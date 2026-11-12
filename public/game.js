@@ -56,7 +56,7 @@ function handle(m) {
     case 'loginfail': $('#loginErr').textContent = m.msg; wantLogin = false; break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
-      G = m; myId = m.id; P.clear(); buildMini();
+      G = m; myId = m.id; P.clear(); buildRooms(); buildMini();
       localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
@@ -72,14 +72,14 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, fol: p.fol, lv: p.lv, veh: p.veh });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, fol: p.fol, lv: p.lv, veh: p.veh, dz: p.dz || [], bed: p.bed });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
       break;
     }
-    case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { s.x = x; s.y = y; s.f = f; } } break;
-    case 'fix': { const s = P.get(myId); if (s) { s.x = s.rx = m.x; s.y = s.ry = m.y; } break; }
+    case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { if (Math.hypot(x - s.x, y - s.y) > 4) { s.rx = x; s.ry = y; } s.x = x; s.y = y; s.f = f; } } break;
+    case 'fix': { const s = P.get(myId); if (s) { s.x = s.rx = m.x; s.y = s.ry = m.y; } if (m.tp) { closePanel(); FX.play('whoosh'); holdAfterTp = true; } break; }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
@@ -131,6 +131,11 @@ const CAREER_ICON = c => G?.careers[c]?.icon || '';
 function paintHud() {
   if (!me) return;
   $('#meCareer').textContent = `${CAREER_ICON(me.career)} Lv.${me.lv}`;
+  const chips = (me.dz || []).map(d => `<span class="chip bad" data-dz="${d}">${G.diseases[d].icon} ${G.diseases[d].name}</span>`);
+  if (me.awake > 20 * 60 && !(me.dz || []).includes('insomnia')) chips.push('<span class="chip warnc" data-dz="_sleepy">🥱 เริ่มง่วง ควรไปนอน</span>');
+  if (me.hunger < 20) chips.push('<span class="chip warnc" data-dz="_hungry">🍗 หิวมาก</span>');
+  const dzBox = $('#dzChips'); const html = chips.join('');
+  if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
   $('#meMoney').textContent = money(me.money);
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? '📜 เควสต์ครบแล้ว ✅' : `📜 เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
@@ -253,13 +258,15 @@ function findNear() {
 }
 function onAction() {
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
+  if (near.type === 'door') return send({ t: 'enter', st: near.id });
+  if (near.type === 'exit') return send({ t: 'exit' });
   if (panel?.st === near.id) { closePanel(); return; }
   openPanel({ kind: near.type, st: near.id });
 }
 $('#actBtn').onclick = onAction;
 
 // ------------------------------------------------------------------ main loop
-let last = performance.now(), sendT = 0, lastSent = '';
+let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false;
 function frame(t) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
@@ -269,6 +276,8 @@ function frame(t) {
     let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
     let dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
     if (joy && Math.hypot(joy.dx, joy.dy) > 0.15) { dx = joy.dx; dy = joy.dy; }
+    // after going through a door, wait until the stick/keys are released so you don't walk straight back out
+    if (holdAfterTp) { if (!dx && !dy && !joy) holdAfterTp = false; else { dx = 0; dy = 0; } }
     const l = Math.hypot(dx, dy);
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
@@ -287,8 +296,9 @@ function frame(t) {
   for (const p of P.values()) if (p.id !== myId) { const k = Math.min(1, dt * 12); p.rx += (p.x - p.rx) * k; p.ry += (p.y - p.ry) * k; }
 
   near = findNear();
+  autoDoor();
   const ab = $('#actBtn');
-  if (near) { ab.classList.remove('hidden'); $('#actIcon').textContent = near.icon; $('#actLabel').textContent = near.type === 'plot' ? 'แปลงเกษตร' : near.label; }
+  if (near) { ab.classList.remove('hidden'); $('#actIcon').textContent = near.icon; $('#actLabel').textContent = near.type === 'plot' ? 'แปลงเกษตร' : near.type === 'door' ? 'เข้า ' + near.label : near.label; }
   else ab.classList.add('hidden');
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
   if (panel?.kind === 'player' && !P.get(panel.pid)) closePanel();
@@ -317,6 +327,10 @@ function draw(t) {
       case 's': col = '#e3d19a'; break;
       case 'f': col = '#7b5538'; break;
       case 'B': col = '#3b4a3a'; break;
+      case '#': col = '#2b2f36'; break;
+      case ' ': col = '#07090c'; break;
+      case 'D': col = '#7a5230'; break;
+      case 'i': { const rm = roomGrid[ty * G.map.w + tx]; col = rm ? (((tx + ty) & 1) ? rm.floorA : rm.floorB) : '#555'; break; }
       default: col = `hsl(${108 + v * 12},${34 + v * 8}%,${42 + v * 5}%)`;
     }
     ctx.fillStyle = col; ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
@@ -358,7 +372,10 @@ function draw(t) {
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
   // night
-  const dark = night;
+  const myRoom = (() => { const m = P.get(myId); return m ? roomOf(m.x, m.y) : null; })();
+  drawRooms(X, Y, t);
+  if (!myRoom) drawRain(t);
+  const dark = myRoom ? 0 : night;
   if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); }
   drawMini();
 }
@@ -391,7 +408,8 @@ function drawPlayer(p, X, Y, t) {
   ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .62, py + Math.sin(ang) * r * .62, r * .13, 0, 7); ctx.fill();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const mine = p.id === myId;
-  sign(`${CAREER_ICON(p.c)} ${p.name}`, px, py - r - TS * .3, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
+  if (p.bed) { ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('💤', px + r, py - r * .6 + Math.sin(t / 300) * 3); }
+  sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, py - r - TS * .3, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
   ctx.textBaseline = 'alphabetic';
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 28 ? p.bubble.slice(0, 27) + '…' : p.bubble;
@@ -407,12 +425,12 @@ let miniBase = null;
 function buildMini() {
   const c = document.createElement('canvas'); c.width = 120; c.height = 88; const g = c.getContext('2d');
   const colors = { '=': '#555a63', ',': '#a9a699', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#c0643a', T: '#2f6b3a', '.': '#5e9b57' };
-  for (let y = 0; y < G.map.h; y++) for (let x = 0; x < G.map.w; x++) { g.fillStyle = colors[G.map.tiles[y][x]]; g.fillRect(x * 2, y * 2, 2, 2); }
+  for (let y = 0; y < G.map.h; y++) for (let x = 0; x < G.tw; x++) { g.fillStyle = colors[G.map.tiles[y][x]]; g.fillRect(x * 2, y * 2, 2, 2); }
   miniBase = c;
 }
 function drawMini() {
   const g = $('#mini').getContext('2d'); g.drawImage(miniBase, 0, 0);
-  for (const p of P.values()) { g.fillStyle = p.id === myId ? '#fff' : COLORS[p.av]; const s = p.id === myId ? 5 : 3; g.fillRect(p.rx * 2 - s / 2, p.ry * 2 - s / 2, s, s); }
+  for (const p of P.values()) { const q = townPos(p.rx, p.ry); g.fillStyle = p.id === myId ? '#fff' : COLORS[p.av]; const s = p.id === myId ? 5 : 3; g.fillRect(q.x * 2 - s / 2, q.y * 2 - s / 2, s, s); }
 }
 
 // ------------------------------------------------------------------ panels
@@ -446,6 +464,9 @@ function bindPanel(root) {
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
+  enter(m) { closePanel(); send({ t: 'enter', st: m.st }); },
+  mtab(m) { panel.tab = m.tab; refreshPanel(true); },
+  list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
   guide(m) { closePanel(); setGuide(m.key); },
   tut() { closePanel(); showTut(0); },
@@ -470,12 +491,31 @@ function renderPanel(p) {
         ${B(`💼 ทำงาน (⚡15) ~${money(pay)}`, { t: 'act', st, a: 'work' }, 'primary big')}${B(`🌙 ทำโอที x2.6 (⚡30, เสียสุขภาพ)`, { t: 'act', st, a: 'ot' }, 'big')}`;
     }
     case 'market': {
-      const rows = Object.entries(G.items).map(([id, it]) => {
-        const have = me.inv[id] || 0, cur = wd?.mk[id] ?? it.base, d = cur / it.base - 1;
-        return itemRow(id, `<div style="text-align:right"><b>${money(cur)}</b><br><small class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'}${Math.abs(d * 100).toFixed(0)}%</small></div>` +
-          (have ? `<div>${B('ขาย 1', { t: 'act', st, a: 'sell', item: id, qty: 1 })}${B(`ขายหมด ${have}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' }, 'good')}</div>` : ''), have ? `มี ${have}` : '');
-      }).join('');
-      return `<h2>🏪 ตลาดกลาง</h2><div class="sub">ราคาแชร์กันทั้งเมือง ขายเยอะราคาตก แล้วค่อยๆ ฟื้น · อาชีพที่เกี่ยวข้องได้ราคาดีกว่า 8–12% · อยากได้ราคาดีกว่านี้ไปแลกเปลี่ยนกับผู้เล่นโดยตรง!</div><div class="list">${rows}</div>`;
+      const tab = p.tab || 'buy', mk = wd?.mk || {};
+      const tabs = `<div class="tabs">${[['buy', '🛍️ ซื้อ'], ['sell', '🏷️ ขาย'], ['mine', `📋 ของที่ฉันวางขาย (${(me.listings || []).length})`]].map(([k, l]) => B(l, { fn: 'mtab', tab: k }, tab === k ? 'primary' : '')).join('')}</div>`;
+      let body = '';
+      if (tab === 'buy') {
+        body = Object.entries(G.items).filter(([, it]) => it.base < 2000).map(([id, it]) => {
+          const m2 = { ...(mk[id] || {}) };
+          const own = (me.listings || []).filter(L => L.item === id).reduce((t, L) => t + L.qty, 0);
+          if (own && own >= m2.n) m2.n = 0;                  // only my own listings: nothing to buy
+          const pl = m2.n ? `<b style="color:var(--ok)">ผู้เล่น ${money(m2.best)}</b> (${m2.n - own} ชิ้น)` : own ? '<span style="opacity:.6">มีแต่ของที่คุณวางขายเอง</span>' : '<span style="opacity:.6">ไม่มีผู้เล่นวางขาย</span>';
+          return itemRow(id, `<div style="display:flex;flex-direction:column;gap:4px">${B(m2.n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !m2.n)}${B(`NPC ${money(m2.sell || 0)}`, { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div>`, `${pl} · ร้าน NPC ${money(m2.sell || 0)}`);
+        }).join('');
+        body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div><div class="list">${body}</div>`;
+      } else if (tab === 'sell') {
+        const inv = Object.entries(me.inv).filter(([, q]) => q > 0);
+        body = inv.map(([id, q]) => {
+          const it = G.items[id], m2 = mk[id] || {}, sug = m2.n ? Math.max(1, m2.best - 1) : Math.round(it.base * 1.3);
+          return itemRow(id, '', `มี ${q} · ผู้เล่นอื่นขายถูกสุด ${m2.n ? money(m2.best) : '—'} · NPC รับซื้อ ${money(m2.npc || 0)}`) +
+            `<div class="rowf" style="margin:-2px 0 6px"><input id="lp_${id}" type="number" min="1" value="${sug}" style="width:96px"> <span class="sub" style="margin:0">฿/ชิ้น</span>${B('วางขาย 1', { fn: 'list', st, item: id, qty: 1 })}${B(`วางขายหมด ${q}`, { fn: 'list', st, item: id, qty: q }, 'good')}${B(`NPC ${money((m2.npc || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' })}</div>`;
+        }).join('');
+        body = `<div class="sub">ตั้งราคาเองแล้ววางขายให้ผู้เล่นคนอื่นซื้อ (ตลาดหัก 5%) · ขายตอนออฟไลน์ก็ได้เงิน · หรือขาย NPC ทันทีราคาถูก</div>${body || '<div class="sub">ไม่มีของในกระเป๋า</div>'}`;
+      } else {
+        body = (me.listings || []).map(L => itemRow(L.item, B('เก็บคืน', { t: 'act', st, a: 'unlist', id: L.id }, 'warn'), `${L.qty} ชิ้น · ${money(L.price)}/ชิ้น`)).join('') || '<div class="sub">ยังไม่ได้วางขายอะไร</div>';
+        body = `<div class="list">${body}</div>`;
+      }
+      return `<h2>🏪 ตลาดกลาง</h2>${tabs}${body}`;
     }
     case 'warehouse': {
       const rows = Object.entries(G.items).filter(([, it]) => it.wholesale).map(([id, it]) =>
@@ -492,22 +532,42 @@ function renderPanel(p) {
         ${B(task ? '🔄 เปลี่ยนโจทย์' : '📝 รับงานใหม่', { t: 'act', st, a: 'new' }, task ? '' : 'primary big')}`;
     }
     case 'restaurant':
-      return `<h2>🍜 ร้านอาหาร</h2><div class="sub">ความหิวเต็มคือสุขภาพดี หิวจัดแล้วสุขภาพจะลดและรายได้ตก · อาหารฝีมือเชฟผู้เล่นให้พลังงานมากกว่า</div>
-        <div class="list">${itemRowRaw('🍛', 'ข้าวมันไก่', 'อิ่ม +25', B('ซื้อ ฿80', { t: 'act', st, a: 'eat', kind: 'basic' }))}${itemRowRaw('🍲', 'บุฟเฟ์ชาบู', 'อิ่ม +70 พลังงาน +10', B('ซื้อ ฿350', { t: 'act', st, a: 'eat', kind: 'buffet' }))}</div>`;
+      return `<h2>🍜 ร้านอาหาร (NPC)</h2><div class="sub">ร้าน NPC ราคาแพง · อาหารฝีมือเชฟผู้เล่นที่ตลาดกลางถูกกว่าและให้พลังงานมากกว่า · ข้าวมันไก่ข้างทางมีโอกาส🤢อาหารเป็นพิษ</div>
+        <div class="list">${itemRowRaw('🍛', 'ข้าวมันไก่', 'อิ่ม +25 · เสี่ยงอาหารเป็นพิษ 4%', B('ซื้อ ฿200', { t: 'act', st, a: 'eat', kind: 'basic' }))}${itemRowRaw('🍲', 'บุฟเฟ่ต์ชาบู', 'อิ่ม +70 พลังงาน +10 · สะอาดปลอดภัย', B('ซื้อ ฿900', { t: 'act', st, a: 'eat', kind: 'buffet' }))}</div>`;
     case 'kitchen': {
       const rows = G.recipes.map(r => {
         const out = G.items[r.id]; const ok = Object.entries(r.in).every(([i, q]) => (me.inv[i] || 0) >= q);
         const ing = Object.entries(r.in).map(([i, q]) => `${G.items[i].icon}${q} (มี ${me.inv[i] || 0})`).join(' + ');
         return itemRow(r.id, B('ปรุง ⚡12', { t: 'act', st, a: 'cook', rid: r.id }, ok ? 'good' : '', !ok), `${ing} · ขาย ~${money(out.base)} · อิ่ม+${out.eat.hunger} ⚡+${out.eat.energy || 0}`);
       }).join('');
-      const ingIds = [...new Set(G.recipes.flatMap(r => Object.keys(r.in)))];
-      const buys = ingIds.map(i => { const it = G.items[i], p = Math.ceil(it.base * 1.8); return itemRowRaw(it.icon, esc(it.name), `มี ${me.inv[i] || 0} · ร้านขาย ${money(p)}/หน่วย (แพงกว่าซื้อจากผู้เล่น ~80%)`, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: i, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: i, qty: 5 })}</div>`); }).join('');
-      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">ปรุงอาหารขายได้แพงกว่าวัตถุดิบ ~3 เท่า · วัตถุดิบถูกที่สุดคือซื้อจากชาวไร่/ชาวประมง (แตะตัวเขาในแมพ → แลกเปลี่ยน) ถ้าไม่มีใครขาย ซื้อจากร้านได้</div>${needCareer('chef')}<div class="list">${rows}</div>
-        <div class="sub" style="margin-top:14px"><b>🛒 ซื้อวัตถุดิบจากร้าน</b></div><div class="list">${buys}</div>`;
+      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">ปรุงอาหารขายได้แพงกว่าวัตถุดิบ ~3 เท่า · ซื้อวัตถุดิบจากชาวไร่/ชาวประมงที่ <b>ตลาดกลาง</b> แล้วเอาอาหารไปวางขายที่ตลาดกลางเหมือนกัน</div>${needCareer('chef')}<div class="list">${rows}</div>
+        ${B('📍 ไปตลาดกลาง', { fn: 'guide', key: 'market' })}`;
     }
-    case 'hospital':
-      return `<h2>🏥 โรงพยาบาล</h2><div class="sub">สุขภาพของคุณ ${Math.floor(me.health)}/100 · หมอผู้เล่นอาจรักษาให้ถูกกว่า (กดที่ตัวหมอในแมพ)</div>
-        ${B('💉 รักษาตัว ฿800 (❤️ +40)', { t: 'act', st, a: 'heal' }, 'big')}${me.career === 'doctor' ? `<div class="sub" style="margin-top:12px">แพทย์: เข้าเวร หรือเดินไปรักษาผู้เล่นคนอื่นรับค่ารักษา</div>${B('🩺 เข้าเวร (⚡28)', { t: 'act', st, a: 'shift' }, 'primary big')}` : needCareer('doctor')}`;
+    case 'hospital': {
+      const dz = me.dz || [], price = dz.length ? 1500 + 500 * (dz.length - 1) : 1200, waiting = (wd?.beds || []).filter(Boolean).length;
+      const mine = dz.map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, `${G.diseases[d].sym.join(' · ')}<br>${G.diseases[d].self}`, '')).join('');
+      return `<h2>🏥 เคาน์เตอร์โรงพยาบาล</h2><div class="sub">สุขภาพ ${Math.floor(me.health)}/100 · <b>ทางเลือกที่ถูกกว่า:</b> ไปนอนที่ <b>เตียงคนไข้</b> (ด้านขวา) รอหมอผู้เล่นรักษา ค่ารักษาแค่ ฿600 · ตอนนี้มีคนไข้รอ ${waiting} เตียง</div>
+        ${mine ? `<div class="list">${mine}</div>` : '<div class="sub">✅ ตอนนี้คุณไม่ได้ป่วย</div>'}
+        ${B(`💉 ให้พยาบาล NPC รักษาทันที ${money(price)}${dz.length ? ' (หายทุกโรค)' : ' (❤️ +40)'}`, { t: 'act', st, a: 'heal' }, 'big')}
+        ${me.career === 'doctor' ? `<div class="sub" style="margin-top:12px">👨‍⚕️ แพทย์: เดินไปที่เตียงที่มีคนไข้เพื่อวินิจฉัยและรักษา หรือเข้าเวรรับค่าตอบแทน</div>${B('🩺 เข้าเวร (⚡28)', { t: 'act', st, a: 'shift' }, 'primary big')}` : ''}`;
+    }
+    case 'bed': {
+      const s = STN(st), b = wd?.beds?.[s.idx];
+      if (me.career === 'doctor' && b && b[1] !== myId) {
+        const [name, , sym, hp, n] = b;
+        const opts = n ? Object.entries(G.treatments).map(([k, tr]) => B(`${tr.icon} ${tr.name}`, { t: 'act', st, a: 'treat', tx: k }, 'good')).join('') : B('🩺 ตรวจร่างกาย + ให้ยาบำรุง', { t: 'act', st, a: 'treat', tx: 'checkup' }, 'good');
+        return `<h2>🛏️ คนไข้: ${esc(name)}</h2><div class="sub">สุขภาพ ${hp}/100 ${n > 1 ? `· ป่วย ${n} โรค (รักษาทีละโรค)` : ''}</div>
+          <div class="item" style="display:block"><b>อาการที่พบ:</b><br>${sym.length ? sym.map(x => '• ' + esc(x)).join('<br>') : 'ไม่มีอาการป่วย แค่อ่อนแรง'}</div>
+          <div class="sub" style="margin-top:10px">${n ? 'วินิจฉัยจากอาการแล้วเลือกการรักษาที่ถูกต้อง (⚡10) ถูก = ได้ ฿900 · ผิด = คนไข้สุขภาพลด' : ''}</div><div class="list">${opts}</div>`;
+      }
+      if (b && b[1] === myId) return `<h2>🛏️ คุณนอนรอหมออยู่</h2><div class="sub">หมอออนไลน์จะได้รับแจ้งเตือน · ค่ารักษา ฿600 · อยากออกจากเตียง เดินออกไปได้เลย</div>${(me.dz || []).map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, G.diseases[d].sym.join(' · '), '')).join('')}`;
+      if (b) return `<h2>🛏️ เตียงนี้มีคนไข้แล้ว</h2><div class="sub">${esc(b[0])} นอนรอหมออยู่ ลองเตียงอื่น</div>`;
+      return `<h2>🛏️ เตียงคนไข้</h2><div class="sub">นอนรอให้หมอผู้เล่นมาวินิจฉัยและรักษา ค่ารักษา ฿600 (ถูกกว่าเคาน์เตอร์มาก)</div>${B('🛏️ นอนรอหมอ', { t: 'act', st, a: 'lie' }, 'primary big')}`;
+    }
+    case 'hbed': {
+      const s = STN(st), mine = me.house === s.idx;
+      return mine ? `<h2>🛏️ เตียงที่บ้าน</h2><div class="sub">นอนแล้วได้พลังงาน และหายง่วง/หายอ่อนเพลีย</div>${B(`😴 นอนพัก (+${40 + me.comfort * 2}⚡, ทุก 60 วิ)`, { t: 'act', st, a: 'sleep' }, 'primary big')}` : '<h2>🛏️ เตียงของเจ้าของบ้าน</h2><div class="sub">นอนได้เฉพาะเจ้าของบ้าน</div>';
+    }
     case 'school': {
       const rows = Object.entries(G.licenses).map(([id, l]) => {
         const has = me.licenses.includes(id), c = Object.values(G.careers).find(c => c.license === id);
@@ -586,11 +646,11 @@ function renderPanel(p) {
         <div class="list">${itemRowRaw('😴', 'นอนฟรีที่บ้าน', 'พลังงาน +40 (และมากขึ้นตามความสบาย) ทุก 60 วิ', '')}${itemRowRaw('🛋️', 'แต่งบ้าน', 'เฟอร์นิเจอร์เพิ่มความสบาย → พลังงานฟื้นเร็วขึ้นตลอดเวลา', '')}${itemRowRaw('🪧', 'ชื่อคุณบนบ้าน', 'ทุกคนในเมืองเห็นว่าบ้านหลังนี้เป็นของใคร', '')}</div>
         ${me.house >= 0 ? '<div class="sub" style="color:var(--bad)">คุณมีบ้านแล้ว ต้องขายหลังเดิมก่อน</div>' : ''}${B(`🏠 ซื้อบ้าน ${money(price)}`, { t: 'act', st, a: 'buy' }, 'primary big', me.house >= 0)}`;
       const [owner, cf, , furn] = h, mine = me.house === s.idx;
-      if (!mine) return `<h2>🏠 บ้านของ ${esc(owner)}</h2><div class="sub">ความสบาย ⭐ ${cf}</div><div style="font-size:30px;letter-spacing:4px">${furn.map(k => G.shop.furniture[k].icon).join('') || '— ยังไม่ได้แต่งบ้าน —'}</div>`;
+      if (!mine) return `<h2>🏠 บ้านของ ${esc(owner)}</h2><div class="sub">ความสบาย ⭐ ${cf}</div><div style="font-size:30px;letter-spacing:4px">${furn.map(k => G.shop.furniture[k].icon).join('') || '— ยังไม่ได้แต่งบ้าน —'}</div>${B('🚪 เข้าไปเยี่ยมบ้าน', { fn: 'enter', st }, 'primary big')}`;
       const rows = Object.entries(G.shop.furniture).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('');
       return `<h2>🏠 บ้านของคุณ</h2><div class="sub">ความสบาย ⭐ <b>${me.comfort}</b> → พลังงานฟื้นเร็วขึ้น <b>+${me.comfort * 3}%</b> ตลอดเวลา · นอนที่บ้านได้ +${40 + me.comfort * 2}⚡</div>
-        ${B(`😴 นอนพัก (+${40 + me.comfort * 2}⚡, ทุก 60 วิ)`, { t: 'act', st, a: 'sleep' }, 'primary big')}
-        <div class="sub" style="margin-top:12px"><b>🛋️ แต่งบ้าน</b></div><div class="list">${rows}</div>
+        ${B('🚪 เข้าบ้าน (นอนพักที่เตียงในบ้าน)', { fn: 'enter', st }, 'primary big')}
+        <div class="sub" style="margin-top:12px"><b>🛋️ แต่งบ้าน</b> (ของจะไปวางในบ้านจริง)</div><div class="list">${rows}</div>
         <div style="margin-top:14px">${B(`ขายบ้าน (ได้คืน ~70%)`, { t: 'act', st, a: 'sell' }, 'warn')}</div>`;
     }
     case 'quests': {
@@ -714,7 +774,7 @@ const TARGETS = {
 };
 function targetOf(key) {
   if (TARGETS[key]) return TARGETS[key]();
-  const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, id: s.id };
+  const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, id: s.id, room: s.room };
 }
 const CAREER_TARGET = { office: 'office', farmer: 'farm', fisher: 'pier1', merchant: 'warehouse', streamer: 'studio', programmer: 'cowork', chef: 'kitchen', doctor: 'hospital' };
 const QUEST_TARGET = { work: 'office', harvest: 'farm', fish: 'pier1', buy: 'warehouse', stream: 'studio', code: 'cowork', cook: 'kitchen', shift: 'hospital', sell: 'market', eat: 'restaurant' };
@@ -726,23 +786,29 @@ function setGuide(key, quiet) {
 function drawGuide(X, Y, t) {
   if (!guide) return;
   const m = P.get(myId); if (!m) return;
-  const dx = guide.x - m.x, dy = guide.y - m.y, d = Math.hypot(dx, dy);
-  if (d < 2) { guide = null; FX.play('ding'); toast('ถึงแล้ว! กดปุ่มกลมสีเหลืองเพื่อใช้งาน', '📍'); return; }
+  // targets inside a building: walk to its door first; if you're in another room, to the exit
+  const inR = roomOf(m.x, m.y), tR = guide.room ? G.rooms.find(r => r.id === guide.room) : null;
+  let tg = guide, final = true;
+  if (inR && (!tR || tR.id !== inR.id)) { tg = { x: inR.exit.x, y: inR.exit.y - .6, label: 'ทางออก' }; final = false; }
+  else if (!inR && tR) { tg = { x: tR.doorPt.x, y: tR.doorPt.y, label: guide.label + ' (ประตู)' }; final = false; }
+  const dx = tg.x - m.x, dy = tg.y - m.y, d = Math.hypot(dx, dy);
+  if (!final && d < 1.2) return;
+  if (final && d < 2) { guide = null; FX.play('ding'); toast('ถึงแล้ว! กดปุ่มกลมสีเหลืองเพื่อใช้งาน', '📍'); return; }
   const a = Math.atan2(dy, dx), cx = m.rx * TS + X, cy = m.ry * TS + Y, r = TS * 1.15 + Math.sin(t / 180) * 4;
   ctx.save(); ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.rotate(a);
   ctx.fillStyle = '#ffc94d'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(TS * .42, 0); ctx.lineTo(-TS * .24, -TS * .3); ctx.lineTo(-TS * .1, 0); ctx.lineTo(-TS * .24, TS * .3); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-  const gx = guide.x * TS + X, gy = guide.y * TS + Y;
+  const gx = tg.x * TS + X, gy = tg.y * TS + Y;
   ctx.strokeStyle = `rgba(255,201,77,${.55 + .45 * Math.sin(t / 160)})`; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.ellipse(gx, gy + TS * .15, TS * 1.2, TS * .6, 0, 0, 7); ctx.stroke();
-  sign(`📍 ${guide.label} · ${Math.round(d)} ม.`, cx, cy + TS * 1.05, { size: TS * .3, bg: 'rgba(255,201,77,.95)', color: '#222' });
+  sign(`📍 ${tg.label} · ${Math.round(d)} ม.`, cx, cy + TS * 1.05, { size: TS * .3, bg: 'rgba(255,201,77,.95)', color: '#222' });
 }
 
 // full-screen town map: tap a place to navigate there
 function openMap() {
   const v = $('#mapView'); v.classList.remove('hidden');
-  const c = $('#bigMap'), W = G.map.w, H = G.map.h;
+  const c = $('#bigMap'), W = G.tw, H = G.map.h;
   const k = Math.min((Math.min(innerWidth, 980) - 24) / W, (innerHeight - 110) / H);
   const dpr = Math.min(2, devicePixelRatio || 1);
   c.width = W * k * dpr; c.height = H * k * dpr; c.style.width = W * k + 'px'; c.style.height = H * k + 'px';
@@ -774,10 +840,11 @@ function openMap() {
   for (const p of P.values()) {
     const mine = p.id === myId;
     g.fillStyle = mine ? '#fff' : COLORS[p.av]; g.strokeStyle = '#000'; g.lineWidth = 1.5;
-    g.beginPath(); g.arc(p.x * k, p.y * k, mine ? k * .75 : k * .5, 0, 7); g.fill(); g.stroke();
-    if (mine) label('คุณอยู่ที่นี่', p.x * k, p.y * k - fs * 1.4, fs * .85, 'rgba(255,120,60,.95)');
+    const q = townPos(p.x, p.y), inR = roomOf(p.x, p.y);
+    g.beginPath(); g.arc(q.x * k, q.y * k, mine ? k * .75 : k * .5, 0, 7); g.fill(); g.stroke();
+    if (mine) label(inR ? `คุณอยู่ใน${inR.label}` : 'คุณอยู่ที่นี่', q.x * k, q.y * k - fs * 1.4, fs * .85, 'rgba(255,120,60,.95)');
   }
-  if (guide) { g.strokeStyle = '#ffc94d'; g.lineWidth = 3; g.beginPath(); g.arc(guide.x * k, guide.y * k, k * 1.4, 0, 7); g.stroke(); }
+  if (guide) { const q = guide.room ? G.rooms.find(r => r.id === guide.room).outside : guide; g.strokeStyle = '#ffc94d'; g.lineWidth = 3; g.beginPath(); g.arc(q.x * k, q.y * k, k * 1.4, 0, 7); g.stroke(); }
   c.onclick = e => {
     const r = c.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     const h = hits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
@@ -790,7 +857,7 @@ function closeMap() { $('#mapView').classList.add('hidden'); }
 const TUT = () => [
   ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือวงกลมที่มีป้ายชื่อ<b>สีเหลือง</b> ผู้เล่นคนอื่นก็เดินอยู่ในเมืองเดียวกันกับคุณ'],
   ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b> (จอยจะโผล่ใต้นิ้ว)<br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร'],
-  ['🏪', 'ใช้สถานที่', 'ทุกตึกมี<b>ป้ายชื่อบนหลังคา</b> เดินไปที่<b>ประตู</b> (วงกลมเรืองแสง) แล้วกด<b>ปุ่มกลมสีเหลือง</b>มุมขวาล่าง (คอม: E)'],
+  ['🚪', 'เข้าอาคาร', 'ทุกตึกมี<b>ป้ายชื่อบนหลังคา</b> <b>เดินชนประตู</b>เพื่อเข้าไปข้างใน แล้วไปที่เคาน์เตอร์ (ไอคอนลอย) กด<b>ปุ่มกลมสีเหลือง</b> (คอม: E) · ออกโดยเดินลงพรมหน้าประตู'],
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ที่อยากไป จะมี<b>ลูกศรสีเหลือง</b>พาเดินไป'],
   ['💼', `อาชีพของคุณ: ${G.careers[me.career].icon} ${G.careers[me.career].name}`, `${G.careers[me.career].desc}<br><br>📜 ทำ<b>เควสต์ประจำวัน</b>รับเงินเพิ่ม · 🤝 <b>แตะผู้เล่นอื่น</b>เพื่อแลกเปลี่ยนของ`],
 ];
@@ -815,6 +882,91 @@ function showDaily(d) {
     <div class="big-reward">+${money(d.reward)}</div><button class="primary big" id="dailyOk">รับเลย!</button>`;
   $('#dailyWrap').classList.remove('hidden');
   $('#dailyOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); FX.play('coin', true); const s = P.get(myId); if (s) { FX.burst(s.x, s.y, '#ffd34d', 26); FX.float(s.x, s.y - .6, '+' + money(d.reward), '#ffd34d', .6); } };
+}
+
+// ------------------------------------------------------------------ building interiors
+let roomGrid = [];
+const ROOM_THEME = {
+  office: ['#c9b48f', '#bfa982'], market: ['#d9c7a3', '#cfbb95'], warehouse: ['#9a8f7c', '#8f8471'], studio: ['#3d3552', '#453c5d'],
+  home: ['#c99c86', '#bf917b'], dealer: ['#d6d9dc', '#c9cdd1'], toolshop: ['#a99a83', '#9e8e77'], restaurant: ['#d8b98a', '#ceae7e'],
+  kitchen: ['#e6e6e6', '#d4d4d4'], hospital: ['#e8f1f5', '#dae7ed'], school: ['#c7b38d', '#bca783'], cowork: ['#b8c4cf', '#adb9c4'],
+  bank: ['#e8dcb4', '#ddd0a6'], house: ['#c8a27c', '#bd9771'],
+};
+const ROOM_PROPS = {
+  office: [[3, 5, '💻'], [5.5, 5, '💻'], [8.5, 5, '💻'], [11, 5, '💻'], [1.6, 1.6, '🪴'], [12.4, 1.6, '🪴'], [2.5, 7.5, '🗄️'], [11.5, 7.5, '☕']],
+  market: [[2.5, 5, '🍎'], [4.5, 5, '🥬'], [6.5, 5.5, '🧺'], [9.5, 5, '🐟'], [11.5, 5, '🍉'], [2, 7.5, '🛒'], [12, 7.5, '🛒']],
+  warehouse: [[2, 2, '📦'], [3, 2, '📦'], [11, 2, '📦'], [12, 2, '📦'], [2, 5, '📦'], [12, 5, '📦'], [3, 7.5, '🛻'], [11, 7.5, '🧃']],
+  studio: [[7, 5.2, '🎤'], [3, 2, '💡'], [11, 2, '💡'], [4.5, 5.5, '📹'], [9.5, 5.5, '🎧'], [2, 7.5, '🛋️']],
+  home: [[2, 3, '🛏️'], [2, 6, '🛏️'], [12, 3, '🛏️'], [12, 6, '🛏️'], [7, 6, '🪑']],
+  dealer: [[3, 5.5, '🚗'], [7, 6, '🛵'], [11, 5.5, '🚙'], [12.2, 1.7, '🏁'], [1.8, 1.7, '🏁']],
+  toolshop: [[2, 2, '🔧'], [3.2, 2, '🔨'], [10.8, 2, '🪚'], [12, 2, '🧰'], [3, 6, '🎣'], [7, 6, '🧪'], [11, 6, '⌨️']],
+  restaurant: [[3, 5, '🍽️'], [6, 5, '🍽️'], [9, 5, '🍽️'], [12, 5, '🍽️'], [3, 7.5, '🪑'], [11, 7.5, '🪑'], [1.6, 1.6, '🏮']],
+  kitchen: [[2.5, 2, '🔥'], [4, 2, '🍳'], [10, 2, '🥘'], [11.5, 2, '🔪'], [3, 6, '🧅'], [11, 6, '🧂'], [7, 6.5, '🍲']],
+  hospital: [[2, 6, '💊'], [3.5, 6, '🌡️'], [5.5, 6, '🩻'], [1.6, 1.6, '🪴'], [6, 2, '🩺']],
+  school: [[3, 5, '✏️'], [5.5, 5, '📚'], [8.5, 5, '📚'], [11, 5, '✏️'], [3, 7, '🪑'], [11, 7, '🪑'], [12.4, 1.6, '🔔']],
+  cowork: [[3, 5, '🖥️'], [5.5, 5, '🖥️'], [8.5, 5, '🖥️'], [11, 5, '🖥️'], [2, 7.5, '☕'], [12, 7.5, '🪴']],
+  bank: [[2.5, 5, '🏧'], [11.5, 5, '🏧'], [7, 6.5, '💰'], [1.8, 1.7, '🔐'], [12.2, 1.7, '🔐']],
+};
+const FURN_SLOTS = [[11.5, 2.5], [9, 2.5], [6, 2.5], [11.5, 5.5], [9, 5.5], [3, 5.5], [5.5, 5.5], [7, 7]];
+function buildRooms() {
+  roomGrid = new Array(G.map.w * G.map.h);
+  for (const r of G.rooms) {
+    const [a, b] = ROOM_THEME[r.kind] || ['#bbb', '#aaa'];
+    r.floorA = a; r.floorB = b;
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomGrid[y * G.map.w + x] = r;
+  }
+}
+const roomOf = (x, y) => G?.rooms?.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
+const townPos = (x, y) => { const r = roomOf(x, y); return r ? r.outside : { x, y }; };
+function drawRooms(X, Y, t) {
+  for (const r of G.rooms) {
+    const px = r.x * TS + X, py = r.y * TS + Y;
+    if (px > VW || py > VH || px + r.w * TS < 0 || py + r.h * TS < 0) continue;
+    ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(px, py, r.w * TS, TS * .35);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let props = ROOM_PROPS[r.kind] || [];
+    if (r.kind === 'house') {
+      const h = wd?.houses?.[r.house];
+      props = h ? h[3].map((k, i) => [...FURN_SLOTS[i], G.shop.furniture[k].icon]) : [];
+      sign(h ? `🏠 บ้านของ ${h[0]}` : '🏷️ บ้านว่าง', px + r.w * TS / 2, py + TS * .5, { size: TS * .36, border: '#fff3' });
+    } else sign(`${r.icon} ${r.label}`, px + r.w * TS / 2, py + TS * .5, { size: TS * .38, border: r.color });
+    ctx.font = `${Math.round(TS * .78)}px serif`;
+    for (const [dx, dy, e] of props) ctx.fillText(e, px + dx * TS, py + dy * TS);
+    // exit arrow on the doormat
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `700 ${Math.round(TS * .32)}px 'Noto Sans Thai',sans-serif`;
+    ctx.fillText('⬇ ทางออก', px + 7 * TS, py + (r.h - .5) * TS + Math.sin(t / 300) * 2);
+  }
+}
+let rainDrops = null;
+function drawRain(t) {
+  if (wd?.ev?.id !== 'rain') return;
+  if (!rainDrops) rainDrops = Array.from({ length: 90 }, () => [Math.random(), Math.random(), .6 + Math.random() * .6]);
+  ctx.strokeStyle = 'rgba(190,215,255,.45)'; ctx.lineWidth = 1.4; ctx.beginPath();
+  for (const d of rainDrops) {
+    const x = ((d[0] * VW + t * .12 * d[2]) % (VW + 40)) - 20, y = ((d[1] * VH + t * .9 * d[2]) % (VH + 40)) - 20;
+    ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 16);
+  }
+  ctx.stroke(); ctx.fillStyle = 'rgba(40,60,90,.12)'; ctx.fillRect(0, 0, VW, VH);
+}
+// walk into a door to go in, walk onto the doormat inside to go out
+let doorCd = 0, doorArmed = true;
+function autoDoor() {
+  const m = P.get(myId); if (!m || !G?.rooms || performance.now() < doorCd) return;
+  const r = roomOf(m.x, m.y);
+  if (r) { doorArmed = false; if (m.y > r.y + r.h - 1.1) { doorCd = performance.now() + 1500; send({ t: 'exit' }); } return; }
+  // after coming out, step away from the door before walking into one re-enters
+  const nearest = Math.min(...G.rooms.map(rm => Math.hypot(m.x - rm.doorPt.x, m.y - rm.doorPt.y)));
+  if (!doorArmed) { if (nearest > 1.1) doorArmed = true; return; }
+  for (const rm of G.rooms) if (Math.hypot(m.x - rm.doorPt.x, m.y - rm.doorPt.y) < 0.55) {
+    doorCd = performance.now() + 1500;
+    send({ t: 'enter', st: rm.house !== undefined ? rm.bld : 'door_' + rm.bld }); return;
+  }
+}
+function dzInfo(id) {
+  if (id === '_sleepy') return toast('ไม่ได้นอนนานแล้ว ถ้าเกิน 25 นาทีจะป่วยเป็นอดนอน ไปนอนที่ห้องพักหรือบ้าน', '🥱', false);
+  if (id === '_hungry') return toast('หิวมาก ถ้าหลอดหมดนานจะขาดสารอาหาร ซื้ออาหารที่ตลาดกลางหรือร้านอาหาร', '🍗', false);
+  const d = G.diseases[id];
+  toast(`${d.name}: ${d.sym.join(', ')} · สาเหตุ: ${d.cause} · ${d.self} · ไปนอนรอหมอที่เตียงในโรงพยาบาลได้`, d.icon, false);
 }
 
 // ------------------------------------------------------------------ sound & effects glue

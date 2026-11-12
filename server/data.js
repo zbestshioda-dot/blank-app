@@ -1,24 +1,25 @@
 'use strict';
 // Static game data: map, stations, items, careers. Tile units everywhere.
 
-const W = 60, H = 44;
+// the town is 60 tiles wide; building interiors live in a separate area to its right
+const TW = 60, H = 44, W = 138;
 
 // ---------------------------------------------------------------- map
 // tile codes: . grass  = road  , sidewalk  w water  p pier  B building
 //             T tree   f soil  s sand
-const grid = Array.from({ length: H }, () => Array(W).fill('.'));
+const grid = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => x < TW ? '.' : ' '));
 const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) grid[y][x] = c; };
 const rect = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c); };
 
 // lake + sand shore
 rect(34, 31, 26, 13, 'w');
-for (let y = 28; y < H; y++) for (let x = 31; x < W; x++) {
+for (let y = 28; y < H; y++) for (let x = 31; x < TW; x++) {
   if (grid[y][x] === '.' && x >= 32 && y >= 29) set(x, y, 's');
 }
 // sidewalks, roads
-rect(0, 19, W, 1, ','); rect(0, 22, W, 1, ',');
+rect(0, 19, TW, 1, ','); rect(0, 22, TW, 1, ',');
 rect(28, 0, 1, H, ','); rect(31, 0, 1, H, ',');
-rect(0, 20, W, 2, '='); rect(29, 0, 2, H, '=');
+rect(0, 20, TW, 2, '='); rect(29, 0, 2, H, '=');
 // pier over the water
 rect(32, 36, 13, 2, 'p');
 // south-west neighbourhood: houses + bank
@@ -79,7 +80,7 @@ STATIONS.push({ id: 'pier2', type: 'pier', label: 'ท่าเรือตก�
 function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const rand = rng(20240607);
 for (let i = 0; i < 160; i++) {
-  const x = Math.floor(rand() * W), y = Math.floor(rand() * H);
+  const x = Math.floor(rand() * TW), y = Math.floor(rand() * H);
   if (grid[y][x] !== '.') continue;
   let ok = true;
   for (let j = -2; j <= 2 && ok; j++) for (let k = -2; k <= 2; k++) {
@@ -88,11 +89,45 @@ for (let i = 0; i < 160; i++) {
   }
   if (ok && !STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3)) set(x, y, 'T');
 }
-for (let x = 0; x < W; x++) { set(x, 0, 'T'); set(x, H - 1, 'T'); }
-for (let y = 0; y < H; y++) { set(0, y, 'T'); set(W - 1, y, 'T'); }
+for (let x = 0; x < TW; x++) { set(x, 0, 'T'); set(x, H - 1, 'T'); }
+for (let y = 0; y < H; y++) { set(0, y, 'T'); set(TW - 1, y, 'T'); }
+
+// ---------------------------------------------------------------- interiors
+// Every usable building gets a room (14x10) right of the town. Its counter moves
+// inside; outside becomes a door that teleports you in. Tiles: # wall, i floor, D exit.
+const ROOMS = [];
+const RW = 14, RH = 10;
+let slot = 0;
+for (const b of BUILDINGS) {
+  if (!b.st) continue;
+  const s = STATIONS.find(x => x.id === b.st);
+  const rx = 62 + (slot % 5) * 15, ry = 1 + Math.floor(slot / 5) * 11; slot++;
+  rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i'); rect(rx + 6, ry + RH - 1, 2, 1, 'D');
+  const south = s.y > b.y + b.h / 2;
+  const room = {
+    id: 'r_' + b.id, bld: b.id, kind: b.house !== undefined ? 'house' : b.id, house: b.house, label: b.label, icon: b.icon, color: b.color,
+    x: rx, y: ry, w: RW, h: RH, spawn: { x: rx + 7, y: ry + RH - 2.3 }, exit: { x: rx + 7, y: ry + RH - 0.5 },
+    outside: { x: s.x, y: south ? b.y + b.h + 1.6 : b.y - 1.6 }, doorPt: { x: s.x, y: south ? b.y + b.h + 0.32 : b.y - 0.32 },
+  };
+  ROOMS.push(room); b.room = room.id;
+  STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + 7, y: ry + RH - 1.6, r: 1.2 });
+  if (b.house !== undefined) {          // house: outside sign stays (buy/furnish/enter), a bed inside
+    s.door = room.id;
+    STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 3, y: ry + 2.6, r: 1.6 });
+    continue;
+  }
+  STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: s.x, y: s.y, r: 1.8 });
+  s.room = room.id;
+  if (b.id === 'hospital') {
+    s.x = rx + 3.5; s.y = ry + 2.6;
+    [[9, 2.6], [11.5, 2.6], [9, 6], [11.5, 6]].forEach(([dx, dy], i) =>
+      STATIONS.push({ id: 'bed' + i, type: 'bed', idx: i, room: room.id, label: 'เตียงคนไข้', icon: '🛏️', x: rx + dx, y: ry + dy, r: 1.4 }));
+  } else { s.x = rx + 7; s.y = ry + 2.6; s.r = 2.2; }
+}
+const roomAt = (x, y) => ROOMS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 
 const TILES = grid.map(r => r.join(''));
-const SOLID = new Set(['w', 'B', 'T']);
+const SOLID = new Set(['w', 'B', 'T', '#', ' ']);
 const isSolidTile = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= H || SOLID.has(grid[ty][tx]);
 const RADIUS = 0.3;
 function blocked(x, y) {
@@ -107,9 +142,9 @@ const SPAWN = { x: 31.0, y: 19.5 };
 // kind: crop | fish | meal | goods.  base = reference sell price at the market.
 const ITEMS = {
   rice:   { name: 'ข้าว', icon: '🌾', kind: 'crop', base: 40 },
-  corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 70 },
+  corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 70, eat: { hunger: 8 } },
   chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 100 },
-  durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 320 },
+  durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 320, eat: { hunger: 20, energy: 5 } },
 
   sfish:  { name: 'ปลาเล็ก', icon: '🐟', kind: 'fish', base: 45 },
   tilapia:{ name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 120 },
@@ -163,7 +198,7 @@ const CAREERS = {
   streamer:   { name: 'สตรีมเมอร์', icon: '🎥', license: null, desc: 'ไลฟ์ที่สตูดิโอ สะสมแฟนคลับ มีรายได้แฝง และรับโดเนท' },
   programmer: { name: 'โปรแกรมเมอร์', icon: '💻', license: 'coding', desc: 'รับงานโค้ดที่โค้ดดิ้งสเปซ ตอบถูกได้ค่าจ้างก้อนโต' },
   chef:       { name: 'เชฟ', icon: '🍳', license: 'cooking', desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายแพงกว่าหลายเท่า' },
-  doctor:     { name: 'แพทย์', icon: '🩺', license: 'medicine', desc: 'เข้าเวรที่โรงพยาบาล และเดินไปรักษาผู้เล่นอื่นเพื่อรับค่ารักษา' },
+  doctor:     { name: 'แพทย์', icon: '🩺', license: 'medicine', desc: 'รักษาคนไข้ที่นอนรอบนเตียงในโรงพยาบาล ต้องดูอาการแล้ววินิจฉัยโรคให้ถูก หรือเข้าเวรรับค่าตอบแทน' },
 };
 
 const LICENSES = {
@@ -215,7 +250,26 @@ const FURNITURE = {
 };
 const BANK = { rate: 0.03, cap: 300000, loanMax: 30000, loanFee: 0.10, repayShare: 0.25 };
 
+// ---------------------------------------------------------------- health
+// cure = the treatment a doctor must pick; symptoms are what the doctor sees
+const DISEASES = {
+  cold:    { name: 'ไข้หวัด', icon: '🤒', cure: 'fever', drain: 0.03, income: 0.8, sym: ['ตัวร้อน มีไข้', 'ไอ จาม น้ำมูกไหล', 'หนาวสั่น'], cause: 'ตากฝนนานๆ หรือช่วงไข้หวัดระบาด', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
+  exhaust: { name: 'อ่อนเพลียสะสม', icon: '😵', cure: 'iv', regen: 0.5, income: 0.85, sym: ['เหนื่อยง่าย หน้ามืด', 'กล้ามเนื้ออ่อนแรง', 'ใจสั่น'], cause: 'ทำงานตอนพลังงานต่ำ หรือทำโอทีหนัก', self: 'นอนเต็มอิ่ม (ห้องพัก/บ้าน) จะหาย' },
+  insomnia:{ name: 'อดนอน', icon: '🥱', cure: 'sleep', income: 0.75, sym: ['ง่วงตลอดเวลา ตาลอย', 'สมาธิสั้น ทำงานพลาด', 'ปวดหัวตื้อๆ'], cause: 'ไม่ได้นอนนานเกิน 25 นาที', self: 'นอนเต็มอิ่ม (ห้องพัก/บ้าน) จะหาย' },
+  poison:  { name: 'อาหารเป็นพิษ', icon: '🤢', cure: 'salt', drain: 0.05, hunger: 2, sym: ['ปวดท้อง คลื่นไส้', 'ท้องเสีย', 'อาเจียน'], cause: 'กินอาหารข้างทางหรือของดิบ', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
+  injury:  { name: 'บาดเจ็บ', icon: '🤕', cure: 'bandage', speed: 0.7, sym: ['ปวดบวม มีแผล', 'เดินกะเผลก', 'ช้ำตามตัว'], cause: 'อุบัติเหตุระหว่างทำงานหนัก', self: 'ใช้ชุดปฐมพยาบาล หรือให้หมอรักษา' },
+  malnut:  { name: 'ขาดสารอาหาร', icon: '😩', cure: 'iv', drain: 0.04, income: 0.8, sym: ['ผอมซีด ไม่มีแรง', 'หิวตลอดเวลา', 'เวียนหัว'], cause: 'ปล่อยให้หิวจนหมดหลอดนานๆ', self: 'กินจนอิ่มเกิน 80 จะหาย' },
+};
+const TREATMENTS = {
+  fever:   { name: 'ยาลดไข้ + ให้พักผ่อน', icon: '💊' },
+  iv:      { name: 'ให้น้ำเกลือ + วิตามิน', icon: '💉' },
+  sleep:   { name: 'ยานอนหลับ + นอนพักฟื้น', icon: '😴' },
+  salt:    { name: 'ผงเกลือแร่ + ยาฆ่าเชื้อ', icon: '🧂' },
+  bandage: { name: 'ทำแผล + เข้าเฝือก', icon: '🩹' },
+};
+
 module.exports = {
+  TW, ROOMS, roomAt, DISEASES, TREATMENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, FURNITURE, BANK,
   W, H, TILES, BUILDINGS, STATIONS, SPAWN, blocked, ITEMS, CROPS, RECIPES, FISH,
   CAREERS, LICENSES, OFFICE_TITLES, EVENTS, RADIUS,
