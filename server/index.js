@@ -232,7 +232,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
-  'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving'];
+  'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe'];
 let nextListing = 1;
 async function load() {
   const rows = await store.loadAll();
@@ -253,6 +253,7 @@ function hydrate(r) {
     inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1,
     furniture: [], bank: 0, bankT: now(), loan: 0, dz: [], awake: 0, listings: [], contacts: [], stats: {}, ach: [], title: '', jobChanges: [],
     enrolled: false, classes: 0, office: null, garden: null, rent: null, houseSale: 0, houseRent: 0, down: null,
+    gender: 'm', look: null, wardrobe: null,
     happy: 80, bills: [], billMonth: null, usage: { sleep: 0 }, utilOff: false, wanted: 0, crimes: [], craving: null,
   }, r, { ws: null, id: null, f: 0, bed: -1, chair: -1, pose: null, seat: null, immune: {}, cd: {}, cast: null, trade: null, call: null, lastPosT: now(), moved: false, meDirty: false });
   if ((a.v || 1) < 2) {                            // migrate saves from the old single-map town
@@ -261,6 +262,10 @@ function hydrate(r) {
     if (a.licenses.includes('medicine') || a.career === 'office') a.licenses = [...new Set([...a.licenses, 'degree'])];
     if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; }   // the old houses were demolished: refund
     a.x = D.SPAWN.x; a.y = D.SPAWN.y; a.v = 2;
+  }
+  if (!a.look) {                                    // looks: shirt from the old colour pick, everyone gets the starter hair
+    const sh = D.SHIRTS[(a.avatar || 0) % 4];
+    a.look = { hair: 'bob', hat: '', shirt: sh }; a.wardrobe = { hair: ['bob'], hat: [], shirt: [sh] };
   }
   if (a.v < 3) {                                   // ม.6 became a requirement for the degree
     if (a.licenses.includes('degree')) a.licenses = [...new Set([...a.licenses, 'hs'])];
@@ -570,6 +575,13 @@ function act(a, m) {
       return toast(a, 'ล้วงพลาด! คนรู้ตัวทัน รีบเดินหนีไป', '😰', false);
     }
     case 'bank.bills': return payBills(a);
+    case 'fashion.buy': {
+      const cat = D.LOOKS[m.cat], it = cat && cat[m.id]; if (!it) return;
+      const W = a.wardrobe; if (W[m.cat].includes(m.id)) return wear(a, m);
+      if (!pay(a, it.price)) return;
+      W[m.cat] = [...W[m.cat], m.id]; joy(a, 8); wear(a, m);
+      return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย!`, '💇');
+    }
     // ---------------- office
     case 'chair.sit': {
       if (!need(a, 'office')) return;
@@ -1235,6 +1247,7 @@ function makeWanted(c, by) {
 function steal(a, m) {
   if (a.down || a.career !== 'thief') return;
   if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำอะไร...', '😞', false);
+  if (+m.to < 0) return stealNpc(a, +m.to);
   const o = nearPlayer(a, m.to, 1.8);
   if (!o) return toast(a, 'ต้องเข้าไปใกล้ๆ เป้าหมาย (ประชิดตัว)', '🕶️', false);
   if (o.down) return toast(a, 'เป้าหมายไม่อยู่ในสภาพที่จะล้วงได้', '🕶️', false);
@@ -1295,12 +1308,84 @@ function arrest(a, m) {
   return toast(a, `จับกุม ${o.name} สำเร็จ! ได้ค่าหัว ${money(got)}`, '👮');
 }
 
+// ------------------------------------------------------------------ looks
+function wear(a, m) {
+  const cat = m.cat; if (!D.LOOKS[cat]) return;
+  if (m.id && !a.wardrobe[cat].includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่นก่อน', '💇', false);
+  if (!m.id && cat !== 'hat') return;
+  a.look = { ...a.look, [cat]: m.id || '' }; markMe(a); sendRoster();
+}
+
+// ------------------------------------------------------------------ townsfolk: NPCs walking around the village
+const npcs = [];
+{
+  const town = D.AREAS.find(r => r.id === 'town');
+  const walkable = [];
+  for (let y = town.y + 1; y < town.y + town.h - 1; y++) for (let x = town.x + 1; x < town.x + town.w - 1; x++)
+    if (',=kcs'.includes(D.TILES[y][x]) && !D.blocked(x + .5, y + .5)) walkable.push([x, y]);
+  const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|begspot|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x), Math.floor(s.y + (s.type === 'door' ? .6 : 0))]).filter(([x, y]) => !D.blocked(x + .5, y + .5));
+  const HAIRS = Object.keys(D.LOOKS.hair), HATS = ['', '', ...Object.keys(D.LOOKS.hat).filter(h => h !== 'hood')];
+  for (let i = 0; i < 12; i++) {
+    const [x, y] = pick(walkable);
+    npcs.push({ id: -(i + 1), npc: 1, name: D.NPC_NAMES[i % D.NPC_NAMES.length], x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+      g: i % 2 ? 'f' : 'm', look: { hair: pick(HAIRS), hat: pick(HATS), shirt: pick(D.SHIRTS) }, speed: rnd(1.1, 1.6), pickedAt: 0 });
+  }
+  // shortest walk between two tiles (BFS over the town); targets are mostly shops, seats and piers
+  function route(n) {
+    const goal = Math.random() < .7 ? pick(spots) : pick(walkable), sx = Math.floor(n.x), sy = Math.floor(n.y);
+    const key = (x, y) => y * D.W + x, prev = new Map([[key(sx, sy), -1]]), q = [[sx, sy]];
+    for (let h = 0; h < q.length; h++) {
+      const [x, y] = q[h]; if (x === goal[0] && y === goal[1]) break;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, k = key(nx, ny);
+        if (prev.has(k) || nx < town.x || ny < town.y || nx >= town.x + town.w || ny >= town.y + town.h || D.blocked(nx + .5, ny + .5)) continue;
+        prev.set(k, key(x, y)); q.push([nx, ny]);
+      }
+    }
+    if (!prev.has(key(goal[0], goal[1]))) return [];
+    const out = []; let k = key(goal[0], goal[1]);
+    while (k !== -1) { out.push([k % D.W + .5, Math.floor(k / D.W) + .5]); k = prev.get(k); }
+    return out.reverse();
+  }
+  var npcTick = (dt, ps) => {
+    for (const n of npcs) {
+      if (n.wait > 0) { n.wait -= dt; continue; }
+      if (!n.path.length) { n.path = route(n); n.wait = n.path.length ? 0 : 2; if (!n.path.length) continue; }
+      const [tx, ty] = n.path[0], dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy), st = n.speed * dt;
+      if (d <= st) { n.x = tx; n.y = ty; n.path.shift(); if (!n.path.length) n.wait = rnd(4, 14); }
+      else { n.x += dx / d * st; n.y += dy / d * st; }
+      if (d > 0.01) n.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
+      ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]);
+    }
+    // now and then a villager near someone says something (bubble over their head)
+    if (Math.random() < dt / 12) {
+      const n = pick(npcs), near = [...online.values()].filter(o => areaId(o) === 'town' && dist(o, n) <= 14);
+      if (near.length) { const msg = { t: 'chat', id: n.id, name: n.name, text: pick(D.NPC_LINES), ts: now(), npc: 1 }; near.forEach(o => send(o, msg)); }
+    }
+  };
+}
+const npcInfo = n => ({ id: n.id, npc: 1, name: n.name, c: 'none', lv: 1, dz: [], pose: n.wait > 0 && !n.path.length ? null : null, g: n.g, lk: n.look, x: n.x, y: n.y, f: n.f, title: '' });
+function stealNpc(a, id) {
+  const n = npcs.find(x => x.id === id);
+  if (!n || areaId(a) !== 'town' || Math.hypot(a.x - n.x, a.y - n.y) > 1.8) return toast(a, 'ต้องเข้าไปใกล้ๆ เป้าหมาย (ประชิดตัว)', '🕶️', false);
+  if (now() - n.pickedAt < 5 * 60000) return toast(a, `${n.name} ระวังตัวแจ ล้วงไม่ได้ (เพิ่งโดนล้วงไป)`, '🕶️', false);
+  if (!cd(a, 'steal', 45000) || !spend(a, 8)) return;
+  n.pickedAt = now(); addXp(a);
+  if (Math.random() < 0.6 + 0.08 * tier(a, 'thief')) {
+    const amt = rint(15, 60); earn(a, amt); stat(a, 'stolen');
+    if (Math.random() < 0.3) { const c = newCrime(a, n.name, amt); makeWanted(c, `${n.name} ร้องโวยวาย`); return toast(a, `ล้วงได้ ${money(amt)} แต่${n.name}รู้ตัวแล้วโทรแจ้งตำรวจ!`, '🚨', false); }
+    return toast(a, `ล้วงกระเป๋า${n.name}ได้ ${money(amt)}`, '🕶️');
+  }
+  const c = newCrime(a, n.name, 0); makeWanted(c, `${n.name} จับได้ว่าถูกล้วง`);
+  return toast(a, `${n.name} จับได้! ร้องเรียกตำรวจแล้ว รีบหนี!`, '😰', false);
+}
+
 // ------------------------------------------------------------------ public views
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), veh: bestVehicle(a), dz: (a.dz || []).map(d => DZ[d].icon),
-    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0 };
+    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look };
 }
-function sendRoster() { broadcast({ t: 'roster', players: [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f })) }); }
+function sendRoster() { broadcast({ t: 'roster', players: [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f })).concat(npcs.map(npcInfo)) }); }
 function meView(a) {
   const isRider = a.career === 'rider';
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
@@ -1312,6 +1397,7 @@ function meView(a) {
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
+    gender: a.gender, look: a.look, wardrobe: a.wardrobe,
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
@@ -1367,7 +1453,9 @@ function login(ws, m) {
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
     const salt = crypto.randomBytes(8).toString('hex');
-    a = hydrate({ v: VERSION, name, salt, hash: hashPin(pin, salt), avatar: clamp(Math.floor(+m.avatar) || 0, 0, 9) });
+    const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'blue';
+    a = hydrate({ v: VERSION, name, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
+      look: { hair: 'bob', hat: '', shirt: sh }, wardrobe: { hair: ['bob'], hat: [], shirt: [sh] } });
     accounts.set(lname, a); isNew = true;
   }
   Q.ensure(a);
@@ -1381,7 +1469,7 @@ function login(ws, m) {
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
     t: 'init', id: a.id,
-    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, solid: D.SOLID,
+    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
@@ -1484,6 +1572,7 @@ function onMessage(ws, raw) {
     case 'paybills': return payBills(a);
     case 'donate': return donate(a, m);
     case 'steal': return steal(a, m);
+    case 'wear': return wear(a, m);
     case 'report': return report(a, m);
     case 'arrest': return arrest(a, m);
     case 'title': { if (!m.id || (a.ach || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
@@ -1619,6 +1708,7 @@ function tick() {
   // positions
   const ps = [];
   for (const a of online.values()) if (a.moved) { a.moved = false; ps.push([a.id, +a.x.toFixed(2), +a.y.toFixed(2), a.f]); }
+  if (online.size) npcTick(dt, ps);
   if (ps.length) broadcast({ t: 'ps', p: ps });
 
   if (t > wdAt) { wdAt = t + 1000; broadcast(worldView()); }

@@ -1,7 +1,7 @@
 'use strict';
 (() => {
 const $ = s => document.querySelector(s);
-const COLORS = ['#ef6a5b', '#f2a541', '#f2d14b', '#7ac96b', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
+const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => '฿' + Math.round(n).toLocaleString('en-US');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -20,10 +20,45 @@ let creds = null, wantLogin = false;
 try { creds = JSON.parse(localStorage.getItem('lt_creds') || 'null'); } catch { }
 
 // ------------------------------------------------------------------ login UI
-let avatar = creds?.avatar ?? Math.floor(Math.random() * COLORS.length);
+// new characters pick a gender and a starter shirt; everyone starts with the same hairstyle
+let avatar = clamp(creds?.avatar ?? 0, 0, 3), gender = creds?.gender || 'm';
+const SHIRT_IDS = ['blue', 'green', 'yellow', 'stripe'];
 const sw = $('#swatches');
-COLORS.forEach((c, i) => { const b = document.createElement('b'); b.style.background = c; b.onclick = () => { avatar = i; paintSw(); }; sw.appendChild(b); });
-function paintSw() { [...sw.children].forEach((b, i) => b.classList.toggle('on', i === avatar)); }
+function paintSw() {
+  sw.innerHTML = '';
+  const row = document.createElement('div'); row.className = 'genders';
+  for (const [g, l] of [['m', '👦 ชาย'], ['f', '👧 หญิง']]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.className = g === gender ? 'primary' : ''; b.onclick = () => { gender = g; paintSw(); }; row.appendChild(b); }
+  sw.appendChild(row);
+  const shirts = document.createElement('div'); shirts.className = 'shirts';
+  SHIRT_IDS.forEach((id, i) => {
+    const c = document.createElement('canvas'); c.width = 84; c.height = 120; c.className = i === avatar ? 'on' : '';
+    c.onclick = () => { avatar = i; paintSw(); }; shirts.appendChild(c);
+    whenChars(() => { const g = c.getContext('2d'); drawCharTo(g, { g: gender, lk: { hair: 'bob', hat: '', shirt: id } }, 42, 116, 110 / CH_ATLAS.canvas[1], 'front', 0); });
+  });
+  sw.appendChild(shirts);
+}
+// ---- character atlas (public/assets/chars.webp, built by tools/build_chars.py)
+let CH_ATLAS = null, chImg = null; const chWait = [];
+const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
+fetch('assets/chars.json').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = j; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/chars.webp'; });
+// draw one character (feet at fx, fy) with scale k; view = front | side | back; flip mirrors the side view to face left
+function drawCharTo(g, p, fx, fy, k, view, frame, flip, item) {
+  const S = CH_ATLAS.sprites, [ax, ay] = CH_ATLAS.feet, lk = p.lk || { hair: 'bob', hat: '', shirt: 'blue' }, gd = p.g === 'f' ? 'f' : 'm';
+  const v = view === 'back' ? 'front' : view;
+  const layer = name => { const s = S[name]; if (!s) return; g.drawImage(chImg, s[0], s[1], s[2], s[3], (s[4] - ax) * k, (s[5] - ay) * k, s[2] * k, s[3] * k); };
+  const small = (name, dx, dy, sc = 1) => { const s = S[name]; if (!s) return; g.drawImage(chImg, s[0], s[1], s[2], s[3], dx * k + s[4] * k * sc, dy * k + s[5] * k * sc, s[2] * k * sc, s[3] * k * sc); };
+  g.save(); g.translate(fx, fy); if (flip) g.scale(-1, 1);
+  if (item === 'bag_red' && view !== 'back') small('bag_red', view === 'side' ? -20 : 0, -78, .9);
+  if (lk.hat === 'hood' && view !== 'back') layer(`hat_hood_${v}`);
+  layer(view === 'back' ? 'body_back' : `body_${v}_${gd}`);
+  layer(`pants_${v}${frame}`);
+  layer(`shirt_${lk.shirt || 'blue'}_${v}`);
+  if (view === 'back') layer(`hair_${lk.hair}_back`); else layer(`hair_${lk.hair || 'bob'}_${v}`);
+  if (lk.hat) layer(`hat_${lk.hat}_${v}`);
+  if (item === 'bag_red' && view === 'back') small('bag_red', 0, -70, .9);
+  else if (item && view !== 'back') small(item, view === 'side' ? 16 : 30, -52);
+  g.restore();
+}
 paintSw();
 if (creds) { $('#inName').value = creds.name; $('#inPin').value = creds.pin; }
 const nameErr = v => /[^\x20-\x7e]/.test(v) ? 'ชื่อตัวละครใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น' : /\s/.test(v) ? 'ชื่อห้ามมีเว้นวรรค' : '';
@@ -31,7 +66,7 @@ $('#inName').addEventListener('input', e => { $('#loginErr').textContent = nameE
 $('#loginForm').onsubmit = e => {
   e.preventDefault();
   // the server has the final say: new characters must use English/digits, old Thai-named characters still log in
-  creds = { name: $('#inName').value.trim(), pin: $('#inPin').value, avatar };
+  creds = { name: $('#inName').value.trim(), pin: $('#inPin').value, avatar, gender, shirt: SHIRT_IDS[avatar] };
   $('#loginErr').textContent = '';
   wantLogin = true; connect();
 };
@@ -71,7 +106,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, veh: p.veh, dz: p.dz || [], pose: p.pose, title: p.title });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, veh: p.veh, dz: p.dz || [], pose: p.pose, title: p.title, g: p.g, lk: p.lk, npc: p.npc, w: p.w, sad: p.sad });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -443,6 +478,7 @@ function draw(t) {
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([f[2], 3, f]);
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
+  if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
@@ -491,7 +527,65 @@ function drawPlot(s, px, py, t) {
   else { ctx.font = `${Math.round(TS * .95)}px serif`; ctx.fillText(it.icon, px, py + Math.sin(t / 250) * 2); ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('✨', px + TS * .55, py - TS * .55 + Math.sin(t / 200) * 3); }
 }
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
+const CAREER_ITEM = { fisher: 'i_rod', farmer: 'i_can', merchant: 'basket', rider: 'bag_red', thief: 'satchel', chef: 'i_berries' };
 function drawPlayer(p, X, Y, t) {
+  if (!chImg) return drawPlayerPixel(p, X, Y, t);
+  const px0 = (p.rx + (p.ox || 0)) * TS + X, py0 = (p.ry + (p.oy || 0)) * TS + Y + TS * .32;
+  if (px0 < -80 || py0 < -140 || px0 > VW + 80 || py0 > VH + 140) return;
+  const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail';
+  const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
+  let dir = Math.abs(cy) > Math.abs(cx) ? (cy > 0 ? 'down' : 'up') : (cx > 0 ? 'right' : 'left');
+  if (sitting || lying) dir = 'down';
+  const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
+  p.walk = (p.walk || 0) + (moving ? .2 : 0);
+  const frame = moving ? Math.floor(p.walk / 1.6) % 2 : 0, bob = moving ? Math.abs(Math.sin(p.walk)) * TS * .05 : 0;
+  const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
+  const k = TS * 2.0 / CH_ATLAS.canvas[1], H = CH_ATLAS.canvas[1] * k;
+  let px = px0, py = py0;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : .32), TS * .11, 0, 0, 7); ctx.fill();
+  if (p.veh && G.shop && !roomOf(p.x, p.y) && !sitting && !lying) {
+    if (p.veh === 'car') { spr('car_blue', p.rx, p.ry + .55, X, Y, 1.05); py -= TS * .25; }
+    else { ctx.save(); ctx.translate(px, py - TS * .1); if (dir === 'right') ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .9)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= TS * .2; }
+  }
+  const item = CAREER_ITEM[p.c];
+  ctx.save();
+  if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
+  else if (sitting) {   // seated: legs tucked away, body lowered a little
+    ctx.beginPath(); ctx.rect(px - H, py - H * 1.2, H * 2, H * 1.2 - H * .2); ctx.clip();
+    drawCharTo(ctx, p, px, py + H * .12, k, 'front', 0, false, pose === 'beg' ? null : item);
+  } else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left', item);
+  ctx.restore();
+  const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .12 : 0);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
+  if (p.w && me?.career === 'police') { ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText('🚨', px - TS * .45, top + Math.sin(t / 120) * 3); }
+  // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
+  const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? 'm_dizzy' : mine && me?.craving ? 'm_bulb' : pose === 'seat' ? 'm_heart' : null;
+  if (emote) { ctx.save(); ctx.translate(px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); drawEmote(emote, k); ctx.restore(); }
+  const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
+  if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
+  nameAndBubble(p, px, top, mine);
+}
+const npcPatients = {};
+function npcPatient(b, s) {
+  const key = b[1]; let n = npcPatients[key];
+  if (!n) { const h = [...String(b[0])].reduce((a, c) => a * 31 + c.charCodeAt(0) >>> 0, 7); n = npcPatients[key] = { id: key, npc: 1, name: b[0], g: h % 2 ? 'f' : 'm', lk: { hair: ['bob', 'swept', 'pony', 'bun', 'm', 'braid'][h % 6], hat: '', shirt: SHIRT_IDS[(h >> 3) % 4] }, pose: 'hosp', dz: ['🤒'] }; }
+  n.rx = n.x = s.x; n.ry = n.y = s.y; return n;
+}
+function drawEmote(name, k) { const s = CH_ATLAS.sprites[name]; if (s) ctx.drawImage(chImg, s[0], s[1], s[2], s[3], s[4] * k * 1.4, s[5] * k * 1.4, s[2] * k * 1.4, s[3] * k * 1.4); }
+function nameAndBubble(p, px, top, mine) {
+  sign(`${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : p.npc ? 'rgba(60,70,60,.6)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
+  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
+  if (p.bubble && performance.now() < p.bt) {
+    const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
+    ctx.font = `${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
+    const w = ctx.measureText(txt).width + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
+    ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + 1);
+  }
+}
+function drawPlayerPixel(p, X, Y, t) {
   const px0 = (p.rx + (p.ox || 0)) * TS + X; let py0 = (p.ry + (p.oy || 0)) * TS + Y + TS * .32;
   if (px0 < -80 || py0 < -120 || px0 > VW + 80 || py0 > VH + 120) return;
   const u = TS / 16, id = p.id || 1, skin = SKIN[id % 4], hair = HAIR[(id * 3 + p.av) % HAIR.length];
@@ -569,6 +663,7 @@ function drawMini() {
   const mini = $('#mini'); if (mini.width !== base.width) { mini.width = base.width; mini.height = base.height; }
   const g = mini.getContext('2d'); g.drawImage(base, 0, 0);
   for (const p of P.values()) {
+    if (p.npc) continue;
     const q = outPos(p.rx, p.ry); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
     g.fillStyle = p.id === myId ? '#fff' : COLORS[p.av]; const s = p.id === myId ? 5 : 3; g.fillRect((q.x - A.x) * 2 - s / 2, (q.y - A.y) * 2 - s / 2, s, s);
   }
@@ -605,6 +700,10 @@ function bindPanel(root) {
   });
   const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
+  root.querySelectorAll('[data-look]').forEach(c => whenChars(() => {
+    const [cat, id] = c.dataset.look.split(':'), lk = { ...(me.look || {}), [cat]: id }, g = c.getContext('2d');
+    drawCharTo(g, { g: me.gender, lk }, 36, 94, 92 / CH_ATLAS.canvas[1], 'front', 0);
+  }));
   const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); };
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
@@ -864,6 +963,15 @@ function renderPanel(p) {
       return `<h2>🏡 สำนักงานอสังหาฯ</h2><div class="sub">${hoursTxt('estate')} · ซื้อ/เช่าได้ที่หน้าบ้านแต่ละหลัง · เจ้าของบ้านประกาศขายหรือปล่อยเช่าให้ผู้เล่นอื่นได้</div><div class="list">${rows}</div>`;
     }
     case 'door': return houseDoor(STN(st), st);
+    case 'fashion': {
+      const W = me.wardrobe || { hair: [], hat: [], shirt: [] }, lk = me.look || {};
+      const sec = (cat, title) => `<div class="sub" style="margin-top:10px"><b>${title}</b></div><div class="looks">${Object.entries(G.looks[cat]).map(([id, it]) => {
+        const has = W[cat].includes(id), on = lk[cat] === id;
+        return `<div class="look ${on ? 'on' : ''}"><canvas data-look="${cat}:${id}" width="72" height="96"></canvas><small>${esc(it.name)}</small>${on ? '<span class="tag">ใส่อยู่</span>' : has ? B('ใส่', { t: 'wear', cat, id }, 'good') : B(money(it.price), { t: 'act', st, a: 'buy', cat, id }, '')}</div>`;
+      }).join('')}${cat === 'hat' && lk.hat ? `<div class="look">${B('ถอดหมวก', { t: 'wear', cat: 'hat', id: '' })}</div>` : ''}</div>`;
+      return `<h2>💇 ร้านแฟชั่น & ทำผม</h2><div class="sub">${hoursTxt('fashion')} · ทุกคนเริ่มด้วยทรงผมเดียวกัน มาเปลี่ยนทรงผม หมวก และเสื้อได้ที่นี่ (แต่งตัวใหม่แล้วมีความสุขเพิ่ม) · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี</div>
+        ${sec('hair', '✂️ ทรงผม')}${sec('hat', '🎩 หมวก')}${sec('shirt', '👕 เสื้อ')}`;
+    }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${applyBox('police', st)}${me.career === 'police' ? policeReports() : ''}`;
     case 'hideout': return `<h2>🕶️ ซอยมืดหลังโรงหนัง</h2><div class="sub">"อยากได้เงินง่ายๆ ไหม?" · ล้วงกระเป๋าผู้เล่นที่เดินผ่าน (แตะที่ตัวเขา) หรือในฝูงชน 👥 · ถ้ามีคนเห็นจะโทรแจ้งตำรวจ ถูกจับ = ปรับ + ติดคุก</div>${applyBox('thief', st)}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ลงทะเบียนเป็นขอทานได้ที่นี่ แล้วไปนั่งตามจุดขอทาน 🥣 (จัตุรัส หน้าตลาด หน้าโรงพยาบาล หน้ามหาวิทยาลัย)</div>${applyBox('beggar', st)}`;
@@ -916,6 +1024,7 @@ function renderPanel(p) {
         ${B('🚪 ออกจากระบบ', { fn: 'logout' }, 'warn big')}`;
     case 'player': {
       const o = P.get(p.pid); if (!o) return '';
+      if (o.npc) { const m = P.get(myId), d = Math.hypot(o.x - m.x, o.y - m.y); return `<h2>🏘️ ${esc(o.name)} <span class="tag">ชาวเมือง</span></h2><div class="sub">ชาวบ้านที่เดินไปมาในเมือง ทักทายกันได้ในแชท</div>${me.career === 'thief' ? B('🕶️ ล้วงกระเป๋า (ต้องประชิดตัว)', { t: 'steal', to: o.id }, 'warn big', d > 1.8) : ''}`; }
       const m = P.get(myId); const d = Math.hypot(o.x - m.x, o.y - m.y), far = d > 5.5;
       const fee = `<input id="feeIn" type="number" value="200" min="0" max="1000" style="width:90px">`;
       return `<h2>${esc(o.name)} <span class="tag">${CAREER_ICON(o.c)} ${G.careers[o.c]?.name || ''}</span></h2>${o.title ? `<div class="sub" style="color:var(--acc)">«${esc(o.title)}»</div>` : ''}
@@ -1050,9 +1159,9 @@ function tex(name, tx, ty, px, py) {
   ctx.drawImage(atlasImg, s[0] + (tx & 1) * q, s[1] + (ty & 1) * q, q, q, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
   return true;
 }
-const FLOOR = { office: 'fl_checker', market: 'fl_beige', warehouse: 'g_pavers', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_brick',
+const FLOOR = { fashion: 'fl_beige', police: 'fl_wood', office: 'fl_checker', market: 'fl_beige', warehouse: 'g_pavers', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_brick',
   restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_white', school: 'fl_wood', bank: 'fl_beige', house: 'fl_wood' };
-const WALL = { office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', rider: '#3f6b63', dealer: '#dfe6ec', toolshop: '#b9a17f',
+const WALL = { fashion: '#f6d6e4', police: '#c7d3e6', office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', rider: '#3f6b63', dealer: '#dfe6ec', toolshop: '#b9a17f',
   restaurant: '#e9cfa4', kitchen: '#f3f3f3', hospital: '#e6f1f6', school: '#cfe0c4', bank: '#efe2bb', house: '#ecd2b2' };
 function under(tx, ty) {
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) { const c = tileAt(tx + dx, ty + dy); if (',=kmspc'.includes(c)) return c; }
@@ -1276,6 +1385,7 @@ function openMap(mapId, keepScroll) {
   }
   // players; you are the big white dot with a ring
   for (const p of P.values()) {
+    if (p.npc) continue;
     const q = outPos(p.x, p.y); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
     const mine = p.id === myId, [x, y] = L(q.x, q.y);
     if (mine) { g.strokeStyle = '#ff6b3d'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, r * 1.5, 0, 7); g.stroke(); }

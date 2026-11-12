@@ -93,7 +93,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   pathDown(B('restaurant', 'b_cafe', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
   B('kitchen', 'b_bakery', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_cowork', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
-  B('cafe2', 'b_flower', 38, 45, { label: 'คาเฟ่', icon: '☕', deco: true });
+  B('fashion', 'b_flower', 38, 45, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
@@ -249,6 +249,7 @@ const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_desk', 8, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 14.4, 2.6], ['f_plant', 1.6, 10.7], ['f_plant2', 14.4, 10.7], ['f_clock', 10, .95]],
   market: [['f_shelf_jars', 2.6, 2.6], ['f_shelf_plants', 11.4, 2.6], ['f_counter', 7, 2.3], ['stall_green', 3.4, 6.6], ['stall_red', 10.6, 6.6], ['f_plant3', 1.6, 8.7]],
   warehouse: [['crate', 1.8, 3.2], ['crate', 3, 3.2], ['barrel', 4.2, 3.2], ['f_cabinet', 7, 2.3], ['hay2', 11.5, 3.4], ['hay', 11.6, 6.6], ['sack', 2.2, 6.6], ['barrel2', 3.3, 6.6], ['crate', 12.2, 8.6]],
+  fashion: [['f_mirror', 2.6, 2.6], ['f_wardrobe', 11.6, 2.7], ['f_counter', 7, 2.3], ['f_display', 3, 6.4], ['f_display', 11, 6.4], ['f_rug_round', 7, 6.6], ['f_plant3', 1.6, 8.7], ['f_plant', 12.4, 8.7]],
   rider: [['f_window', 10.5, 1.1], ['f_counter', 7, 2.3], ['f_display', 2.6, 2.6], ['f_bench', 10.6, 5.6], ['f_coffee', 12.4, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7]],
   dealer: [['f_desk', 7, 2.3], ['car_red', 3, 4.8], ['car_blue', 11, 4.8], ['car_green', 3, 8.3], ['f_plant', 1.5, 2.6], ['f_plant2', 12.5, 2.6]],
   toolshop: [['f_shelf_pots', 2.6, 2.6], ['f_bookshelf3', 11.6, 2.7], ['f_counter', 7, 2.3], ['cart', 3, 7.2], ['crate', 11.4, 6.6], ['barrel', 12.4, 6.6], ['f_trash', 12.4, 8.7]],
@@ -328,7 +329,7 @@ const TIME_OFF = +process.env.TIME_OFFSET_MS || 0;           // testing aid: shi
 const hourAt = t => (((t + TIME_OFF) % DAY_MS) / DAY_MS) * 24;
 const dayAt = t => Math.floor((t + TIME_OFF) / DAY_MS);
 // opening hours [open, close) in game hours
-const HOURS = { police: [0, 24], square: [6, 22], office: [6, 21], market: [5, 22], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+const HOURS = { fashion: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [5, 22], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
@@ -507,6 +508,20 @@ const TREATMENTS = {
 const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้องเมย์', 'พี่ต้น', 'ยายจันทร์', 'ตาเหลือง', 'น้าแดง', 'พี่ฝน', 'น้องบอส', 'ป้าแจ๋ว', 'ลุงชัย', 'พี่นก'];
 
 // ================================================================= achievements -> titles shown over your head
+// ================================================================= looks (paper-doll character parts in public/assets/chars.*)
+// everyone starts with the same hair; new hair, hats and shirts are bought at the fashion shop
+const LOOKS = {
+  hair:  { bob: { name: 'ผมบ็อบ (เริ่มต้น)', price: 0 }, swept: { name: 'ผมปัดข้าง', price: 900 }, m: { name: 'ผมสั้นเกรียน', price: 600 },
+           pony: { name: 'ผมหางม้า', price: 1400 }, bun: { name: 'ผมมวย', price: 1400 }, braid: { name: 'ผมเปียข้าง', price: 1800 } },
+  hat:   { beanie: { name: 'หมวกไหมพรม', price: 900 }, straw: { name: 'หมวกฟาง', price: 700 }, beret: { name: 'หมวกเบเร่ต์แดง', price: 1600 },
+           green: { name: 'หมวกเบเร่ต์เขียว', price: 1600 }, hood: { name: 'ผ้าคลุมฮู้ด', price: 2500 } },
+  shirt: { blue: { name: 'เสื้อฮู้ดฟ้า', price: 500 }, green: { name: 'เสื้อฮู้ดเขียว', price: 500 }, yellow: { name: 'เสื้อฮู้ดเหลือง', price: 500 },
+           stripe: { name: 'เสื้อฮู้ดลายทาง', price: 1200 } },
+};
+const SHIRTS = ['blue', 'green', 'yellow', 'stripe'];
+const NPC_LINES = ['วันนี้อากาศดีจังเลย', 'ตลาดวันนี้คนเยอะมาก', 'หิวจัง ไปกินก๋วยเตี๋ยวดีกว่า', 'ระวังโจรล้วงกระเป๋านะ', 'ได้ยินว่าที่ทะเลมีฉลามด้วย',
+  'ค่าไฟเดือนนี้แพงจัง', 'ไปนั่งเล่นที่จัตุรัสกัน', 'หมอที่โรงพยาบาลเก่งมาก', 'อยากได้บ้านในหมู่บ้านจัดสรรจัง', 'ข้าวโพดปีนี้หวานมาก', 'สวัสดีจ้า', 'วันนี้ทำงานเหนื่อยมาก'];
+
 const ACHIEVEMENTS = [
   { id: 'off1', c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
   { id: 'off2', c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
@@ -540,7 +555,7 @@ const ACHIEVEMENTS = [
 ];
 
 module.exports = {
-  MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
+  LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
