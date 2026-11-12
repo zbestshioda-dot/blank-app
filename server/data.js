@@ -56,6 +56,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   rect(14, 14, 74, 2, '='); rect(14, 13, 74, 1, ',');                                 // north street
   rect(49, 40, 2, 36, '=');                                                           // south avenue
   rect(4, 46, 45, 2, '='); rect(4, 45, 45, 1, ',');                                   // south-west lane
+  rect(49, 76, 2, 2, '=');                                                            // corner: avenue -> south road
+  rect(2, 14, 12, 2, '='); rect(2, 16, 2, 15, '=');                                   // north street west end joins the main road
+  rect(88, 14, 8, 2, '='); rect(94, 16, 2, 15, '=');                                  // north street east end joins the coast road
   // town square
   rect(42, 24, 16, 16, 'k');
   // winding cobble paths through the parks (they make it feel like a village, not a grid)
@@ -126,7 +129,8 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('lamp2', x + .5, 17);
-  prop('busstop', 39, 30.2); prop('trafficlight', 48.4, 30); prop('vending', 41.2, 29.9); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
+  prop('busstop', 39, 30.2); prop('vending', 41.2, 29.9);
+  for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
   prop('phonebooth', 57.3, 23.9); prop('bin_blue', 36, 29.95); prop('bin_green', 75, 33.95);
   prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95); prop('bus', 30, 18.2);
   // parks, the lake and the beach
@@ -351,9 +355,9 @@ const ITEMS = {
   catfish:  { name: 'ปลาดุก', icon: '🐟', kind: 'fish', base: 45 },
   tilapia:  { name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 60 },
   snakehead:{ name: 'ปลาช่อน', icon: '🐠', kind: 'fish', base: 95 },
-  squid:    { name: 'ปลาหมึก', icon: '🦑', kind: 'fish', base: 120 },
-  seabass:  { name: 'ปลากะพง', icon: '🐡', kind: 'fish', base: 150 },
-  tuna:     { name: 'ทูน่า', icon: '🐋', kind: 'fish', base: 400 },
+  squid:    { name: 'ปลาหมึก', icon: '🦑', kind: 'fish', base: 80 },
+  seabass:  { name: 'ปลากะพง', icon: '🐡', kind: 'fish', base: 110 },
+  tuna:     { name: 'ทูน่า', icon: '🐋', kind: 'fish', base: 300 },
   shark:    { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200 },
   chest:    { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 3000 },
 
@@ -375,10 +379,10 @@ const ITEMS = {
 const CATEGORIES = { crop: '🌾 พืชผล', fish: '🐟 ปลา', meal: '🍱 อาหาร', goods: '📦 สินค้า' };
 
 const CROPS = {
-  rice:   { seed: 15,  grow: 90,  min: 4, max: 6 },
-  corn:   { seed: 30,  grow: 150, min: 4, max: 5 },
-  chili:  { seed: 50,  grow: 220, min: 4, max: 5 },
-  durian: { seed: 260, grow: 420, min: 3, max: 4 },
+  rice:   { seed: 15,  grow: 240, min: 3, max: 5 },
+  corn:   { seed: 30,  grow: 360, min: 4, max: 5 },
+  chili:  { seed: 50,  grow: 480, min: 4, max: 5 },
+  durian: { seed: 200, grow: 900, min: 3, max: 4 },
 };
 const RECIPES = [
   { id: 'fried_rice',   in: { rice: 2 } },
@@ -391,7 +395,7 @@ const RECIPES = [
 const FISH = {
   river: [[null, 25], ['sfish', 40], ['catfish', 26], ['tilapia', 12], ['snakehead', 4]],
   lake:  [[null, 22], ['sfish', 30], ['tilapia', 28], ['snakehead', 12], ['seabass', 6], ['chest', 0.1]],
-  sea:   [[null, 25], ['sfish', 18], ['squid', 22], ['seabass', 18], ['tuna', 6], ['shark', 1], ['chest', 0.3]],
+  sea:   [[null, 28], ['sfish', 25], ['squid', 18], ['seabass', 12], ['tuna', 3], ['shark', 0.5], ['chest', 0.15]],
 };
 const BIG_FISH = ['seabass', 'tuna', 'shark', 'chest', 'snakehead', 'squid'];
 
@@ -436,9 +440,9 @@ const POLICE_TEST = [
 // changing careers too often makes you wait longer (minutes); index = changes in the last 24 h
 const JOB_COOLDOWN_MIN = [0, 10, 30, 60, 120, 240, 480];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
-const OFFICE_WAGE = [45, 54, 66, 80, 96, 114, 135];            // per game hour seated
+const OFFICE_WAGE = [55, 65, 78, 92, 110, 130, 155];            // per game hour seated
 const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
-const POLICE = { patrolWage: 22, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6 };
+const POLICE = { patrolWage: 18, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6 };
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
 const EVENTS = [

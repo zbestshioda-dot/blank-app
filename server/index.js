@@ -27,7 +27,7 @@ for (const [k, it] of Object.entries(D.ITEMS)) {
   if (it.wholesale) stock[k] = it.stock;
 }
 let event = null;                           // { id, text, until }
-let nextEventAt = Date.now() + 120_000;
+let nextEventAt = Date.now() + (process.env.EVENT_NOW ? 2000 : 120_000);   // EVENT_NOW=1 starts an event right away (testing)
 const chatLog = [];                         // town-wide announcements only
 const reqs = new Map();                     // pending requests (trade / heal / call)
 let nextId = 1, dirty = false;
@@ -128,7 +128,7 @@ function enterRoom(a, m) {
   }
   if (s.house !== undefined) {
     const i = s.house, o = houses[i], tn = tenants[i];
-    if ((o || tn) && o !== a && tn !== a) return toast(a, `บ้านหลังนี้มีเจ้าของ${tn ? '/ผู้เช่า' : ''}แล้ว (${(tn || o).name}) เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า`, '🔒', false);
+    if (o !== a && tn !== a) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
   }
   if (!cd(a, 'door', 1200, true)) return;
   teleport(a, room.spawn.x, room.spawn.y);
@@ -209,8 +209,9 @@ function marketPrice(id) {
 function npcBuyPrice(a, id, rate = NPC_BUY) {
   const it = D.ITEMS[id];
   let b = 1;
-  if (a.career === 'merchant') b += 0.08 + Math.min(0.1, 0.01 * (lvl(a, 'merchant') - 1));
-  if (a.career === 'chef' && it.kind === 'meal') b += 0.08;
+  if (a.career === 'merchant' && it.kind === 'goods') rate = 0.7 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
+  else if (a.career === 'merchant') b += 0.05;
+  if (a.career === 'chef' && it.kind === 'meal') rate = Math.max(rate, 0.5);                                      // restaurants buy chefs' dishes
   if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
   if (a.career === 'fisher' && it.kind === 'fish') b += 0.08;
   return marketPrice(id) * rate * b;
@@ -324,7 +325,7 @@ function placeOrder(a, m) {
 function spawnNpcOrder() {
   const spots = [...D.STATIONS.filter(s => s.type === 'door' && s.house !== undefined), ...D.STATIONS.filter(s => s.type === 'seat')];
   const s = pick(spots), id = pick(MENU);
-  const fee = Math.round(deliveryFee(s.x, s.y) * 1.2 * (ev('hungry') ? 1.3 : 1));
+  const fee = Math.round(deliveryFee(s.x, s.y) * (ev('hungry') ? 1.3 : 1));
   const o = { id: nextOrder++, cust: null, custName: pick(D.NPC_NAMES), item: id, price: 0, fee, tip: rint(0, 3) ? 0 : rint(10, D.RIDER.tipMax),
     state: 'open', t: now(), rider: null, npc: { x: s.x, y: s.y + (s.type === 'door' ? .4 : 0), area: s.area } };
   orders.set(o.id, o); ordersChanged();
@@ -552,15 +553,15 @@ function act(a, m) {
     }
     case 'crowd.pick': {
       if (!need(a, 'thief')) return;
-      if (!cd(a, 'crowd', 90000) || !spend(a, 8)) return;
+      if (!cd(a, 'crowd', 60000) || !spend(a, 8)) return;
       addXp(a);
       if (Math.random() < 0.6 + 0.08 * tier(a, 'thief')) {
-        const amt = rint(15, 60); earn(a, amt); stat(a, 'stolen');
+        const amt = rint(20, 80); earn(a, amt); stat(a, 'stolen');
         if (Math.random() < 0.25) { const c = newCrime(a, '', amt); makeWanted(c, 'ชาวบ้านโทรแจ้ง'); return toast(a, `ล้วงได้ ${money(amt)} แต่มีชาวบ้านเห็นแล้วโทรแจ้งตำรวจ! รีบหลบไป`, '🚨', false); }
         return toast(a, `ล้วงกระเป๋าคนในฝูงชนได้ ${money(amt)}`, '🕶️');
       }
-      if (Math.random() < 0.5) {
-        const fine = Math.min(Math.floor(a.money), 200); a.money -= fine;
+      if (Math.random() < 0.3) {
+        const fine = Math.min(Math.floor(a.money), 100); a.money -= fine;
         standUp(a); a.down = { kind: 'jail', t: now(), until: now() + 60000 };
         const r = ROOM.r_police; place(a, r.x + 10.5, r.y + 7.8, true); joy(a, -15); markMe(a); sendRoster();
         feed(`👮 ${a.name} ถูกชาวบ้านจับได้คาหนังคาเขาขณะล้วงกระเป๋า`);
@@ -690,7 +691,7 @@ function act(a, m) {
       if (!need(a, 'chef')) return;
       const id = m.item, it = D.ITEMS[id];
       if (!it || !D.RECIPES.some(r => id in r.in)) return;
-      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), cost = npcSellPrice(id) * q;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), cost = Math.ceil(D.ITEMS[id].base * 1.3) * q;
       if (!pay(a, cost)) return;
       addItem(a, id, q); markMe(a);
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคา ${money(cost)} (แพงกว่าซื้อจากผู้เล่นมาก)`, '🛒');
@@ -803,8 +804,8 @@ function act(a, m) {
       if (pt.down) return toast(a, 'คนไข้หมดสติอยู่ ต้องช่วยให้ฟื้นก่อน', '💓', false);
       const target = (pt.dz || [])[0];
       if (!target) {                                    // check-up only
-        let fee = 120;
-        if (!pt.npc) { const f = Math.min(150, Math.floor(pt.money)); pt.money -= f; fee = f + 80; markMe(pt); toast(pt, `หมอ${a.name}ตรวจร่างกายให้ สุขภาพ +25`, '🩺'); }
+        let fee = 25;
+        if (!pt.npc) { const f = Math.min(150, Math.floor(pt.money)); pt.money -= f; fee = f + 40; markMe(pt); toast(pt, `หมอ${a.name}ตรวจร่างกายให้ สุขภาพ +25`, '🩺'); }
         pt.health = Math.min(100, pt.health + 25);
         const got = earn(a, fee * boost); addXp(a);
         if (pt.npc) beds[s.idx] = null; wdAt = 0;
@@ -815,9 +816,9 @@ function act(a, m) {
         wdAt = 0;
         return toast(a, 'วินิจฉัยผิด! คนไข้ไม่ได้เป็นโรคที่รักษานี้ ลองดูอาการอีกครั้ง', '❌', false);
       }
-      let fee = 260;
+      let fee = 55;
       if (pt.npc) pt.dz = pt.dz.filter(x => x !== target);
-      else { cure(pt, target); const f = Math.min(300, Math.floor(pt.money)); pt.money -= f; fee = f + 120; markMe(pt); toast(pt, `หมอ${a.name}รักษา${DZ[target].name}หายแล้ว! (ค่ารักษา ${money(f)})`, '💉'); }
+      else { cure(pt, target); const f = Math.min(300, Math.floor(pt.money)); pt.money -= f; fee = f + 60; markMe(pt); toast(pt, `หมอ${a.name}รักษา${DZ[target].name}หายแล้ว! (ค่ารักษา ${money(f)})`, '💉'); }
       pt.health = Math.min(100, pt.health + 20);
       const got = earn(a, fee * boost); addXp(a, 2); quest(a, 'treat'); stat(a, 'treated');
       if (!pt.dz.length) { if (pt.npc) beds[s.idx] = null; else standUp(pt); }
@@ -830,7 +831,7 @@ function act(a, m) {
     case 'pier.cast': {
       if (!need(a, 'fisher')) return;
       if (a.cast) return;
-      if (!spend(a, 8)) return;
+      if (!spend(a, 10)) return;
       const bite = now() + rnd(2500, 7000);
       a.cast = { state: 'wait', bite, expire: bite + 1700, st: s.id }; markMe(a);
       return;
@@ -1164,7 +1165,7 @@ function moodTick(a, t, indoors) {
   // monthly water & electricity bills
   billUp(a);
   // begging: passers-by drop coins now and then
-  if (a.pose === 'beg' && a.career === 'beggar' && Math.random() < 0.02 * (1 + BOOST[tier(a, 'beggar')]) * (D.isOpen('market') ? 1 : 0.4)) {
+  if (a.pose === 'beg' && a.career === 'beggar' && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * (D.isOpen('market') ? 1 : 0.4)) {
     const c = rint(2, 12); earn(a, c); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
   }
   // police on patrol (outside, on their feet) earn a small allowance
@@ -1542,7 +1543,7 @@ function tick() {
     // ---- energy, hunger, health
     const restMul = a.pose === 'rest' ? 3 : a.pose === 'seat' ? 2 : a.pose === 'bed' ? 2 : 1;
     if (a.pose !== 'chair') a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt);
-    a.hunger = Math.max(0, a.hunger - 0.06 * dzProd(a, 'hunger') * (flu ? 1.3 : 1) * (a.down ? 0.2 : 1) * dt);
+    a.hunger = Math.max(0, a.hunger - 0.045 * dzProd(a, 'hunger') * (flu ? 1.3 : 1) * (a.down ? 0.2 : 1) * dt);
     if (!a.down) {
       if (a.hunger < 15) { a.lowFood = (a.lowFood || 0) + dt; if (a.lowFood > 60) a.health -= 0.08 * dt; } else a.lowFood = 0;
       if (a.hunger <= 0) a.health -= 0.25 * dt;
@@ -1597,7 +1598,7 @@ function tick() {
     tenants.forEach((a, i) => { if (a && a.rent && a.rent.until < t) { tenants[i] = null; a.rent = null; a.sd = true; if (a.ws) { toast(a, 'สัญญาเช่าบ้านหมดแล้ว ต่อสัญญาได้ที่หน้าบ้าน', '🔑', false); markMe(a); } wdAt = 0; } });
     // NPC patients
     for (let i = 0; i < beds.length; i++) { const b = beds[i]; if (b && b.npc && b.until < t) { beds[i] = null; wdAt = 0; } }
-    if (t > npcPatientAt) { npcPatientAt = t + rnd(35000, 70000); if ([...online.values()].some(o => o.career === 'doctor')) spawnPatient(); }
+    if (t > npcPatientAt) { npcPatientAt = t + rnd(60000, 120000); if ([...online.values()].some(o => o.career === 'doctor')) spawnPatient(); }
     // food delivery
     for (const o of [...orders.values()]) {
       if (o.state === 'open' && !o.npc && t - o.t > (ridersOnline().length ? 90000 : 60000)) finishOrder(o, null);

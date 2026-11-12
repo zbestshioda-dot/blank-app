@@ -94,7 +94,6 @@ pre{background:#0e1216;border:1px solid var(--line);border-radius:10px;padding:1
   #menu button{padding:5px 0;width:42px;font-size:17px}
   #mini{width:96px;height:auto}
   #card{width:min(178px,calc(100vw - 130px))}
-  #eventBar{top:auto;bottom:calc(126px + env(safe-area-inset-bottom));left:8px;right:110px;transform:none;max-width:none}
 }
 
 /* ---- readability / polish pass ---- */
@@ -175,3 +174,15 @@ pre{background:#0e1216;border:1px solid var(--line);border-radius:10px;padding:1
 #mapLegend button.hl i{background:#ffc94d;color:#222}
 #mapLegend small{display:block;color:var(--mut);font-size:11px}
 @media(max-width:820px){.mapBody{flex-direction:column}#mapLegend{width:auto;max-height:34vh;display:grid;grid-template-columns:1fr 1fr}#mapLegend .lgHead{grid-column:1/-1}}
+
+/* ---- alert bar on top, foldable menu, zoomable map ---- */
+#eventBar{top:calc(6px + env(safe-area-inset-top));left:8px;right:8px;transform:none;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:4;background:rgba(120,70,10,.88);color:#ffe7b0;font-weight:700;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+body.hasEvent #card,body.hasEvent #topRight{top:44px}
+body.hasEvent #callChip{top:84px}
+#menuToggle{padding:5px 11px;font-size:16px;background:var(--card);align-self:flex-end}
+#mapScroll{overflow:auto;max-width:calc(100vw - 30px);max-height:calc(100vh - 140px);border-radius:10px;touch-action:none;flex-shrink:1}
+#mapScroll::-webkit-scrollbar{width:8px;height:8px}#mapScroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:4px}
+.mapHead #mapIn,.mapHead #mapOut{padding:4px 10px}
+#mapZoomLbl{font-size:12px;min-width:38px;text-align:center}
+@media(min-width:821px){#mapScroll{max-width:calc(min(100vw,1180px) - 310px)}}
+@media(max-width:820px){#mapScroll{max-height:calc(100vh - 360px)}.mapHead span{display:none}}

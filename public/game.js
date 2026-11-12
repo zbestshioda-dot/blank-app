@@ -211,6 +211,7 @@ setInterval(() => { if (me?.down) paintDown(); }, 500);
 function paintEvent() {
   const e = $('#eventBar');
   if (wd?.ev) { e.textContent = wd.ev.text; e.classList.remove('hidden'); } else e.classList.add('hidden');
+  document.body.classList.toggle('hasEvent', !!wd?.ev);
 }
 const hourNow = () => FORCE_PHASE !== null ? +FORCE_PHASE * 24 : ((((Date.now() + clockOff + (wd?.toff || 0)) % G.dayMs) / G.dayMs) * 24);
 const FORCE_PHASE = new URLSearchParams(location.search).get('phase');   // ?phase=0.95 previews a time of day
@@ -218,7 +219,7 @@ const isOpen = (kind, h = hourNow()) => { const o = G?.hours[kind]; return !o ||
 setInterval(() => {
   if (!wd || !G) return;
   const h = hourNow();
-  const dt = me?.date; $('#clock').textContent = `${dt ? `📅 ${dt.day}/${G.monthDays} ${G.months[dt.month].slice(0, 3)}. ${dt.year} · ` : ''}🕐 ${hhmm(h)} · 👥 ${wd.on}`;
+  const dt = me?.date; $('#clock').textContent = `${dt ? `📅 ${dt.day}/${G.monthDays} ${G.months[dt.month]} · ` : ''}🕐 ${hhmm(h)} · 👥 ${wd.on}`;
   document.querySelectorAll('.qcd').forEach(el => {
     const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
     el.textContent = `${Math.floor(s / 3600)} ชม. ${Math.floor(s % 3600 / 60)} นาที`;
@@ -231,7 +232,11 @@ setInterval(() => {
 
 document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPanel({ kind: b.dataset.open }));
 $('#panelX').onclick = closePanel;
-$('#mini').onclick = () => G && openMap();
+$('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
+// side menu can be folded away (remembered on this device)
+const setMenu = open => { $('#menu').classList.toggle('hidden', !open); $('#menuToggle').textContent = open ? '✕' : '☰'; $('#menuToggle').title = open ? 'ซ่อนเมนู' : 'เปิดเมนู'; try { localStorage.setItem('lt_menu', open ? '1' : '0'); } catch { } };
+$('#menuToggle').onclick = () => { FX.play('click'); setMenu($('#menu').classList.contains('hidden')); };
+{ let m = '1'; try { m = localStorage.getItem('lt_menu') ?? '1'; } catch { } setMenu(m !== '0'); }
 $('#mapX').onclick = closeMap;
 $('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapView') closeMap(); });
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
@@ -937,8 +942,8 @@ function houseDoor(s, st) {
   const i = s.house, h = wd?.houses?.[i]; if (!h) return '';
   const [owner, cf, furn, sale, rentP, tenant, until] = h, price = G.shop.housePrices[i], rent = G.shop.houseRent[i];
   const mine = me.house === i, iRent = me.rent && me.rent.idx === i;
-  const canEnter = mine || iRent || (!owner && !tenant);
-  const enter = canEnter ? B(owner || tenant ? '🚪 เข้าบ้าน' : '🚪 เข้าไปดูบ้าน', { t: 'enter', st }, 'primary big') : '<div class="sub">🔒 เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า</div>';
+  const canEnter = mine || iRent;
+  const enter = canEnter ? B(owner || tenant ? '🚪 เข้าบ้าน' : '🚪 เข้าไปดูบ้าน', { t: 'enter', st }, 'primary big') : (owner || tenant ? '<div class="sub">🔒 เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า</div>' : '<div class="sub">🔒 บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้</div>');
   const days = r => `<div class="grid3">${[1, 3, 7].map(d => B(`${d} วัน ${money(r * d)}`, { t: 'act', st, a: 'rent', days: d }, 'good')).join('')}</div>`;
   const left = until ? Math.max(0, Math.round((until - Date.now() - clockOff) / G.dayMs * 10) / 10) : 0;
   if (mine) {
@@ -1187,15 +1192,41 @@ function drawGuide(X, Y, t) {
 // full-screen map of one outdoor area: a clean, simplified drawing with numbered markers
 // and a legend underneath. Tap a marker or a legend row to get the yellow guide arrow.
 const MAP_COL = { '=': '#5d636d', ',': '#c9c5b5', c: '#c4b494', w: '#5fb4e6', p: '#b48a5c', s: '#ecdcab', f: '#8a6040', B: '#9a8a7a', T: '#6fae5c', '.': '#8cc56f', o: '#8cc56f', m: '#a7d07a', k: '#e0b083', ' ': '#07090c' };
-function openMap(mapId) {
+let mapZoom = 1, mapCur = null;
+function zoomMap(z, cx, cy) {
+  const box = $('#mapScroll'), old = mapZoom; mapZoom = clamp(z, 1, 5); if (mapZoom === old) return;
+  const r = box.getBoundingClientRect(); cx = cx ?? r.width / 2; cy = cy ?? r.height / 2;
+  const fx = (box.scrollLeft + cx) / old, fy = (box.scrollTop + cy) / old;     // keep the point under the finger/cursor still
+  openMap(mapCur, true);
+  box.scrollLeft = fx * mapZoom - cx; box.scrollTop = fy * mapZoom - cy;
+}
+$('#mapIn').onclick = () => zoomMap(mapZoom * 1.5); $('#mapOut').onclick = () => zoomMap(mapZoom / 1.5);
+$('#mapScroll').addEventListener('wheel', e => { e.preventDefault(); const r = $('#mapScroll').getBoundingClientRect(); zoomMap(mapZoom * (e.deltaY < 0 ? 1.25 : 0.8), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+{ // two-finger pinch to zoom, one finger drags the map when zoomed in
+  const pts = new Map(); let pinch = 0, drag = null;
+  const box = $('#mapScroll');
+  box.addEventListener('pointerdown', e => { pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } else drag = { x: e.clientX, y: e.clientY, sl: box.scrollLeft, st: box.scrollTop, moved: false }; });
+  box.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2 && pinch) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), r = box.getBoundingClientRect(); if (Math.abs(d / pinch - 1) > 0.12) { zoomMap(mapZoom * d / pinch, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top); pinch = d; } }
+    else if (drag && e.pointerType !== 'mouse' || drag && e.buttons) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 6) drag.moved = true; box.scrollLeft = drag.sl - dx; box.scrollTop = drag.st - dy; }
+  });
+  const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = 0; if (!pts.size) setTimeout(() => { drag = null; }, 0); };
+  box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+  box.addEventListener('click', e => { if (drag?.moved) { e.stopPropagation(); e.preventDefault(); } }, true);
+}
+function openMap(mapId, keepScroll) {
   const m = P.get(myId);
   mapId = mapId || mapOf(areaOf(m.x, m.y)?.id);
+  if (mapId !== mapCur && !keepScroll) mapZoom = Math.min(mapZoom, 5);
+  mapCur = mapId;
   const A = AREA[mapId];
   $('#mapView').classList.remove('hidden');
   $('#mapTabs').innerHTML = G.areas.filter(a => a.kind === 'map').map(a => `<button data-map="${a.id}" class="${a.id === mapId ? 'primary' : ''}">${a.name}</button>`).join('');
-  $('#mapTabs').querySelectorAll('[data-map]').forEach(b => b.onclick = () => openMap(b.dataset.map));
+  $('#mapTabs').querySelectorAll('[data-map]').forEach(b => b.onclick = () => { mapZoom = 1; openMap(b.dataset.map); });
   const c = $('#bigMap'), W = A.w, H = A.h, wide = innerWidth > 820;
-  const k = Math.min((Math.min(innerWidth, 1180) - (wide ? 300 : 30)) / W, (innerHeight - (wide ? 140 : 330)) / H);
+  const k = Math.min((Math.min(innerWidth, 1180) - (wide ? 300 : 30)) / W, (innerHeight - (wide ? 140 : 330)) / H) * mapZoom;
+  $('#mapZoomLbl').textContent = `${Math.round(mapZoom * 100)}%`;
   const dpr = Math.min(2, devicePixelRatio || 1);
   c.width = W * k * dpr; c.height = H * k * dpr; c.style.width = W * k + 'px'; c.style.height = H * k + 'px';
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1256,6 +1287,7 @@ function openMap(mapId) {
   $('#mapLegend').innerHTML = `<div class="lgHead">⚪ คุณอยู่${here ? `ใน${esc(here.label)}` : 'ที่วงสีส้ม'} · แตะชื่อสถานที่เพื่อนำทาง</div>` + places.map(pl =>
     `<button data-key="${esc(pl.key)}" class="${pl.hl ? 'hl' : ''}"><i class="k-${pl.kind}">${pl.n}</i><span>${pl.icon} ${esc(pl.label)}${pl.sub ? `<small>${esc(pl.sub)}</small>` : ''}</span></button>`).join('');
   $('#mapLegend').querySelectorAll('[data-key]').forEach(b => b.onclick = () => { closeMap(); setGuide(b.dataset.key); });
+  if (!keepScroll && mapZoom > 1) { const q = outPos(m.x, m.y), [x, y] = L(q.x, q.y), box = $('#mapScroll'); box.scrollLeft = x - box.clientWidth / 2; box.scrollTop = y - box.clientHeight / 2; }
   c.onclick = e => {
     const rc = c.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
     const hit = places.map(pl => [pl, Math.hypot(pl.x - x, pl.y - y)]).sort((a, b) => a[1] - b[1])[0];
