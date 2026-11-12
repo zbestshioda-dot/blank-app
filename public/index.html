@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#14181d">
+<title>เมืองชีวิตนี้เลือกได้</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="card">
+    <div class="row"><b id="meName"></b><span id="meCareer"></span></div>
+    <div class="money" id="meMoney"></div>
+    <div class="bars">
+      <div class="bar" title="พลังงาน"><i>⚡</i><s><u id="bE"></u></s></div>
+      <div class="bar" title="ความหิว (เต็ม = อิ่ม)"><i>🍗</i><s><u id="bH"></u></s></div>
+      <div class="bar" title="สุขภาพ"><i>❤️</i><s><u id="bL"></u></s></div>
+    </div>
+  </div>
+  <div id="topRight">
+    <div id="clock"></div>
+    <canvas id="mini" width="120" height="88"></canvas>
+    <div id="menu">
+      <button data-open="career">💼</button>
+      <button data-open="bag">🎒</button>
+      <button data-open="rank">🏆</button>
+      <button data-open="chat">💬</button>
+      <button data-open="help">❔</button>
+    </div>
+  </div>
+  <div id="eventBar" class="hidden"></div>
+  <div id="log"></div>
+  <div id="toasts"></div>
+  <div id="reqs"></div>
+  <div id="stick"><i></i></div>
+  <button id="actBtn" class="hidden"><span id="actIcon">👆</span><small id="actLabel"></small></button>
+</div>
+
+<div id="panel" class="hidden"><div class="sheet"><button class="x" id="panelX">✕</button><div id="panelBody"></div></div></div>
+<div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div></div></div>
+
+<div id="login">
+  <form id="loginForm" class="box" autocomplete="off">
+    <h1>🏙️ เมืองชีวิตนี้เลือกได้</h1>
+    <p class="sub">เดินในเมืองเดียวกับผู้เล่นคนอื่น เลือกอาชีพ หาเงิน แล้วเดินไปแลกเปลี่ยนกัน</p>
+    <label>ชื่อตัวละคร<input id="inName" maxlength="16" placeholder="เช่น สมชาย" required></label>
+    <label>PIN 4 หลัก <small>(ผู้เล่นใหม่ตั้งเอง / ผู้เล่นเดิมใส่เพื่อเล่นต่อ)</small><input id="inPin" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="••••" type="password" required></label>
+    <div class="lbl">สีตัวละคร</div><div id="swatches"></div>
+    <label>อาชีพเริ่มต้น<select id="inCareer"></select></label>
+    <div id="loginErr"></div>
+    <button class="primary" type="submit">เข้าเมือง</button>
+    <div id="careerHint" class="sub"></div>
+  </form>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

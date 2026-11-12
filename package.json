@@ -1,0 +1,9 @@
+{
+  "name": "life-town",
+  "version": "1.0.0",
+  "description": "เมืองชีวิตนี้เลือกได้ — เกมใช้ชีวิตเลือกอาชีพ มัลติเพลเยอร์เรียลไทม์บนเบราว์เซอร์",
+  "main": "server/index.js",
+  "scripts": { "start": "node server/index.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}
