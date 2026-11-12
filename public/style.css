@@ -134,3 +134,28 @@ pre{background:#0e1216;border:1px solid var(--line);border-radius:10px;padding:1
 .chip.bad{background:rgba(239,106,91,.22);border:1px solid rgba(239,106,91,.6);color:#ffc0b8}
 .chip.warnc{background:rgba(255,201,77,.16);border:1px solid rgba(255,201,77,.5);color:#ffe2a0}
 .tabs{display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap}.tabs button{flex:1;font-size:13px;padding:7px 6px}
+
+/* ---- jobs, phone, rest, knocked out ---- */
+#eventBar,#log,#toasts{pointer-events:none!important}
+#reqs{pointer-events:none}#reqs .req{pointer-events:auto}
+.jobbox{background:rgba(255,201,77,.08);border:1px solid rgba(255,201,77,.35);border-radius:12px;padding:10px 12px;margin:8px 0}
+.jobbox.ok{background:rgba(111,211,138,.1);border-color:rgba(111,211,138,.5)}
+.jobbox .big{margin-top:6px}
+.col2{display:flex;flex-direction:column;gap:4px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}.grid3 button{font-size:12.5px;padding:8px 4px}
+.tabs.cats button{font-size:12px;padding:5px 6px}
+#mSearch{margin:4px 0 0}
+#restBtn{position:absolute;right:120px;bottom:calc(30px + env(safe-area-inset-bottom));padding:10px 14px;border-radius:24px;background:var(--card);font-weight:700;font-size:14px;backdrop-filter:blur(6px)}
+#restBtn.on{background:#3f6b8f;border-color:#6aa3d1}
+#actBtn.closed{background:#8a5a5a;color:#fff}
+#callChip{position:absolute;left:50%;transform:translateX(-50%);top:46px;background:#2e7d4f;border-color:#3f9c66;font-weight:700;border-radius:20px;padding:6px 14px;animation:breathe 1.6s infinite}
+#downView{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);background:rgba(10,12,16,.88);border:1px solid var(--bad);border-radius:16px;padding:16px 22px;text-align:center;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:90vw}
+#downView b{font-size:18px}#downView span{color:var(--mut)}
+#callMsgs{display:flex;flex-direction:column;gap:3px;max-height:30vh;overflow:auto;margin:8px 0;font-size:13.5px}
+#callMsgs .me{color:#ffe2a0}
+#log .call{color:#9fe0b4}
+#phoneBtn.has::after{content:'';position:absolute;right:3px;top:3px;width:8px;height:8px;border-radius:50%;background:#ef6a5b}
+#mapTabs{margin:0 0 8px}
+.dq{text-align:left;margin:0 0 12px;display:flex;flex-direction:column;gap:5px}.dq b{font-size:14px}.dq button{text-align:left}
+#daily{max-height:90vh;overflow:auto}
+@media(max-width:600px){#restBtn{right:116px;bottom:calc(26px + env(safe-area-inset-bottom));padding:8px 11px}}

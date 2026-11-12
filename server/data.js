@@ -1,277 +1,440 @@
 'use strict';
-// Static game data: map, stations, items, careers. Tile units everywhere.
-
-// Town layout is built around the sprite atlas (public/assets/atlas.json, 48 px per tile):
-// buildings are front-facing sprites standing on solid footprints, doors face the street below.
+// Static game data: maps, stations, items, careers. Tile units everywhere.
+//
+// The world is one big tile grid split into separate AREAS that never touch:
+//   town (the village), farm (player gardens + river), housing (houses to buy / rent),
+//   and the building interiors. You travel between maps through gates and doors.
 const ATLAS = require('../public/assets/atlas.json');
 const SPR = name => { const s = ATLAS.sprites[name]; return { w: s[2] / ATLAS.tile, h: s[3] / ATLAS.tile }; };
-const TW = 64, H = 56, W = 142;           // town 64x56; interiors live at x >= 66
 
-// ---------------------------------------------------------------- map
-// tile codes: . grass  = road  , sidewalk  w water  p pier  B building  T tree  o solid prop
-//             f soil   s sand  k plaza bricks  m meadow
-const grid = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => x < TW ? '.' : ' '));
+const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, y: 0, w: 110, h: 90 };
+const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
+const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
+const RX0 = 256;                                         // interiors start here
+const W = RX0 + 6 * 18 + 2, H = 90;
+
+// ---------------------------------------------------------------- grid helpers
+// tile codes: . grass  = road  , sidewalk  c cobble path  k plaza bricks  w water  p pier/bridge
+//             s sand  m meadow  f soil  B building  T tree  o solid prop  # wall  i floor  D door mat  ' ' void
+const grid = Array.from({ length: H }, () => Array.from({ length: W }, () => ' '));
 const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) grid[y][x] = c; };
 const rect = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c); };
 const get = (x, y) => (grid[y] || [])[x];
-
-// streets: three east-west roads (buildings face them from the north) + a north-south avenue
-const ROWS = [9, 21, 33];                 // y of the sidewalk in front of each building row
-for (const y of ROWS) { rect(1, y, TW - 2, 1, ','); rect(1, y + 1, TW - 2, 2, '='); rect(1, y + 3, TW - 2, 1, ','); }
-rect(28, 1, 1, H - 2, ','); rect(31, 1, 1, H - 2, ','); rect(29, 1, 2, H - 2, '=');
-
-// south: farm (west), park (centre), lake with a pier (east)
-rect(2, 39, 25, 13, 'm');
-rect(33, 38, 7, 16, 'k');
-rect(41, 41, 22, 14, 'w');
-for (let y = 38; y < H - 1; y++) for (let x = 39; x < TW - 1; x++) if (get(x, y) === '.' || get(x, y) === 'k') {
-  if ([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [2, 0], [0, 2]].some(([dx, dy]) => get(x + dx, y + dy) === 'w')) set(x, y, 's');
+const ellipse = (cx, cy, rx, ry, c) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) if (((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2 <= 1) set(x, y, c); };
+function shore(a, c = 's') {   // sand ring around water inside an area
+  for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) if (get(x, y) === '.' || get(x, y) === 'm') {
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => get(x + dx, y + dy) === 'w')) set(x, y, c);
+  }
 }
-rect(38, 46, 12, 2, 'p');
-
-// ---------------------------------------------------------------- buildings
-const B = (id, sprite, x, row, extra = {}) => {
-  const sp = SPR(sprite), w = Math.ceil(sp.w - 0.05), h = Math.max(2, Math.round(sp.h - 0.4));
-  return { id, sprite, x, y: ROWS[row] - h, w, h, ...extra };
-};
-const BUILDINGS = [
-  B('toolshop', 'b_shop', 2, 0, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' }),
-  B('dealer', 'b_dealer', 9, 0, { label: 'โชว์รูมรถ', icon: '🚗', st: 'dealer' }),
-  B('office', 'b_office', 19, 0, { label: 'บริษัท', icon: '🏢', st: 'office' }),
-  B('market', 'b_mart', 33, 0, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' }),
-  B('police', 'b_police', 41, 0, { label: 'สถานีตำรวจ', icon: '👮', deco: true }),
-  B('fire', 'b_fire', 49, 0, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }),
-  B('warehouse', 'b_warehouse', 2, 1, { label: 'คลังสินค้า', icon: '📦', st: 'warehouse' }),
-  B('studio', 'b_studio', 10, 1, { label: 'สตูดิโอ', icon: '🎥', st: 'studio' }),
-  B('home', 'b_inn', 19, 1, { label: 'บ้านพัก', icon: '🏠', st: 'home' }),
-  B('restaurant', 'b_cafe', 33, 1, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }),
-  B('kitchen', 'b_bakery', 40, 1, { label: 'ครัวใหญ่', icon: '🍳', st: 'kitchen' }),
-  B('hospital', 'b_hospital', 47, 1, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' }),
-  B('flower', 'b_flower', 57, 1, { label: 'ร้านดอกไม้', icon: '💐', deco: true }),
-  B('school', 'b_school', 2, 2, { label: 'โรงเรียน', icon: '🎓', st: 'school' }),
-  B('cowork', 'b_cowork', 11, 2, { label: 'โค้ดดิ้งสเปซ', icon: '💻', st: 'cowork' }),
-  B('bank', 'b_bank', 20, 2, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }),
-];
-const HOUSE_SPRITES = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
-HOUSE_SPRITES.forEach((sp, i) => BUILDINGS.push(B('house' + i, sp, 33 + i * 5, 2, { label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i })));
-const barn = { id: 'barn', sprite: 'b_barn', x: 3, y: 47, w: 4, h: 3, label: 'โรงนา', icon: '🐄', deco: true };
-BUILDINGS.push(barn);
-BUILDINGS.forEach(b => rect(b.x, b.y, b.w, b.h, 'B'));
-
-// ---------------------------------------------------------------- stations
-const STATIONS = [];
-// farm: 12 plots (2x2 soil) in two rows
-let plotIdx = 0;
-for (const py of [41, 44]) for (const px of [8, 11, 14, 17, 20, 23]) {
-  rect(px, py, 2, 2, 'f');
-  STATIONS.push({ id: 'plot' + plotIdx, type: 'plot', idx: plotIdx, label: 'แปลงเกษตร', icon: '🌱', x: px + 1, y: py + 1, r: 1.5 });
-  plotIdx++;
-}
-const DOOR_LABELS = { office: 'บริษัท ไทยเทค', warehouse: 'คลังสินค้าราคาส่ง', studio: 'สตูดิโอสตรีม', kitchen: 'ครัวใหญ่ (เชฟ)' };
-for (const b of BUILDINGS) {
-  if (!b.st) continue;
-  const x = b.x + b.w / 2, y = b.y + b.h + 0.6;          // just in front of the door, on the sidewalk
-  if (b.house !== undefined) STATIONS.push({ id: b.st, type: 'house', idx: b.house, label: 'บ้าน', icon: '🏠', x, y, r: 1.6 });
-  else STATIONS.push({ id: b.st, type: b.st, label: DOOR_LABELS[b.st] || b.label, icon: b.icon, x, y, r: 1.8 });
-}
-STATIONS.push({ id: 'pier1', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 44, y: 47, r: 3 });
-STATIONS.push({ id: 'pier2', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 48.5, y: 47, r: 3 });
-
-// ---------------------------------------------------------------- props (decoration sprites)
-// x, y = bottom-centre in tiles; solid props block the tile under their base
-const PROPS = [];
-const prop = (s, x, y, solid = true) => { PROPS.push({ s, x, y }); if (solid) set(Math.floor(x), Math.floor(y - 0.5), 'o'); };
-// street lamps and bins along every sidewalk
-for (const y of ROWS) for (let x = 4; x < TW - 3; x += 9) if (x < 27 || x > 32) {
-  if (get(x, y + 3) === ',') prop(x % 2 ? 'lamp' : 'lamp2', x + 0.5, y + 4);
-}
-prop('busstop', 26, 13); prop('bench', 36.5, 13.9, false); prop('trafficlight', 27.6, 9.95);
-prop('trafficlight', 32.4, 24.95); prop('vending', 26.6, 21.9); prop('bin_blue', 7, 21.95); prop('postbox', 10, 33.95);
-prop('hydrant', 46.5, 9.95); prop('phonebooth', 39.5, 9.95);
-prop('stall_red', 35, 14.9); prop('stall_green', 39, 14.9); prop('stall_blue', 43, 14.9); prop('stall_orange', 47, 14.9);
-prop('car_red', 16.5, 10.95); prop('car_blue', 7.5, 10.95); prop('taxi', 56.5, 22.95); prop('car_yellow', 57.5, 34.95);
-prop('foodtruck', 36.5, 53.3);
-// park
-prop('fountain', 36.5, 42); prop('gazebo', 36.5, 50.5); prop('bench', 34, 45.5, false); prop('bench2', 39, 45.5, false);
-prop('flowerbed', 34, 39.4); prop('flowerbed2', 39, 39.4); prop('lamp3', 33.5, 47.5); prop('lamp3', 33.5, 52.5);
-prop('parasol', 44, 39.2); prop('picnic', 48, 39.1); prop('icecream', 53, 39.4);
-// farm
-prop('fence_wood', 3.5, 39); prop('fence_wood', 6.5, 39); for (let x = 9.5; x < 26; x += 3) prop('fence_wood', x, 39);
-prop('well', 4, 44.2); prop('hay', 25.5, 50.5); prop('hay2', 23.5, 50.5); prop('cart', 19, 50.6); prop('planter_crops', 12, 50.4);
-prop('scarecrow' in ATLAS.sprites ? 'scarecrow' : 'signpost', 26, 45);
-// gardens and pets around the houses
-for (let i = 0; i < 6; i++) prop(i % 2 ? 'flowerbed' : 'hedge', 35 + i * 5, 37.6, false);
-prop('doghouse', 61.5, 37.9); prop('dog', 60, 38.5, false); prop('cat', 47.6, 33.8, false);
-// school yard & misc
-prop('flowerbox', 9.5, 21.95, false); prop('flowerbox2', 25.5, 33.95, false); prop('easel', 23.6, 9.95);
-prop('noticeboard', 18, 33.95); prop('kiosk', 53.5, 14.9);
-
-// trees: rows along the edges + scatter on free grass
-for (let x = 2; x < TW - 2; x += 3) { if (get(x, 2) === '.' && get(x, 1) === '.') { set(x, 1, 'T'); } }
-const TREE_KINDS = ['tree', 'tree', 'pine', 'tree_orange', 'tree_pink', 'tree'];
 function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const rand = rng(20240607);
-for (let i = 0; i < 260; i++) {
-  const x = 1 + Math.floor(rand() * (TW - 2)), y = 2 + Math.floor(rand() * (H - 3));
-  if (get(x, y) !== '.') continue;
-  let ok = true;
-  for (let j = -3; j <= 1 && ok; j++) for (let k = -2; k <= 2; k++) { const c = get(x + k, y + j); if (c && c !== '.' && c !== 'T') { ok = false; break; } }
-  if (ok && !STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3) && !PROPS.some(p => Math.hypot(p.x - x - .5, p.y - y - .5) < 2.5)) set(x, y, 'T');
+const rand = rng(20261112);
+for (const a of [TOWN, FARM, HOUSING]) rect(a.x, a.y, a.w, a.h, '.');
+
+const BUILDINGS = [], STATIONS = [], PROPS = [];
+const prop = (s, x, y, solid = true) => { PROPS.push({ s, x, y }); if (solid) set(Math.floor(x), Math.floor(y - 0.5), 'o'); };
+// a building whose door opens onto row `front` (the first walkable row in front of it)
+function B(id, sprite, x, front, extra = {}) {
+  const sp = SPR(sprite), w = Math.ceil(sp.w - 0.05), h = Math.max(2, Math.round(sp.h - 0.4));
+  const b = { id, sprite, x, y: front - h, w, h, ...extra };
+  BUILDINGS.push(b); return b;
 }
-for (let x = 0; x < TW; x++) { set(x, 0, 'T'); set(x, H - 1, 'T'); }
-for (let y = 0; y < H; y++) { set(0, y, 'T'); set(TW - 1, y, 'T'); }
-// which sprite each tree tile uses (stable per position)
-const TREES = [];
-for (let y = 0; y < H; y++) for (let x = 0; x < TW; x++) if (grid[y][x] === 'T') {
-  const near = (x < 2 || x > TW - 3 || y < 1 || y > H - 2);
-  TREES.push([x, y, near && (x + y) % 3 === 0 ? 'pine' : TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
+// cobblestone path from a door straight down to a road
+function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b.y + b.h; y < toY; y++) for (const x of [cx - 1, cx]) if ('.mT'.includes(get(x, y))) set(x, y, 'c'); }
+
+// ================================================================= TOWN
+{
+  const T = TOWN;
+  rect(102, 0, 8, H, 'w'); rect(97, 0, 5, H, 's');               // sea + beach along the east
+  ellipse(26, 68, 15, 9, 'w');                                     // the lake
+  ellipse(80, 54, 7, 4.5, 'w');                                    // pond in the east park
+  // roads (2 lanes) with sidewalks where buildings face them
+  rect(2, 31, 40, 2, '='); rect(2, 30, 40, 1, ','); rect(2, 33, 40, 1, ',');          // west main road
+  rect(58, 31, 38, 2, '='); rect(58, 30, 36, 1, ','); rect(58, 33, 36, 1, ',');       // east main road
+  rect(94, 33, 2, 45, '=');                                                           // coast road south
+  rect(50, 76, 46, 2, '=');                                                           // south road
+  rect(49, 4, 2, 20, '=');                                                            // north road
+  rect(14, 14, 74, 2, '='); rect(14, 13, 74, 1, ',');                                 // north street
+  rect(49, 40, 2, 36, '=');                                                           // south avenue
+  rect(4, 46, 45, 2, '='); rect(4, 45, 45, 1, ',');                                   // south-west lane
+  // town square
+  rect(42, 24, 16, 16, 'k');
+  // winding cobble paths through the parks (they make it feel like a village, not a grid)
+  const wiggle = (x0, y0, dirs) => { let x = x0, y = y0; for (const [dx, dy, n] of dirs) for (let i = 0; i < n; i++) { if ('.m'.includes(get(x, y))) { set(x, y, 'c'); set(x + (dy ? 1 : 0), y + (dx ? 1 : 0), get(x + (dy ? 1 : 0), y + (dx ? 1 : 0)) === '.' ? 'c' : get(x + (dy ? 1 : 0), y + (dx ? 1 : 0))); } x += dx; y += dy; } };
+  wiggle(58, 37, [[1, 0, 6], [0, 1, 5], [1, 0, 8], [0, 1, 4], [1, 0, 6], [0, 1, 6], [1, 0, 6]]);
+  wiggle(26, 48, [[0, 1, 4], [1, 0, 3], [0, 1, 3]]);
+  wiggle(88, 34, [[0, 1, 6], [-1, 0, 4], [0, 1, 6]]);
+  wiggle(51, 16, [[1, 0, 4], [0, 1, 3], [1, 0, 6], [0, 1, 3]]);
+  rect(20, 56, 2, 7, 'p'); rect(31, 56, 2, 7, 'p');                 // lake piers
+  rect(96, 60, 10, 2, 'p');                                          // sea pier
+  rect(49, 38, 2, 2, '=');                                           // avenue meets the square
+  shore(T);
+  rect(94, 60, 2, 2, '=');
+
+  // west main road, north side (doors on row 30)
+  B('toolshop', 'b_shop', 4, 30, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
+  pathDown(B('dealer', 'b_dealer', 11, 28, { label: 'โชว์รูมรถ & ใบขับขี่', icon: '🚗', st: 'dealer' }), 30);
+  B('school', 'b_school', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
+  pathDown(B('bank', 'b_bank', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
+  // east main road, north side
+  B('market', 'b_mart', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' });
+  B('hospital', 'b_hospital', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
+  pathDown(B('office', 'b_office', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
+  B('flower', 'b_flower', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true });
+  // north street
+  B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', deco: true });
+  pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
+  B('cinema', 'b_studio', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true });
+  B('inn', 'b_inn', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
+  // south-west lane (doors on row 45)
+  B('warehouse', 'b_warehouse', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
+  pathDown(B('restaurant', 'b_cafe', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
+  B('kitchen', 'b_bakery', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
+  B('rider', 'b_cowork', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
+  B('cafe2', 'b_flower', 38, 45, { label: 'คาเฟ่', icon: '☕', deco: true });
+
+  // villagers' homes scattered around town (scenery) so it reads as a lived-in village
+  const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
+  [[54, 76], [61, 75], [68, 76], [76, 75], [83, 76], [3, 13], [8, 12], [55, 62], [86, 46], [60, 52], [12, 85], [20, 85], [30, 85], [70, 85], [80, 85]].forEach(([x, f], i) => {
+    const b = B('vh' + i, HS[i % 6], x, f, { label: '', icon: '🏡', deco: true });
+    pathDown(b, f + 1);
+    prop(i % 2 ? 'flowerbox' : 'hedge', x + (i % 2 ? 4.5 : -0.8), f + .02, false);
+  });
+  rect(52, 85, 40, 2, 'c'); rect(8, 85, 30, 2, 'c'); rect(37, 78, 2, 9, 'c'); rect(38, 78, 12, 2, 'c'); rect(60, 78, 2, 7, 'c');
+  // empty lots kept for careers added later
+  for (const [x, y] of [[66, 12], [75, 12], [84, 12]]) { rect(x - 2, y - 3, 6, 3, 'm'); prop('signpost', x + .5, y + .2); }
+
+  // town square: fountain, picnic tables you can sit at, benches, flowers
+  prop('fountain', 50, 33.6);
+  rect(48, 32, 4, 2, 'o');
+  for (const [x, y] of [[45, 27.6], [55, 27.6], [45, 37.4], [55, 37.4]]) {
+    prop('picnic', x, y); set(Math.floor(x) - 1, Math.floor(y - .5), 'o'); set(Math.floor(x) + 1, Math.floor(y - .5), 'o');
+    STATIONS.push({ id: `seat${x}_${y}`, type: 'seat', label: 'โต๊ะนั่งเล่น', icon: '🪑', x, y: y + .75, r: 1.3, area: 'town' });
+  }
+  for (const [x, y, s] of [[43.6, 32.6, 'bench'], [56.4, 32.6, 'bench2']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
+  prop('flowerbed', 44, 25.4); prop('flowerbed2', 56, 25.4); prop('lamp3', 42.6, 30); prop('lamp3', 57.4, 30); prop('lamp3', 42.6, 36); prop('lamp3', 57.4, 36);
+  prop('noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
+  // street furniture
+  for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
+  for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
+  for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('lamp2', x + .5, 17);
+  prop('busstop', 39, 30.2); prop('trafficlight', 48.4, 30); prop('vending', 41.2, 29.9); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
+  prop('phonebooth', 57.3, 23.9); prop('bin_blue', 36, 29.95); prop('bin_green', 75, 33.95);
+  prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95); prop('bus', 30, 18.2);
+  // parks, the lake and the beach
+  prop('gazebo', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
+  prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
+  prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
+  prop('kiosk', 26.5, 54.6); prop('crate', 23.5, 55.5); prop('barrel', 29.5, 55.5);
+  prop('stall_red', 9, 52); prop('stall_green', 13, 52); prop('cartstall', 41, 55);
+
+  // where the gates and fishing spots are
+  STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'pier_l1', type: 'pier', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 21, y: 62.2, r: 1.8, area: 'town' });
+  STATIONS.push({ id: 'pier_l2', type: 'pier', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 32, y: 62.2, r: 1.8, area: 'town' });
+  STATIONS.push({ id: 'pier_s1', type: 'pier', pool: 'sea', label: 'สะพานปลา (ทะเล)', icon: '🎣', x: 105, y: 61, r: 1.8, area: 'town' });
+  STATIONS.push({ id: 'pier_s2', type: 'pier', pool: 'sea', label: 'ริมหาด (ทะเล)', icon: '🎣', x: 101.2, y: 38, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'pier_p', type: 'pier', pool: 'lake', label: 'บ่อตกปลา', icon: '🎣', x: 80, y: 49.2, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'gate_farm', type: 'gate', to: 'farm_in', label: 'ไปไร่ชานเมือง', icon: '🌾', x: 3, y: 32, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'gate_housing', type: 'gate', to: 'housing_in', label: 'ไปหมู่บ้านจัดสรร', icon: '🏘️', x: 50, y: 5, r: 1.6, area: 'town' });
+  prop('sign_walk', 4.6, 30.3); prop('signpost', 52.2, 5.3);
 }
 
-// ---------------------------------------------------------------- interiors
-// Every usable building gets a room (14x10) right of the town. Its counter moves
-// inside; outside becomes a door that teleports you in. Tiles: # wall, i floor, D exit.
+// ================================================================= FARM (player gardens)
+const LOTS = [];
+const GARDEN = { lotPrice: 2500, startPlots: 2, maxPlots: 6, expand: [0, 0, 900, 1600, 2600, 4000] };
+{
+  const X = FARM.x;
+  rect(X + 2, 24, 66, 2, 'c');                                       // farm track
+  rect(X, 42, FARM.w, 5, 'w');                                       // river
+  rect(X + 20, 39, 2, 5, 'p'); rect(X + 48, 39, 2, 5, 'p');          // fishing piers
+  rect(X + 34, 40, 3, 9, 'p');                                       // bridge
+  shore(FARM);
+  B('coop', 'b_barn', X + 4, 24, { label: 'สหกรณ์การเกษตร', icon: '🧑‍🌾', deco: true, area: 'farm' });
+  STATIONS.push({ id: 'coop', type: 'coop', label: 'สหกรณ์การเกษตร', icon: '🧑‍🌾', x: X + 6, y: 24.6, r: 1.6, area: 'farm' });
+  prop('cartstall', X + 12, 23.4); STATIONS.push({ id: 'farmbuy', type: 'farmbuy', label: 'จุดรับซื้อผลผลิต', icon: '⚖️', x: X + 12, y: 24.5, r: 1.6, area: 'farm' });
+  prop('well', X + 9, 21); prop('hay', X + 4, 29); prop('hay2', X + 6, 29.5); prop('cart', X + 10, 29.5); prop('scarecrow' in ATLAS.sprites ? 'scarecrow' : 'signpost', X + 13, 30);
+  for (let i = 0; i < 10; i++) {
+    const north = i < 5, lx = X + 17 + (i % 5) * 10, ly = north ? 13 : 27;
+    const lot = { idx: i, x: lx, y: ly, plots: [] };
+    rect(lx, ly, 9, 10, 'm');
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+      const px = lx + 1 + c * 3, py = ly + (north ? 3 : 1) + r * 3;
+      rect(px, py, 2, 2, 'f');
+      const n = lot.plots.length;
+      lot.plots.push({ x: px + 1, y: py + 1 });
+      STATIONS.push({ id: `g${i}_${n}`, type: 'gplot', lot: i, n, label: 'แปลงปลูก', icon: '🌱', x: px + 1, y: py + 1, r: 1.4, area: 'farm' });
+    }
+    const sx = lx + 4.5, sy = north ? ly + 10.2 : ly - .3;
+    lot.sign = { x: sx, y: sy };
+    STATIONS.push({ id: `lot${i}`, type: 'lot', lot: i, label: `สวนแปลงที่ ${i + 1}`, icon: '🪧', x: sx, y: north ? sy + .1 : sy + .5, r: 1.3, area: 'farm' });
+    // fence along the far side
+    for (let fx = lx + 1.5; fx < lx + 9; fx += 3) prop('fence_wood', fx, north ? ly + .9 : ly + 10.4, false);
+    LOTS.push(lot);
+  }
+  STATIONS.push({ id: 'pier_r1', type: 'pier', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 21, y: 43.3, r: 1.8, area: 'farm' });
+  STATIONS.push({ id: 'pier_r2', type: 'pier', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 49, y: 43.3, r: 1.8, area: 'farm' });
+  STATIONS.push({ id: 'gate_town_f', type: 'gate', to: 'town_from_farm', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 66.5, y: 25, r: 1.6, area: 'farm' });
+  prop('signpost', X + 65, 23.3);
+}
+
+// ================================================================= HOUSING (houses to buy / rent)
+const HOUSE_SPRITES = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
+const HOUSE_PRICES = [], HOUSE_RENT = [];
+{
+  const X = HOUSING.x;
+  rect(X + 2, 21, 64, 2, '='); rect(X + 2, 20, 64, 1, ',');
+  rect(X + 6, 38, 58, 2, '='); rect(X + 6, 37, 58, 1, ',');
+  rect(X + 6, 23, 2, 15, '='); rect(X + 62, 23, 2, 15, '=');
+  ellipse(X + 35, 45, 8, 3, 'w'); shore(HOUSING);
+  rect(X + 26, 25, 18, 7, 'k');
+  for (let i = 0; i < 12; i++) {
+    const row = i < 6 ? 0 : 1, col = i % 6;
+    const front = row ? 37 : 20, x = X + 10 + col * 9 + (row ? 1 : 0);
+    const price = Math.round((22000 + (i % 6) * 6000 + row * 9000) / 1000) * 1000;
+    HOUSE_PRICES.push(price); HOUSE_RENT.push(Math.round(price / 90 / 10) * 10);
+    B('house' + i, HOUSE_SPRITES[(i + row) % 6], x, front, { label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i, area: 'housing' });
+    prop(i % 2 ? 'hedge_flower' : 'hedge', x - 1, front - .1, false);
+    if (i % 3 === 0) prop('postbox', x + 5.3, front + .05);
+  }
+  prop('fountain', X + 35, 30.4); rect(X + 33, 29, 4, 2, 'o');
+  prop('bench', X + 29, 27, false); prop('bench2', X + 41, 27, false); prop('tree_pink', X + 27.5, 31.6); prop('tree_pink', X + 42.5, 31.6);
+  prop('kiosk', X + 3.5, 30); STATIONS.push({ id: 'estate', type: 'estate', label: 'สำนักงานอสังหาฯ', icon: '🏡', x: X + 3.5, y: 30.7, r: 1.5, area: 'housing' });
+  STATIONS.push({ id: 'gate_town_h', type: 'gate', to: 'town_from_housing', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 3, y: 22, r: 1.6, area: 'housing' });
+  for (const [x, y] of [[X + 15, 45], [X + 55, 45]]) STATIONS.push({ id: 'seat_h' + x, type: 'seat', label: 'ม้านั่งในสวน', icon: '🪑', x, y: y - .25, r: 1.1, area: 'housing' }), prop('bench', x, y, false);
+}
+
+// where gates drop you
+const GATES = {
+  farm_in: { x: FARM.x + 64.5, y: 25 }, town_from_farm: { x: 5.5, y: 32 },
+  housing_in: { x: HOUSING.x + 5, y: 22 }, town_from_housing: { x: 50, y: 7 },
+};
+
+// ================================================================= trees (scatter on free grass)
+const TREE_KINDS = ['tree', 'tree', 'pine', 'tree_orange', 'tree_pink', 'tree', 'bush'];
+for (const a of [TOWN, FARM, HOUSING]) {
+  for (let x = a.x; x < a.x + a.w; x++) { set(x, a.y, 'T'); set(x, a.y + a.h - 1, 'T'); }
+  for (let y = a.y; y < a.y + a.h; y++) { if (get(a.x, y) !== 'w') set(a.x, y, 'T'); if (get(a.x + a.w - 1, y) !== 'w') set(a.x + a.w - 1, y, 'T'); }
+  const n = a.w * a.h / 6;
+  for (let i = 0; i < n; i++) {
+    const x = a.x + 1 + Math.floor(rand() * (a.w - 2)), y = a.y + 2 + Math.floor(rand() * (a.h - 3));
+    if (get(x, y) !== '.') continue;
+    let ok = true;
+    for (let j = -2; j <= 1 && ok; j++) for (let k = -1; k <= 1; k++) { const c = get(x + k, y + j); if (c && c !== '.' && c !== 'T') { ok = false; break; } }
+    if (ok && !STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3) && !PROPS.some(p => Math.hypot(p.x - x - .5, p.y - y - .5) < 2.5)) set(x, y, 'T');
+  }
+}
+BUILDINGS.forEach(b => rect(b.x, b.y, b.w, b.h, 'B'));
+const TREES = [];
+for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
+
+// ================================================================= interiors
+// Every enterable building has a room. Furniture is real: solid pieces block movement
+// (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
+const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [12, 9] };
+const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
+const LAYOUT = {
+  office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_desk', 8, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 14.4, 2.6], ['f_plant', 1.6, 10.7], ['f_plant2', 14.4, 10.7], ['f_clock', 10, .95]],
+  market: [['f_shelf_jars', 2.6, 2.6], ['f_shelf_plants', 11.4, 2.6], ['f_counter', 7, 2.3], ['stall_green', 3.4, 6.6], ['stall_red', 10.6, 6.6], ['f_plant3', 1.6, 8.7]],
+  warehouse: [['crate', 1.8, 3.2], ['crate', 3, 3.2], ['barrel', 4.2, 3.2], ['f_cabinet', 7, 2.3], ['hay2', 11.5, 3.4], ['hay', 11.6, 6.6], ['sack', 2.2, 6.6], ['barrel2', 3.3, 6.6], ['crate', 12.2, 8.6]],
+  rider: [['f_window', 10.5, 1.1], ['f_counter', 7, 2.3], ['f_display', 2.6, 2.6], ['f_bench', 10.6, 5.6], ['f_coffee', 12.4, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7]],
+  dealer: [['f_desk', 7, 2.3], ['car_red', 3, 4.8], ['car_blue', 11, 4.8], ['car_green', 3, 8.3], ['f_plant', 1.5, 2.6], ['f_plant2', 12.5, 2.6]],
+  toolshop: [['f_shelf_pots', 2.6, 2.6], ['f_bookshelf3', 11.6, 2.7], ['f_counter', 7, 2.3], ['cart', 3, 7.2], ['crate', 11.4, 6.6], ['barrel', 12.4, 6.6], ['f_trash', 12.4, 8.7]],
+  restaurant: [['f_counter_micro', 7, 2.3], ['menuboard', 12.4, 2.7], ['f_plant4', 1.6, 2.6], ['f_table_chairs', 3, 5.4], ['f_round_table', 11, 5.4], ['f_table_check', 3, 8.4], ['f_table_check', 11, 8.4]],
+  kitchen: [['f_counter_micro', 2.7, 2.6], ['f_stove', 4.9, 2.6], ['f_counter_toast', 7, 2.3], ['f_counter_oven', 9.6, 2.6], ['f_fridge', 12, 2.7], ['f_shelf_pots', 2.6, 6.4], ['f_bench', 10.5, 6.6]],
+  hospital: [['f_counter', 3.5, 2.3], ['f_shelf_jars', 1.8, 6.4], ['f_plant', 1.5, 9.7], ['f_window', 6.4, 1.1]],
+  school: [['f_bookshelf_wide', 2.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_desk', 3.6, 5.4], ['f_desk', 10.4, 5.4], ['f_desk', 3.6, 7.9], ['f_desk', 10.4, 7.9], ['f_clock', 9.4, .95]],
+  bank: [['f_cabinet', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_plant2', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
+  house: [['f_bed_blue', 2.6, 3.4], ['f_window', 6, 1.1], ['f_welcome', 6, 8.2]],
+};
+// office: 8 work desks with a chair in front of each
+for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_chair', cx, by + 1.25]);
 const ROOMS = [];
-const RW = 14, RH = 10;
 let slot = 0;
 for (const b of BUILDINGS) {
   if (!b.st) continue;
-  const s = STATIONS.find(x => x.id === b.st);
-  const rx = TW + 2 + (slot % 5) * 15, ry = 1 + Math.floor(slot / 5) * 11; slot++;
-  rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i'); rect(rx + 6, ry + RH - 1, 2, 1, 'D');
+  const kind = b.house !== undefined ? 'house' : b.id;
+  const [RW, RH] = ROOM_SIZE[kind] || [14, 10];
+  const rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14; slot++;
+  rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i');
+  const mx = Math.floor(RW / 2);
+  rect(rx + mx - 1, ry + RH - 1, 2, 1, 'D');
+  const front = { x: b.x + b.w / 2, y: b.y + b.h };
   const room = {
-    id: 'r_' + b.id, bld: b.id, kind: b.house !== undefined ? 'house' : b.id, house: b.house, label: b.label, icon: b.icon, color: b.color,
-    x: rx, y: ry, w: RW, h: RH, spawn: { x: rx + 7, y: ry + RH - 2.3 }, exit: { x: rx + 7, y: ry + RH - 0.5 },
-    outside: { x: s.x, y: b.y + b.h + 1.7 }, doorPt: { x: s.x, y: b.y + b.h + 0.32 },
+    id: 'r_' + b.id, kind: 'room', bld: b.id, rk: kind, house: b.house, label: b.label, icon: b.icon, area: b.area || 'town',
+    x: rx, y: ry, w: RW, h: RH, spawn: { x: rx + mx, y: ry + RH - 2.3 }, exit: { x: rx + mx, y: ry + RH - 0.5 },
+    outside: { x: front.x, y: front.y + 1.2 }, doorPt: { x: front.x, y: front.y + 0.32 }, hours: null,
   };
   ROOMS.push(room); b.room = room.id;
-  STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + 7, y: ry + RH - 1.6, r: 1.2 });
-  if (b.house !== undefined) {          // house: outside sign stays (buy/furnish/enter), a bed inside
-    s.door = room.id;
-    STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 3, y: ry + 2.6, r: 1.6 });
+  const items = LAYOUT[kind] || [];
+  room.furniture = items.map(([s, x, y, solid]) => [s, rx + x, ry + y]);
+  for (const [s, x, y, solid] of items) {
+    if (solid === false || SOFT.test(s) || y < 1.3 || !ATLAS.sprites[s]) continue;
+    const w = SPR(s).w, row = ry + Math.floor(y - 0.45);
+    for (let i = Math.floor(rx + x - w / 2 + 0.3); i <= Math.floor(rx + x + w / 2 - 0.3); i++) if (get(i, row) === 'i') set(i, row, 'o');
+  }
+  STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + mx, y: ry + RH - 1.5, r: 1.2 });
+  STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: front.x, y: front.y + 0.6, r: 1.5, area: b.area || 'town', bld: b.id, house: b.house });
+  if (kind === 'house') {
+    STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 2.6, y: ry + 3.7, r: 1.4 });
     continue;
   }
-  STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: s.x, y: s.y, r: 1.8 });
-  s.room = room.id;
-  if (b.id === 'hospital') {
-    s.x = rx + 3.5; s.y = ry + 2.6;
-    [[9, 2.6], [11.5, 2.6], [9, 6], [11.5, 6]].forEach(([dx, dy], i) =>
-      STATIONS.push({ id: 'bed' + i, type: 'bed', idx: i, room: room.id, label: 'เตียงคนไข้', icon: '🛏️', x: rx + dx, y: ry + dy, r: 1.4 }));
-  } else { s.x = rx + 7; s.y = ry + 2.6; s.r = 2.2; }
+  const s = { id: b.st, type: b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
+  if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
+  if (kind === 'hospital') {
+    s.x = rx + 3.5;
+    [[8.5, 3.6], [11, 3.6], [13.5, 3.6], [8.5, 7.4], [11, 7.4], [13.5, 7.4]].forEach(([dx, dy], i) => {
+      room.furniture.push(['f_bed_blue', rx + dx, ry + dy - .3]);
+      STATIONS.push({ id: 'bed' + i, type: 'bed', idx: i, room: room.id, label: 'เตียงคนไข้', icon: '🛏️', x: rx + dx, y: ry + dy, r: 1.2 });
+    });
+  }
+  STATIONS.push(s);
+  if (kind === 'office') {
+    let n = 0;
+    for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) STATIONS.push({ id: 'chair' + n, type: 'chair', idx: n++, room: room.id, label: 'โต๊ะทำงาน', icon: '💺', x: rx + cx, y: ry + by + .95, r: .9 });
+  }
 }
-const roomAt = (x, y) => ROOMS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
-
+const AREAS = [TOWN, FARM, HOUSING, ...ROOMS];
+const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
+const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
+for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;
 const TILES = grid.map(r => r.join(''));
-const SOLID = new Set(['w', 'B', 'T', '#', ' ', 'o']);
-const isSolidTile = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= H || SOLID.has(grid[ty][tx]);
+const SOLID = 'wBT# o';
+const isSolidTile = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= H || SOLID.includes(grid[ty][tx]);
 const RADIUS = 0.3;
-function blocked(x, y) {
-  return isSolidTile(Math.floor(x - RADIUS), Math.floor(y - RADIUS)) ||
-         isSolidTile(Math.floor(x + RADIUS), Math.floor(y - RADIUS)) ||
-         isSolidTile(Math.floor(x - RADIUS), Math.floor(y + RADIUS)) ||
-         isSolidTile(Math.floor(x + RADIUS), Math.floor(y + RADIUS));
+function blocked(x, y, r = RADIUS) {
+  return isSolidTile(Math.floor(x - r), Math.floor(y - r)) || isSolidTile(Math.floor(x + r), Math.floor(y - r)) ||
+         isSolidTile(Math.floor(x - r), Math.floor(y + r)) || isSolidTile(Math.floor(x + r), Math.floor(y + r));
 }
-const SPAWN = { x: 30.0, y: 16.5 };
+const SPAWN = { x: 50, y: 36.6 };
 
-// ---------------------------------------------------------------- items
-// kind: crop | fish | meal | goods.  base = reference sell price at the market.
+// ================================================================= time
+// One in-game day lasts 24 real minutes (1 game hour = 1 real minute).
+const DAY_MS = 24 * 60 * 1000;
+const TIME_OFF = +process.env.TIME_OFFSET_MS || 0;           // testing aid: shift the in-game clock
+const hourAt = t => (((t + TIME_OFF) % DAY_MS) / DAY_MS) * 24;
+const dayAt = t => Math.floor((t + TIME_OFF) / DAY_MS);
+// opening hours [open, close) in game hours
+const HOURS = { office: [6, 21], market: [5, 22], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
+const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
+const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
+for (const r of ROOMS) r.hours = HOURS[r.rk] || null;
+for (const b of BUILDINGS) b.hours = HOURS[b.house !== undefined ? 'house' : b.id] || null;
+
+// ================================================================= items
+// kind: crop | fish | meal | goods.  base = what players typically pay; NPCs buy far below it.
 const ITEMS = {
-  rice:   { name: 'ข้าว', icon: '🌾', kind: 'crop', base: 40 },
-  corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 70, eat: { hunger: 8 } },
-  chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 100 },
-  durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 320, eat: { hunger: 20, energy: 5 } },
+  rice:   { name: 'ข้าว', icon: '🌾', kind: 'crop', base: 25 },
+  corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 45, eat: { hunger: 8 } },
+  chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 65 },
+  durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 220, eat: { hunger: 20, energy: 5 } },
 
-  sfish:  { name: 'ปลาเล็ก', icon: '🐟', kind: 'fish', base: 45 },
-  tilapia:{ name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 120 },
-  seabass:{ name: 'ปลากะพง', icon: '🐡', kind: 'fish', base: 300 },
-  tuna:   { name: 'ทูน่า', icon: '🐋', kind: 'fish', base: 800 },
-  shark:  { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 2400 },
-  chest:  { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 8000 },
+  sfish:    { name: 'ปลาเล็ก', icon: '🐟', kind: 'fish', base: 25 },
+  catfish:  { name: 'ปลาดุก', icon: '🐟', kind: 'fish', base: 45 },
+  tilapia:  { name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 60 },
+  snakehead:{ name: 'ปลาช่อน', icon: '🐠', kind: 'fish', base: 95 },
+  squid:    { name: 'ปลาหมึก', icon: '🦑', kind: 'fish', base: 120 },
+  seabass:  { name: 'ปลากะพง', icon: '🐡', kind: 'fish', base: 150 },
+  tuna:     { name: 'ทูน่า', icon: '🐋', kind: 'fish', base: 400 },
+  shark:    { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200 },
+  chest:    { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 3000 },
 
-  fried_rice:   { name: 'ข้าวผัด', icon: '🍚', kind: 'meal', base: 240, eat: { hunger: 35, energy: 5 } },
-  corn_soup:    { name: 'ซุปข้าวโพด', icon: '🥣', kind: 'meal', base: 540, eat: { hunger: 30, energy: 8 } },
-  grilled_fish: { name: 'ปลาเผา', icon: '🍤', kind: 'meal', base: 440, eat: { hunger: 45, energy: 10 } },
-  tomyum:       { name: 'ต้มยำ', icon: '🍲', kind: 'meal', base: 870, eat: { hunger: 50, energy: 15 } },
-  durian_sweet: { name: 'ทุเรียนเชื่อม', icon: '🍨', kind: 'meal', base: 1080, eat: { hunger: 30, energy: 25, health: 5 } },
+  fried_rice:   { name: 'ข้าวผัด', icon: '🍚', kind: 'meal', base: 150, eat: { hunger: 35, energy: 5 } },
+  corn_soup:    { name: 'ซุปข้าวโพด', icon: '🥣', kind: 'meal', base: 300, eat: { hunger: 30, energy: 8 } },
+  grilled_fish: { name: 'ปลาเผา', icon: '🍤', kind: 'meal', base: 260, eat: { hunger: 45, energy: 10 } },
+  tomyum:       { name: 'ต้มยำ', icon: '🍲', kind: 'meal', base: 500, eat: { hunger: 50, energy: 15 } },
+  durian_sweet: { name: 'ทุเรียนเชื่อม', icon: '🍨', kind: 'meal', base: 650, eat: { hunger: 30, energy: 25, health: 5 } },
+  // restaurant menu (sold at the restaurant and through the delivery app)
+  kaprao:  { name: 'ข้าวกะเพรา', icon: '🍛', kind: 'meal', base: 90, eat: { hunger: 32 }, menu: 1 },
+  noodle:  { name: 'ก๋วยเตี๋ยว', icon: '🍜', kind: 'meal', base: 70, eat: { hunger: 26 }, menu: 1 },
+  somtam:  { name: 'ส้มตำ', icon: '🥗', kind: 'meal', base: 80, eat: { hunger: 22, energy: 6 }, menu: 1 },
+  shabu:   { name: 'ชุดชาบู', icon: '🍲', kind: 'meal', base: 260, eat: { hunger: 70, energy: 10 }, menu: 1 },
 
-  snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 40, eat: { hunger: 10 }, wholesale: 30, stock: 80, refill: 8 },
-  drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 250, eat: { energy: 25 }, wholesale: 190, stock: 12, refill: 25 },
-  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', base: 400, eat: { health: 35 }, wholesale: 310, stock: 10, refill: 40 },
+  snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
+  drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 150, eat: { energy: 25 }, wholesale: 105, stock: 12, refill: 25 },
+  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', base: 250, eat: { health: 30 }, wholesale: 180, stock: 10, refill: 40 },
 };
+const CATEGORIES = { crop: '🌾 พืชผล', fish: '🐟 ปลา', meal: '🍱 อาหาร', goods: '📦 สินค้า' };
 
 const CROPS = {
-  rice:   { seed: 20,  grow: 40,  min: 4, max: 6 },
-  corn:   { seed: 45,  grow: 80,  min: 4, max: 5 },
-  chili:  { seed: 70,  grow: 120, min: 4, max: 5 },
-  durian: { seed: 350, grow: 240, min: 3, max: 4 },
+  rice:   { seed: 15,  grow: 90,  min: 4, max: 6 },
+  corn:   { seed: 30,  grow: 150, min: 4, max: 5 },
+  chili:  { seed: 50,  grow: 220, min: 4, max: 5 },
+  durian: { seed: 260, grow: 420, min: 3, max: 4 },
 };
-
 const RECIPES = [
   { id: 'fried_rice',   in: { rice: 2 } },
   { id: 'corn_soup',    in: { corn: 2, rice: 1 } },
-  { id: 'grilled_fish', in: { sfish: 1, chili: 1 } },
+  { id: 'grilled_fish', in: { catfish: 1, chili: 1 } },
   { id: 'tomyum',       in: { tilapia: 1, chili: 1, corn: 1 } },
   { id: 'durian_sweet', in: { durian: 1, rice: 1 } },
 ];
+// fishing pools: [id, weight]. null = junk
+const FISH = {
+  river: [[null, 25], ['sfish', 40], ['catfish', 26], ['tilapia', 12], ['snakehead', 4]],
+  lake:  [[null, 22], ['sfish', 30], ['tilapia', 28], ['snakehead', 12], ['seabass', 6], ['chest', 0.1]],
+  sea:   [[null, 25], ['sfish', 18], ['squid', 22], ['seabass', 18], ['tuna', 6], ['shark', 1], ['chest', 0.3]],
+};
+const BIG_FISH = ['seabass', 'tuna', 'shark', 'chest', 'snakehead', 'squid'];
 
-// id, normal weight, with-event weight
-const FISH = [
-  { id: null,      w: 20 },
-  { id: 'sfish',    w: 38 },
-  { id: 'tilapia',  w: 24 },
-  { id: 'seabass',  w: 11 },
-  { id: 'tuna',     w: 4.5 },
-  { id: 'shark',    w: 1.2 },
-  { id: 'chest',    w: 0.3 },
-];
-
+// ================================================================= careers
+// Nobody picks a career at the start: you walk into the right building and apply.
 const CAREERS = {
-  office:     { name: 'พนักงานออฟฟิศ', icon: '👔', license: null, desc: 'ทำงานที่บริษัท เงินเดือนมั่นคง เลื่อนตำแหน่งได้' },
-  farmer:     { name: 'เกษตรกร', icon: '🌾', license: null, desc: 'ปลูกพืชที่แปลงกลางเมือง รอโต แล้วเก็บเกี่ยว (ระวังคนอื่นมาเก็บตัดหน้า!)' },
-  fisher:     { name: 'ชาวประมง', icon: '🎣', license: null, desc: 'ตกปลาที่ท่าเรือ จับจังหวะให้ทัน ลุ้นปลาใหญ่และหีบสมบัติ' },
-  merchant:   { name: 'พ่อค้า', icon: '🛒', license: null, desc: 'ซื้อของราคาส่งจากคลัง ขายต่อให้ผู้เล่นในราคาที่ตั้งเอง' },
-  streamer:   { name: 'สตรีมเมอร์', icon: '🎥', license: null, desc: 'ไลฟ์ที่สตูดิโอ สะสมแฟนคลับ มีรายได้แฝง และรับโดเนท' },
-  programmer: { name: 'โปรแกรมเมอร์', icon: '💻', license: 'coding', desc: 'รับงานโค้ดที่โค้ดดิ้งสเปซ ตอบถูกได้ค่าจ้างก้อนโต' },
-  chef:       { name: 'เชฟ', icon: '🍳', license: 'cooking', desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายแพงกว่าหลายเท่า' },
-  doctor:     { name: 'แพทย์', icon: '🩺', license: 'medicine', desc: 'รักษาคนไข้ที่นอนรอบนเตียงในโรงพยาบาล ต้องดูอาการแล้ววินิจฉัยโรคให้ถูก หรือเข้าเวรรับค่าตอบแทน' },
+  none:     { name: 'ว่างงาน', icon: '🙂', where: null, desc: 'ยังไม่มีงานทำ ไปสมัครงานตามอาคารต่างๆ' },
+  office:   { name: 'พนักงานบริษัท', icon: '👔', where: 'office', need: ['degree'], desc: 'เข้างาน 08:00–17:00 นั่งที่โต๊ะทำงาน ได้เงินตามชั่วโมงที่นั่งทำงาน มาสายโดนหักเงินและอาจถูกเลิกจ้าง' },
+  farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
+  fisher:   { name: 'ชาวประมง', icon: '🎣', where: 'fishclub', need: [], desc: 'ตกปลาตามแหล่งน้ำ แม่น้ำ ทะเลสาบ และทะเล แต่ละที่ได้ปลาไม่เหมือนกัน' },
+  merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
+  chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
+  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รักษาคนไข้บนเตียงในโรงพยาบาล ทั้งผู้เล่นและชาวเมือง ต้องวินิจฉัยจากอาการให้ถูก' },
+  rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], vehicle: 'scooter', desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วขี่ไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป' },
 };
-
+// the degree comes from classes at the university; other licences are bought
 const LICENSES = {
-  coding:   { name: 'ใบรับรองโปรแกรมเมอร์', icon: '📜', price: 3000 },
-  cooking:  { name: 'ใบรับรองเชฟ', icon: '📜', price: 1800 },
-  medicine: { name: 'ใบประกอบวิชาชีพแพทย์', icon: '📜', price: 12000 },
+  degree:   { name: 'ปริญญาตรี', icon: '🎓', price: 3500, classes: 6, where: 'school' },
+  cooking:  { name: 'ใบรับรองเชฟ', icon: '📜', price: 1800, where: 'school' },
+  medicine: { name: 'ใบประกอบวิชาชีพเวชกรรม', icon: '⚕️', price: 15000, need: 'degree', where: 'school' },
+  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 900, where: 'dealer', test: true },
 };
-
+const DRIVING_TEST = [
+  { q: 'สัญญาณไฟสีเหลือง หมายถึงอะไร', a: ['เร่งความเร็วผ่านไป', 'เตรียมหยุดรถ', 'จอดรถได้ทันที'], ok: 1 },
+  { q: 'ขี่มอเตอร์ไซค์ต้องสวมอะไรทุกครั้ง', a: ['หมวกกันน็อก', 'แว่นกันแดด', 'ถุงมือ'], ok: 0 },
+  { q: 'เห็นคนกำลังข้ามทางม้าลาย ควรทำอย่างไร', a: ['บีบแตรไล่', 'ขับอ้อมไป', 'หยุดรถให้คนข้าม'], ok: 2 },
+  { q: 'ป้ายสีแดงแปดเหลี่ยมเขียนว่า หยุด หมายถึง', a: ['หยุดรถก่อนแล้วค่อยไป', 'ลดความเร็ว', 'ห้ามจอด'], ok: 0 },
+  { q: 'ดื่มแอลกอฮอล์แล้วควรทำอย่างไร', a: ['ขับช้าๆ', 'ไม่ขับรถ', 'เปิดไฟฉุกเฉินแล้วขับ'], ok: 1 },
+];
+// changing careers too often makes you wait longer (minutes); index = changes in the last 24 h
+const JOB_COOLDOWN_MIN = [0, 10, 30, 60, 120, 240, 480];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
+const OFFICE_WAGE = [60, 75, 92, 112, 135, 160, 190];            // per game hour seated
+const RIDER = { baseFee: 35, perTile: 0.9, npcEvery: 45, tipMax: 40 };
 
 const EVENTS = [
-  { id: 'festival', text: '🎉 เทศกาลเมือง! ราคาอาหารและสินค้าในตลาดสูงขึ้น 30%' },
-  { id: 'drought',  text: '☀️ ภัยแล้ง! พืชโตช้าลง แต่ราคาพืชผลพุ่ง 40%' },
-  { id: 'rain',     text: '🌧️ ฝนตกชุก! พืชโตเร็วขึ้นเท่าตัว' },
+  { id: 'festival', text: '🎉 เทศกาลเมือง! ราคาอาหารและสินค้าในตลาดสูงขึ้น 20%' },
+  { id: 'drought',  text: '☀️ ภัยแล้ง! พืชโตช้าลง แต่ราคาพืชผลพุ่ง 30%' },
+  { id: 'rain',     text: '🌧️ ฝนตกชุก! พืชโตเร็วขึ้นเท่าตัว (ตากฝนนานๆ อาจเป็นไข้หวัด)' },
   { id: 'bloom',    text: '🐟 ปลาชุกชุม! ตกปลาได้ปลาใหญ่บ่อยขึ้น' },
-  { id: 'boom',     text: '📈 เศรษฐกิจบูม! เงินเดือนออฟฟิศและค่าเวรหมอ +25%' },
-  { id: 'viral',    text: '🔥 โซเชียลคึกคัก! สตรีมมีโอกาสไวรัลสูงขึ้น' },
-  { id: 'flu',      text: '🤧 ไข้หวัดระบาด! ทุกคนหิวและป่วยง่ายขึ้น หมอได้ค่าเวร +40%' },
+  { id: 'flu',      text: '🦠 ไข้หวัดใหญ่ระบาด! ติดง่าย เลือดลดเร็ว รีบไปหาหมอ' },
+  { id: 'hungry',   text: '🛵 ชาวเมืองสั่งอาหารเยอะ! ออเดอร์ไรเดอร์เพิ่มขึ้น ค่าส่ง +30%' },
 ];
 
-// ---------------------------------------------------------------- things to spend money on
+// ================================================================= things to spend money on
 const VEHICLES = {
-  skate:  { name: 'สเก็ตบอร์ด', icon: '🛹', price: 2500,  speed: 1.2 },
-  bike:   { name: 'จักรยาน', icon: '🚲', price: 8000,  speed: 1.4 },
-  scooter:{ name: 'มอเตอร์ไซค์', icon: '🛵', price: 25000, speed: 1.7 },
-  car:    { name: 'รถยนต์', icon: '🚗', price: 70000, speed: 2.0 },
+  skate:  { name: 'สเก็ตบอร์ด', icon: '🛹', price: 1500,  speed: 1.15 },
+  bike:   { name: 'จักรยาน', icon: '🚲', price: 5000,  speed: 1.3 },
+  scooter:{ name: 'มอเตอร์ไซค์', icon: '🛵', price: 18000, speed: 1.5, license: 'driving' },
+  car:    { name: 'รถยนต์', icon: '🚗', price: 60000, speed: 1.75, license: 'driving' },
 };
-const TOOL_PRICES = [4000, 15000, 45000];
+const TOOL_PRICES = [3000, 12000, 40000];
 const TOOLS = {
-  office:     { name: 'ชุดสูทหรู', icon: '👔', fx: ['เงินเดือน +10%', 'เงินเดือน +22%', 'เงินเดือน +35%'] },
-  farmer:     { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
-  fisher:     { name: 'เบ็ดตกปลา', icon: '🎣', fx: ['ขยะน้อยลง, ปลาใหญ่บ่อยขึ้น', 'ขยะน้อยมาก, ปลาใหญ่บ่อยขึ้นมาก', 'แทบไม่เจอขยะ, ปลาใหญ่บ่อยสุด'] },
-  merchant:   { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
-  streamer:   { name: 'ไมค์ & กล้อง', icon: '🎙️', fx: ['รายได้และแฟน +15%', 'รายได้และแฟน +30%', 'รายได้และแฟน +50%'] },
-  programmer: { name: 'คอมสเปคแรง', icon: '⌨️', fx: ['ค่าจ้าง +15%', 'ค่าจ้าง +30%', 'ค่าจ้าง +50%'] },
-  chef:       { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
-  doctor:     { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่าเวร +15%, รักษาได้มากขึ้น', 'ค่าเวร +30%, รักษาได้มากขึ้น', 'ค่าเวร +50%, รักษาได้มากที่สุด'] },
+  office:   { name: 'ชุดสูทหรู', icon: '👔', fx: ['ค่าแรง +10%', 'ค่าแรง +20%', 'ค่าแรง +30%'] },
+  farmer:   { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
+  fisher:   { name: 'เบ็ดตกปลา', icon: '🎣', fx: ['ขยะน้อยลง, ปลาใหญ่บ่อยขึ้น', 'ขยะน้อยมาก, ปลาใหญ่บ่อยขึ้นมาก', 'แทบไม่เจอขยะ, ปลาใหญ่บ่อยสุด'] },
+  merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
+  chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
+  doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
+  rider:    { name: 'กล่องเก็บความร้อน', icon: '📦', fx: ['ค่าส่ง +10%', 'ค่าส่ง +20%', 'ค่าส่ง +35%'] },
 };
-const HOUSE_PRICES = [55000, 50000, 45000, 40000, 35000, 30000];
 const FURNITURE = {
   plant:  { name: 'ต้นไม้', icon: '🪴', price: 1500,  comfort: 1 },
   sofa:   { name: 'โซฟา', icon: '🛋️', price: 3000,  comfort: 1 },
@@ -282,29 +445,57 @@ const FURNITURE = {
   piano:  { name: 'เปียโน', icon: '🎹', price: 25000, comfort: 4 },
   jacuzzi:{ name: 'อ่างจากุซซี่', icon: '🛁', price: 40000, comfort: 5 },
 };
-const BANK = { rate: 0.03, cap: 300000, loanMax: 30000, loanFee: 0.10, repayShare: 0.25 };
+const BANK = { rate: 0.005, cap: 100000, loanMax: 10000, loanFee: 0.10, repayShare: 0.25 };
 
-// ---------------------------------------------------------------- health
-// cure = the treatment a doctor must pick; symptoms are what the doctor sees
+// ================================================================= health
 const DISEASES = {
-  cold:    { name: 'ไข้หวัด', icon: '🤒', cure: 'fever', drain: 0.03, income: 0.8, sym: ['ตัวร้อน มีไข้', 'ไอ จาม น้ำมูกไหล', 'หนาวสั่น'], cause: 'ตากฝนนานๆ หรือช่วงไข้หวัดระบาด', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
-  exhaust: { name: 'อ่อนเพลียสะสม', icon: '😵', cure: 'iv', regen: 0.5, income: 0.85, sym: ['เหนื่อยง่าย หน้ามืด', 'กล้ามเนื้ออ่อนแรง', 'ใจสั่น'], cause: 'ทำงานตอนพลังงานต่ำ หรือทำโอทีหนัก', self: 'นอนเต็มอิ่ม (ห้องพัก/บ้าน) จะหาย' },
-  insomnia:{ name: 'อดนอน', icon: '🥱', cure: 'sleep', income: 0.75, sym: ['ง่วงตลอดเวลา ตาลอย', 'สมาธิสั้น ทำงานพลาด', 'ปวดหัวตื้อๆ'], cause: 'ไม่ได้นอนนานเกิน 25 นาที', self: 'นอนเต็มอิ่ม (ห้องพัก/บ้าน) จะหาย' },
-  poison:  { name: 'อาหารเป็นพิษ', icon: '🤢', cure: 'salt', drain: 0.05, hunger: 2, sym: ['ปวดท้อง คลื่นไส้', 'ท้องเสีย', 'อาเจียน'], cause: 'กินอาหารข้างทางหรือของดิบ', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
-  injury:  { name: 'บาดเจ็บ', icon: '🤕', cure: 'bandage', speed: 0.7, sym: ['ปวดบวม มีแผล', 'เดินกะเผลก', 'ช้ำตามตัว'], cause: 'อุบัติเหตุระหว่างทำงานหนัก', self: 'ใช้ชุดปฐมพยาบาล หรือให้หมอรักษา' },
-  malnut:  { name: 'ขาดสารอาหาร', icon: '😩', cure: 'iv', drain: 0.04, income: 0.8, sym: ['ผอมซีด ไม่มีแรง', 'หิวตลอดเวลา', 'เวียนหัว'], cause: 'ปล่อยให้หิวจนหมดหลอดนานๆ', self: 'กินจนอิ่มเกิน 80 จะหาย' },
+  cold:    { name: 'ไข้หวัด', icon: '🤒', cure: 'fever', drain: 0.05, income: 0.8, sym: ['ตัวร้อน มีไข้', 'ไอ จาม น้ำมูกไหล', 'หนาวสั่น'], cause: 'ตากฝนนานๆ อยู่ใกล้คนป่วย หรือช่วงไข้หวัดระบาด', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
+  flu:     { name: 'ไข้หวัดใหญ่', icon: '🦠', cure: 'antiviral', drain: 0.12, income: 0.7, hunger: 1.3, sym: ['ไข้สูง ปวดเมื่อยทั้งตัว', 'ไอแห้ง เจ็บคอ', 'อ่อนเพลียมาก'], cause: 'ช่วงไข้หวัดใหญ่ระบาด ติดต่อกันได้', self: 'อันตราย! เลือดลดเร็ว ต้องให้หมอรักษา' },
+  exhaust: { name: 'อ่อนเพลียสะสม', icon: '😵', cure: 'iv', regen: 0.5, income: 0.85, drain: 0.02, sym: ['เหนื่อยง่าย หน้ามืด', 'กล้ามเนื้ออ่อนแรง', 'ใจสั่น'], cause: 'ทำงานตอนพลังงานต่ำ', self: 'นอนพักให้หายง่วงจะหาย หรือให้หมอรักษา' },
+  insomnia:{ name: 'อดนอน', icon: '🥱', cure: 'sleep', income: 0.75, sym: ['ง่วงตลอดเวลา ตาลอย', 'สมาธิสั้น ทำงานพลาด', 'ปวดหัวตื้อๆ'], cause: 'ไม่ได้นอนนานเกิน 2 วันในเกม', self: 'นอนที่บ้าน หรือนั่งพักหลับตาจนหายง่วง' },
+  poison:  { name: 'อาหารเป็นพิษ', icon: '🤢', cure: 'salt', drain: 0.08, hunger: 2, sym: ['ปวดท้อง คลื่นไส้', 'ท้องเสีย', 'อาเจียน'], cause: 'กินอาหารข้างทางหรือของดิบ', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
+  injury:  { name: 'บาดเจ็บ', icon: '🤕', cure: 'bandage', speed: 0.7, drain: 0.02, sym: ['ปวดบวม มีแผล', 'เดินกะเผลก', 'ช้ำตามตัว'], cause: 'อุบัติเหตุระหว่างทำงาน', self: 'ใช้ชุดปฐมพยาบาล หรือให้หมอรักษา' },
+  malnut:  { name: 'ขาดสารอาหาร', icon: '😩', cure: 'iv', drain: 0.07, income: 0.8, sym: ['ผอมซีด ไม่มีแรง', 'หิวตลอดเวลา', 'เวียนหัว'], cause: 'ปล่อยให้หิวจนหมดหลอดนานๆ', self: 'กินจนอิ่มเกิน 80 จะหาย' },
 };
 const TREATMENTS = {
-  fever:   { name: 'ยาลดไข้ + ให้พักผ่อน', icon: '💊' },
-  iv:      { name: 'ให้น้ำเกลือ + วิตามิน', icon: '💉' },
-  sleep:   { name: 'ยานอนหลับ + นอนพักฟื้น', icon: '😴' },
-  salt:    { name: 'ผงเกลือแร่ + ยาฆ่าเชื้อ', icon: '🧂' },
-  bandage: { name: 'ทำแผล + เข้าเฝือก', icon: '🩹' },
+  fever:     { name: 'ยาลดไข้ + ให้พักผ่อน', icon: '💊' },
+  antiviral: { name: 'ยาต้านไวรัส + แยกกักตัว', icon: '🧪' },
+  iv:        { name: 'ให้น้ำเกลือ + วิตามิน', icon: '💉' },
+  sleep:     { name: 'ยานอนหลับ + นอนพักฟื้น', icon: '😴' },
+  salt:      { name: 'ผงเกลือแร่ + ยาฆ่าเชื้อ', icon: '🧂' },
+  bandage:   { name: 'ทำแผล + เข้าเฝือก', icon: '🩹' },
 };
+const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้องเมย์', 'พี่ต้น', 'ยายจันทร์', 'ตาเหลือง', 'น้าแดง', 'พี่ฝน', 'น้องบอส', 'ป้าแจ๋ว', 'ลุงชัย', 'พี่นก'];
+
+// ================================================================= achievements -> titles shown over your head
+const ACHIEVEMENTS = [
+  { id: 'off1', c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
+  { id: 'off2', c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
+  { id: 'off3', c: 'office', stat: 'promo', n: 4, title: 'ผู้จัดการไฟแรง', desc: 'ได้เลื่อนตำแหน่ง 4 ครั้ง' },
+  { id: 'far1', c: 'farmer', stat: 'harvest', n: 15, title: 'มือใหม่หัดปลูก', desc: 'เก็บเกี่ยว 15 ครั้ง' },
+  { id: 'far2', c: 'farmer', stat: 'plots', n: 6, title: 'เจ้าของไร่', desc: 'ขยายสวนจนครบ 6 แปลง' },
+  { id: 'far3', c: 'farmer', stat: 'durian', n: 10, title: 'ราชาทุเรียน', desc: 'เก็บทุเรียน 10 ครั้ง' },
+  { id: 'fis1', c: 'fisher', stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
+  { id: 'fis2', c: 'fisher', stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
+  { id: 'fis3', c: 'fisher', stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
+  { id: 'mer1', c: 'merchant', stat: 'wholesale', n: 50, title: 'พ่อค้าหน้าใหม่', desc: 'ซื้อสินค้าจากคลัง 50 ชิ้น' },
+  { id: 'mer2', c: 'merchant', stat: 'psold', n: 100, title: 'เจ้าสัว', desc: 'ขายของให้ผู้เล่นอื่น 100 ชิ้น' },
+  { id: 'che1', c: 'chef', stat: 'cooked', n: 20, title: 'แม่ครัวหัวป่าก์', desc: 'ปรุงอาหาร 20 จาน' },
+  { id: 'che2', c: 'chef', stat: 'cooked', n: 100, title: 'เชฟกระทะเหล็ก', desc: 'ปรุงอาหาร 100 จาน' },
+  { id: 'doc1', c: 'doctor', stat: 'treated', n: 5, title: 'หมอใจดี', desc: 'รักษาคนไข้หาย 5 คน' },
+  { id: 'doc2', c: 'doctor', stat: 'treated', n: 50, title: 'หัตถ์เทวดา', desc: 'รักษาคนไข้หาย 50 คน' },
+  { id: 'doc3', c: 'doctor', stat: 'revived', n: 3, title: 'ผู้กู้ชีพ', desc: 'ช่วยชีวิตผู้เล่นที่หมดสติ 3 ครั้ง' },
+  { id: 'rid1', c: 'rider', stat: 'delivered', n: 10, title: 'ไรเดอร์สายฟ้า', desc: 'ส่งอาหารสำเร็จ 10 ออเดอร์' },
+  { id: 'rid2', c: 'rider', stat: 'delivered', n: 60, title: 'ขาซิ่งประจำเมือง', desc: 'ส่งอาหารสำเร็จ 60 ออเดอร์' },
+  { id: 'gen1', c: null, stat: 'trades', n: 5, title: 'นักเจรจา', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 5 ครั้ง' },
+  { id: 'gen2', c: null, stat: 'worth', n: 100000, title: 'เศรษฐีใหม่', desc: 'มีทรัพย์สินรวม ฿100,000' },
+  { id: 'gen3', c: null, stat: 'calls', n: 5, title: 'สายโทรศัพท์', desc: 'โทรคุยกับเพื่อน 5 ครั้ง' },
+  { id: 'gen4', c: null, stat: 'degree', n: 1, title: 'บัณฑิต', desc: 'เรียนจบปริญญาตรี' },
+];
 
 module.exports = {
-  PROPS, TREES, TW, ROOMS, roomAt, DISEASES, TREATMENTS,
-  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, FURNITURE, BANK,
-  W, H, TILES, BUILDINGS, STATIONS, SPAWN, blocked, ITEMS, CROPS, RECIPES, FISH,
-  CAREERS, LICENSES, OFFICE_TITLES, EVENTS, RADIUS,
+  W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
+  areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
+  ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

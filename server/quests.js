@@ -1,24 +1,24 @@
 'use strict';
 // Daily quests: 3 per real day (reset at midnight Thailand time), tracked on the server.
 const DEFS = {
-  // career quests: [min,max] target, reward per unit
-  work:    { cat: 'career', career: 'office',     text: 'ทำงานที่บริษัท {n} ครั้ง', n: [4, 8], per: 150 },
-  harvest: { cat: 'career', career: 'farmer',     text: 'เก็บเกี่ยวผลผลิต {n} ครั้ง', n: [3, 6], per: 220 },
-  fish:    { cat: 'career', career: 'fisher',     text: 'ตกปลาให้ได้ {n} ตัว', n: [5, 10], per: 110 },
-  buy:     { cat: 'career', career: 'merchant',   text: 'ซื้อสินค้าจากคลัง {n} ชิ้น', n: [10, 20], per: 55 },
-  stream:  { cat: 'career', career: 'streamer',   text: 'ไลฟ์สด {n} ครั้ง', n: [3, 6], per: 220 },
-  code:    { cat: 'career', career: 'programmer', text: 'ส่งงานโค้ดผ่าน {n} ครั้ง', n: [3, 5], per: 320 },
-  cook:    { cat: 'career', career: 'chef',       text: 'ปรุงอาหาร {n} จาน', n: [3, 6], per: 230 },
-  shift:   { cat: 'career', career: 'doctor',     text: 'เข้าเวรโรงพยาบาล {n} ครั้ง', n: [2, 4], per: 420 },
+  // career quests: [min,max] target, reward per unit (kept small: quests should not flood the town with money)
+  work:    { cat: 'career', career: 'office',   text: 'นั่งทำงานที่บริษัท {n} ชั่วโมง', n: [4, 8], per: 30 },
+  harvest: { cat: 'career', career: 'farmer',   text: 'เก็บเกี่ยวผลผลิต {n} ครั้ง', n: [3, 6], per: 60 },
+  fish:    { cat: 'career', career: 'fisher',   text: 'ตกปลาให้ได้ {n} ตัว', n: [5, 10], per: 25 },
+  buy:     { cat: 'career', career: 'merchant', text: 'ซื้อสินค้าจากคลัง {n} ชิ้น', n: [10, 20], per: 12 },
+  cook:    { cat: 'career', career: 'chef',     text: 'ปรุงอาหาร {n} จาน', n: [3, 6], per: 60 },
+  treat:   { cat: 'career', career: 'doctor',   text: 'รักษาคนไข้หาย {n} คน', n: [2, 4], per: 120 },
+  deliver: { cat: 'career', career: 'rider',    text: 'ส่งอาหารสำเร็จ {n} ออเดอร์', n: [3, 6], per: 60 },
   // social / daily life
-  trade:   { cat: 'social', text: 'แลกเปลี่ยนกับผู้เล่นอื่น {n} ครั้ง', n: [1, 2], per: 700 },
-  chat:    { cat: 'social', text: 'ทักทายในแชท {n} ครั้ง', n: [1, 3], per: 120 },
-  eat:     { cat: 'social', text: 'กินอาหาร {n} ครั้ง', n: [2, 4], per: 150 },
+  trade:   { cat: 'social', text: 'แลกเปลี่ยนกับผู้เล่นอื่น {n} ครั้ง', n: [1, 2], per: 200 },
+  chat:    { cat: 'social', text: 'คุยกับคนที่อยู่ใกล้ๆ {n} ครั้ง', n: [1, 3], per: 40 },
+  eat:     { cat: 'social', text: 'กินอาหาร {n} ครั้ง', n: [2, 4], per: 40 },
+  sit:     { cat: 'social', text: 'นั่งเล่นที่จัตุรัสกลางเมือง {n} ครั้ง', n: [1, 2], per: 60 },
   // general
-  sell:    { cat: 'general', text: 'ขายของที่ตลาดกลาง {n} ชิ้น', n: [5, 15], per: 60 },
-  earn:    { cat: 'general', text: 'หาเงินให้ได้ ฿{n}', n: [2000, 5000], step: 500, per: 0.25 },
+  sell:    { cat: 'general', text: 'ขายของ {n} ชิ้น', n: [5, 15], per: 15 },
+  earn:    { cat: 'general', text: 'หาเงินให้ได้ ฿{n}', n: [800, 2000], step: 100, per: 0.1 },
 };
-const BONUS = 1500;          // all three done; +10% per streak day (max +50%)
+const BONUS = 600;          // all three done; +10% per streak day (max +50%)
 
 const dayKey = (t = Date.now()) => new Date(t + 7 * 3600e3).toISOString().slice(0, 10);
 function nextReset(t = Date.now()) { const d = new Date(t + 7 * 3600e3); d.setUTCHours(24, 0, 0, 0); return d.getTime() - 7 * 3600e3; }
@@ -28,22 +28,24 @@ function make(type) {
   const d = DEFS[type];
   const step = d.step || 1;
   const n = Math.round((d.n[0] + Math.random() * (d.n[1] - d.n[0])) / step) * step;
-  const reward = Math.max(100, Math.round(n * d.per / 50) * 50);
+  const reward = Math.max(50, Math.round(n * d.per / 10) * 10);
   return { type, n, p: 0, reward, done: false };
 }
-function careerType(career) { return Object.keys(DEFS).find(k => DEFS[k].career === career) || 'work'; }
+function careerType(career) { return Object.keys(DEFS).find(k => DEFS[k].career === career) || null; }
 
 function generate(a) {
   const social = pick(Object.keys(DEFS).filter(k => DEFS[k].cat === 'social'));
   const general = pick(Object.keys(DEFS).filter(k => DEFS[k].cat === 'general'));
-  return [make(careerType(a.career)), make(social), make(general)];
+  const ct = careerType(a.career);
+  const extra = pick(Object.keys(DEFS).filter(k => DEFS[k].cat === 'general' && k !== general));
+  return [make(ct || extra), make(social), make(general)];
 }
 
 // call before reading/updating; handles the daily rollover and streaks
 function ensure(a) {
   const today = dayKey();
   const q = a.quests;
-  if (q && q.day === today) return false;
+  if (q && q.day === today && q.list.every(x => DEFS[x.type])) return false;
   const yesterday = dayKey(Date.now() - 86400e3);
   // the streak survives only if every quest was finished yesterday
   if (!(q && q.day === yesterday && q.bonus)) a.qStreak = 0;
@@ -91,7 +93,7 @@ function reroll(a, i) {
   if (x.done) return 'เควสต์นี้ทำสำเร็จแล้ว';
   const cat = DEFS[x.type].cat, unused = k => !q.list.some(y => y.type === k);
   let pool;
-  if (cat === 'career' && careerType(a.career) !== x.type) pool = [careerType(a.career)];   // changed career: follow the new one
+  if (cat === 'career' && careerType(a.career) && careerType(a.career) !== x.type) pool = [careerType(a.career)];   // changed career: follow the new one
   else pool = Object.keys(DEFS).filter(k => DEFS[k].cat === (cat === 'career' ? 'general' : cat) && unused(k));
   if (!pool.length) pool = Object.keys(DEFS).filter(k => DEFS[k].cat !== 'career' && unused(k));
   if (!pool.length) return 'ไม่มีเควสต์อื่นให้เปลี่ยน';

@@ -26,14 +26,16 @@
   </div>
   <div id="topRight">
     <div id="clock"></div>
-    <div id="miniWrap"><canvas id="mini" width="120" height="88"></canvas><span>🗺️ แตะดูแผนที่</span></div>
+    <div id="miniWrap"><canvas id="mini" width="120" height="88"></canvas><span id="miniName">🗺️ แผนที่</span></div>
     <div id="menu">
-      <button data-open="career">💼</button>
-      <button data-open="bag">🎒</button>
-      <button data-open="quests" id="qBtn">📜</button>
-      <button data-open="rank">🏆</button>
-      <button data-open="chat">💬</button>
-      <button data-open="help">❔</button>
+      <button data-open="career" title="งาน">💼</button>
+      <button data-open="bag" title="กระเป๋า">🎒</button>
+      <button data-open="phone" id="phoneBtn" title="มือถือ">📱</button>
+      <button data-open="quests" id="qBtn" title="เควสต์">📜</button>
+      <button data-open="ach" title="ความสำเร็จ/ฉายา">🏅</button>
+      <button data-open="rank" title="อันดับ">🏆</button>
+      <button data-open="chat" title="คุยกับคนใกล้ๆ">💬</button>
+      <button data-open="help" title="วิธีเล่น">❔</button>
       <button id="muteBtn" title="เปิด/ปิดเสียง">🔊</button>
     </div>
   </div>
@@ -41,12 +43,15 @@
   <div id="log"></div>
   <div id="toasts"></div>
   <div id="reqs"></div>
+  <button id="callChip" class="hidden"></button>
+  <div id="downView" class="hidden"></div>
   <div id="stick"><i></i></div>
+  <button id="restBtn" title="นั่งพักหลับตา (R)">😌 พัก</button>
   <button id="actBtn" class="hidden"><span id="actIcon">👆</span><small id="actLabel"></small></button>
 </div>
 
 <div id="panel" class="hidden"><div class="sheet"><button class="x" id="panelX">✕</button><div id="panelBody"></div></div></div>
-<div id="mapView" class="hidden"><div class="mapBox"><div class="mapHead"><b>🗺️ แผนที่เมือง</b><span>แตะสถานที่เพื่อให้ลูกศรนำทาง</span><button id="mapX">✕</button></div><canvas id="bigMap"></canvas></div></div>
+<div id="mapView" class="hidden"><div class="mapBox"><div class="mapHead"><b>🗺️ แผนที่</b><span>แตะสถานที่เพื่อให้ลูกศรนำทาง</span><button id="mapX">✕</button></div><div id="mapTabs" class="tabs"></div><canvas id="bigMap"></canvas></div></div>
 <div id="tut" class="hidden"><div class="tutCard"><div id="tutBody"></div><div class="rowf"><button id="tutSkip">ข้าม</button><button class="primary" id="tutNext" style="flex:1">ถัดไป →</button></div></div></div>
 <div id="dailyWrap" class="hidden"><div class="tutCard" id="daily"></div></div>
 <div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div></div></div>
@@ -54,14 +59,13 @@
 <div id="login">
   <form id="loginForm" class="box" autocomplete="off">
     <h1>🏙️ เมืองชีวิตนี้เลือกได้</h1>
-    <p class="sub">เดินในเมืองเดียวกับผู้เล่นคนอื่น เลือกอาชีพ หาเงิน แล้วเดินไปแลกเปลี่ยนกัน</p>
-    <label>ชื่อตัวละคร<input id="inName" maxlength="16" placeholder="เช่น สมชาย" required></label>
+    <p class="sub">ใช้ชีวิตในเมืองเดียวกับผู้เล่นคนอื่น หางานทำ หาเงิน ซื้อบ้าน ทำสวน และช่วยเหลือกัน</p>
+    <label>ชื่อตัวละคร <small>(ภาษาอังกฤษและตัวเลขเท่านั้น)</small><input id="inName" maxlength="16" placeholder="เช่น Somchai" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
     <label>PIN 4-8 หลัก <small>(ผู้เล่นใหม่ตั้งเอง / ผู้เล่นเดิมใส่เพื่อเล่นต่อ)</small><input id="inPin" inputmode="numeric" pattern="\d{4,8}" maxlength="8" placeholder="••••" type="password" required></label>
     <div class="lbl">สีตัวละคร</div><div id="swatches"></div>
-    <label>อาชีพเริ่มต้น<select id="inCareer"></select></label>
     <div id="loginErr"></div>
     <button class="primary" type="submit">เข้าเมือง</button>
-    <div id="careerHint" class="sub"></div>
+    <div class="sub">เริ่มต้นแบบว่างงาน แล้วเข้าไปสมัครงานตามอาคารต่างๆ ในเมือง</div>
   </form>
 </div>
 <script src="fx.js"></script>
