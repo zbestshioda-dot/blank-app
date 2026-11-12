@@ -15,32 +15,45 @@ from scipy import ndimage as ndi
 OUT = 'public/assets/pchar'
 # outfit -> (sheet, which layers are recoloured). Outfits other than 'base' keep their clothes and only dye the hair.
 SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',)),
-          'police': ('tools/sheets/pixel_police.jpg', ())}
+          'police': ('tools/sheets/pixel_police.jpg', ()),
+          'farmer': ('tools/sheets/pixel_farmer.jpg', ())}
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'police': {'left2': 6}}
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
 FRAMES = {'down0': 0, 'down1': 16, 'down2': 18, 'up0': 14, 'up1': 19, 'left0': 5, 'left1': 7, 'left2': 17}
 
+# frame cells: all sheets share the same 4x5 layout (centres measured on the first sheet)
+CELLS = [(cx, cy) for cy in (128, 384, 640, 896) for cx in (128, 384, 591, 768, 921)]
 def load(src):
-    global A, lab, boxes
+    """returns A (pixels) and FR: per frame (x, y, w, h, mask). Each frame is cut from its own grid cell,
+    so sprites whose hats touch a neighbour are still separated."""
+    global A, FR
     im = Image.open(src).convert('RGB'); A = np.array(im).astype(int)
     R, G, B = A[..., 0], A[..., 1], A[..., 2]
     bg = (R > 150) & (B > 150) & (G < 120)
     grid = (R > 80) & (B > 80) & (G < 70) & (abs(R - B) < 70)
     fg = ndi.binary_opening(~(bg | grid), iterations=1)
-    lab, n = ndi.label(fg)
-    boxes = []
-    for i, sl in enumerate(ndi.find_objects(lab)):
-        h = sl[0].stop - sl[0].start; w = sl[1].stop - sl[1].start
-        if h > 100 and w > 60: boxes.append((sl[1].start, sl[0].start, w, h, i + 1))
-    boxes.sort(key=lambda b: (round(b[1] / 200), b[0]))
-    assert len(boxes) == 20, len(boxes)
+    FR = []
+    for cx, cy in CELLS:
+        xs_row = sorted({c[0] for c in CELLS}); j = xs_row.index(cx)
+        left = (xs_row[j - 1] + cx) // 2 if j else 0; right = (cx + xs_row[j + 1]) // 2 if j + 1 < len(xs_row) else A.shape[1]
+        x0, x1, y0, y1 = max(left, cx - 95), min(right, cx + 95), max(0, cy - 128), min(A.shape[0], cy + 128)
+        win = fg[y0:y1, x0:x1].copy()
+        lab, n = ndi.label(win)
+        sz = ndi.sum(win, lab, range(1, n + 1))
+        # keep the blob at the centre of the cell (+ any big blob touching it), drop pieces of the neighbours
+        mid = lab[(y1 - y0) // 2 - 10:(y1 - y0) // 2 + 10, (x1 - x0) // 2 - 10:(x1 - x0) // 2 + 10]
+        keep = set(np.unique(mid)) - {0}
+        if not keep: keep = {int(np.argmax(sz)) + 1}
+        m = np.isin(lab, list(keep))
+        ys, xs = np.where(m)
+        FR.append((x0 + xs.min(), y0 + ys.min(), xs.max() - xs.min() + 1, ys.max() - ys.min() + 1, m[ys.min():ys.max() + 1, xs.min():xs.max() + 1]))
 
 OUTLINE = np.array([46, 14, 8])
 def split(k, tint):
-    x, y, w, h, i = boxes[k]
-    sub = A[y:y + h, x:x + w].copy(); m = ndi.binary_fill_holes(lab[y:y + h, x:x + w] == i)
+    x, y, w, h, m = FR[k]
+    sub = A[y:y + h, x:x + w].copy(); m = ndi.binary_fill_holes(m)
     r, g, b = sub[..., 0], sub[..., 1], sub[..., 2]
     # magenta-tinted rim pixels are outline blended with the background: make them outline
     tinted = m & (b > g + 25) & (r > g + 20)
