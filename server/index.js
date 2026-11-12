@@ -6,10 +6,9 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const D = require('./data');
+const store = require('./store');
 
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-const SAVE_FILE = path.join(DATA_DIR, 'players.json');
 const PUBLIC = path.join(__dirname, '..', 'public');
 const DAY_MS = 8 * 60 * 1000;               // one in-game day
 const SPEED = 4.2;                          // tiles / second (client)
@@ -107,12 +106,10 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses',
   'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created'];
-function load() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(SAVE_FILE, 'utf8'));
-    for (const r of raw) accounts.set(r.name.toLowerCase(), hydrate(r));
-    console.log(`loaded ${accounts.size} players`);
-  } catch { /* first run */ }
+async function load() {
+  const rows = await store.loadAll();
+  for (const r of rows) if (r && r.name) accounts.set(r.name.toLowerCase(), hydrate(r));
+  console.log(`loaded ${accounts.size} players`);
 }
 function hydrate(r) {
   return Object.assign({
@@ -120,15 +117,17 @@ function hydrate(r) {
     followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(),
   }, r, { ws: null, id: null, f: 0, cd: {}, task: null, cast: null, trade: null, lastPosT: now(), moved: false, meDirty: false });
 }
-function save() {
-  if (!dirty) return;
-  dirty = false;
+let saving = false;
+async function save(force) {
+  if ((!dirty && !force) || saving) return;
+  saving = true; dirty = false;
+  const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
+  const changed = [...accounts.values()].filter(a => a.ws || a.sd);
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    const out = [...accounts.values()].map(a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]])));
-    fs.writeFileSync(SAVE_FILE + '.tmp', JSON.stringify(out));
-    fs.renameSync(SAVE_FILE + '.tmp', SAVE_FILE);
-  } catch (e) { console.error('save failed', e.message); }
+    await store.save(changed.map(rec), [...accounts.values()].map(rec));
+    changed.forEach(a => { if (!a.ws) a.sd = false; });
+  } catch (e) { dirty = true; console.error('save failed:', e.message); }
+  saving = false;
 }
 
 // ------------------------------------------------------------------ public views
@@ -508,7 +507,7 @@ function detach(a) {
   if (a.trade) tradeClose(a.trade, `${a.name} ออกจากเกม`);
   for (const [id, r] of reqs) if (r.from === a || r.to === a) reqs.delete(id);
   online.delete(a.id);
-  a.ws = null; a.cast = null; dirty = true;
+  a.ws = null; a.cast = null; a.sd = true; dirty = true;
   sendRoster();
 }
 
@@ -616,7 +615,7 @@ function tick() {
   if (ps.length) broadcast({ t: 'ps', p: ps });
 
   if (t > wdAt) { wdAt = t + 1000; broadcast(worldView()); }
-  if (t > saveAt) { saveAt = t + 20000; save(); }
+  if (t > saveAt) { saveAt = t + 15000; save(); }
 }
 
 // ------------------------------------------------------------------ http
@@ -647,9 +646,26 @@ wss.on('connection', ws => {
   ws.on('close', () => clearInterval(ka));
 });
 
-load();
-setInterval(tick, TICK);
-function shutdown() { dirty = true; save(); process.exit(0); }
+// keep a free-tier host awake by requesting our own public URL while running
+const SELF_URL = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL;
+if (SELF_URL) {
+  setInterval(() => { fetch(SELF_URL.replace(/\/$/, '') + '/healthz').catch(() => {}); }, 9 * 60 * 1000);
+  console.log('keep-alive ping enabled for', SELF_URL);
+}
+
+let closing = false;
+async function shutdown() {
+  if (closing) return; closing = true;
+  setTimeout(() => process.exit(0), 5000).unref();
+  await save(true); await store.close(); process.exit(0);
+}
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
-if (require.main === module) server.listen(PORT, () => console.log(`Life Town running on http://localhost:${PORT}`));
+
+async function main() {
+  await store.init();
+  await load();
+  setInterval(tick, TICK);
+  server.listen(PORT, () => console.log(`Life Town running on http://localhost:${PORT}`));
+}
+if (require.main === module) main().catch(e => { console.error('fatal:', e); process.exit(1); });
 module.exports = { server };
