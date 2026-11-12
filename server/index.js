@@ -89,7 +89,7 @@ function sellPrice(a, id) {
   if (ev('festival') && (it.kind === 'meal' || it.kind === 'goods')) p *= 1.3;
   if (ev('drought') && it.kind === 'crop') p *= 1.4;
   let b = 1;
-  if (a.career === 'merchant') b += 0.12;
+  if (a.career === 'merchant') b += 0.12 + Math.min(0.13, 0.01 * (lvl(a, 'merchant') - 1));
   if (a.career === 'chef' && it.kind === 'meal') b += 0.10;
   if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
   if (a.career === 'fisher' && it.kind === 'fish') b += 0.08;
@@ -198,7 +198,7 @@ function act(a, m) {
       const ot = m.a === 'ot';
       if (!cd(a, 'work', 1500) || !spend(a, ot ? 30 : 15)) return;
       const l = Math.min(lvl(a), D.OFFICE_TITLES.length);
-      let p = (450 + 160 * (l - 1)) * (ot ? 1.9 : 1) * wb * (ev('boom') ? 1.25 : 1);
+      let p = (450 + 100 * (l - 1)) * (ot ? 2.6 : 1) * wb * (ev('boom') ? 1.25 : 1);
       const got = earn(a, p);
       if (ot) a.health = Math.max(0, a.health - 3);
       const before = lvl(a); addXp(a);
@@ -229,17 +229,19 @@ function act(a, m) {
       if (!need(a, 'merchant')) return;
       const id = m.item, it = D.ITEMS[id];
       if (!it || !it.wholesale) return;
-      let q = clamp(Math.floor(+m.qty) || 1, 1, 50);
+      let q = clamp(Math.floor(+m.qty) || 1, 1, 10);
       if (stock[id] < q) q = Math.floor(stock[id]);
       if (q <= 0) return toast(a, 'สินค้าหมดสต็อก รอเติมของหน่อย', '📦', false);
-      if (!pay(a, it.wholesale * q)) return;
-      stock[id] -= q; addItem(a, id, q); addXp(a, 0.2); markMe(a);
+      if (a.money < it.wholesale * q) return toast(a, `เงินไม่พอ (ต้องใช้ ${money(it.wholesale * q)})`, '💸', false);
+      if (!spend(a, 4)) return;
+      a.money -= it.wholesale * q;
+      stock[id] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a);
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(it.wholesale * q)}`, '📦');
     }
     case 'studio.stream': {
       if (!need(a, 'streamer')) return;
       if (!cd(a, 'stream', 3000) || !spend(a, 20)) return;
-      const base = 250 + a.followers * 0.5;
+      const base = 350 + a.followers * 0.5;
       let views = Math.round(base * Math.exp(rnd(-0.5, 0.6)));
       const viral = Math.random() < (ev('viral') ? 0.12 : 0.04);
       if (viral) views *= rint(8, 20);
@@ -262,7 +264,7 @@ function act(a, m) {
       const fast = now() - a.task.at < 25000;
       const ans = a.task.answer; a.task = null; markMe(a);
       if (!ok) return toast(a, `โค้ดมีบั๊ก! คำตอบที่ถูกคือ ${ans} ลูกค้าไม่จ่าย`, '🐛', false);
-      const got = earn(a, (900 + 220 * (lvl(a) - 1)) * (fast ? 1.2 : 1) * wb); addXp(a);
+      const got = earn(a, (700 + 180 * (lvl(a) - 1)) * (fast ? 1.2 : 1) * wb); addXp(a);
       return toast(a, `ส่งงานผ่าน! ได้ ${money(got)}${fast ? ' (โบนัสส่งไว)' : ''}`, '💻');
     }
     case 'restaurant.eat': {
@@ -283,6 +285,15 @@ function act(a, m) {
       addItem(a, r.id, 1); addXp(a); markMe(a);
       return toast(a, `ปรุง ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} สำเร็จ`, '🍳');
     }
+    case 'kitchen.buy': {
+      if (!need(a, 'chef')) return;
+      const id = m.item, it = D.ITEMS[id];
+      if (!it || !D.RECIPES.some(r => id in r.in)) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), cost = Math.ceil(it.base * 1.8) * q;
+      if (!pay(a, cost)) return;
+      addItem(a, id, q); markMe(a);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคา ${money(cost)} (แพงกว่าซื้อจากชาวไร่/ชาวประมงโดยตรง)`, '🛒');
+    }
     case 'hospital.heal': {
       if (a.health >= 98) return toast(a, 'คุณสุขภาพดีอยู่แล้ว', 'ℹ️', false);
       if (!pay(a, 800)) return;
@@ -292,7 +303,7 @@ function act(a, m) {
     case 'hospital.shift': {
       if (!need(a, 'doctor')) return;
       if (!cd(a, 'shift', 2000) || !spend(a, 28)) return;
-      const got = earn(a, (1400 + 220 * (lvl(a) - 1)) * wb * (ev('boom') ? 1.25 : 1) * (ev('flu') ? 1.4 : 1));
+      const got = earn(a, (1100 + 200 * (lvl(a) - 1)) * wb * (ev('boom') ? 1.25 : 1) * (ev('flu') ? 1.4 : 1));
       a.health = Math.max(0, a.health - 2); addXp(a);
       return toast(a, `เข้าเวรเสร็จ ได้ ${money(got)}`, '🩺');
     }
@@ -304,15 +315,15 @@ function act(a, m) {
       return toast(a, `ได้รับ ${l.name} แล้ว! เปลี่ยนอาชีพได้ในเมนู 💼`, '🎓');
     }
     case 'home.rest': {
-      if (!cd(a, 'rest', 30000)) return;
+      if (!cd(a, 'rest', 90000)) return;
       a.energy = Math.min(100, a.energy + 25); markMe(a);
       return toast(a, 'งีบหลับ พลังงาน +25', '😴');
     }
     case 'home.inn': {
-      if (!cd(a, 'inn', 20000)) return;
-      if (!pay(a, 150)) { a.cd.inn = 0; return; }
-      a.energy = Math.min(100, a.energy + 60); a.health = Math.min(100, a.health + 10); markMe(a);
-      return toast(a, 'นอนเต็มอิ่ม พลังงาน +60 สุขภาพ +10', '🛏️');
+      if (!cd(a, 'inn', 60000)) return;
+      if (!pay(a, 400)) { a.cd.inn = 0; return; }
+      a.energy = Math.min(100, a.energy + 40); a.health = Math.min(100, a.health + 10); markMe(a);
+      return toast(a, 'นอนห้องพัก พลังงาน +40 สุขภาพ +10', '🛏️');
     }
     case 'pier.cast': {
       if (!need(a, 'fisher')) return;

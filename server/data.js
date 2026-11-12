@@ -96,10 +96,10 @@ const SPAWN = { x: 31.0, y: 19.5 };
 // ---------------------------------------------------------------- items
 // kind: crop | fish | meal | goods.  base = reference sell price at the market.
 const ITEMS = {
-  rice:   { name: 'ข้าว', icon: '🌾', kind: 'crop', base: 30 },
-  corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 60 },
-  chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 90 },
-  durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 300 },
+  rice:   { name: 'ข้าว', icon: '🌾', kind: 'crop', base: 40 },
+  corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 70 },
+  chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 100 },
+  durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 320 },
 
   sfish:  { name: 'ปลาเล็ก', icon: '🐟', kind: 'fish', base: 45 },
   tilapia:{ name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 120 },
@@ -108,22 +108,22 @@ const ITEMS = {
   shark:  { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 2400 },
   chest:  { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 8000 },
 
-  fried_rice:   { name: 'ข้าวผัด', icon: '🍚', kind: 'meal', base: 150, eat: { hunger: 35, energy: 5 } },
-  corn_soup:    { name: 'ซุปข้าวโพด', icon: '🥣', kind: 'meal', base: 300, eat: { hunger: 30, energy: 8 } },
-  grilled_fish: { name: 'ปลาเผา', icon: '🍤', kind: 'meal', base: 350, eat: { hunger: 45, energy: 10 } },
-  tomyum:       { name: 'ต้มยำ', icon: '🍲', kind: 'meal', base: 600, eat: { hunger: 50, energy: 15 } },
-  durian_sweet: { name: 'ทุเรียนเชื่อม', icon: '🍨', kind: 'meal', base: 800, eat: { hunger: 30, energy: 25, health: 5 } },
+  fried_rice:   { name: 'ข้าวผัด', icon: '🍚', kind: 'meal', base: 240, eat: { hunger: 35, energy: 5 } },
+  corn_soup:    { name: 'ซุปข้าวโพด', icon: '🥣', kind: 'meal', base: 540, eat: { hunger: 30, energy: 8 } },
+  grilled_fish: { name: 'ปลาเผา', icon: '🍤', kind: 'meal', base: 440, eat: { hunger: 45, energy: 10 } },
+  tomyum:       { name: 'ต้มยำ', icon: '🍲', kind: 'meal', base: 870, eat: { hunger: 50, energy: 15 } },
+  durian_sweet: { name: 'ทุเรียนเชื่อม', icon: '🍨', kind: 'meal', base: 1080, eat: { hunger: 30, energy: 25, health: 5 } },
 
-  snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 40, eat: { hunger: 10 }, wholesale: 24, stock: 80, refill: 3 },
-  drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 250, eat: { energy: 25 }, wholesale: 150, stock: 20, refill: 9 },
-  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', base: 400, eat: { health: 35 }, wholesale: 240, stock: 15, refill: 12 },
+  snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 40, eat: { hunger: 10 }, wholesale: 30, stock: 80, refill: 8 },
+  drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 250, eat: { energy: 25 }, wholesale: 190, stock: 12, refill: 25 },
+  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', base: 400, eat: { health: 35 }, wholesale: 310, stock: 10, refill: 40 },
 };
 
 const CROPS = {
   rice:   { seed: 20,  grow: 40,  min: 4, max: 6 },
-  corn:   { seed: 50,  grow: 80,  min: 4, max: 5 },
-  chili:  { seed: 80,  grow: 120, min: 4, max: 5 },
-  durian: { seed: 400, grow: 240, min: 3, max: 4 },
+  corn:   { seed: 45,  grow: 80,  min: 4, max: 5 },
+  chili:  { seed: 70,  grow: 120, min: 4, max: 5 },
+  durian: { seed: 350, grow: 240, min: 3, max: 4 },
 };
 
 const RECIPES = [

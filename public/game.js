@@ -435,9 +435,9 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'office': {
-      const l = Math.min(me.lv, G.titles.length), pay = 450 + 160 * (l - 1);
+      const l = Math.min(me.lv, G.titles.length), pay = 450 + 100 * (l - 1);
       return `<h2>🏢 บริษัท ไทยเทค</h2><div class="sub">ตำแหน่ง: <b>${G.titles[l - 1]}</b> · ทำงานต่อเนื่องเพื่อเลื่อนขั้น · เงินเดือนต่อกะ ~${money(pay)}</div>${needCareer('office')}
-        ${B(`💼 ทำงาน (⚡15) ~${money(pay)}`, { t: 'act', st, a: 'work' }, 'primary big')}${B(`🌙 ทำโอที x1.9 (⚡30, เสียสุขภาพ)`, { t: 'act', st, a: 'ot' }, 'big')}`;
+        ${B(`💼 ทำงาน (⚡15) ~${money(pay)}`, { t: 'act', st, a: 'work' }, 'primary big')}${B(`🌙 ทำโอที x2.6 (⚡30, เสียสุขภาพ)`, { t: 'act', st, a: 'ot' }, 'big')}`;
     }
     case 'market': {
       const rows = Object.entries(G.items).map(([id, it]) => {
@@ -449,9 +449,9 @@ function renderPanel(p) {
     }
     case 'warehouse': {
       const rows = Object.entries(G.items).filter(([, it]) => it.wholesale).map(([id, it]) =>
-        itemRow(id, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: id, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 })}</div>`,
+        itemRow(id, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: id, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 })}${B('x10', { t: 'act', st, a: 'buy', item: id, qty: 10 })}</div>`,
           `ราคาส่ง ${money(it.wholesale)} · ราคาตลาด ~${money(it.base)} · สต็อกเหลือ ${wd?.stock[id] ?? '-'}`)).join('');
-      return `<h2>📦 คลังสินค้าราคาส่ง</h2><div class="sub">สต็อกมีจำกัดและทุกคนแย่งกัน ซื้อไปขายให้ผู้เล่นที่ต้องการ (กดคนในแมพ → แลกเปลี่ยน) หรือขายตลาดกลาง</div>${needCareer('merchant')}<div class="list">${rows}</div>`;
+      return `<h2>📦 คลังสินค้าราคาส่ง</h2><div class="sub">สต็อกมีจำกัดและทุกคนแย่งกัน ทุกครั้งที่ซื้อเสีย ⚡4 (ซื้อได้ครั้งละไม่เกิน 10) ซื้อไปขายให้ผู้เล่นที่ต้องการ (กดคนในแมพ → แลกเปลี่ยน) หรือขายตลาดกลาง</div>${needCareer('merchant')}<div class="list">${rows}</div>`;
     }
     case 'studio':
       return `<h2>🎥 สตูดิโอสตรีม</h2><div class="sub">ผู้ติดตาม <b>${me.followers.toLocaleString()}</b> คน · รายได้แฝงทุก 30 วินาที · ยิ่งดังยิ่งมีลุ้นไวรัล · ผู้เล่นคนอื่นเดินมาโดเนทได้</div>${needCareer('streamer')}${B('🎥 เริ่มไลฟ์ (⚡20)', { t: 'act', st, a: 'stream' }, 'primary big')}`;
@@ -470,7 +470,10 @@ function renderPanel(p) {
         const ing = Object.entries(r.in).map(([i, q]) => `${G.items[i].icon}${q} (มี ${me.inv[i] || 0})`).join(' + ');
         return itemRow(r.id, B('ปรุง ⚡12', { t: 'act', st, a: 'cook', rid: r.id }, ok ? 'good' : '', !ok), `${ing} · ขาย ~${money(out.base)} · อิ่ม+${out.eat.hunger} ⚡+${out.eat.energy || 0}`);
       }).join('');
-      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">ซื้อวัตถุดิบจากชาวไร่/ชาวประมง (แลกเปลี่ยนในแมพ) มาปรุงเป็นอาหาร ขายได้แพงกว่าวัตถุดิบหลายเท่า</div>${needCareer('chef')}<div class="list">${rows}</div>`;
+      const ingIds = [...new Set(G.recipes.flatMap(r => Object.keys(r.in)))];
+      const buys = ingIds.map(i => { const it = G.items[i], p = Math.ceil(it.base * 1.8); return itemRowRaw(it.icon, esc(it.name), `มี ${me.inv[i] || 0} · ร้านขาย ${money(p)}/หน่วย (แพงกว่าซื้อจากผู้เล่น ~80%)`, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: i, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: i, qty: 5 })}</div>`); }).join('');
+      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">ปรุงอาหารขายได้แพงกว่าวัตถุดิบ ~3 เท่า · วัตถุดิบถูกที่สุดคือซื้อจากชาวไร่/ชาวประมง (แตะตัวเขาในแมพ → แลกเปลี่ยน) ถ้าไม่มีใครขาย ซื้อจากร้านได้</div>${needCareer('chef')}<div class="list">${rows}</div>
+        <div class="sub" style="margin-top:14px"><b>🛒 ซื้อวัตถุดิบจากร้าน</b></div><div class="list">${buys}</div>`;
     }
     case 'hospital':
       return `<h2>🏥 โรงพยาบาล</h2><div class="sub">สุขภาพของคุณ ${Math.floor(me.health)}/100 · หมอผู้เล่นอาจรักษาให้ถูกกว่า (กดที่ตัวหมอในแมพ)</div>
@@ -483,7 +486,7 @@ function renderPanel(p) {
       return `<h2>🎓 โรงเรียน</h2><div class="sub">ซื้อใบรับรองเพื่อปลดล็อกอาชีพพิเศษ (ถาวร)</div><div class="list">${rows}</div>`;
     }
     case 'home':
-      return `<h2>🏠 บ้านพัก</h2><div class="sub">พลังงาน ${Math.floor(me.energy)}/100</div>${B('😴 งีบหลับ (ฟรี, +25⚡, คูลดาวน์ 30 วิ)', { t: 'act', st, a: 'rest' }, 'big')}${B('🛏️ นอนห้องพัก ฿150 (+60⚡ +10❤️)', { t: 'act', st, a: 'inn' }, 'big')}`;
+      return `<h2>🏠 บ้านพัก</h2><div class="sub">พลังงาน ${Math.floor(me.energy)}/100</div>${B('😴 งีบหลับ (ฟรี, +25⚡, คูลดาวน์ 90 วิ)', { t: 'act', st, a: 'rest' }, 'big')}${B('🛏️ นอนห้องพัก ฿400 (+40⚡ +10❤️, คูลดาวน์ 60 วิ)', { t: 'act', st, a: 'inn' }, 'big')}`;
     case 'pier': {
       const c = me.cast;
       let btn;
