@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#14181d">
+<meta name="theme-color" content="#5a3620">
 <title>เมืองชีวิตนี้เลือกได้</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;600;800&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,31 +14,30 @@
 
 <div id="hud" class="hidden">
   <div id="card">
-    <div class="row"><b id="meName"></b><span id="meCareer"></span></div>
-    <div class="money" id="meMoney"></div>
+    <div class="who"><img id="mePortrait" src="assets/ui/face_m.png" alt=""><div><b id="meName"></b><span id="meCareer"></span><div class="money" id="meMoney"></div></div></div>
     <div class="bars">
-      <div class="bar" title="พลังงาน"><i>⚡</i><s><u id="bE"></u></s><em id="vE"></em></div>
-      <div class="bar" title="ความอิ่ม"><i>🍗</i><s><u id="bH"></u></s><em id="vH"></em></div>
-      <div class="bar" title="สุขภาพ"><i>❤️</i><s><u id="bL"></u></s><em id="vL"></em></div>
-      <div class="bar" title="ความสุข"><i>😊</i><s><u id="bJ"></u></s><em id="vJ"></em></div>
+      <div class="bar" title="พลังงาน"><img src="assets/ui/i_bolt.png" alt="⚡"><s><u id="bE"></u></s><em id="vE"></em></div>
+      <div class="bar" title="ความอิ่ม"><img src="assets/ui/i_leg.png" alt="🍗"><s><u id="bH"></u></s><em id="vH"></em></div>
+      <div class="bar" title="สุขภาพ"><img src="assets/ui/i_hp.png" alt="❤️"><s><u id="bL"></u></s><em id="vL"></em></div>
+      <div class="bar" title="ความสุข"><img src="assets/ui/i_calm.png" alt="😊"><s><u id="bJ"></u></s><em id="vJ"></em></div>
     </div>
-    <div id="dzChips"></div>
-    <button id="qline" data-open="quests">📜 เควสต์ 0/3</button>
+    <div id="statusBox"><div class="st">สถานะปัจจุบัน</div><div id="dzChips"></div></div>
+    <button id="qline" data-open="quests">เควสต์ 0/3</button>
   </div>
   <div id="topRight">
     <div id="clock"></div>
     <div id="miniWrap"><canvas id="mini" width="120" height="88"></canvas><span id="miniName">🗺️ แผนที่</span></div>
-    <button id="menuToggle" title="ซ่อนเมนู">✕</button>
+    <button id="menuToggle" class="tile" title="ซ่อนเมนู"></button>
     <div id="menu">
-      <button data-open="career" title="งาน">💼</button>
-      <button data-open="bag" title="กระเป๋า">🎒</button>
-      <button data-open="phone" id="phoneBtn" title="มือถือ">📱</button>
-      <button data-open="quests" id="qBtn" title="เควสต์">📜</button>
-      <button data-open="ach" title="ความสำเร็จ/ฉายา">🏅</button>
-      <button data-open="rank" title="อันดับ">🏆</button>
-      <button data-open="chat" title="คุยกับคนใกล้ๆ">💬</button>
-      <button data-open="help" title="วิธีเล่น">❔</button>
-      <button id="muteBtn" title="เปิด/ปิดเสียง">🔊</button>
+      <button class="tile" data-open="career" title="งาน"><img src="assets/ui/b_job.png" alt="งาน"><i>งาน</i></button>
+      <button class="tile" data-open="bag" title="กระเป๋า"><img src="assets/ui/b_bag.png" alt="กระเป๋า"><i>กระเป๋า</i></button>
+      <button class="tile" data-open="phone" id="phoneBtn" title="มือถือ"><img src="assets/ui/b_phone.png" alt="มือถือ"><i>มือถือ</i></button>
+      <button class="tile" data-open="quests" id="qBtn" title="เควสต์"><img src="assets/ui/b_quest.png" alt="เควสต์"><i>เควสต์</i></button>
+      <button class="tile" data-open="ach" title="ความสำเร็จ/ฉายา"><img src="assets/ui/i_medal.png" alt="ฉายา"><i>ฉายา</i></button>
+      <button class="tile" data-open="rank" title="อันดับ"><img src="assets/ui/b_rank.png" alt="อันดับ"><i>อันดับ</i></button>
+      <button class="tile full" data-open="chat" title="คุยกับคนใกล้ๆ"><img src="assets/ui/b_chat.png" alt="แชท"><i>แชท</i></button>
+      <button class="tile" data-open="help" title="วิธีเล่น"><b class="q">?</b><i>วิธีเล่น</i></button>
+      <button class="tile" id="muteBtn" title="เปิด/ปิดเสียง"><b class="q">🔊</b><i>เสียง</i></button>
     </div>
   </div>
   <div id="eventBar" class="hidden"></div>
@@ -49,18 +48,18 @@
   <div id="downView" class="hidden"></div>
   <div id="stick"><i></i></div>
   <button id="restBtn" title="นั่งพักหลับตา (R)">😌 พัก</button>
-  <button id="actBtn" class="hidden"><span id="actIcon">👆</span><small id="actLabel"></small></button>
+  <button id="actBtn" class="hidden"><span class="medal"><span id="actIcon">👆</span></span><small id="actLabel"></small></button>
 </div>
 
-<div id="panel" class="hidden"><div class="sheet"><button class="x" id="panelX">✕</button><div id="panelBody"></div></div></div>
-<div id="mapView" class="hidden"><div class="mapBox"><div class="mapHead"><b>🗺️ แผนที่</b><span>แตะสถานที่เพื่อนำทาง · ซูม: ปุ่ม / ล้อเมาส์ / สองนิ้ว</span><button id="mapOut">➖</button><b id="mapZoomLbl">100%</b><button id="mapIn">➕</button><button id="mapX">✕</button></div><div id="mapTabs" class="tabs"></div><div class="mapBody"><div id="mapScroll"><canvas id="bigMap"></canvas></div><div id="mapLegend"></div></div></div></div>
+<div id="panel" class="hidden"><div class="sheet"><button class="x" id="panelX" title="ปิด"></button><div id="panelBody"></div></div></div>
+<div id="mapView" class="hidden"><div class="mapBox"><div class="mapHead"><b>🗺️ แผนที่</b><span>แตะสถานที่เพื่อนำทาง · ซูม: ปุ่ม / ล้อเมาส์ / สองนิ้ว</span><button id="mapOut">➖</button><b id="mapZoomLbl">100%</b><button id="mapIn">➕</button><button id="mapX" class="x" title="ปิด"></button></div><div id="mapTabs" class="tabs"></div><div class="mapBody"><div id="mapScroll"><canvas id="bigMap"></canvas></div><div id="mapLegend"></div></div></div></div>
 <div id="tut" class="hidden"><div class="tutCard"><div id="tutBody"></div><div class="rowf"><button id="tutSkip">ข้าม</button><button class="primary" id="tutNext" style="flex:1">ถัดไป →</button></div></div></div>
 <div id="dailyWrap" class="hidden"><div class="tutCard" id="daily"></div></div>
 <div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div></div></div>
 
 <div id="login">
   <form id="loginForm" class="box" autocomplete="off">
-    <h1>🏙️ เมืองชีวิตนี้เลือกได้</h1>
+    <div class="logo"><img src="assets/ui/pin.png" alt=""><h1>เมืองชีวิตนี้เลือกได้<small>LIFE TOWN</small></h1></div>
     <p class="sub">ใช้ชีวิตในเมืองเดียวกับผู้เล่นคนอื่น หางานทำ หาเงิน ซื้อบ้าน ทำสวน และช่วยเหลือกัน</p>
     <label>ชื่อตัวละคร <small>(ภาษาอังกฤษและตัวเลขเท่านั้น)</small><input id="inName" maxlength="16" placeholder="เช่น Somchai" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
     <label>PIN 4-8 หลัก <small>(ผู้เล่นใหม่ตั้งเอง / ผู้เล่นเดิมใส่เพื่อเล่นต่อ)</small><input id="inPin" inputmode="numeric" pattern="\d{4,8}" maxlength="8" placeholder="••••" type="password" required></label>

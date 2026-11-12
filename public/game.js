@@ -208,17 +208,22 @@ function paintHud() {
   if (!me) return;
   const c = G.careers[me.career];
   $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} Lv.${me.lv}`;
-  const chips = (me.dz || []).map(d => `<span class="chip bad" data-dz="${d}">${G.diseases[d].icon} ${G.diseases[d].name}</span>`);
-  if (me.awake > 32 * 60 && !(me.dz || []).includes('insomnia')) chips.push('<span class="chip warnc" data-dz="_sleepy">🥱 เริ่มง่วง ควรพัก</span>');
-  if (me.hunger < 20) chips.push('<span class="chip warnc" data-dz="_hungry">🍗 หิวมาก</span>');
-  if (me.happy < 20) chips.push('<span class="chip bad" data-dz="_sad">😞 ซึมเศร้า</span>');
-  if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">🤤 อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
+  // status pills (icons from the UI sheet where we have one)
+  const ic = (f, alt) => f ? `<img src="assets/ui/${f}.png" alt="">` : alt;
+  const DZ_IC = { cold: 'i_cold', flu: 'i_cold', poison: 'i_belly', insomnia: 'i_sleepy', exhaust: 'i_sad', malnut: 'i_meal' };
+  const chips = (me.dz || []).map(d => `<span class="chip bad" data-dz="${d}">${ic(DZ_IC[d], G.diseases[d].icon)} ${G.diseases[d].name}</span>`);
+  if (me.awake > 32 * 60 && !(me.dz || []).includes('insomnia')) chips.push(`<span class="chip warnc" data-dz="_sleepy">${ic('i_sleepy')} ง่วงนอน</span>`);
+  if (me.hunger < 20) chips.push(`<span class="chip warnc" data-dz="_hungry">${ic('i_leg')} หิวมาก</span>`);
+  if (me.happy < 20) chips.push(`<span class="chip bad" data-dz="_sad">${ic('i_sad')} ซึมเศร้า</span>`);
+  if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">${ic('i_bulb')} อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
   if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
-  else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างค่าน้ำไฟ ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
+  else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
+  $('#statusBox').classList.toggle('hidden', !chips.length);
+  $('#mePortrait').src = `assets/ui/face_${me.gender === 'f' ? 'f' : 'm'}.png`;
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
-  $('#meMoney').textContent = money(me.money);
-  const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? '📜 เควสต์ครบแล้ว ✅' : `📜 เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
+  $('#meMoney').textContent = Math.round(me.money).toLocaleString('en-US');
+  const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
@@ -269,7 +274,7 @@ document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPane
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // side menu can be folded away (remembered on this device)
-const setMenu = open => { $('#menu').classList.toggle('hidden', !open); $('#menuToggle').textContent = open ? '✕' : '☰'; $('#menuToggle').title = open ? 'ซ่อนเมนู' : 'เปิดเมนู'; try { localStorage.setItem('lt_menu', open ? '1' : '0'); } catch { } };
+const setMenu = open => { $('#menu').classList.toggle('hidden', !open); $('#menuToggle').classList.toggle('closed', !open); $('#menuToggle').title = open ? 'ซ่อนเมนู' : 'เปิดเมนู'; try { localStorage.setItem('lt_menu', open ? '1' : '0'); } catch { } };
 $('#menuToggle').onclick = () => { FX.play('click'); setMenu($('#menu').classList.contains('hidden')); };
 { let m = '1'; try { m = localStorage.getItem('lt_menu') ?? '1'; } catch { } setMenu(m !== '0'); }
 $('#mapX').onclick = closeMap;
@@ -574,11 +579,11 @@ function npcPatient(b, s) {
 }
 function drawEmote(name, k) { const s = CH_ATLAS.sprites[name]; if (s) ctx.drawImage(chImg, s[0], s[1], s[2], s[3], s[4] * k * 1.4, s[5] * k * 1.4, s[2] * k * 1.4, s[3] * k * 1.4); }
 function nameAndBubble(p, px, top, mine) {
-  sign(`${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : p.npc ? 'rgba(60,70,60,.6)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
-  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
+  sign(`${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
+  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
-    ctx.font = `${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
+    ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
     const w = ctx.measureText(txt).width + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
     ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
@@ -636,10 +641,10 @@ function drawPlayerPixel(p, X, Y, t) {
   const badge = pose === 'veg' ? '🥬' : pose === 'hosp' ? '🚑' : pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px + 7 * u, top + Math.sin(t / 300) * 3); }
   sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
-  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
+  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
-    ctx.font = `${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
+    ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
     const w = ctx.measureText(txt).width + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
     ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
@@ -1137,9 +1142,9 @@ function shade(hex, f) {
 }
 function sign(text, x, y, o = {}) {
   const fs = Math.max(10, Math.round(o.size || TS * .36));
-  ctx.font = `700 ${fs}px 'Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const w = ctx.measureText(text).width + fs * .9, h = fs * 1.55;
-  ctx.fillStyle = o.bg || 'rgba(18,22,28,.88)';
+  ctx.fillStyle = o.bg || 'rgba(58,36,20,.88)';
   ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
   if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 2; ctx.stroke(); }
   ctx.fillStyle = o.color || '#fff'; ctx.fillText(text, x, y + fs * .04);
@@ -1472,7 +1477,7 @@ function drawRoomLabels(r, X, Y, t) {
   const px = r.x * TS + X, py = r.y * TS + Y;
   const h = r.rk === 'house' ? wd?.houses?.[r.house] : null;
   sign(r.rk === 'house' ? (h && h[0] ? `🏠 บ้านของ ${h[0]}` : `🏠 บ้านเลขที่ ${r.house + 1}`) : `${r.icon} ${r.label}`, px + r.w * TS / 2, py - TS * .1, { size: TS * .34, border: '#ffc94d88' });
-  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `700 ${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
   ctx.fillText('⬇ ทางออก', px + Math.floor(r.w / 2) * TS, py + (r.h + .45) * TS + Math.sin(t / 300) * 2);
 }
 let rainDrops = null;
@@ -1498,7 +1503,7 @@ function dzInfo(id) {
 
 // ------------------------------------------------------------------ sound & effects glue
 let stepAcc = 0, bobber = null;
-function paintMute() { $('#muteBtn').textContent = FX.opts.sfx || FX.opts.music ? '🔊' : '🔇'; }
+function paintMute() { $('#muteBtn').innerHTML = FX.opts.sfx || FX.opts.music ? '<b class="q">🔊</b><i>เสียง</i>' : '<img src="assets/ui/b_sound.png" alt="ปิดเสียง"><i>เสียง</i>'; }
 paintMute();
 $('#muteBtn').onclick = () => { const on = !(FX.opts.sfx || FX.opts.music); FX.setOpt('sfx', on); FX.setOpt('music', on); paintMute(); if (panel?.kind === 'help') refreshPanel(true); };
 function onMeDiff(a, b) {
