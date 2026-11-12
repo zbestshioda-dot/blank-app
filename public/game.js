@@ -159,7 +159,8 @@ setInterval(() => {
     el.textContent = left > 0 ? `อีก ${left} วิ` : 'พร้อมเก็บเกี่ยว!';
   });
 }, 500);
-const phaseNow = () => (((Date.now() + clockOff) % DAY_MS) / DAY_MS);
+const FORCE_PHASE = new URLSearchParams(location.search).get('phase');   // ?phase=0.95 previews a time of day
+const phaseNow = () => FORCE_PHASE !== null ? +FORCE_PHASE : (((Date.now() + clockOff) % DAY_MS) / DAY_MS);
 
 document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPanel({ kind: b.dataset.open }));
 $('#panelX').onclick = closePanel;
