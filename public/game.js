@@ -112,7 +112,14 @@ function handle(m) {
       if (panel?.kind === 'phone') refreshPanel(true);
       break;
     }
-    case 'dtest': showDriveTest(m.qs); break;
+    case 'dtest': showDriveTest(m); break;
+    case 'crave': FX.play('ding'); break;
+    case 'witness':
+      popup(`👀 คุณเห็น <b>${esc(m.thief)}</b> ล้วงกระเป๋า <b>${esc(m.victim)}</b>!`, [['📞 แจ้งตำรวจ 191', 'warn', () => send({ t: 'report', crime: m.crime })], ['ปล่อยไป', '', () => {}]], 25000);
+      FX.play('notice'); break;
+    case 'robbed':
+      popup(m.thief ? `😠 <b>${esc(m.thief)}</b> พยายามล้วงกระเป๋าคุณ!` : `😱 มีคนล้วงกระเป๋าคุณไป <b>${money(m.amt)}</b>`, [['📞 แจ้งตำรวจ 191', 'warn', () => send({ t: 'report', crime: m.crime })], ['ช่างมัน', '', () => {}]], 25000);
+      FX.play('fail'); if (navigator.vibrate) navigator.vibrate(300); break;
     case 'ach': FX.play('levelup'); { const s = P.get(myId); if (s) { FX.burst(s.x, s.y, '#ffd34d', 24); FX.ring(s.x, s.y, '#ffd34d', 900, 1.6); } } break;
     case 'daily': if (tutPending) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
     case 'quest': {
@@ -169,22 +176,38 @@ function paintHud() {
   const chips = (me.dz || []).map(d => `<span class="chip bad" data-dz="${d}">${G.diseases[d].icon} ${G.diseases[d].name}</span>`);
   if (me.awake > 32 * 60 && !(me.dz || []).includes('insomnia')) chips.push('<span class="chip warnc" data-dz="_sleepy">🥱 เริ่มง่วง ควรพัก</span>');
   if (me.hunger < 20) chips.push('<span class="chip warnc" data-dz="_hungry">🍗 หิวมาก</span>');
+  if (me.happy < 20) chips.push('<span class="chip bad" data-dz="_sad">😞 ซึมเศร้า</span>');
+  if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">🤤 อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
+  if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
+  else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างค่าน้ำไฟ ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
   $('#meMoney').textContent = money(me.money);
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? '📜 เควสต์ครบแล้ว ✅' : `📜 เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
+  $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
+  $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
   $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
+  { const cd = $('#card'); $('#log').style.top = (cd.offsetTop + cd.offsetHeight + 6) + 'px'; }
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
   $('#restBtn').textContent = me.pose === 'rest' ? '🧍 ลุก' : '😌 พัก';
   $('#phoneBtn').classList.toggle('has', me.career === 'rider' && (me.jobs || []).some(j => j.state === 'open'));
   const dn = $('#downView');
   if (me.down) {
     dn.classList.remove('hidden');
-    dn.innerHTML = me.down.kind === 'veg' ? `<b>🥬 หิวจนหมดแรง นอนเป็นผัก</b><span>ร่างกายจะค่อยๆ ฟื้นเอง (❤️ ${Math.floor(me.health)}/15)</span>` : `<b>🚑 หมดสติอยู่ที่โรงพยาบาล</b><span>รอหมอมาช่วย... ทำอะไรไม่ได้</span>`;
+    paintDown();
   } else dn.classList.add('hidden');
 }
+// knocked out / jailed: show what is happening and when it ends
+function paintDown() {
+  const dn = $('#downView'); if (!me?.down) return;
+  const left = me.down.until ? Math.max(0, Math.ceil((me.down.until - Date.now() - clockOff) / 1000)) : 0, mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  dn.innerHTML = me.down.kind === 'veg' ? `<b>🥬 หิวจนหมดแรง นอนเป็นผัก</b><span>ร่างกายจะค่อยๆ ฟื้นเอง (❤️ ${Math.floor(me.health)}/15)</span>`
+    : me.down.kind === 'jail' ? `<b>⛓️ ติดคุกอยู่ที่สถานีตำรวจ</b><span>พ้นโทษในอีก <b class="big-cd">${mm}</b></span>`
+    : `<b>🚑 หมดสติอยู่บนเตียงโรงพยาบาล</b><span>รอหมอมาช่วย... ทำอะไรไม่ได้</span><span>ถ้าไม่มีหมอ เจ้าหน้าที่จะช่วยให้ฟื้นในอีก <b class="big-cd">${mm}</b></span>`;
+}
+setInterval(() => { if (me?.down) paintDown(); }, 500);
 function paintEvent() {
   const e = $('#eventBar');
   if (wd?.ev) { e.textContent = wd.ev.text; e.classList.remove('hidden'); } else e.classList.add('hidden');
@@ -195,7 +218,7 @@ const isOpen = (kind, h = hourNow()) => { const o = G?.hours[kind]; return !o ||
 setInterval(() => {
   if (!wd || !G) return;
   const h = hourNow();
-  $('#clock').textContent = `🕐 ${hhmm(h)} · 👥 ${wd.on}`;
+  const dt = me?.date; $('#clock').textContent = `${dt ? `📅 ${dt.day}/${G.monthDays} ${G.months[dt.month].slice(0, 3)}. ${dt.year} · ` : ''}🕐 ${hhmm(h)} · 👥 ${wd.on}`;
   document.querySelectorAll('.qcd').forEach(el => {
     const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
     el.textContent = `${Math.floor(s / 3600)} ชม. ${Math.floor(s % 3600 / 60)} นาที`;
@@ -328,6 +351,7 @@ function onAction() {
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
+  if (near.type === 'begspot' && me.career === 'beggar') return doAct(near.id, 'beg');
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (panel?.st === near.id) { closePanel(); return; }
   openPanel({ kind: near.type, st: near.id });
@@ -467,7 +491,7 @@ function drawPlayer(p, X, Y, t) {
   if (px0 < -80 || py0 < -120 || px0 > VW + 80 || py0 > VH + 120) return;
   const u = TS / 16, id = p.id || 1, skin = SKIN[id % 4], hair = HAIR[(id * 3 + p.av) % HAIR.length];
   const shirt = COLORS[p.av] || '#999', pants = shade(shirt, -.55), dark = '#1d1a22';
-  const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest';
+  const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail';
   const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
   let dir = Math.abs(cy) > Math.abs(cx) ? (cy > 0 ? 'down' : 'up') : (cx > 0 ? 'right' : 'left');
   if (sitting || lying) dir = 'down';
@@ -508,7 +532,9 @@ function drawPlayer(p, X, Y, t) {
   px = px0; if (sitting) py += u * 4;
   const mine = p.id === myId, top = (lying ? py0 - 10 * u : py - 23 * u - bob);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const badge = pose === 'veg' ? '🥬' : pose === 'hosp' ? '🚑' : pose === 'rest' || pose === 'bed' ? '💤' : '';
+  if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 + TS * .05); }
+  if (p.w && me?.career === 'police') { ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText('🚨', px - 7 * u, top + Math.sin(t / 120) * 3); }
+  const badge = pose === 'veg' ? '🥬' : pose === 'hosp' ? '🚑' : pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px + 7 * u, top + Math.sin(t / 300) * 3); }
   sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
   if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
@@ -541,6 +567,7 @@ function drawMini() {
     const q = outPos(p.rx, p.ry); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
     g.fillStyle = p.id === myId ? '#fff' : COLORS[p.av]; const s = p.id === myId ? 5 : 3; g.fillRect((q.x - A.x) * 2 - s / 2, (q.y - A.y) * 2 - s / 2, s, s);
   }
+  if (me?.career === 'police') for (const rp of me.reports || []) { const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp; if (mapOf(rp.area) !== mapId) continue; g.fillStyle = (performance.now() / 300 | 0) % 2 ? '#ff2b2b' : '#fff'; g.fillRect((q.x - A.x) * 2 - 4, (q.y - A.y) * 2 - 4, 8, 8); }
   $('#miniName').textContent = `🗺️ ${A.name}`;
 }
 
@@ -590,6 +617,7 @@ const FN = {
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
   addContact(m, root) { send({ t: 'contact_add', phone: m.phone || root.querySelector('#phIn').value }); },
+  donate(m, root) { send({ t: 'donate', to: m.to, amt: +root.querySelector('#donIn').value || 0 }); },
   order(m, root) { send({ t: 'order', item: m.item, tip: +(root.querySelector('#tipIn')?.value || 0) }); },
 };
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${it.icon}</div><div class="nm">${esc(it.name)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
@@ -706,10 +734,16 @@ function renderPanel(p) {
       return own || rent ? `<h2>🛏️ เตียงนอน</h2><div class="sub">นอนแล้วได้พลังงาน หายง่วง หายอ่อนเพลีย (ทุก 2 นาที)</div>${B(`😴 นอนพัก (+${50 + (own ? me.comfort * 2 : 0)}⚡)`, { t: 'act', st, a: 'sleep' }, 'primary big')}` : '<h2>🛏️ เตียงนอน</h2><div class="sub">นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า</div>';
     }
     case 'school': {
-      const L = G.licenses, deg = lic('degree');
-      const degRow = deg ? itemRowRaw('🎓', 'ปริญญาตรี', 'เรียนจบแล้ว ✓', '<span class="tag">จบแล้ว</span>')
-        : me.enrolled ? itemRowRaw('📖', `ปริญญาตรี (เรียนอยู่ ${me.classes}/${L.degree.classes} คาบ)`, `<div class="qbar"><i style="width:${me.classes / L.degree.classes * 100}%"></i></div>คาบละ ⚡15 · เข้าได้ทุก 1 ชั่วโมงในเกม`, B('📖 เข้าเรียน', { t: 'act', st, a: 'class' }, 'good'))
-        : itemRowRaw('🎓', 'ปริญญาตรี', `ค่าเทอม ${money(L.degree.price)} · เรียน ${L.degree.classes} คาบ · ปลดล็อกงานบริษัท และเรียนต่อแพทย์`, B(`ลงทะเบียน ${money(L.degree.price)}`, { t: 'act', st, a: 'enroll' }, 'good'));
+      const L = G.licenses;
+      const course = (id, what) => {
+        const l = L[id], blocked = l.need && !lic(l.need);
+        if (lic(id)) return itemRowRaw(l.icon, l.name, 'เรียนจบแล้ว ✓', '<span class="tag">จบแล้ว</span>');
+        if (me.enrolled === id) return itemRowRaw('📖', `${l.name} (เรียนอยู่ ${me.classes}/${l.classes} คาบ)`, `<div class="qbar"><i style="width:${me.classes / l.classes * 100}%"></i></div>คาบละ ⚡15 · เข้าได้ทุก 1 ชั่วโมงในเกม`, B('📖 เข้าเรียน', { t: 'act', st, a: 'class' }, 'good'));
+        return itemRowRaw(l.icon, l.name, `ค่าเทอม ${money(l.price)} · เรียน ${l.classes} คาบ · ${what}${blocked ? ` · <span style="color:var(--bad)">ต้องจบ${L[l.need].name}ก่อน</span>` : ''}`, B(`ลงทะเบียน ${money(l.price)}`, { t: 'act', st, a: 'enroll', lic: id }, 'good', blocked || !!me.enrolled));
+      };
+      const pol = lic('policeExam') ? itemRowRaw('👮', L.policeExam.name, 'สอบผ่านแล้ว ✓', '<span class="tag">ผ่าน</span>')
+        : itemRowRaw('👮', 'สอบนายสิบตำรวจ', `ค่าสมัครสอบ ${money(L.policeExam.price)} · ตอบ 3 ข้อ ต้องถูกทุกข้อ · ต้องจบ ม.6`, B('📝 สอบ', { t: 'act', st, a: 'ptest' }, 'good', !lic('hs')));
+      const degRow = course('hs', 'ปลดล็อกการเรียนปริญญาตรีและสอบตำรวจ') + course('degree', 'ปลดล็อกงานบริษัท และเรียนต่อแพทย์') + pol;
       const rows = ['cooking', 'medicine'].map(id => {
         const l = L[id], has = lic(id), blocked = l.need && !lic(l.need);
         const c = Object.values(G.careers).find(c => (c.need || []).includes(id));
@@ -762,7 +796,7 @@ function renderPanel(p) {
     }
     case 'bank': {
       const bk = G.shop.bank;
-      return `<h2>🏦 ธนาคาร</h2><div class="sub">${hoursTxt('bank')} · ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (บนยอดไม่เกิน ${money(bk.cap)})</div>
+      return `<h2>🏦 ธนาคาร</h2>${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (บนยอดไม่เกิน ${money(bk.cap)})</div>
         <div class="grid2"><div class="item"><div class="nm">💵 เงินสด<small><b style="color:var(--acc);font-size:16px">${money(me.money)}</b></small></div></div><div class="item"><div class="nm">🏦 เงินฝาก<small><b style="color:var(--ok);font-size:16px">${money(me.bank)}</b></small></div></div></div>
         <div class="rowf" style="margin-top:10px"><input id="bankAmt" type="number" min="1" value="1000" inputmode="numeric"></div>
         <div class="grid2" style="margin-top:8px">${B('⬇️ ฝาก', { fn: 'bank', st, op: 'deposit' }, 'good')}${B('⬆️ ถอน', { fn: 'bank', st, op: 'withdraw' })}${B('ฝากทั้งหมด', { fn: 'bank', st, op: 'deposit', all: Math.floor(me.money) })}${B('ถอนทั้งหมด', { fn: 'bank', st, op: 'withdraw', all: me.bank })}</div>
@@ -825,6 +859,11 @@ function renderPanel(p) {
       return `<h2>🏡 สำนักงานอสังหาฯ</h2><div class="sub">${hoursTxt('estate')} · ซื้อ/เช่าได้ที่หน้าบ้านแต่ละหลัง · เจ้าของบ้านประกาศขายหรือปล่อยเช่าให้ผู้เล่นอื่นได้</div><div class="list">${rows}</div>`;
     }
     case 'door': return houseDoor(STN(st), st);
+    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${applyBox('police', st)}${me.career === 'police' ? policeReports() : ''}`;
+    case 'hideout': return `<h2>🕶️ ซอยมืดหลังโรงหนัง</h2><div class="sub">"อยากได้เงินง่ายๆ ไหม?" · ล้วงกระเป๋าผู้เล่นที่เดินผ่าน (แตะที่ตัวเขา) หรือในฝูงชน 👥 · ถ้ามีคนเห็นจะโทรแจ้งตำรวจ ถูกจับ = ปรับ + ติดคุก</div>${applyBox('thief', st)}`;
+    case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ลงทะเบียนเป็นขอทานได้ที่นี่ แล้วไปนั่งตามจุดขอทาน 🥣 (จัตุรัส หน้าตลาด หน้าโรงพยาบาล หน้ามหาวิทยาลัย)</div>${applyBox('beggar', st)}`;
+    case 'begspot': return `<h2>🥣 ${esc(STN(st).label)}</h2>${me.career === 'beggar' ? B(me.pose === 'beg' ? 'ลุกขึ้น' : '🥣 นั่งขอทาน', { t: 'act', st, a: 'beg' }, 'primary big') : '<div class="sub">จุดนั่งของขอทาน · ถ้าเจอขอทาน แตะที่ตัวเขาเพื่อบริจาค</div>'}`;
+    case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน${me.career === 'thief' ? ' · ล้วงได้ทุก 1.5 นาที · ถ้าพลาดอาจถูกจับได้คาหนังคาเขา' : ''}</div>${me.career === 'thief' ? B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big') : ''}`;
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;
     case 'quests': {
@@ -863,7 +902,10 @@ function renderPanel(p) {
         🕐 <b>เวลา</b>: 1 วันในเกม = 24 นาที · ร้านต่างๆ มีเวลาเปิด-ปิด · ออฟฟิศเข้างาน 08:00<br>
         😌 <b>พัก</b>: ไม่มีบ้านก็นั่งพักหลับตาได้ทุกที่ (ปุ่ม 😌 / R) พลังงานฟื้นเร็ว 3 เท่า<br>
         ❤️ <b>สุขภาพ</b>: หิวนานเลือดลด · ป่วยต้องหาหมอ · เลือดหมด = หมดสติถูกส่งโรงพยาบาล (หิวจนหมด = ล้มนอนเป็นผัก)<br>
-        📱 <b>มือถือ</b>: บันทึกเบอร์เพื่อน โทรหา สั่งอาหาร · 🏅 ทำความสำเร็จได้ฉายาบนหัว</div>
+        📱 <b>มือถือ</b>: บันทึกเบอร์เพื่อน โทรหา สั่งอาหาร จ่ายบิล · 🏅 ทำความสำเร็จได้ฉายาบนหัว<br>
+        😊 <b>ความสุข</b>: ลดลงเรื่อยๆ ถ้าต่ำกว่า 20 จะซึมเศร้าทำงานไม่ได้ · เพิ่มได้จากกินของที่อยากกิน นั่งเล่นที่จัตุรัส โทรคุย บริจาค นอนบ้าน<br>
+        📅 <b>ปฏิทิน</b>: 1 เดือน = 5 วันในเกม (2 ชม.จริง) มีบ้าน/เช่าบ้านต้องจ่ายค่าน้ำค่าไฟทุกเดือน ค้างเกินกำหนดถูกตัดน้ำไฟ<br>
+        🚨 <b>เห็นโจรล้วงกระเป๋า</b>: กด "แจ้งตำรวจ 191" ตำแหน่งโจรจะขึ้นบนแผนที่ตำรวจ</div>
         <div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="grid2" style="margin-top:8px">${B('📖 ดูบทช่วยสอน', { fn: 'tut' })}${B('🗺️ เปิดแผนที่', { fn: 'map' })}</div>
         ${B('🚪 ออกจากระบบ', { fn: 'logout' }, 'warn big')}`;
@@ -875,16 +917,28 @@ function renderPanel(p) {
         <div class="sub">${far ? '⚠️ อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน' : 'อยู่ใกล้พอที่จะติดต่อกันได้'}</div>
         ${B('🤝 ขอแลกเปลี่ยน (ของ/เงิน)', { fn: 'tradeReq', to: o.id }, 'primary big', far)}
         ${me.career === 'doctor' ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
+        ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}
+        ${me.career === 'thief' ? B('🕶️ ล้วงกระเป๋า (ต้องประชิดตัว)', { t: 'steal', to: o.id }, 'warn big', d > 1.8) : ''}
+        ${me.career === 'police' ? (o.w ? B('👮 จับกุม! (มีการแจ้งความ)', { t: 'arrest', to: o.id }, 'warn big pulse', d > 2) : '<div class="sub">👮 ไม่มีการแจ้งความเกี่ยวกับคนนี้</div>') : ''}
         <div class="sub" style="margin-top:10px">📱 ขอเบอร์โทรได้จากเจ้าตัว แล้วบันทึกในแอพรายชื่อ</div>`;
     }
   }
   return '';
 }
+function billsBox() {
+  const bills = me.bills || [], due = bills.reduce((s, b) => s + b.water + b.elec, 0);
+  const rows = bills.map(b => itemRowRaw(b.late ? '⚠️' : '🧾', `ค่าน้ำค่าไฟเดือน${G.months[b.m % 12]} · บ้าน #${b.home + 1}`, `💧 ค่าน้ำ ${money(b.water)} · ⚡ ค่าไฟ ${money(b.elec)}${b.late ? ' · <b style="color:var(--bad)">เกินกำหนด (รวมค่าปรับ)</b>' : ' · จ่ายภายในสิ้นเดือนหน้า'}`, '')).join('');
+  const next = me.date ? `${G.monthDays - me.date.day + 1} วันในเกม (${G.months[(me.date.month + 1) % 12]})` : '';
+  return `<div class="jobbox ${me.utilOff ? '' : due ? '' : 'ok'}"><b>🧾 ค่าน้ำค่าไฟ</b>${me.home >= 0 ? ` · บิลรอบถัดไปในอีก ${next}` : ' · ยังไม่มีบ้าน/บ้านเช่า ไม่ต้องจ่าย'}
+    ${me.utilOff ? '<div class="sub" style="color:var(--bad)">🔌 ถูกตัดน้ำตัดไฟ — นอนที่บ้านไม่ได้จนกว่าจะจ่าย</div>' : ''}
+    ${rows ? `<div class="list">${rows}</div>${B(`💳 จ่ายทั้งหมด ${money(due)}`, { t: 'paybills' }, 'primary big')}` : '<div class="sub">ไม่มีบิลค้างจ่าย ✅</div>'}</div>`;
+}
 function houseDoor(s, st) {
   const i = s.house, h = wd?.houses?.[i]; if (!h) return '';
   const [owner, cf, furn, sale, rentP, tenant, until] = h, price = G.shop.housePrices[i], rent = G.shop.houseRent[i];
   const mine = me.house === i, iRent = me.rent && me.rent.idx === i;
-  const enter = B('🚪 เข้าบ้าน', { t: 'enter', st }, 'primary big');
+  const canEnter = mine || iRent || (!owner && !tenant);
+  const enter = canEnter ? B(owner || tenant ? '🚪 เข้าบ้าน' : '🚪 เข้าไปดูบ้าน', { t: 'enter', st }, 'primary big') : '<div class="sub">🔒 เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า</div>';
   const days = r => `<div class="grid3">${[1, 3, 7].map(d => B(`${d} วัน ${money(r * d)}`, { t: 'act', st, a: 'rent', days: d }, 'good')).join('')}</div>`;
   const left = until ? Math.max(0, Math.round((until - Date.now() - clockOff) / G.dayMs * 10) / 10) : 0;
   if (mine) {
@@ -912,6 +966,13 @@ function houseDoor(s, st) {
   }
   return `<h2>🏠 บ้านเลขที่ ${i + 1}${owner ? ` · ของ ${esc(owner)}` : ' · ว่าง'}</h2>${body}`;
 }
+function policeReports() {
+  const r = me.reports || [];
+  if (!r.length) return '<div class="sub" style="margin-top:10px">ยังไม่มีการแจ้งเหตุ · เมื่อมีคนโทร 191 ตำแหน่งโจรจะขึ้นที่นี่และบนแผนที่ (เฉพาะตำรวจ)</div>';
+  return `<div class="list">${r.map(c => itemRowRaw('🚨', `${esc(c.thief)} ล้วงกระเป๋า${c.victim ? ` ${esc(c.victim)}` : ''}`, `${c.amt ? `เงินที่หายไป ${money(c.amt)} · ` : ''}แจ้งเมื่อ ${Math.max(0, Math.round((Date.now() + clockOff - c.t) / 1000))} วิที่แล้ว · ${AREA[c.area]?.name || ''}`,
+    `<div class="col2">${B('📍 จุดที่เห็น', { fn: 'guidePt', x: c.x, y: c.y, area: c.area, label: `จุดที่เห็น ${c.thief}` }, 'good')}${P.get(c.tid) ? B('🎯 ตามตัว', { fn: 'guide', key: 'p' + c.tid }, 'warn') : ''}</div>`)).join('')}</div>
+    <div class="sub">เข้าใกล้โจรแล้วแตะที่ตัวเพื่อจับกุม (โจรที่มีการแจ้งความจะมี 🚨 บนหัว)</div>`;
+}
 function riderJobs() {
   const jobs = me.jobs || [];
   if (!jobs.length) return '<div class="sub" style="margin-top:10px">ยังไม่มีออเดอร์ รอสักครู่... (ออเดอร์ใหม่จะแจ้งเตือน 🔔)</div>';
@@ -928,7 +989,7 @@ function riderJobs() {
 }
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'contacts');
-  const tabs = `<div class="tabs">${[['contacts', '📇 รายชื่อ'], ['call', call ? '📞 กำลังคุย' : '📞 โทร'], ['food', '🍔 สั่งอาหาร'], ...(me.career === 'rider' ? [['rider', '🛵 ไรเดอร์']] : [])].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;
+  const tabs = `<div class="tabs">${[['contacts', '📇 รายชื่อ'], ['call', call ? '📞 กำลังคุย' : '📞 โทร'], ['food', '🍔 อาหาร'], ['bills', (me.bills || []).length ? '🧾 บิล ❗' : '🧾 บิล'], ...(me.career === 'rider' ? [['rider', '🛵 ไรเดอร์']] : []), ...(me.career === 'police' ? [['police', '🚨 แจ้งเหตุ']] : [])].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;
   let body = '';
   if (tab === 'contacts') {
     const online = new Set([...P.values()].map(x => x.name));
@@ -948,6 +1009,8 @@ function phonePanel(p) {
       ${mine ? `<div class="sub"><b>ออเดอร์ของฉัน</b></div><div class="list">${mine}</div>` : ''}
       <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" min="0" max="500" value="0" style="width:90px"> ฿</div><div class="list">${rows}</div>`;
   } else if (tab === 'rider') body = riderJobs();
+  else if (tab === 'bills') body = billsBox();
+  else if (tab === 'police') body = policeReports();
   return `<h2>📱 มือถือ</h2>${tabs}${body}`;
 }
 
@@ -1081,7 +1144,7 @@ function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
-const CAREER_TARGET = { none: 'door_office', office: 'office', farmer: 'coop', fisher: 'fishclub', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
+const CAREER_TARGET = { police: 'police', thief: 'hideout', beggar: 'square', none: 'door_office', office: 'office', farmer: 'coop', fisher: 'fishclub', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seat45_27.6' };
 function setGuide(key, quiet) {
   const g = targetOf(key); if (!g) return;
@@ -1121,59 +1184,82 @@ function drawGuide(X, Y, t) {
   sign(`📍 ${tg.label} · ${Math.round(d)} ม.`, cx, cy + TS * 1.05, { size: TS * .3, bg: 'rgba(255,201,77,.95)', color: '#222' });
 }
 
-// full-screen map of one outdoor area: tap a place to navigate there
+// full-screen map of one outdoor area: a clean, simplified drawing with numbered markers
+// and a legend underneath. Tap a marker or a legend row to get the yellow guide arrow.
+const MAP_COL = { '=': '#5d636d', ',': '#c9c5b5', c: '#c4b494', w: '#5fb4e6', p: '#b48a5c', s: '#ecdcab', f: '#8a6040', B: '#9a8a7a', T: '#6fae5c', '.': '#8cc56f', o: '#8cc56f', m: '#a7d07a', k: '#e0b083', ' ': '#07090c' };
 function openMap(mapId) {
   const m = P.get(myId);
   mapId = mapId || mapOf(areaOf(m.x, m.y)?.id);
   const A = AREA[mapId];
-  const v = $('#mapView'); v.classList.remove('hidden');
+  $('#mapView').classList.remove('hidden');
   $('#mapTabs').innerHTML = G.areas.filter(a => a.kind === 'map').map(a => `<button data-map="${a.id}" class="${a.id === mapId ? 'primary' : ''}">${a.name}</button>`).join('');
   $('#mapTabs').querySelectorAll('[data-map]').forEach(b => b.onclick = () => openMap(b.dataset.map));
-  const c = $('#bigMap'), W = A.w, H = A.h;
-  const k = Math.min((Math.min(innerWidth, 1100) - 24) / W, (innerHeight - 150) / H);
+  const c = $('#bigMap'), W = A.w, H = A.h, wide = innerWidth > 820;
+  const k = Math.min((Math.min(innerWidth, 1180) - (wide ? 300 : 30)) / W, (innerHeight - (wide ? 140 : 330)) / H);
   const dpr = Math.min(2, devicePixelRatio || 1);
   c.width = W * k * dpr; c.height = H * k * dpr; c.style.width = W * k + 'px'; c.style.height = H * k + 'px';
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { g.fillStyle = MINI_COLORS[G.map.tiles[A.y + y][A.x + x]] || '#5e9b57'; g.fillRect(x * k, y * k, k + .5, k + .5); }
-  const hits = [];
-  const label = (text, x, y, size, bg, maxW = 1e9) => {
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (; size > 8; size -= .5) { g.font = `700 ${size}px 'Noto Sans Thai',sans-serif`; if (g.measureText(text).width + size * .8 <= maxW) break; }
-    const w = g.measureText(text).width + size * .8, h = size * 1.5;
-    g.fillStyle = bg; g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, h / 2); g.fill();
-    g.fillStyle = '#fff'; g.fillText(text, x, y + 1);
-  };
-  const fs = clamp(k * .9, 9, 14), L = (x, y) => [(x - A.x) * k, (y - A.y) * k];
+  // ground: flat colours, trees as soft dots, roads drawn clearly
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const ch = G.map.tiles[A.y + y][A.x + x];
+    g.fillStyle = MAP_COL[ch === 'T' || ch === 'B' || ch === 'o' ? '.' : ch] || '#8cc56f'; g.fillRect(x * k, y * k, k + .6, k + .6);
+    if (ch === 'T') { g.fillStyle = '#4f8f43'; g.beginPath(); g.arc((x + .5) * k, (y + .5) * k, k * .45, 0, 7); g.fill(); }
+  }
+  const L = (x, y) => [(x - A.x) * k, (y - A.y) * k];
+  const places = [], dot = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+  // buildings as clean blocks
   for (const b of G.map.buildings) {
     if (b.x < A.x || b.x >= A.x + A.w) continue;
-    const sp = atlas?.sprites[b.sprite], [bx, by] = L(b.x, b.y);
-    if (sp && atlasImg) { const w = sp[2] / atlas.tile * k, h = sp[3] / atlas.tile * k; g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], bx + b.w * k / 2 - w / 2, by + b.h * k - h, w, h); }
-    const cx = bx + b.w * k / 2, cy = by + b.h * k / 2;
-    if (b.house !== undefined) { const h = houseInfo(b); label(`#${b.house + 1}`, cx, cy, fs * .8, h.mine ? 'rgba(200,140,20,.95)' : h.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.9)'); hits.push({ x: bx, y: by, w: b.w * k, h: b.h * k, key: 'door_' + b.id }); continue; }
-    if (b.deco && !b.label) continue;
-    if (b.deco) { g.globalAlpha = .6; label(b.label, cx, cy, fs * .8, 'rgba(18,22,28,.8)', b.w * k + 4); g.globalAlpha = 1; continue; }
-    label(`${b.icon} ${b.label}`, cx, cy, fs, isOpen(b.id) ? 'rgba(18,22,28,.9)' : 'rgba(90,30,30,.9)', b.w * k + 8);
-    hits.push({ x: bx, y: by, w: b.w * k, h: b.h * k, key: b.st });
+    const [bx, by] = L(b.x, b.y), mineHouse = b.house !== undefined && (me.house === b.house || me.rent?.idx === b.house);
+    g.fillStyle = b.deco ? '#b9a48f' : b.house !== undefined ? (mineHouse ? '#f2b636' : '#d98f6a') : isOpen(b.id) ? '#4d5b7a' : '#7a4a4a';
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
+    g.beginPath(); g.roundRect(bx + 1, by + 1, b.w * k - 2, b.h * k - 2, Math.min(6, k)); g.fill(); g.stroke();
+    if (b.deco || !b.st) { if (b.label) { g.font = `${Math.max(9, k * .8)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(b.icon, bx + b.w * k / 2, by + b.h * k / 2); } continue; }
+    const h = b.house !== undefined ? houseInfo(b) : null;
+    places.push({ key: b.house !== undefined ? 'door_' + b.id : b.st, icon: b.house !== undefined ? '🏠' : b.icon, label: b.house !== undefined ? `บ้าน #${b.house + 1}` : b.label,
+      sub: b.house !== undefined ? (mineHouse ? '⭐ บ้านของฉัน' : h.label.replace(/^\S+\s/, '')) : `${isOpen(b.id) ? '🟢 เปิด' : '🔴 ปิด'} ${hoursTxt(b.id).replace('เปิด ', '')}`,
+      x: bx + b.w * k / 2, y: by + b.h * k / 2, hl: mineHouse, kind: b.house !== undefined ? 'home' : 'bld' });
   }
   for (const s of G.stations) {
-    if (s.area !== A.id || !/^(pier|gate|coop|farmbuy|estate|fishclub|lot)$/.test(s.type)) continue;
-    if (s.type === 'lot' && !(me.garden && me.garden.lot === s.lot) && wd?.lots?.[s.lot]) continue;
+    if (s.area !== A.id || !/^(pier|gate|coop|farmbuy|estate|fishclub|lot|square|hideout)$/.test(s.type)) continue;
+    if (s.type === 'hideout' && !['thief', 'none'].includes(me.career)) continue;
+    if (s.type === 'lot' && !(me.garden?.lot === s.lot) && !(!wd?.lots?.[s.lot] && me.career === 'farmer')) continue;
     const [x, y] = L(s.x, s.y);
-    label(s.type === 'lot' ? (me.garden?.lot === s.lot ? '⭐ สวนของฉัน' : `🪧${s.lot + 1}`) : `${s.icon} ${s.type === 'pier' ? 'ตกปลา' : s.label}`, x, y, fs * .85, s.type === 'gate' ? 'rgba(40,90,150,.95)' : 'rgba(26,62,88,.94)');
-    hits.push({ x: x - 3 * k, y: y - 1.5 * k, w: 6 * k, h: 3 * k, key: s.id });
+    places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
   }
-  if (mapId === 'town') { const [x, y] = L(50, 32); label('⛲ จัตุรัสกลางเมือง', x, y - 3 * k, fs, 'rgba(160,90,40,.92)'); hits.push({ x: x - 7 * k, y: y - 7 * k, w: 14 * k, h: 14 * k, key: 'seat45_27.6' }); }
+  if (mapId === 'town') { const [x, y] = L(50, 32); places.push({ key: 'seat45_27.6', icon: '⛲', label: 'จัตุรัสกลางเมือง', sub: 'นั่งเล่น พูดคุย', x, y, kind: 'spot' }); }
+  // numbered markers
+  const r = clamp(k * .95, 8, 13);
+  places.forEach((pl, i) => {
+    pl.n = i + 1;
+    dot(pl.x, pl.y, r + 2, 'rgba(0,0,0,.45)');
+    dot(pl.x, pl.y, r, pl.hl ? '#ffc94d' : pl.kind === 'gate' ? '#2f7fd1' : pl.kind === 'home' ? '#c0623e' : pl.kind === 'spot' ? '#2e8a57' : '#1f2630');
+    g.fillStyle = pl.hl ? '#222' : '#fff'; g.font = `800 ${Math.round(r * 1.05)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(pl.n, pl.x, pl.y + 1);
+  });
+  // police only: where reported thieves were seen
+  if (me.career === 'police') for (const rp of me.reports || []) if (mapOf(rp.area) === mapId) {
+    const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp, [x, y] = L(q.x, q.y);
+    g.strokeStyle = '#ff3b3b'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, r * 1.6, 0, 7); g.stroke();
+    g.font = `${Math.round(r * 1.6)}px serif`; g.fillText('🚨', x, y);
+  }
+  // players; you are the big white dot with a ring
   for (const p of P.values()) {
     const q = outPos(p.x, p.y); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
     const mine = p.id === myId, [x, y] = L(q.x, q.y);
-    g.fillStyle = mine ? '#fff' : COLORS[p.av]; g.strokeStyle = '#000'; g.lineWidth = 1.5;
-    g.beginPath(); g.arc(x, y, mine ? k * .9 : k * .55, 0, 7); g.fill(); g.stroke();
-    if (mine) label(roomOf(p.x, p.y) ? `คุณอยู่ใน${roomOf(p.x, p.y).label}` : 'คุณอยู่ที่นี่', x, y - fs * 1.4, fs * .85, 'rgba(255,120,60,.95)');
+    if (mine) { g.strokeStyle = '#ff6b3d'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, r * 1.5, 0, 7); g.stroke(); }
+    dot(x, y, mine ? r * .8 : r * .5, mine ? '#fff' : COLORS[p.av]);
   }
+  if (guide) { const hop = guide.player ? null : guide; if (hop && mapOf(hop.area) === mapId) { const q = AREA[hop.area]?.kind === 'room' ? AREA[hop.area].outside : hop, [x, y] = L(q.x, q.y); g.strokeStyle = '#ffc94d'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(x, y, r * 1.9, 0, 7); g.stroke(); g.setLineDash([]); } }
+  // legend
+  const here = roomOf(m.x, m.y);
+  $('#mapLegend').innerHTML = `<div class="lgHead">⚪ คุณอยู่${here ? `ใน${esc(here.label)}` : 'ที่วงสีส้ม'} · แตะชื่อสถานที่เพื่อนำทาง</div>` + places.map(pl =>
+    `<button data-key="${esc(pl.key)}" class="${pl.hl ? 'hl' : ''}"><i class="k-${pl.kind}">${pl.n}</i><span>${pl.icon} ${esc(pl.label)}${pl.sub ? `<small>${esc(pl.sub)}</small>` : ''}</span></button>`).join('');
+  $('#mapLegend').querySelectorAll('[data-key]').forEach(b => b.onclick = () => { closeMap(); setGuide(b.dataset.key); });
   c.onclick = e => {
-    const r = c.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-    const h = hits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
-    if (h) { closeMap(); setGuide(h.key); }
+    const rc = c.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
+    const hit = places.map(pl => [pl, Math.hypot(pl.x - x, pl.y - y)]).sort((a, b) => a[1] - b[1])[0];
+    if (hit && hit[1] < r * 2.2) { closeMap(); setGuide(hit[0].key); }
   };
 }
 function closeMap() { $('#mapView').classList.add('hidden'); }
@@ -1210,16 +1296,16 @@ function showDaily(d) {
   $('#dailyOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); FX.play('coin', true); };
 }
 // driving test
-function showDriveTest(qs) {
-  const box = $('#daily'), ans = [];
-  box.innerHTML = `<div class="tutIcon">🪪</div><h2>สอบใบขับขี่</h2><p>ตอบให้ถูกทุกข้อ</p>${qs.map((q, i) => `<div class="dq"><b>${i + 1}. ${esc(q.q)}</b>${q.a.map((a, j) => `<button data-q="${i}" data-a="${j}">${esc(a)}</button>`).join('')}</div>`).join('')}<button class="primary big" id="dtOk" disabled>ส่งคำตอบ</button>`;
+function showDriveTest(m) {
+  const qs = m.qs, box = $('#daily'), ans = [];
+  box.innerHTML = `<div class="tutIcon">${m.lic === 'driving' ? '🪪' : '👮'}</div><h2>สอบ${esc(m.title)}</h2><p>ตอบให้ถูกทุกข้อ</p>${qs.map((q, i) => `<div class="dq"><b>${i + 1}. ${esc(q.q)}</b>${q.a.map((a, j) => `<button data-q="${i}" data-a="${j}">${esc(a)}</button>`).join('')}</div>`).join('')}<button class="primary big" id="dtOk" disabled>ส่งคำตอบ</button>`;
   $('#dailyWrap').classList.remove('hidden');
   box.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
     const i = +b.dataset.q; ans[i] = +b.dataset.a;
     box.querySelectorAll(`[data-q="${i}"]`).forEach(x => x.classList.toggle('good', x === b));
     $('#dtOk').disabled = qs.some((_, k) => ans[k] === undefined);
   });
-  $('#dtOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); const s = STN('dealer'); doAct(s.id, 'answer', { ans }); };
+  $('#dtOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); doAct(m.st, 'answer', { ans }); };
 }
 
 // ------------------------------------------------------------------ areas, interiors
@@ -1260,6 +1346,9 @@ function drawRain(t) {
 }
 function dzInfo(id) {
   if (id === '_sleepy') return toast('ไม่ได้นอนนานแล้ว นั่งพักหลับตา (😌) หรือนอนที่บ้าน ไม่งั้นจะป่วยเป็นอดนอน', '🥱', false);
+  if (id === '_sad') return toast('ความสุขต่ำมาก ทำงานไม่ได้ · กินของที่อยากกิน นั่งเล่นที่จัตุรัส โทรหาเพื่อน บริจาคให้ขอทาน นอนในบ้านตัวเอง', '😞', false);
+  if (id === '_crave') return toast(`อยากกิน${G.items[me.craving.item].name} หาซื้อที่ตลาด/ร้านอาหาร แล้วกินภายในเวลาจะมีความสุขเพิ่มมาก`, '🤤');
+  if (id === '_bills') return openPanel({ kind: 'phone', tab: 'bills' });
   if (id === '_hungry') return toast('หิวมาก หิวนานๆ เลือดจะลด ถ้าหมดหลอดจะล้มนอนเป็นผัก รีบหาอะไรกิน', '🍗', false);
   const d = G.diseases[id];
   toast(`${d.name}: ${d.sym.join(', ')} · สาเหตุ: ${d.cause} · ${d.self}`, d.icon, false);

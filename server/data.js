@@ -81,7 +81,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   pathDown(B('office', 'b_office', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
   B('flower', 'b_flower', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true });
   // north street
-  B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', deco: true });
+  B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
   B('cinema', 'b_studio', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true });
   B('inn', 'b_inn', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
@@ -113,6 +113,15 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   for (const [x, y, s] of [[43.6, 32.6, 'bench'], [56.4, 32.6, 'bench2']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
   prop('flowerbed', 44, 25.4); prop('flowerbed2', 56, 25.4); prop('lamp3', 42.6, 30); prop('lamp3', 57.4, 30); prop('lamp3', 42.6, 36); prop('lamp3', 57.4, 36);
   prop('noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
+  STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47, y: 26.4, r: 1.4, area: 'town' });
+  // begging spots (beggars sit here) and crowds (pickpockets work here)
+  for (const [id, x, y, l] of [['beg1', 53.5, 38.6, 'จัตุรัสกลางเมือง'], ['beg2', 64.5, 33.5, 'หน้าตลาด'], ['beg3', 76.5, 33.5, 'หน้าโรงพยาบาล'], ['beg4', 27, 33.5, 'หน้ามหาวิทยาลัย']])
+    STATIONS.push({ id, type: 'begspot', label: `จุดขอทาน (${l})`, icon: '🥣', x, y, r: 1.1, area: 'town' });
+  for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด'], ['crowd3', 11, 51.5, 'แผงลอย']])
+    STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
+  // a dark alley behind the cinema: where thieves find work
+  prop('barrel2', 42.5, 11.4); prop('crate', 44.2, 10.4); prop('bin_grey', 41.4, 12.2);
+  STATIONS.push({ id: 'hideout', type: 'hideout', label: 'ซอยมืดหลังโรงหนัง', icon: '🕶️', x: 43, y: 12.4, r: 1.4, area: 'town' });
   // street furniture
   for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
@@ -190,8 +199,8 @@ const HOUSE_PRICES = [], HOUSE_RENT = [];
   for (let i = 0; i < 12; i++) {
     const row = i < 6 ? 0 : 1, col = i % 6;
     const front = row ? 37 : 20, x = X + 10 + col * 9 + (row ? 1 : 0);
-    const price = Math.round((22000 + (i % 6) * 6000 + row * 9000) / 1000) * 1000;
-    HOUSE_PRICES.push(price); HOUSE_RENT.push(Math.round(price / 90 / 10) * 10);
+    const price = Math.round((28000 + (i % 6) * 7000 + row * 10000) / 1000) * 1000;
+    HOUSE_PRICES.push(price); HOUSE_RENT.push(Math.round(price / 80 / 10) * 10);
     B('house' + i, HOUSE_SPRITES[(i + row) % 6], x, front, { label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i, area: 'housing' });
     prop(i % 2 ? 'hedge_flower' : 'hedge', x - 1, front - .1, false);
     if (i % 3 === 0) prop('postbox', x + 5.3, front + .05);
@@ -243,6 +252,7 @@ const LAYOUT = {
   kitchen: [['f_counter_micro', 2.7, 2.6], ['f_stove', 4.9, 2.6], ['f_counter_toast', 7, 2.3], ['f_counter_oven', 9.6, 2.6], ['f_fridge', 12, 2.7], ['f_shelf_pots', 2.6, 6.4], ['f_bench', 10.5, 6.6]],
   hospital: [['f_counter', 3.5, 2.3], ['f_shelf_jars', 1.8, 6.4], ['f_plant', 1.5, 9.7], ['f_window', 6.4, 1.1]],
   school: [['f_bookshelf_wide', 2.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_desk', 3.6, 5.4], ['f_desk', 10.4, 5.4], ['f_desk', 3.6, 7.9], ['f_desk', 10.4, 7.9], ['f_clock', 9.4, .95]],
+  police: [['f_desk', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 3, 2.6], ['f_pictures', 10, 1.05], ['f_bunk', 11.5, 7.4], ['f_bunk', 9.5, 7.4], ['f_plant', 1.6, 8.7]],
   bank: [['f_cabinet', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_plant2', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
   house: [['f_bed_blue', 2.6, 3.4], ['f_window', 6, 1.1], ['f_welcome', 6, 8.2]],
 };
@@ -314,10 +324,18 @@ const TIME_OFF = +process.env.TIME_OFFSET_MS || 0;           // testing aid: shi
 const hourAt = t => (((t + TIME_OFF) % DAY_MS) / DAY_MS) * 24;
 const dayAt = t => Math.floor((t + TIME_OFF) / DAY_MS);
 // opening hours [open, close) in game hours
-const HOURS = { office: [6, 21], market: [5, 22], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+const HOURS = { police: [0, 24], square: [6, 22], office: [6, 21], market: [5, 22], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
+// calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
+const MONTH_DAYS = 5;
+const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const monthIdx = t => Math.floor(dayAt(t) / MONTH_DAYS);
+const YEAR0 = Math.floor(Math.floor(Date.UTC(2026, 10, 1) / DAY_MS) / (MONTH_DAYS * 12)) * MONTH_DAYS * 12;   // year 2569 starts here
+const dateAt = t => { const d = dayAt(t) - YEAR0; return { day: d % MONTH_DAYS + 1, month: Math.floor(d / MONTH_DAYS) % 12, year: 2569 + Math.floor(d / MONTH_DAYS / 12) }; };
+// a home's monthly bill: a fixed part + what you used (nights slept, furniture that runs on power)
+const UTIL = { water: 150, waterPerSleep: 25, elec: 220, elecPerComfort: 35, elecPerSleep: 20, lateFee: 0.15 };
 for (const r of ROOMS) r.hours = HOURS[r.rk] || null;
 for (const b of BUILDINGS) b.hours = HOURS[b.house !== undefined ? 'house' : b.id] || null;
 
@@ -345,10 +363,10 @@ const ITEMS = {
   tomyum:       { name: 'ต้มยำ', icon: '🍲', kind: 'meal', base: 500, eat: { hunger: 50, energy: 15 } },
   durian_sweet: { name: 'ทุเรียนเชื่อม', icon: '🍨', kind: 'meal', base: 650, eat: { hunger: 30, energy: 25, health: 5 } },
   // restaurant menu (sold at the restaurant and through the delivery app)
-  kaprao:  { name: 'ข้าวกะเพรา', icon: '🍛', kind: 'meal', base: 90, eat: { hunger: 32 }, menu: 1 },
-  noodle:  { name: 'ก๋วยเตี๋ยว', icon: '🍜', kind: 'meal', base: 70, eat: { hunger: 26 }, menu: 1 },
-  somtam:  { name: 'ส้มตำ', icon: '🥗', kind: 'meal', base: 80, eat: { hunger: 22, energy: 6 }, menu: 1 },
-  shabu:   { name: 'ชุดชาบู', icon: '🍲', kind: 'meal', base: 260, eat: { hunger: 70, energy: 10 }, menu: 1 },
+  kaprao:  { name: 'ข้าวกะเพรา', icon: '🍛', kind: 'meal', base: 100, eat: { hunger: 32 }, menu: 1 },
+  noodle:  { name: 'ก๋วยเตี๋ยว', icon: '🍜', kind: 'meal', base: 80, eat: { hunger: 26 }, menu: 1 },
+  somtam:  { name: 'ส้มตำ', icon: '🥗', kind: 'meal', base: 90, eat: { hunger: 22, energy: 6 }, menu: 1 },
+  shabu:   { name: 'ชุดชาบู', icon: '🍲', kind: 'meal', base: 320, eat: { hunger: 70, energy: 10 }, menu: 1 },
 
   snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
   drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 150, eat: { energy: 25 }, wholesale: 105, stock: 12, refill: 25 },
@@ -387,14 +405,19 @@ const CAREERS = {
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รักษาคนไข้บนเตียงในโรงพยาบาล ทั้งผู้เล่นและชาวเมือง ต้องวินิจฉัยจากอาการให้ถูก' },
+  police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ลาดตระเวนได้เบี้ยเลี้ยง รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
+  thief:    { name: 'โจร', icon: '🕶️', where: 'hideout', need: [], desc: 'ล้วงกระเป๋าคนเดินผ่านไปมาหรือในฝูงชน ถ้ามีคนเห็นแล้วแจ้งตำรวจ หรือตำรวจอยู่แถวนั้น อาจถูกจับเข้าคุก' },
+  beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'นั่งขอทานตามจุดต่างๆ ได้เศษเงินจากคนผ่านไปมา ผู้เล่นที่บริจาคให้จะมีความสุขเพิ่ม' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], vehicle: 'scooter', desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วขี่ไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป' },
 };
 // the degree comes from classes at the university; other licences are bought
 const LICENSES = {
-  degree:   { name: 'ปริญญาตรี', icon: '🎓', price: 3500, classes: 6, where: 'school' },
+  hs:       { name: 'วุฒิ ม.6', icon: '📘', price: 1500, classes: 4, where: 'school' },
+  degree:   { name: 'ปริญญาตรี', icon: '🎓', price: 4500, classes: 6, need: 'hs', where: 'school' },
+  policeExam: { name: 'ผลสอบนายสิบตำรวจ', icon: '👮', price: 1000, need: 'hs', where: 'school', test: true },
   cooking:  { name: 'ใบรับรองเชฟ', icon: '📜', price: 1800, where: 'school' },
   medicine: { name: 'ใบประกอบวิชาชีพเวชกรรม', icon: '⚕️', price: 15000, need: 'degree', where: 'school' },
-  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 900, where: 'dealer', test: true },
+  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 1200, where: 'dealer', test: true },
 };
 const DRIVING_TEST = [
   { q: 'สัญญาณไฟสีเหลือง หมายถึงอะไร', a: ['เร่งความเร็วผ่านไป', 'เตรียมหยุดรถ', 'จอดรถได้ทันที'], ok: 1 },
@@ -403,11 +426,20 @@ const DRIVING_TEST = [
   { q: 'ป้ายสีแดงแปดเหลี่ยมเขียนว่า หยุด หมายถึง', a: ['หยุดรถก่อนแล้วค่อยไป', 'ลดความเร็ว', 'ห้ามจอด'], ok: 0 },
   { q: 'ดื่มแอลกอฮอล์แล้วควรทำอย่างไร', a: ['ขับช้าๆ', 'ไม่ขับรถ', 'เปิดไฟฉุกเฉินแล้วขับ'], ok: 1 },
 ];
+const POLICE_TEST = [
+  { q: 'เจอคนถูกล้วงกระเป๋า ตำรวจควรทำอะไรก่อน', a: ['ไล่จับโจรทันที', 'ถามรายละเอียดและตำแหน่งที่เห็นล่าสุด', 'กลับสถานี'], ok: 1 },
+  { q: 'หมายเลขแจ้งเหตุด่วนเหตุร้ายคือ', a: ['191', '1669', '199'], ok: 0 },
+  { q: 'จับกุมผู้ต้องสงสัยได้เมื่อใด', a: ['เมื่อหน้าตาน่าสงสัย', 'เมื่อมีพยานหรือหลักฐานการกระทำผิด', 'ทุกเมื่อที่อยากจับ'], ok: 1 },
+  { q: 'ตำรวจควรวางตัวกับประชาชนอย่างไร', a: ['สุภาพและช่วยเหลือ', 'ข่มขู่ให้กลัว', 'ไม่สนใจ'], ok: 0 },
+  { q: 'ของกลางที่ยึดคืนได้จากโจร ควรทำอย่างไร', a: ['เก็บไว้เอง', 'แบ่งกับเพื่อน', 'คืนให้ผู้เสียหาย'], ok: 2 },
+];
 // changing careers too often makes you wait longer (minutes); index = changes in the last 24 h
 const JOB_COOLDOWN_MIN = [0, 10, 30, 60, 120, 240, 480];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
-const OFFICE_WAGE = [60, 75, 92, 112, 135, 160, 190];            // per game hour seated
-const RIDER = { baseFee: 35, perTile: 0.9, npcEvery: 45, tipMax: 40 };
+const OFFICE_WAGE = [45, 54, 66, 80, 96, 114, 135];            // per game hour seated
+const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
+const POLICE = { patrolWage: 22, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6 };
+const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
 const EVENTS = [
   { id: 'festival', text: '🎉 เทศกาลเมือง! ราคาอาหารและสินค้าในตลาดสูงขึ้น 20%' },
@@ -420,12 +452,12 @@ const EVENTS = [
 
 // ================================================================= things to spend money on
 const VEHICLES = {
-  skate:  { name: 'สเก็ตบอร์ด', icon: '🛹', price: 1500,  speed: 1.15 },
-  bike:   { name: 'จักรยาน', icon: '🚲', price: 5000,  speed: 1.3 },
-  scooter:{ name: 'มอเตอร์ไซค์', icon: '🛵', price: 18000, speed: 1.5, license: 'driving' },
-  car:    { name: 'รถยนต์', icon: '🚗', price: 60000, speed: 1.75, license: 'driving' },
+  skate:  { name: 'สเก็ตบอร์ด', icon: '🛹', price: 2000,  speed: 1.15 },
+  bike:   { name: 'จักรยาน', icon: '🚲', price: 6500,  speed: 1.3 },
+  scooter:{ name: 'มอเตอร์ไซค์', icon: '🛵', price: 22000, speed: 1.5, license: 'driving' },
+  car:    { name: 'รถยนต์', icon: '🚗', price: 75000, speed: 1.75, license: 'driving' },
 };
-const TOOL_PRICES = [3000, 12000, 40000];
+const TOOL_PRICES = [4000, 15000, 50000];
 const TOOLS = {
   office:   { name: 'ชุดสูทหรู', icon: '👔', fx: ['ค่าแรง +10%', 'ค่าแรง +20%', 'ค่าแรง +30%'] },
   farmer:   { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
@@ -433,6 +465,9 @@ const TOOLS = {
   merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
   chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
+  police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['เบี้ยเลี้ยง +15%', 'เบี้ยเลี้ยง +30%', 'เบี้ยเลี้ยง +50%'] },
+  thief:    { name: 'ถุงมือโจร', icon: '🧤', fx: ['ล้วงสำเร็จง่ายขึ้น', 'ล้วงสำเร็จง่ายขึ้นมาก', 'ล้วงแทบไม่พลาด'] },
+  beggar:   { name: 'ป้ายกระดาษซึ้งๆ', icon: '🪧', fx: ['คนให้เงินบ่อยขึ้น 15%', 'คนให้เงินบ่อยขึ้น 30%', 'คนให้เงินบ่อยขึ้น 50%'] },
   rider:    { name: 'กล่องเก็บความร้อน', icon: '📦', fx: ['ค่าส่ง +10%', 'ค่าส่ง +20%', 'ค่าส่ง +35%'] },
 };
 const FURNITURE = {
@@ -445,7 +480,7 @@ const FURNITURE = {
   piano:  { name: 'เปียโน', icon: '🎹', price: 25000, comfort: 4 },
   jacuzzi:{ name: 'อ่างจากุซซี่', icon: '🛁', price: 40000, comfort: 5 },
 };
-const BANK = { rate: 0.005, cap: 100000, loanMax: 10000, loanFee: 0.10, repayShare: 0.25 };
+const BANK = { rate: 0.003, cap: 100000, loanMax: 8000, loanFee: 0.12, repayShare: 0.25 };
 
 // ================================================================= health
 const DISEASES = {
@@ -487,6 +522,13 @@ const ACHIEVEMENTS = [
   { id: 'doc3', c: 'doctor', stat: 'revived', n: 3, title: 'ผู้กู้ชีพ', desc: 'ช่วยชีวิตผู้เล่นที่หมดสติ 3 ครั้ง' },
   { id: 'rid1', c: 'rider', stat: 'delivered', n: 10, title: 'ไรเดอร์สายฟ้า', desc: 'ส่งอาหารสำเร็จ 10 ออเดอร์' },
   { id: 'rid2', c: 'rider', stat: 'delivered', n: 60, title: 'ขาซิ่งประจำเมือง', desc: 'ส่งอาหารสำเร็จ 60 ออเดอร์' },
+  { id: 'pol1', c: 'police', stat: 'arrests', n: 3, title: 'มือปราบ', desc: 'จับโจรได้ 3 ครั้ง' },
+  { id: 'pol2', c: 'police', stat: 'arrests', n: 20, title: 'ผู้พิทักษ์เมือง', desc: 'จับโจรได้ 20 ครั้ง' },
+  { id: 'thi1', c: 'thief', stat: 'stolen', n: 10, title: 'มือไว', desc: 'ล้วงกระเป๋าสำเร็จ 10 ครั้ง' },
+  { id: 'thi2', c: 'thief', stat: 'stolen', n: 50, title: 'จอมโจรเงา', desc: 'ล้วงกระเป๋าสำเร็จ 50 ครั้ง' },
+  { id: 'beg1', c: 'beggar', stat: 'alms', n: 20, title: 'ผู้ยากไร้', desc: 'ได้รับเงินบริจาค 20 ครั้ง' },
+  { id: 'gen5', c: null, stat: 'donated', n: 5, title: 'ใจบุญ', desc: 'บริจาคให้ขอทาน 5 ครั้ง' },
+  { id: 'gen6', c: null, stat: 'cravings', n: 10, title: 'นักชิม', desc: 'กินของที่อยากกินได้ทันเวลา 10 ครั้ง' },
   { id: 'gen1', c: null, stat: 'trades', n: 5, title: 'นักเจรจา', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 5 ครั้ง' },
   { id: 'gen2', c: null, stat: 'worth', n: 100000, title: 'เศรษฐีใหม่', desc: 'มีทรัพย์สินรวม ฿100,000' },
   { id: 'gen3', c: null, stat: 'calls', n: 5, title: 'สายโทรศัพท์', desc: 'โทรคุยกับเพื่อน 5 ครั้ง' },
@@ -494,6 +536,7 @@ const ACHIEVEMENTS = [
 ];
 
 module.exports = {
+  MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
