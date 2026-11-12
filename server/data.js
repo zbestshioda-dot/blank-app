@@ -508,17 +508,19 @@ const TREATMENTS = {
 const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้องเมย์', 'พี่ต้น', 'ยายจันทร์', 'ตาเหลือง', 'น้าแดง', 'พี่ฝน', 'น้องบอส', 'ป้าแจ๋ว', 'ลุงชัย', 'พี่นก'];
 
 // ================================================================= achievements -> titles shown over your head
-// ================================================================= looks (paper-doll character parts in public/assets/chars.*)
-// everyone starts with the same hair; new hair, hats and shirts are bought at the fashion shop
+// ================================================================= looks (pixel character in public/assets/pchar.*, recoloured per player)
+// everyone starts with the same brown hair; hair dye, shirts and shorts are bought at the fashion shop
 const LOOKS = {
-  hair:  { bob: { name: 'ผมบ็อบ (เริ่มต้น)', price: 0 }, swept: { name: 'ผมปัดข้าง', price: 900 }, m: { name: 'ผมสั้นเกรียน', price: 600 },
-           pony: { name: 'ผมหางม้า', price: 1400 }, bun: { name: 'ผมมวย', price: 1400 }, braid: { name: 'ผมเปียข้าง', price: 1800 } },
-  hat:   { beanie: { name: 'หมวกไหมพรม', price: 900 }, straw: { name: 'หมวกฟาง', price: 700 }, beret: { name: 'หมวกเบเร่ต์แดง', price: 1600 },
-           green: { name: 'หมวกเบเร่ต์เขียว', price: 1600 }, hood: { name: 'ผ้าคลุมฮู้ด', price: 2500 } },
-  shirt: { blue: { name: 'เสื้อฮู้ดฟ้า', price: 500 }, green: { name: 'เสื้อฮู้ดเขียว', price: 500 }, yellow: { name: 'เสื้อฮู้ดเหลือง', price: 500 },
-           stripe: { name: 'เสื้อฮู้ดลายทาง', price: 1200 } },
+  hair:  { brown: { name: 'ผมสีน้ำตาล (เริ่มต้น)', price: 0, color: '#6e4528' }, black: { name: 'ย้อมผมดำ', price: 800, color: '#2e2622' },
+           blonde: { name: 'ย้อมผมบลอนด์', price: 1200, color: '#e6bd55' }, ginger: { name: 'ย้อมผมส้มแดง', price: 1200, color: '#c0552d' },
+           pink: { name: 'ย้อมผมชมพู', price: 1800, color: '#ec82b8' }, blue: { name: 'ย้อมผมน้ำเงิน', price: 1800, color: '#4f6fd6' }, silver: { name: 'ย้อมผมสีเงิน', price: 2200, color: '#d9dbe6' } },
+  shirt: { white: { name: 'เสื้อยืดขาว', price: 300, color: '#ffffff' }, blue: { name: 'เสื้อยืดฟ้า', price: 300, color: '#5aa0e0' }, green: { name: 'เสื้อยืดเขียว', price: 300, color: '#7cc06a' },
+           red: { name: 'เสื้อยืดแดง', price: 300, color: '#e0645a' }, yellow: { name: 'เสื้อยืดเหลือง', price: 400, color: '#f2c84b' }, pink: { name: 'เสื้อยืดชมพู', price: 400, color: '#f29ac0' },
+           purple: { name: 'เสื้อยืดม่วง', price: 600, color: '#9a7ae0' }, black: { name: 'เสื้อยืดดำ', price: 600, color: '#45454f' } },
+  pants: { gray: { name: 'กางเกงเทา (เริ่มต้น)', price: 0, color: '#bdbdbd' }, jeans: { name: 'กางเกงยีนส์', price: 400, color: '#5574b0' }, brown: { name: 'กางเกงน้ำตาล', price: 400, color: '#93613f' },
+           black: { name: 'กางเกงดำ', price: 500, color: '#3d3d47' }, green: { name: 'กางเกงเขียวขี้ม้า', price: 500, color: '#6f8e4c' } },
 };
-const SHIRTS = ['blue', 'green', 'yellow', 'stripe'];
+const SHIRTS = ['white', 'blue', 'green', 'red'];       // starter choices
 const NPC_LINES = ['วันนี้อากาศดีจังเลย', 'ตลาดวันนี้คนเยอะมาก', 'หิวจัง ไปกินก๋วยเตี๋ยวดีกว่า', 'ระวังโจรล้วงกระเป๋านะ', 'ได้ยินว่าที่ทะเลมีฉลามด้วย',
   'ค่าไฟเดือนนี้แพงจัง', 'ไปนั่งเล่นที่จัตุรัสกัน', 'หมอที่โรงพยาบาลเก่งมาก', 'อยากได้บ้านในหมู่บ้านจัดสรรจัง', 'ข้าวโพดปีนี้หวานมาก', 'สวัสดีจ้า', 'วันนี้ทำงานเหนื่อยมาก'];
 

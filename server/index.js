@@ -263,9 +263,11 @@ function hydrate(r) {
     if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; }   // the old houses were demolished: refund
     a.x = D.SPAWN.x; a.y = D.SPAWN.y; a.v = 2;
   }
-  if (!a.look) {                                    // looks: shirt from the old colour pick, everyone gets the starter hair
-    const sh = D.SHIRTS[(a.avatar || 0) % 4];
-    a.look = { hair: 'bob', hat: '', shirt: sh }; a.wardrobe = { hair: ['bob'], hat: [], shirt: [sh] };
+  if (!a.look || !a.look.pants) {                   // looks moved to the pixel character: refund the old hairstyles/hats, keep the shirt colour
+    const OLD = { swept: 900, m: 600, pony: 1400, bun: 1400, braid: 1800, beanie: 900, straw: 700, beret: 1600, green: 1600, hood: 2500 };
+    const W = a.wardrobe || {}; a.money += [...(W.hair || []), ...(W.hat || [])].reduce((t, k) => t + (OLD[k] || 0), 0) + Math.max(0, (W.shirt || []).length - 1) * 500;
+    const sh = { blue: 'blue', green: 'green', yellow: 'yellow' }[a.look?.shirt] || D.SHIRTS[(a.avatar || 0) % 4];
+    a.look = { hair: 'brown', shirt: sh, pants: 'gray' }; a.wardrobe = { hair: ['brown'], shirt: [sh], pants: ['gray'] };
   }
   if (a.v < 3) {                                   // ม.6 became a requirement for the degree
     if (a.licenses.includes('degree')) a.licenses = [...new Set([...a.licenses, 'hs'])];
@@ -1312,7 +1314,7 @@ function arrest(a, m) {
 function wear(a, m) {
   const cat = m.cat; if (!D.LOOKS[cat]) return;
   if (m.id && !a.wardrobe[cat].includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่นก่อน', '💇', false);
-  if (!m.id && cat !== 'hat') return;
+  if (!m.id) return;
   a.look = { ...a.look, [cat]: m.id || '' }; markMe(a); sendRoster();
 }
 
@@ -1324,11 +1326,11 @@ const npcs = [];
   for (let y = town.y + 1; y < town.y + town.h - 1; y++) for (let x = town.x + 1; x < town.x + town.w - 1; x++)
     if (',=kcs'.includes(D.TILES[y][x]) && !D.blocked(x + .5, y + .5)) walkable.push([x, y]);
   const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|begspot|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x), Math.floor(s.y + (s.type === 'door' ? .6 : 0))]).filter(([x, y]) => !D.blocked(x + .5, y + .5));
-  const HAIRS = Object.keys(D.LOOKS.hair), HATS = ['', '', ...Object.keys(D.LOOKS.hat).filter(h => h !== 'hood')];
+  const HAIRS = Object.keys(D.LOOKS.hair), SH = Object.keys(D.LOOKS.shirt), PA = Object.keys(D.LOOKS.pants);
   for (let i = 0; i < 12; i++) {
     const [x, y] = pick(walkable);
     npcs.push({ id: -(i + 1), npc: 1, name: D.NPC_NAMES[i % D.NPC_NAMES.length], x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
-      g: i % 2 ? 'f' : 'm', look: { hair: pick(HAIRS), hat: pick(HATS), shirt: pick(D.SHIRTS) }, speed: rnd(1.1, 1.6), pickedAt: 0 });
+      g: i % 2 ? 'f' : 'm', look: { hair: pick(['brown', 'brown', 'black', 'black', ...HAIRS]), shirt: pick(SH), pants: pick(PA) }, speed: rnd(1.1, 1.6), pickedAt: 0 });
   }
   // shortest walk between two tiles (BFS over the town); targets are mostly shops, seats and piers
   function route(n) {
@@ -1453,9 +1455,9 @@ function login(ws, m) {
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
     const salt = crypto.randomBytes(8).toString('hex');
-    const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'blue';
+    const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
     a = hydrate({ v: VERSION, name, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
-      look: { hair: 'bob', hat: '', shirt: sh }, wardrobe: { hair: ['bob'], hat: [], shirt: [sh] } });
+      look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
     accounts.set(lname, a); isNew = true;
   }
   Q.ensure(a);

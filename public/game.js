@@ -22,7 +22,7 @@ try { creds = JSON.parse(localStorage.getItem('lt_creds') || 'null'); } catch { 
 // ------------------------------------------------------------------ login UI
 // new characters pick a gender and a starter shirt; everyone starts with the same hairstyle
 let avatar = clamp(creds?.avatar ?? 0, 0, 3), gender = creds?.gender || 'm';
-const SHIRT_IDS = ['blue', 'green', 'yellow', 'stripe'];
+const SHIRT_IDS = ['white', 'blue', 'green', 'red'];
 const sw = $('#swatches');
 function paintSw() {
   sw.innerHTML = '';
@@ -33,30 +33,42 @@ function paintSw() {
   SHIRT_IDS.forEach((id, i) => {
     const c = document.createElement('canvas'); c.width = 84; c.height = 120; c.className = i === avatar ? 'on' : '';
     c.onclick = () => { avatar = i; paintSw(); }; shirts.appendChild(c);
-    whenChars(() => { const g = c.getContext('2d'); drawCharTo(g, { g: gender, lk: { hair: 'bob', hat: '', shirt: id } }, 42, 116, 110 / CH_ATLAS.canvas[1], 'front', 0); });
+    whenChars(() => { const g = c.getContext('2d'); drawCharTo(g, { g: gender, lk: { hair: 'brown', shirt: id, pants: 'gray' } }, 42, 112, 100 / CH_ATLAS.h, 'front', 0); });
   });
   sw.appendChild(shirts);
 }
-// ---- character atlas (public/assets/chars.webp, built by tools/build_chars.py)
-let CH_ATLAS = null, chImg = null; const chWait = [];
+// ---- pixel character (public/assets/pchar.webp, built by tools/build_pixel_chars.py)
+// every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
+let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
-fetch('assets/chars.json').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = j; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/chars.webp'; });
-// draw one character (feet at fx, fy) with scale k; view = front | side | back; flip mirrors the side view to face left
-function drawCharTo(g, p, fx, fy, k, view, frame, flip, item) {
-  const S = CH_ATLAS.sprites, [ax, ay] = CH_ATLAS.feet, lk = p.lk || { hair: 'bob', hat: '', shirt: 'blue' }, gd = p.g === 'f' ? 'f' : 'm';
-  const v = view === 'back' ? 'front' : view;
-  const layer = name => { const s = S[name]; if (!s) return; g.drawImage(chImg, s[0], s[1], s[2], s[3], (s[4] - ax) * k, (s[5] - ay) * k, s[2] * k, s[3] * k); };
-  const small = (name, dx, dy, sc = 1) => { const s = S[name]; if (!s) return; g.drawImage(chImg, s[0], s[1], s[2], s[3], dx * k + s[4] * k * sc, dy * k + s[5] * k * sc, s[2] * k * sc, s[3] * k * sc); };
-  g.save(); g.translate(fx, fy); if (flip) g.scale(-1, 1);
-  if (item === 'bag_red' && view !== 'back') small('bag_red', view === 'side' ? -20 : 0, -78, .9);
-  if (lk.hat === 'hood' && view !== 'back') layer(`hat_hood_${v}`);
-  layer(view === 'back' ? 'body_back' : `body_${v}_${gd}`);
-  layer(`pants_${v}${frame}`);
-  layer(`shirt_${lk.shirt || 'blue'}_${v}`);
-  if (view === 'back') layer(`hair_${lk.hair}_back`); else layer(`hair_${lk.hair || 'bob'}_${v}`);
-  if (lk.hat) layer(`hat_${lk.hat}_${v}`);
-  if (item === 'bag_red' && view === 'back') small('bag_red', 0, -70, .9);
-  else if (item && view !== 'back') small(item, view === 'side' ? 16 : 30, -52);
+fetch('assets/pchar.json').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp'; });
+const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
+// starter colours are known before login (the creator screen); everything else comes from the server
+const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
+const lookColor = (cat, id) => G?.looks?.[cat]?.[id]?.color || STARTER_COLORS[cat][id] || STARTER_COLORS[cat][Object.keys(STARTER_COLORS[cat])[0]];
+// one tinted frame, cached per (frame, colours)
+function charFrame(frame, lk) {
+  const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
+  const { w, h, rows } = CH_ATLAS, row = rows[frame] ?? 0;
+  c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.drawImage(chImg, 0, row * h, w, h, 0, 0, w, h);
+  const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
+  [['shirt', 1], ['pants', 2], ['hair', 3]].forEach(([cat, col]) => {
+    t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h);
+    t.drawImage(chImg, col * w, row * h, w, h, 0, 0, w, h);
+    t.globalCompositeOperation = 'multiply'; t.fillStyle = lookColor(cat, lk[cat]); t.fillRect(0, 0, w, h);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, col * w, row * h, w, h, 0, 0, w, h);
+    g.drawImage(tmp, 0, 0);
+  });
+  chCache.set(key, c); if (chCache.size > 400) chCache.delete(chCache.keys().next().value);
+  return c;
+}
+// draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
+const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
+function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
+  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
+  g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
+  g.imageSmoothingEnabled = false; g.drawImage(fr, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
   g.restore();
 }
 paintSw();
@@ -91,7 +103,7 @@ function handle(m) {
     case 'loginfail': $('#loginErr').textContent = m.msg; wantLogin = false; break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
-      G = m; myId = m.id; P.clear(); buildAreas();
+      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear();
       localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
@@ -532,7 +544,6 @@ function drawPlot(s, px, py, t) {
   else { ctx.font = `${Math.round(TS * .95)}px serif`; ctx.fillText(it.icon, px, py + Math.sin(t / 250) * 2); ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('✨', px + TS * .55, py - TS * .55 + Math.sin(t / 200) * 3); }
 }
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
-const CAREER_ITEM = { fisher: 'i_rod', farmer: 'i_can', merchant: 'basket', rider: 'bag_red', thief: 'satchel', chef: 'i_berries' };
 function drawPlayer(p, X, Y, t) {
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
   const px0 = (p.rx + (p.ox || 0)) * TS + X, py0 = (p.ry + (p.oy || 0)) * TS + Y + TS * .32;
@@ -543,30 +554,29 @@ function drawPlayer(p, X, Y, t) {
   if (sitting || lying) dir = 'down';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
   p.walk = (p.walk || 0) + (moving ? .2 : 0);
-  const frame = moving ? Math.floor(p.walk / 1.6) % 2 : 0, bob = moving ? Math.abs(Math.sin(p.walk)) * TS * .05 : 0;
+  const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = moving ? Math.abs(Math.sin(p.walk)) * TS * .05 : 0;
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
-  const k = TS * 2.0 / CH_ATLAS.canvas[1], H = CH_ATLAS.canvas[1] * k;
+  const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
   let px = px0, py = py0;
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : .32), TS * .11, 0, 0, 7); ctx.fill();
   if (p.veh && G.shop && !roomOf(p.x, p.y) && !sitting && !lying) {
     if (p.veh === 'car') { spr('car_blue', p.rx, p.ry + .55, X, Y, 1.05); py -= TS * .25; }
     else { ctx.save(); ctx.translate(px, py - TS * .1); if (dir === 'right') ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .9)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= TS * .2; }
   }
-  const item = CAREER_ITEM[p.c];
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
   else if (sitting) {   // seated: legs tucked away, body lowered a little
     ctx.beginPath(); ctx.rect(px - H, py - H * 1.2, H * 2, H * 1.2 - H * .2); ctx.clip();
-    drawCharTo(ctx, p, px, py + H * .12, k, 'front', 0, false, pose === 'beg' ? null : item);
-  } else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left', item);
+    drawCharTo(ctx, p, px, py + H * .12, k, 'front', 0);
+  } else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
   ctx.restore();
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .12 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
   if (p.w && me?.career === 'police') { ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText('🚨', px - TS * .45, top + Math.sin(t / 120) * 3); }
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
-  const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? 'm_dizzy' : mine && me?.craving ? 'm_bulb' : pose === 'seat' ? 'm_heart' : null;
-  if (emote) { ctx.save(); ctx.translate(px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); drawEmote(emote, k); ctx.restore(); }
+  const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? '💫' : mine && me?.craving ? '💡' : pose === 'seat' ? '❤️' : null;
+  if (emote) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
   const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
   nameAndBubble(p, px, top, mine);
@@ -574,10 +584,9 @@ function drawPlayer(p, X, Y, t) {
 const npcPatients = {};
 function npcPatient(b, s) {
   const key = b[1]; let n = npcPatients[key];
-  if (!n) { const h = [...String(b[0])].reduce((a, c) => a * 31 + c.charCodeAt(0) >>> 0, 7); n = npcPatients[key] = { id: key, npc: 1, name: b[0], g: h % 2 ? 'f' : 'm', lk: { hair: ['bob', 'swept', 'pony', 'bun', 'm', 'braid'][h % 6], hat: '', shirt: SHIRT_IDS[(h >> 3) % 4] }, pose: 'hosp', dz: ['🤒'] }; }
+  if (!n) { const h = [...String(b[0])].reduce((a, c) => a * 31 + c.charCodeAt(0) >>> 0, 7); n = npcPatients[key] = { id: key, npc: 1, name: b[0], g: h % 2 ? 'f' : 'm', lk: { hair: ['brown', 'black', 'blonde', 'ginger'][h % 4], shirt: SHIRT_IDS[(h >> 3) % 4], pants: ['gray', 'jeans', 'brown'][(h >> 5) % 3] }, pose: 'hosp', dz: ['🤒'] }; }
   n.rx = n.x = s.x; n.ry = n.y = s.y; return n;
 }
-function drawEmote(name, k) { const s = CH_ATLAS.sprites[name]; if (s) ctx.drawImage(chImg, s[0], s[1], s[2], s[3], s[4] * k * 1.4, s[5] * k * 1.4, s[2] * k * 1.4, s[3] * k * 1.4); }
 function nameAndBubble(p, px, top, mine) {
   sign(`${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
@@ -707,7 +716,7 @@ function bindPanel(root) {
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
   root.querySelectorAll('[data-look]').forEach(c => whenChars(() => {
     const [cat, id] = c.dataset.look.split(':'), lk = { ...(me.look || {}), [cat]: id }, g = c.getContext('2d');
-    drawCharTo(g, { g: me.gender, lk }, 36, 94, 92 / CH_ATLAS.canvas[1], 'front', 0);
+    drawCharTo(g, { g: me.gender, lk }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
   const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); };
 }
@@ -969,13 +978,13 @@ function renderPanel(p) {
     }
     case 'door': return houseDoor(STN(st), st);
     case 'fashion': {
-      const W = me.wardrobe || { hair: [], hat: [], shirt: [] }, lk = me.look || {};
+      const W = { hair: [], shirt: [], pants: [], ...(me.wardrobe || {}) }, lk = me.look || {};
       const sec = (cat, title) => `<div class="sub" style="margin-top:10px"><b>${title}</b></div><div class="looks">${Object.entries(G.looks[cat]).map(([id, it]) => {
         const has = W[cat].includes(id), on = lk[cat] === id;
         return `<div class="look ${on ? 'on' : ''}"><canvas data-look="${cat}:${id}" width="72" height="96"></canvas><small>${esc(it.name)}</small>${on ? '<span class="tag">ใส่อยู่</span>' : has ? B('ใส่', { t: 'wear', cat, id }, 'good') : B(money(it.price), { t: 'act', st, a: 'buy', cat, id }, '')}</div>`;
-      }).join('')}${cat === 'hat' && lk.hat ? `<div class="look">${B('ถอดหมวก', { t: 'wear', cat: 'hat', id: '' })}</div>` : ''}</div>`;
-      return `<h2>💇 ร้านแฟชั่น & ทำผม</h2><div class="sub">${hoursTxt('fashion')} · ทุกคนเริ่มด้วยทรงผมเดียวกัน มาเปลี่ยนทรงผม หมวก และเสื้อได้ที่นี่ (แต่งตัวใหม่แล้วมีความสุขเพิ่ม) · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี</div>
-        ${sec('hair', '✂️ ทรงผม')}${sec('hat', '🎩 หมวก')}${sec('shirt', '👕 เสื้อ')}`;
+      }).join('')}</div>`;
+      return `<h2>💇 ร้านแฟชั่น & ทำผม</h2><div class="sub">${hoursTxt('fashion')} · ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน มาย้อมผม เปลี่ยนเสื้อ และกางเกงได้ที่นี่ (แต่งตัวใหม่แล้วมีความสุขเพิ่ม) · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี</div>
+        ${sec('hair', '💇 ย้อมสีผม')}${sec('shirt', '👕 เสื้อ')}${sec('pants', '👖 กางเกง')}`;
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${applyBox('police', st)}${me.career === 'police' ? policeReports() : ''}`;
     case 'hideout': return `<h2>🕶️ ซอยมืดหลังโรงหนัง</h2><div class="sub">"อยากได้เงินง่ายๆ ไหม?" · ล้วงกระเป๋าผู้เล่นที่เดินผ่าน (แตะที่ตัวเขา) หรือในฝูงชน 👥 · ถ้ามีคนเห็นจะโทรแจ้งตำรวจ ถูกจับ = ปรับ + ติดคุก</div>${applyBox('thief', st)}`;

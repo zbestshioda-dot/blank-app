@@ -68,7 +68,7 @@ button.x{width:38px;height:38px;padding:0;border:0;background:url(assets/ui/b_cl
 .tile{position:relative;width:46px;height:46px;padding:4px;border-radius:10px;border:2px solid #3e2414;background:linear-gradient(#b67c46,#7f4c26);box-shadow:inset 0 2px 0 rgba(255,255,255,.28),inset 0 -3px 0 rgba(0,0,0,.2),0 3px 0 #3e2414;display:flex;align-items:center;justify-content:center}
 .tile img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 1px 0 rgba(0,0,0,.35))}
 .tile.full{padding:0;background:none;border:0;box-shadow:none}.tile.full img{border-radius:9px}
-.tile b.q{font-family:var(--px);font-size:24px;color:#fbecd2;text-shadow:0 2px 0 #3e2414}
+.tile b.q{font-family:var(--ui);font-weight:600;font-size:24px;color:#fbecd2;text-shadow:0 2px 0 #3e2414}
 .tile i{position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);font-style:normal;font-size:10px;font-weight:600;color:#fbecd2;text-shadow:0 1px 2px #000,0 0 3px #000;white-space:nowrap;pointer-events:none}
 #menu{row-gap:19px;padding-bottom:12px}
 #menuToggle{background:linear-gradient(#b67c46,#7f4c26) ;}
