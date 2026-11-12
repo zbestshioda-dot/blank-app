@@ -14,7 +14,10 @@ from scipy import ndimage as ndi
 
 OUT = 'public/assets/pchar'
 # outfit -> (sheet, which layers are recoloured). Outfits other than 'base' keep their clothes and only dye the hair.
-SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',))}
+SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',)),
+          'police': ('tools/sheets/pixel_police.jpg', ())}
+# per-sheet frame overrides (some sheets put the poses in different cells)
+FRAME_FIX = {'police': {'left2': 6}}
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
 FRAMES = {'down0': 0, 'down1': 16, 'down2': 18, 'up0': 14, 'up1': 19, 'left0': 5, 'left1': 7, 'left2': 17}
@@ -52,7 +55,7 @@ def split(k, tint):
     shirt = neutral & (yy <= shirt_bottom)
     pants = neutral & (yy > shirt_bottom)
     brown = m & (r > g) & (g > b) & (r < 150) & (r > 55) & (g < 105) & (b < 80) & (r - b > 25)
-    hair = brown & (yy < h * .55)
+    hair = brown & (yy < h * .55) if 'hair' in tint else m & False
     # eyes and brows are the same dark brown: keep only the big connected hair mass
     hl, hn = ndi.label(hair)
     if hn:
@@ -65,7 +68,7 @@ def split(k, tint):
 frames = {}
 for outfit, (src, tint) in SHEETS.items():
   load(src)
-  for fname, k in FRAMES.items():
+  for fname, k in {**FRAMES, **FRAME_FIX.get(outfit, {})}.items():
     name = fname if outfit == 'base' else f'{outfit}:{fname}'
     sub, m, L, lum = split(k, tint)
     ys, xs = np.where(m)
