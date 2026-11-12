@@ -23,19 +23,19 @@ rect(0, 20, W, 2, '='); rect(29, 0, 2, H, '=');
 rect(32, 36, 13, 2, 'p');
 
 const BUILDINGS = [
-  { id: 'office',    x: 33, y: 10, w: 8, h: 8, color: '#5b7c99', label: 'บริษัท' },
-  { id: 'market',    x: 44, y: 11, w: 9, h: 7, color: '#c0643a', label: 'ตลาดกลาง' },
-  { id: 'warehouse', x: 20, y: 11, w: 8, h: 7, color: '#8a7a5c', label: 'คลังสินค้า' },
-  { id: 'studio',    x: 3,  y: 13, w: 8, h: 5, color: '#8e5ba8', label: 'สตูดิโอ' },
-  { id: 'home',      x: 12, y: 13, w: 7, h: 5, color: '#b0675f', label: 'บ้านพัก' },
-  { id: 'barn',      x: 21, y: 2,  w: 7, h: 6, color: '#a2563f', label: 'โรงนา' },
-  { id: 'condo',     x: 44, y: 2,  w: 13, h: 7, color: '#6f7f8f', label: 'คอนโด' },
-  { id: 'hotel',     x: 33, y: 2,  w: 8, h: 6, color: '#7a6f9b', label: 'โรงแรม' },
-  { id: 'restaurant',x: 33, y: 24, w: 8, h: 7, color: '#d08a3a', label: 'ร้านอาหาร' },
-  { id: 'kitchen',   x: 44, y: 24, w: 9, h: 7, color: '#c25b5b', label: 'ครัวใหญ่' },
-  { id: 'hospital',  x: 20, y: 24, w: 8, h: 7, color: '#e4e8ec', label: 'โรงพยาบาล' },
-  { id: 'school',    x: 3,  y: 24, w: 8, h: 7, color: '#4f8f6f', label: 'โรงเรียน' },
-  { id: 'cowork',    x: 12, y: 24, w: 7, h: 7, color: '#3f6f9f', label: 'โค้ดดิ้งสเปซ' },
+  { id: 'office',    x: 33, y: 10, w: 8, h: 8, color: '#5b7c99', label: 'บริษัท', icon: '🏢', st: 'office' },
+  { id: 'market',    x: 44, y: 11, w: 9, h: 7, color: '#c0643a', label: 'ตลาดกลาง', icon: '🏪', st: 'market' },
+  { id: 'warehouse', x: 20, y: 11, w: 8, h: 7, color: '#8a7a5c', label: 'คลังสินค้า', icon: '📦', st: 'warehouse' },
+  { id: 'studio',    x: 3,  y: 13, w: 8, h: 5, color: '#8e5ba8', label: 'สตูดิโอ', icon: '🎥', st: 'studio' },
+  { id: 'home',      x: 12, y: 13, w: 7, h: 5, color: '#b0675f', label: 'บ้านพัก', icon: '🏠', st: 'home' },
+  { id: 'barn',      x: 21, y: 2,  w: 7, h: 6, color: '#a2563f', label: 'โรงนา', icon: '🐄', deco: true },
+  { id: 'condo',     x: 44, y: 2,  w: 13, h: 7, color: '#6f7f8f', label: 'คอนโด', icon: '🏙️', deco: true },
+  { id: 'hotel',     x: 33, y: 2,  w: 8, h: 6, color: '#7a6f9b', label: 'โรงแรม', icon: '🏨', deco: true },
+  { id: 'restaurant',x: 33, y: 24, w: 8, h: 7, color: '#d08a3a', label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' },
+  { id: 'kitchen',   x: 44, y: 24, w: 9, h: 7, color: '#c25b5b', label: 'ครัวใหญ่', icon: '🍳', st: 'kitchen' },
+  { id: 'hospital',  x: 20, y: 24, w: 8, h: 7, color: '#e4e8ec', label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' },
+  { id: 'school',    x: 3,  y: 24, w: 8, h: 7, color: '#4f8f6f', label: 'โรงเรียน', icon: '🎓', st: 'school' },
+  { id: 'cowork',    x: 12, y: 24, w: 7, h: 7, color: '#3f6f9f', label: 'โค้ดดิ้งสเปซ', icon: '💻', st: 'cowork' },
 ];
 BUILDINGS.forEach(b => rect(b.x, b.y, b.w, b.h, 'B'));
 

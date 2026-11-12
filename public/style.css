@@ -96,3 +96,33 @@ pre{background:#0e1216;border:1px solid var(--line);border-radius:10px;padding:1
   #card{width:min(178px,calc(100vw - 130px))}
   #eventBar{top:auto;bottom:calc(126px + env(safe-area-inset-bottom));left:8px;right:110px;transform:none;max-width:none}
 }
+
+/* ---- readability / polish pass ---- */
+#card{border-left:5px solid #999;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.bar em{font-style:normal;font-size:11px;color:var(--mut);width:22px;text-align:right}
+#miniWrap{position:relative;cursor:pointer}
+#miniWrap span{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000;pointer-events:none}
+#mini{cursor:pointer;display:block}
+.toast{animation:slidein .25s ease-out,fade 3.6s forwards;box-shadow:0 6px 18px rgba(0,0,0,.4);font-weight:600}
+@keyframes slidein{from{transform:translateY(-12px);opacity:0}to{transform:none;opacity:1}}
+#actBtn{animation:breathe 1.6s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 8px rgba(255,201,77,.25),0 4px 18px rgba(0,0,0,.45)}}
+.sheet::before{content:'';display:block;width:42px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);margin:-6px auto 10px}
+.sheet h2{font-size:19px}
+.item{transition:background .15s}
+.item button.good{white-space:nowrap}
+#mapView{position:fixed;inset:0;z-index:8;background:rgba(5,8,12,.82);display:flex;align-items:center;justify-content:center;padding:10px}
+.mapBox{background:#1b2128;border:1px solid var(--line);border-radius:16px;padding:10px;max-width:100%}
+.mapHead{display:flex;align-items:center;gap:10px;margin-bottom:8px}.mapHead span{flex:1;color:var(--mut);font-size:12.5px}.mapHead button{padding:4px 10px}
+#bigMap{display:block;border-radius:10px;cursor:pointer;touch-action:manipulation}
+#tut,#dailyWrap{position:fixed;inset:0;z-index:9;background:rgba(5,8,12,.7);display:flex;align-items:center;justify-content:center;padding:16px}
+.tutCard{background:#1b2128;border:1px solid var(--acc);border-radius:18px;padding:20px;width:min(400px,100%);text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:slidein .25s ease-out}
+.tutCard h2{margin:6px 0 8px;font-size:20px}.tutCard p{color:#d6dbe0;line-height:1.7;margin:0 0 14px}
+.tutIcon{font-size:52px;line-height:1.1}
+.dots{display:flex;gap:6px;justify-content:center;margin-bottom:14px}.dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.25)}.dots i.on{background:var(--acc);width:20px;border-radius:4px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:4px 0 12px}
+.days div{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:5px 0;font-size:11px}
+.days div small{display:block;color:var(--mut);font-size:10px}.days div.got{opacity:.45}.days div.now{border-color:var(--acc);background:rgba(255,201,77,.2)}
+.big-reward{font-size:34px;font-weight:800;color:var(--acc);margin:4px 0 8px}
+@media(max-width:600px){#miniWrap span{font-size:9px}
+  #toasts{top:auto;bottom:calc(178px + env(safe-area-inset-bottom));flex-direction:column-reverse}}

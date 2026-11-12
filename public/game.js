@@ -60,6 +60,9 @@ function handle(m) {
       localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
+      let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut'); } catch { }
+      tutPending = !!(m.isNew || !tutDone);
+      if (tutPending) setTimeout(() => me && showTut(0), 400);
       break;
     case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
     case 'wd': wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); break;
@@ -90,6 +93,7 @@ function handle(m) {
     }
     case 'bite': FX.play('bite'); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 0.9); FX.float(bobber.x, bobber.y - .3, '‼️', '#fff', .6); } if (navigator.vibrate) navigator.vibrate(200); break;
     case 'req': showReq(m); break;
+    case 'daily': if (tutPending) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
     case 'quest': {
       const s = P.get(myId);
       if (m.kind === 'done') { toast(`เควสต์สำเร็จ: ${m.text} · รางวัล ${money(m.reward)}`, '📜'); FX.play('levelup'); if (s) { FX.ring(s.x, s.y, '#ffd34d', 900, 1.4); FX.float(s.x, s.y - .7, 'เควสต์สำเร็จ!', '#ffd34d', .5); } }
@@ -130,6 +134,8 @@ function paintHud() {
   $('#meMoney').textContent = money(me.money);
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? '📜 เควสต์ครบแล้ว ✅' : `📜 เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
+  $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
+  $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
 }
 function paintEvent() {
   const e = $('#eventBar');
@@ -152,6 +158,9 @@ const phaseNow = () => (((Date.now() + clockOff) % DAY_MS) / DAY_MS);
 
 document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPanel({ kind: b.dataset.open }));
 $('#panelX').onclick = closePanel;
+$('#mini').onclick = () => G && openMap();
+$('#mapX').onclick = closeMap;
+$('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapView') closeMap(); });
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
 
 // ------------------------------------------------------------------ map helpers
@@ -325,20 +334,11 @@ function draw(t) {
       ctx.fillStyle = '#3d8a49'; ctx.beginPath(); ctx.arc(px + TS * .42, py + TS * .38, TS * .26, 0, 7); ctx.fill();
     }
   }
-  // buildings
+  // zones, then buildings with roof icons, doors and name signs
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (const b of G.map.buildings) {
-    const px = b.x * TS + X, py = b.y * TS + Y, w = b.w * TS, h = b.h * TS;
-    if (px > VW || py > VH || px + w < 0 || py + h < 0) continue;
-    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(px + 6, py + 8, w, h);
-    ctx.fillStyle = b.color; ctx.fillRect(px, py, w, h);
-    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(px, py, w, h * .18);
-    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(px, py + h - h * .1, w, h * .1);
-    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 3; ctx.strokeRect(px + 1.5, py + 1.5, w - 3, h - 3);
-    ctx.fillStyle = 'rgba(0,0,0,.16)'; for (let i = 1; i < b.h; i += 2) ctx.fillRect(px + 8, py + i * TS - 2, w - 16, 3);
-    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.font = `800 ${Math.round(TS * .42)}px 'Noto Sans Thai',sans-serif`;
-    ctx.fillText(b.label, px + w / 2, py + h / 2);
-  }
+  const night = nightLevel();
+  drawZones(X, Y);
+  for (const b of G.map.buildings) drawBuilding(b, X, Y, night);
   // stations
   for (const s of G.stations) {
     const px = s.x * TS + X, py = s.y * TS + Y;
@@ -356,9 +356,9 @@ function draw(t) {
   for (const p of list) drawPlayer(p, X, Y, t);
   drawBobber(X, Y, t);
   FX.draw(ctx, X, Y, TS);
+  drawGuide(X, Y, t);
   // night
-  const l = Math.cos((phaseNow() - 0.5) * Math.PI * 2);
-  const dark = clamp((0.2 - l) / 1.2, 0, 0.55);
+  const dark = night;
   if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); }
   drawMini();
 }
@@ -366,7 +366,7 @@ function drawPlot(s, px, py, t) {
   const pl = wd?.plots?.[s.idx];
   const isNear = near && near.id === s.id;
   if (isNear) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.strokeRect(px - TS, py - TS, TS * 2, TS * 2); }
-  if (!pl) return;
+  if (!pl) { ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.font = `700 ${Math.round(TS * .6)}px sans-serif`; ctx.fillText('+', px, py); return; }
   const [crop, owner, , readyAt] = pl, it = G.items[crop], total = G.crops[crop].grow * 1000;
   const left = readyAt - (Date.now() + clockOff);
   if (left > 0) {
@@ -387,11 +387,10 @@ function drawPlayer(p, X, Y, t) {
   ctx.lineWidth = p.id === myId ? 3 : 2; ctx.strokeStyle = p.id === myId ? '#fff' : 'rgba(0,0,0,.45)'; ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .5, py + Math.sin(ang) * r * .5, r * .3, 0, 7); ctx.fill();
   ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .62, py + Math.sin(ang) * r * .62, r * .13, 0, 7); ctx.fill();
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.font = `700 ${Math.round(TS * .28)}px 'Noto Sans Thai',sans-serif`;
-  const label = `${CAREER_ICON(p.c)} ${p.name}`;
-  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(label, px, py - r - 8);
-  ctx.fillStyle = p.id === myId ? '#ffe28a' : '#fff'; ctx.fillText(label, px, py - r - 8);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const mine = p.id === myId;
+  sign(`${CAREER_ICON(p.c)} ${p.name}`, px, py - r - TS * .3, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
+  ctx.textBaseline = 'alphabetic';
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 28 ? p.bubble.slice(0, 27) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
@@ -445,6 +444,9 @@ function bindPanel(root) {
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
+  guide(m) { closePanel(); setGuide(m.key); },
+  tut() { closePanel(); showTut(0); },
+  map() { closePanel(); openMap(); },
   ans(m, root) { const v = root.querySelector('#ansIn').value.trim(); if (v === '') return; doAct(m.st, 'submit', { ans: v }); root.querySelector('#ansIn').value = ''; },
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
@@ -549,7 +551,8 @@ function renderPanel(p) {
       const rows = q.list.map((x, i) => {
         const c = x.career ? G.careers[x.career] : null, wrong = c && me.career !== x.career;
         const icon = x.done ? '✅' : c ? c.icon : { trade: '🤝', chat: '💬', eat: '🍛', sell: '🏪', earn: '💰' }[x.type] || '📜';
-        const btn = x.done ? '<span class="tag">สำเร็จ</span>' : B('🔄', { t: 'quest_reroll', i }, '', q.rerolled);
+        const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
+        const btn = x.done ? '<span class="tag">สำเร็จ</span>' : `<div style="display:flex;flex-direction:column;gap:4px">${tgt ? B('📍 ไป', { fn: 'guide', key: tgt }, 'good') : ''}${B('🔄', { t: 'quest_reroll', i }, '', q.rerolled)}</div>`;
         return `<div class="item ${x.done ? 'done' : ''}"><div class="em">${icon}</div><div class="nm">${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
       }).join('');
       return `<h2>📜 เควสต์ประจำวัน</h2><div class="sub">เควสต์ใหม่ในอีก <b class="qcd" data-t="${q.resetAt}"></b> (เที่ยงคืนเวลาไทย) · ทำสำเร็จได้รางวัลทันที${q.streak ? ` · 🔥 ทำครบติดต่อกัน ${q.streak} วัน` : ''}</div>
@@ -573,6 +576,7 @@ function renderPanel(p) {
         ⚠️ พลังงาน⚡ฟื้นช้าตามเวลา · หิวจัดสุขภาพลด · สุขภาพ 0 จะเป็นลมเสียเงิน</div>
         <div class="sub" style="margin-top:12px"><b>🔊 ตั้งค่าเสียง</b></div>
         <div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
+        <div class="grid2" style="margin-top:8px">${B('📖 ดูบทช่วยสอน', { fn: 'tut' })}${B('🗺️ เปิดแผนที่', { fn: 'map' })}</div>
         ${B('🚪 ออกจากระบบ', { fn: 'logout' }, 'warn big')}`;
     case 'player': {
       const o = P.get(p.pid); if (!o) return '';
@@ -590,6 +594,169 @@ function renderPanel(p) {
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 
+// ------------------------------------------------------------------ map readability: signs, buildings, zones, navigation
+const nightLevel = () => clamp((0.2 - Math.cos((phaseNow() - 0.5) * Math.PI * 2)) / 1.2, 0, 0.55);
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = n >> 8 & 255, b = n & 255;
+  const t = f < 0 ? 0 : 255, p = Math.abs(f);
+  return `rgb(${Math.round((t - r) * p + r)},${Math.round((t - g) * p + g)},${Math.round((t - b) * p + b)})`;
+}
+function sign(text, x, y, o = {}) {
+  const fs = Math.max(10, Math.round(o.size || TS * .36));
+  ctx.font = `700 ${fs}px 'Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(text).width + fs * .9, h = fs * 1.55;
+  ctx.fillStyle = o.bg || 'rgba(18,22,28,.88)';
+  ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
+  if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 2; ctx.stroke(); }
+  ctx.fillStyle = o.color || '#fff'; ctx.fillText(text, x, y + fs * .04);
+}
+const STN = id => G.stations.find(s => s.id === id);
+function drawBuilding(b, X, Y, night) {
+  const px = b.x * TS + X, py = b.y * TS + Y, w = b.w * TS, h = b.h * TS;
+  if (px > VW + 40 || py > VH + 40 || px + w < -40 || py + h < -40) return;
+  const st = b.st && STN(b.st), south = st ? st.y > b.y + b.h / 2 : true;
+  const fh = Math.min(h * .36, TS * 1.5), rh = h - fh;
+  const roofY = south ? py : py + fh, faY = south ? py + rh : py;
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(px + 6, py + 8, w, h);
+  // front wall with windows and a door facing the street
+  ctx.fillStyle = shade(b.color, -.4); ctx.fillRect(px, faY, w, fh);
+  const doorX = st ? st.x * TS + X : -1e9;
+  ctx.fillStyle = night > .15 ? '#ffd97a' : 'rgba(190,225,255,.85)';
+  for (let wx = px + TS * .35; wx + TS * .5 < px + w - TS * .2; wx += TS * .95)
+    if (Math.abs(wx + TS * .25 - doorX) > TS * .8) ctx.fillRect(wx, faY + fh * .25, TS * .5, fh * .4);
+  if (st) {
+    const dw = TS * .9, dh = fh * .75, dy = south ? faY + fh - dh : faY;
+    ctx.fillStyle = '#4a3324'; ctx.fillRect(doorX - dw / 2, dy, dw, dh);
+    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(doorX + dw * .28, dy + dh / 2, Math.max(2, TS * .05), 0, 7); ctx.fill();
+  }
+  // roof
+  ctx.fillStyle = b.color; ctx.fillRect(px, roofY, w, rh);
+  ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(px, roofY, w, rh * .5);
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(px, roofY + rh * .5 - 1.5, w, 3);
+  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, w - 2, h - 2);
+  const cx = px + w / 2, cy = roofY + rh / 2;
+  if (b.deco) { ctx.globalAlpha = .55; sign(`${b.icon} ${b.label}`, cx, cy, { size: TS * .3 }); ctx.globalAlpha = 1; return; }
+  // icon badge + name sign so every place is recognisable from afar
+  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(cx, cy - TS * .42, TS * .6, 0, 7); ctx.fill();
+  ctx.strokeStyle = shade(b.color, -.3); ctx.lineWidth = 3; ctx.stroke();
+  ctx.font = `${Math.round(TS * .78)}px serif`; ctx.fillStyle = '#000'; ctx.fillText(b.icon, cx, cy - TS * .38);
+  sign(b.label, cx, cy + TS * .55, { size: TS * .4, border: shade(b.color, .25) });
+}
+function drawZones(X, Y) {
+  const fx = 2 * TS + X, fy = 2 * TS + Y, fw = 16 * TS, fhh = 10 * TS;
+  ctx.strokeStyle = '#9b7748'; ctx.lineWidth = Math.max(3, TS * .09); ctx.setLineDash([TS * .55, TS * .18]);
+  ctx.strokeRect(fx, fy, fw, fhh); ctx.setLineDash([]);
+  sign('🌾 ไร่กลางเมือง', fx + fw / 2, fy + fhh, { size: TS * .42, bg: 'rgba(74,52,26,.94)' });
+  sign('🎣 ท่าเรือตกปลา', 33 * TS + X, 35.35 * TS + Y, { size: TS * .4, bg: 'rgba(26,62,88,.94)' });
+}
+// navigation: a yellow arrow that walks the player to a place
+let guide = null;
+const TARGETS = {
+  farm: () => ({ x: 9, y: 7.5, label: 'ไร่กลางเมือง' }),
+};
+function targetOf(key) {
+  if (TARGETS[key]) return TARGETS[key]();
+  const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, id: s.id };
+}
+const CAREER_TARGET = { office: 'office', farmer: 'farm', fisher: 'pier1', merchant: 'warehouse', streamer: 'studio', programmer: 'cowork', chef: 'kitchen', doctor: 'hospital' };
+const QUEST_TARGET = { work: 'office', harvest: 'farm', fish: 'pier1', buy: 'warehouse', stream: 'studio', code: 'cowork', cook: 'kitchen', shift: 'hospital', sell: 'market', eat: 'restaurant' };
+function setGuide(key, quiet) {
+  const g = targetOf(key); if (!g) return;
+  guide = g;
+  if (!quiet) { toast(`นำทางไป ${g.label} — เดินตามลูกศรสีเหลือง`, '📍'); FX.play('notice'); }
+}
+function drawGuide(X, Y, t) {
+  if (!guide) return;
+  const m = P.get(myId); if (!m) return;
+  const dx = guide.x - m.x, dy = guide.y - m.y, d = Math.hypot(dx, dy);
+  if (d < 2) { guide = null; FX.play('ding'); toast('ถึงแล้ว! กดปุ่มกลมสีเหลืองเพื่อใช้งาน', '📍'); return; }
+  const a = Math.atan2(dy, dx), cx = m.rx * TS + X, cy = m.ry * TS + Y, r = TS * 1.15 + Math.sin(t / 180) * 4;
+  ctx.save(); ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.rotate(a);
+  ctx.fillStyle = '#ffc94d'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(TS * .42, 0); ctx.lineTo(-TS * .24, -TS * .3); ctx.lineTo(-TS * .1, 0); ctx.lineTo(-TS * .24, TS * .3); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  const gx = guide.x * TS + X, gy = guide.y * TS + Y;
+  ctx.strokeStyle = `rgba(255,201,77,${.55 + .45 * Math.sin(t / 160)})`; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(gx, gy + TS * .15, TS * 1.2, TS * .6, 0, 0, 7); ctx.stroke();
+  sign(`📍 ${guide.label} · ${Math.round(d)} ม.`, cx, cy + TS * 1.05, { size: TS * .3, bg: 'rgba(255,201,77,.95)', color: '#222' });
+}
+
+// full-screen town map: tap a place to navigate there
+function openMap() {
+  const v = $('#mapView'); v.classList.remove('hidden');
+  const c = $('#bigMap'), W = G.map.w, H = G.map.h;
+  const k = Math.min((Math.min(innerWidth, 980) - 24) / W, (innerHeight - 110) / H);
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  c.width = W * k * dpr; c.height = H * k * dpr; c.style.width = W * k + 'px'; c.style.height = H * k + 'px';
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const col = { '=': '#555a63', ',': '#b7b4a6', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#888', T: '#2f6b3a', '.': '#5e9b57' };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { g.fillStyle = col[G.map.tiles[y][x]]; g.fillRect(x * k, y * k, k + .5, k + .5); }
+  const hits = [];
+  const label = (text, x, y, size, bg, maxW = 1e9) => {
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    // shrink the font until the label fits inside its building
+    for (; size > 8; size -= .5) { g.font = `700 ${size}px 'Noto Sans Thai',sans-serif`; if (g.measureText(text).width + size * .8 <= maxW) break; }
+    const w = g.measureText(text).width + size * .8, h = size * 1.5;
+    g.fillStyle = bg; g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, h / 2); g.fill();
+    g.fillStyle = '#fff'; g.fillText(text, x, y + 1);
+  };
+  const fs = clamp(k * .85, 10, 15);
+  for (const b of G.map.buildings) {
+    g.fillStyle = b.color; g.fillRect(b.x * k, b.y * k, b.w * k, b.h * k);
+    g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1.5; g.strokeRect(b.x * k, b.y * k, b.w * k, b.h * k);
+    const cx = (b.x + b.w / 2) * k, cy = (b.y + b.h / 2) * k;
+    if (b.deco) { g.globalAlpha = .6; label(b.label, cx, cy, fs * .85, 'rgba(18,22,28,.8)', b.w * k - 2); g.globalAlpha = 1; continue; }
+    label(`${b.icon} ${b.label}`, cx, cy, fs, 'rgba(18,22,28,.9)', b.w * k - 2);
+    hits.push({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k, key: b.st });
+  }
+  label('🌾 ไร่กลางเมือง', 10 * k, 7 * k, fs, 'rgba(74,52,26,.94)'); hits.push({ x: 2 * k, y: 2 * k, w: 16 * k, h: 10 * k, key: 'farm' });
+  label('🎣 ท่าเรือ', 39 * k, 39.3 * k, fs, 'rgba(26,62,88,.94)'); hits.push({ x: 31 * k, y: 35 * k, w: 14 * k, h: 5 * k, key: 'pier1' });
+  for (const p of P.values()) {
+    const mine = p.id === myId;
+    g.fillStyle = mine ? '#fff' : COLORS[p.av]; g.strokeStyle = '#000'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(p.x * k, p.y * k, mine ? k * .75 : k * .5, 0, 7); g.fill(); g.stroke();
+    if (mine) label('คุณอยู่ที่นี่', p.x * k, p.y * k - fs * 1.4, fs * .85, 'rgba(255,120,60,.95)');
+  }
+  if (guide) { g.strokeStyle = '#ffc94d'; g.lineWidth = 3; g.beginPath(); g.arc(guide.x * k, guide.y * k, k * 1.4, 0, 7); g.stroke(); }
+  c.onclick = e => {
+    const r = c.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const h = hits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
+    if (h) { closeMap(); setGuide(h.key); }
+  };
+}
+function closeMap() { $('#mapView').classList.add('hidden'); }
+
+// first-time tutorial
+const TUT = () => [
+  ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือวงกลมที่มีป้ายชื่อ<b>สีเหลือง</b> ผู้เล่นคนอื่นก็เดินอยู่ในเมืองเดียวกันกับคุณ'],
+  ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b> (จอยจะโผล่ใต้นิ้ว)<br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร'],
+  ['🏪', 'ใช้สถานที่', 'ทุกตึกมี<b>ป้ายชื่อบนหลังคา</b> เดินไปที่<b>ประตู</b> (วงกลมเรืองแสง) แล้วกด<b>ปุ่มกลมสีเหลือง</b>มุมขวาล่าง (คอม: E)'],
+  ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ที่อยากไป จะมี<b>ลูกศรสีเหลือง</b>พาเดินไป'],
+  ['💼', `อาชีพของคุณ: ${G.careers[me.career].icon} ${G.careers[me.career].name}`, `${G.careers[me.career].desc}<br><br>📜 ทำ<b>เควสต์ประจำวัน</b>รับเงินเพิ่ม · 🤝 <b>แตะผู้เล่นอื่น</b>เพื่อแลกเปลี่ยนของ`],
+];
+let tutStep = 0, tutPending = false, pendingDaily = null;
+function showTut(i = 0) {
+  tutStep = i; const steps = TUT(), [icon, title, body] = steps[i];
+  $('#tut').classList.remove('hidden');
+  $('#tutBody').innerHTML = `<div class="tutIcon">${icon}</div><h2>${esc(title)}</h2><p>${body}</p><div class="dots">${steps.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
+  $('#tutNext').textContent = i === steps.length - 1 ? '🚀 เริ่มเล่น! (พาไปที่ทำงาน)' : 'ถัดไป →';
+}
+$('#tutNext').onclick = () => { FX.play('click'); if (tutStep < TUT().length - 1) return showTut(tutStep + 1); endTut(); };
+$('#tutSkip').onclick = endTut;
+function endTut() {
+  tutPending = false; if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
+  $('#tut').classList.add('hidden'); try { localStorage.setItem('lt_tut', '1'); } catch { } if (me) setGuide(CAREER_TARGET[me.career]); }
+
+// daily login bonus popup
+function showDaily(d) {
+  const box = $('#daily');
+  box.innerHTML = `<div class="tutIcon">🎁</div><h2>โบนัสเข้าเกมวันที่ ${d.streak}</h2><p>เข้าเล่นทุกวันติดต่อกัน รางวัลจะเพิ่มขึ้นเรื่อยๆ (สูงสุดวันที่ 7)</p>
+    <div class="days">${d.table.map((v, i) => `<div class="${i + 1 < Math.min(d.streak, 7) ? 'got' : i + 1 === Math.min(d.streak, 7) ? 'now' : ''}"><small>วัน ${i + 1}</small><b>฿${v.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="big-reward">+${money(d.reward)}</div><button class="primary big" id="dailyOk">รับเลย!</button>`;
+  $('#dailyWrap').classList.remove('hidden');
+  $('#dailyOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); FX.play('coin', true); const s = P.get(myId); if (s) { FX.burst(s.x, s.y, '#ffd34d', 26); FX.float(s.x, s.y - .6, '+' + money(d.reward), '#ffd34d', .6); } };
+}
+
 // ------------------------------------------------------------------ sound & effects glue
 let stepAcc = 0, bobber = null;
 function paintMute() { $('#muteBtn').textContent = FX.opts.sfx || FX.opts.music ? '🔊' : '🔇'; }
@@ -606,6 +773,8 @@ function onMeDiff(a, b) {
   for (const [k, q] of Object.entries(b.inv)) { const d = q - (a.inv[k] || 0); if (d > 0) gained.push(`+${d}${G.items[k].icon}`); }
   if (gained.length) { FX.play('pop'); FX.float(x - .3, y - .4, gained.join(' '), '#ffffff', .5); FX.burst(x, y, '#ffffff', 6); }
   if (b.career === a.career && b.lv > a.lv) { FX.play('levelup'); FX.ring(x, y, '#ffd34d', 900, 1.6); FX.ring(x, y, '#ffffff', 700, 1.1); FX.float(x, y - .6, `LEVEL UP! Lv.${b.lv}`, '#ffd34d', .55); FX.burst(x, y, '#ffd34d', 20); }
+  if (a.energy < 99.5 && b.energy >= 100) toast('พลังงานเต็มแล้ว! ไปทำงานต่อได้เลย', '⚡');
+  if (a.career !== b.career) setTimeout(() => setGuide(CAREER_TARGET[b.career]), 300);
   if (b.energy - a.energy >= 8) FX.float(x + .5, y + .2, `+${Math.round(b.energy - a.energy)}⚡`, '#f2c94c', .34);
   if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }
   if (b.hunger - a.hunger >= 8) FX.float(x, y + .4, `+${Math.round(b.hunger - a.hunger)}🍗`, '#8fe3a6', .34);

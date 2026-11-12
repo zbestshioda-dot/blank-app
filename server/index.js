@@ -114,7 +114,7 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses',
-  'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created', 'quests', 'qStreak'];
+  'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak'];
 async function load() {
   const rows = await store.loadAll();
   for (const r of rows) if (r && r.name) accounts.set(r.name.toLowerCase(), hydrate(r));
@@ -123,7 +123,7 @@ async function load() {
 function hydrate(r) {
   return Object.assign({
     avatar: 0, money: 2000, energy: 100, hunger: 100, health: 100, career: 'office', licenses: [], xp: {},
-    followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0,
+    followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0,
   }, r, { ws: null, id: null, f: 0, cd: {}, task: null, cast: null, trade: null, lastPosT: now(), moved: false, meDirty: false });
 }
 let saving = false;
@@ -148,7 +148,7 @@ function sendRoster() {
 }
 function meView(a) {
   return {
-    t: 'me', id: a.id, name: a.name, money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
+    t: 'me', id: a.id, name: a.name, avatar: a.avatar, money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, followers: a.followers, inv: a.inv,
     cast: a.cast ? { state: a.cast.state } : null, task: a.task ? { code: a.task.code } : null,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a),
@@ -496,18 +496,27 @@ function login(ws, m) {
   const name = cleanText(m.name, 16);
   if (!/^[\p{L}\p{N}_ .-]{2,16}$/u.test(name)) return fail(ws, 'ชื่อต้องยาว 2-16 ตัว (ตัวอักษร ตัวเลข _ - .)');
   const pin = String(m.pin ?? '');
-  if (!/^\d{4}$/.test(pin)) return fail(ws, 'PIN ต้องเป็นตัวเลข 4 หลัก');
-  let a = accounts.get(name.toLowerCase());
+  if (!/^\d{4,8}$/.test(pin)) return fail(ws, 'PIN ต้องเป็นตัวเลข 4-8 หลัก');
+  const lname = name.toLowerCase(), t = now();
+  const lock = loginFails.get('n:' + lname), ipLock = loginFails.get('i:' + ws.ip);
+  if (lock && lock.until > t) return fail(ws, `ใส่ PIN ผิดหลายครั้ง ลองใหม่ในอีก ${Math.ceil((lock.until - t) / 60000)} นาที`);
+  if (ipLock && ipLock.until > t) return fail(ws, `ลองเข้าสู่ระบบผิดบ่อยเกินไป ลองใหม่ในอีก ${Math.ceil((ipLock.until - t) / 60000)} นาที`);
+  let a = accounts.get(lname), isNew = false;
   if (a) {
-    if (hashPin(pin, a.salt) !== a.hash) return fail(ws, 'ชื่อนี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
+    if (hashPin(pin, a.salt) !== a.hash) {
+      loginFail('n:' + lname, 5, 5 * 60000); loginFail('i:' + ws.ip, 15, 10 * 60000);
+      return fail(ws, 'ชื่อนี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
+    }
+    loginFails.delete('n:' + lname);
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
     const salt = crypto.randomBytes(8).toString('hex');
     const career = ['office', 'farmer', 'fisher', 'merchant', 'streamer'].includes(m.career) ? m.career : 'office';
     a = hydrate({ name, salt, hash: hashPin(pin, salt), avatar: clamp(Math.floor(+m.avatar) || 0, 0, 9), career });
-    accounts.set(name.toLowerCase(), a);
+    accounts.set(lname, a); isNew = true;
   }
   Q.ensure(a);
+  const daily = dailyLogin(a);
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true;
   if (D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   online.set(a.id, a);
@@ -516,13 +525,36 @@ function login(ws, m) {
     t: 'init', id: a.id,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS,
     items: D.ITEMS, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, speed: SPEED, radius: D.RADIUS, chat: chatLog.slice(-25),
+    titles: D.OFFICE_TITLES, speed: SPEED, radius: D.RADIUS, chat: chatLog.slice(-25), isNew,
   });
   send(a, meView(a)); send(a, worldView());
+  if (daily) send(a, { t: 'daily', ...daily });
   sendRoster();
   feed(`👋 ${a.name} เข้าเมือง`);
 }
 function fail(ws, msg) { ws.send(JSON.stringify({ t: 'loginfail', msg })); }
+
+// brute-force protection: too many wrong PINs locks that name (and that IP) for a while
+const loginFails = new Map();
+function loginFail(key, max, ms) {
+  const t = now(), r = loginFails.get(key);
+  const e = r && r.reset > t ? r : { n: 0, reset: t + ms, until: 0 };
+  if (++e.n >= max) { e.until = t + ms; e.n = 0; }
+  loginFails.set(key, e);
+}
+setInterval(() => { const t = now(); for (const [k, v] of loginFails) if (v.reset < t && v.until < t) loginFails.delete(k); }, 60000).unref();
+
+// daily login bonus: grows each consecutive day, capped at day 7
+const LOGIN_BONUS = [300, 500, 700, 900, 1200, 1500, 2500];
+function dailyLogin(a) {
+  const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
+  if (a.lastLogin === today) return null;
+  a.loginStreak = a.lastLogin === yesterday ? (a.loginStreak || 0) + 1 : 1;
+  a.lastLogin = today;
+  const reward = LOGIN_BONUS[Math.min(a.loginStreak, 7) - 1];
+  a.money += reward; a.earned += reward; dirty = true;
+  return { streak: a.loginStreak, reward, table: LOGIN_BONUS };
+}
 
 function detach(a) {
   if (!a.id) return;
@@ -634,6 +666,11 @@ function tick() {
     if (a.trade && dist(a.trade.a, a.trade.b) > 8) tradeClose(a.trade, 'อยู่ไกลกันเกินไป ยกเลิกการแลกเปลี่ยน');
     if (a.meDirty || t % 2000 < TICK) { a.meDirty = false; send(a, meView(a)); }
   }
+  for (const p of plots) if (p && !p.told && p.readyAt <= t) {
+    p.told = true;
+    const o = online.get(p.owner);
+    if (o) toast(o, `${D.ITEMS[p.crop].name}ที่คุณปลูกไว้โตแล้ว! รีบไปเก็บก่อนคนอื่นเก็บตัดหน้า (60 วิ)`, '🌾');
+  }
   for (const [id, r] of reqs) if (t > r.exp) { reqs.delete(id); toast(r.from, `${r.to.name} ไม่ตอบรับ`, '⌛', false); }
 
   // positions
@@ -659,7 +696,8 @@ const server = http.createServer((req, res) => {
   });
 });
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
-wss.on('connection', ws => {
+wss.on('connection', (ws, req) => {
+  ws.ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   let count = 0, winStart = now();
   ws.on('message', raw => {
     const t = now();
