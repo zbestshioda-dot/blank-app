@@ -64,9 +64,12 @@ function charFrame(frame, lk) {
   return c;
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
+const CAREER_OUTFIT = { doctor: 'doctor' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
-  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
+  // career outfits: doctors wear the white coat + scrubs sheet (only their hair colour is applied)
+  const outfit = CAREER_OUTFIT[p.c] && CH_ATLAS.rows[`${CAREER_OUTFIT[p.c]}:down0`] !== undefined ? CAREER_OUTFIT[p.c] + ':' : '';
+  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(outfit + WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false; g.drawImage(fr, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
   g.restore();

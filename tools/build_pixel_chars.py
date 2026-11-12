@@ -12,26 +12,30 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage as ndi
 
-SRC = 'tools/sheets/pixel_char.jpg'; OUT = 'public/assets/pchar'
+OUT = 'public/assets/pchar'
+# outfit -> (sheet, which layers are recoloured). Outfits other than 'base' keep their clothes and only dye the hair.
+SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',))}
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
 FRAMES = {'down0': 0, 'down1': 16, 'down2': 18, 'up0': 14, 'up1': 19, 'left0': 5, 'left1': 7, 'left2': 17}
 
-im = Image.open(SRC).convert('RGB'); A = np.array(im).astype(int)
-R, G, B = A[..., 0], A[..., 1], A[..., 2]
-bg = (R > 150) & (B > 150) & (G < 120)
-grid = (R > 80) & (B > 80) & (G < 70) & (abs(R - B) < 70)
-fg = ndi.binary_opening(~(bg | grid), iterations=1)
-lab, n = ndi.label(fg)
-boxes = []
-for i, sl in enumerate(ndi.find_objects(lab)):
-    h = sl[0].stop - sl[0].start; w = sl[1].stop - sl[1].start
-    if h > 100 and w > 60: boxes.append((sl[1].start, sl[0].start, w, h, i + 1))
-boxes.sort(key=lambda b: (round(b[1] / 200), b[0]))
-assert len(boxes) == 20, len(boxes)
+def load(src):
+    global A, lab, boxes
+    im = Image.open(src).convert('RGB'); A = np.array(im).astype(int)
+    R, G, B = A[..., 0], A[..., 1], A[..., 2]
+    bg = (R > 150) & (B > 150) & (G < 120)
+    grid = (R > 80) & (B > 80) & (G < 70) & (abs(R - B) < 70)
+    fg = ndi.binary_opening(~(bg | grid), iterations=1)
+    lab, n = ndi.label(fg)
+    boxes = []
+    for i, sl in enumerate(ndi.find_objects(lab)):
+        h = sl[0].stop - sl[0].start; w = sl[1].stop - sl[1].start
+        if h > 100 and w > 60: boxes.append((sl[1].start, sl[0].start, w, h, i + 1))
+    boxes.sort(key=lambda b: (round(b[1] / 200), b[0]))
+    assert len(boxes) == 20, len(boxes)
 
 OUTLINE = np.array([46, 14, 8])
-def split(k):
+def split(k, tint):
     x, y, w, h, i = boxes[k]
     sub = A[y:y + h, x:x + w].copy(); m = ndi.binary_fill_holes(lab[y:y + h, x:x + w] == i)
     r, g, b = sub[..., 0], sub[..., 1], sub[..., 2]
@@ -53,12 +57,17 @@ def split(k):
     hl, hn = ndi.label(hair)
     if hn:
         sz = ndi.sum(hair, hl, range(1, hn + 1)); hair = np.isin(hl, [j + 1 for j, v in enumerate(sz) if v >= max(sz) * .15])
+    if 'shirt' not in tint: shirt = shirt & False
+    if 'pants' not in tint: pants = pants & False
     base = m & ~shirt & ~pants & ~hair
     return sub, m, {'base': base, 'shirt': shirt, 'pants': pants, 'hair': hair}, lum
 
 frames = {}
-for name, k in FRAMES.items():
-    sub, m, L, lum = split(k)
+for outfit, (src, tint) in SHEETS.items():
+  load(src)
+  for fname, k in FRAMES.items():
+    name = fname if outfit == 'base' else f'{outfit}:{fname}'
+    sub, m, L, lum = split(k, tint)
     ys, xs = np.where(m)
     layers = {}
     for ln, msk in L.items():
@@ -74,7 +83,7 @@ for name, k in FRAMES.items():
     frames[name] = (layers, xs.min(), xs.max(), ys.max())
 
 # common canvas: bottom-centre aligned, then scaled so the character is TARGET_H tall
-W = max(f[2] - f[1] for f in frames.values()) + 12; H = max(boxes[k][3] for k in FRAMES.values()) + 6
+W = max(f[2] - f[1] for f in frames.values()) + 12; H = max(f[3] for f in frames.values()) + 6
 sc = TARGET_H / H; cw, ch = round(W * sc), TARGET_H
 ORDER = ['base', 'shirt', 'pants', 'hair']
 atlas = Image.new('RGBA', (cw * len(ORDER), ch * len(frames)), (0, 0, 0, 0)); meta = {}
