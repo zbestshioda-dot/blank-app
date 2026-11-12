@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const D = require('./data');
 const store = require('./store');
+const Q = require('./quests');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -62,7 +63,15 @@ function wellbeing(a) {
   if (a.health < 30) m *= 0.6;
   return m;
 }
-function earn(a, amount) { amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a); return amount; }
+function earn(a, amount) { amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a); if (amount > 0) quest(a, 'earn', amount); return amount; }
+// advance a daily quest and tell the player about anything completed
+function quest(a, type, n = 1) {
+  for (const e of Q.progress(a, type, n)) {
+    send(a, { t: 'quest', ...e });
+    if (e.kind === 'all') feed(`📜 ${a.name} ทำเควสต์ประจำวันครบทั้ง 3 ข้อ! (ติดต่อกัน ${e.streak} วัน)`);
+  }
+  markMe(a);
+}
 function spend(a, e) {
   if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) กินอาหารหรือพักผ่อนก่อน`, '😴', false); return false; }
   a.energy -= e; return true;
@@ -105,7 +114,7 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses',
-  'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created'];
+  'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created', 'quests', 'qStreak'];
 async function load() {
   const rows = await store.loadAll();
   for (const r of rows) if (r && r.name) accounts.set(r.name.toLowerCase(), hydrate(r));
@@ -114,7 +123,7 @@ async function load() {
 function hydrate(r) {
   return Object.assign({
     avatar: 0, money: 2000, energy: 100, hunger: 100, health: 100, career: 'office', licenses: [], xp: {},
-    followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(),
+    followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0,
   }, r, { ws: null, id: null, f: 0, cd: {}, task: null, cast: null, trade: null, lastPosT: now(), moved: false, meDirty: false });
 }
 let saving = false;
@@ -142,7 +151,7 @@ function meView(a) {
     t: 'me', id: a.id, name: a.name, money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, followers: a.followers, inv: a.inv,
     cast: a.cast ? { state: a.cast.state } : null, task: a.task ? { code: a.task.code } : null,
-    earned: a.earned, worth: Math.round(worth(a)),
+    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a),
   };
 }
 function worldView() {
@@ -201,7 +210,7 @@ function act(a, m) {
       let p = (450 + 100 * (l - 1)) * (ot ? 2.6 : 1) * wb * (ev('boom') ? 1.25 : 1);
       const got = earn(a, p);
       if (ot) a.health = Math.max(0, a.health - 3);
-      const before = lvl(a); addXp(a);
+      const before = lvl(a); addXp(a); quest(a, 'work');
       let msg = `${ot ? 'ทำโอที' : 'ทำงาน'}เสร็จ ได้ ${money(got)}`;
       if (lvl(a) > before && lvl(a) <= D.OFFICE_TITLES.length) {
         msg += ` 🎊 เลื่อนเป็น ${D.OFFICE_TITLES[lvl(a) - 1]}`;
@@ -221,7 +230,7 @@ function act(a, m) {
       let total = 0;
       for (let i = 0; i < q; i++) { total += sellPrice(a, id); market[id].mult = Math.max(0.4, market[id].mult * 0.985); }
       addItem(a, id, -q);
-      const got = earn(a, total);
+      const got = earn(a, total); quest(a, 'sell', q);
       if (got >= 3000) feed(`💰 ${a.name} ขาย${it.name}ล็อตใหญ่ได้ ${money(got)}`);
       return toast(a, `ขาย ${it.icon}${it.name} x${q} ได้ ${money(got)}`, '💰');
     }
@@ -235,7 +244,7 @@ function act(a, m) {
       if (a.money < it.wholesale * q) return toast(a, `เงินไม่พอ (ต้องใช้ ${money(it.wholesale * q)})`, '💸', false);
       if (!spend(a, 4)) return;
       a.money -= it.wholesale * q;
-      stock[id] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a);
+      stock[id] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a); quest(a, 'buy', q);
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(it.wholesale * q)}`, '📦');
     }
     case 'studio.stream': {
@@ -246,7 +255,7 @@ function act(a, m) {
       const viral = Math.random() < (ev('viral') ? 0.12 : 0.04);
       if (viral) views *= rint(8, 20);
       const got = earn(a, views * 0.9 * wb);
-      const nf = Math.round(views * rnd(0.04, 0.08)); a.followers += nf; addXp(a);
+      const nf = Math.round(views * rnd(0.04, 0.08)); a.followers += nf; addXp(a); quest(a, 'stream');
       if (viral) { feed(`🔥 คลิปของ ${a.name} ไวรัล! ${views.toLocaleString()} วิว`); }
       sendRoster();
       return toast(a, `${viral ? 'ไวรัล!! ' : 'ไลฟ์จบ '}${views.toLocaleString()} วิว ได้ ${money(got)} ผู้ติดตาม +${nf.toLocaleString()}`, viral ? '🔥' : '🎥');
@@ -264,7 +273,7 @@ function act(a, m) {
       const fast = now() - a.task.at < 25000;
       const ans = a.task.answer; a.task = null; markMe(a);
       if (!ok) return toast(a, `โค้ดมีบั๊ก! คำตอบที่ถูกคือ ${ans} ลูกค้าไม่จ่าย`, '🐛', false);
-      const got = earn(a, (700 + 180 * (lvl(a) - 1)) * (fast ? 1.2 : 1) * wb); addXp(a);
+      const got = earn(a, (700 + 180 * (lvl(a) - 1)) * (fast ? 1.2 : 1) * wb); addXp(a); quest(a, 'code');
       return toast(a, `ส่งงานผ่าน! ได้ ${money(got)}${fast ? ' (โบนัสส่งไว)' : ''}`, '💻');
     }
     case 'restaurant.eat': {
@@ -273,7 +282,7 @@ function act(a, m) {
       if (!pay(a, buffet ? 350 : 80)) { a.cd.eat = 0; return; }
       a.hunger = Math.min(100, a.hunger + (buffet ? 70 : 25));
       if (buffet) a.energy = Math.min(100, a.energy + 10);
-      markMe(a);
+      markMe(a); quest(a, 'eat');
       return toast(a, buffet ? 'บุฟเฟต์ชาบู! อิ่มแปล้' : 'กินข้าวมันไก่ อิ่มแล้ว', buffet ? '🍲' : '🍛');
     }
     case 'kitchen.cook': {
@@ -282,7 +291,7 @@ function act(a, m) {
       for (const [k, q] of Object.entries(r.in)) if ((a.inv[k] || 0) < q) return toast(a, 'วัตถุดิบไม่พอ', '🥬', false);
       if (!cd(a, 'cook', 1200) || !spend(a, 12)) return;
       for (const [k, q] of Object.entries(r.in)) addItem(a, k, -q);
-      addItem(a, r.id, 1); addXp(a); markMe(a);
+      addItem(a, r.id, 1); addXp(a); markMe(a); quest(a, 'cook');
       return toast(a, `ปรุง ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} สำเร็จ`, '🍳');
     }
     case 'kitchen.buy': {
@@ -304,7 +313,7 @@ function act(a, m) {
       if (!need(a, 'doctor')) return;
       if (!cd(a, 'shift', 2000) || !spend(a, 28)) return;
       const got = earn(a, (1100 + 200 * (lvl(a) - 1)) * wb * (ev('boom') ? 1.25 : 1) * (ev('flu') ? 1.4 : 1));
-      a.health = Math.max(0, a.health - 2); addXp(a);
+      a.health = Math.max(0, a.health - 2); addXp(a); quest(a, 'shift');
       return toast(a, `เข้าเวรเสร็จ ได้ ${money(got)}`, '🩺');
     }
     case 'school.learn': {
@@ -339,7 +348,7 @@ function act(a, m) {
       a.cast = null;
       const id = rollFish(a); addXp(a);
       if (!id) { markMe(a); return toast(a, 'ได้ขยะทะเล 🥫 ... ไม่มีราคา', '🥫', false); }
-      addItem(a, id, 1); markMe(a);
+      addItem(a, id, 1); markMe(a); quest(a, 'fish');
       const it = D.ITEMS[id];
       if (it.base >= 2000) feed(`${it.icon} ${a.name} ตกได้ ${it.name}!! (มูลค่า ~${money(it.base)})`);
       return toast(a, `ได้ ${it.icon}${it.name} (~${money(it.base)})`, it.icon);
@@ -365,7 +374,7 @@ function act(a, m) {
       if (!spend(a, 8)) return;
       const c = D.CROPS[p.crop];
       const n = rint(c.min, c.max) + Math.floor(lvl(a) / 3);
-      addItem(a, p.crop, n); plots[s.idx] = null; addXp(a); markMe(a);
+      addItem(a, p.crop, n); plots[s.idx] = null; addXp(a); markMe(a); quest(a, 'harvest');
       if (stealing) { const o = [...online.values()].find(x => x.id === p.owner); if (o) toast(o, `${a.name} เก็บ${D.ITEMS[p.crop].name}ที่คุณปลูกไว้ไปแล้ว!`, '😱', false); }
       return toast(a, `เก็บเกี่ยว ${D.ITEMS[p.crop].icon}${D.ITEMS[p.crop].name} ได้ ${n} หน่วย${stealing ? ' (ของคนอื่นที่ทิ้งไว้)' : ''}`, '🧺');
     }
@@ -378,7 +387,7 @@ function useItem(a, id) {
   if (!cd(a, 'use', 400)) return;
   addItem(a, id, -1);
   const e = it.eat;
-  if (e.hunger) a.hunger = Math.min(100, a.hunger + e.hunger);
+  if (e.hunger) { a.hunger = Math.min(100, a.hunger + e.hunger); quest(a, 'eat'); }
   if (e.energy) a.energy = Math.min(100, a.energy + e.energy);
   if (e.health) a.health = Math.min(100, a.health + e.health);
   markMe(a);
@@ -425,6 +434,7 @@ function tradeConfirm(a) {
     for (const [k, q] of Object.entries(o.items)) { addItem(from, k, -q); addItem(to, k, q); }
   };
   move(tr.a, tr.b, tr.oa); move(tr.b, tr.a, tr.ob);
+  quest(tr.a, 'trade'); quest(tr.b, 'trade');
   markMe(tr.a); markMe(tr.b);
   const total = tr.oa.money + tr.ob.money;
   if (total >= 3000) feed(`🤝 ${tr.a.name} และ ${tr.b.name} แลกเปลี่ยนกัน (เงินหมุนเวียน ${money(total)})`);
@@ -497,6 +507,7 @@ function login(ws, m) {
     a = hydrate({ name, salt, hash: hashPin(pin, salt), avatar: clamp(Math.floor(+m.avatar) || 0, 0, 9), career });
     accounts.set(name.toLowerCase(), a);
   }
+  Q.ensure(a);
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true;
   if (D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   online.set(a.id, a);
@@ -545,7 +556,7 @@ function onMessage(ws, raw) {
       if (!cd(a, 'chat', 800)) return;
       const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now() };
       chatLog.push(msg); if (chatLog.length > 40) chatLog.shift();
-      return broadcast(msg);
+      broadcast(msg); return quest(a, 'chat');
     }
     case 'act': return act(a, m);
     case 'use': return useItem(a, m.item);
@@ -561,6 +572,11 @@ function onMessage(ws, raw) {
     case 'donate': return donate(a, m);
     case 'trade_offer': return tradeOffer(a, m);
     case 'trade_confirm': return tradeConfirm(a);
+    case 'quest_reroll': {
+      const err = Q.reroll(a, Math.floor(+m.i));
+      if (err) return toast(a, err, '📜', false);
+      markMe(a); return toast(a, 'เปลี่ยนเควสต์แล้ว', '📜');
+    }
     case 'trade_cancel': if (a.trade) tradeClose(a.trade, `${a.name} ยกเลิกการแลกเปลี่ยน`); return;
   }
 }

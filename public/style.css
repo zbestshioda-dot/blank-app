@@ -27,9 +27,14 @@ select option{color:#222}
 #clock{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 10px;font-size:12px;text-align:right}
 #mini{width:120px;height:88px;border-radius:8px;border:1px solid var(--line);background:#000;opacity:.92}
 #menu{display:flex;gap:4px}
-#menu button{padding:6px 9px;font-size:16px;background:var(--card)}
+#menu button{padding:6px 9px;font-size:16px;background:var(--card);position:relative}
+#qBtn.has::after{content:'';position:absolute;right:3px;top:3px;width:8px;height:8px;border-radius:50%;background:#ef6a5b}
+#qline{display:block;width:100%;margin-top:7px;padding:4px 6px;font-size:12px;text-align:left;background:rgba(255,201,77,.12);border-color:rgba(255,201,77,.35)}
+#qline.all{background:rgba(111,211,138,.15);border-color:rgba(111,211,138,.5)}
+.qbar{height:7px;background:rgba(255,255,255,.12);border-radius:5px;overflow:hidden;margin-top:4px}.qbar i{display:block;height:100%;background:var(--acc)}
+.item.done{border-color:rgba(111,211,138,.6);background:rgba(111,211,138,.08)}
 #eventBar{position:absolute;left:50%;top:8px;transform:translateX(-50%);max-width:calc(100% - 340px);min-width:150px;text-align:center;background:rgba(255,201,77,.18);border:1px solid rgba(255,201,77,.5);padding:5px 10px;border-radius:10px;font-size:12px}
-#log{position:absolute;left:8px;top:150px;width:min(330px,60vw);font-size:12.5px;pointer-events:none;display:flex;flex-direction:column;gap:2px}
+#log{position:absolute;left:8px;top:182px;width:min(330px,60vw);font-size:12.5px;pointer-events:none;display:flex;flex-direction:column;gap:2px}
 #log div{background:rgba(0,0,0,.45);padding:2px 7px;border-radius:7px;width:fit-content;max-width:100%;animation:fade 9s forwards;word-break:break-word}
 #log .sys{color:#ffd98a}
 @keyframes fade{0%,80%{opacity:1}100%{opacity:0}}
@@ -84,3 +89,10 @@ pre{background:#0e1216;border:1px solid var(--line);border-radius:10px;padding:1
 #swatches b{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer}
 #swatches b.on{border-color:#fff}
 #loginErr{color:var(--bad);min-height:18px;font-size:13px}
+@media(max-width:600px){
+  #menu{flex-direction:column}
+  #menu button{padding:5px 0;width:42px;font-size:17px}
+  #mini{width:96px;height:70px}
+  #card{width:min(178px,calc(100vw - 130px))}
+  #eventBar{top:auto;bottom:calc(126px + env(safe-area-inset-bottom));left:8px;right:110px;transform:none;max-width:none}
+}

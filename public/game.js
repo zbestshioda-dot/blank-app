@@ -90,6 +90,12 @@ function handle(m) {
     }
     case 'bite': FX.play('bite'); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 0.9); FX.float(bobber.x, bobber.y - .3, '‼️', '#fff', .6); } if (navigator.vibrate) navigator.vibrate(200); break;
     case 'req': showReq(m); break;
+    case 'quest': {
+      const s = P.get(myId);
+      if (m.kind === 'done') { toast(`เควสต์สำเร็จ: ${m.text} · รางวัล ${money(m.reward)}`, '📜'); FX.play('levelup'); if (s) { FX.ring(s.x, s.y, '#ffd34d', 900, 1.4); FX.float(s.x, s.y - .7, 'เควสต์สำเร็จ!', '#ffd34d', .5); } }
+      else { toast(`ทำเควสต์ครบทั้ง 3 ข้อ! โบนัส ${money(m.reward)} · ติดต่อกัน ${m.streak} วัน 🔥`, '🏆'); setTimeout(() => FX.play('chime'), 500); if (s) { FX.burst(s.x, s.y, '#ffd34d', 30); FX.ring(s.x, s.y, '#ffffff', 1100, 2.2); FX.float(s.x, s.y - 1.1, '🏆 ครบทุกเควสต์!', '#8fe3a6', .6); } }
+      break;
+    }
     case 'trade': {
       if (m.open && !trade) FX.play('pop');
       trade = m.open ? m : null;
@@ -122,6 +128,7 @@ function paintHud() {
   if (!me) return;
   $('#meCareer').textContent = `${CAREER_ICON(me.career)} Lv.${me.lv}`;
   $('#meMoney').textContent = money(me.money);
+  const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? '📜 เควสต์ครบแล้ว ✅' : `📜 เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
 }
 function paintEvent() {
@@ -132,6 +139,10 @@ setInterval(() => {
   if (!wd) return;
   const ph = phaseNow(); const h = Math.floor(ph * 24), mi = Math.floor((ph * 24 - h) * 60);
   $('#clock').textContent = `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')} · 👥 ${wd.on}`;
+  document.querySelectorAll('.qcd').forEach(el => {
+    const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
+    el.textContent = `${Math.floor(s / 3600)} ชม. ${Math.floor(s % 3600 / 60)} นาที`;
+  });
   document.querySelectorAll('.cd').forEach(el => {
     const left = Math.max(0, Math.ceil((+el.dataset.t - (Date.now() + clockOff)) / 1000));
     el.textContent = left > 0 ? `อีก ${left} วิ` : 'พร้อมเก็บเกี่ยว!';
@@ -532,6 +543,19 @@ function renderPanel(p) {
           B(me.career === id ? 'อาชีพนี้' : 'เลือก', { t: 'career', career: id }, me.career === id ? '' : 'good', me.career === id || locked));
       }).join('');
       return `<h2>💼 เลือกอาชีพ</h2><div class="sub">เปลี่ยนได้ทุกเมื่อ ฟรี (เลเวลของแต่ละอาชีพเก็บไว้แยกกัน)</div><div class="list">${rows}</div>`;
+    }
+    case 'quests': {
+      const q = me.quests; if (!q) return '';
+      const rows = q.list.map((x, i) => {
+        const c = x.career ? G.careers[x.career] : null, wrong = c && me.career !== x.career;
+        const icon = x.done ? '✅' : c ? c.icon : { trade: '🤝', chat: '💬', eat: '🍛', sell: '🏪', earn: '💰' }[x.type] || '📜';
+        const btn = x.done ? '<span class="tag">สำเร็จ</span>' : B('🔄', { t: 'quest_reroll', i }, '', q.rerolled);
+        return `<div class="item ${x.done ? 'done' : ''}"><div class="em">${icon}</div><div class="nm">${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
+      }).join('');
+      return `<h2>📜 เควสต์ประจำวัน</h2><div class="sub">เควสต์ใหม่ในอีก <b class="qcd" data-t="${q.resetAt}"></b> (เที่ยงคืนเวลาไทย) · ทำสำเร็จได้รางวัลทันที${q.streak ? ` · 🔥 ทำครบติดต่อกัน ${q.streak} วัน` : ''}</div>
+        <div class="list">${rows}</div>
+        <div class="item ${q.bonus ? 'done' : ''}" style="margin-top:10px"><div class="em">🏆</div><div class="nm">ทำครบทั้ง 3 ข้อ<small>โบนัส <b style="color:var(--acc)">${money(q.bonusAmount)}</b> · ทำครบติดต่อกันทุกวัน โบนัส +10%/วัน (สูงสุด +50%)</small></div>${q.bonus ? '<span class="tag">ได้แล้ว</span>' : ''}</div>
+        <div class="sub" style="margin-top:8px">🔄 เปลี่ยนเควสต์ได้วันละ 1 ข้อ${q.rerolled ? ' (วันนี้ใช้ไปแล้ว)' : ''} · เควสต์อาชีพจะตามอาชีพที่เป็นอยู่ตอนเปลี่ยน</div>`;
     }
     case 'rank': {
       const rows = (wd?.lb || []).map((r, i) => itemRowRaw(['🥇', '🥈', '🥉'][i] || `${i + 1}.`, `${esc(r.name)} <span class="tag">${CAREER_ICON(r.c)}</span>${r.on ? ' 🟢' : ''}`, '', `<b>${money(r.w)}</b>`)).join('');
