@@ -72,7 +72,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, fol: p.fol, lv: p.lv });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, fol: p.fol, lv: p.lv, veh: p.veh });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -272,7 +272,7 @@ function frame(t) {
     const l = Math.hypot(dx, dy);
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
-      const sp = G.speed * dt;
+      const sp = G.speed * (me.speed || 1) * dt;
       let nx = m.x + dx * sp; if (!blockedAt(nx, m.y)) m.x = nx;
       let ny = m.y + dy * sp; if (!blockedAt(m.x, ny)) m.y = ny;
       m.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
@@ -379,11 +379,13 @@ function drawPlot(s, px, py, t) {
   if (owner === myId) { ctx.fillStyle = 'rgba(255,201,77,.9)'; ctx.beginPath(); ctx.arc(px - TS * .8, py - TS * .8, 4, 0, 7); ctx.fill(); }
 }
 function drawPlayer(p, X, Y, t) {
-  const px = p.rx * TS + X, py = p.ry * TS + Y;
+  const px = p.rx * TS + X; let py = p.ry * TS + Y;
   if (px < -80 || py < -80 || px > VW + 80 || py > VH + 80) return;
   const r = TS * .36, col = COLORS[p.av] || '#999', ang = (p.f / 8) * Math.PI * 2 - Math.PI;
   ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(px, py + r * .85, r, r * .45, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+  // riding: draw the vehicle big underneath and sit the player on top of it
+  if (p.veh && G.shop) { ctx.save(); ctx.translate(px, py + r * .45); if (Math.cos(ang) > 0) ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .95)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= r * .55; }
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, p.veh ? r * .82 : r, 0, 7); ctx.fill();
   ctx.lineWidth = p.id === myId ? 3 : 2; ctx.strokeStyle = p.id === myId ? '#fff' : 'rgba(0,0,0,.45)'; ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .5, py + Math.sin(ang) * r * .5, r * .3, 0, 7); ctx.fill();
   ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .62, py + Math.sin(ang) * r * .62, r * .13, 0, 7); ctx.fill();
@@ -444,6 +446,7 @@ function bindPanel(root) {
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
+  bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
   guide(m) { closePanel(); setGuide(m.key); },
   tut() { closePanel(); showTut(0); },
   map() { closePanel(); openMap(); },
@@ -536,7 +539,10 @@ function renderPanel(p) {
     case 'bag': {
       const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const lic = me.licenses.map(l => G.licenses[l].name).join(', ') || 'ไม่มี';
-      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${lic} · ทรัพย์สินรวม ${money(me.worth)} · รายได้สะสม ${money(me.earned)}</div><div class="list">${rows || '<div class="sub">ยังไม่มีของ — ปลูก ตกปลา ปรุงอาหาร หรือแลกเปลี่ยนกับผู้เล่นอื่น</div>'}</div>`;
+      const veh = (me.vehicles || []).map(v => G.shop.vehicles[v].icon).join(' ') || '—';
+      const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c].icon}${'★'.repeat(t)}`).join(' ') || '—';
+      const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🚗 ยานพาหนะ<small>${veh}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${me.house >= 0 ? `มีแล้ว ⭐${me.comfort}` : 'ยังไม่มี'}</small></div>${me.house >= 0 ? B('📍', { fn: 'guide', key: 'house' + me.house }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div></div>`;
+      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${lic} · ทรัพย์สินรวม ${money(me.worth)} · รายได้สะสม ${money(me.earned)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ — ปลูก ตกปลา ปรุงอาหาร หรือแลกเปลี่ยนกับผู้เล่นอื่น</div>'}</div>`;
     }
     case 'career': {
       const rows = Object.entries(G.careers).map(([id, c]) => {
@@ -545,6 +551,47 @@ function renderPanel(p) {
           B(me.career === id ? 'อาชีพนี้' : 'เลือก', { t: 'career', career: id }, me.career === id ? '' : 'good', me.career === id || locked));
       }).join('');
       return `<h2>💼 เลือกอาชีพ</h2><div class="sub">เปลี่ยนได้ทุกเมื่อ ฟรี (เลเวลของแต่ละอาชีพเก็บไว้แยกกัน)</div><div class="list">${rows}</div>`;
+    }
+    case 'toolshop': {
+      const order = [me.career, ...Object.keys(G.shop.tools).filter(c => c !== me.career)];
+      const rows = order.map(c => {
+        const d = G.shop.tools[c], t = (me.tools || {})[c] || 0, cc = G.careers[c];
+        const stars = '★'.repeat(t) + '☆'.repeat(3 - t);
+        const sub = t >= 3 ? `สูงสุดแล้ว · ${d.fx[2]}` : `ถัดไป: ${d.fx[t]}${t ? ` · ตอนนี้: ${d.fx[t - 1]}` : ''}`;
+        return itemRowRaw(d.icon, `${d.name} <span class="tag">${cc.icon} ${cc.name}</span> <span style="color:var(--acc)">${stars}</span>`, sub,
+          t >= 3 ? '<span class="tag">MAX</span>' : B(money(G.shop.toolPrices[t]), { t: 'act', st, a: 'buy', career: c }, c === me.career ? 'good' : ''));
+      }).join('');
+      return `<h2>🛠️ ร้านอุปกรณ์</h2><div class="sub">อัปเกรดอุปกรณ์ให้อาชีพหาเงินได้มากขึ้น (มีผลตอนทำอาชีพนั้น) · อัปได้ 3 ระดับ</div><div class="list">${rows}</div>`;
+    }
+    case 'dealer': {
+      const best = Object.entries(G.shop.vehicles).filter(([k]) => (me.vehicles || []).includes(k)).sort((a, b) => b[1].speed - a[1].speed)[0]?.[0];
+      const rows = Object.entries(G.shop.vehicles).map(([k, v]) => {
+        const has = (me.vehicles || []).includes(k);
+        return itemRowRaw(v.icon, `${v.name}${best === k ? ' <span class="tag">กำลังใช้</span>' : ''}`, `เดินเร็วขึ้น x${v.speed}`, has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(v.price), { t: 'act', st, a: 'buy', veh: k }, 'good'));
+      }).join('');
+      return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">ยานพาหนะทำให้เดินทางเร็วขึ้น ไปทำงาน ไปขายของ ไปหาเพื่อนได้ไวขึ้น · ใช้คันที่เร็วที่สุดที่มีอัตโนมัติ · ทุกคนเห็นคุณขี่</div><div class="list">${rows}</div>`;
+    }
+    case 'bank': {
+      const bk = G.shop.bank;
+      return `<h2>🏦 ธนาคาร</h2><div class="sub">ฝากเงินได้ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (คิดดอกบนยอดไม่เกิน ${money(bk.cap)}) · เงินในธนาคาร<b>ไม่หายตอนเป็นลม</b></div>
+        <div class="grid2"><div class="item"><div class="nm">💵 เงินสด<small><b style="color:var(--acc);font-size:16px">${money(me.money)}</b></small></div></div><div class="item"><div class="nm">🏦 เงินฝาก<small><b style="color:var(--ok);font-size:16px">${money(me.bank)}</b></small></div></div></div>
+        <div class="rowf" style="margin-top:10px"><input id="bankAmt" type="number" min="1" value="1000" inputmode="numeric"></div>
+        <div class="grid2" style="margin-top:8px">${B('⬇️ ฝาก', { fn: 'bank', st, op: 'deposit' }, 'good')}${B('⬆️ ถอน', { fn: 'bank', st, op: 'withdraw' })}${B('ฝากทั้งหมด', { fn: 'bank', st, op: 'deposit', all: Math.floor(me.money) })}${B('ถอนทั้งหมด', { fn: 'bank', st, op: 'withdraw', all: me.bank })}</div>
+        <div class="sub" style="margin-top:14px"><b>💳 กู้เงิน</b> · กู้ได้สูงสุด ${money(bk.loanMax)} ค่าธรรมเนียม ${bk.loanFee * 100}% · ระหว่างเป็นหนี้ ${bk.repayShare * 100}% ของรายได้จะถูกหักใช้หนี้อัตโนมัติ</div>
+        <div class="item"><div class="nm">หนี้คงเหลือ<small><b style="color:${me.loan ? 'var(--bad)' : 'var(--ok)'};font-size:16px">${money(me.loan)}</b></small></div>${B('กู้ (ตามจำนวนในช่อง)', { fn: 'bank', st, op: 'borrow' })}${B('ใช้คืน', { fn: 'bank', st, op: 'repay' }, me.loan ? 'good' : '', !me.loan)}</div>`;
+    }
+    case 'house': {
+      const s = STN(st), h = wd?.houses?.[s.idx], price = G.shop.housePrices[s.idx];
+      if (!h) return `<h2>🏷️ บ้านว่าง ประกาศขาย</h2><div class="sub">ในเมืองมีบ้านแค่ 6 หลัง ใครซื้อก่อนได้ก่อน!</div>
+        <div class="list">${itemRowRaw('😴', 'นอนฟรีที่บ้าน', 'พลังงาน +40 (และมากขึ้นตามความสบาย) ทุก 60 วิ', '')}${itemRowRaw('🛋️', 'แต่งบ้าน', 'เฟอร์นิเจอร์เพิ่มความสบาย → พลังงานฟื้นเร็วขึ้นตลอดเวลา', '')}${itemRowRaw('🪧', 'ชื่อคุณบนบ้าน', 'ทุกคนในเมืองเห็นว่าบ้านหลังนี้เป็นของใคร', '')}</div>
+        ${me.house >= 0 ? '<div class="sub" style="color:var(--bad)">คุณมีบ้านแล้ว ต้องขายหลังเดิมก่อน</div>' : ''}${B(`🏠 ซื้อบ้าน ${money(price)}`, { t: 'act', st, a: 'buy' }, 'primary big', me.house >= 0)}`;
+      const [owner, cf, , furn] = h, mine = me.house === s.idx;
+      if (!mine) return `<h2>🏠 บ้านของ ${esc(owner)}</h2><div class="sub">ความสบาย ⭐ ${cf}</div><div style="font-size:30px;letter-spacing:4px">${furn.map(k => G.shop.furniture[k].icon).join('') || '— ยังไม่ได้แต่งบ้าน —'}</div>`;
+      const rows = Object.entries(G.shop.furniture).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('');
+      return `<h2>🏠 บ้านของคุณ</h2><div class="sub">ความสบาย ⭐ <b>${me.comfort}</b> → พลังงานฟื้นเร็วขึ้น <b>+${me.comfort * 3}%</b> ตลอดเวลา · นอนที่บ้านได้ +${40 + me.comfort * 2}⚡</div>
+        ${B(`😴 นอนพัก (+${40 + me.comfort * 2}⚡, ทุก 60 วิ)`, { t: 'act', st, a: 'sleep' }, 'primary big')}
+        <div class="sub" style="margin-top:12px"><b>🛋️ แต่งบ้าน</b></div><div class="list">${rows}</div>
+        <div style="margin-top:14px">${B(`ขายบ้าน (ได้คืน ~70%)`, { t: 'act', st, a: 'sell' }, 'warn')}</div>`;
     }
     case 'quests': {
       const q = me.quests; if (!q) return '';
@@ -611,7 +658,13 @@ function sign(text, x, y, o = {}) {
   ctx.fillStyle = o.color || '#fff'; ctx.fillText(text, x, y + fs * .04);
 }
 const STN = id => G.stations.find(s => s.id === id);
+function houseLook(b) {
+  const h = wd?.houses?.[b.house];
+  if (!h) return { ...b, color: '#8f9499', label: `🏷️ ขาย ${money(G.shop.housePrices[b.house])}`, forSale: true };
+  return { ...b, color: COLORS[h[2]] || b.color, label: `🏠 ${h[0]}`, stars: h[1], mine: me && me.house === b.house };
+}
 function drawBuilding(b, X, Y, night) {
+  if (b.house !== undefined) b = houseLook(b);
   const px = b.x * TS + X, py = b.y * TS + Y, w = b.w * TS, h = b.h * TS;
   if (px > VW + 40 || py > VH + 40 || px + w < -40 || py + h < -40) return;
   const st = b.st && STN(b.st), south = st ? st.y > b.y + b.h / 2 : true;
@@ -635,6 +688,11 @@ function drawBuilding(b, X, Y, night) {
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(px, roofY + rh * .5 - 1.5, w, 3);
   ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, w - 2, h - 2);
   const cx = px + w / 2, cy = roofY + rh / 2;
+  if (b.house !== undefined) {
+    sign(b.label, cx, cy - (b.stars ? TS * .2 : 0), { size: TS * .3, bg: b.mine ? 'rgba(255,201,77,.95)' : b.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.88)', color: b.mine ? '#222' : '#fff' });
+    if (b.stars) sign(`⭐ ${b.stars}`, cx, cy + TS * .32, { size: TS * .24 });
+    return;
+  }
   if (b.deco) { ctx.globalAlpha = .55; sign(`${b.icon} ${b.label}`, cx, cy, { size: TS * .3 }); ctx.globalAlpha = 1; return; }
   // icon badge + name sign so every place is recognisable from afar
   ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(cx, cy - TS * .42, TS * .6, 0, 7); ctx.fill();
@@ -701,10 +759,12 @@ function openMap() {
     g.fillStyle = '#fff'; g.fillText(text, x, y + 1);
   };
   const fs = clamp(k * .85, 10, 15);
-  for (const b of G.map.buildings) {
+  for (let b of G.map.buildings) {
     g.fillStyle = b.color; g.fillRect(b.x * k, b.y * k, b.w * k, b.h * k);
     g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1.5; g.strokeRect(b.x * k, b.y * k, b.w * k, b.h * k);
+    if (b.house !== undefined) b = houseLook(b);
     const cx = (b.x + b.w / 2) * k, cy = (b.y + b.h / 2) * k;
+    if (b.house !== undefined) { label(b.forSale ? '🏷️ ขาย' : b.label, cx, cy, fs * .8, b.mine ? 'rgba(200,140,20,.95)' : b.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.9)', b.w * k - 2); hits.push({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k, key: b.st }); continue; }
     if (b.deco) { g.globalAlpha = .6; label(b.label, cx, cy, fs * .85, 'rgba(18,22,28,.8)', b.w * k - 2); g.globalAlpha = 1; continue; }
     label(`${b.icon} ${b.label}`, cx, cy, fs, 'rgba(18,22,28,.9)', b.w * k - 2);
     hits.push({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k, key: b.st });

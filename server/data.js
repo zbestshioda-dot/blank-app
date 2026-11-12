@@ -21,6 +21,8 @@ rect(28, 0, 1, H, ','); rect(31, 0, 1, H, ',');
 rect(0, 20, W, 2, '='); rect(29, 0, 2, H, '=');
 // pier over the water
 rect(32, 36, 13, 2, 'p');
+// south-west neighbourhood: houses + bank
+rect(1, 32, 28, 1, ','); rect(1, 37, 19, 1, ','); rect(19, 32, 1, 11, ',');
 
 const BUILDINGS = [
   { id: 'office',    x: 33, y: 10, w: 8, h: 8, color: '#5b7c99', label: 'บริษัท', icon: '🏢', st: 'office' },
@@ -29,14 +31,18 @@ const BUILDINGS = [
   { id: 'studio',    x: 3,  y: 13, w: 8, h: 5, color: '#8e5ba8', label: 'สตูดิโอ', icon: '🎥', st: 'studio' },
   { id: 'home',      x: 12, y: 13, w: 7, h: 5, color: '#b0675f', label: 'บ้านพัก', icon: '🏠', st: 'home' },
   { id: 'barn',      x: 21, y: 2,  w: 7, h: 6, color: '#a2563f', label: 'โรงนา', icon: '🐄', deco: true },
-  { id: 'condo',     x: 44, y: 2,  w: 13, h: 7, color: '#6f7f8f', label: 'คอนโด', icon: '🏙️', deco: true },
-  { id: 'hotel',     x: 33, y: 2,  w: 8, h: 6, color: '#7a6f9b', label: 'โรงแรม', icon: '🏨', deco: true },
+  { id: 'dealer',    x: 44, y: 2,  w: 13, h: 7, color: '#5f7d8f', label: 'โชว์รูมรถ', icon: '🚗', st: 'dealer' },
+  { id: 'toolshop',  x: 33, y: 2,  w: 8, h: 6, color: '#7a6f9b', label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' },
   { id: 'restaurant',x: 33, y: 24, w: 8, h: 7, color: '#d08a3a', label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' },
   { id: 'kitchen',   x: 44, y: 24, w: 9, h: 7, color: '#c25b5b', label: 'ครัวใหญ่', icon: '🍳', st: 'kitchen' },
   { id: 'hospital',  x: 20, y: 24, w: 8, h: 7, color: '#e4e8ec', label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' },
   { id: 'school',    x: 3,  y: 24, w: 8, h: 7, color: '#4f8f6f', label: 'โรงเรียน', icon: '🎓', st: 'school' },
   { id: 'cowork',    x: 12, y: 24, w: 7, h: 7, color: '#3f6f9f', label: 'โค้ดดิ้งสเปซ', icon: '💻', st: 'cowork' },
+  { id: 'bank',      x: 21, y: 33, w: 7, h: 5, color: '#c9a23a', label: 'ธนาคาร', icon: '🏦', st: 'bank' },
 ];
+// houses players can buy (row A faces sidewalk y=32, row B faces y=37)
+const HOUSE_LOTS = [[2, 33], [7, 33], [12, 33], [2, 38], [7, 38], [12, 38]];
+HOUSE_LOTS.forEach(([x, y], i) => BUILDINGS.push({ id: 'house' + i, x, y, w: 4, h: 3, color: '#9aa4ad', label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i }));
 BUILDINGS.forEach(b => rect(b.x, b.y, b.w, b.h, 'B'));
 
 // farm plots (2x2 soil each)
@@ -62,6 +68,10 @@ door('kitchen', 'kitchen', 'ครัวใหญ่ (เชฟ)', '🍳', 48.5,
 door('hospital', 'hospital', 'โรงพยาบาล', '🏥', 24, 23.5);
 door('school', 'school', 'โรงเรียน', '🎓', 7, 23.5);
 door('cowork', 'cowork', 'โค้ดดิ้งสเปซ', '💻', 15.5, 23.5);
+door('toolshop', 'toolshop', 'ร้านอุปกรณ์', '🛠️', 37, 8.5);
+door('dealer', 'dealer', 'โชว์รูมรถ', '🚗', 50.5, 9.5);
+door('bank', 'bank', 'ธนาคาร', '🏦', 24.5, 32.5);
+HOUSE_LOTS.forEach(([x, y], i) => { STATIONS.push({ id: 'house' + i, type: 'house', idx: i, label: 'บ้าน', icon: '🏠', x: x + 2, y: y - 0.5, r: 1.8 }); });
 STATIONS.push({ id: 'pier1', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 36, y: 37, r: 3.2 });
 STATIONS.push({ id: 'pier2', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 42.5, y: 37, r: 3.2 });
 
@@ -174,7 +184,39 @@ const EVENTS = [
   { id: 'flu',      text: '🤧 ไข้หวัดระบาด! ทุกคนหิวและป่วยง่ายขึ้น หมอได้ค่าเวร +40%' },
 ];
 
+// ---------------------------------------------------------------- things to spend money on
+const VEHICLES = {
+  skate:  { name: 'สเก็ตบอร์ด', icon: '🛹', price: 2500,  speed: 1.2 },
+  bike:   { name: 'จักรยาน', icon: '🚲', price: 8000,  speed: 1.4 },
+  scooter:{ name: 'มอเตอร์ไซค์', icon: '🛵', price: 25000, speed: 1.7 },
+  car:    { name: 'รถยนต์', icon: '🚗', price: 70000, speed: 2.0 },
+};
+const TOOL_PRICES = [4000, 15000, 45000];
+const TOOLS = {
+  office:     { name: 'ชุดสูทหรู', icon: '👔', fx: ['เงินเดือน +10%', 'เงินเดือน +22%', 'เงินเดือน +35%'] },
+  farmer:     { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
+  fisher:     { name: 'เบ็ดตกปลา', icon: '🎣', fx: ['ขยะน้อยลง, ปลาใหญ่บ่อยขึ้น', 'ขยะน้อยมาก, ปลาใหญ่บ่อยขึ้นมาก', 'แทบไม่เจอขยะ, ปลาใหญ่บ่อยสุด'] },
+  merchant:   { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
+  streamer:   { name: 'ไมค์ & กล้อง', icon: '🎙️', fx: ['รายได้และแฟน +15%', 'รายได้และแฟน +30%', 'รายได้และแฟน +50%'] },
+  programmer: { name: 'คอมสเปคแรง', icon: '⌨️', fx: ['ค่าจ้าง +15%', 'ค่าจ้าง +30%', 'ค่าจ้าง +50%'] },
+  chef:       { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
+  doctor:     { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่าเวร +15%, รักษาได้มากขึ้น', 'ค่าเวร +30%, รักษาได้มากขึ้น', 'ค่าเวร +50%, รักษาได้มากที่สุด'] },
+};
+const HOUSE_PRICES = [55000, 50000, 45000, 40000, 35000, 30000];
+const FURNITURE = {
+  plant:  { name: 'ต้นไม้', icon: '🪴', price: 1500,  comfort: 1 },
+  sofa:   { name: 'โซฟา', icon: '🛋️', price: 3000,  comfort: 1 },
+  tv:     { name: 'ทีวีจอใหญ่', icon: '📺', price: 6000,  comfort: 2 },
+  bed:    { name: 'เตียงนุ่ม', icon: '🛏️', price: 8000,  comfort: 2 },
+  aqua:   { name: 'ตู้ปลา', icon: '🐠', price: 12000, comfort: 3 },
+  art:    { name: 'ภาพวาด', icon: '🖼️', price: 18000, comfort: 3 },
+  piano:  { name: 'เปียโน', icon: '🎹', price: 25000, comfort: 4 },
+  jacuzzi:{ name: 'อ่างจากุซซี่', icon: '🛁', price: 40000, comfort: 5 },
+};
+const BANK = { rate: 0.03, cap: 300000, loanMax: 30000, loanFee: 0.10, repayShare: 0.25 };
+
 module.exports = {
+  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, FURNITURE, BANK,
   W, H, TILES, BUILDINGS, STATIONS, SPAWN, blocked, ITEMS, CROPS, RECIPES, FISH,
   CAREERS, LICENSES, OFFICE_TITLES, EVENTS, RADIUS,
 };

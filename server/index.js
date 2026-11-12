@@ -63,7 +63,25 @@ function wellbeing(a) {
   if (a.health < 30) m *= 0.6;
   return m;
 }
-function earn(a, amount) { amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a); if (amount > 0) quest(a, 'earn', amount); return amount; }
+function earn(a, amount) {
+  amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a);
+  if (amount > 0) {
+    quest(a, 'earn', amount);
+    if (a.loan > 0) { const r = Math.min(a.loan, Math.ceil(amount * D.BANK.repayShare)); a.money -= r; a.loan -= r; }   // loans auto-repay from income
+  }
+  return amount;
+}
+// ---- possessions
+const houses = D.HOUSE_PRICES.map(() => null);       // house index -> owner account
+const tier = (a, c) => (a.tools && a.tools[c]) || 0;
+const BOOST = [0, .15, .3, .5];
+const comfort = a => a.house >= 0 ? (a.furniture || []).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0) : 0;
+const speedOf = a => Math.max(1, ...(a.vehicles || []).map(v => D.VEHICLES[v]?.speed || 1));
+const bestVehicle = a => (a.vehicles || []).reduce((b, v) => !b || D.VEHICLES[v].speed > D.VEHICLES[b].speed ? v : b, null);
+function accrue(a) {
+  const t = now(), days = (t - (a.bankT || t)) / 86400e3; a.bankT = t;
+  if (a.bank > 0 && days > 0) a.bank += Math.min(a.bank, D.BANK.cap) * (Math.pow(1 + D.BANK.rate, days) - 1);
+}
 // advance a daily quest and tell the player about anything completed
 function quest(a, type, n = 1) {
   for (const e of Q.progress(a, type, n)) {
@@ -105,8 +123,11 @@ function sellPrice(a, id) {
   return p * b;
 }
 function worth(a) {
-  let w = a.money;
+  let w = a.money + (a.bank || 0) - (a.loan || 0);
   for (const [k, q] of Object.entries(a.inv)) w += (D.ITEMS[k]?.base || 0) * q * 0.7;
+  for (const v of a.vehicles || []) w += (D.VEHICLES[v]?.price || 0) * 0.5;
+  for (const [, t] of Object.entries(a.tools || {})) for (let i = 0; i < t; i++) w += D.TOOL_PRICES[i] * 0.5;
+  if (a.house >= 0) { w += D.HOUSE_PRICES[a.house] * 0.7; for (const f of a.furniture || []) w += (D.FURNITURE[f]?.price || 0) * 0.5; }
   return w;
 }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
@@ -114,16 +135,17 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses',
-  'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak'];
+  'xp', 'followers', 'inv', 'x', 'y', 'earned', 'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan'];
 async function load() {
   const rows = await store.loadAll();
   for (const r of rows) if (r && r.name) accounts.set(r.name.toLowerCase(), hydrate(r));
+  for (const a of accounts.values()) if (a.house >= 0) { if (houses[a.house]) a.house = -1; else houses[a.house] = a; }
   console.log(`loaded ${accounts.size} players`);
 }
 function hydrate(r) {
   return Object.assign({
     avatar: 0, money: 2000, energy: 100, hunger: 100, health: 100, career: 'office', licenses: [], xp: {},
-    followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0,
+    followers: 0, inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1, furniture: [], bank: 0, bankT: now(), loan: 0,
   }, r, { ws: null, id: null, f: 0, cd: {}, task: null, cast: null, trade: null, lastPosT: now(), moved: false, meDirty: false });
 }
 let saving = false;
@@ -141,7 +163,7 @@ async function save(force) {
 
 // ------------------------------------------------------------------ public views
 function pubInfo(a) {
-  return { id: a.id, name: a.name, av: a.avatar, c: a.career, fol: a.followers, lv: lvl(a) };
+  return { id: a.id, name: a.name, av: a.avatar, c: a.career, fol: a.followers, lv: lvl(a), veh: bestVehicle(a) };
 }
 function sendRoster() {
   broadcast({ t: 'roster', players: [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f })) });
@@ -150,6 +172,8 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, followers: a.followers, inv: a.inv,
+    tools: a.tools, vehicles: a.vehicles, house: a.house, furniture: a.furniture, comfort: comfort(a), speed: speedOf(a),
+    bank: Math.floor(a.bank), loan: Math.ceil(a.loan),
     cast: a.cast ? { state: a.cast.state } : null, task: a.task ? { code: a.task.code } : null,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a),
   };
@@ -164,6 +188,7 @@ function worldView() {
     t: 'wd', now: t, phase: (t % DAY_MS) / DAY_MS, on: online.size,
     mk, stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     plots: plots.map(p => p ? [p.crop, p.owner, p.ownerName, p.readyAt] : 0),
+    houses: houses.map(h => h ? [h.name, comfort(h), h.avatar, (h.furniture || []).slice(0, 8)] : 0),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb,
   };
 }
@@ -186,7 +211,8 @@ function rollFish(a) {
   const l = lvl(a, 'fisher');
   const ws = D.FISH.map(f => {
     let w = f.w;
-    if (f.id === null) w = Math.max(5, w - l);
+    if (f.id === null) w = Math.max(5, w - l) * [1, .6, .35, .15][tier(a, 'fisher')];
+    if (['seabass', 'tuna', 'shark', 'chest'].includes(f.id)) w *= [1, 1.3, 1.7, 2.2][tier(a, 'fisher')];
     if (ev('bloom') && ['seabass', 'tuna', 'shark', 'chest'].includes(f.id)) w *= 2;
     return w;
   });
@@ -207,7 +233,7 @@ function act(a, m) {
       const ot = m.a === 'ot';
       if (!cd(a, 'work', 1500) || !spend(a, ot ? 30 : 15)) return;
       const l = Math.min(lvl(a), D.OFFICE_TITLES.length);
-      let p = (450 + 100 * (l - 1)) * (ot ? 2.6 : 1) * wb * (ev('boom') ? 1.25 : 1);
+      let p = (450 + 100 * (l - 1)) * (ot ? 2.6 : 1) * wb * (ev('boom') ? 1.25 : 1) * (1 + [0, .1, .22, .35][tier(a, 'office')]);
       const got = earn(a, p);
       if (ot) a.health = Math.max(0, a.health - 3);
       const before = lvl(a); addXp(a); quest(a, 'work');
@@ -241,11 +267,12 @@ function act(a, m) {
       let q = clamp(Math.floor(+m.qty) || 1, 1, 10);
       if (stock[id] < q) q = Math.floor(stock[id]);
       if (q <= 0) return toast(a, 'สินค้าหมดสต็อก รอเติมของหน่อย', '📦', false);
-      if (a.money < it.wholesale * q) return toast(a, `เงินไม่พอ (ต้องใช้ ${money(it.wholesale * q)})`, '💸', false);
+      const unit = Math.round(it.wholesale * (1 - 0.06 * tier(a, 'merchant')));
+      if (a.money < unit * q) return toast(a, `เงินไม่พอ (ต้องใช้ ${money(unit * q)})`, '💸', false);
       if (!spend(a, 4)) return;
-      a.money -= it.wholesale * q;
+      a.money -= unit * q;
       stock[id] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a); quest(a, 'buy', q);
-      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(it.wholesale * q)}`, '📦');
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(unit * q)}`, '📦');
     }
     case 'studio.stream': {
       if (!need(a, 'streamer')) return;
@@ -254,8 +281,9 @@ function act(a, m) {
       let views = Math.round(base * Math.exp(rnd(-0.5, 0.6)));
       const viral = Math.random() < (ev('viral') ? 0.12 : 0.04);
       if (viral) views *= rint(8, 20);
-      const got = earn(a, views * 0.9 * wb);
-      const nf = Math.round(views * rnd(0.04, 0.08)); a.followers += nf; addXp(a); quest(a, 'stream');
+      const tb = 1 + BOOST[tier(a, 'streamer')];
+      const got = earn(a, views * 0.9 * wb * tb);
+      const nf = Math.round(views * rnd(0.04, 0.08) * tb); a.followers += nf; addXp(a); quest(a, 'stream');
       if (viral) { feed(`🔥 คลิปของ ${a.name} ไวรัล! ${views.toLocaleString()} วิว`); }
       sendRoster();
       return toast(a, `${viral ? 'ไวรัล!! ' : 'ไลฟ์จบ '}${views.toLocaleString()} วิว ได้ ${money(got)} ผู้ติดตาม +${nf.toLocaleString()}`, viral ? '🔥' : '🎥');
@@ -273,7 +301,7 @@ function act(a, m) {
       const fast = now() - a.task.at < 25000;
       const ans = a.task.answer; a.task = null; markMe(a);
       if (!ok) return toast(a, `โค้ดมีบั๊ก! คำตอบที่ถูกคือ ${ans} ลูกค้าไม่จ่าย`, '🐛', false);
-      const got = earn(a, (700 + 180 * (lvl(a) - 1)) * (fast ? 1.2 : 1) * wb); addXp(a); quest(a, 'code');
+      const got = earn(a, (700 + 180 * (lvl(a) - 1)) * (fast ? 1.2 : 1) * wb * (1 + BOOST[tier(a, 'programmer')])); addXp(a); quest(a, 'code');
       return toast(a, `ส่งงานผ่าน! ได้ ${money(got)}${fast ? ' (โบนัสส่งไว)' : ''}`, '💻');
     }
     case 'restaurant.eat': {
@@ -291,8 +319,9 @@ function act(a, m) {
       for (const [k, q] of Object.entries(r.in)) if ((a.inv[k] || 0) < q) return toast(a, 'วัตถุดิบไม่พอ', '🥬', false);
       if (!cd(a, 'cook', 1200) || !spend(a, 12)) return;
       for (const [k, q] of Object.entries(r.in)) addItem(a, k, -q);
-      addItem(a, r.id, 1); addXp(a); markMe(a); quest(a, 'cook');
-      return toast(a, `ปรุง ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} สำเร็จ`, '🍳');
+      const extra = Math.random() < 0.2 * tier(a, 'chef') ? 1 : 0;
+      addItem(a, r.id, 1 + extra); addXp(a); markMe(a); quest(a, 'cook');
+      return toast(a, `ปรุง ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} สำเร็จ${extra ? ' — ฝีมือดี ได้เพิ่มอีก 1 จาน!' : ''}`, '🍳');
     }
     case 'kitchen.buy': {
       if (!need(a, 'chef')) return;
@@ -303,6 +332,63 @@ function act(a, m) {
       addItem(a, id, q); markMe(a);
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคา ${money(cost)} (แพงกว่าซื้อจากชาวไร่/ชาวประมงโดยตรง)`, '🛒');
     }
+    case 'toolshop.buy': {
+      const c = m.career, def = D.TOOLS[c]; if (!def) return;
+      const cur = tier(a, c);
+      if (cur >= 3) return toast(a, `${def.name}ของคุณอัปเกรดสูงสุดแล้ว`, 'ℹ️', false);
+      if (!pay(a, D.TOOL_PRICES[cur])) return;
+      a.tools = { ...a.tools, [c]: cur + 1 }; markMe(a);
+      if (cur + 1 === 3) feed(`🛠️ ${a.name} อัปเกรด${def.name}ถึงระดับสูงสุด!`);
+      return toast(a, `อัปเกรด ${def.icon}${def.name} เป็นระดับ ${cur + 1}: ${def.fx[cur]}`, '🛠️');
+    }
+    case 'dealer.buy': {
+      const v = D.VEHICLES[m.veh]; if (!v) return;
+      if (a.vehicles.includes(m.veh)) return toast(a, `คุณมี${v.name}อยู่แล้ว`, 'ℹ️', false);
+      if (!pay(a, v.price)) return;
+      a.vehicles = [...a.vehicles, m.veh]; markMe(a); sendRoster();
+      if (v.price >= 25000) feed(`${v.icon} ${a.name} ถอย${v.name}ป้ายแดง!`);
+      return toast(a, `ได้ ${v.icon}${v.name} แล้ว! เดินเร็วขึ้น x${speedOf(a)}`, v.icon);
+    }
+    case 'bank.deposit': case 'bank.withdraw': case 'bank.borrow': case 'bank.repay': {
+      accrue(a);
+      let amt = Math.floor(+m.amt) || 0;
+      if (amt <= 0) return toast(a, 'ใส่จำนวนเงินก่อน', '⚠️', false);
+      if (m.a === 'deposit') { amt = Math.min(amt, Math.floor(a.money)); if (amt <= 0) return toast(a, 'ไม่มีเงินสดให้ฝาก', '💸', false); a.money -= amt; a.bank += amt; toast(a, `ฝากเงิน ${money(amt)}`, '🏦'); }
+      if (m.a === 'withdraw') { amt = Math.min(amt, Math.floor(a.bank)); if (amt <= 0) return toast(a, 'ไม่มีเงินในบัญชี', '💸', false); a.bank -= amt; a.money += amt; toast(a, `ถอนเงิน ${money(amt)}`, '🏦'); }
+      if (m.a === 'borrow') {
+        const room = Math.floor((D.BANK.loanMax - a.loan) / (1 + D.BANK.loanFee)); amt = Math.min(amt, room);
+        if (amt <= 0) return toast(a, `กู้ได้สูงสุด ${money(D.BANK.loanMax)} (รวมดอกเบี้ย) ใช้คืนก่อนนะ`, '🏦', false);
+        a.money += amt; a.loan += Math.ceil(amt * (1 + D.BANK.loanFee)); toast(a, `กู้เงิน ${money(amt)} (ต้องคืน ${money(amt * (1 + D.BANK.loanFee))})`, '🏦');
+      }
+      if (m.a === 'repay') { amt = Math.min(amt, Math.floor(a.money), Math.ceil(a.loan)); if (amt <= 0) return toast(a, a.loan > 0 ? 'เงินสดไม่พอ' : 'คุณไม่มีหนี้', 'ℹ️', false); a.money -= amt; a.loan -= amt; toast(a, `ชำระหนี้ ${money(amt)}${a.loan <= 0 ? ' — ปลดหนี้แล้ว! 🎉' : ''}`, '🏦'); }
+      a.loan = Math.max(0, a.loan); return markMe(a);
+    }
+    case 'house.buy': {
+      if (houses[s.idx]) return toast(a, `บ้านหลังนี้เป็นของ ${houses[s.idx].name} แล้ว`, '🏠', false);
+      if (a.house >= 0) return toast(a, 'คุณมีบ้านแล้ว (ขายบ้านเดิมก่อนถึงจะซื้อใหม่ได้)', '🏠', false);
+      if (!pay(a, D.HOUSE_PRICES[s.idx])) return;
+      houses[s.idx] = a; a.house = s.idx; a.furniture = []; markMe(a); wdAt = 0;
+      feed(`🏠 ${a.name} ซื้อบ้านหลังใหม่ในหมู่บ้าน!`);
+      return toast(a, 'ยินดีด้วย! ได้บ้านแล้ว แต่งบ้านเพื่อเพิ่มความสบาย และนอนฟรีที่นี่ได้', '🏠');
+    }
+    case 'house.sell': case 'house.sleep': case 'house.furnish': {
+      if (houses[s.idx] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
+      if (m.a === 'sell') {
+        const back = Math.round(D.HOUSE_PRICES[s.idx] * 0.7 + (a.furniture || []).reduce((t, k) => t + D.FURNITURE[k].price * 0.4, 0));
+        houses[s.idx] = null; a.house = -1; a.furniture = []; a.money += back; markMe(a); wdAt = 0;
+        return toast(a, `ขายบ้านได้ ${money(back)}`, '🏠');
+      }
+      if (m.a === 'sleep') {
+        if (!cd(a, 'homesleep', 60000)) return;
+        const e = 40 + comfort(a) * 2; a.energy = Math.min(100, a.energy + e); a.health = Math.min(100, a.health + 5); markMe(a);
+        return toast(a, `นอนหลับสบายที่บ้าน พลังงาน +${e}`, '😴');
+      }
+      const f = D.FURNITURE[m.item]; if (!f) return;
+      if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, f.price)) return;
+      a.furniture = [...a.furniture, m.item]; markMe(a); wdAt = 0;
+      return toast(a, `ซื้อ ${f.icon}${f.name} ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
+    }
     case 'hospital.heal': {
       if (a.health >= 98) return toast(a, 'คุณสุขภาพดีอยู่แล้ว', 'ℹ️', false);
       if (!pay(a, 800)) return;
@@ -312,7 +398,7 @@ function act(a, m) {
     case 'hospital.shift': {
       if (!need(a, 'doctor')) return;
       if (!cd(a, 'shift', 2000) || !spend(a, 28)) return;
-      const got = earn(a, (1100 + 200 * (lvl(a) - 1)) * wb * (ev('boom') ? 1.25 : 1) * (ev('flu') ? 1.4 : 1));
+      const got = earn(a, (1100 + 200 * (lvl(a) - 1)) * wb * (ev('boom') ? 1.25 : 1) * (ev('flu') ? 1.4 : 1) * (1 + BOOST[tier(a, 'doctor')]));
       a.health = Math.max(0, a.health - 2); addXp(a); quest(a, 'shift');
       return toast(a, `เข้าเวรเสร็จ ได้ ${money(got)}`, '🩺');
     }
@@ -359,7 +445,7 @@ function act(a, m) {
       if (plots[s.idx]) return toast(a, 'แปลงนี้ปลูกอยู่แล้ว', '⚠️', false);
       if (!pay(a, c.seed)) return;
       if (!spend(a, 6)) { a.money += c.seed; return; }
-      const f = ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1;
+      const f = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer'));
       plots[s.idx] = { crop: m.crop, owner: a.id, ownerName: a.name, readyAt: now() + c.grow * 1000 * f };
       markMe(a);
       return toast(a, `ปลูก${D.ITEMS[m.crop].name}แล้ว`, '🌱');
@@ -373,7 +459,7 @@ function act(a, m) {
       if (stealing && now() < p.readyAt + 60000) return toast(a, `ของ ${p.ownerName} เขามีสิทธิ์เก็บก่อน (อีก ${Math.ceil((p.readyAt + 60000 - now()) / 1000)} วิ)`, '🔒', false);
       if (!spend(a, 8)) return;
       const c = D.CROPS[p.crop];
-      const n = rint(c.min, c.max) + Math.floor(lvl(a) / 3);
+      const n = rint(c.min, c.max) + Math.floor(lvl(a) / 3) + tier(a, 'farmer');
       addItem(a, p.crop, n); plots[s.idx] = null; addXp(a); markMe(a); quest(a, 'harvest');
       if (stealing) { const o = [...online.values()].find(x => x.id === p.owner); if (o) toast(o, `${a.name} เก็บ${D.ITEMS[p.crop].name}ที่คุณปลูกไว้ไปแล้ว!`, '😱', false); }
       return toast(a, `เก็บเกี่ยว ${D.ITEMS[p.crop].icon}${D.ITEMS[p.crop].name} ได้ ${n} หน่วย${stealing ? ' (ของคนอื่นที่ทิ้งไว้)' : ''}`, '🧺');
@@ -471,7 +557,7 @@ function answerReq(a, m) {
   } else if (r.kind === 'heal') {
     if (a.money < r.fee) return toast(a, 'เงินไม่พอจ่ายค่ารักษา', '💸', false);
     a.money -= r.fee; earn(f, r.fee);
-    const heal = 35 + 5 * lvl(f, 'doctor');
+    const heal = 35 + 5 * lvl(f, 'doctor') + 10 * tier(f, 'doctor');
     a.health = Math.min(100, a.health + heal); f.xp.doctor = (f.xp.doctor || 0) + 2;
     markMe(a); markMe(f);
     toast(a, `${f.name} รักษาคุณ สุขภาพ +${heal} (จ่าย ${money(r.fee)})`, '💉');
@@ -526,6 +612,7 @@ function login(ws, m) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS,
     items: D.ITEMS, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, speed: SPEED, radius: D.RADIUS, chat: chatLog.slice(-25), isNew,
+    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, furniture: D.FURNITURE, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
   if (daily) send(a, { t: 'daily', ...daily });
@@ -575,9 +662,13 @@ function onMessage(ws, raw) {
     case 'p': {
       const x = +m.x, y = +m.y;
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-      const t = now(), dt = Math.min(0.7, (t - a.lastPosT) / 1000);
+      // movement budget: refills with real time at the player's speed (+25% for jitter), small cap for bursts
+      const t = now(), dt = Math.min(1, (t - a.lastPosT) / 1000);
       a.lastPosT = t;
-      if (Math.hypot(x - a.x, y - a.y) > SPEED * 1.35 * dt + 0.5 || D.blocked(x, y)) return send(a, { t: 'fix', x: a.x, y: a.y });
+      a.mvb = Math.min(1.2, (a.mvb ?? 1.2) + SPEED * speedOf(a) * 1.25 * dt);
+      const d = Math.hypot(x - a.x, y - a.y);
+      if (d > a.mvb + 0.05 || D.blocked(x, y)) return send(a, { t: 'fix', x: a.x, y: a.y });
+      a.mvb -= d;
       if (x !== a.x || y !== a.y) { a.x = x; a.y = y; a.moved = true; dirty = true; }
       a.f = clamp(Math.floor(+m.f) || 0, 0, 7);
       if (a.cast && Math.hypot(a.x - ST[a.cast.st].x, a.y - ST[a.cast.st].y) > ST[a.cast.st].r + 1.2) { a.cast = null; markMe(a); }
@@ -639,9 +730,9 @@ function tick() {
     for (const k in market) market[k].target = clamp(market[k].target + rnd(-0.08, 0.08) + (1 - market[k].target) * 0.2, 0.8, 1.25);
   }
 
-  const passive = t > passiveAt; if (passive) passiveAt = t + 30000;
+  const passive = t > passiveAt; if (passive) { passiveAt = t + 30000; for (const a of online.values()) if (a.bank > 0) { accrue(a); markMe(a); } }
   for (const a of online.values()) {
-    a.energy = Math.min(100, a.energy + 0.25 * dt);
+    a.energy = Math.min(100, a.energy + 0.25 * (1 + 0.03 * comfort(a)) * dt);
     a.hunger = Math.max(0, a.hunger - (ev('flu') ? 0.1 : 0.05) * dt);
     if (a.hunger <= 0) a.health = Math.max(0, a.health - 0.15 * dt);
     else if (a.hunger > 60 && a.health < 100) a.health = Math.min(100, a.health + 0.05 * dt);
