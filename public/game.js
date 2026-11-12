@@ -61,7 +61,7 @@ function handle(m) {
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
       break;
-    case 'me': me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); break;
+    case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
     case 'wd': wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); break;
     case 'roster': {
       const ids = new Set();
@@ -77,25 +77,29 @@ function handle(m) {
     }
     case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { s.x = x; s.y = y; s.f = f; } } break;
     case 'fix': { const s = P.get(myId); if (s) { s.x = s.rx = m.x; s.y = s.ry = m.y; } break; }
-    case 'toast': toast(m.msg, m.icon, m.ok); break;
+    case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
       const l = $('#log'); const d = document.createElement('div');
       if (m.sys) { d.className = 'sys'; d.textContent = m.text; } else d.innerHTML = `<b>${esc(m.name)}</b>: ${esc(m.text)}`;
       l.appendChild(d); setTimeout(() => d.remove(), 9000); while (l.children.length > 5) l.firstChild.remove();
       const s = P.get(m.id); if (s && !m.sys) { s.bubble = m.text; s.bt = performance.now() + 6000; }
+      if (m.sys) { if (/🔥|🦈|💎|🎊|💰|💝/.test(m.text)) FX.play('notice'); } else if (m.id !== myId) FX.play('pop');
       if (panel?.kind === 'chat') refreshPanel(true);
       break;
     }
-    case 'bite': beep(); if (navigator.vibrate) navigator.vibrate(200); break;
+    case 'bite': FX.play('bite'); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 0.9); FX.float(bobber.x, bobber.y - .3, '‼️', '#fff', .6); } if (navigator.vibrate) navigator.vibrate(200); break;
     case 'req': showReq(m); break;
-    case 'trade': trade = m.open ? m : null; if (!m.open && m.reason) toast(m.reason, '🤝', m.reason.startsWith('✅')); renderTrade(); break;
+    case 'trade': {
+      if (m.open && !trade) FX.play('pop');
+      trade = m.open ? m : null;
+      if (!m.open && m.reason) { const ok = m.reason.startsWith('✅'); toast(m.reason, '🤝', ok); if (ok) { FX.play('chime'); const s = P.get(myId); if (s) FX.burst(s.x, s.y, '#8fe3a6', 14); } else FX.play('fail'); }
+      renderTrade(); break;
+    }
   }
 }
 
 // ------------------------------------------------------------------ audio / toast
-let actx;
-function beep() { try { actx = actx || new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; g.gain.value = .12; o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + .18); } catch { } }
 function toast(msg, icon = '✅', ok = true) {
   const d = document.createElement('div'); d.className = 'toast' + (ok ? '' : ' bad'); d.textContent = `${icon} ${msg}`;
   const t = $('#toasts'); t.appendChild(d); while (t.children.length > 4) t.firstChild.remove();
@@ -109,7 +113,7 @@ function showReq(r) {
   ok.onclick = () => { send({ t: 'req_ans', id: r.id, ok: true }); d.remove(); };
   no.onclick = () => { send({ t: 'req_ans', id: r.id, ok: false }); d.remove(); };
   $('#reqs').appendChild(d); setTimeout(() => d.remove(), 20000);
-  beep();
+  FX.play('ding');
 }
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -197,9 +201,13 @@ const endPtr = e => {
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 let mouseTarget = null;
 
+let camLift = 0;
 function camera() {
   const m = P.get(myId); const x = m ? m.rx : 30, y = m ? m.ry : 20;
-  return { x: x * TS - VW / 2, y: y * TS - VH / 2 };
+  // when a bottom sheet is open, lift the view so your character stays visible above it
+  const target = panel && !trade ? VH * 0.24 : 0;
+  camLift += (target - camLift) * 0.18;
+  return { x: x * TS - VW / 2, y: y * TS - VH / 2 + camLift };
 }
 function onTap(px, py) {
   const c = camera(); const wx = (px + c.x) / TS, wy = (py + c.y) / TS;
@@ -248,6 +256,8 @@ function frame(t) {
       let nx = m.x + dx * sp; if (!blockedAt(nx, m.y)) m.x = nx;
       let ny = m.y + dy * sp; if (!blockedAt(m.x, ny)) m.y = ny;
       m.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
+      stepAcc += Math.hypot(m.x - m.rx, m.y - m.ry);
+      if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
     m.rx = m.x; m.ry = m.y;
     sendT += dt;
@@ -333,6 +343,8 @@ function draw(t) {
   // players (sorted by y)
   const list = [...P.values()].sort((a, b) => a.ry - b.ry);
   for (const p of list) drawPlayer(p, X, Y, t);
+  drawBobber(X, Y, t);
+  FX.draw(ctx, X, Y, TS);
   // night
   const l = Math.cos((phaseNow() - 0.5) * Math.PI * 2);
   const dark = clamp((0.2 - l) / 1.2, 0, 0.55);
@@ -412,6 +424,7 @@ function refreshPanel(force) {
 }
 function bindPanel(root) {
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+    FX.play('click');
     const m = JSON.parse(b.dataset.m);
     if (m.fn) return FN[m.fn](m, root);
     send(m);
@@ -423,6 +436,7 @@ const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="$
 const FN = {
   ans(m, root) { const v = root.querySelector('#ansIn').value.trim(); if (v === '') return; doAct(m.st, 'submit', { ans: v }); root.querySelector('#ansIn').value = ''; },
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
+  toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
   donate(m, root) { send({ t: 'donate', to: m.to, amt: +root.querySelector('#donIn').value || 0 }); },
@@ -533,6 +547,8 @@ function renderPanel(p) {
         💼 <b>อาชีพ</b>: เมนูมุมขวาบน เลือกได้ตลอด หมอ/เชฟ/โปรแกรมเมอร์ต้องซื้อใบรับรองที่โรงเรียน<br>
         🔗 <b>เศรษฐกิจเชื่อมกัน</b>: ชาวไร่/ชาวประมง → เชฟปรุงอาหาร → พ่อค้า/ผู้เล่นซื้อไปกิน · ทุกคนต้องกินให้อิ่มและดูแลสุขภาพ<br>
         ⚠️ พลังงาน⚡ฟื้นช้าตามเวลา · หิวจัดสุขภาพลด · สุขภาพ 0 จะเป็นลมเสียเงิน</div>
+        <div class="sub" style="margin-top:12px"><b>🔊 ตั้งค่าเสียง</b></div>
+        <div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         ${B('🚪 ออกจากระบบ', { fn: 'logout' }, 'warn big')}`;
     case 'player': {
       const o = P.get(p.pid); if (!o) return '';
@@ -549,6 +565,53 @@ function renderPanel(p) {
 }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
+
+// ------------------------------------------------------------------ sound & effects glue
+let stepAcc = 0, bobber = null;
+function paintMute() { $('#muteBtn').textContent = FX.opts.sfx || FX.opts.music ? '🔊' : '🔇'; }
+paintMute();
+$('#muteBtn').onclick = () => { const on = !(FX.opts.sfx || FX.opts.music); FX.setOpt('sfx', on); FX.setOpt('music', on); paintMute(); if (panel?.kind === 'help') refreshPanel(true); };
+function onMeDiff(a, b) {
+  const s = P.get(myId); if (!s) return;
+  const x = s.x, y = s.y;
+  const dm = b.money - a.money;
+  if (dm) { const sp = document.createElement('span'); sp.className = 'mfloat'; sp.style.color = dm > 0 ? '#ffd34d' : '#ff8a7a'; sp.textContent = (dm > 0 ? '+' : '−') + money(Math.abs(dm)); $('#card').appendChild(sp); setTimeout(() => sp.remove(), 1600); }
+  if (dm > 0) { FX.play('coin', dm >= 1000); FX.float(x, y, '+' + money(dm), '#ffd34d', dm >= 1000 ? .55 : .42); if (dm >= 300) FX.burst(x, y, '#ffd34d', Math.min(24, 6 + Math.floor(dm / 200))); }
+  else if (dm < 0) { FX.play('spend'); FX.float(x + .4, y, '−' + money(-dm), '#ff8a7a', .34); }
+  let gained = [];
+  for (const [k, q] of Object.entries(b.inv)) { const d = q - (a.inv[k] || 0); if (d > 0) gained.push(`+${d}${G.items[k].icon}`); }
+  if (gained.length) { FX.play('pop'); FX.float(x - .3, y - .4, gained.join(' '), '#ffffff', .5); FX.burst(x, y, '#ffffff', 6); }
+  if (b.career === a.career && b.lv > a.lv) { FX.play('levelup'); FX.ring(x, y, '#ffd34d', 900, 1.6); FX.ring(x, y, '#ffffff', 700, 1.1); FX.float(x, y - .6, `LEVEL UP! Lv.${b.lv}`, '#ffd34d', .55); FX.burst(x, y, '#ffd34d', 20); }
+  if (b.energy - a.energy >= 8) FX.float(x + .5, y + .2, `+${Math.round(b.energy - a.energy)}⚡`, '#f2c94c', .34);
+  if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }
+  if (b.hunger - a.hunger >= 8) FX.float(x, y + .4, `+${Math.round(b.hunger - a.hunger)}🍗`, '#8fe3a6', .34);
+  if (!a.cast && b.cast) { bobber = findWater(s.x, s.y); FX.play('whoosh'); if (bobber) setTimeout(() => { FX.play('splash'); FX.ring(bobber.x, bobber.y, '#fff', 800, 1); }, 250); }
+  if (!b.cast) bobber = null;
+}
+const ICON_SFX = { '🍳': 'sizzle', '🍛': 'munch', '🍲': 'munch', '😴': 'sleep', '🛏️': 'sleep', '🏥': 'heal', '💉': 'heal', '🎓': 'levelup', '🌱': 'pop', '📦': 'pop', '🎥': 'notice', '🔥': 'levelup' };
+function toastSfx(m) {
+  if (!m.ok) return FX.play('fail');
+  if (ICON_SFX[m.icon]) FX.play(ICON_SFX[m.icon]);
+  if (m.icon === '🔥') { const s = P.get(myId); if (s) { FX.burst(s.x, s.y, '#ff7a3d', 24); FX.ring(s.x, s.y, '#ff7a3d', 900, 1.8); } }
+}
+function findWater(x, y) {
+  for (let d = 1; d <= 3; d++) for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const tx = Math.floor(x + dx * d), ty = Math.floor(y + dy * d);
+    if (tileAt(tx, ty) === 'w') return { x: tx + .5, y: ty + .5 };
+  }
+  return null;
+}
+function drawBobber(X, Y, t) {
+  if (!bobber || !me?.cast) return;
+  const s = P.get(myId); if (!s) return;
+  const bite = me.cast.state === 'bite';
+  const bx = bobber.x * TS + X + (bite ? Math.sin(t / 30) * 3 : 0), by = bobber.y * TS + Y + (bite ? Math.sin(t / 45) * 4 + 4 : Math.sin(t / 400) * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(s.rx * TS + X, s.ry * TS + Y - TS * .2); ctx.quadraticCurveTo((s.rx * TS + X + bx) / 2, Math.min(s.ry * TS + Y, by) - TS * .6, bx, by); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx, by, TS * .12, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e0453a'; ctx.beginPath(); ctx.arc(bx, by, TS * .12, Math.PI, 0); ctx.fill();
+  if (bite && Math.random() < .08) FX.ring(bobber.x, bobber.y, '#fff', 500, .6);
+}
 
 // ------------------------------------------------------------------ trade window
 function renderTrade() {
