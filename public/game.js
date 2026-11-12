@@ -244,7 +244,7 @@ function paintHud() {
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
   $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
-  { const cd = $('#card'); $('#log').style.top = (cd.offsetTop + cd.offsetHeight + 6) + 'px'; }
+  placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
   $('#restBtn').textContent = me.pose === 'rest' ? '🧍 ลุก' : '😌 พัก';
   $('#phoneBtn').classList.toggle('has', me.career === 'rider' && (me.jobs || []).some(j => j.state === 'open'));
@@ -288,6 +288,12 @@ setInterval(() => {
 document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPanel({ kind: b.dataset.open }));
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
+// the status card folds down to a small strip (face, money, slim bars); folded by default on phones
+const placeLog = () => { const cd = $('#card'); $('#log').style.top = (cd.offsetTop + cd.offsetHeight + 6) + 'px'; };
+addEventListener('resize', () => placeLog());
+const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
+$('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard(!$('#card').classList.contains('mini')); };
+{ let c = null; try { c = localStorage.getItem('lt_card'); } catch { } setCard(c === null ? innerWidth < 700 : c === '1'); }
 // side menu can be folded away (remembered on this device)
 const setMenu = open => { $('#menu').classList.toggle('hidden', !open); $('#menuToggle').classList.toggle('closed', !open); $('#menuToggle').title = open ? 'ซ่อนเมนู' : 'เปิดเมนู'; try { localStorage.setItem('lt_menu', open ? '1' : '0'); } catch { } };
 $('#menuToggle').onclick = () => { FX.play('click'); setMenu($('#menu').classList.contains('hidden')); };

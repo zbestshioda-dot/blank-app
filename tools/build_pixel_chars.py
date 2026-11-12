@@ -96,10 +96,14 @@ for outfit, (src, tint) in SHEETS.items():
             a[..., 0] = a[..., 1] = a[..., 2] = g
         a[..., 3] = (msk * 255).astype(np.uint8)
         layers[ln] = Image.fromarray(a, 'RGBA')
-    frames[name] = (layers, xs.min(), xs.max(), ys.max())
+    # align on the head (top 40% of the sprite), not the whole body: swinging arms/legs change the
+    # body's width per frame and would make the head jump sideways while walking
+    top = ys.min() + (ys.max() - ys.min()) * 0.4
+    hx = xs[ys <= top]
+    frames[name] = (layers, hx.min(), hx.max(), ys.max())
 
 # common canvas: bottom-centre aligned, then scaled so the character is TARGET_H tall
-W = max(f[2] - f[1] for f in frames.values()) + 12; H = max(f[3] for f in frames.values()) + 6
+W = max(max(L['base'].width for L in [f[0]]) for f in frames.values()) * 2; H = max(f[3] for f in frames.values()) + 6
 sc = TARGET_H / H; cw, ch = round(W * sc), TARGET_H
 ORDER = ['base', 'shirt', 'pants', 'hair']
 atlas = Image.new('RGBA', (cw * len(ORDER), ch * len(frames)), (0, 0, 0, 0)); meta = {}

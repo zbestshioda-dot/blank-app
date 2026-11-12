@@ -222,3 +222,14 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
   #restBtn{right:140px;padding:8px 12px;font-size:14px}
   #log{width:min(240px,55vw);font-size:11.5px}
 }
+
+/* ---- foldable status card ---- */
+#cardToggle{position:absolute;right:-8px;top:-8px;width:26px;height:26px;padding:0;border-radius:50%;z-index:2;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center}
+#cardToggle::after{content:'▴'}
+#card.mini #cardToggle::after{content:'▾'}
+#card.mini{width:150px}
+#card.mini #statusBox,#card.mini #qline,#card.mini .bar em,#card.mini #meCareer{display:none!important}
+#card.mini .who{margin:-6px 0 2px}#card.mini #mePortrait{width:30px;height:30px}
+#card.mini #meName{font-size:13px}#card.mini .money{font-size:14px}
+#card.mini .bars{gap:1px}#card.mini .bar img{width:13px;height:13px}#card.mini .bar s{height:7px;border-width:1.5px}
+@media(max-width:600px){#card.mini{width:128px;border-width:10px;border-image-width:10px}}
