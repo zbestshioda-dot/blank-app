@@ -8,7 +8,7 @@ const money = n => '฿' + Math.round(n).toLocaleString('en-US');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ------------------------------------------------------------------ state
-let ws, G = null;                       // G = static init data
+let ws, G = null, lastHouses = '';                       // G = static init data
 let me = null, wd = null, myId = 0;     // private state, world data
 const P = new Map();                    // id -> player sprite
 let clockOff = 0;
@@ -65,7 +65,7 @@ function handle(m) {
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       break;
     case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
-    case 'wd': wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); break;
+    case 'wd': { const hs = JSON.stringify(m.houses); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
     case 'roster': {
       const ids = new Set();
       for (const p of m.players) {
@@ -169,7 +169,7 @@ $('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapVie
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
 
 // ------------------------------------------------------------------ map helpers
-const SOLID = 'wBT';
+const SOLID = 'wBTo';
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.map.w || y >= G.map.h) ? 'T' : G.map.tiles[y][x];
 const solid = (x, y) => SOLID.includes(tileAt(Math.floor(x), Math.floor(y)));
 const blockedAt = (x, y) => { const r = G.radius; return solid(x - r, y - r) || solid(x + r, y - r) || solid(x - r, y + r) || solid(x + r, y + r); };
@@ -228,10 +228,16 @@ let mouseTarget = null;
 
 let camLift = 0;
 function camera() {
-  const m = P.get(myId); const x = m ? m.rx : 30, y = m ? m.ry : 20;
+  const m = P.get(myId); let x = m ? m.rx : 30, y = m ? m.ry : 20;
   // when a bottom sheet is open, lift the view so your character stays visible above it
   const target = panel && !trade ? VH * 0.24 : 0;
   camLift += (target - camLift) * 0.18;
+  // inside a building: frame the room (centre it if it fits, otherwise follow but stay inside it)
+  const r = m && G?.rooms ? roomOf(m.x, m.y) : null;
+  if (r) {
+    const fit = (pos, lo, size, view) => size * TS + TS * 2 <= view ? lo + size / 2 : clamp(pos, lo + view / TS / 2 - 1, lo + size - view / TS / 2 + 1.5);
+    x = fit(x, r.x, r.w, VW); y = fit(y, r.y - .6, r.h + 1.2, VH - camLift * 2);
+  }
   return { x: x * TS - VW / 2, y: y * TS - VH / 2 + camLift };
 }
 function onTap(px, py) {
@@ -266,7 +272,7 @@ function onAction() {
 $('#actBtn').onclick = onAction;
 
 // ------------------------------------------------------------------ main loop
-let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false;
+let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false;
 function frame(t) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
@@ -278,13 +284,13 @@ function frame(t) {
     if (joy && Math.hypot(joy.dx, joy.dy) > 0.15) { dx = joy.dx; dy = joy.dy; }
     // after going through a door, wait until the stick/keys are released so you don't walk straight back out
     if (holdAfterTp) { if (!dx && !dy && !joy) holdAfterTp = false; else { dx = 0; dy = 0; } }
-    const l = Math.hypot(dx, dy);
+    const l = Math.hypot(dx, dy); meMoving = false;
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
       const sp = G.speed * (me.speed || 1) * dt;
       let nx = m.x + dx * sp; if (!blockedAt(nx, m.y)) m.x = nx;
       let ny = m.y + dy * sp; if (!blockedAt(m.x, ny)) m.y = ny;
-      m.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
+      m.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8; meMoving = true;
       stepAcc += Math.hypot(m.x - m.rx, m.y - m.ry);
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
@@ -312,71 +318,60 @@ const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 1
 function draw(t) {
   const c = camera(), X = -c.x, Y = -c.y;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#1d3a2a'; ctx.fillRect(0, 0, VW, VH);
-  const x0 = Math.max(0, Math.floor(c.x / TS)), y0 = Math.max(0, Math.floor(c.y / TS));
-  const x1 = Math.min(G.map.w - 1, Math.ceil((c.x + VW) / TS)), y1 = Math.min(G.map.h - 1, Math.ceil((c.y + VH) / TS));
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#07090c'; ctx.fillRect(0, 0, VW, VH);
+  const meP = P.get(myId), myRoom = meP ? roomOf(meP.x, meP.y) : null;
+  let x0 = Math.max(0, Math.floor(c.x / TS)), y0 = Math.max(0, Math.floor(c.y / TS));
+  let x1 = Math.min(G.map.w - 1, Math.ceil((c.x + VW) / TS)), y1 = Math.min(G.map.h - 1, Math.ceil((c.y + VH) / TS));
+  if (myRoom) { x0 = Math.max(x0, myRoom.x); y0 = Math.max(y0, myRoom.y); x1 = Math.min(x1, myRoom.x + myRoom.w - 1); y1 = Math.min(y1, myRoom.y + myRoom.h - 1); }
+  const inside = (x, y) => !myRoom || (x >= myRoom.x && x <= myRoom.x + myRoom.w && y >= myRoom.y && y <= myRoom.y + myRoom.h + .5);
   const tm = t / 1000;
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-    const ch = G.map.tiles[ty][tx], px = tx * TS + X, py = ty * TS + Y, v = hash(tx, ty);
-    let col;
-    switch (ch) {
-      case '=': col = '#4b5058'; break;
-      case ',': col = '#b7b4a6'; break;
-      case 'w': col = `hsl(200,55%,${46 + Math.sin(tm * 1.6 + tx * .7 + ty * .5) * 3}%)`; break;
-      case 'p': col = '#a47b50'; break;
-      case 's': col = '#e3d19a'; break;
-      case 'f': col = '#7b5538'; break;
-      case 'B': col = '#3b4a3a'; break;
-      case '#': col = '#2b2f36'; break;
-      case ' ': col = '#07090c'; break;
-      case 'D': col = '#7a5230'; break;
-      case 'i': { const rm = roomGrid[ty * G.map.w + tx]; col = rm ? (((tx + ty) & 1) ? rm.floorA : rm.floorB) : '#555'; break; }
-      default: col = `hsl(${108 + v * 12},${34 + v * 8}%,${42 + v * 5}%)`;
-    }
-    ctx.fillStyle = col; ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
-    if (ch === '=') { // lane dashes
-      ctx.fillStyle = '#e8d9a0';
-      if ((ty === 20) && (tx < 29 || tx > 30) && tx % 2 === 0) ctx.fillRect(px + 4, py + TS - 2, TS - 8, 4);
-      if (tx === 29 && ty % 2 === 0 && ty !== 20 && ty !== 21) ctx.fillRect(px + TS - 2, py + 4, 4, TS - 8);
-    }
-    if (ch === 'p') { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(px, py + TS * .5, TS, 2); ctx.fillRect(px, py, TS, 1); }
-    if (ch === 'f') { ctx.fillStyle = 'rgba(0,0,0,.16)'; for (let i = 1; i < 4; i++) ctx.fillRect(px + 2, py + i * TS / 4, TS - 4, 2); }
-    if (ch === '.' && v > .86) { ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(px + v * TS * .8, py + (1 - v) * TS * 5, 3, 3); }
-    if (ch === 'T') { // tree
-      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px + TS / 2 + 3, py + TS * .8, TS * .38, TS * .16, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = '#2f6b3a'; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS * .45, TS * .46, 0, 7); ctx.fill();
-      ctx.fillStyle = '#3d8a49'; ctx.beginPath(); ctx.arc(px + TS * .42, py + TS * .38, TS * .26, 0, 7); ctx.fill();
-    }
-  }
-  // zones, then buildings with roof icons, doors and name signs
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
-  drawZones(X, Y);
-  for (const b of G.map.buildings) drawBuilding(b, X, Y, night);
-  // stations
+  // ground-level markers: farm plots and glowing door mats
   for (const s of G.stations) {
     const px = s.x * TS + X, py = s.y * TS + Y;
-    if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
+    if (px < -80 || py < -80 || px > VW + 80 || py > VH + 80) continue;
     if (s.type === 'plot') { drawPlot(s, px, py, t); continue; }
     const isNear = near && near.id === s.id;
-    ctx.fillStyle = isNear ? 'rgba(255,201,77,.5)' : 'rgba(255,255,255,.22)';
-    ctx.beginPath(); ctx.ellipse(px, py + TS * .15, TS * (isNear ? .9 : .7), TS * (isNear ? .45 : .35), 0, 0, 7); ctx.fill();
-    if (isNear) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 2; ctx.stroke(); }
-    const bob = Math.sin(t / 380 + s.x) * 3;
-    ctx.font = `${Math.round(TS * .75)}px serif`; ctx.fillStyle = '#fff'; ctx.fillText(s.icon, px, py - TS * .55 + bob);
+    if (isNear) { ctx.fillStyle = 'rgba(255,201,77,.35)'; ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py, TS * .85, TS * .4, 0, 0, 7); ctx.fill(); ctx.stroke(); }
   }
-  // players (sorted by y)
-  const list = [...P.values()].sort((a, b) => a.ry - b.ry);
-  for (const p of list) drawPlayer(p, X, Y, t);
+  // everything that stands up is drawn back-to-front so you can walk behind it
+  const ents = [];
+  const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
+  for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
+  for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([p.y, 1, p]);
+  for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
+  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([f[2], 3, f]);
+  for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
+  ents.sort((a, b) => a[0] - b[0]);
+  for (const [, k, e] of ents) {
+    if (k === 0) drawBuildingSprite(e, X, Y, night);
+    else if (k === 1) spr(e.s, e.x, e.y, X, Y);
+    else if (k === 2) spr(e[2], e[0] + .5, e[1] + 1.05, X, Y);
+    else if (k === 3) spr(e[0], e[1], e[2], X, Y);
+    else drawPlayer(e, X, Y, t);
+  }
+  // signs and floating station icons on top
+  for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) drawBuildingSign(b, X, Y);
+  for (const s of G.stations) {
+    if (s.type === 'plot' || s.type === 'house' || !inside(s.x, s.y)) continue;
+    const px = s.x * TS + X, py = s.y * TS + Y;
+    if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
+    const isNear = near && near.id === s.id;
+    if (/^(door|exit|bed|hbed)$/.test(s.type) && !isNear) continue;
+    if (s.type === 'exit') continue;
+    ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
+    ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * 1.7 + Math.sin(t / 380 + s.x) * 3);
+  }
   drawBobber(X, Y, t);
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
-  // night
-  const myRoom = (() => { const m = P.get(myId); return m ? roomOf(m.x, m.y) : null; })();
-  drawRooms(X, Y, t);
+  if (myRoom) drawRoomLabels(myRoom, X, Y, t);
   if (!myRoom) drawRain(t);
   const dark = myRoom ? 0 : night;
-  if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); }
+  if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); drawLights(X, Y, dark); }
   drawMini();
 }
 function drawPlot(s, px, py, t) {
@@ -395,38 +390,65 @@ function drawPlot(s, px, py, t) {
   }
   if (owner === myId) { ctx.fillStyle = 'rgba(255,201,77,.9)'; ctx.beginPath(); ctx.arc(px - TS * .8, py - TS * .8, 4, 0, 7); ctx.fill(); }
 }
+const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
 function drawPlayer(p, X, Y, t) {
-  const px = p.rx * TS + X; let py = p.ry * TS + Y;
-  if (px < -80 || py < -80 || px > VW + 80 || py > VH + 80) return;
-  const r = TS * .36, col = COLORS[p.av] || '#999', ang = (p.f / 8) * Math.PI * 2 - Math.PI;
-  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(px, py + r * .85, r, r * .45, 0, 0, 7); ctx.fill();
-  // riding: draw the vehicle big underneath and sit the player on top of it
-  if (p.veh && G.shop) { ctx.save(); ctx.translate(px, py + r * .45); if (Math.cos(ang) > 0) ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .95)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= r * .55; }
-  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, p.veh ? r * .82 : r, 0, 7); ctx.fill();
-  ctx.lineWidth = p.id === myId ? 3 : 2; ctx.strokeStyle = p.id === myId ? '#fff' : 'rgba(0,0,0,.45)'; ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .5, py + Math.sin(ang) * r * .5, r * .3, 0, 7); ctx.fill();
-  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px + Math.cos(ang) * r * .62, py + Math.sin(ang) * r * .62, r * .13, 0, 7); ctx.fill();
+  const px = p.rx * TS + X; let py = p.ry * TS + Y + TS * .32;
+  if (px < -80 || py < -120 || px > VW + 80 || py > VH + 120) return;
+  const u = TS / 16, id = p.id || 1, skin = SKIN[id % 4], hair = HAIR[(id * 3 + p.av) % HAIR.length];
+  const shirt = COLORS[p.av] || '#999', pants = shade(shirt, -.55), dark = '#1d1a22';
+  // facing from the 8-way index: 0=left, 2=up, 4=right, 6=down
+  const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
+  const dir = Math.abs(cy) > Math.abs(cx) ? (cy > 0 ? 'down' : 'up') : (cx > 0 ? 'right' : 'left');
+  const moving = p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02;
+  p.walk = (p.walk || 0) + (moving ? .25 : 0);
+  const sw = moving ? Math.sin(p.walk) : 0, bob = moving ? Math.abs(Math.cos(p.walk)) * u * .8 : 0;
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(px, py, u * 5.5, u * 2, 0, 0, 7); ctx.fill();
+  if (p.veh && G.shop && !roomOf(p.x, p.y)) {
+    if (p.veh === 'car') { spr('car_blue', p.rx, p.ry + .55, X, Y, 1.05); py -= u * 4; }
+    else { ctx.save(); ctx.translate(px, py - u * 2); if (dir === 'right') ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .9)}px serif`; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= u * 3; }
+  }
+  const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(px + (x - 6) * u), Math.round(py + (y - 22) * u - bob), Math.ceil(w * u), Math.ceil(h * u)); };
+  const L = sw * 2, Rr = -sw * 2;
+  // outline silhouette
+  R(1.4, 0.4, 9.2, 8, dark); R(1.4, 7.6, 9.2, 8, dark); R(0.4, 8.6, 11.2, 6, dark);
+  R(2.4, 14.6, 3.2, 6.8 + Math.min(0, L) * .5, dark); R(6.4, 14.6, 3.2, 6.8 + Math.min(0, Rr) * .5, dark);
+  // legs + shoes
+  R(3, 15, 2, 5 - Math.max(0, -L) * .4, pants); R(7, 15, 2, 5 - Math.max(0, -Rr) * .4, pants);
+  R(2.8, 20 - Math.max(0, -L) * .4, 2.4, 1.2, '#3a2a20'); R(6.8, 20 - Math.max(0, -Rr) * .4, 2.4, 1.2, '#3a2a20');
+  // body + arms
+  R(2, 8, 8, 7, shirt); R(2, 8, 8, 1, shade(shirt, .25));
+  const armY = 9 + (dir === 'left' || dir === 'right' ? sw : -sw) * .8;
+  if (dir !== 'left') R(1, armY, 1.4, 5, shade(shirt, -.15)); if (dir !== 'right') R(9.6, 9 - (armY - 9), 1.4, 5, shade(shirt, -.15));
+  if (dir !== 'left') R(1, armY + 5, 1.4, 1.2, skin); if (dir !== 'right') R(9.6, 14 - (armY - 9), 1.4, 1.2, skin);
+  // head
+  R(2, 1, 8, 7, skin);
+  if (dir === 'up') R(2, 1, 8, 6.2, hair);
+  else {
+    R(2, 1, 8, 2.4, hair); R(2, 1, 1.2, 5, hair); R(8.8, 1, 1.2, 5, hair);
+    if (dir === 'down') { R(3.8, 4.4, 1.2, 1.6, dark); R(7, 4.4, 1.2, 1.6, dark); R(5.2, 6.4, 1.6, .6, '#c0605a'); }
+    if (dir === 'left') { R(2, 1, 4, 3, hair); R(3.2, 4.4, 1.2, 1.6, dark); }
+    if (dir === 'right') { R(6, 1, 4, 3, hair); R(7.6, 4.4, 1.2, 1.6, dark); }
+  }
+  const mine = p.id === myId, top = py - 23 * u - bob;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const mine = p.id === myId;
-  if (p.bed) { ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('💤', px + r, py - r * .6 + Math.sin(t / 300) * 3); }
-  sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, py - r - TS * .3, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
-  ctx.textBaseline = 'alphabetic';
+  if (p.bed) { ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('💤', px + 6 * u, top + Math.sin(t / 300) * 3); }
+  sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 28 ? p.bubble.slice(0, 27) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
-    const w = ctx.measureText(txt).width + 14, by = py - r - TS * .85;
+    const w = ctx.measureText(txt).width + 14, by = top - TS * .8;
     ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - TS * .27, w, TS * .46, 8); ctx.fill();
-    ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + TS * .08);
+    ctx.fillStyle = '#222'; ctx.fillText(txt, px, by - TS * .03);
   }
-  ctx.textBaseline = 'middle';
 }
 // minimap
 let miniBase = null;
+const MINI_COLORS = { '=': '#555a63', ',': '#b7b4a6', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#c0643a', T: '#2f6b3a', '.': '#5e9b57', o: '#5e9b57', m: '#7fb04e', k: '#c98a5a' };
 function buildMini() {
-  const c = document.createElement('canvas'); c.width = 120; c.height = 88; const g = c.getContext('2d');
-  const colors = { '=': '#555a63', ',': '#a9a699', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#c0643a', T: '#2f6b3a', '.': '#5e9b57' };
-  for (let y = 0; y < G.map.h; y++) for (let x = 0; x < G.tw; x++) { g.fillStyle = colors[G.map.tiles[y][x]]; g.fillRect(x * 2, y * 2, 2, 2); }
+  const c = document.createElement('canvas'); c.width = G.tw * 2; c.height = G.map.h * 2; const g = c.getContext('2d');
+  for (let y = 0; y < G.map.h; y++) for (let x = 0; x < G.tw; x++) { g.fillStyle = MINI_COLORS[G.map.tiles[y][x]] || '#5e9b57'; g.fillRect(x * 2, y * 2, 2, 2); }
   miniBase = c;
+  const mini = $('#mini'); mini.width = c.width; mini.height = c.height;
 }
 function drawMini() {
   const g = $('#mini').getContext('2d'); g.drawImage(miniBase, 0, 0);
@@ -718,59 +740,115 @@ function sign(text, x, y, o = {}) {
   ctx.fillStyle = o.color || '#fff'; ctx.fillText(text, x, y + fs * .04);
 }
 const STN = id => G.stations.find(s => s.id === id);
-function houseLook(b) {
-  const h = wd?.houses?.[b.house];
-  if (!h) return { ...b, color: '#8f9499', label: `🏷️ ขาย ${money(G.shop.housePrices[b.house])}`, forSale: true };
-  return { ...b, color: COLORS[h[2]] || b.color, label: `🏠 ${h[0]}`, stars: h[1], mine: me && me.house === b.house };
+// ---- sprite atlas (public/assets/atlas.webp + .json, 48 px per tile)
+let atlas = null, atlasImg = null;
+fetch('assets/atlas.json').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp'; });
+// draw a sprite with its bottom-centre at world tile (cx, by)
+function spr(name, cx, by, X, Y, scale = 1) {
+  const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
+  const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
+  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
+  return true;
 }
-function drawBuilding(b, X, Y, night) {
-  if (b.house !== undefined) b = houseLook(b);
-  const px = b.x * TS + X, py = b.y * TS + Y, w = b.w * TS, h = b.h * TS;
-  if (px > VW + 40 || py > VH + 40 || px + w < -40 || py + h < -40) return;
-  const st = b.st && STN(b.st), south = st ? st.y > b.y + b.h / 2 : true;
-  const fh = Math.min(h * .36, TS * 1.5), rh = h - fh;
-  const roofY = south ? py : py + fh, faY = south ? py + rh : py;
-  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(px + 6, py + 8, w, h);
-  // front wall with windows and a door facing the street
-  ctx.fillStyle = shade(b.color, -.4); ctx.fillRect(px, faY, w, fh);
-  const doorX = st ? st.x * TS + X : -1e9;
-  ctx.fillStyle = night > .15 ? '#ffd97a' : 'rgba(190,225,255,.85)';
-  for (let wx = px + TS * .35; wx + TS * .5 < px + w - TS * .2; wx += TS * .95)
-    if (Math.abs(wx + TS * .25 - doorX) > TS * .8) ctx.fillRect(wx, faY + fh * .25, TS * .5, fh * .4);
-  if (st) {
-    const dw = TS * .9, dh = fh * .75, dy = south ? faY + fh - dh : faY;
-    ctx.fillStyle = '#4a3324'; ctx.fillRect(doorX - dw / 2, dy, dw, dh);
-    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(doorX + dw * .28, dy + dh / 2, Math.max(2, TS * .05), 0, 7); ctx.fill();
+// ground textures are 2x2 tiles; pick the quarter for this tile
+function tex(name, tx, ty, px, py) {
+  const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
+  const q = atlas.tile;
+  ctx.drawImage(atlasImg, s[0] + (tx & 1) * q, s[1] + (ty & 1) * q, q, q, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
+  return true;
+}
+const FLOOR = { office: 'fl_checker', market: 'fl_beige', warehouse: 'g_pavers', studio: 'fl_stone', home: 'fl_wood', dealer: 'fl_white', toolshop: 'fl_brick',
+  restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_white', school: 'fl_wood', cowork: 'fl_stone', bank: 'fl_beige', house: 'fl_wood' };
+const WALL = { office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', studio: '#4a3f63', home: '#e7c9a9', dealer: '#dfe6ec', toolshop: '#b9a17f',
+  restaurant: '#e9cfa4', kitchen: '#f3f3f3', hospital: '#e6f1f6', school: '#cfe0c4', cowork: '#c4d0dc', bank: '#efe2bb', house: '#ecd2b2' };
+function under(tx, ty) {   // what ground lies beneath a building/prop/tree tile
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) { const c = tileAt(tx + dx, ty + dy); if (',=kmsp'.includes(c)) return c; }
+  return '.';
+}
+function drawTile(ch, tx, ty, px, py, tm) {
+  if (ch === 'B' || ch === 'T' || ch === 'o') ch = under(tx, ty);
+  const S = Math.ceil(TS) + 1;
+  switch (ch) {
+    case '.': { const v = hash(tx >> 1, ty >> 1); tex(v < .84 ? 'g_grass' : v < .92 ? 'g_grass_dots' : 'g_grass_flowers', tx, ty, px, py); return; }
+    case 'm': tex(hash(tx >> 1, ty >> 1) < .9 ? 'g_grass3' : 'g_grass_dots', tx, ty, px, py); return;
+    case 's': tex('g_sand', tx, ty, px, py); return;
+    case 'k': tex('g_terracotta', tx, ty, px, py); return;
+    case 'p': tex('g_planks', tx, ty, px, py); return;
+    case 'f': tex('g_dirt', tx, ty, px, py); ctx.fillStyle = 'rgba(96,52,24,.55)'; ctx.fillRect(px, py, S, S); ctx.fillStyle = 'rgba(50,26,10,.45)'; for (let i = 1; i < 4; i++) ctx.fillRect(px + 3, py + i * TS / 4, TS - 6, Math.max(2, TS / 18)); return;
+    case ',': {
+      tex('g_sidewalk', tx, ty, px, py);
+      const hz = tileAt(tx - 1, ty) === '=' && tileAt(tx + 1, ty) === '=', vt = tileAt(tx, ty - 1) === '=' && tileAt(tx, ty + 1) === '=';
+      if (hz || vt) {   // where a sidewalk crosses a road: zebra crossing
+        ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S); ctx.fillStyle = '#eef0f2';
+        for (let i = 0; i < 4; i++) hz ? ctx.fillRect(px + 2, py + i * TS / 4 + 2, TS - 4, TS / 8) : ctx.fillRect(px + i * TS / 4 + 2, py + 2, TS / 8, TS - 4);
+      }
+      return;
+    }
+    case '=': {
+      ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S);
+      const v = hash(tx, ty); ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(px + v * TS * .7, py + (1 - v) * TS * .7, 3, 3);
+      ctx.fillStyle = '#f2d25c';
+      const up = tileAt(tx, ty - 1) === '=', down = tileAt(tx, ty + 1) === '=', left = tileAt(tx - 1, ty) === '=', right = tileAt(tx + 1, ty) === '=';
+      if (up && !down && left && right && tx % 2 === 0 && !(tileAt(tx, ty - 2) === '=')) ctx.fillRect(px + TS * .15, py - 2, TS * .7, 4);   // horizontal centre line
+      if (left && !right && up && down && ty % 2 === 0 && tileAt(tx - 2, ty) !== '=') ctx.fillRect(px - 2, py + TS * .15, 4, TS * .7);   // vertical centre line
+      return;
+    }
+    case 'w': {
+      ctx.fillStyle = '#3d8fd1'; ctx.fillRect(px, py, S, S);
+      const ph = Math.sin(tm * 1.5 + tx * .9 + ty * 1.7);
+      ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(px + TS * (.2 + ph * .1), py + TS * .3, TS * .35, Math.max(2, TS / 16));
+      ctx.fillStyle = 'rgba(20,60,120,.18)'; ctx.fillRect(px + TS * .5, py + TS * (.7 + ph * .05), TS * .3, Math.max(2, TS / 16));
+      if (',.sk'.includes(tileAt(tx, ty - 1))) { ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(px, py, S, Math.max(2, TS / 12)); }
+      return;
+    }
+    case 'i': { const rm = roomGrid[ty * G.map.w + tx]; if (!tex(FLOOR[rm?.kind] || 'fl_wood', tx, ty, px, py)) { ctx.fillStyle = '#b89a78'; ctx.fillRect(px, py, S, S); } return; }
+    case 'D': { tex('fl_wood', tx, ty, px, py); return; }
+    case '#': {
+      const rm = roomGrid[ty * G.map.w + tx];
+      if (rm && ty === rm.y && tx > rm.x && tx < rm.x + rm.w - 1) {   // back wall: wallpaper + skirting
+        ctx.fillStyle = WALL[rm.kind] || '#ddd'; ctx.fillRect(px, py, S, S);
+        ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(px + TS / 2, py, 2, TS * .8);
+        ctx.fillStyle = shade(WALL[rm.kind] || '#dddddd', -.35); ctx.fillRect(px, py + TS * .82, S, TS * .18);
+      } else { ctx.fillStyle = '#2a2730'; ctx.fillRect(px, py, S, S); ctx.fillStyle = '#3a3542'; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 4); }
+      return;
+    }
+    case ' ': ctx.fillStyle = '#07090c'; ctx.fillRect(px, py, S, S); return;
+    default: ctx.fillStyle = '#5e9b57'; ctx.fillRect(px, py, S, S);
   }
-  // roof
-  ctx.fillStyle = b.color; ctx.fillRect(px, roofY, w, rh);
-  ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(px, roofY, w, rh * .5);
-  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(px, roofY + rh * .5 - 1.5, w, 3);
-  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, w - 2, h - 2);
-  const cx = px + w / 2, cy = roofY + rh / 2;
+}
+function houseInfo(b) {
+  const h = wd?.houses?.[b.house];
+  return h ? { label: `🏠 ${h[0]}`, stars: h[1], mine: me && me.house === b.house } : { label: `🏷️ ขาย ${money(G.shop.housePrices[b.house])}`, forSale: true };
+}
+function drawBuildingSprite(b, X, Y) {
+  if (!spr(b.sprite, b.x + b.w / 2, b.y + b.h + .02, X, Y)) { ctx.fillStyle = '#8a7a6a'; ctx.fillRect(b.x * TS + X, b.y * TS + Y, b.w * TS, b.h * TS); }
+}
+function drawBuildingSign(b, X, Y) {
+  const s = atlas?.sprites[b.sprite]; const hTiles = s ? s[3] / atlas.tile : b.h;
+  const cx = (b.x + b.w / 2) * TS + X, top = (b.y + b.h - hTiles) * TS + Y;
   if (b.house !== undefined) {
-    sign(b.label, cx, cy - (b.stars ? TS * .2 : 0), { size: TS * .3, bg: b.mine ? 'rgba(255,201,77,.95)' : b.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.88)', color: b.mine ? '#222' : '#fff' });
-    if (b.stars) sign(`⭐ ${b.stars}`, cx, cy + TS * .32, { size: TS * .24 });
+    const h = houseInfo(b);
+    sign(h.label + (h.stars ? ` ⭐${h.stars}` : ''), cx, top - TS * .1, { size: TS * .28, bg: h.mine ? 'rgba(255,201,77,.95)' : h.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.85)', color: h.mine ? '#222' : '#fff' });
     return;
   }
-  if (b.deco) { ctx.globalAlpha = .55; sign(`${b.icon} ${b.label}`, cx, cy, { size: TS * .3 }); ctx.globalAlpha = 1; return; }
-  // icon badge + name sign so every place is recognisable from afar
-  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(cx, cy - TS * .42, TS * .6, 0, 7); ctx.fill();
-  ctx.strokeStyle = shade(b.color, -.3); ctx.lineWidth = 3; ctx.stroke();
-  ctx.font = `${Math.round(TS * .78)}px serif`; ctx.fillStyle = '#000'; ctx.fillText(b.icon, cx, cy - TS * .38);
-  sign(b.label, cx, cy + TS * .55, { size: TS * .4, border: shade(b.color, .25) });
+  if (b.deco) { ctx.globalAlpha = .75; sign(`${b.icon} ${b.label}`, cx, top - TS * .1, { size: TS * .26 }); ctx.globalAlpha = 1; return; }
+  sign(`${b.icon} ${b.label}`, cx, top - TS * .15, { size: TS * .36, bg: 'rgba(18,22,28,.9)', border: '#ffc94d88' });
 }
-function drawZones(X, Y) {
-  const fx = 2 * TS + X, fy = 2 * TS + Y, fw = 16 * TS, fhh = 10 * TS;
-  ctx.strokeStyle = '#9b7748'; ctx.lineWidth = Math.max(3, TS * .09); ctx.setLineDash([TS * .55, TS * .18]);
-  ctx.strokeRect(fx, fy, fw, fhh); ctx.setLineDash([]);
-  sign('🌾 ไร่กลางเมือง', fx + fw / 2, fy + fhh, { size: TS * .42, bg: 'rgba(74,52,26,.94)' });
-  sign('🎣 ท่าเรือตกปลา', 33 * TS + X, 35.35 * TS + Y, { size: TS * .4, bg: 'rgba(26,62,88,.94)' });
+// warm light pools around lamps and windows at night
+function drawLights(X, Y, dark) {
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of G.props) if (/^lamp/.test(p.s)) {
+    const px = p.x * TS + X, py = (p.y - 1.6) * TS + Y; if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) continue;
+    const g = ctx.createRadialGradient(px, py, 0, px, py, TS * 2.4);
+    g.addColorStop(0, `rgba(255,200,110,${dark * .9})`); g.addColorStop(1, 'rgba(255,200,110,0)');
+    ctx.fillStyle = g; ctx.fillRect(px - TS * 2.4, py - TS * 2.4, TS * 4.8, TS * 4.8);
+  }
+  ctx.globalCompositeOperation = 'source-over';
 }
 // navigation: a yellow arrow that walks the player to a place
 let guide = null;
 const TARGETS = {
-  farm: () => ({ x: 9, y: 7.5, label: 'ไร่กลางเมือง' }),
+  farm: () => ({ x: 15, y: 43, label: 'ไร่กลางเมือง' }),
 };
 function targetOf(key) {
   if (TARGETS[key]) return TARGETS[key]();
@@ -813,7 +891,7 @@ function openMap() {
   const dpr = Math.min(2, devicePixelRatio || 1);
   c.width = W * k * dpr; c.height = H * k * dpr; c.style.width = W * k + 'px'; c.style.height = H * k + 'px';
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const col = { '=': '#555a63', ',': '#b7b4a6', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#888', T: '#2f6b3a', '.': '#5e9b57' };
+  const col = MINI_COLORS;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { g.fillStyle = col[G.map.tiles[y][x]]; g.fillRect(x * k, y * k, k + .5, k + .5); }
   const hits = [];
   const label = (text, x, y, size, bg, maxW = 1e9) => {
@@ -825,18 +903,19 @@ function openMap() {
     g.fillStyle = '#fff'; g.fillText(text, x, y + 1);
   };
   const fs = clamp(k * .85, 10, 15);
-  for (let b of G.map.buildings) {
-    g.fillStyle = b.color; g.fillRect(b.x * k, b.y * k, b.w * k, b.h * k);
-    g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1.5; g.strokeRect(b.x * k, b.y * k, b.w * k, b.h * k);
-    if (b.house !== undefined) b = houseLook(b);
+  for (const b of G.map.buildings) {
+    const sp = atlas?.sprites[b.sprite];
+    if (sp && atlasImg) { const w = sp[2] / atlas.tile * k, h = sp[3] / atlas.tile * k; g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (b.x + b.w / 2) * k - w / 2, (b.y + b.h) * k - h, w, h); }
+    else { g.fillStyle = '#8a7a6a'; g.fillRect(b.x * k, b.y * k, b.w * k, b.h * k); }
     const cx = (b.x + b.w / 2) * k, cy = (b.y + b.h / 2) * k;
-    if (b.house !== undefined) { label(b.forSale ? '🏷️ ขาย' : b.label, cx, cy, fs * .8, b.mine ? 'rgba(200,140,20,.95)' : b.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.9)', b.w * k - 2); hits.push({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k, key: b.st }); continue; }
+    if (b.house !== undefined) { const h = houseInfo(b); label(h.forSale ? '🏷️ ขาย' : h.label, cx, cy, fs * .8, h.mine ? 'rgba(200,140,20,.95)' : h.forSale ? 'rgba(40,120,70,.95)' : 'rgba(18,22,28,.9)', b.w * k + 6); hits.push({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k, key: b.st }); continue; }
     if (b.deco) { g.globalAlpha = .6; label(b.label, cx, cy, fs * .85, 'rgba(18,22,28,.8)', b.w * k - 2); g.globalAlpha = 1; continue; }
     label(`${b.icon} ${b.label}`, cx, cy, fs, 'rgba(18,22,28,.9)', b.w * k - 2);
     hits.push({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k, key: b.st });
   }
-  label('🌾 ไร่กลางเมือง', 10 * k, 7 * k, fs, 'rgba(74,52,26,.94)'); hits.push({ x: 2 * k, y: 2 * k, w: 16 * k, h: 10 * k, key: 'farm' });
-  label('🎣 ท่าเรือ', 39 * k, 39.3 * k, fs, 'rgba(26,62,88,.94)'); hits.push({ x: 31 * k, y: 35 * k, w: 14 * k, h: 5 * k, key: 'pier1' });
+  label('🌾 ไร่กลางเมือง', 15 * k, 45 * k, fs, 'rgba(74,52,26,.94)'); hits.push({ x: 2 * k, y: 39 * k, w: 25 * k, h: 13 * k, key: 'farm' });
+  label('🎣 ท่าเรือ', 44 * k, 49.2 * k, fs, 'rgba(26,62,88,.94)'); hits.push({ x: 38 * k, y: 44 * k, w: 12 * k, h: 5 * k, key: 'pier1' });
+  label('⛲ สวนสาธารณะ', 36.5 * k, 44.5 * k, fs * .85, 'rgba(60,90,50,.9)');
   for (const p of P.values()) {
     const mine = p.id === myId;
     g.fillStyle = mine ? '#fff' : COLORS[p.av]; g.strokeStyle = '#000'; g.lineWidth = 1.5;
@@ -855,7 +934,7 @@ function closeMap() { $('#mapView').classList.add('hidden'); }
 
 // first-time tutorial
 const TUT = () => [
-  ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือวงกลมที่มีป้ายชื่อ<b>สีเหลือง</b> ผู้เล่นคนอื่นก็เดินอยู่ในเมืองเดียวกันกับคุณ'],
+  ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือตัวละครที่มีป้ายชื่อ<b>สีเหลือง</b> ผู้เล่นคนอื่นก็เดินอยู่ในเมืองเดียวกันกับคุณ'],
   ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b> (จอยจะโผล่ใต้นิ้ว)<br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร'],
   ['🚪', 'เข้าอาคาร', 'ทุกตึกมี<b>ป้ายชื่อบนหลังคา</b> <b>เดินชนประตู</b>เพื่อเข้าไปข้างใน แล้วไปที่เคาน์เตอร์ (ไอคอนลอย) กด<b>ปุ่มกลมสีเหลือง</b> (คอม: E) · ออกโดยเดินลงพรมหน้าประตู'],
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ที่อยากไป จะมี<b>ลูกศรสีเหลือง</b>พาเดินไป'],
@@ -885,56 +964,50 @@ function showDaily(d) {
 }
 
 // ------------------------------------------------------------------ building interiors
-let roomGrid = [];
-const ROOM_THEME = {
-  office: ['#c9b48f', '#bfa982'], market: ['#d9c7a3', '#cfbb95'], warehouse: ['#9a8f7c', '#8f8471'], studio: ['#3d3552', '#453c5d'],
-  home: ['#c99c86', '#bf917b'], dealer: ['#d6d9dc', '#c9cdd1'], toolshop: ['#a99a83', '#9e8e77'], restaurant: ['#d8b98a', '#ceae7e'],
-  kitchen: ['#e6e6e6', '#d4d4d4'], hospital: ['#e8f1f5', '#dae7ed'], school: ['#c7b38d', '#bca783'], cowork: ['#b8c4cf', '#adb9c4'],
-  bank: ['#e8dcb4', '#ddd0a6'], house: ['#c8a27c', '#bd9771'],
+let roomGrid = [], roomFurniture = [];
+// [sprite, x, y(bottom)] relative to the room's top-left corner; the counter station stands at (7, 2.6)
+const ROOM_LAYOUT = {
+  office: [['f_window', 3.5, 1.1], ['f_window', 10.5, 1.1], ['f_desk', 7, 2.3], ['f_computer_desk', 3.3, 5.6], ['f_computer_desk', 10.7, 5.6], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 12.4, 2.6], ['f_plant', 1.6, 8.7], ['f_plant2', 12.4, 8.7]],
+  market: [['f_shelf_jars', 2.6, 2.6], ['f_shelf_plants', 11.4, 2.6], ['f_counter', 7, 2.3], ['stall_green', 3.4, 6.6], ['stall_red', 10.6, 6.6], ['f_plant3', 1.6, 8.7]],
+  warehouse: [['crate', 1.8, 3.2], ['crate', 3, 3.2], ['barrel', 4.2, 3.2], ['f_cabinet', 7, 2.3], ['hay2', 11.5, 3.4], ['hay', 11.6, 6.6], ['sack', 2.2, 6.6], ['barrel2', 3.3, 6.6], ['crate', 12.2, 8.6]],
+  studio: [['f_window', 10.5, 1.1], ['f_speaker', 1.6, 2.6], ['f_stereo', 3.5, 2.6], ['f_laptop_desk', 7, 2.3], ['f_guitar', 12.3, 2.7], ['f_rug_round', 7, 6.4], ['f_beanbag', 3, 6], ['f_beanbag', 11, 6], ['f_floorlamp', 12.4, 8.6]],
+  home: [['f_bed_blue', 2.4, 3.6], ['f_bed_pink', 2.4, 7.4], ['f_bed_green', 11.6, 3.6], ['f_bed_beige', 11.6, 7.4], ['f_drawer', 7, 2.2], ['f_rug_red', 7, 6.4], ['f_window', 4.8, 1.1]],
+  dealer: [['f_desk', 7, 2.3], ['car_red', 3, 4.8], ['car_blue', 11, 4.8], ['car_green', 3, 8.3], ['car_yellow', 11, 8.3], ['f_plant', 1.5, 2.6], ['f_plant2', 12.5, 2.6]],
+  toolshop: [['f_shelf_pots', 2.6, 2.6], ['f_bookshelf3', 11.6, 2.7], ['f_counter', 7, 2.3], ['cart', 3, 7.2], ['crate', 11.4, 6.6], ['barrel', 12.4, 6.6], ['f_trash', 12.4, 8.7]],
+  restaurant: [['f_counter_micro', 7, 2.3], ['menuboard', 12.4, 2.7], ['f_plant4', 1.6, 2.6], ['f_table_chairs', 3, 5.4], ['f_round_table', 11, 5.4], ['f_table_check', 3, 8.4], ['f_table_check', 11, 8.4]],
+  kitchen: [['f_counter_micro', 2.7, 2.6], ['f_stove', 4.9, 2.6], ['f_counter_toast', 7, 2.3], ['f_counter_oven', 9.6, 2.6], ['f_fridge', 12, 2.7], ['f_shelf_pots', 2.6, 6.4], ['f_bench', 10.5, 6.6]],
+  hospital: [['f_counter', 3.5, 2.3], ['f_shelf_jars', 1.8, 6.4], ['f_plant', 1.5, 8.7], ['f_window', 6.4, 1.1], ['f_bed_blue', 9, 3.3], ['f_bed_blue', 11.5, 3.3], ['f_bed_blue', 9, 6.7], ['f_bed_blue', 11.5, 6.7]],
+  school: [['f_bookshelf_wide', 2.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_desk', 3.6, 5.4], ['f_desk', 10.4, 5.4], ['f_desk', 3.6, 7.9], ['f_desk', 10.4, 7.9], ['f_clock', 9.4, .95]],
+  cowork: [['f_laptop_desk', 7, 2.3], ['f_computer_desk', 3.2, 5.4], ['f_computer_desk', 10.8, 5.4], ['f_laptop_desk', 3, 8.4], ['f_laptop_desk', 11, 8.4], ['f_coffee', 12.4, 2.6], ['f_plant', 1.6, 2.6]],
+  bank: [['f_cabinet', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_plant2', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
 };
-const ROOM_PROPS = {
-  office: [[3, 5, '💻'], [5.5, 5, '💻'], [8.5, 5, '💻'], [11, 5, '💻'], [1.6, 1.6, '🪴'], [12.4, 1.6, '🪴'], [2.5, 7.5, '🗄️'], [11.5, 7.5, '☕']],
-  market: [[2.5, 5, '🍎'], [4.5, 5, '🥬'], [6.5, 5.5, '🧺'], [9.5, 5, '🐟'], [11.5, 5, '🍉'], [2, 7.5, '🛒'], [12, 7.5, '🛒']],
-  warehouse: [[2, 2, '📦'], [3, 2, '📦'], [11, 2, '📦'], [12, 2, '📦'], [2, 5, '📦'], [12, 5, '📦'], [3, 7.5, '🛻'], [11, 7.5, '🧃']],
-  studio: [[7, 5.2, '🎤'], [3, 2, '💡'], [11, 2, '💡'], [4.5, 5.5, '📹'], [9.5, 5.5, '🎧'], [2, 7.5, '🛋️']],
-  home: [[2, 3, '🛏️'], [2, 6, '🛏️'], [12, 3, '🛏️'], [12, 6, '🛏️'], [7, 6, '🪑']],
-  dealer: [[3, 5.5, '🚗'], [7, 6, '🛵'], [11, 5.5, '🚙'], [12.2, 1.7, '🏁'], [1.8, 1.7, '🏁']],
-  toolshop: [[2, 2, '🔧'], [3.2, 2, '🔨'], [10.8, 2, '🪚'], [12, 2, '🧰'], [3, 6, '🎣'], [7, 6, '🧪'], [11, 6, '⌨️']],
-  restaurant: [[3, 5, '🍽️'], [6, 5, '🍽️'], [9, 5, '🍽️'], [12, 5, '🍽️'], [3, 7.5, '🪑'], [11, 7.5, '🪑'], [1.6, 1.6, '🏮']],
-  kitchen: [[2.5, 2, '🔥'], [4, 2, '🍳'], [10, 2, '🥘'], [11.5, 2, '🔪'], [3, 6, '🧅'], [11, 6, '🧂'], [7, 6.5, '🍲']],
-  hospital: [[2, 6, '💊'], [3.5, 6, '🌡️'], [5.5, 6, '🩻'], [1.6, 1.6, '🪴'], [6, 2, '🩺']],
-  school: [[3, 5, '✏️'], [5.5, 5, '📚'], [8.5, 5, '📚'], [11, 5, '✏️'], [3, 7, '🪑'], [11, 7, '🪑'], [12.4, 1.6, '🔔']],
-  cowork: [[3, 5, '🖥️'], [5.5, 5, '🖥️'], [8.5, 5, '🖥️'], [11, 5, '🖥️'], [2, 7.5, '☕'], [12, 7.5, '🪴']],
-  bank: [[2.5, 5, '🏧'], [11.5, 5, '🏧'], [7, 6.5, '💰'], [1.8, 1.7, '🔐'], [12.2, 1.7, '🔐']],
-};
-const FURN_SLOTS = [[11.5, 2.5], [9, 2.5], [6, 2.5], [11.5, 5.5], [9, 5.5], [3, 5.5], [5.5, 5.5], [7, 7]];
+const FURN_SPRITE = { plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
+const FURN_SLOTS = [[11.8, 8.6], [8, 2.9], [11, 2.9], [11.2, 5.6], [5.3, 1.05], [2.3, 6.4], [6.5, 6.2], [3, 8.8]];
 function buildRooms() {
   roomGrid = new Array(G.map.w * G.map.h);
+  for (const r of G.rooms) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomGrid[y * G.map.w + x] = r;
+  layoutFurniture();
+}
+function layoutFurniture() {
+  roomFurniture = [];
   for (const r of G.rooms) {
-    const [a, b] = ROOM_THEME[r.kind] || ['#bbb', '#aaa'];
-    r.floorA = a; r.floorB = b;
-    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomGrid[y * G.map.w + x] = r;
+    let items = ROOM_LAYOUT[r.kind] || [];
+    if (r.kind === 'house') {
+      const h = wd?.houses?.[r.house];
+      items = [['f_bed_blue', 3, 3.3], ['f_window', 6, 1.1], ['f_welcome', 7, 9.2]].concat(h ? h[3].map((k, i) => [FURN_SPRITE[k], ...FURN_SLOTS[i]]) : []);
+    }
+    for (const [sp, x, y] of items) roomFurniture.push([sp, r.x + x, r.y + y]);
   }
 }
 const roomOf = (x, y) => G?.rooms?.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const townPos = (x, y) => { const r = roomOf(x, y); return r ? r.outside : { x, y }; };
-function drawRooms(X, Y, t) {
-  for (const r of G.rooms) {
+function drawRoomLabels(r, X, Y, t) {
+  {
     const px = r.x * TS + X, py = r.y * TS + Y;
-    if (px > VW || py > VH || px + r.w * TS < 0 || py + r.h * TS < 0) continue;
-    ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(px, py, r.w * TS, TS * .35);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    let props = ROOM_PROPS[r.kind] || [];
-    if (r.kind === 'house') {
-      const h = wd?.houses?.[r.house];
-      props = h ? h[3].map((k, i) => [...FURN_SLOTS[i], G.shop.furniture[k].icon]) : [];
-      sign(h ? `🏠 บ้านของ ${h[0]}` : '🏷️ บ้านว่าง', px + r.w * TS / 2, py + TS * .5, { size: TS * .36, border: '#fff3' });
-    } else sign(`${r.icon} ${r.label}`, px + r.w * TS / 2, py + TS * .5, { size: TS * .38, border: r.color });
-    ctx.font = `${Math.round(TS * .78)}px serif`;
-    for (const [dx, dy, e] of props) ctx.fillText(e, px + dx * TS, py + dy * TS);
-    // exit arrow on the doormat
-    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `700 ${Math.round(TS * .32)}px 'Noto Sans Thai',sans-serif`;
-    ctx.fillText('⬇ ทางออก', px + 7 * TS, py + (r.h - .5) * TS + Math.sin(t / 300) * 2);
+    const h = r.kind === 'house' ? wd?.houses?.[r.house] : null;
+    sign(r.kind === 'house' ? (h ? `🏠 บ้านของ ${h[0]}` : '🏷️ บ้านว่าง') : `${r.icon} ${r.label}`, px + r.w * TS / 2, py - TS * .1, { size: TS * .34, border: '#ffc94d88' });
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `700 ${Math.round(TS * .3)}px 'Noto Sans Thai',sans-serif`;
+    ctx.fillText('⬇ ทางออก', px + 7 * TS, py + (r.h + .45) * TS + Math.sin(t / 300) * 2);
   }
 }
 let rainDrops = null;

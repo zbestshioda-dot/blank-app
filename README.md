@@ -52,6 +52,16 @@ npm start          # http://localhost:3000
 ### กันเซิร์ฟเวอร์หลับ
 บน Render เซิร์ฟเวอร์จะ ping ตัวเองทุก 9 นาที (ใช้ `RENDER_EXTERNAL_URL` ที่ Render ใส่ให้เอง หรือกำหนด `KEEPALIVE_URL` เอง) จึงไม่หลับตอนไม่มีคนเล่น
 
+## กราฟิก
+ภาพทั้งหมดมาจาก sprite sheet แนวพิกเซลอาร์ต 5 แผ่นที่ให้มา ตัดพื้นหลังสีชมพูออกและรวมเป็น `public/assets/atlas.webp` (+ `atlas.json`, 1 ช่อง = 48 px)
+สร้างใหม่ได้ด้วย:
+```
+SHEETS_DIR=path/to/sheets/ python3 tools/slice_sheets.py      # ลบพื้นหลัง -> cut_*.png
+python3 tools/segment_sprites.py                               # หา sprite -> boxes.json
+python3 tools/build_atlas.py .                                 # ตัด/ประกอบตึก/รวม -> public/assets/
+```
+ผังเมืองสร้างจากขนาด sprite จริง (`server/data.js` อ่าน atlas.json) ตึกหันหน้าลงถนน เดินไปหลังตึก/ต้นไม้แล้วจะถูกบัง
+
 ## โครงสร้าง
 - `server/data.js` แผนที่ สถานที่ ไอเทม อาชีพ
 - `server/quests.js` เควสต์ประจำวัน

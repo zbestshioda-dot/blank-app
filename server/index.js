@@ -758,7 +758,7 @@ function login(ws, m) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS,
     items: D.ITEMS, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, speed: SPEED, radius: D.RADIUS, chat: chatLog.slice(-25), isNew,
-    rooms: D.ROOMS, tw: D.TW, diseases: D.DISEASES, treatments: D.TREATMENTS,
+    rooms: D.ROOMS, tw: D.TW, props: D.PROPS, trees: D.TREES, diseases: D.DISEASES, treatments: D.TREATMENTS,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, furniture: D.FURNITURE, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());

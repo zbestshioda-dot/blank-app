@@ -1,96 +1,131 @@
 'use strict';
 // Static game data: map, stations, items, careers. Tile units everywhere.
 
-// the town is 60 tiles wide; building interiors live in a separate area to its right
-const TW = 60, H = 44, W = 138;
+// Town layout is built around the sprite atlas (public/assets/atlas.json, 48 px per tile):
+// buildings are front-facing sprites standing on solid footprints, doors face the street below.
+const ATLAS = require('../public/assets/atlas.json');
+const SPR = name => { const s = ATLAS.sprites[name]; return { w: s[2] / ATLAS.tile, h: s[3] / ATLAS.tile }; };
+const TW = 64, H = 56, W = 142;           // town 64x56; interiors live at x >= 66
 
 // ---------------------------------------------------------------- map
-// tile codes: . grass  = road  , sidewalk  w water  p pier  B building
-//             T tree   f soil  s sand
+// tile codes: . grass  = road  , sidewalk  w water  p pier  B building  T tree  o solid prop
+//             f soil   s sand  k plaza bricks  m meadow
 const grid = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => x < TW ? '.' : ' '));
 const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) grid[y][x] = c; };
 const rect = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c); };
+const get = (x, y) => (grid[y] || [])[x];
 
-// lake + sand shore
-rect(34, 31, 26, 13, 'w');
-for (let y = 28; y < H; y++) for (let x = 31; x < TW; x++) {
-  if (grid[y][x] === '.' && x >= 32 && y >= 29) set(x, y, 's');
+// streets: three east-west roads (buildings face them from the north) + a north-south avenue
+const ROWS = [9, 21, 33];                 // y of the sidewalk in front of each building row
+for (const y of ROWS) { rect(1, y, TW - 2, 1, ','); rect(1, y + 1, TW - 2, 2, '='); rect(1, y + 3, TW - 2, 1, ','); }
+rect(28, 1, 1, H - 2, ','); rect(31, 1, 1, H - 2, ','); rect(29, 1, 2, H - 2, '=');
+
+// south: farm (west), park (centre), lake with a pier (east)
+rect(2, 39, 25, 13, 'm');
+rect(33, 38, 7, 16, 'k');
+rect(41, 41, 22, 14, 'w');
+for (let y = 38; y < H - 1; y++) for (let x = 39; x < TW - 1; x++) if (get(x, y) === '.' || get(x, y) === 'k') {
+  if ([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [2, 0], [0, 2]].some(([dx, dy]) => get(x + dx, y + dy) === 'w')) set(x, y, 's');
 }
-// sidewalks, roads
-rect(0, 19, TW, 1, ','); rect(0, 22, TW, 1, ',');
-rect(28, 0, 1, H, ','); rect(31, 0, 1, H, ',');
-rect(0, 20, TW, 2, '='); rect(29, 0, 2, H, '=');
-// pier over the water
-rect(32, 36, 13, 2, 'p');
-// south-west neighbourhood: houses + bank
-rect(1, 32, 28, 1, ','); rect(1, 37, 19, 1, ','); rect(19, 32, 1, 11, ',');
+rect(38, 46, 12, 2, 'p');
 
+// ---------------------------------------------------------------- buildings
+const B = (id, sprite, x, row, extra = {}) => {
+  const sp = SPR(sprite), w = Math.ceil(sp.w - 0.05), h = Math.max(2, Math.round(sp.h - 0.4));
+  return { id, sprite, x, y: ROWS[row] - h, w, h, ...extra };
+};
 const BUILDINGS = [
-  { id: 'office',    x: 33, y: 10, w: 8, h: 8, color: '#5b7c99', label: 'บริษัท', icon: '🏢', st: 'office' },
-  { id: 'market',    x: 44, y: 11, w: 9, h: 7, color: '#c0643a', label: 'ตลาดกลาง', icon: '🏪', st: 'market' },
-  { id: 'warehouse', x: 20, y: 11, w: 8, h: 7, color: '#8a7a5c', label: 'คลังสินค้า', icon: '📦', st: 'warehouse' },
-  { id: 'studio',    x: 3,  y: 13, w: 8, h: 5, color: '#8e5ba8', label: 'สตูดิโอ', icon: '🎥', st: 'studio' },
-  { id: 'home',      x: 12, y: 13, w: 7, h: 5, color: '#b0675f', label: 'บ้านพัก', icon: '🏠', st: 'home' },
-  { id: 'barn',      x: 21, y: 2,  w: 7, h: 6, color: '#a2563f', label: 'โรงนา', icon: '🐄', deco: true },
-  { id: 'dealer',    x: 44, y: 2,  w: 13, h: 7, color: '#5f7d8f', label: 'โชว์รูมรถ', icon: '🚗', st: 'dealer' },
-  { id: 'toolshop',  x: 33, y: 2,  w: 8, h: 6, color: '#7a6f9b', label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' },
-  { id: 'restaurant',x: 33, y: 24, w: 8, h: 7, color: '#d08a3a', label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' },
-  { id: 'kitchen',   x: 44, y: 24, w: 9, h: 7, color: '#c25b5b', label: 'ครัวใหญ่', icon: '🍳', st: 'kitchen' },
-  { id: 'hospital',  x: 20, y: 24, w: 8, h: 7, color: '#e4e8ec', label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' },
-  { id: 'school',    x: 3,  y: 24, w: 8, h: 7, color: '#4f8f6f', label: 'โรงเรียน', icon: '🎓', st: 'school' },
-  { id: 'cowork',    x: 12, y: 24, w: 7, h: 7, color: '#3f6f9f', label: 'โค้ดดิ้งสเปซ', icon: '💻', st: 'cowork' },
-  { id: 'bank',      x: 21, y: 33, w: 7, h: 5, color: '#c9a23a', label: 'ธนาคาร', icon: '🏦', st: 'bank' },
+  B('toolshop', 'b_shop', 2, 0, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' }),
+  B('dealer', 'b_dealer', 9, 0, { label: 'โชว์รูมรถ', icon: '🚗', st: 'dealer' }),
+  B('office', 'b_office', 19, 0, { label: 'บริษัท', icon: '🏢', st: 'office' }),
+  B('market', 'b_mart', 33, 0, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' }),
+  B('police', 'b_police', 41, 0, { label: 'สถานีตำรวจ', icon: '👮', deco: true }),
+  B('fire', 'b_fire', 49, 0, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }),
+  B('warehouse', 'b_warehouse', 2, 1, { label: 'คลังสินค้า', icon: '📦', st: 'warehouse' }),
+  B('studio', 'b_studio', 10, 1, { label: 'สตูดิโอ', icon: '🎥', st: 'studio' }),
+  B('home', 'b_inn', 19, 1, { label: 'บ้านพัก', icon: '🏠', st: 'home' }),
+  B('restaurant', 'b_cafe', 33, 1, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }),
+  B('kitchen', 'b_bakery', 40, 1, { label: 'ครัวใหญ่', icon: '🍳', st: 'kitchen' }),
+  B('hospital', 'b_hospital', 47, 1, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' }),
+  B('flower', 'b_flower', 57, 1, { label: 'ร้านดอกไม้', icon: '💐', deco: true }),
+  B('school', 'b_school', 2, 2, { label: 'โรงเรียน', icon: '🎓', st: 'school' }),
+  B('cowork', 'b_cowork', 11, 2, { label: 'โค้ดดิ้งสเปซ', icon: '💻', st: 'cowork' }),
+  B('bank', 'b_bank', 20, 2, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }),
 ];
-// houses players can buy (row A faces sidewalk y=32, row B faces y=37)
-const HOUSE_LOTS = [[2, 33], [7, 33], [12, 33], [2, 38], [7, 38], [12, 38]];
-HOUSE_LOTS.forEach(([x, y], i) => BUILDINGS.push({ id: 'house' + i, x, y, w: 4, h: 3, color: '#9aa4ad', label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i }));
+const HOUSE_SPRITES = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
+HOUSE_SPRITES.forEach((sp, i) => BUILDINGS.push(B('house' + i, sp, 33 + i * 5, 2, { label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i })));
+const barn = { id: 'barn', sprite: 'b_barn', x: 3, y: 47, w: 4, h: 3, label: 'โรงนา', icon: '🐄', deco: true };
+BUILDINGS.push(barn);
 BUILDINGS.forEach(b => rect(b.x, b.y, b.w, b.h, 'B'));
 
-// farm plots (2x2 soil each)
-const PLOT_COLS = [3, 7, 11, 15], PLOT_ROWS = [3, 6, 9];
+// ---------------------------------------------------------------- stations
 const STATIONS = [];
+// farm: 12 plots (2x2 soil) in two rows
 let plotIdx = 0;
-for (const py of PLOT_ROWS) for (const px of PLOT_COLS) {
+for (const py of [41, 44]) for (const px of [8, 11, 14, 17, 20, 23]) {
   rect(px, py, 2, 2, 'f');
-  STATIONS.push({ id: 'plot' + plotIdx, type: 'plot', idx: plotIdx, label: 'แปลงเกษตร', icon: '🌱', x: px + 1, y: py + 1, r: 1.7 });
+  STATIONS.push({ id: 'plot' + plotIdx, type: 'plot', idx: plotIdx, label: 'แปลงเกษตร', icon: '🌱', x: px + 1, y: py + 1, r: 1.5 });
   plotIdx++;
 }
-const door = (id, type, label, icon, x, y, r = 2.0) => {
-  STATIONS.push({ id, type, label, icon, x, y, r });
-  rect(Math.floor(x) - 1, Math.floor(y), 3, 1, ',');
-};
-door('office', 'office', 'บริษัท ไทยเทค', '🏢', 37, 19.5);
-door('market', 'market', 'ตลาดกลาง', '🏪', 48.5, 19.5);
-door('warehouse', 'warehouse', 'คลังสินค้าราคาส่ง', '📦', 24, 19.5);
-door('studio', 'studio', 'สตูดิโอสตรีม', '🎥', 7, 19.5);
-door('home', 'home', 'บ้านพัก', '🏠', 15.5, 19.5);
-door('restaurant', 'restaurant', 'ร้านอาหาร', '🍜', 37, 23.5);
-door('kitchen', 'kitchen', 'ครัวใหญ่ (เชฟ)', '🍳', 48.5, 23.5);
-door('hospital', 'hospital', 'โรงพยาบาล', '🏥', 24, 23.5);
-door('school', 'school', 'โรงเรียน', '🎓', 7, 23.5);
-door('cowork', 'cowork', 'โค้ดดิ้งสเปซ', '💻', 15.5, 23.5);
-door('toolshop', 'toolshop', 'ร้านอุปกรณ์', '🛠️', 37, 8.5);
-door('dealer', 'dealer', 'โชว์รูมรถ', '🚗', 50.5, 9.5);
-door('bank', 'bank', 'ธนาคาร', '🏦', 24.5, 32.5);
-HOUSE_LOTS.forEach(([x, y], i) => { STATIONS.push({ id: 'house' + i, type: 'house', idx: i, label: 'บ้าน', icon: '🏠', x: x + 2, y: y - 0.5, r: 1.8 }); });
-STATIONS.push({ id: 'pier1', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 36, y: 37, r: 3.2 });
-STATIONS.push({ id: 'pier2', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 42.5, y: 37, r: 3.2 });
+const DOOR_LABELS = { office: 'บริษัท ไทยเทค', warehouse: 'คลังสินค้าราคาส่ง', studio: 'สตูดิโอสตรีม', kitchen: 'ครัวใหญ่ (เชฟ)' };
+for (const b of BUILDINGS) {
+  if (!b.st) continue;
+  const x = b.x + b.w / 2, y = b.y + b.h + 0.6;          // just in front of the door, on the sidewalk
+  if (b.house !== undefined) STATIONS.push({ id: b.st, type: 'house', idx: b.house, label: 'บ้าน', icon: '🏠', x, y, r: 1.6 });
+  else STATIONS.push({ id: b.st, type: b.st, label: DOOR_LABELS[b.st] || b.label, icon: b.icon, x, y, r: 1.8 });
+}
+STATIONS.push({ id: 'pier1', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 44, y: 47, r: 3 });
+STATIONS.push({ id: 'pier2', type: 'pier', label: 'ท่าเรือตกปลา', icon: '🎣', x: 48.5, y: 47, r: 3 });
 
-// trees: seeded scatter on free grass + border
+// ---------------------------------------------------------------- props (decoration sprites)
+// x, y = bottom-centre in tiles; solid props block the tile under their base
+const PROPS = [];
+const prop = (s, x, y, solid = true) => { PROPS.push({ s, x, y }); if (solid) set(Math.floor(x), Math.floor(y - 0.5), 'o'); };
+// street lamps and bins along every sidewalk
+for (const y of ROWS) for (let x = 4; x < TW - 3; x += 9) if (x < 27 || x > 32) {
+  if (get(x, y + 3) === ',') prop(x % 2 ? 'lamp' : 'lamp2', x + 0.5, y + 4);
+}
+prop('busstop', 26, 13); prop('bench', 36.5, 13.9, false); prop('trafficlight', 27.6, 9.95);
+prop('trafficlight', 32.4, 24.95); prop('vending', 26.6, 21.9); prop('bin_blue', 7, 21.95); prop('postbox', 10, 33.95);
+prop('hydrant', 46.5, 9.95); prop('phonebooth', 39.5, 9.95);
+prop('stall_red', 35, 14.9); prop('stall_green', 39, 14.9); prop('stall_blue', 43, 14.9); prop('stall_orange', 47, 14.9);
+prop('car_red', 16.5, 10.95); prop('car_blue', 7.5, 10.95); prop('taxi', 56.5, 22.95); prop('car_yellow', 57.5, 34.95);
+prop('foodtruck', 36.5, 53.3);
+// park
+prop('fountain', 36.5, 42); prop('gazebo', 36.5, 50.5); prop('bench', 34, 45.5, false); prop('bench2', 39, 45.5, false);
+prop('flowerbed', 34, 39.4); prop('flowerbed2', 39, 39.4); prop('lamp3', 33.5, 47.5); prop('lamp3', 33.5, 52.5);
+prop('parasol', 44, 39.2); prop('picnic', 48, 39.1); prop('icecream', 53, 39.4);
+// farm
+prop('fence_wood', 3.5, 39); prop('fence_wood', 6.5, 39); for (let x = 9.5; x < 26; x += 3) prop('fence_wood', x, 39);
+prop('well', 4, 44.2); prop('hay', 25.5, 50.5); prop('hay2', 23.5, 50.5); prop('cart', 19, 50.6); prop('planter_crops', 12, 50.4);
+prop('scarecrow' in ATLAS.sprites ? 'scarecrow' : 'signpost', 26, 45);
+// gardens and pets around the houses
+for (let i = 0; i < 6; i++) prop(i % 2 ? 'flowerbed' : 'hedge', 35 + i * 5, 37.6, false);
+prop('doghouse', 61.5, 37.9); prop('dog', 60, 38.5, false); prop('cat', 47.6, 33.8, false);
+// school yard & misc
+prop('flowerbox', 9.5, 21.95, false); prop('flowerbox2', 25.5, 33.95, false); prop('easel', 23.6, 9.95);
+prop('noticeboard', 18, 33.95); prop('kiosk', 53.5, 14.9);
+
+// trees: rows along the edges + scatter on free grass
+for (let x = 2; x < TW - 2; x += 3) { if (get(x, 2) === '.' && get(x, 1) === '.') { set(x, 1, 'T'); } }
+const TREE_KINDS = ['tree', 'tree', 'pine', 'tree_orange', 'tree_pink', 'tree'];
 function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const rand = rng(20240607);
-for (let i = 0; i < 160; i++) {
-  const x = Math.floor(rand() * TW), y = Math.floor(rand() * H);
-  if (grid[y][x] !== '.') continue;
+for (let i = 0; i < 260; i++) {
+  const x = 1 + Math.floor(rand() * (TW - 2)), y = 2 + Math.floor(rand() * (H - 3));
+  if (get(x, y) !== '.') continue;
   let ok = true;
-  for (let j = -2; j <= 2 && ok; j++) for (let k = -2; k <= 2; k++) {
-    const c = (grid[y + j] || [])[x + k];
-    if (c && c !== '.' && c !== 'T') { ok = false; break; }
-  }
-  if (ok && !STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3)) set(x, y, 'T');
+  for (let j = -3; j <= 1 && ok; j++) for (let k = -2; k <= 2; k++) { const c = get(x + k, y + j); if (c && c !== '.' && c !== 'T') { ok = false; break; } }
+  if (ok && !STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3) && !PROPS.some(p => Math.hypot(p.x - x - .5, p.y - y - .5) < 2.5)) set(x, y, 'T');
 }
 for (let x = 0; x < TW; x++) { set(x, 0, 'T'); set(x, H - 1, 'T'); }
 for (let y = 0; y < H; y++) { set(0, y, 'T'); set(TW - 1, y, 'T'); }
+// which sprite each tree tile uses (stable per position)
+const TREES = [];
+for (let y = 0; y < H; y++) for (let x = 0; x < TW; x++) if (grid[y][x] === 'T') {
+  const near = (x < 2 || x > TW - 3 || y < 1 || y > H - 2);
+  TREES.push([x, y, near && (x + y) % 3 === 0 ? 'pine' : TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
+}
 
 // ---------------------------------------------------------------- interiors
 // Every usable building gets a room (14x10) right of the town. Its counter moves
@@ -101,13 +136,12 @@ let slot = 0;
 for (const b of BUILDINGS) {
   if (!b.st) continue;
   const s = STATIONS.find(x => x.id === b.st);
-  const rx = 62 + (slot % 5) * 15, ry = 1 + Math.floor(slot / 5) * 11; slot++;
+  const rx = TW + 2 + (slot % 5) * 15, ry = 1 + Math.floor(slot / 5) * 11; slot++;
   rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i'); rect(rx + 6, ry + RH - 1, 2, 1, 'D');
-  const south = s.y > b.y + b.h / 2;
   const room = {
     id: 'r_' + b.id, bld: b.id, kind: b.house !== undefined ? 'house' : b.id, house: b.house, label: b.label, icon: b.icon, color: b.color,
     x: rx, y: ry, w: RW, h: RH, spawn: { x: rx + 7, y: ry + RH - 2.3 }, exit: { x: rx + 7, y: ry + RH - 0.5 },
-    outside: { x: s.x, y: south ? b.y + b.h + 1.6 : b.y - 1.6 }, doorPt: { x: s.x, y: south ? b.y + b.h + 0.32 : b.y - 0.32 },
+    outside: { x: s.x, y: b.y + b.h + 1.7 }, doorPt: { x: s.x, y: b.y + b.h + 0.32 },
   };
   ROOMS.push(room); b.room = room.id;
   STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + 7, y: ry + RH - 1.6, r: 1.2 });
@@ -127,7 +161,7 @@ for (const b of BUILDINGS) {
 const roomAt = (x, y) => ROOMS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 
 const TILES = grid.map(r => r.join(''));
-const SOLID = new Set(['w', 'B', 'T', '#', ' ']);
+const SOLID = new Set(['w', 'B', 'T', '#', ' ', 'o']);
 const isSolidTile = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= H || SOLID.has(grid[ty][tx]);
 const RADIUS = 0.3;
 function blocked(x, y) {
@@ -136,7 +170,7 @@ function blocked(x, y) {
          isSolidTile(Math.floor(x - RADIUS), Math.floor(y + RADIUS)) ||
          isSolidTile(Math.floor(x + RADIUS), Math.floor(y + RADIUS));
 }
-const SPAWN = { x: 31.0, y: 19.5 };
+const SPAWN = { x: 30.0, y: 16.5 };
 
 // ---------------------------------------------------------------- items
 // kind: crop | fish | meal | goods.  base = reference sell price at the market.
@@ -269,7 +303,7 @@ const TREATMENTS = {
 };
 
 module.exports = {
-  TW, ROOMS, roomAt, DISEASES, TREATMENTS,
+  PROPS, TREES, TW, ROOMS, roomAt, DISEASES, TREATMENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, FURNITURE, BANK,
   W, H, TILES, BUILDINGS, STATIONS, SPAWN, blocked, ITEMS, CROPS, RECIPES, FISH,
   CAREERS, LICENSES, OFFICE_TITLES, EVENTS, RADIUS,

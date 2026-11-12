@@ -25,7 +25,7 @@ select option{color:#222}
 #bE{background:#f2c94c}#bH{background:#6fcf97}#bL{background:#eb5757}
 #topRight{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 #clock{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 10px;font-size:12px;text-align:right}
-#mini{width:120px;height:88px;border-radius:8px;border:1px solid var(--line);background:#000;opacity:.92}
+#mini{width:120px;height:auto;border-radius:8px;border:1px solid var(--line);background:#000;opacity:.92}
 #menu{display:flex;gap:4px}
 #menu button{padding:6px 9px;font-size:16px;background:var(--card);position:relative}
 #qBtn.has::after{content:'';position:absolute;right:3px;top:3px;width:8px;height:8px;border-radius:50%;background:#ef6a5b}
@@ -92,7 +92,7 @@ pre{background:#0e1216;border:1px solid var(--line);border-radius:10px;padding:1
 @media(max-width:600px){
   #menu{flex-direction:column}
   #menu button{padding:5px 0;width:42px;font-size:17px}
-  #mini{width:96px;height:70px}
+  #mini{width:96px;height:auto}
   #card{width:min(178px,calc(100vw - 130px))}
   #eventBar{top:auto;bottom:calc(126px + env(safe-area-inset-bottom));left:8px;right:110px;transform:none;max-width:none}
 }
