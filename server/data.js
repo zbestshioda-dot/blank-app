@@ -199,7 +199,7 @@ const HOUSE_PRICES = [], HOUSE_RENT = [];
     const row = i < 6 ? 0 : 1, col = i % 6;
     const front = row ? 37 : 20, x = X + 10 + col * 9 + (row ? 1 : 0);
     const price = Math.round((28000 + (i % 6) * 7000 + row * 10000) / 1000) * 1000;
-    HOUSE_PRICES.push(price); HOUSE_RENT.push(Math.round(price / 80 / 10) * 10);
+    HOUSE_PRICES.push(price); HOUSE_RENT.push(Math.round(price / 160 / 10) * 10);   // a day's rent ≈ a third of a day's starting wage
     B('house' + i, HOUSE_SPRITES[(i + row) % 6], x, front, { label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i, area: 'housing' });
     prop(i % 2 ? 'hedge_flower' : 'hedge', x - 1, front - .1, false);
     if (i % 3 === 0) prop('postbox', x + 5.3, front + .05);
@@ -346,7 +346,7 @@ const HOURS = { fashion: [9, 21], police: [0, 24], square: [6, 22], office: [6, 
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
 // doctors are paid for every game hour they spend inside the hospital during their shift
-const DOCTOR = { start: 8, end: 20, wage: [45, 52, 60, 70, 82, 95, 110] };
+const DOCTOR = { start: 8, end: 20, wage: [60, 70, 82, 96, 112, 130, 152] };   // above office: needs a degree + licence
 // calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
 const MONTH_DAYS = 5;
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -464,7 +464,7 @@ const OFFICE_WAGE = [55, 65, 78, 92, 110, 130, 155];            // per game hour
 const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
 // running: faster, costs energy per tile; you stop running when energy gets low
 const RUN = { mul: 1.6, energyPerTile: 0.3, minEnergy: 5 };
-const POLICE = { patrolWage: 18, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 2.7 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
+const POLICE = { patrolWage: 24, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 2.7 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
 const EVENTS = [

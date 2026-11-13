@@ -240,7 +240,7 @@ function npcBuyPrice(a, id, rate = NPC_BUY) {
   let b = 1;
   if (a.career === 'merchant' && it.kind === 'goods') rate = 0.7 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
   else if (a.career === 'merchant') b += 0.05;
-  if (a.career === 'chef' && it.kind === 'meal') rate = Math.max(rate, 0.5);                                      // restaurants buy chefs' dishes
+  if (a.career === 'chef' && it.kind === 'meal') rate = Math.max(rate, 0.65);                                      // restaurants buy chefs' dishes
   if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
   if (it.kind === 'fish') b += 0.01 * Math.min(8, fishLv(a) - 1);       // experienced anglers know the buyers
   return marketPrice(id) * rate * b;
@@ -279,7 +279,7 @@ async function load() {
 function newPhone() { let p; do p = String(rint(100000, 999999)); while (byPhone.has(p)); return p; }
 function hydrate(r) {
   const a = Object.assign({
-    avatar: 0, money: 600, energy: 100, hunger: 100, health: 100, career: 'none', licenses: [], xp: {},
+    avatar: 0, money: 1000, energy: 100, hunger: 100, health: 100, career: 'none', licenses: [], xp: {},
     inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1,
     furniture: [], bank: 0, bankT: now(), loan: 0, dz: [], awake: 0, listings: [], contacts: [], stats: {}, ach: [], title: '', jobChanges: [],
     enrolled: false, classes: 0, office: null, garden: null, rent: null, houseSale: 0, houseRent: 0, down: null,
@@ -736,7 +736,7 @@ function act(a, m) {
       q = Math.min(q, have, 500);
       if (q <= 0) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
       if (!cd(a, 'sell', 300)) return;
-      const rate = s.type === 'market' ? NPC_BUY : 0.38;
+      const rate = s.type === 'market' ? NPC_BUY : s.type === 'fishclub' ? 0.55 : 0.5;   // the fish club and the farm buyer pay far better than the market's NPC
       let total = 0;
       for (let i = 0; i < q; i++) { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); }
       addItem(a, id, -q);
@@ -1319,7 +1319,7 @@ function moodTick(a, t, indoors) {
   billUp(a);
   // begging: passers-by drop coins now and then
   if (a.pose === 'beg' && a.career === 'beggar' && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
-    const c = rint(2, 12); earn(a, c); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
+    const c = rint(4, 14); earn(a, c); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
   }
   // police on patrol (outside, on their feet) earn a small allowance
   if (a.career === 'police' && !indoors && !a.pose && t - (a.lastMoveT || 0) < 15000) {
@@ -1719,7 +1719,7 @@ function marketView() {
     b.p = Math.min(b.p, L.price); b.n += L.qty;
   }
   const out = {};
-  for (const k in D.ITEMS) out[k] = { npc: Math.round(npcBuyPrice({ career: '' }, k)), farm: Math.round(npcBuyPrice({ career: '' }, k, 0.45)), sell: npcSellPrice(k), ref: Math.round(marketPrice(k)), best: best[k] ? best[k].p : 0, n: best[k] ? best[k].n : 0 };
+  for (const k in D.ITEMS) out[k] = { npc: Math.round(npcBuyPrice({ career: '' }, k)), farm: Math.round(npcBuyPrice({ career: '' }, k, D.ITEMS[k].kind === 'fish' ? 0.55 : 0.5)), sell: npcSellPrice(k), ref: Math.round(marketPrice(k)), best: best[k] ? best[k].p : 0, n: best[k] ? best[k].n : 0 };
   return out;
 }
 
