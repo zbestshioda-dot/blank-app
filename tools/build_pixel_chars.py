@@ -124,9 +124,19 @@ for name in frames:
     pre, _, f = name.rpartition(':'); base = (pre + ':' if pre else '') + f[:-1] + '0'
     if f.endswith('0') or base not in canv: continue
     ny = neck_y(base)
+    # line the walking body up under the standing head: match the shoulders (rows just below the neck)
+    def torso_cx(nm):
+        a = np.zeros((H, W), bool)
+        for ln in ORDER: a |= np.array(canv[nm][ln])[..., 3] > 60
+        band = a[ny + 1:ny + 1 + max(4, int(H * 0.12))]
+        xs = np.where(band.any(0))[0]; return (xs.min() + xs.max()) / 2 if len(xs) else W / 2
+    dx = int(round(torso_cx(base) - torso_cx(name)))
     for ln in ORDER:
-        step = np.array(canv[name][ln]); stand = np.array(canv[base][ln])
-        step[:ny] = stand[:ny]; canv[name][ln] = Image.fromarray(step, 'RGBA')
+        step = np.roll(np.array(canv[name][ln]), dx, axis=1); stand = np.array(canv[base][ln])
+        step[:ny] = stand[:ny]
+        # the stand's chin/neck may hang a row or two below the cut: keep it on top
+        st = stand[ny:ny + 3]; keep = st[..., 3] > 60; step[ny:ny + 3][keep] = st[keep]
+        canv[name][ln] = Image.fromarray(step, 'RGBA')
 atlas = Image.new('RGBA', (cw * len(ORDER), ch * len(frames)), (0, 0, 0, 0)); meta = {}
 for row, name in enumerate(frames):
     for col, ln in enumerate(ORDER): atlas.alpha_composite(canv[name][ln].resize((cw, ch), Image.LANCZOS), (col * cw, row * ch))
