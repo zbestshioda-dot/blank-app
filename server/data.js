@@ -96,8 +96,8 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   pathDown(B('office', 'b_tower', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
   B('flower', 'b_flower2', 13, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
   // north street: the civic street
-  B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
-  pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
+  B('police', 'b_police2', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
+  B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true });
   B('cinema', 'b_cinema', 27, 30, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
   B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', outdoor: true, noSlot: true });   // hair dye at the counter outside
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
