@@ -565,7 +565,13 @@ function drawPlayer(p, X, Y, t) {
   if (px0 < -80 || py0 < -140 || px0 > VW + 80 || py0 > VH + 140) return;
   const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail';
   const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
-  let dir = Math.abs(cy) > Math.abs(cx) ? (cy > 0 ? 'down' : 'up') : (cx > 0 ? 'right' : 'left');
+  // facing from the 8-way index with hysteresis: on a diagonal keep the current facing if it is one of
+  // the two neighbours, so a wobbling joystick does not flip the view (head turning) every frame
+  const CARD = { 0: 'left', 2: 'up', 4: 'right', 6: 'down' }, DIAG = { 1: ['left', 'up'], 3: ['up', 'right'], 5: ['right', 'down'], 7: ['down', 'left'] };
+  const f8 = ((p.f | 0) % 8 + 8) % 8;
+  let dir = CARD[f8] || (DIAG[f8].includes(p.view) ? p.view : DIAG[f8].find(d => d === 'up' || d === 'down'));
+  if (CARD[f8] && p.view && p.view !== dir && performance.now() - (p.viewT || 0) < 120) dir = p.view;   // tiny debounce
+  if (dir !== p.view) { p.view = dir; p.viewT = performance.now(); }
   if (sitting || lying) dir = 'down';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
   p.walk = (p.walk || 0) + (moving ? .2 : 0);
