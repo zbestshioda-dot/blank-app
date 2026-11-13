@@ -34,11 +34,14 @@ const BUILDINGS = [], STATIONS = [], PROPS = [];
 const prop = (s, x, y, solid = true) => { PROPS.push({ s, x, y }); if (solid) set(Math.floor(x), Math.floor(y - 0.5), 'o'); };
 // a straight run of fence pieces from x0 to x1 along row y (bottom edge); solid fences block the grass tiles they stand on
 function fenceRow(s, x0, x1, y, solid = true) {
-  const w = SPR(s).w;
-  for (let x = x0; x + w <= x1 + 0.05; x += w) {
+  const w = SPR(s).w, n = Math.max(1, Math.round((x1 - x0) / w));
+  // pieces overlap a little when the run is not a whole number of pieces, so it always ends exactly at x1
+  const step = n > 1 ? (x1 - x0 - w) / (n - 1) : 0;
+  for (let k = 0; k < n; k++) {
+    const x = n > 1 ? x0 + k * step : (x0 + x1 - w) / 2;
     PROPS.push({ s, x: x + w / 2, y });
-    if (solid) for (let i = Math.floor(x + .15); i <= Math.floor(x + w - .15); i++) if ('.mT'.includes(get(i, Math.floor(y - .5)))) set(i, Math.floor(y - .5), 'o');
   }
+  if (solid) for (let i = Math.floor(x0 + .15); i <= Math.floor(x1 - .15); i++) if ('.mT'.includes(get(i, Math.floor(y - .5)))) set(i, Math.floor(y - .5), 'o');
 }
 // a building whose door opens onto row `front` (the first walkable row in front of it)
 function B(id, sprite, x, front, extra = {}) {
@@ -153,7 +156,10 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   STATIONS.push({ id: 'pier_p', type: 'pier', pool: 'lake', label: 'บ่อตกปลา', icon: '🎣', x: 80, y: 49.2, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'gate_farm', type: 'gate', to: 'farm_in', label: 'ไปไร่ชานเมือง', icon: '🌾', x: 3, y: 32, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'gate_housing', type: 'gate', to: 'housing_in', label: 'ไปหมู่บ้านจัดสรร', icon: '🏘️', x: 50, y: 5, r: 1.6, area: 'town' });
-  prop('sign_walk', 4.6, 30.3); prop('signpost', 52.2, 5.3);
+  prop('sign_walk', 4.6, 30.3); prop('signpost', 52.8, 7.4);
+  // the town wall along the north edge, with the wooden town gate standing open over the road to the housing estate
+  fenceRow('wall_stone', 1, 47.27, 5.95); fenceRow('wall_stone', 52.73, 97, 5.95);
+  prop('gate_wood_l', 48.13, 5.95); prop('gate_wood_r', 51.87, 5.95);
 }
 
 // ================================================================= FARM (player gardens)
