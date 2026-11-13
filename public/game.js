@@ -1004,9 +1004,10 @@ function renderPanel(p) {
           const own = (me.listings || []).filter(L => L.item === id).reduce((t, L) => t + L.qty, 0);
           const n = Math.max(0, (m2.n || 0) - own);
           const pl = n ? `<b style="color:var(--ok)">ผู้เล่น ${money(m2.best)}</b> (${n} ชิ้น)` : '<span style="opacity:.6">ไม่มีผู้เล่นวางขาย</span>';
-          return itemRow(id, `<div class="col2">${B(n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}${B(`NPC ${money(m2.sell || 0)}`, { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div>`, `${pl} · ร้าน NPC ${money(m2.sell || 0)}`);
+          const it = G.items[id];
+          return `<div class="card"><div class="ic">${it.icon}</div><div class="nm2">${esc(it.name)}</div><small>${n ? `ผู้เล่น ${money(m2.best)} · ${n} ชิ้น` : 'ไม่มีผู้เล่นขาย'}<br>NPC ${money(m2.sell || 0)}</small><div class="btns">${B(n ? `ซื้อ ${money(m2.best)}` : 'หมด', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}${B('NPC', { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div></div>`;
         }).join('');
-        body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div>${search}${cats}<div class="list">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
+        body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div>${search}${cats}<div class="shopGrid">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
       } else if (tab === 'sell') {
         const inv = Object.entries(me.inv).filter(([id, q]) => q > 0 && match(id));
         body = inv.map(([id, q]) => {
@@ -1090,13 +1091,17 @@ function renderPanel(p) {
       return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่/ต่ออายุได้ที่นี่</div><div class="list">${degRow}${rows}</div>`;
     }
     case 'bag': {
-      const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
+      const invIds = Object.entries(me.inv).filter(([, q]) => q > 0).map(([id]) => id);
+      const selId = p.sel && (me.inv[p.sel] || 0) > 0 ? p.sel : invIds[0] || null;
+      const grid = invIds.map(id => B(`${G.items[id].icon}<b>${me.inv[id]}</b>`, { fn: 'mtab', set: { sel: id } }, 'slot' + (id === selId ? ' sel' : ''))).join('');
+      const sd = selId ? G.items[selId] : null;
+      const detail = sd ? `<div class="item detailCard"><div class="em">${sd.icon}</div><div class="nm">${esc(sd.name)}<small>x${me.inv[selId]} · ~${money(sd.base)}${sd.eat ? ' · ' + eatText(sd.eat) : ''}</small></div>${sd.eat ? B('ใช้', { t: 'use', item: selId }, 'good') : ''}</div>` : '';
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
       const rod = me.rod ? `🎣 เบ็ด${'★'.repeat((me.tools || {}).fisher || 0) || ' ธรรมดา'} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
       const home = me.house >= 0 ? `บ้านเลขที่ ${me.house + 1} ⭐${me.comfort}` : me.rent ? `เช่าบ้านเลขที่ ${me.rent.idx + 1}` : 'ยังไม่มี';
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🎣 ตกปลา<small>${rod}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
-      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>`;
+      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="bagGrid">${grid || '<div class="sub">ยังไม่มีของ</div>'}</div>${detail}`;
     }
     case 'career': {
       const cur = G.careers[me.career];

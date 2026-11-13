@@ -369,3 +369,17 @@ textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid
 }
 #mapLegend .lgSec{font-size:12px;font-weight:600;color:var(--ink);padding:6px 4px 2px;grid-column:1/-1}
 #mapLegend button i.k-staff{background:#8b4fc4}#mapLegend button i.k-player{background:#e0453a}
+
+/* ---------------- shop cards + inventory slots */
+.shopGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:8px;margin-top:8px}
+.card{background:linear-gradient(#fbf0d6,#efdcb0);border:2px solid var(--line);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 0 var(--woodDk)}
+.card .ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:30px;background:radial-gradient(#fff8e6,#e7cf9e);border:2px solid #b38955}
+.card .nm2{font-weight:600;font-size:13px;text-align:center;line-height:1.25}
+.card small{color:var(--mut);font-size:11.5px;text-align:center;line-height:1.35}
+.card .btns{display:flex;gap:4px;width:100%;margin-top:auto}
+.card .btns button{flex:1;font-size:12px;padding:5px 4px}
+.bagGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.bagGrid button.slot{position:relative;aspect-ratio:1/1;width:100%;padding:0;font-size:26px;border-radius:10px;border:2px solid #b38955;background:radial-gradient(#fff8e6,#e7cf9e);box-shadow:none;display:grid;place-items:center}
+.bagGrid button.slot.sel{border-color:#5f7a2c;box-shadow:0 0 0 3px #c9e08b}
+.bagGrid button.slot b{position:absolute;right:3px;bottom:1px;font-size:11px;background:var(--woodDk);color:#fff8e6;border-radius:8px;padding:0 5px;line-height:1.5}
+.detailCard{margin-top:10px}
