@@ -269,3 +269,8 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
 #card.mini #mePortrait{display:none}
 #card.mini .who>div{padding-right:20px}
 #card.admin #meName::before{font-size:11px}
+
+/* ---- job staff NPC line in panels ---- */
+.npcSay{display:flex;gap:8px;align-items:center;background:var(--paper3);border:2px solid var(--line);border-radius:12px;padding:6px 10px 6px 4px;margin:4px 0 8px;font-size:13px}
+.npcSay b{color:var(--wood);margin-right:2px}
+.npcFace{width:40px;height:46px;flex:none;image-rendering:pixelated}

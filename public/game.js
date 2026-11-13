@@ -64,7 +64,7 @@ function charFrame(frame, lk) {
   return c;
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const CAREER_OUTFIT = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', rider: 'rider' };
+const CAREER_OUTFIT = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
   // career outfits: doctors wear the white coat + scrubs sheet (only their hair colour is applied)
@@ -115,7 +115,7 @@ function handle(m) {
       $('#createName').textContent = 'ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
-      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear();
+      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff();
       creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
@@ -490,7 +490,9 @@ function frame(t) {
   if (near) {
     ab.classList.remove('hidden'); $('#actIcon').textContent = near.icon;
     const closed = near.type === 'door' && near.house === undefined && !isOpen(near.bld);
-    $('#actLabel').textContent = near.type === 'door' ? (near.house !== undefined ? `บ้านเลขที่ ${near.house + 1}` : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label) : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? near.label : near.type === 'seat' ? 'นั่ง' : near.label;
+    const stf = STAFF_AT[near.id];
+    if (stf) { $('#actIcon').textContent = '💬'; staffGreet(stf); }
+    $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้านเลขที่ ${near.house + 1}` : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label) : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? near.label : near.type === 'seat' ? 'นั่ง' : near.label;
     ab.classList.toggle('closed', closed);
   } else ab.classList.add('hidden');
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
@@ -533,6 +535,7 @@ function draw(t) {
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([f[2], 3, f]);
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
+  for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
   for (const [, k, e] of ents) {
@@ -631,6 +634,35 @@ function npcPatient(b, s) {
   const key = b[1]; let n = npcPatients[key];
   if (!n) { const h = [...String(b[0])].reduce((a, c) => a * 31 + c.charCodeAt(0) >>> 0, 7); n = npcPatients[key] = { id: key, npc: 1, name: b[0], g: h % 2 ? 'f' : 'm', lk: { hair: ['brown', 'black', 'blonde', 'ginger'][h % 4], shirt: SHIRT_IDS[(h >> 3) % 4], pants: ['gray', 'jeans', 'brown'][(h >> 5) % 3] }, pose: 'hosp', dz: ['🤒'] }; }
   n.rx = n.x = s.x; n.ry = n.y = s.y; return n;
+}
+// ---- job staff: an NPC at every place that hires, wearing that job's outfit; talk to them to apply / change jobs
+const STAFF_DEF = {
+  office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', lk: { hair: 'black' }, hi: 'สวัสดีค่ะ สนใจร่วมงานกับไทยเทคไหมคะ?', yes: 'ทำงานให้ตรงเวลานะคะ เข้างาน 8 โมง!' },
+  farmer:   { name: 'ลุงคำ (ประธานสหกรณ์)', short: 'ลุงคำ', hi: 'มาทำไร่ด้วยกันไหมหลาน ได้กินผักสดทุกวัน', yes: 'ดูแลแปลงดีๆ นะหลาน' },
+  fisher:   { name: 'น้าเล็ก (นายกสมาคมประมง)', short: 'น้าเล็ก', hi: 'ทะเลวันนี้ปลาชุม สนใจออกเรือไหม?', yes: 'ที่ทะเลมีฉลามนะ ระวังตัวด้วย' },
+  merchant: { name: 'เฮียชัย (เจ้าของคลังสินค้า)', short: 'เฮียชัย', lk: { hair: 'black' }, hi: 'ของถูกเอาไปขายแพง กำไรงามนะ สนใจไหม?', yes: 'ซื้อถูกขายแพง จำไว้!' },
+  chef:     { name: 'เชฟหมี (หัวหน้าครัว)', short: 'เชฟหมี', hi: 'อยากเป็นเชฟต้องมีใบรับรองนะ แล้วมาปรุงด้วยกัน', yes: 'วัตถุดิบดี อาหารก็อร่อย!' },
+  doctor:   { name: 'หมอวิทย์ (ผอ.โรงพยาบาล)', short: 'หมอวิทย์', lk: { hair: 'silver' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะ', yes: 'คนไข้รออยู่ที่เตียง ไปช่วยเขาเถอะ' },
+  rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', hi: 'มีใบขับขี่กับมอไซค์ไหม? มาวิ่งส่งอาหารกัน', yes: 'ออเดอร์เข้าเยอะ ดูแอพด้วยนะ!' },
+  police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', hi: 'เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ', yes: 'ถ้ามีแจ้งเหตุ 191 รีบไปนะ' },
+  thief:    { name: 'เสี่ยดำ (ซอยมืด)', short: 'เสี่ยดำ', lk: { hair: 'black', shirt: 'black', pants: 'black' }, hi: 'ชู่ว... อยากได้เงินง่ายๆ ไหม?', yes: 'อย่าให้ตำรวจจับได้ล่ะ' },
+  beggar:   { name: 'ป้าจุก (ศาลาประชาคม)', short: 'ป้าจุก', lk: { hair: 'silver', shirt: 'white', pants: 'brown' }, hi: 'ไม่มีงานทำก็มานั่งขอทานกับป้าได้นะลูก', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะลูก' },
+};
+let STAFF = [], STAFF_AT = {};
+function buildStaff() {
+  STAFF = []; STAFF_AT = {};
+  for (const [career, d] of Object.entries(STAFF_DEF)) {
+    const c = G.careers[career], s = c && STN(c.where); if (!s) continue;
+    const inside = AREA[s.area]?.kind === 'room';
+    const x = inside ? s.x + 1.3 : s.x + 1.2, y = inside ? s.y - 0.9 : s.y - 0.15;      // behind the counter / beside the kiosk
+    const n = { id: 'staff_' + career, staff: 1, career, c: career, name: d.name, short: d.short, lk: { hair: 'brown', shirt: 'white', pants: 'gray', ...(d.lk || {}) },
+      x, y, rx: x, ry: y, f: 6, dz: [], line: m => m.career === career ? ` ${d.yes}` : ` ${d.hi}`, greetT: 0 };
+    STAFF.push(n); STAFF_AT[s.id] = n;
+  }
+}
+function staffGreet(n) {
+  const t = performance.now(); if (t - n.greetT < 20000) return;
+  n.greetT = t; n.bubble = me?.career === n.career ? STAFF_DEF[n.career].yes : STAFF_DEF[n.career].hi; n.bt = t + 5000;
 }
 function nameAndBubble(p, px, top, mine) {
   sign(`${p.adm ? '👑 ' : ''}${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
@@ -739,7 +771,9 @@ function openPanel(p) {
 function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
 function refreshPanel(force) {
   if (!panel || !me) return;
-  const html = renderPanel(panel);
+  let html = renderPanel(panel);
+  const stf = panel.st && STAFF_AT[panel.st];
+  if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.career}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
   if (!force && html === panelSig) return;
   const ae = document.activeElement;
   if (!force && ae && ae.tagName === 'INPUT' && $('#panelBody').contains(ae)) { if (panel.kind === 'chat') { const box = $('#chatMsgs'); if (box) box.innerHTML = chatHtml(); } return; }
@@ -759,6 +793,10 @@ function bindPanel(root) {
   });
   const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
+  root.querySelectorAll('[data-staff]').forEach(c => whenChars(() => {
+    const n = STAFF.find(x => x.career === c.dataset.staff); if (!n) return;
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, n, 24, 98, 100 / CH_ATLAS.h, 'front', 0);
+  }));
   root.querySelectorAll('[data-look]').forEach(c => whenChars(() => {
     const [cat, id] = c.dataset.look.split(':'), lk = { ...(me.look || {}), [cat]: id }, g = c.getContext('2d');
     drawCharTo(g, { g: me.gender, lk }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
@@ -1324,7 +1362,7 @@ function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
-const CAREER_TARGET = { police: 'police', thief: 'hideout', beggar: 'square', none: 'door_office', office: 'office', farmer: 'coop', fisher: 'fishclub', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
+const CAREER_TARGET = { police: 'police', thief: 'hideout', beggar: 'square', none: 'door_office', office: 'office', farmer: 'coop', fisher: 'fishclub', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider', beggar: 'beggar', thief: 'thief' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seat45_27.6' };
 function setGuide(key, quiet) {
   const g = targetOf(key); if (!g) return;

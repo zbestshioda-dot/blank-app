@@ -21,9 +21,12 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'merchant': ('tools/sheets/pixel_merchant.jpg', ('hair',)),
           'office': ('tools/sheets/pixel_office.jpg', ('hair',)),
           'fisher': ('tools/sheets/pixel_fisher.jpg', ()),
-          'rider': ('tools/sheets/pixel_rider.jpg', ())}
+          'rider': ('tools/sheets/pixel_rider.jpg', ()),
+          'beggar': ('tools/sheets/pixel_beggar.jpg', ()),
+          'thief': ('tools/sheets/pixel_thief.jpg', ())}
 # per-sheet frame overrides (some sheets put the poses in different cells)
-FRAME_FIX = {'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}}   # negative = use that cell mirrored
+FRAME_FIX = {'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}, 'beggar': {'up0': 19, 'up1': 19},
+             'thief': {'down1': 10, 'down2': 15, 'up0': 4, 'up1': 9, 'left1': 6, 'left2': -7}}   # negative = use that cell mirrored
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
 FRAMES = {'down0': 0, 'down1': 16, 'down2': 18, 'up0': 14, 'up1': 19, 'left0': 5, 'left1': 7, 'left2': 17}
