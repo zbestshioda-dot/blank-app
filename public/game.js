@@ -696,6 +696,7 @@ function draw(t) {
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
+  if (A?.id === 'town') { stepTraffic(); for (const c of traffic) if (c.y > c.y0 + .3 && c.y < c.y1 - .3 && vis(c.x, c.y, 3)) ents.push([c.y, 5, c]); }   // cars only show on their own stretch of road
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
   if (!myRoom) drawCastShadows(ents, X, Y, night);
@@ -704,6 +705,7 @@ function draw(t) {
     else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) spr(e[2], e[0] + .5, e[1] + 1.05, X, Y);
     else if (k === 3) spr(e[0], e[1], e[2], X, Y);
+    else if (k === 5) spr(e.s, e.x, e.y + .35, X, Y, .78);
     else drawPlayer(e, X, Y, t);
   }
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) drawBuildingSign(b, X, Y);
@@ -1847,6 +1849,7 @@ function drawCastShadows(ents, X, Y, night) {
     if (kind === 0) one(e.sprite, e.x + e.w / 2, e.y + e.h + .02);
     else if (kind === 1 && !e.z) one(e.s, e.x, e.y);
     else if (kind === 2) one(e[2], e[0] + .5, e[1] + 1.05);
+    else if (kind === 5) one(e.s, e.x, e.y + .35, .78);
     else if (kind === 4 && e.rx != null) {          // people: a body-shaped blob
       g.setTransform(DPR, 0, -k * DPR, -d * DPR, ((e.rx) * TS + X) * DPR, ((e.ry + .32) * TS + Y) * DPR);
       g.fillStyle = '#000'; g.beginPath(); g.ellipse(0, -TS * .55, TS * .2, TS * .55, 0, 0, 7); g.fill();
@@ -1876,8 +1879,32 @@ function drawSunlight(t, night) {
   v.addColorStop(0, 'rgba(20,10,0,0)'); v.addColorStop(1, `rgba(20,10,0,${.32 * day + .1})`);
   ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
 }
+// ---- ambient traffic: cosmetic cars on the vertical roads (left lane drives down toward you, right lane up); they wait for people in the way
+const LANES = [[49.5, 4, 23.5], [49.5, 40, 75.5], [2.5, 14, 31.5], [94.5, 16, 77.5]];
+let traffic = [], trafT = 0;
+function stepTraffic() {
+  const t = performance.now(), dt = Math.min(.1, (t - (trafT || t)) / 1000); trafT = t;
+  if (!traffic.length) {
+    const kinds = ['car_red', 'car_blue', 'taxi', 'car_green'];
+    LANES.forEach(([x, y0, y1], li) => { for (const dir of [1, -1]) { const n = Math.max(1, Math.round((y1 - y0) / 14)); for (let i = 0; i < n; i++) traffic.push({ s: kinds[(li * 3 + i + (dir > 0 ? 0 : 2)) % 4], x: x + (dir > 0 ? -.5 : .5), y0, y1, dir, y: y0 + (y1 - y0) * ((i + (dir > 0 ? 0 : .5)) / n), v: 2.6 + (li % 3) * .3 }); } });
+  }
+  for (const c of traffic) {
+    const ahead = c.y + c.dir * 1.3;
+    const blocked = [...P.values()].some(p => Math.abs(p.rx - c.x) < .8 && Math.abs(p.ry - ahead) < 1) || traffic.some(o => o !== c && o.x === c.x && (o.y - c.y) * c.dir > 0 && Math.abs(o.y - c.y) < 2.2);
+    if (!blocked) c.y += c.dir * c.v * dt;
+    if (c.dir > 0 && c.y > c.y1) c.y = c.y0;
+    if (c.dir < 0 && c.y < c.y0) c.y = c.y1;
+  }
+}
 function drawLights(X, Y, dark) {
   ctx.globalCompositeOperation = 'lighter';
+  const glow = (px, py, r, col) => { if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) return; const g = ctx.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(px - r, py - r, r * 2, r * 2); };
+  // shop doors spill warm light onto the street while they are open
+  for (const b of G.map.buildings) if (b.st && !b.renov && b.house === undefined && isOpen(b.id)) glow((b.x + b.w / 2) * TS + X, (b.y + b.h) * TS + Y, TS * 2.2, `rgba(255,190,110,${dark * .75})`);
+  // homes with someone living in them have lit windows
+  for (const b of G.map.buildings) if (b.house !== undefined && wd?.houses?.[b.house]?.[0]) glow((b.x + b.w / 2) * TS + X, (b.y + b.h - 1.2) * TS + Y, TS * 1.6, `rgba(255,210,130,${dark * .6})`);
+  // cars: headlights ahead, red tail lights behind
+  if (drawArea?.id === 'town') for (const c of traffic) if (c.y > c.y0 + .3 && c.y < c.y1 - .3) { const px = c.x * TS + X, py = c.y * TS + Y; glow(px, py + c.dir * TS * 1.3, TS * 1.6, c.dir > 0 ? `rgba(255,245,200,${dark * .9})` : `rgba(255,60,40,${dark * .6})`); }
   for (const p of G.props) if (/^lamp/.test(p.s)) {
     const px = p.x * TS + X, py = (p.y - 1.6) * TS + Y; if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) continue;
     const g = ctx.createRadialGradient(px, py, 0, px, py, TS * 2.4);
