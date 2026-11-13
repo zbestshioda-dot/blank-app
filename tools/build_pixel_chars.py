@@ -19,9 +19,10 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'farmer': ('tools/sheets/pixel_farmer.jpg', ()),
           'chef': ('tools/sheets/pixel_chef.jpg', ()),
           'merchant': ('tools/sheets/pixel_merchant.jpg', ('hair',)),
-          'office': ('tools/sheets/pixel_office.jpg', ('hair',))}
+          'office': ('tools/sheets/pixel_office.jpg', ('hair',)),
+          'fisher': ('tools/sheets/pixel_fisher.jpg', ())}
 # per-sheet frame overrides (some sheets put the poses in different cells)
-FRAME_FIX = {'police': {'left2': 6}}
+FRAME_FIX = {'police': {'left2': 6}, 'fisher': {'down2': 13}}
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
 FRAMES = {'down0': 0, 'down1': 16, 'down2': 18, 'up0': 14, 'up1': 19, 'left0': 5, 'left1': 7, 'left2': 17}
