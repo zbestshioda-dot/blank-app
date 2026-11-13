@@ -217,6 +217,25 @@ const GATES = {
 };
 
 // ================================================================= trees (scatter on free grass)
+// scattered outdoor decor (placed before the random trees so trees keep clear of it)
+function scatter(A, kinds, n, flat) {
+  for (let i = 0, tries = 0; i < n && tries < n * 40; tries++) {
+    const x = A.x + 2 + Math.floor(rand() * (A.w - 4)), y = A.y + 3 + Math.floor(rand() * (A.h - 5));
+    let ok = true;
+    for (let j = -2; j <= 1 && ok; j++) for (let k = -1; k <= 1; k++) if (!'.m'.includes(get(x + k, y + j) || '#')) { ok = false; break; }
+    if (!ok || STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3) || PROPS.some(p => Math.hypot(p.x - x - .5, p.y - y - .5) < 3)) continue;
+    prop(kinds[i % kinds.length], x + .5, y + .95, !flat); i++;
+  }
+}
+scatter(TOWN, ['rock', 'stump', 'bench_stone', 'flowerbox', 'rock_big', 'barrel', 'crates'], 16);
+scatter(TOWN, ['tuft', 'tuft', 'puddle'], 14, true);
+scatter(FARM, ['wheelbarrow', 'hay', 'crate_apple', 'firewood', 'ladder', 'barrel', 'hose', 'faucet', 'crate', 'rock'], 14);
+scatter(FARM, ['tuft'], 10, true);
+scatter(HOUSING, ['gnome', 'gnome2', 'flowerbox', 'stump', 'bench_stone', 'rock', 'hose'], 14);
+scatter(HOUSING, ['tuft'], 8, true);
+// manholes on the main roads, a news box and bollards by the square
+for (const [x, y] of [[50, 52], [50, 66], [30, 47], [70, 15], [25, 15], [50, 10]]) if (get(Math.floor(x), Math.floor(y - .5)) === '=') prop('manhole', x, y, false);
+prop('newsbox', 57.3, 38.9); prop('bollard', 47.6, 39.95); prop('bollard', 52.4, 39.95);
 const TREE_KINDS = ['tree', 'tree2', 'pine', 'tree_oak', 'tree_pink', 'tree3', 'bush', 'tree4', 'pine2', 'tree_cone', 'tree_twin', 'tree_pink2', 'bush2', 'tree_white'];
 for (const a of [TOWN, FARM, HOUSING]) {
   for (let x = a.x; x < a.x + a.w; x++) { set(x, a.y, 'T'); set(x, a.y + a.h - 1, 'T'); }

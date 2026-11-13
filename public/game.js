@@ -679,7 +679,7 @@ function draw(t) {
   const ents = [];
   const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
-  for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([p.y, 1, p]);
+  for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
@@ -1732,7 +1732,8 @@ function silhouettes() {
   const g = c.getContext('2d'); g.drawImage(atlasImg, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
   return shadowAtlas = c;
 }
-const FLAT = /^(f_rug|flowerbed|fl_|g_|pond|grass_tuft|sign_walk)/;
+const FLAT = /^(f_rug|flowerbed|fl_|g_|pond|grass_tuft|manhole|puddle|tuft)/;
+const GROUND_PROP = /^(manhole|puddle|tuft|grass_tuft)$/;
 function drawCastShadows(ents, X, Y, night) {
   const sa = silhouettes(); if (!sa) return;
   const day = 1 - night / 0.55; if (day < 0.05) return;
