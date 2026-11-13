@@ -242,3 +242,4 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
   #clock span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#clock i{display:none}
 }
 #card.admin #meName::before{content:'👑 ';font-size:13px}
+#createName{font-family:var(--ui)!important;letter-spacing:0!important;font-size:13px!important}

@@ -77,9 +77,13 @@ function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
 paintSw();
 if (creds) { $('#inName').value = creds.name; $('#inPin').value = creds.pin; }
 const nameErr = v => /[^\x20-\x7e]/.test(v) ? 'ชื่อตัวละครใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น' : /\s/.test(v) ? 'ชื่อห้ามมีเว้นวรรค' : '';
-$('#inName').addEventListener('input', e => { $('#loginErr').textContent = nameErr(e.target.value) ? nameErr(e.target.value) + ' (ตัวละครเก่าชื่อไทยยังเข้าได้)' : ''; });
+$('#inName').addEventListener('input', e => { $('#loginErr').textContent = nameErr(e.target.value) ? nameErr(e.target.value).replace('ชื่อตัวละคร', 'ID') + ' (บัญชีเก่าที่เป็นภาษาไทยยังเข้าได้)' : ''; });
 $('#createBack').onclick = () => { $('#createBox').classList.add('hidden'); $('#loginForm').classList.remove('hidden'); };
-$('#createOk').onclick = () => { $('#createErr').textContent = ''; creds = { ...creds, create: 1, gender, shirt: SHIRT_IDS[avatar] }; wantLogin = true; connect(); };
+$('#createOk').onclick = () => {
+  const cname = $('#inCname').value.trim();
+  if (cname.length < 2) { $('#createErr').textContent = 'ตั้งชื่อตัวละครก่อน (2-16 ตัว)'; return; }
+  $('#createErr').textContent = ''; creds = { ...creds, create: 1, cname, gender, shirt: SHIRT_IDS[avatar] }; wantLogin = true; connect();
+};
 $('#loginForm').onsubmit = e => {
   e.preventDefault();
   // the server has the final say: new characters must use English/digits, old Thai-named characters still log in
@@ -108,7 +112,7 @@ function handle(m) {
     case 'loginfail': $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
     case 'newchar':     // new ID: pick gender + first shirt once
       wantLogin = false; $('#loginForm').classList.add('hidden'); $('#createBox').classList.remove('hidden');
-      $('#createName').textContent = m.name; paintSw(); break;
+      $('#createName').textContent = 'ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear();

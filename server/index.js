@@ -15,7 +15,7 @@ const SPEED = 3.0;                          // tiles / second on foot
 const TICK = 100;
 // admins (lower-case names): stats are locked full, never sick / knocked out / jailed. Extra names via ADMINS=a,b
 const ADMINS = new Set(['james2324', ...String(process.env.ADMINS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean)]);
-const isAdmin = a => !!a && ADMINS.has(String(a.name).toLowerCase());
+const isAdmin = a => !!a && ADMINS.has(String(a.login || a.name).toLowerCase());
 const VERSION = 3;                          // save-format version (2 = new world, 3 = happiness/bills/ม.6)
 
 // ------------------------------------------------------------------ state
@@ -234,13 +234,13 @@ function worth(a) {
 
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
-const SAVE_KEYS = ['v', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe'];
 let nextListing = 1;
 async function load() {
   const rows = await store.loadAll();
-  for (const r of rows) if (r && r.name) accounts.set(r.name.toLowerCase(), hydrate(r));
+  for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
     if (a.house >= 0) { if (houses[a.house]) a.house = -1; else houses[a.house] = a; }
@@ -278,6 +278,7 @@ function hydrate(r) {
     if (a.enrolled === true) a.enrolled = 'degree';
     a.v = 3;
   }
+  if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
   if (!a.phone || byPhone.has(a.phone) && byPhone.get(a.phone) !== a) a.phone = newPhone();
   byPhone.set(a.phone, a);
   return a;
@@ -1306,7 +1307,7 @@ function arrest(a, m) {
   o.money -= fine;
   // give the loot back to the victims
   let back = fine;
-  for (const c of recent) { const v = accounts.get(String(c.victim).toLowerCase()); const r = Math.min(back, c.amt); if (v && r > 0) { credit(v, r); back -= r; if (v.ws) toast(v, `ตำรวจ${a.name}จับ${o.name}ได้ คืนเงินที่ถูกล้วง ${money(r)}`, '👮'); } }
+  for (const c of recent) { const v = byName(c.victim); const r = Math.min(back, c.amt); if (v && r > 0) { credit(v, r); back -= r; if (v.ws) toast(v, `ตำรวจ${a.name}จับ${o.name}ได้ คืนเงินที่ถูกล้วง ${money(r)}`, '👮'); } }
   for (const c of recent) crimes.delete(c.id);
   o.crimes = []; o.wanted = 0;
   const got = earn(a, D.POLICE.bounty * (1 + BOOST[tier(a, 'police')]) + Math.max(0, back) * 0.3); stat(a, 'arrests'); addXp(a, 2); joy(a, 6);
@@ -1440,12 +1441,13 @@ function marketView() {
 }
 
 // ------------------------------------------------------------------ connection
+const byName = n => { n = String(n || '').toLowerCase(); for (const a of accounts.values()) if (a.name.toLowerCase() === n) return a; return null; };
 function login(ws, m) {
+  // m.name is the login ID; the character's display name (a.name) is chosen once at creation
   const name = cleanText(m.name, 16);
-  // new characters: English letters and digits only (older characters with Thai names can still log in)
-  if (!accounts.has(name.toLowerCase())) {
-    if (/[^\x20-\x7e]/.test(name)) return fail(ws, 'ชื่อตัวละครใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น (A-Z, 0-9, _ - .)');
-    if (!/^[A-Za-z0-9_.-]{2,16}$/.test(name)) return fail(ws, 'ชื่อต้องยาว 2-16 ตัว ใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข และ _ - . (ห้ามเว้นวรรค)');
+  if (!accounts.has(name.toLowerCase())) {     // new IDs: English letters and digits only (older Thai IDs still log in)
+    if (/[^\x20-\x7e]/.test(name)) return fail(ws, 'ID ใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น (A-Z, 0-9, _ - .)');
+    if (!/^[A-Za-z0-9_.-]{2,16}$/.test(name)) return fail(ws, 'ID ต้องยาว 2-16 ตัว ใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข และ _ - . (ห้ามเว้นวรรค)');
   }
   const pin = String(m.pin ?? '');
   if (!/^\d{4,8}$/.test(pin)) return fail(ws, 'PIN ต้องเป็นตัวเลข 4-8 หลัก');
@@ -1457,16 +1459,19 @@ function login(ws, m) {
   if (a) {
     if (hashPin(pin, a.salt) !== a.hash) {
       loginFail('n:' + lname, 5, 5 * 60000); loginFail('i:' + ws.ip, 15, 10 * 60000);
-      return fail(ws, 'ชื่อนี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
+      return fail(ws, 'ID นี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
     }
     loginFails.delete('n:' + lname);
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
     // a brand-new ID: the client first shows the one-time character creator, then logs in again with create:1
     if (!m.create) return ws.send(JSON.stringify({ t: 'newchar', name }));
+    const cname = String(m.cname ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
+    if (!/^[\p{L}\p{M}\p{N}_. -]{2,16}$/u.test(cname)) return send({ ws }, { t: 'loginfail', msg: 'ชื่อตัวละครต้องยาว 2-16 ตัว (ไทย/อังกฤษ/ตัวเลข)', create: 1 });
+    if (byName(cname)) return send({ ws }, { t: 'loginfail', msg: `ชื่อตัวละคร "${cname}" มีคนใช้แล้ว`, create: 1 });
     const salt = crypto.randomBytes(8).toString('hex');
     const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
-    a = hydrate({ v: VERSION, name, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
+    a = hydrate({ v: VERSION, login: name, name: cname, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
     accounts.set(lname, a); isNew = true;
   }

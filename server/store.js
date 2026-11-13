@@ -29,7 +29,7 @@ async function loadAll() {
 async function save(records, all) {
   if (pool) {
     if (!records.length) return;
-    const names = records.map(r => r.name.toLowerCase());
+    const names = records.map(r => (r.login || r.name).toLowerCase());   // the login ID is the key
     const datas = records.map(r => JSON.stringify(r));
     await pool.query(
       `INSERT INTO players (name_lc, data, updated_at)
