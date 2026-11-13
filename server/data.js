@@ -82,7 +82,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
 
   // west main road, north side (doors on row 30)
   B('toolshop', 'b_toolshop', 4, 30, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
-  pathDown(B('dealer', 'b_dealer', 11, 28, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true }), 30);
+  pathDown(B('dealer', 'b_showroom', 11, 28, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true }), 30);
   B('school', 'b_school2', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
   pathDown(B('bank', 'b_bank2', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
   // east main road, north side
@@ -93,10 +93,10 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // north street
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
-  B('cinema', 'b_studio', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
-  B('inn', 'b_inn2', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
+  B('cinema', 'b_cinema', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
+  B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
   // south-west lane (doors on row 45)
-  B('warehouse', 'b_warehouse', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
+  B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
   pathDown(B('restaurant', 'b_cafe2', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
   B('kitchen', 'b_bakery', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_rider', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });

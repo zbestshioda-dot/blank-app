@@ -13,7 +13,8 @@ JS = os.path.join(ROOT, 'public', 'assets', 'atlas.json')
 TILE = 48
 # name: (sheet, cell col, cell row, width in game tiles)
 ITEMS = {'b_rider': ('a', 0, 0, 5.6), 'b_toolshop': ('a', 1, 0, 5), 'b_market': ('a', 0, 1, 5), 'b_fishing': ('a', 1, 1, 5.5),
-         'b_cafe2': ('b', 0, 0, 5), 'b_school2': ('b', 1, 0, 6.4), 'b_inn2': ('b', 0, 1, 5.4), 'b_bank2': ('b', 1, 1, 5.6)}
+         'b_cafe2': ('b', 0, 0, 5), 'b_school2': ('b', 1, 0, 6.4), 'b_inn2': ('b', 0, 1, 5.4), 'b_bank2': ('b', 1, 1, 5.6),
+         'b_showroom': ('c', 0, 0, 6.4), 'b_cinema': ('c', 1, 0, 5.2), 'b_library': ('c', 0, 1, 5.4), 'b_factory': ('c', 1, 1, 5.6)}
 SHEET = lambda k: os.path.join(ROOT, 'tools', 'sheets', f'pixel_buildings_{k}.jpg')
 
 def cut(sheet, col, row):
