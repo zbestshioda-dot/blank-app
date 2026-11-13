@@ -736,17 +736,41 @@ function draw(t) {
   if (fp < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fp})`; ctx.fillRect(0, 0, VW, VH); }
   drawMini();
 }
+// a garden bed: wooden frame, dark tilled soil in furrows, crops planted in two rows that grow and ripen
 function drawPlot(s, px, py, t) {
   const lot = wd?.lots?.[s.lot], isNear = near && near.id === s.id;
-  const unlocked = lot && s.n < lot[1];
-  if (isNear) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.strokeRect(px - TS, py - TS, TS * 2, TS * 2); }
-  if (!unlocked) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(px - TS, py - TS, TS * 2, TS * 2); ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText(lot ? '🔒' : '', px, py); return; }
+  const unlocked = lot && s.n < lot[1], x0 = px - TS * .95, y0 = py - TS * .95, W = TS * 1.9;
+  const b = Math.max(3, TS * .09);
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 3, y0 + 4, W, W);                          // shadow
+  ctx.fillStyle = '#8a5a32'; ctx.fillRect(x0, y0, W, W);                                          // wooden frame
+  ctx.fillStyle = '#a8733f'; ctx.fillRect(x0, y0, W, b * .6);
+  ctx.fillStyle = unlocked ? '#5a3a22' : '#4a3a2e'; ctx.fillRect(x0 + b, y0 + b, W - 2 * b, W - 2 * b);   // soil
+  for (let i = 0; i < 4; i++) {                                                                    // furrows
+    const fy = y0 + b + (W - 2 * b) * (i + .5) / 4;
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x0 + b + 2, fy, W - 2 * b - 4, Math.max(2, TS * .05));
+    ctx.fillStyle = 'rgba(255,220,170,.10)'; ctx.fillRect(x0 + b + 2, fy - Math.max(2, TS * .05), W - 2 * b - 4, Math.max(1, TS * .03));
+  }
+  if (isNear) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.strokeRect(x0 - 2, y0 - 2, W + 4, W + 4); }
+  if (!unlocked) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x0, y0, W, W); ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText(lot ? '🔒' : '', px, py); return; }
   const pl = lot[2][s.n];
-  if (!pl) { ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.font = `700 ${Math.round(TS * .6)}px sans-serif`; ctx.fillText('+', px, py); return; }
+  if (!pl) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = `700 ${Math.round(TS * .6)}px sans-serif`; ctx.fillText('+', px, py); return; }
   const [crop, readyAt] = pl, it = G.items[crop], total = G.crops[crop].grow * 1000;
-  const left = readyAt - (Date.now() + clockOff);
-  if (left > 0) { const prog = clamp(1 - left / total, 0, 1); ctx.font = `${Math.round(TS * (.35 + prog * .5))}px serif`; ctx.fillText('🌱', px, py); }
-  else { ctx.font = `${Math.round(TS * .95)}px serif`; ctx.fillText(it.icon, px, py + Math.sin(t / 250) * 2); ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('✨', px + TS * .55, py - TS * .55 + Math.sin(t / 200) * 3); }
+  const left = readyAt - (Date.now() + clockOff), prog = clamp(1 - left / total, 0, 1);
+  const spots = [[-.48, -.35], [0, -.35], [.48, -.35], [-.48, .4], [0, .4], [.48, .4]];
+  for (const [dx, dy] of spots) {
+    const cx = px + dx * TS, cy = py + dy * TS, sway = Math.sin(t / 600 + dx * 3 + dy) * TS * .02;
+    if (left > 0) {                                     // sprout → leafy plant
+      const h = TS * (.12 + prog * .38);
+      ctx.fillStyle = '#3f8a2a'; ctx.fillRect(cx - 1 + sway, cy - h, 2, h);
+      ctx.fillStyle = prog < .5 ? '#7cc843' : '#4fa632';
+      ctx.beginPath(); ctx.ellipse(cx - h * .35 + sway, cy - h * .7, h * .38, h * .2, -.5, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + h * .35 + sway, cy - h * .85, h * .38, h * .2, .5, 0, 7); ctx.fill();
+    } else {                                            // ripe: the crop itself, bobbing a little
+      ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .48)}px serif`; ctx.fillText(it.icon, cx, cy - TS * .12 + Math.sin(t / 260 + dx * 4) * 1.5);
+    }
+  }
+  if (left <= 0) { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText('✨', px + TS * .75, py - TS * .8 + Math.sin(t / 200) * 3); }
+  else { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x0 + b, y0 + W - b - 4, W - 2 * b, 4); ctx.fillStyle = '#9be15d'; ctx.fillRect(x0 + b, y0 + W - b - 4, (W - 2 * b) * prog, 4); }   // growth bar
 }
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
 function drawPlayer(p, X, Y, t) {
@@ -1632,7 +1656,7 @@ function drawTile(ch, tx, ty, px, py, tm) {
     case 'k': tex('g_terracotta', tx, ty, px, py); return;
     case 'c': tex('g_cobble', tx, ty, px, py); return;
     case 'p': tex('g_planks', tx, ty, px, py); return;
-    case 'f': tex('g_dirt', tx, ty, px, py); ctx.fillStyle = 'rgba(96,52,24,.55)'; ctx.fillRect(px, py, S, S); ctx.fillStyle = 'rgba(50,26,10,.45)'; for (let i = 1; i < 4; i++) ctx.fillRect(px + 3, py + i * TS / 4, TS - 6, Math.max(2, TS / 18)); return;
+    case 'f': tex('g_grass3', tx, ty, px, py); return;                 // garden beds are drawn by drawPlot on top
     case ',': {
       tex('g_sidewalk', tx, ty, px, py);
       const hz = tileAt(tx - 1, ty) === '=' && tileAt(tx + 1, ty) === '=', vt = tileAt(tx, ty - 1) === '=' && tileAt(tx, ty + 1) === '=';
@@ -1714,7 +1738,7 @@ function drawBuildingSign(b, X, Y) {
 }
 // ------------------------------------------------------------------ depth: soft tile edges, cast shadows, sunlight
 // material of a tile for edge blending (trees and buildings stand on grass)
-const MAT = c => c === '=' ? 'road' : ',ckp'.includes(c) ? 'pave' : c === 's' ? 'sand' : c === 'w' ? 'water' : c === 'f' ? 'soil' : c === ' ' || c === '#' || c === 'i' || c === 'D' || c === 'o' ? null : 'grass';
+const MAT = c => c === '=' ? 'road' : ',ckp'.includes(c) ? 'pave' : c === 's' ? 'sand' : c === 'w' ? 'water' : c === 'f' ? 'grass' : c === ' ' || c === '#' || c === 'i' || c === 'D' || c === 'o' ? null : 'grass';
 let edgeTS = 0; const EDGE = {};
 // one small canvas per edge kind, drawn for the top side and rotated for the others
 function edgeCanvas(kind) {
@@ -2215,6 +2239,6 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
-window.__lt = { P, camera, walkTo, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+window.__lt = { P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();
