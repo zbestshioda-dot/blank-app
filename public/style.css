@@ -243,3 +243,29 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
 }
 #card.admin #meName::before{content:'👑 ';font-size:13px}
 #createName{font-family:var(--ui)!important;letter-spacing:0!important;font-size:13px!important}
+
+/* ---- landscape phones: low screens get a compact right column ---- */
+#fsBtn.on{background:linear-gradient(#8aa54a,#5f7a2c)}
+@media (max-height:520px) and (orientation:landscape){
+  #card{width:180px}#card.mini{width:160px}
+  #topRight{flex-direction:row;align-items:flex-start;gap:6px}
+  #miniWrap{order:0}#mini{width:96px}
+  #clock{order:-1;width:auto;font-size:10.5px;padding:3px 6px;line-height:1.35;text-align:center}
+  #clock span{display:block;white-space:nowrap}#clock i{display:none}
+  #menu{display:grid;grid-template-columns:repeat(2,36px);gap:4px;row-gap:4px;padding-bottom:0;max-height:calc(100vh - 16px)}
+  #menu .tile,#menuToggle{width:36px;height:36px;padding:3px;border-radius:8px}.tile i{display:none}.tile b.q{font-size:18px}
+  #topRight{right:6px;top:6px}
+  body.hasEvent #card,body.hasEvent #topRight{top:40px}
+  #eventBar{padding:3px 10px;font-size:12px}
+  #actBtn{width:122px;height:84px;right:92px}#actBtn .medal{width:52px;height:52px}#actIcon{font-size:26px}
+  #restBtn{right:224px;bottom:calc(16px + env(safe-area-inset-bottom));padding:7px 12px;font-size:13px}
+  .sheet{max-height:86vh;width:min(640px,100%)}
+  #toasts{top:auto;bottom:10px;left:40%;width:min(380px,55vw)}
+  #log{width:min(260px,40vw)}
+}
+#meName{font-family:var(--ui)!important;font-weight:600!important;font-size:15px!important;letter-spacing:0}
+#card.mini #meName{font-size:12.5px!important}
+#card .who>div{padding-right:18px}
+#card.mini #mePortrait{display:none}
+#card.mini .who>div{padding-right:20px}
+#card.admin #meName::before{font-size:11px}

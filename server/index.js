@@ -279,6 +279,9 @@ function hydrate(r) {
     a.v = 3;
   }
   if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
+  // fixed character names for special accounts (login ID -> character name)
+  const RENAME = { james2324: 'GameMaster' }[String(a.login).toLowerCase()];
+  if (RENAME && a.name !== RENAME) { a.name = RENAME; a.sd = true; }
   if (!a.phone || byPhone.has(a.phone) && byPhone.get(a.phone) !== a) a.phone = newPhone();
   byPhone.set(a.phone, a);
   return a;

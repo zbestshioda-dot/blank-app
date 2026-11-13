@@ -308,7 +308,20 @@ const placeLog = () => { const cd = $('#card'); $('#log').style.top = (cd.offset
 addEventListener('resize', () => placeLog());
 const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
 $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard(!$('#card').classList.contains('mini')); };
-{ let c = null; try { c = localStorage.getItem('lt_card'); } catch { } setCard(c === null ? innerWidth < 700 : c === '1'); }
+{ let c = null; try { c = localStorage.getItem('lt_card'); } catch { } setCard(c === null ? innerWidth < 700 || innerHeight < 520 : c === '1'); }
+// fullscreen / landscape (Android Chrome & desktop; iOS only via "Add to Home Screen" + the manifest)
+async function screenMode(mode) {
+  const el = document.documentElement;
+  try {
+    if (mode === 'exit') { if (document.fullscreenElement) await document.exitFullscreen(); try { screen.orientation.unlock(); } catch { } return; }
+    if (!document.fullscreenElement && el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' });
+    if (mode === 'landscape') { try { await screen.orientation.lock('landscape'); toast('ล็อกจอแนวนอนแล้ว', '🔄'); } catch { toast('อุปกรณ์นี้ล็อกแนวนอนไม่ได้ หมุนเครื่องเองได้เลย', '🔄', false); } }
+    if (mode === 'free') try { screen.orientation.unlock(); } catch { }
+  } catch { toast('เบราว์เซอร์นี้เปิดเต็มจอไม่ได้ (iPhone: แชร์ → เพิ่มไปยังหน้าจอโฮม)', '⛶', false); }
+  setTimeout(resize, 300);
+}
+$('#fsBtn').onclick = () => { FX.play('click'); openPanel({ kind: 'screen' }); };
+document.addEventListener('fullscreenchange', () => { $('#fsBtn').classList.toggle('on', !!document.fullscreenElement); if (panel?.kind === 'screen') refreshPanel(true); setTimeout(resize, 200); });
 // side menu can be folded away (remembered on this device)
 const setMenu = open => { $('#menu').classList.toggle('hidden', !open); $('#menuToggle').classList.toggle('closed', !open); $('#menuToggle').title = open ? 'ซ่อนเมนู' : 'เปิดเมนู'; try { localStorage.setItem('lt_menu', open ? '1' : '0'); } catch { } };
 $('#menuToggle').onclick = () => { FX.play('click'); setMenu($('#menu').classList.contains('hidden')); };
@@ -761,6 +774,7 @@ const FN = {
   tut() { closePanel(); showTut(0); },
   map() { closePanel(); openMap(); },
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
+  fs(m) { closePanel(); screenMode(m.mode); },
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
@@ -1051,6 +1065,12 @@ function renderPanel(p) {
     }
     case 'chat':
       return `<h2>💬 คุยกับคนใกล้ๆ</h2><div class="sub">ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น · คุยไกลๆ ใช้ 📱 โทรหา</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="พิมพ์ข้อความ..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
+    case 'screen': {
+      const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
+      return `<h2>⛶ หน้าจอ</h2><div class="sub">${canFs ? 'เต็มจอซ่อนแถบเบราว์เซอร์ · แนวนอนจะล็อกจอให้เป็นแนวนอน (มือถือ Android)' : 'iPhone/iPad ใช้เต็มจอจากเบราว์เซอร์ไม่ได้: กดปุ่มแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ · หมุนเครื่องเป็นแนวนอนได้เลย'}</div>
+        <div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
+        ${fsOn ? B('📱 แนวตั้ง (ปลดล็อกการหมุน)', { fn: 'fs', mode: 'free' }, 'big') : ''}`;
+    }
     case 'help':
       return `<h2>❔ วิธีเล่น</h2><div class="sub" style="font-size:14px;line-height:1.7">
         👣 <b>เดิน</b>: มือถือแตะค้างแล้วลาก · คอม WASD/ลูกศร<br>
