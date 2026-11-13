@@ -19,7 +19,7 @@
 <div id="hud" class="hidden">
   <div id="card">
     <button id="cardToggle" title="ย่อ/ขยายสถานะ"></button>
-    <div class="who"><img id="mePortrait" src="assets/ui/face_m.png" alt=""><div><b id="meName"></b><span id="meCareer"></span><div class="money" id="meMoney"></div></div></div>
+    <div class="who"><img id="mePortrait" data-open="profile" src="assets/ui/face_m.png" alt=""><div><b id="meName"></b><span id="meCareer"></span><div class="money" id="meMoney"></div></div></div>
     <div class="bars">
       <div class="bar" data-bar="energy" title="พลังงาน (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_bolt.png" alt="⚡"><s><u id="bE"></u></s><em id="vE"></em></div>
       <div class="bar" data-bar="hunger" title="ความอิ่ม (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_leg.png" alt="🍗"><s><u id="bH"></u></s><em id="vH"></em></div>
@@ -43,7 +43,8 @@
       <button class="tile" data-open="phone" id="phoneBtn" title="มือถือ"><img src="assets/ui/b_phone.png" alt="มือถือ"><i>มือถือ</i></button>
       <button class="tile" data-open="friends" id="friendsBtn" title="เพื่อนที่ออนไลน์"><b class="q">👥</b><i>เพื่อน</i></button>
       <button class="tile" data-open="quests" id="qBtn" title="เควสต์"><img src="assets/ui/b_quest.png" alt="เควสต์"><i>เควสต์</i></button>
-      <button class="tile" data-open="ach" title="ความสำเร็จ/ฉายา"><img src="assets/ui/i_medal.png" alt="ฉายา"><i>ฉายา</i></button>
+      <button class="tile" data-open="profile" title="ข้อมูลผู้เล่น / ฉายา"><img src="assets/ui/i_medal.png" alt="โปรไฟล์"><i>โปรไฟล์</i></button>
+      <button class="tile" data-open="mail" id="mailBtn" title="กล่องจดหมาย"><b class="q">📬</b><i>จดหมาย</i></button>
       <button class="tile" data-open="rank" title="อันดับ"><img src="assets/ui/b_rank.png" alt="อันดับ"><i>อันดับ</i></button>
       <button class="tile full" data-open="chat" title="คุยกับคนใกล้ๆ"><img src="assets/ui/b_chat.png" alt="แชท"><i>แชท</i></button>
       <button class="tile" data-open="settings" title="ตั้งค่า"><b class="q">⚙️</b><i>ตั้งค่า</i></button>
@@ -62,11 +63,10 @@
   <div id="stick"><i></i></div>
   <!-- right-thumb controls -->
   <div id="thumbs">
-    <button id="actBtn" class="idle" title="ใช้งาน / เข้าอาคาร (E)"><span id="actIcon">👆</span><small id="actLabel">ใช้งาน</small></button>
+    <button id="actBtn" class="idle" title="แตะ = ใช้งาน / เข้าอาคาร (E) · กดค้าง = วิ่ง (Shift)"><span id="actIcon">👆</span><small id="actLabel">ใช้งาน</small></button>
     <button id="talkBtn" class="round" title="พูดคุยกับคนใกล้ๆ (F)"><span>💬</span><small>คุย</small></button>
     <button id="restBtn" class="round sm" title="นั่งพักหลับตา (R)"><span>😌</span><small>พัก</small></button>
     <button id="emoBtn" class="round sm" title="อิโมจิบนหัว"><span>😀</span><small>อิโมจิ</small></button>
-    <button id="runBtn" class="round sm" title="วิ่ง (Shift)"><span>🏃</span><small>วิ่ง</small></button>
     <button id="begBtn" class="round sm hidden" title="นั่งขอทานตรงนี้"><span>🥣</span><small>ขอทาน</small></button>
   </div>
   <div id="emoPick" class="hidden"></div>
@@ -76,7 +76,7 @@
 <div id="mapView" class="hidden"><div class="mapBox"><div class="mapHead"><b>🗺️ แผนที่</b><span>แตะสถานที่เพื่อนำทาง · ซูม: ปุ่ม / ล้อเมาส์ / สองนิ้ว</span><button id="mapOut">➖</button><b id="mapZoomLbl">100%</b><button id="mapIn">➕</button><button id="mapX" class="x" title="ปิด"></button></div><div id="mapTabs" class="tabs"></div><div class="mapBody"><div id="mapScroll"><canvas id="bigMap"></canvas></div><div id="mapLegend"></div></div></div></div>
 <div id="tut" class="hidden"><div class="tutCard"><div id="tutBody"></div><div class="rowf"><button id="tutSkip">ข้าม</button><button class="primary" id="tutNext" style="flex:1">ถัดไป →</button></div></div></div>
 <div id="dailyWrap" class="hidden"><div class="tutCard" id="daily"></div></div>
-<div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div></div></div>
+<div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div><div class="tchat"><b>💬 คุยต่อรอง</b><div class="log" id="tchatLog"></div><form id="tchatForm" class="rowf"><input id="tchatIn" maxlength="120" placeholder="พิมพ์คุยกับอีกฝ่าย..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form></div></div></div>
 
 <div id="login">
   <form id="loginForm" class="box" autocomplete="off">

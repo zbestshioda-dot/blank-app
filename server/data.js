@@ -82,11 +82,11 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('market', 'b_mart', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' });
   B('hospital', 'b_hospital', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
   pathDown(B('office', 'b_office', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
-  B('flower', 'b_flower', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true });
+  B('flower', 'b_flower', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
   // north street
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
-  B('cinema', 'b_studio', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true });
+  B('cinema', 'b_studio', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
   B('inn', 'b_inn', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
   // south-west lane (doors on row 45)
   B('warehouse', 'b_warehouse', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
@@ -136,7 +136,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('stall_red', 9, 52); prop('stall_green', 13, 52); prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
-  STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง · ร้านขายปลา', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'pier_l1', type: 'pier', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 21, y: 62.2, r: 1.8, area: 'town' });
   STATIONS.push({ id: 'pier_l2', type: 'pier', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 32, y: 62.2, r: 1.8, area: 'town' });
   STATIONS.push({ id: 'pier_s1', type: 'pier', pool: 'sea', label: 'สะพานปลา (ทะเล)', icon: '🎣', x: 105, y: 61, r: 1.8, area: 'town' });
@@ -329,7 +329,7 @@ const SPAWN = { x: 50, y: 36.6 };
 // 05:00-20:00 (15 game hours) take 19.5 real minutes, 20:00-05:00 (9 game hours) take 4.5 real minutes.
 const DAY_MS = 24 * 60 * 1000;
 const TIME_OFF = +process.env.TIME_OFFSET_MS || 0;           // testing aid: shift the in-game clock
-const CLOCK = { dawn: 5, dusk: 20, dayMin: 19.5 };            // the client gets the same numbers
+const CLOCK = { dawn: 7, dusk: 19, dayMin: 21 };              // night 19:00–07:00 passes in 3 real minutes            // the client gets the same numbers
 const hourOfPhase = m => {                                    // m = real minutes into the day (0-24)
   const nightH = 24 - (CLOCK.dusk - CLOCK.dawn), nightMin = 24 - CLOCK.dayMin;
   return m < CLOCK.dayMin ? CLOCK.dawn + m * (CLOCK.dusk - CLOCK.dawn) / CLOCK.dayMin : (CLOCK.dusk + (m - CLOCK.dayMin) * nightH / nightMin) % 24;
@@ -389,8 +389,13 @@ const ITEMS = {
 
   snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
   drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 150, eat: { energy: 25 }, wholesale: 105, stock: 12, refill: 25 },
+  med_fever:  { name: 'ยาลดไข้', icon: '💊', kind: 'goods', pharmacy: true, base: 300, cures: ['cold'], eat: { health: 5 } },
+  med_flu:    { name: 'ยาต้านไวรัส', icon: '🧪', kind: 'goods', pharmacy: true, base: 900, cures: ['flu'], eat: { health: 5 } },
+  med_ors:    { name: 'ผงเกลือแร่ + ยาฆ่าเชื้อ', icon: '🧂', kind: 'goods', pharmacy: true, base: 250, cures: ['poison'], eat: { health: 5 } },
+  med_sleep:  { name: 'ยานอนหลับ', icon: '😴', kind: 'goods', pharmacy: true, base: 200, cures: ['insomnia'], eat: { health: 2 } },
+  med_vit:    { name: 'วิตามินรวม + น้ำเกลือแร่', icon: '💉', kind: 'goods', pharmacy: true, base: 350, cures: ['exhaust', 'malnut'], eat: { energy: 10, health: 5 } },
   painkiller: { name: 'ยาแก้ปวด/ยาบำรุง', icon: '💊', kind: 'goods', pharmacy: true, base: 150, eat: { health: 20 } },
-  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', pharmacy: true, base: 250, eat: { health: 30 }, wholesale: 180, stock: 10, refill: 40 },
+  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', pharmacy: true, cures: ['injury'], base: 250, eat: { health: 30 }, wholesale: 180, stock: 10, refill: 40 },
 };
 const CATEGORIES = { crop: '🌾 พืชผล', fish: '🐟 ปลา', meal: '🍱 อาหาร', goods: '📦 สินค้า' };
 
@@ -543,36 +548,53 @@ const NPC_LINES = ['วันนี้อากาศดีจังเลย', 
 // outfits you can wear instead of your job's clothes (rewards)
 const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ตกปลาจนถึงเลเวลสูงสุด' } };
 const ACHIEVEMENTS = [
-  { id: 'off1', c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
-  { id: 'off2', c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
-  { id: 'off3', c: 'office', stat: 'promo', n: 4, title: 'ผู้จัดการไฟแรง', desc: 'ได้เลื่อนตำแหน่ง 4 ครั้ง' },
-  { id: 'far1', c: 'farmer', stat: 'harvest', n: 15, title: 'มือใหม่หัดปลูก', desc: 'เก็บเกี่ยว 15 ครั้ง' },
-  { id: 'far2', c: 'farmer', stat: 'plots', n: 6, title: 'เจ้าของไร่', desc: 'ขยายสวนจนครบ 6 แปลง' },
-  { id: 'far3', c: 'farmer', stat: 'durian', n: 10, title: 'ราชาทุเรียน', desc: 'เก็บทุเรียน 10 ครั้ง' },
-  { id: 'fis1', c: null, stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
-  { id: 'fis2', c: null, stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
-  { id: 'fis3', c: null, stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
-  { id: 'mer1', c: 'merchant', stat: 'wholesale', n: 50, title: 'พ่อค้าหน้าใหม่', desc: 'ซื้อสินค้าจากคลัง 50 ชิ้น' },
-  { id: 'mer2', c: 'merchant', stat: 'psold', n: 100, title: 'เจ้าสัว', desc: 'ขายของให้ผู้เล่นอื่น 100 ชิ้น' },
-  { id: 'che1', c: 'chef', stat: 'cooked', n: 20, title: 'แม่ครัวหัวป่าก์', desc: 'ปรุงอาหาร 20 จาน' },
-  { id: 'che2', c: 'chef', stat: 'cooked', n: 100, title: 'เชฟกระทะเหล็ก', desc: 'ปรุงอาหาร 100 จาน' },
-  { id: 'doc1', c: 'doctor', stat: 'treated', n: 5, title: 'หมอใจดี', desc: 'รักษาคนไข้หาย 5 คน' },
-  { id: 'doc2', c: 'doctor', stat: 'treated', n: 50, title: 'หัตถ์เทวดา', desc: 'รักษาคนไข้หาย 50 คน' },
-  { id: 'doc3', c: 'doctor', stat: 'revived', n: 3, title: 'ผู้กู้ชีพ', desc: 'ช่วยชีวิตผู้เล่นที่หมดสติ 3 ครั้ง' },
-  { id: 'rid1', c: 'rider', stat: 'delivered', n: 10, title: 'ไรเดอร์สายฟ้า', desc: 'ส่งอาหารสำเร็จ 10 ออเดอร์' },
-  { id: 'rid2', c: 'rider', stat: 'delivered', n: 60, title: 'ขาซิ่งประจำเมือง', desc: 'ส่งอาหารสำเร็จ 60 ออเดอร์' },
-  { id: 'pol1', c: 'police', stat: 'arrests', n: 3, title: 'มือปราบ', desc: 'จับโจรได้ 3 ครั้ง' },
-  { id: 'pol2', c: 'police', stat: 'arrests', n: 20, title: 'ผู้พิทักษ์เมือง', desc: 'จับโจรได้ 20 ครั้ง' },
-  { id: 'thi1', c: null, stat: 'stolen', n: 10, title: 'มือไว', desc: 'ล้วงกระเป๋าสำเร็จ 10 ครั้ง' },
-  { id: 'thi2', c: null, stat: 'stolen', n: 50, title: 'จอมโจรเงา', desc: 'ล้วงกระเป๋าสำเร็จ 50 ครั้ง' },
-  { id: 'beg1', c: 'beggar', stat: 'alms', n: 20, title: 'ผู้ยากไร้', desc: 'ได้รับเงินบริจาค 20 ครั้ง' },
-  { id: 'gen5', c: null, stat: 'donated', n: 5, title: 'ใจบุญ', desc: 'บริจาคให้ขอทาน 5 ครั้ง' },
-  { id: 'gen6', c: null, stat: 'cravings', n: 10, title: 'นักชิม', desc: 'กินของที่อยากกินได้ทันเวลา 10 ครั้ง' },
-  { id: 'gen1', c: null, stat: 'trades', n: 5, title: 'นักเจรจา', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 5 ครั้ง' },
-  { id: 'gen2', c: null, stat: 'worth', n: 100000, title: 'เศรษฐีใหม่', desc: 'มีทรัพย์สินรวม ฿100,000' },
-  { id: 'gen3', c: null, stat: 'calls', n: 5, title: 'สายโทรศัพท์', desc: 'โทรคุยกับเพื่อน 5 ครั้ง' },
-  { id: 'gen4', c: null, stat: 'degree', n: 1, title: 'บัณฑิต', desc: 'เรียนจบปริญญาตรี' },
+  { id: 'off1', r: 1, c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
+  { id: 'off2', r: 2, c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
+  { id: 'off3', r: 3, c: 'office', stat: 'promo', n: 4, title: 'ผู้จัดการไฟแรง', desc: 'ได้เลื่อนตำแหน่ง 4 ครั้ง' },
+  { id: 'far1', r: 1, c: 'farmer', stat: 'harvest', n: 15, title: 'มือใหม่หัดปลูก', desc: 'เก็บเกี่ยว 15 ครั้ง' },
+  { id: 'far2', r: 3, c: 'farmer', stat: 'plots', n: 6, title: 'เจ้าของไร่', desc: 'ขยายสวนจนครบ 6 แปลง' },
+  { id: 'far3', r: 3, c: 'farmer', stat: 'durian', n: 10, title: 'ราชาทุเรียน', desc: 'เก็บทุเรียน 10 ครั้ง' },
+  { id: 'fis1', r: 1, c: null, stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
+  { id: 'fis2', r: 4, c: null, stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
+  { id: 'fis3', r: 5, c: null, stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
+  { id: 'mer1', r: 1, c: 'merchant', stat: 'wholesale', n: 50, title: 'พ่อค้าหน้าใหม่', desc: 'ซื้อสินค้าจากคลัง 50 ชิ้น' },
+  { id: 'mer2', r: 3, c: 'merchant', stat: 'psold', n: 100, title: 'เจ้าสัว', desc: 'ขายของให้ผู้เล่นอื่น 100 ชิ้น' },
+  { id: 'che1', r: 2, c: 'chef', stat: 'cooked', n: 20, title: 'แม่ครัวหัวป่าก์', desc: 'ปรุงอาหาร 20 จาน' },
+  { id: 'che2', r: 4, c: 'chef', stat: 'cooked', n: 100, title: 'เชฟกระทะเหล็ก', desc: 'ปรุงอาหาร 100 จาน' },
+  { id: 'doc1', r: 2, c: 'doctor', stat: 'treated', n: 5, title: 'หมอใจดี', desc: 'รักษาคนไข้หาย 5 คน' },
+  { id: 'doc2', r: 4, c: 'doctor', stat: 'treated', n: 50, title: 'หัตถ์เทวดา', desc: 'รักษาคนไข้หาย 50 คน' },
+  { id: 'doc3', r: 3, c: 'doctor', stat: 'revived', n: 3, title: 'ผู้กู้ชีพ', desc: 'ช่วยชีวิตผู้เล่นที่หมดสติ 3 ครั้ง' },
+  { id: 'rid1', r: 1, c: 'rider', stat: 'delivered', n: 10, title: 'ไรเดอร์สายฟ้า', desc: 'ส่งอาหารสำเร็จ 10 ออเดอร์' },
+  { id: 'rid2', r: 3, c: 'rider', stat: 'delivered', n: 60, title: 'ขาซิ่งประจำเมือง', desc: 'ส่งอาหารสำเร็จ 60 ออเดอร์' },
+  { id: 'pol1', r: 2, c: 'police', stat: 'arrests', n: 3, title: 'มือปราบ', desc: 'จับโจรได้ 3 ครั้ง' },
+  { id: 'pol2', r: 4, c: 'police', stat: 'arrests', n: 20, title: 'ผู้พิทักษ์เมือง', desc: 'จับโจรได้ 20 ครั้ง' },
+  { id: 'thi1', r: 2, c: null, stat: 'stolen', n: 10, title: 'มือไว', desc: 'ล้วงกระเป๋าสำเร็จ 10 ครั้ง' },
+  { id: 'thi2', r: 4, c: null, stat: 'stolen', n: 50, title: 'จอมโจรเงา', desc: 'ล้วงกระเป๋าสำเร็จ 50 ครั้ง' },
+  { id: 'beg1', r: 1, c: 'beggar', stat: 'alms', n: 20, title: 'ผู้ยากไร้', desc: 'ได้รับเงินบริจาค 20 ครั้ง' },
+  { id: 'gen5', r: 1, c: null, stat: 'donated', n: 5, title: 'ใจบุญ', desc: 'บริจาคให้ขอทาน 5 ครั้ง' },
+  { id: 'gen6', r: 2, c: null, stat: 'cravings', n: 10, title: 'นักชิม', desc: 'กินของที่อยากกินได้ทันเวลา 10 ครั้ง' },
+  { id: 'gen1', r: 1, c: null, stat: 'trades', n: 5, title: 'นักเจรจา', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 5 ครั้ง' },
+  { id: 'gen2', r: 3, c: null, stat: 'worth', n: 100000, title: 'เศรษฐีใหม่', desc: 'มีทรัพย์สินรวม ฿100,000' },
+  { id: 'gen3', r: 1, c: null, stat: 'calls', n: 5, title: 'สายโทรศัพท์', desc: 'โทรคุยกับเพื่อน 5 ครั้ง' },
+  { id: 'gen4', r: 3, c: null, stat: 'degree', n: 1, title: 'บัณฑิต', desc: 'เรียนจบปริญญาตรี' },
+  { id: 'fis4', r: 4, c: null, stat: 'fish', n: 300, title: 'เจ้าแห่งท้องน้ำ', desc: 'ตกปลาได้ 300 ตัว' },
+  { id: 'fis6', r: 5, c: null, stat: 'shark', n: 10, title: 'ราชาฉลาม', desc: 'ตกฉลามได้ 10 ตัว' },
+  { id: 'far4', r: 4, c: 'farmer', stat: 'harvest', n: 200, title: 'เทพเกษตร', desc: 'เก็บเกี่ยว 200 ครั้ง' },
+  { id: 'che3', r: 5, c: 'chef', stat: 'cooked', n: 500, title: 'ยอดเชฟแห่งเมือง', desc: 'ปรุงอาหาร 500 จาน' },
+  { id: 'doc4', r: 5, c: 'doctor', stat: 'treated', n: 200, title: 'แพทย์ในตำนาน', desc: 'รักษาคนไข้หาย 200 คน' },
+  { id: 'rid3', r: 5, c: 'rider', stat: 'delivered', n: 300, title: 'ตำนานไรเดอร์', desc: 'ส่งอาหารสำเร็จ 300 ออเดอร์' },
+  { id: 'pol3', r: 5, c: 'police', stat: 'arrests', n: 100, title: 'ผู้บัญชาการ', desc: 'จับโจรได้ 100 ครั้ง' },
+  { id: 'thi3', r: 5, c: null, stat: 'stolen', n: 200, title: 'ราชันย์โจร', desc: 'ล้วงกระเป๋าสำเร็จ 200 ครั้ง' },
+  { id: 'beg2', r: 3, c: 'beggar', stat: 'alms', n: 200, title: 'ขอทานพันล้าน', desc: 'ได้รับเงินบริจาค 200 ครั้ง' },
+  { id: 'gen7', r: 5, c: null, stat: 'worth', n: 1000000, title: 'มหาเศรษฐี', desc: 'มีทรัพย์สินรวม ฿1,000,000' },
+  { id: 'gen8', r: 3, c: null, stat: 'trades', n: 50, title: 'นักค้าขายตัวยง', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 50 ครั้ง' },
+  { id: 'gen9', r: 4, c: null, stat: 'donated', n: 50, title: 'นักบุญแห่งเมือง', desc: 'บริจาคให้ขอทาน 50 ครั้ง' },
+  { id: 'gen10', r: 2, c: null, stat: 'calls', n: 50, title: 'คนช่างคุย', desc: 'โทรคุยกับเพื่อน 50 ครั้ง' },
+  { id: 'gen11', r: 3, c: null, stat: 'cravings', n: 50, title: 'นักชิมระดับมิชลิน', desc: 'กินของที่อยากกินได้ทันเวลา 50 ครั้ง' },
+  { id: 'gen12', r: 2, c: null, stat: 'mails', n: 10, title: 'นักเขียนจดหมาย', desc: 'ส่งจดหมายถึงผู้เล่นอื่น 10 ฉบับ' },
 ];
+// title rarity: common → legendary (colour on the name tag)
+const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: 'ไม่ธรรมดา', col: '#7be07b' }, { name: 'หายาก', col: '#62b8ff' }, { name: 'มหากาพย์', col: '#d08cff' }, { name: 'ตำนาน', col: '#ffb43c' }];
 
 // ================================================================= job staff: an NPC at every place that hires (and the rod seller)
 // Each gets its own talk spot next to the place's counter, so talking to staff and using the place are separate.
@@ -592,6 +614,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

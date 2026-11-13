@@ -72,7 +72,7 @@ button.x{width:38px;height:38px;padding:0;border:0;background:url(assets/ui/b_cl
 #menuToggle{background:linear-gradient(#b67c46,#7f4c26) ;}
 #menuToggle::after{content:'';position:absolute;inset:4px;background:url(assets/ui/b_close.png) center/contain no-repeat}
 #menuToggle.closed::after{background:none;content:'☰';display:flex;align-items:center;justify-content:center;font-size:24px;color:#fbecd2;inset:0;text-shadow:0 2px 0 #3e2414}
-#qBtn.has::after,#phoneBtn.has::after{content:'';position:absolute;right:-3px;top:-3px;width:11px;height:11px;border-radius:50%;background:#e04a35;border:2px solid #fbecd2}
+#qBtn.has::after,#phoneBtn.has::after,#mailBtn.has::after{content:'';position:absolute;right:-3px;top:-3px;width:11px;height:11px;border-radius:50%;background:#e04a35;border:2px solid #fbecd2}
 
 #eventBar{position:absolute;top:calc(6px + env(safe-area-inset-top));left:8px;right:8px;z-index:4;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:6px 12px;border-radius:12px;font-size:13px;font-weight:600;color:#fff1d2;background:repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0 3px,transparent 3px 22px),linear-gradient(#a8703f,#7b4a26);border:2px solid var(--woodDk);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 4px 12px rgba(0,0,0,.35);pointer-events:none!important}
 body.hasEvent #card,body.hasEvent #topRight{top:46px}
@@ -291,8 +291,9 @@ body.hasEvent #topBar{top:46px}
 #restBtn{right:104px;bottom:78px;width:50px;height:50px}
 #emoBtn{right:19px;bottom:100px;width:50px;height:50px}
 #begBtn{right:166px;bottom:10px;width:50px;height:50px}
-#runBtn{right:164px;bottom:70px;width:50px;height:50px}
-#runBtn.on{background:linear-gradient(#e8763c,#a8401a)}
+#actBtn{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#actBtn.run{background:radial-gradient(circle at 50% 35%,#ffc38a,#e8763c 70%)}
+#actBtn.run::after{content:'🏃 วิ่ง';position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#a8401a;color:#fff;font-size:11px;padding:2px 8px;border-radius:9px;white-space:nowrap}
 #thumbs .sm span{font-size:20px}
 #restBtn.on,#begBtn.on{background:linear-gradient(#5c8fb8,#2f5878)}
 #emoPick{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(170px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,44px);gap:6px;padding:8px;border-radius:14px;background:rgba(43,29,18,.9);border:2px solid #3e2414;z-index:6}
@@ -369,3 +370,46 @@ textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid
 }
 #mapLegend .lgSec{font-size:12px;font-weight:600;color:var(--ink);padding:6px 4px 2px;grid-column:1/-1}
 #mapLegend button i.k-staff{background:#8b4fc4}#mapLegend button i.k-player{background:#e0453a}
+
+/* profile / mail / world chat / trade chat */
+#mePortrait{cursor:pointer;object-fit:cover}
+.prof{display:flex;gap:12px;align-items:center;margin:4px 0 8px}
+.prof .ph{width:76px;height:76px;border-radius:16px;object-fit:cover;border:3px solid #6b3f12;background:#e9d4ad;flex:none}
+.prof .pi{flex:1;min-width:0}.prof .pi b{font-size:18px}
+.ttl{font-weight:800;text-shadow:0 1px 0 #0006}
+.rar1{color:#8a8a8a}.rar2{color:#2e9e3a}.rar3{color:#1d7fd6}.rar4{color:#9a45d6}.rar5{color:#e07b00}
+.rar6{background:linear-gradient(90deg,#ffb52e,#ffe08a,#ffb52e);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rtag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;color:#fff;margin-left:4px;vertical-align:middle}
+.rtag.r1{background:#8a8a8a}.rtag.r2{background:#2e9e3a}.rtag.r3{background:#1d7fd6}.rtag.r4{background:#9a45d6}.rtag.r5{background:#e07b00}
+.tchips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}.tchips span{font-size:12px;padding:2px 8px;border-radius:10px;background:#0000000d;border:1px solid #0001}
+.mailItem{padding:8px 10px;border-radius:10px;background:#fff8e8;border:1px solid #e4cfa4;margin:6px 0}
+.mailItem.new{border-color:#e07b00;background:#fff0d6}
+.mailItem small{display:block;color:#8a6a45;font-size:11px;margin-bottom:3px}
+.mailItem p{margin:0;white-space:pre-wrap;word-break:break-word}
+#mailTo,#mailText{width:100%;box-sizing:border-box;margin:4px 0}
+#mailText{min-height:70px}
+#chatMsgs .w b{color:#1d7fd6}
+.tchat{margin-top:10px;border-top:1px dashed #c9a877;padding-top:8px}
+.tchat .log{max-height:110px;overflow:auto;font-size:13px;background:#fff8e8;border-radius:8px;padding:6px 8px;min-height:30px}
+.tchat .log .me b{color:#2e9e3a}
+
+/* landscape phones: a compact status card and centred, balanced popups */
+@media (max-height:520px) and (orientation:landscape){
+  #card,#card.mini{max-width:300px;border-width:8px;border-image-width:8px;column-gap:6px;font-size:11px}
+  #card .bars{grid-template-columns:1fr 1fr;min-width:150px;column-gap:6px;row-gap:1px}
+  #card .bar img{width:12px;height:12px}#card .bar em{font-size:9px;min-width:16px}
+  #card .bar s{height:6px}
+  #mePortrait{width:28px;height:28px}
+  #meName{font-size:12px!important}#meCareer{font-size:10px}#card .money{font-size:11px}
+  #statusBox:not(:has(#dzChips:not(:empty))){display:none}
+  #qline{font-size:10px;padding:0 5px;margin-top:2px}
+  #topBar{left:calc(var(--cardW,250px) + 8px)}
+  #panel{align-items:center;background:rgba(20,12,6,.35)}
+  #panel .sheet,#tradeWin .sheet{width:min(560px,72vw);max-height:84vh;max-height:84dvh;font-size:13px}
+  .sheet h2{font-size:16px;margin-bottom:4px}
+  .sheet .item{padding:5px 8px}
+  .sheet button.big{padding:8px 12px;font-size:14px}
+  .prof .ph{width:56px;height:56px}
+  #chatMsgs,#callMsgs{max-height:30vh}
+  .tutCard{width:min(480px,70vw)}
+}

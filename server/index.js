@@ -96,6 +96,7 @@ function stat(a, key, n = 1, absolute = false) {
   markMe(a);
 }
 const titleOf = a => isAdmin(a) ? ADMIN_TITLE : D.ACHIEVEMENTS.find(x => x.id === a.title)?.title || '';
+const titleRar = a => isAdmin(a) ? 6 : D.ACHIEVEMENTS.find(x => x.id === a.title)?.r || 0;
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -260,7 +261,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school'];
+  'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
 async function load() {
   const rows = await store.loadAll();
@@ -1106,7 +1107,8 @@ function useItem(a, id) {
   if (e.hunger) { a.hunger = Math.min(100, a.hunger + e.hunger); quest(a, 'eat'); }
   if (e.energy) a.energy = Math.min(100, a.energy + e.energy);
   if (e.health) a.health = Math.min(100, a.health + e.health);
-  if (id === 'medkit') cure(a, 'injury');
+  const healed = (it.cures || []).filter(d => cure(a, d));
+  if (healed.length) toast(a, `หายจาก${healed.map(d => DZ[d].name).join(', ')}แล้ว`, '💊');
   if (id === 'snack') infect(a, 'poison', 0.04);
   if (it.kind === 'crop') infect(a, 'poison', 0.12);          // raw produce
   ate(a, id);
@@ -1526,8 +1528,37 @@ let npcRosterDirty = false;
     const [x, y] = pick(walkableIn('town'));
     npcs.push({ id: -(i + 1), folk: 1, name: D.NPC_NAMES[i % D.NPC_NAMES.length], area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
       g: i % 2 ? 'f' : 'm', look: randLook(), speed: rnd(1.1, 1.6), pickedAt: 0,
-      next: () => Math.random() < .7 ? pick(spots) : pick(walkableIn('town')).map(v => v + .5), stay: () => rnd(4, 14) });
+      next: function () { return folkNext(this, spots); }, stay: () => rnd(4, 14) });
   }
+}
+// townsfolk go in and out of open shops through the front door, just like players
+const PUBLIC_DOORS = D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov && ROOM[s.to]);
+function folkNext(n, spots) {
+  if (n.inside) {
+    if (n.inside.left-- > 0) { const w = walkableIn(n.area); return w.length ? pick(w).map(v => v + .5) : [n.inside.room.exit.x, n.inside.room.exit.y]; }
+    n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y];
+  }
+  if (Math.random() < .3) {
+    const d = pick(PUBLIC_DOORS.filter(s => buildingOpen(s.bld)));
+    if (d) { n.goingIn = d; return [d.x, d.y]; }
+  }
+  return Math.random() < .7 ? pick(spots) : pick(walkableIn('town')).map(v => v + .5);
+}
+// called when a townsperson reaches the end of its walk: step through a door if that was the plan
+function folkArrive(n) {
+  if (n.goingIn) {
+    const room = ROOM[n.goingIn.to]; n.goingIn = null;
+    if (!room) return false;
+    n.x = room.spawn.x; n.y = room.spawn.y; n.area = room.id; n.inside = { room, left: 1 + Math.floor(Math.random() * 3) }; n.wait = rnd(1, 3);
+    return true;
+  }
+  if (n.leaving) {
+    const room = n.inside?.room; n.leaving = false; n.inside = null;
+    if (!room) return false;
+    n.x = room.outside.x; n.y = room.outside.y; n.area = 'town'; n.wait = rnd(2, 5);
+    return true;
+  }
+  return false;
 }
 // worker NPCs: where they walk and what they do there (only while no player has that job)
 const ST_XY = id => { const s = ST[id]; return s ? [s.x, s.y] : null; };
@@ -1589,11 +1620,13 @@ function npcTick(dt, ps) {
     if (!n.path.length) {
       if (n.pose) { n.pose = null; npcRosterDirty = true; }
       const goal = n.next(); n.path = goal ? routeTo(n, goal, n.area) || [] : [];
+      if (!n.path.length && n.folk) { n.goingIn = null; if (n.leaving) folkArrive(n); }   // could not reach the door: give up (or just step outside)
       n.wait = n.path.length ? 0 : 2; if (!n.path.length) continue;
     }
     const [tx, ty] = n.path[0], dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy), st = n.speed * dt;
     if (d <= st) {
       n.x = tx; n.y = ty; n.path.shift();
+      if (!n.path.length && n.folk && folkArrive(n)) { ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]); continue; }
       if (!n.path.length && !n.chase) { n.wait = n.stay(); const pose = n.worker?.pose?.(); if (pose) { n.pose = pose; n.f = 6; npcRosterDirty = true; } }
     } else { n.x += dx / d * st; n.y += dy / d * st; }
     if (d > 0.01) n.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
@@ -1638,7 +1671,7 @@ function outfitOf(a) {
 }
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
-    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
+    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
     of: outfitOf(a), th: a.thiefUntil > now() ? 1 : 0, afk: a.afk ? 1 : 0 };
 }
 function sendRoster() { broadcast({ t: 'roster', players: [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f })).concat(npcs.filter(npcVisible).map(npcInfo)) }); }
@@ -1660,6 +1693,7 @@ function meView(a) {
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
+    mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a),
   };
@@ -1739,11 +1773,12 @@ function login(ws, m) {
     t: 'init', id: a.id,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
     shop: { tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
@@ -1827,6 +1862,12 @@ function onMessage(ws, raw) {
     case 'p': return move(a, m);
     case 'chat': {                          // local chat: only people near you see it (bubble over your head)
       const text = cleanText(m.text, 120); if (!text) return;
+      if (m.ch === 'world') {                 // town-wide chat: everyone reads it in the chat box, no bubble over the head
+        if (!cd(a, 'wchat', 3000)) return;
+        const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };
+        chatLog.push(wm); if (chatLog.length > 40) chatLog.shift();
+        return broadcast(wm);
+      }
       if (!cd(a, 'chat', 800)) return;
       const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now() };
       const here = areaId(a);
@@ -1890,6 +1931,40 @@ function onMessage(ws, raw) {
     case 'req': return request(a, m);
     case 'req_ans': return answerReq(a, m);
     case 'trade_offer': return tradeOffer(a, m);
+    case 'trade_chat': {                    // chatting inside the trade window
+      const tr = a.trade, text = cleanText(m.text, 120); if (!tr || !text || !cd(a, 'tchat', 600, true)) return;
+      for (const p of [tr.a, tr.b]) send(p, { t: 'tchat', name: a.name, mine: p === a, text });
+      return;
+    }
+    case 'pic': {                           // profile photo from the phone's album (already shrunk to a small JPEG by the client)
+      const d = String(m.data || '');
+      if (d && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d) || d.length > 24000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '🖼️', false);
+      if (!cd(a, 'pic', 8000)) return;
+      a.pic = d || ''; markMe(a); sendRoster(); send(a, { t: 'mypic', pic: a.pic });
+      return toast(a, d ? 'เปลี่ยนรูปโปรไฟล์แล้ว' : 'ลบรูปโปรไฟล์แล้ว', '🖼️');
+    }
+    case 'info': {                          // someone's profile: tap a player
+      const o = playerById(m.id); if (!o || o.npc) return;
+      const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(Boolean).sort((x, y) => y.r - x.r);
+      return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
+        ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
+        home: o.house >= 0 ? o.house + 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
+    }
+    case 'mail': {                          // letters: reach anyone, online or not
+      const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
+      if (!text || !to) return toast(a, 'ใส่ชื่อผู้รับและข้อความ', '✉️', false);
+      const o = [...accounts.values()].find(x => x.name === to);
+      if (!o) return toast(a, `ไม่พบผู้เล่นชื่อ "${to}"`, '✉️', false);
+      if (o === a) return toast(a, 'ส่งจดหมายถึงตัวเองไม่ได้', '✉️', false);
+      if (!cd(a, 'mail', 5000)) return;
+      o.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: a.name, text, t: now(), read: 0 }, ...(o.mail || [])].slice(0, 50);
+      markMe(o); stat(a, 'mails'); dirty = true; send(o, { t: 'mail', list: o.mail });
+      if (o.ws) toast(o, `📬 จดหมายใหม่จาก ${a.name}`, '📬');
+      return toast(a, `ส่งจดหมายถึง ${o.name} แล้ว`, '📨');
+    }
+    case 'mailget': return send(a, { t: 'mail', list: a.mail || [] });
+    case 'mailread': { let ch = false; for (const x of a.mail || []) if (!x.read) { x.read = 1; ch = true; } if (ch) markMe(a); return; }
+    case 'maildel': { a.mail = (a.mail || []).filter(x => x.id !== m.id); markMe(a); return send(a, { t: 'mail', list: a.mail }); }
     case 'trade_confirm': return tradeConfirm(a);
     case 'trade_cancel': if (a.trade) tradeClose(a.trade, `${a.name} ยกเลิกการแลกเปลี่ยน`); return;
     case 'quest_reroll': {
@@ -1943,7 +2018,7 @@ function resetChar(a, m) {
   if (a.house >= 0 && houses[a.house] === a) houses[a.house] = null;
   if (a.rent && tenants[a.rent.idx] === a) tenants[a.rent.idx] = null;
   if (a.garden && lots[a.garden.lot] === a) lots[a.garden.lot] = null;
-  const keep = { v: VERSION, login: a.login, name: a.name, salt: a.salt, hash: a.hash, phone: a.phone, gender: a.gender, avatar: a.avatar, contacts: a.contacts, god: a.god,
+  const keep = { v: VERSION, login: a.login, name: a.name, salt: a.salt, hash: a.hash, phone: a.phone, gender: a.gender, avatar: a.avatar, contacts: a.contacts, god: a.god, pic: a.pic, mail: a.mail,
     look: { hair: 'brown', shirt: a.look?.shirt && D.SHIRTS.includes(a.look.shirt) ? a.look.shirt : 'white', pants: 'gray' } };
   keep.wardrobe = { hair: ['brown'], shirt: [keep.look.shirt], pants: ['gray'] };
   byPhone.delete(a.phone);
@@ -2110,7 +2185,7 @@ const server = http.createServer((req, res) => {
     res.end(buf);
   });
 });
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 32768 });
 wss.on('connection', (ws, req) => {
   ws.ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   let count = 0, winStart = now();
@@ -2118,7 +2193,9 @@ wss.on('connection', (ws, req) => {
     const t = now();
     if (t - winStart > 1000) { winStart = t; count = 0; }
     if (++count > 60) return;
-    onMessage(ws, raw.toString());
+    const str = raw.toString();
+    if (str.length > 4096 && !str.startsWith('{"t":"pic"')) return;   // only a profile photo may be large
+    onMessage(ws, str);
   });
   ws.on('close', () => { if (ws.acct && ws.acct.ws === ws) detach(ws.acct); });
   ws.on('error', () => {});

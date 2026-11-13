@@ -126,7 +126,7 @@ function handle(m) {
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
-      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#runBtn').classList.remove('on'); lastInput = performance.now();
+      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); lastInput = performance.now();
       creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
@@ -141,7 +141,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -161,10 +161,14 @@ function handle(m) {
       break;
     }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
+    case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
+    case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
+    case 'tchat': tradeChat.push(m); if (tradeChat.length > 30) tradeChat.shift(); paintTradeChat(); if (!m.mine) FX.play('pop'); break;
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
-      logLine(m.sys ? m.text : `<b>${esc(m.name)}</b>: ${esc(m.text)}`, m.sys ? 'sys' : '', !m.sys);
-      const s = P.get(m.id); if (s && !m.sys) { s.bubble = m.text; s.bt = performance.now() + 6500; }
+      logLine(m.sys ? m.text : `${m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}`, m.sys ? 'sys' : '', !m.sys);
+      const s = P.get(m.id); if (s && !m.sys && !m.w) { s.bubble = m.text; s.bt = performance.now() + 6500; }
       if (m.sys) { if (/🦈|💎|🎊|🏅|🎓/.test(m.text)) FX.play('notice'); } else if (m.id !== myId) FX.play('pop');
       if (panel?.kind === 'chat') refreshPanel(true);
       break;
@@ -267,7 +271,7 @@ function paintHud() {
   if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
   else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
   $('#statusBox').classList.toggle('hidden', !chips.length);
-  $('#mePortrait').src = `assets/ui/face_${me.gender === 'f' ? 'f' : 'm'}.png`;
+  paintPortrait(); $('#mailBtn').classList.toggle('has', (me.mailN || 0) > 0);
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
   $('#meMoney').textContent = Math.round(me.money).toLocaleString('en-US');
@@ -375,8 +379,7 @@ $('#restBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); se
 // running: toggle with the 🏃 button, or hold Shift on a keyboard
 let running = false, shiftRun = false, runSetT = 0;
 const canRun = () => !!me && me.energy > G.run.minEnergy && !me.down;
-function setRun(on) { if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#runBtn').classList.toggle('on', on); }
-$('#runBtn').onclick = () => { FX.play('click'); setRun(!running); };
+function setRun(on) { if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#actBtn').classList.toggle('run', on); }
 $('#begBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); send({ t: 'beg', on: me.pose !== 'beg' }); };
 $('#talkBtn').onclick = () => talk();
 $('#updBtn').onclick = () => location.reload();
@@ -460,7 +463,7 @@ addEventListener('pointerup', e => { if (joy && joy.id === e.pointerId) { joy = 
 let camLift = 0;
 function camera() {
   const m = P.get(myId); let x = m ? m.rx + m.ox : 50, y = m ? m.ry + m.oy : 36;
-  const target = panel && !trade ? VH * 0.24 : 0;
+  const target = panel && !trade && !(VW > VH && VH <= 520) ? VH * 0.24 : 0;   // landscape popups sit in the middle, no lift
   camLift += (target - camLift) * 0.18;
   const a = m ? areaOf(m.x, m.y) : null;
   if (a) {   // keep the view inside the current map/room (you never see past its edge)
@@ -469,8 +472,55 @@ function camera() {
   }
   return { x: x * TS - VW / 2, y: y * TS - VH / 2 + camLift };
 }
-// tapping the map no longer opens people (it fought with the joystick); use the 💬 talk button by your right thumb
-function onTap() { $('#emoPick').classList.add('hidden'); }
+// tap the map: a person under your finger opens their profile, anywhere else walks you there
+function onTap(sx, sy) {
+  $('#emoPick').classList.add('hidden');
+  if (!G || !me || sx == null) return;
+  const c = camera(), wx = (sx + c.x) / TS, wy = (sy + c.y) / TS, m = P.get(myId); if (!m) return;
+  const here = areaOf(m.x, m.y)?.id;
+  let hit = null, hd = .8;
+  for (const p of P.values()) {
+    if (p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
+    const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
+  }
+  if (hit) { FX.play('click'); return openPanel({ kind: 'player', pid: hit.id }); }
+  walkTo(wx, wy);
+}
+// ---- tap-to-walk: breadth-first path over free tiles of the current area, followed by the movement loop
+let autoPath = null;
+function walkTo(wx, wy) {
+  const m = P.get(myId), A = areaOf(m.x, m.y); if (!A || me.down) return;
+  const W = G.map.w, free = (x, y) => x >= A.x && y >= A.y && x < A.x + A.w && y < A.y + A.h && !blockedAt(x + .5, y + .5);
+  const sx = Math.floor(m.x), sy = Math.floor(m.y), gx = Math.floor(wx), gy = Math.floor(wy);
+  const prev = new Map([[sy * W + sx, -1]]), q = [[sx, sy]];
+  let best = sy * W + sx, bd = Math.hypot(sx - gx, sy - gy);
+  for (let qi = 0; qi < q.length && qi < 6000; qi++) {
+    const [x, y] = q[qi]; const dd = Math.hypot(x - gx, y - gy); if (dd < bd) { bd = dd; best = y * W + x; } if (!dd) break;
+    for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + ex, ny = y + ey, k = ny * W + nx; if (!prev.has(k) && free(nx, ny)) { prev.set(k, y * W + x); q.push([nx, ny]); } }
+  }
+  const path = []; for (let k = best; k !== -1; k = prev.get(k)) path.push([k % W + .5, Math.floor(k / W) + .5]);
+  path.reverse(); path.shift();
+  // the last step goes to the exact spot you tapped when it is walkable
+  if (bd === 0 && !blockedAt(wx, wy)) path.push([wx, wy]);
+  if (!path.length) return;
+  autoPath = { pts: path, goal: path[path.length - 1], stuck: 0, tries: 0, tx: wx, ty: wy };
+  FX.ring(wx, wy, '#ffc94d', 450, .5);
+}
+// returns the direction to walk this frame (or null), and steers around anything that blocks the way
+function autoStep(m, dt) {
+  const ap = autoPath; if (!ap) return null;
+  while (ap.pts.length && Math.hypot(ap.pts[0][0] - m.x, ap.pts[0][1] - m.y) < .12) ap.pts.shift();
+  if (!ap.pts.length) { autoPath = null; return null; }
+  const [tx, ty] = ap.pts[0]; let dx = tx - m.x, dy = ty - m.y; const l = Math.hypot(dx, dy);
+  dx /= l; dy /= l;
+  if (ap.stuck > .35) {                 // not getting anywhere: turn aside, then plan the route again
+    if (++ap.tries > 4) { autoPath = null; toast('ไปต่อไม่ได้ มีอะไรขวางทางอยู่', '🚧', false); return null; }
+    ap.stuck = 0; const side = ap.tries % 2 ? 1 : -1; [dx, dy] = [-dy * side, dx * side]; ap.sideT = .25; ap.side = [dx, dy];
+    const g = [ap.tx, ap.ty]; setTimeout(() => { if (autoPath === ap) { walkTo(g[0], g[1]); if (autoPath) autoPath.tries = ap.tries; } }, 260);
+  }
+  if (ap.sideT > 0) { ap.sideT -= dt; [dx, dy] = ap.side; }
+  return [dx, dy];
+}
 // talk to the nearest person (player or townsfolk) within a few steps
 function nearestPerson(r = 3) {
   const m = P.get(myId); if (!m) return null; const here = areaOf(m.x, m.y)?.id;
@@ -529,7 +579,14 @@ function onAction() {
   if (panel?.st === near.id) { closePanel(); return; }
   openPanel({ kind: near.type, st: near.id });
 }
-$('#actBtn').onclick = onAction;
+// the big button: tap = use / enter, press and hold = run while held
+{
+  const ab = $('#actBtn'); let hold = null;
+  ab.addEventListener('pointerdown', e => { e.preventDefault(); ab.setPointerCapture?.(e.pointerId); hold = { id: e.pointerId, ran: false, tm: setTimeout(() => { if (hold) { hold.ran = true; setRun(true); if (navigator.vibrate) navigator.vibrate(20); } }, 320) }; });
+  const up = e => { if (!hold || hold.id !== e.pointerId) return; clearTimeout(hold.tm); const ran = hold.ran; hold = null; if (ran) setRun(false); else if (e.type === 'pointerup') onAction(); };
+  ab.addEventListener('pointerup', up); ab.addEventListener('pointercancel', up);
+  ab.addEventListener('contextmenu', e => e.preventDefault());
+}
 
 // ------------------------------------------------------------------ main loop
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
@@ -542,6 +599,9 @@ function frame(t) {
     let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
     let dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
     if (joy && Math.hypot(joy.dx, joy.dy) > 0.15) { dx = joy.dx; dy = joy.dy; }
+    if (dx || dy) autoPath = null;
+    else if (autoPath && !me.down) { const st = autoStep(m, dt); if (st) [dx, dy] = st; }
+    const ox0 = m.x, oy0 = m.y;
     if (holdAfterTp) { if (!dx && !dy && !joy) holdAfterTp = false; else { dx = 0; dy = 0; } }
     if (me.down) { dx = 0; dy = 0; }
     const l = Math.hypot(dx, dy); meMoving = false;
@@ -557,6 +617,9 @@ function frame(t) {
       stepAcc += Math.hypot(m.x - m.rx, m.y - m.ry);
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
+    if (autoPath) autoPath.stuck = Math.hypot(m.x - ox0, m.y - oy0) < .004 ? autoPath.stuck + dt : 0;
+    // walking down onto the door mat takes you outside, no button needed
+    if (dy > .3 && near?.type === 'exit' && Math.hypot(near.x - m.x, near.y - m.y) < Math.max(.7, near.r * .6) && performance.now() > actCd) { actCd = performance.now() + 1500; autoPath = null; send({ t: 'exit' }); }
     m.rx = m.x; m.ry = m.y;
     m.ox *= 0.8; m.oy *= 0.8; if (Math.abs(m.ox) < .002) m.ox = 0; if (Math.abs(m.oy) < .002) m.oy = 0;
     sendT += dt;
@@ -646,6 +709,13 @@ function draw(t) {
   drawBobber(X, Y, t);
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
+  if (autoPath) {                          // tap-to-walk route: dotted line and a marker where you tapped
+    const m = P.get(myId), pts = [[m.rx, m.ry], ...autoPath.pts];
+    ctx.save(); ctx.setLineDash([TS * .14, TS * .14]); ctx.lineDashOffset = -t / 40; ctx.lineWidth = Math.max(3, TS * .08); ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,201,77,.9)'; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x * TS + X, y * TS + Y) : ctx.moveTo(x * TS + X, y * TS + Y)); ctx.stroke(); ctx.setLineDash([]);
+    const [gx, gy] = autoPath.goal, pr = 1 + Math.sin(t / 160) * .12;
+    ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(gx * TS + X, gy * TS + Y, TS * .32 * pr, TS * .16 * pr, 0, 0, 7); ctx.stroke(); ctx.restore();
+  }
   if (myRoom) drawRoomLabels(myRoom, X, Y, t);
   if (!myRoom) drawSunlight(t, night);
   if (!myRoom) drawRain(t);
@@ -753,8 +823,9 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
   if (p.title) {
     ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58);
-    if (p.adm) { const w = ctx.measureText(`«${p.title}»`).width, g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, '#ffd34d'); g.addColorStop(Math.max(0, sh - .15), '#ffd34d'); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), '#ffd34d'); g.addColorStop(1, '#ffb52e'); ctx.fillStyle = g; }
-    else ctx.fillStyle = '#ffd34d';
+    // title colour = rarity; legendary titles (and the mayor's) shimmer
+    if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = ctx.measureText(`«${p.title}»`).width, g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
+    else ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d';
     ctx.fillText(`«${p.title}»`, px, top - TS * .58);
   }
   if (p.emo && performance.now() < p.emoT) {
@@ -835,7 +906,7 @@ function drawPlayerPixel(p, X, Y, t) {
   const badge = pose === 'veg' ? '🥬' : pose === 'hosp' ? '🚑' : pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px + 7 * u, top + Math.sin(t / 300) * 3); }
   sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
-  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
+  if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
@@ -875,6 +946,7 @@ function drawMini() {
 // ------------------------------------------------------------------ panels
 function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
+  if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
   panel = p; panelSig = ''; $('#panel').classList.remove('hidden'); refreshPanel(true);
   if (p.kind === 'chat') setTimeout(() => $('#chatIn')?.focus(), 50);
 }
@@ -901,7 +973,7 @@ function bindPanel(root) {
     if (m.fn) return FN[m.fn](m, root);
     send(m);
   });
-  const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value }); i.value = ''; };
+  const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value, ch: chatTab }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
   root.querySelectorAll('[data-staff]').forEach(c => whenChars(() => {
     const n = STAFF.find(x => x.career === c.dataset.staff); if (!n) return;
@@ -915,6 +987,11 @@ function bindPanel(root) {
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
+  photo: () => pickPhoto(),
+  photoDel: () => send({ t: 'pic', data: '' }),
+  chatTab: m => { chatTab = m.tab; panel.sig = 'x' + m.tab; refreshPanel(true); setTimeout(() => $('#chatIn')?.focus(), 30); },
+  mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); $('#mailText').value = ''; },
+  mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
@@ -949,7 +1026,47 @@ let bugList = null;
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${it.icon}</div><div class="nm">${esc(it.name)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
-const chatHtml = () => chatLog.map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+let chatTab = 'near';
+const chatHtml = () => chatLog.filter(m => m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+// ---- profile photo, titles by rarity, mail
+let myPic = '', mailList = [], tradeChat = [];
+const infoCache = new Map();
+const facePng = () => `assets/ui/face_${me?.gender === 'f' ? 'f' : 'm'}.png`;
+function paintPortrait() { const im = $('#mePortrait'); const src = myPic || facePng(); if (im.getAttribute('src') !== src) im.src = src; }
+const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ'];
+const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d'];
+const titleHtml = (t, r) => t ? `<span class="ttl rar${r || 1}">«${esc(t)}»</span>` : '';
+// shrink a photo from the album to a small square JPEG before it is sent (kept under ~20 KB)
+function pickPhoto() {
+  // the input must be in the page for iOS Safari to open the photo picker
+  let inp = document.getElementById('picIn');
+  if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.id = 'picIn'; inp.style.display = 'none'; document.body.appendChild(inp); }
+  inp.value = '';
+  inp.onchange = () => {
+    const f = inp.files?.[0]; if (!f) return;
+    const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => {
+      const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+      const k = Math.min(im.width, im.height); g.drawImage(im, (im.width - k) / 2, (im.height - k) / 2, k, k, 0, 0, S, S);
+      let q = .82, d = c.toDataURL('image/jpeg', q); while (d.length > 22000 && q > .3) { q -= .12; d = c.toDataURL('image/jpeg', q); }
+      URL.revokeObjectURL(url); send({ t: 'pic', data: d });
+    };
+    im.onerror = () => toast('เปิดรูปนี้ไม่ได้', '🖼️', false);
+    im.src = url;
+  };
+  inp.click();
+}
+function achRows() {
+  return G.ach.slice().sort((x, y) => (x.r || 1) - (y.r || 1)).map(a => {
+    const has = (me.ach || []).includes(a.id), c = a.c ? G.careers[a.c] : null, prog = Math.min(a.n, me.stats?.[a.stat] || 0), on = me.title === a.id;
+    return `<div class="item ${has ? 'done' : ''}"><div class="em">${has ? '🏅' : '🔒'}</div><div class="nm">${titleHtml(a.title, a.r)}<span class="rtag r${a.r || 1}">${RAR[a.r || 1]}</span> ${c ? `<span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${prog.toLocaleString()}/${a.n.toLocaleString()}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้ฉายานี้', { t: 'title', id: on ? '' : a.id }, on ? 'primary' : 'good') : ''}</div>`;
+  }).join('');
+}
+function paintTradeChat() {
+  const box = document.getElementById('tchatLog'); if (!box) return;
+  box.innerHTML = tradeChat.map(x => `<div class="${x.mine ? 'me' : ''}"><b>${esc(x.name)}</b>: ${esc(x.text)}</div>`).join('') || '<div class="sub">พิมพ์คุยต่อรองกันได้ตรงนี้</div>';
+  box.scrollTop = box.scrollHeight;
+}
 const hoursTxt = k => { const o = G.hours[k]; return o ? (o[1] - o[0] >= 24 ? 'เปิด 24 ชม.' : `เปิด ${hhmm(o[0])}–${hhmm(o[1])}`) : ''; };
 const lic = id => me.licenses.includes(id);
 const licExp = id => lic(id) && !!G.licenses[id]?.renew && (me.licExp?.[id] || 0) < Date.now() + clockOff;
@@ -1051,7 +1168,7 @@ function renderPanel(p) {
       const shift = me.career === 'doctor' ? `<div class="jobbox ok">🩺 เวรหมอ ${hhmm(G.doctor.start)}–${hhmm(G.doctor.end)} · อยู่ในโรงพยาบาลช่วงนี้ได้เงินเดือน <b>${money(G.doctor.wage[Math.min(me.lv, G.doctor.wage.length) - 1])}</b>/ชม. · วันนี้ ${(me.docShift?.hours || 0).toFixed(1)} ชม.</div>` : '';
       return `<h2>🏥 โรงพยาบาล</h2><div class="sub">เปิด 24 ชม. · สุขภาพ ${Math.floor(me.health)}/100 · <b>ถูกกว่า:</b> นอนที่ <b>เตียงคนไข้</b> รอหมอรักษา (~฿300) · ตอนนี้มีคนไข้ ${waiting} เตียง</div>${shift}
         ${mine ? `<div class="list">${mine}</div>` : '<div class="sub">✅ ตอนนี้คุณไม่ได้ป่วย</div>'}
-        <h3>💊 ร้านขายยา</h3><div class="list">${Object.entries(G.items).filter(([, it]) => it.pharmacy).map(([id, it]) => itemRow(id, B(`ซื้อ ${money(it.base)}`, { t: 'act', st, a: 'medbuy', item: id }, '', me.money < it.base), `${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('')}</div>
+        <h3>💊 ร้านขายยา</h3><div class="sub">ซื้อยาให้ตรงกับอาการ แล้วกดใช้ในกระเป๋า 🎒 (ถูกกว่าให้พยาบาลรักษา)</div><div class="list">${Object.entries(G.items).filter(([, it]) => it.pharmacy).map(([id, it]) => itemRow(id, B(`ซื้อ ${money(it.base)}`, { t: 'act', st, a: 'medbuy', item: id }, it.cures?.some(d => dz.includes(d)) ? 'good pulse' : '', me.money < it.base), `${it.cures ? `รักษา <b>${it.cures.map(d => G.diseases[d].icon + G.diseases[d].name).join(', ')}</b>${it.cures.some(d => dz.includes(d)) ? ' ✅ ตรงอาการคุณ' : ''} · ` : ''}${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('')}</div>
         ${B(`💉 ให้พยาบาล NPC รักษาทันที ${money(price)}${dz.length ? ' (หายทุกโรค)' : ' (❤️ +40)'}`, { t: 'act', st, a: 'heal' }, 'big')}
         ${me.career === 'doctor' ? '<div class="sub">🩺 เดินไปที่เตียงที่มีคนไข้ (ทั้งผู้เล่นและชาวเมือง) แล้ววินิจฉัยจากอาการ</div>' : staffHint('doctor')}`;
     }
@@ -1101,7 +1218,12 @@ function renderPanel(p) {
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
       const home = me.house >= 0 ? `บ้านเลขที่ ${me.house + 1} ⭐${me.comfort}` : me.rent ? `เช่าบ้านเลขที่ ${me.rent.idx + 1}` : 'ยังไม่มี';
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🎣 ตกปลา<small>${rod}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
-      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>`;
+      const job = me.career !== 'none' && G.careers[me.career]?.where;
+      const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(G.outfitDefs[id]?.name || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
+      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>
+        <div class="secT">👕 ชุด</div>
+        <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
+        ${outfits || '<div class="sub">ชุดพิเศษ (รางวัล) จะมาอยู่ตรงนี้ เช่น 🎽 ชุดนักตกปลา (ตกปลาถึงเลเวลสูงสุด) · ชุดแฟชั่นจะมาเพิ่มในอนาคต</div>'}`;
     }
     case 'career': {
       const cur = G.careers[me.career];
@@ -1151,7 +1273,7 @@ function renderPanel(p) {
     case 'fishclub': {
       const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id].kind === 'fish');
       const rows = fish.map(([id, q]) => itemRow(id, B(`ขาย ${money((wd?.mk[id]?.farm || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' }, 'good'), `มี ${q} · รับซื้อ ${money(wd?.mk[id]?.farm || 0)}/ตัว`)).join('');
-      return `<h2>🎣 สมาคมประมง</h2><div class="sub">${hoursTxt('fishclub')} · แหล่งตกปลา: 🏞️ ทะเลสาบ (ใต้เมือง) · 🌊 ทะเล (ฝั่งตะวันออก) · 🐟 แม่น้ำ (ไร่ชานเมือง)</div>
+      return `<h2>🎣 สมาคมประมง · ร้านขายปลา</h2><div class="sub">${hoursTxt('fishclub')} · แหล่งตกปลา: 🏞️ ทะเลสาบ (ใต้เมือง) · 🌊 ทะเล (ฝั่งตะวันออก) · 🐟 แม่น้ำ (ไร่ชานเมือง)</div>
         <div class="jobbox">💬 ซื้อเบ็ด/อัปเกรดเบ็ด คุยกับ <b>น้าเล็ก</b> ที่ยืนอยู่ข้างๆ</div>
         ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}`;
     }
@@ -1237,13 +1359,26 @@ function renderPanel(p) {
         <div class="list">${rows}</div>
         <div class="item ${q.bonus ? 'done' : ''}" style="margin-top:10px"><div class="em">🏆</div><div class="nm">ทำครบทั้ง 3 ข้อ<small>โบนัส <b style="color:var(--acc)">${money(q.bonusAmount)}</b> · ทำครบติดต่อกันทุกวัน โบนัส +10%/วัน</small></div>${q.bonus ? '<span class="tag">ได้แล้ว</span>' : ''}</div>`;
     }
-    case 'ach': {
-      const rows = G.ach.map(a => {
-        const has = (me.ach || []).includes(a.id), c = a.c ? G.careers[a.c] : null, prog = Math.min(a.n, me.stats?.[a.stat] || 0);
-        const on = me.title === a.id;
-        return `<div class="item ${has ? 'done' : ''}"><div class="em">${has ? '🏅' : '🔒'}</div><div class="nm">«${esc(a.title)}» ${c ? `<span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${prog.toLocaleString()}/${a.n.toLocaleString()}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้ฉายานี้', { t: 'title', id: on ? '' : a.id }, on ? 'primary' : 'good') : ''}</div>`;
-      }).join('');
-      return `<h2>🏅 ความสำเร็จ & ฉายา</h2><div class="sub">ทำความสำเร็จของแต่ละอาชีพเพื่อปลดล็อก<b>ฉายาบนหัว</b> ทุกคนในเมืองจะเห็น · ปลดล็อกแล้ว ${(me.ach || []).length}/${G.ach.length}</div><div class="list">${rows}</div>`;
+    case 'ach':
+    case 'profile': {
+      const ti = G.ach.find(x => x.id === me.title), got = (me.ach || []).length;
+      return `<h2>🪪 ข้อมูลผู้เล่น</h2>
+        <div class="prof"><img class="ph" src="${myPic || facePng()}" alt=""><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
+          <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
+        <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div></div>
+        <div class="secT">🏅 ฉายา · สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
+        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น</div><div class="list">${achRows()}</div>`;
+    }
+    case 'mail': {
+      if (!p.read) { p.read = 1; if ((me.mailN || 0) > 0) send({ t: 'mailread' }); }
+      const rows = mailList.map(x => `<div class="mailItem ${x.read ? '' : 'new'}"><small>${x.read ? '' : '🆕 '}จาก <b>${esc(x.from)}</b> · ${new Date(x.t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</small><p>${esc(x.text)}</p>
+        <div class="rowf" style="margin-top:4px">${B('↩️ ตอบกลับ', { fn: 'mailReply', to: x.from })}${B('🗑️', { t: 'maildel', id: x.id }, 'warn')}</div></div>`).join('');
+      const names = [...new Set([...(me.friends || []).map(f => f.n), ...[...P.values()].filter(x => !x.npc && x.id !== myId).map(x => x.name)])];
+      return `<h2>📬 กล่องจดหมาย</h2><div class="sub">ส่งถึงผู้เล่นคนไหนก็ได้ด้วยชื่อตัวละคร แม้เขาจะออฟไลน์ เก็บได้ 50 ฉบับล่าสุด</div>
+        <div class="secT">✍️ เขียนจดหมาย</div>
+        <input id="mailTo" maxlength="16" list="mailNames" placeholder="ชื่อผู้รับ" value="${esc(p.to || '')}"><datalist id="mailNames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+        <textarea id="mailText" maxlength="500" placeholder="ข้อความ..."></textarea>${B('📨 ส่งจดหมาย', { fn: 'mailSend' }, 'primary big')}
+        <div class="secT">📥 จดหมายของคุณ (${mailList.length})</div>${rows || '<div class="sub">ยังไม่มีจดหมาย</div>'}`;
     }
     case 'phone': return phonePanel(p);
     case 'rank': {
@@ -1251,7 +1386,8 @@ function renderPanel(p) {
       return `<h2>🏆 อันดับเศรษฐี</h2><div class="sub">นับเงินสด + เงินฝาก + ทรัพย์สิน</div><div class="list">${rows}</div>`;
     }
     case 'chat':
-      return `<h2>💬 คุยกับคนใกล้ๆ</h2><div class="sub">ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น · คุยไกลๆ ใช้ 📱 โทรหา</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="พิมพ์ข้อความ..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
+      return `<h2>💬 แชท</h2><div class="tabs">${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}</div>
+        <div class="sub">${chatTab === 'world' ? 'ทุกคนในเมืองอ่านได้ ไม่ขึ้นบนหัว (ส่งได้ทุก 3 วินาที)' : 'ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น'}</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="${chatTab === 'world' ? 'พิมพ์ถึงทุกคน...' : 'พิมพ์ข้อความ...'}" autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
     case 'screen': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⛶ หน้าจอ</h2><div class="sub">${canFs ? 'เต็มจอซ่อนแถบเบราว์เซอร์ · แนวนอนจะล็อกจอให้เป็นแนวนอน (มือถือ Android)' : 'iPhone/iPad ใช้เต็มจอจากเบราว์เซอร์ไม่ได้: กดปุ่มแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ · หมุนเครื่องเป็นแนวนอนได้เลย'}</div>
@@ -1260,12 +1396,12 @@ function renderPanel(p) {
     }
     case 'help':
       return `<h2>❔ วิธีเล่น</h2><div class="sub" style="font-size:14px;line-height:1.7">
-        👣 <b>เดิน</b>: มือถือแตะค้างแล้วลาก · คอม WASD/ลูกศร<br>
-        🟡 <b>ปุ่มใหญ่ขวาล่าง</b>: เข้าอาคาร/ใช้งาน/ดึงเบ็ด (คอม: E) · 💬 <b>คุย</b> กับคนใกล้ๆ (F) · 😌 <b>พัก</b> (R) · 😀 อิโมจิบนหัว<br>
+        👣 <b>เดิน</b>: มือถือแตะค้างแล้วลาก หรือ<b>แตะพื้น</b>ให้ตัวละครเดินไปเอง (มีเส้นนำทาง) · แตะตัวคนอื่นเพื่อดูข้อมูล · คอม WASD/ลูกศร<br>
+        🟡 <b>ปุ่มใหญ่ขวาล่าง</b>: แตะ = เข้าอาคาร/ใช้งาน/ดึงเบ็ด (คอม: E) · <b>กดค้าง = วิ่ง</b> (คอม: Shift) · ออกจากอาคารแค่เดินลงไปที่พรมหน้าประตู · 💬 <b>คุย</b> กับคนใกล้ๆ (F) · 😌 <b>พัก</b> (R) · 😀 อิโมจิบนหัว<br>
         💰 <b>เริ่มต้นไม่มีเงิน?</b> ซื้อเบ็ดที่สมาคมประมงแล้ว<b>ตกปลาขาย</b> · กดตอนขีดขาวอยู่ในแถบเขียว<br>
         💼 <b>หางาน</b>: คุยกับ NPC เจ้าหน้าที่ (💬) ที่ยืนข้างเคาน์เตอร์ของแต่ละที่ · เปลี่ยนงานแล้วรอ 5 นาที<br>
         🎓 <b>เรียน</b>: ลงทะเบียนที่มหาวิทยาลัย แล้วนั่งที่โต๊ะเรียน 1 ชั่วโมงในเกม = 1 คาบ · ใบขับขี่ต้องต่ออายุทุกปี<br>
-        🕐 <b>เวลา</b>: 1 วันในเกม = 24 นาที (กลางคืนผ่านไปเร็วกว่ากลางวัน) · ร้านต่างๆ มีเวลาเปิด-ปิด<br>
+        🕐 <b>เวลา</b>: 1 วันในเกม = 24 นาที (กลางคืน 19:00–07:00 ผ่านไปใน 3 นาที) · ร้านต่างๆ มีเวลาเปิด-ปิด<br>
         😌 <b>พัก</b>: นั่งพักได้ทุกที่ พลังงานฟื้นเร็ว 3 เท่า และเลือดค่อยๆ ฟื้น (ถ้าไม่หิว)<br>
         ❤️ <b>สุขภาพ</b>: หิวนานเลือดลด · ป่วยต้องหาหมอ · แตะแถบสถานะเพื่อดูวิธีเพิ่ม<br>
         🍱 <b>ตุนอาหาร</b>: ซื้อใส่กระเป๋าที่ร้านอาหาร แล้วกด "ใช้" ในกระเป๋าตอนหิว<br>
@@ -1283,7 +1419,13 @@ function renderPanel(p) {
       }
       const fee = `<input id="feeIn" type="number" value="200" min="0" max="1000" style="width:90px">`;
       const known = (me.contacts || []).some(c => c.n === o.name);
-      return `<h2>${o.adm ? '👑 ' : ''}${esc(o.name)} <span class="tag">${CAREER_ICON(o.c)} ${G.careers[o.c]?.name || ''}</span>${o.afk ? ' <span class="tag">💤 ไม่อยู่</span>' : ''}</h2>${o.title ? `<div class="sub" style="color:var(--acc)">«${esc(o.title)}»</div>` : ''}
+      const inf = infoCache.get(o.id);
+      const prof = `<div class="prof"><img class="ph" src="${inf?.pic || `assets/ui/face_${o.g === 'f' ? 'f' : 'm'}.png`}" alt=""><div class="pi">
+        <div>${CAREER_ICON(o.c)} ${G.careers[o.c]?.name || 'ว่างงาน'} · Lv.${o.lv || 1}</div><div>${titleHtml(o.title, o.tr)}</div>
+        ${inf ? `<small>💰 ${money(inf.worth)} · 🎣 Lv.${inf.fishLv} · อยู่ในเมือง ${inf.days} วัน${inf.home ? ` · 🏠 บ้าน #${inf.home}` : ''}${inf.degree ? ' · 🎓' : ''}${inf.phone ? ` · 📱 ${inf.phone}` : ''}</small>` : '<small>กำลังโหลด...</small>'}</div></div>
+        ${inf?.ach?.length ? `<div class="tchips">${inf.ach.slice(0, 12).map(([t, r]) => `<span class="rar${r}">🏅 ${esc(t)}</span>`).join('')}</div>` : ''}`;
+      return `<h2>${o.adm ? '👑 ' : ''}${esc(o.name)}${o.afk ? ' <span class="tag">💤 ไม่อยู่</span>' : ''}</h2>${prof}
+        <div class="grid2" style="margin-bottom:6px">${B('✉️ ส่งจดหมาย', { fn: 'open', kind: 'mail', set: { to: o.name } })}</div>
         <div class="sub">${far ? '⚠️ อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน' : 'อยู่ใกล้พอที่จะติดต่อกันได้'}</div>
         <div class="grid2">${B('🤝 แลกเปลี่ยน', { fn: 'tradeReq', to: o.id }, 'primary', far)}${B(known ? '📇 มีเบอร์แล้ว' : '📱 ขอเบอร์', { t: 'req', kind: 'phone', to: o.id }, 'good', far || known)}</div>
         ${me.career === 'doctor' ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
@@ -1316,15 +1458,10 @@ function renderPanel(p) {
     }
     case 'settings': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
-      const job = me.career !== 'none' && G.careers[me.career]?.where;
-      const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(G.outfitDefs[id]?.name || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
       return `<h2>⚙️ ตั้งค่า</h2>
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}
-        <div class="secT">👕 ชุด</div>
-        <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
-        ${outfits || '<div class="sub">ชุดพิเศษ (รางวัล) จะมาอยู่ตรงนี้ เช่น 🎽 ชุดนักตกปลา (ตกปลาถึงเลเวลสูงสุด) · ชุดแฟชั่นจะมาเพิ่มในอนาคต</div>'}
         ${me.admin ? `<div class="secT">👑 แอดมิน</div>${B('👑 เปิด God mode', { fn: 'open', kind: 'god' }, 'primary big')}` : ''}
         <div class="secT">🎮 อื่นๆ</div>
         <div class="grid2">${B('📤 ชวนเพื่อน', { fn: 'share' }, 'good')}${B('🐞 แจ้งบัค', { fn: 'open', kind: 'bug' })}${B('❔ วิธีเล่น', { fn: 'open', kind: 'help' })}${B('📖 บทช่วยสอน', { fn: 'tut' })}</div>
@@ -1533,8 +1670,8 @@ function drawBuildingSign(b, X, Y) {
     return;
   }
   if (b.deco && !b.label) return;
-  if (b.deco) { ctx.globalAlpha = .75; sign(`${b.icon} ${b.label}`, cx, top - TS * .1, { size: TS * .26 }); ctx.globalAlpha = 1; return; }
   if (b.renov) { sign(`🚧 ${b.label} · ปิดปรับปรุง`, cx, top - TS * .15, { size: TS * .32, bg: 'rgba(150,90,10,.92)', border: '#ffc94d88' }); return; }
+  if (b.deco) { ctx.globalAlpha = .75; sign(`${b.icon} ${b.label}`, cx, top - TS * .1, { size: TS * .26 }); ctx.globalAlpha = 1; return; }
   const open = isOpen(b.id);
   sign(`${b.icon} ${b.label}${open ? '' : ' · ปิด'}`, cx, top - TS * .15, { size: TS * .34, bg: open ? 'rgba(18,22,28,.9)' : 'rgba(90,30,30,.92)', border: '#ffc94d88' });
   const o = G.hours[b.id]; if (o && o[1] - o[0] < 24) sign(`${hhmm(o[0])}–${hhmm(o[1])}`, cx, top + TS * .32, { size: TS * .22, bg: 'rgba(0,0,0,.55)' });
@@ -1783,9 +1920,9 @@ function openMap(mapId, keepScroll) {
     const room = AREA[s.area]?.kind === 'room' ? AREA[s.area] : null, q = room ? room.doorPt : s;
     if (mapOf(s.area) !== mapId) continue;
     const [x, y] = L(q.x + (room ? 1.4 : 0), q.y + (room ? -1.2 : 0)), c = G.careers[n.career];
-    staffPl.push({ key: n.st, icon: '👤', label: n.short, sub: n.career === 'fishing' ? '🎣 ซื้อเบ็ด (ตกปลาได้ทุกคน)' : `${c?.icon || ''} สมัคร/เปลี่ยนเป็น${c?.name || ''}${room ? ` · ใน${room.label}` : ''}`, x, y, kind: 'staff', hl: me.career === n.career });
+    staffPl.push({ key: n.st, icon: '👤', label: n.short, sub: n.career === 'fishing' ? '🎣 ซื้อเบ็ด (ตกปลาได้ทุกคน)' : `${c?.icon || ''} สมัคร/เปลี่ยนเป็น${c?.name || ''}${room ? ` · ใน${room.label}` : ''}`, x, y, kind: 'staff', hl: me.career === n.career, ci: n.career === 'fishing' ? '🎣' : c?.icon || '👤' });
   }
-  // numbered markers (job staff are lettered person pins)
+  // numbered markers (job staff are person pins with their career's symbol)
   const r = clamp(k * .95, 8, 13);
   places.forEach((pl, i) => {
     pl.n = i + 1;
@@ -1795,10 +1932,10 @@ function openMap(mapId, keepScroll) {
     g.fillText(pl.n, pl.x, pl.y + 1);
   });
   staffPl.forEach((pl, i) => {
-    pl.n = String.fromCharCode(65 + i);
+    pl.n = pl.ci;
     g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.moveTo(pl.x, pl.y + r * 1.5); g.arc(pl.x, pl.y - r * .2, r + 2, Math.PI * .8, Math.PI * 2.2); g.fill();
     g.fillStyle = pl.hl ? '#ffc94d' : '#8b4fc4'; g.beginPath(); g.moveTo(pl.x, pl.y + r * 1.3); g.arc(pl.x, pl.y - r * .2, r, Math.PI * .8, Math.PI * 2.2); g.fill();
-    g.fillStyle = pl.hl ? '#222' : '#fff'; g.font = `800 ${Math.round(r * 1.05)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
+    g.font = `${Math.round(r * 1.15)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
   });
   // police only: where reported thieves were seen
   if (me.career === 'police') for (const rp of me.reports || []) if (mapOf(rp.area) === mapId) {
@@ -1822,7 +1959,7 @@ function openMap(mapId, keepScroll) {
   if (guide) { const hop = guide.player ? null : guide; if (hop && mapOf(hop.area) === mapId) { const q = AREA[hop.area]?.kind === 'room' ? AREA[hop.area].outside : hop, [x, y] = L(q.x, q.y); g.strokeStyle = '#ffc94d'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(x, y, r * 1.9, 0, 7); g.stroke(); g.setLineDash([]); } }
   // legend
   const here = roomOf(m.x, m.y);
-  const row = pl => `<button data-key="${esc(pl.key)}" class="${pl.hl ? 'hl' : ''}"><i class="k-${pl.kind}">${pl.n}</i><span>${pl.icon} ${esc(pl.label)}${pl.sub ? `<small>${esc(pl.sub)}</small>` : ''}</span></button>`;
+  const row = pl => `<button data-key="${esc(pl.key)}" class="${pl.hl ? 'hl' : ''}"><i class="k-${pl.kind}">${pl.n}</i><span>${pl.kind === 'staff' ? '' : pl.icon + ' '}${esc(pl.label)}${pl.sub ? `<small>${esc(pl.sub)}</small>` : ''}</span></button>`;
   $('#mapLegend').innerHTML = `<div class="lgHead">⚪ คุณอยู่${here ? `ใน${esc(here.label)}` : 'ที่วงสีส้ม'} · 🟢 ผู้เล่นออนไลน์บนแผนที่นี้ ${onHere} คน · แตะชื่อเพื่อนำทาง</div>`
     + (staffPl.length ? `<div class="lgSec">👤 NPC สมัครงาน / เปลี่ยนอาชีพ</div>${staffPl.map(row).join('')}` : '')
     + `<div class="lgSec">📍 สถานที่</div>${places.map(row).join('')}`;
@@ -1998,7 +2135,8 @@ function drawBobber(X, Y, t) {
 // ------------------------------------------------------------------ trade window
 function renderTrade() {
   const w = $('#tradeWin');
-  if (!trade) { w.classList.add('hidden'); tradeSig = ''; return; }
+  if (!trade) { w.classList.add('hidden'); tradeSig = ''; tradeChat = []; return; }
+  if (w.classList.contains('hidden')) paintTradeChat();
   w.classList.remove('hidden'); closePanel();
   const { mine, theirs } = trade;
   const col = o => {
@@ -2033,4 +2171,6 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
+window.__lt = { P, camera, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+$('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();
