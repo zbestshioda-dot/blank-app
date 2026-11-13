@@ -64,7 +64,7 @@ function charFrame(frame, lk) {
   return c;
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const CAREER_OUTFIT = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant' };
+const CAREER_OUTFIT = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
   // career outfits: doctors wear the white coat + scrubs sheet (only their hair colour is applied)

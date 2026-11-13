@@ -18,7 +18,8 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'police': ('tools/sheets/pixel_police.jpg', ()),
           'farmer': ('tools/sheets/pixel_farmer.jpg', ()),
           'chef': ('tools/sheets/pixel_chef.jpg', ()),
-          'merchant': ('tools/sheets/pixel_merchant.jpg', ('hair',))}
+          'merchant': ('tools/sheets/pixel_merchant.jpg', ('hair',)),
+          'office': ('tools/sheets/pixel_office.jpg', ('hair',))}
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'police': {'left2': 6}}
 TARGET_H = 96
