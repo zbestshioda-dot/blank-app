@@ -148,6 +148,11 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // parks, the lake and the beach
   prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 84.5, 47.2, false);
   prop('b_pavilion', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
+  // the beach: umbrellas with loungers, palms, rocks at the waterline, a lifebuoy stand by the pier
+  for (const [y, k] of [[20, 0], [27, 1], [35, 0], [44, 1], [55, 0], [67, 1], [74, 0], [83, 1]]) { prop(k ? 'parasol2' : 'parasol', 99.2, y); prop('deckchair', 98.3, y + 1.6); }
+  for (const y of [16, 31, 49, 64, 79, 87]) prop(y % 2 ? 'palm_small' : 'palm', 98.2, y);
+  for (const y of [24, 41, 58, 71, 85]) prop('rock', 100.8, y);
+  prop('i_ball', 100.2, 37.6, false); prop('i_lantern', 96.6, 61.2, false); prop('bench2', 98.6, 59.2, false);
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
   prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
   prop('kiosk', 26.5, 54.6); prop('crate', 23.5, 55.5); prop('barrel', 29.5, 55.5);

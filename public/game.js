@@ -663,6 +663,17 @@ function draw(t) {
   // only things inside the area you are in are drawn: inside a building you never see the street
   const inside = (x, y) => !A || (x >= A.x && x <= A.x + A.w && y >= A.y && y <= A.y + A.h + .5);
   const tm = t / 1000;
+  // outdoors the land and sea carry on past the edge of the map (the edge column repeats), so the view never ends in black
+  drawArea = A;
+  if (A && !myRoom) {
+    const vx0 = Math.floor(c.x / TS) - 1, vy0 = Math.floor(c.y / TS) - 1, vx1 = Math.ceil((c.x + VW) / TS), vy1 = Math.ceil((c.y + VH) / TS);
+    for (let ty = vy0; ty <= vy1; ty++) for (let tx = vx0; tx <= vx1; tx++) {
+      if (tx >= A.x && tx < A.x + A.w && ty >= A.y && ty < A.y + A.h) continue;
+      const cx = clamp(tx, A.x + 1, A.x + A.w - 2), cy = clamp(ty, A.y + 1, A.y + A.h - 2);
+      const ch = G.map.tiles[cy][cx];
+      drawTile(ch === 'w' ? 'w' : ch === 's' ? 's' : '.', tx, ty, tx * TS + X, ty * TS + Y, tm);
+    }
+  }
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
   if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
   else for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
@@ -1645,6 +1656,16 @@ function under(tx, ty) {
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) { const c = tileAt(tx + dx, ty + dy); if (',=kmspc'.includes(c)) return c; }
   return '.';
 }
+const depthCache = new Map(); let drawArea = null;
+function waterDepth(tx, ty) {
+  const k = ty * 4096 + tx; let d = depthCache.get(k); if (d !== undefined) return d;
+  d = 4; const A = drawArea; if (!A || tx < A.x || ty < A.y || tx >= A.x + A.w || ty >= A.y + A.h) return 4;   // open sea past the map edge
+  for (let r = 1; r <= 4 && d === 4; r++) for (let j = -r; j <= r && d === 4; j++) for (let i = -r; i <= r; i++) {
+    const x = tx + i, y = ty + j; if (A && (x < A.x || y < A.y || x >= A.x + A.w || y >= A.y + A.h)) continue;   // the map's own edge is open sea
+    const c = tileAt(x, y); if (c !== 'w' && c !== ' ') { d = r - 1; break; }
+  }
+  depthCache.set(k, d); return d;
+}
 function drawTile(ch, tx, ty, px, py, tm) {
   if (ch === 'B' || ch === 'T' || ch === 'o' && !roomGrid[ty * G.map.w + tx]) ch = under(tx, ty);
   if (ch === 'o') ch = 'i';
@@ -1673,8 +1694,11 @@ function drawTile(ch, tx, ty, px, py, tm) {
       return;
     }
     case 'w': {
-      ctx.fillStyle = '#3d8fd1'; ctx.fillRect(px, py, S, S);
+      // deeper (darker) the further from land
+      const dep = waterDepth(tx, ty);
+      ctx.fillStyle = ['#5cb3e3', '#4aa2da', '#3d8fd1', '#3480c4', '#2c72b6'][dep]; ctx.fillRect(px, py, S, S);
       const ph = Math.sin(tm * 1.5 + tx * .9 + ty * 1.7);
+      if (dep >= 3 && hash(tx, ty) < .12) { const sp = (tm * .8 + hash(ty, tx) * 6) % 6; if (sp < 1) { ctx.fillStyle = `rgba(255,255,255,${.5 * (1 - sp)})`; ctx.fillRect(px + TS * .3, py + TS * .4, TS * .4 * (1 - sp * .5), Math.max(2, TS / 14)); } }
       ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(px + TS * (.2 + ph * .1), py + TS * .3, TS * .35, Math.max(2, TS / 16));
       ctx.fillStyle = 'rgba(20,60,120,.18)'; ctx.fillRect(px + TS * .5, py + TS * (.7 + ph * .05), TS * .3, Math.max(2, TS / 16));
       if (',.sk'.includes(tileAt(tx, ty - 1))) { ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(px, py, S, Math.max(2, TS / 12)); }
