@@ -73,10 +73,10 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   rect(94, 60, 2, 2, '=');
 
   // west main road, north side (doors on row 30)
-  B('toolshop', 'b_shop', 4, 30, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
+  B('toolshop', 'b_toolshop', 4, 30, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
   pathDown(B('dealer', 'b_dealer', 11, 28, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true }), 30);
-  B('school', 'b_school', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
-  pathDown(B('bank', 'b_bank', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
+  B('school', 'b_school2', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
+  pathDown(B('bank', 'b_bank2', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
   // east main road, north side
   B('market', 'b_mart', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' });
   B('hospital', 'b_hospital', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
@@ -86,12 +86,14 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
   B('cinema', 'b_studio', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
-  B('inn', 'b_inn', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
+  B('inn', 'b_inn2', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
   // south-west lane (doors on row 45)
   B('warehouse', 'b_warehouse', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
-  pathDown(B('restaurant', 'b_cafe', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
+  pathDown(B('restaurant', 'b_cafe2', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
   B('kitchen', 'b_bakery', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
-  B('rider', 'b_cowork', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
+  B('rider', 'b_rider', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
+  B('fishhut', 'b_fishing', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });         // the fishing club's hut by the lake
+  B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
   B('fashion', 'b_flower', 38, 45, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
@@ -246,6 +248,7 @@ for (const a of [TOWN, FARM, HOUSING]) {
     if (get(x, y) !== '.') continue;
     let ok = true;
     for (let j = -2; j <= 1 && ok; j++) for (let k = -1; k <= 1; k++) { const c = get(x + k, y + j); if (c && c !== '.' && c !== 'T') { ok = false; break; } }
+    if (ok && BUILDINGS.some(b => x >= b.x - 1 && x < b.x + b.w + 1 && y >= b.y - 1 && y < b.y + b.h + 3)) ok = false;   // keep building fronts clear
     if (ok && !STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3) && !PROPS.some(p => Math.hypot(p.x - x - .5, p.y - y - .5) < 2.5)) set(x, y, 'T');
   }
 }

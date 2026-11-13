@@ -463,6 +463,7 @@ addEventListener('pointerup', e => { if (joy && joy.id === e.pointerId) { joy = 
 let camLift = 0;
 function camera() {
   const m = P.get(myId); let x = m ? m.rx + m.ox : 50, y = m ? m.ry + m.oy : 36;
+  if (window.__camAt) { x = window.__camAt[0]; y = window.__camAt[1]; return { x: x * TS - VW / 2, y: y * TS - VH / 2 }; }   // automated screenshots only
   const target = panel && !trade && !(VW > VH && VH <= 520) ? VH * 0.24 : 0;   // landscape popups sit in the middle, no lift
   camLift += (target - camLift) * 0.18;
   const a = m ? areaOf(m.x, m.y) : null;
