@@ -327,8 +327,6 @@ textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid
   #topBar{left:6px;right:6px;top:4px;justify-content:flex-start}
   #menu{padding-bottom:2px;gap:4px}
   #menu .tile,#menuToggle{width:36px;height:36px;padding:3px;border-radius:8px}.tile i{display:none}.tile b.q{font-size:18px}
-  #card{top:48px}#topRight{top:48px}
-  body.hasEvent #topBar{top:44px}body.hasEvent #card,body.hasEvent #topRight{top:88px}
   #toasts{bottom:calc(186px + env(safe-area-inset-bottom))}
   #thumbs{transform:scale(.92);transform-origin:bottom right}
 }
@@ -516,3 +514,13 @@ body.hasEvent #topBar{top:146px!important}
   #createBox>*{grid-column:2}#createBox>.logo,#createBox>p.sub{grid-column:1}
   #createBox>.logo{grid-row:1}#createBox>p.sub{grid-row:2}
 }
+
+/* status card and minimap sit right at the top (the menu lives on the right now) */
+#card,#topRight,body.hasEvent #card,body.hasEvent #topRight{top:calc(6px + env(safe-area-inset-top))!important}
+.money{white-space:nowrap}
+/* the CBT notice scrolls across its own pill (container units: travels exactly its width) */
+#ticker{container-type:inline-size}
+#ticker span{left:0!important;animation:tick2 14s linear forwards!important}
+@keyframes tick2{from{transform:translateX(100cqw)}to{transform:translateX(-100%)}}
+#topBar,body.hasEvent #topBar{top:calc(136px + env(safe-area-inset-top))!important}
+@media (max-height:520px) and (orientation:landscape){#topBar,body.hasEvent #topBar{top:calc(4px + env(safe-area-inset-top))!important}}
