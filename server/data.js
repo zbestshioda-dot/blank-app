@@ -261,6 +261,9 @@ for (const [x, y] of [[50, 52], [50, 66], [30, 47], [70, 15], [25, 15], [50, 10]
 prop('newsbox', 57.3, 38.9); prop('bollard', 47.6, 39.95); prop('bollard', 52.4, 39.95);
 // A-frame signs by the doors of open shops, produce on the market stall, a lantern at the fishing club
 for (const id of ['restaurant', 'fashion', 'toolshop', 'rider', 'kitchen']) { const b = BUILDINGS.find(x => x.id === id); if (b) prop('i_shopsign', b.x + b.w - .2, b.y + b.h + .05, false); }
+// neon OPEN signs hung beside the doors (lit only while the shop is open), and a cake on show outside the restaurant
+for (const id of ['restaurant', 'fashion', 'toolshop', 'rider', 'kitchen', 'bank']) { const b = BUILDINGS.find(x => x.id === id); if (b) PROPS.push({ s: 'i_open', x: b.x + .7, y: b.y + b.h + .02, z: 1.3, open: id }); }
+{ const r = BUILDINGS.find(x => x.id === 'restaurant'); if (r) prop('i_cake', r.x + .5, r.y + r.h + .05, false); }
 { const m = BUILDINGS.find(x => x.id === 'market'); if (m) { prop('i_crate_apple', m.x - .4, m.y + m.h); prop('i_crate_carrot', m.x + m.w + .4, m.y + m.h); prop('i_pricestand', m.x + m.w + 1.6, m.y + m.h); } }
 { const f = BUILDINGS.find(x => x.id === 'fishhut'); if (f) prop('i_lantern', f.x - .3, f.y + f.h + .05, false); }
 prop('i_bin_yellow', 58.6, 38.9);

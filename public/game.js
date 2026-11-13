@@ -690,7 +690,7 @@ function draw(t) {
   if (!myRoom) drawCastShadows(ents, X, Y, night);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
-    else if (k === 1) spr(e.s, e.x, e.y, X, Y);
+    else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) spr(e[2], e[0] + .5, e[1] + 1.05, X, Y);
     else if (k === 3) spr(e[0], e[1], e[2], X, Y);
     else drawPlayer(e, X, Y, t);
@@ -1754,7 +1754,7 @@ function drawCastShadows(ents, X, Y, night) {
   };
   for (const [, kind, e] of ents) {
     if (kind === 0) one(e.sprite, e.x + e.w / 2, e.y + e.h + .02);
-    else if (kind === 1) one(e.s, e.x, e.y);
+    else if (kind === 1 && !e.z) one(e.s, e.x, e.y);
     else if (kind === 2) one(e[2], e[0] + .5, e[1] + 1.05);
     else if (kind === 4 && e.rx != null) {          // people: a body-shaped blob
       g.setTransform(DPR, 0, -k * DPR, -d * DPR, ((e.rx) * TS + X) * DPR, ((e.ry + .32) * TS + Y) * DPR);
