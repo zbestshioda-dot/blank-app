@@ -572,7 +572,6 @@ function onAction() {
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
-  if (near.type === 'begspot' && me.career === 'beggar') return doAct(near.id, 'beg');
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
   if (near.type === 'pier' && me.cast) return reel();                // the big button reels in too
@@ -666,6 +665,7 @@ function draw(t) {
   const tm = t / 1000;
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
   if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
+  else for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
   for (const s of G.stations) {
@@ -719,6 +719,12 @@ function draw(t) {
   }
   if (myRoom) drawRoomLabels(myRoom, X, Y, t);
   if (!myRoom) drawSunlight(t, night);
+  else {                                   // indoors: warm lamp light from the middle of the room, darker corners
+    const r = myRoom, cx = (r.x + r.w / 2) * TS + X, cy = (r.y + r.h / 2) * TS + Y, R0 = Math.max(r.w, r.h) * TS * .62;
+    const gl = ctx.createRadialGradient(cx, cy - TS, TS, cx, cy, R0);
+    gl.addColorStop(0, 'rgba(255,214,150,.10)'); gl.addColorStop(.7, 'rgba(255,200,140,0)'); gl.addColorStop(1, 'rgba(30,15,5,.28)');
+    ctx.fillStyle = gl; ctx.fillRect(r.x * TS + X, r.y * TS + Y, r.w * TS, r.h * TS);
+  }
   if (!myRoom) drawRain(t);
   // inside: no day/night, but the office turns its lights off after work hours
   let dark = myRoom ? 0 : night;
@@ -1343,7 +1349,6 @@ function renderPanel(p) {
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ขอทานนั่งได้ทุกที่ (ปุ่ม 🥣) ที่คนพลุกพล่านอย่างหน้าร้าน/จัตุรัสได้เงินบ่อยกว่า</div>${staffHint('beggar')}`;
-    case 'begspot': return `<h2>🥣 ${esc(STN(st).label)}</h2><div class="sub">ทำเลดี คนผ่านเยอะ</div>${me.career === 'beggar' ? B(me.pose === 'beg' ? 'ลุกขึ้น' : '🥣 นั่งขอทานตรงนี้', { t: 'act', st, a: 'beg' }, 'primary big') : '<div class="sub">ถ้าเจอขอทาน กด 💬 คุย เพื่อบริจาค</div>'}`;
     case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน · ใครก็ล้วงกระเป๋าได้ (ทุก 1 นาที) ตอนล้วงจะใส่ชุดโจรทันที คนเห็นแจ้งตำรวจได้ และสายตรวจจะวิ่งไล่จับ · ถ้าพลาดอาจถูกจับคาหนังคาเขา</div>${me.career === 'police' ? '<div class="sub">👮 ตำรวจล้วงกระเป๋าไม่ได้</div>' : B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big')}`;
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;
@@ -1655,9 +1660,26 @@ function drawTile(ch, tx, ty, px, py, tm) {
     case '#': {
       const rm = roomGrid[ty * G.map.w + tx];
       if (rm && ty === rm.y && tx > rm.x && tx < rm.x + rm.w - 1) {
-        ctx.fillStyle = WALL[rm.rk] || '#ddd'; ctx.fillRect(px, py, S, S);
-        ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(px + TS / 2, py, 2, TS * .8);
-        ctx.fillStyle = shade(WALL[rm.rk] || '#dddddd', -.35); ctx.fillRect(px, py + TS * .82, S, TS * .18);
+        // back wall: wallpaper with a faint pattern, a chair rail, a darker wainscot and a skirting board
+        const c = WALL[rm.rk] || '#dddddd';
+        // the back wall stands taller than one tile: an upper band (with a cornice) above the room
+        ctx.fillStyle = shade(c, .05); ctx.fillRect(px, py - TS, S, S);
+        ctx.fillStyle = 'rgba(255,255,255,.10)'; for (let i = 0; i < 4; i++) ctx.fillRect(px + i * TS / 4 + TS / 8 - 1, py - TS + TS * .2, 2, TS * .8);
+        ctx.fillStyle = shade(c, -.5); ctx.fillRect(px, py - TS, S, TS * .1);
+        ctx.fillStyle = c; ctx.fillRect(px, py, S, S);
+        ctx.fillStyle = 'rgba(255,255,255,.10)'; for (let i = 0; i < 4; i++) ctx.fillRect(px + i * TS / 4 + TS / 8 - 1, py + 3, 2, TS * .5);
+        ctx.fillStyle = shade(c, -.18); ctx.fillRect(px, py + TS * .6, S, TS * .3);
+        ctx.fillStyle = shade(c, .12); ctx.fillRect(px, py + TS * .58, S, Math.max(2, TS * .05));
+        ctx.fillStyle = shade(c, -.45); ctx.fillRect(px, py + TS * .88, S, TS * .12);
+        ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(px, py, S, Math.max(2, TS * .06));
+      } else if (rm) {
+        // side and front walls: one solid wall with a wooden trim where it meets the floor
+        ctx.fillStyle = '#3a2b24'; ctx.fillRect(px, py, S, S);
+        const fl = (dx, dy) => 'ioD'.includes(tileAt(tx + dx, ty + dy));
+        ctx.fillStyle = '#7a5434';
+        if (fl(1, 0)) ctx.fillRect(px + TS - TS * .14, py, TS * .14 + 1, S);
+        if (fl(-1, 0)) ctx.fillRect(px, py, TS * .14, S);
+        if (fl(0, -1)) ctx.fillRect(px, py, S, TS * .14);
       } else { ctx.fillStyle = '#2a2730'; ctx.fillRect(px, py, S, S); ctx.fillStyle = '#3a3542'; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 4); }
       return;
     }

@@ -638,13 +638,6 @@ function act(a, m) {
       return toast(a, 'นั่งพักที่โต๊ะ พลังงานฟื้นเร็วขึ้น คุยกับคนรอบๆ ได้ (เดินเพื่อลุก)', '🪑');
     }
     // ---------------- beggars and pickpockets
-    case 'begspot.beg': {
-      if (!need(a, 'beggar')) return;
-      if (a.pose === 'beg' && a.seat === s.id) { standUp(a); return toast(a, 'เลิกนั่งขอทานแล้ว', '🥣'); }
-      for (const o of online.values()) if (o !== a && o.seat === s.id) return toast(a, 'จุดนี้มีคนนั่งแล้ว', '🥣', false);
-      standUp(a); a.pose = 'beg'; a.seat = s.id; place(a, s.x, s.y); sendRoster(); markMe(a);
-      return toast(a, 'นั่งขอทานแล้ว คนเดินผ่านจะหยอดเงินให้เป็นระยะ ผู้เล่นแตะที่ตัวคุณเพื่อบริจาคได้ (เดินเพื่อลุก)', '🥣');
-    }
     case 'crowd.pick': {
       if (a.career === 'police') return toast(a, 'ตำรวจล้วงกระเป๋าไม่ได้!', '👮', false);
       if (!cd(a, 'crowd', 60000) || !spend(a, 8)) return;
@@ -1332,7 +1325,7 @@ function moodTick(a, t, indoors) {
 function begSpot(a) {
   const area = areaId(a); if (area !== 'town' && area !== 'housing' && area !== 'farm') return 0.3;
   let m = area === 'town' ? 0.7 : 0.45;
-  if (D.STATIONS.some(s => s.type === 'begspot' && Math.hypot(s.x - a.x, s.y - a.y) < 4)) m = 1.2;
+  if (D.STATIONS.some(s => s.type === 'crowd' && s.area === area && Math.hypot(s.x - a.x, s.y - a.y) < 4)) m = 1.2;
   else if (D.STATIONS.some(s => (s.type === 'door' && s.house === undefined || s.type === 'crowd') && s.area === area && Math.hypot(s.x - a.x, s.y - a.y) < 6)) m = 1;
   const h = hourNow(); if (h >= 22 || h < 6) m *= 0.4;
   return m;
@@ -1523,7 +1516,7 @@ const HAIRS = Object.keys(D.LOOKS.hair), SH = Object.keys(D.LOOKS.shirt), PA = O
 const randLook = () => ({ hair: pick(['brown', 'brown', 'black', 'black', ...HAIRS]), shirt: pick(SH), pants: pick(PA) });
 let npcRosterDirty = false;
 {
-  const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|begspot|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
+  const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
   for (let i = 0; i < 12; i++) {
     const [x, y] = pick(walkableIn('town'));
     npcs.push({ id: -(i + 1), folk: 1, name: D.NPC_NAMES[i % D.NPC_NAMES.length], area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
@@ -1571,8 +1564,8 @@ const WORKERS = [
   { career: 'chef', name: 'เชฟต้อม', area: 'r_kitchen', pts: () => roomPts('r_kitchen', [[4.9, 3.4], [9.6, 3.4], [7, 3.4], [7, 5.4]]), stay: () => rnd(4, 9) },
   { career: 'doctor', name: 'หมอแนน (แพทย์เวร)', area: 'r_hospital', always: true, pts: () => D.STATIONS.filter(s => s.type === 'bed').map(s => [s.x, s.y + .95]).concat(roomPts('r_hospital', [[5, 5]])).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 8), job: npcDoctor },
   { career: 'rider', name: 'พี่บอย (ไรเดอร์)', area: 'town', pts: () => [ST_XY('door_restaurant'), ...D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined).map(s => [s.x, s.y + .3])].filter(p => p && !D.blocked(p[0], p[1])), stay: () => rnd(3, 6), speed: 2.4 },
-  { career: 'beggar', name: 'ตาผล (ขอทาน)', area: 'town', pts: () => D.STATIONS.filter(s => s.type === 'begspot' && ![...online.values()].some(o => o.seat === s.id)).map(s => [s.x, s.y]), pose: () => 'beg', stay: () => rnd(60, 160) },
-  { career: 'police', name: 'ดาบชัย (สายตรวจ)', area: 'town', always: true, cop: true, pts: () => D.STATIONS.filter(s => s.area === 'town' && /^(crowd|begspot|door)$/.test(s.type) && s.house === undefined).map(s => [s.x, s.y + (s.type === 'door' ? .3 : 0)]).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 10), speed: 1.6 },
+  { career: 'beggar', name: 'ตาผล (ขอทาน)', area: 'town', pts: () => [[53.5, 38.6], [64.5, 33.5], [76.5, 33.5], [27, 33.5]].filter(([x, y]) => !D.blocked(x, y) && ![...online.values()].some(o => Math.hypot(o.x - x, o.y - y) < 1)), pose: () => 'beg', stay: () => rnd(60, 160) },
+  { career: 'police', name: 'ดาบชัย (สายตรวจ)', area: 'town', always: true, cop: true, pts: () => D.STATIONS.filter(s => s.area === 'town' && /^(crowd|door)$/.test(s.type) && s.house === undefined).map(s => [s.x, s.y + (s.type === 'door' ? .3 : 0)]).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 10), speed: 1.6 },
 ];
 WORKERS.forEach((w, i) => {
   const [x, y] = pick(w.pts().length ? w.pts() : walkableIn(w.area).map(p => [p[0] + .5, p[1] + .5]));

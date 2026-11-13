@@ -128,9 +128,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('flowerbed', 44, 25.4); prop('flowerbed2', 56, 25.4); prop('lamp3', 42.6, 30); prop('lamp3', 57.4, 30); prop('lamp3', 42.6, 36); prop('lamp3', 57.4, 36);
   prop('noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
   STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47, y: 26.4, r: 1.4, area: 'town' });
-  // begging spots (beggars sit here) and crowds (pickpockets work here)
-  for (const [id, x, y, l] of [['beg1', 53.5, 38.6, 'จัตุรัสกลางเมือง'], ['beg2', 64.5, 33.5, 'หน้าตลาด'], ['beg3', 76.5, 33.5, 'หน้าโรงพยาบาล'], ['beg4', 27, 33.5, 'หน้ามหาวิทยาลัย']])
-    STATIONS.push({ id, type: 'begspot', label: `จุดขอทาน (${l})`, icon: '🥣', x, y, r: 1.1, area: 'town' });
+  // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
   for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด'], ['crowd3', 11, 51.5, 'แผงลอย']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   // a dark alley behind the cinema: where thieves find work
