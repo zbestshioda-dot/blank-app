@@ -279,7 +279,7 @@ const isOpen = (kind, h = hourNow()) => { const o = G?.hours[kind]; return !o ||
 setInterval(() => {
   if (!wd || !G) return;
   const h = hourNow();
-  const dt = me?.date; $('#clock').textContent = `${dt ? `📅 ${dt.day}/${G.monthDays} ${G.months[dt.month]} · ` : ''}🕐 ${hhmm(h)} · 👥 ${wd.on}`;
+  const dt = me?.date; $('#clock').innerHTML = `${dt ? `<span>📅 ${dt.day}/${G.monthDays} ${G.months[dt.month]}</span><i> · </i>` : ''}<span>🕐 ${hhmm(h)} · 👥 ${wd.on}</span>`;
   document.querySelectorAll('.qcd').forEach(el => {
     const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
     el.textContent = `${Math.floor(s / 3600)} ชม. ${Math.floor(s % 3600 / 60)} นาที`;
