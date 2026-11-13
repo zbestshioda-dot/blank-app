@@ -1172,8 +1172,8 @@ function moodTick(a, t, indoors) {
   if (a.call) d += 0.04;
   if (holdsHome(a) >= 0 && D.roomAt(a.x, a.y)?.house === holdsHome(a)) d += 0.03 + 0.005 * comfort(a);
   joy(a, d);
-  // cravings: "I really want to eat X"
-  if (!a.down) {
+  // cravings: "I really want to eat X" (admins have no needs)
+  if (!a.down && !isAdmin(a)) {
     if (!a.craving && t > (a.craveNext || 0)) {
       if (!a.craveNext) a.craveNext = t + rnd(1, 3) * 60000;
       else { const id = pick(CRAVE); a.craving = { item: id, until: t + 6 * 60000 }; send(a, { t: 'crave', item: id }); toast(a, `อยากกิน${D.ITEMS[id].icon}${D.ITEMS[id].name}จัง! กินภายใน 6 นาทีจะมีความสุขเพิ่มมาก`, '🤤'); markMe(a); }

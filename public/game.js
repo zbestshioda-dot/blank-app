@@ -198,9 +198,14 @@ function logLine(html, cls, bubbleOnly) {
 }
 
 // ------------------------------------------------------------------ toasts and popups
+const recentToasts = new Map();
 function toast(msg, icon = '✅', ok = true) {
+  // never stack the same message: identical text within 8 s is dropped
+  const key = icon + msg, t0 = performance.now();
+  if (recentToasts.get(key) > t0 - 8000) return;
+  recentToasts.set(key, t0); if (recentToasts.size > 50) recentToasts.delete(recentToasts.keys().next().value);
   const d = document.createElement('div'); d.className = 'toast' + (ok ? '' : ' bad'); d.textContent = `${icon} ${msg}`;
-  const t = $('#toasts'); t.appendChild(d); while (t.children.length > 4) t.firstChild.remove();
+  const t = $('#toasts'); t.appendChild(d); while (t.children.length > (innerWidth < 600 ? 2 : 4)) t.firstChild.remove();
   setTimeout(() => d.remove(), 3800);
 }
 function popup(html, buttons, ms = 20000) {
