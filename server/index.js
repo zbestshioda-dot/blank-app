@@ -1454,6 +1454,8 @@ function login(ws, m) {
     loginFails.delete('n:' + lname);
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
+    // a brand-new ID: the client first shows the one-time character creator, then logs in again with create:1
+    if (!m.create) return ws.send(JSON.stringify({ t: 'newchar', name }));
     const salt = crypto.randomBytes(8).toString('hex');
     const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
     a = hydrate({ v: VERSION, name, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
