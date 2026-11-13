@@ -364,7 +364,7 @@ function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   VW = innerWidth; VH = innerHeight;
   cv.width = VW * DPR; cv.height = VH * DPR;
-  TS = clamp(Math.min(VW, VH) / 9.5, 34, 54);
+  TS = Math.round(clamp(Math.min(VW, VH) / 9.5, 34, 54));   // whole pixels: tile seams stay put while scrolling
 }
 addEventListener('resize', resize); resize();
 
@@ -502,7 +502,8 @@ requestAnimationFrame(frame);
 // ------------------------------------------------------------------ drawing
 const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967296; };
 function draw(t) {
-  const c = camera(), X = -c.x, Y = -c.y;
+  // snap the camera to whole device pixels so the map does not shimmer against the player while walking
+  const c = camera(), X = Math.round(-c.x * DPR) / DPR, Y = Math.round(-c.y * DPR) / DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#07090c'; ctx.fillRect(0, 0, VW, VH);
@@ -583,7 +584,8 @@ function drawPlot(s, px, py, t) {
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
 function drawPlayer(p, X, Y, t) {
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
-  const px0 = (p.rx + (p.ox || 0)) * TS + X, py0 = (p.ry + (p.oy || 0)) * TS + Y + TS * .32;
+  const snap = v => Math.round(v * DPR) / DPR;
+  const px0 = snap((p.rx + (p.ox || 0)) * TS + X), py0 = snap((p.ry + (p.oy || 0)) * TS + Y + TS * .32);
   if (px0 < -80 || py0 < -140 || px0 > VW + 80 || py0 > VH + 140) return;
   const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail';
   const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
@@ -597,7 +599,7 @@ function drawPlayer(p, X, Y, t) {
   if (sitting || lying) dir = 'down';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
   p.walk = (p.walk || 0) + (moving ? .2 : 0);
-  const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = moving ? Math.abs(Math.sin(p.walk)) * TS * .05 : 0;
+  const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
   const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
   let px = px0, py = py0;
