@@ -107,12 +107,29 @@ for outfit, (src, tint) in SHEETS.items():
 W = max(max(L['base'].width for L in [f[0]]) for f in frames.values()) * 2; H = max(f[3] for f in frames.values()) + 6
 sc = TARGET_H / H; cw, ch = round(W * sc), TARGET_H
 ORDER = ['base', 'shirt', 'pants', 'hair']
+# place every layer of every frame on the shared canvas
+canv = {}
+for name, (layers, x0, x1, yb) in frames.items():
+    cx = (x0 + x1) / 2; canv[name] = {}
+    for ln in ORDER:
+        c = Image.new('RGBA', (W, H), (0, 0, 0, 0)); c.alpha_composite(layers[ln], (round(W / 2 - cx), round(H - 3 - yb))); canv[name][ln] = c
+# lock the head while walking: the sheet's step frames draw the head at slightly different angles,
+# so each step frame gets the head (everything above the neck) of its direction's standing frame
+def neck_y(name):
+    a = np.zeros((H, W), bool)
+    for ln in ORDER: a |= np.array(canv[name][ln])[..., 3] > 60
+    ys = np.where(a.any(1))[0]; top, bot = ys.min(), ys.max()
+    return int(top + (bot - top) * 0.44)
+for name in frames:
+    pre, _, f = name.rpartition(':'); base = (pre + ':' if pre else '') + f[:-1] + '0'
+    if f.endswith('0') or base not in canv: continue
+    ny = neck_y(base)
+    for ln in ORDER:
+        step = np.array(canv[name][ln]); stand = np.array(canv[base][ln])
+        step[:ny] = stand[:ny]; canv[name][ln] = Image.fromarray(step, 'RGBA')
 atlas = Image.new('RGBA', (cw * len(ORDER), ch * len(frames)), (0, 0, 0, 0)); meta = {}
-for row, (name, (layers, x0, x1, yb)) in enumerate(frames.items()):
-    cx = (x0 + x1) / 2
-    for col, ln in enumerate(ORDER):
-        c = Image.new('RGBA', (W, H), (0, 0, 0, 0)); c.alpha_composite(layers[ln], (round(W / 2 - cx), round(H - 3 - yb)))
-        atlas.alpha_composite(c.resize((cw, ch), Image.LANCZOS), (col * cw, row * ch))
+for row, name in enumerate(frames):
+    for col, ln in enumerate(ORDER): atlas.alpha_composite(canv[name][ln].resize((cw, ch), Image.LANCZOS), (col * cw, row * ch))
     meta[name] = row
 atlas.save(OUT + '.webp', 'WEBP', lossless=True)
 json.dump({'w': cw, 'h': ch, 'feet': [cw / 2, ch - 3 * sc], 'layers': ORDER, 'rows': meta}, open(OUT + '.json', 'w'))
