@@ -877,6 +877,12 @@ function act(a, m) {
       return toast(a, `ได้รับ ${l.name} แล้ว! ไปสมัครงานได้เลย`, '🎓');
     }
     // ---------------- hospital
+    case 'hospital.medbuy': {
+      const it = D.ITEMS[m.item]; if (!it || !it.pharmacy) return;
+      if (!pay(a, it.base)) return;
+      addItem(a, m.item, 1); markMe(a);
+      return toast(a, `ซื้อ ${it.icon}${it.name} ${money(it.base)} ใส่กระเป๋าแล้ว (กดใช้ในกระเป๋า 🎒)`, '💊');
+    }
     case 'hospital.heal': {
       if (a.health >= 98 && !(a.dz || []).length) return toast(a, 'คุณสุขภาพดีอยู่แล้ว', 'ℹ️', false);
       const price = (a.dz || []).length ? 1500 + 500 * (a.dz.length - 1) : 800;
@@ -2003,7 +2009,7 @@ function tick() {
       if (a.hunger <= 0) a.health -= 0.25 * dt;
       else if (a.hunger > 60 && a.health < 100 && !(a.dz || []).length) a.health = Math.min(100, a.health + 0.05 * dt);
       // sitting down to rest heals (slowly while sick, not at all while starving)
-      if ((a.pose === 'rest' || a.pose === 'seat') && a.hunger > 25 && a.health < 100) a.health = Math.min(100, a.health + ((a.dz || []).length ? 0.06 : 0.18) * dt);
+      if ((a.pose === 'rest' || a.pose === 'seat') && a.hunger > 25 && a.health < 100) a.health = Math.min(100, a.health + ((a.dz || []).length ? 0.1 : 0.5) * dt);
       for (const d of a.dz || []) a.health -= (DZ[d].drain || 0) * (flu && (d === 'flu' || d === 'cold') ? 2.5 : 1) * dt;
       a.health = Math.max(0, a.health);
     }

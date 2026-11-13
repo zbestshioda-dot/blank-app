@@ -389,7 +389,8 @@ const ITEMS = {
 
   snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
   drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 150, eat: { energy: 25 }, wholesale: 105, stock: 12, refill: 25 },
-  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', base: 250, eat: { health: 30 }, wholesale: 180, stock: 10, refill: 40 },
+  painkiller: { name: 'ยาแก้ปวด/ยาบำรุง', icon: '💊', kind: 'goods', pharmacy: true, base: 150, eat: { health: 20 } },
+  medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', pharmacy: true, base: 250, eat: { health: 30 }, wholesale: 180, stock: 10, refill: 40 },
 };
 const CATEGORIES = { crop: '🌾 พืชผล', fish: '🐟 ปลา', meal: '🍱 อาหาร', goods: '📦 สินค้า' };
 
