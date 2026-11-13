@@ -435,3 +435,22 @@ body.hasEvent #topBar{top:186px!important}
   #topRight{right:44px!important}
   #thumbs{right:calc(44px + env(safe-area-inset-right))!important}
 }
+
+/* ---------------- UI kit skin (wood/parchment pieces from assets/ui/k_*) */
+#menu .tile,#menuToggle{background:url(assets/ui/k_slot.png) center/100% 100% no-repeat;border:0;box-shadow:0 2px 3px rgba(0,0,0,.35);border-radius:10px;padding:6px}
+#menu .tile img{filter:none}
+#menu .tile b.q{color:#3e2414;text-shadow:none}
+#menu .tile:active,#menu .tile:hover{background-image:url(assets/ui/k_slot_on.png)}
+#menu .tile.full{background:url(assets/ui/k_slot.png) center/100% 100% no-repeat;padding:6px}
+#menuToggle{background-image:url(assets/ui/k_slot_dk.png)}
+#menuToggle.closed::after{color:#fbecd2}
+.item{border:8px solid transparent;border-image:url(assets/ui/k_plank.png) 16 fill / 8px stretch;background:none;border-radius:0;padding:2px 4px}
+.item.done{filter:saturate(1.15)}
+.tabs button{border:0;border-image:url(assets/ui/k_tab_dk.png) 16 30 4 30 fill / 8px 15px 2px 15px stretch;border-style:solid;background:none;box-shadow:none;color:#fbecd2;text-shadow:0 1px 0 #3e2414;border-radius:0;padding:5px 4px 3px}
+.tabs button.primary{border-image-source:url(assets/ui/k_tab_on.png);color:#fffbe8}
+.sheet h2{border-bottom:0;padding-bottom:10px;background:url(assets/ui/k_line2.png) bottom/100% 8px no-repeat}
+.secT{padding-bottom:8px;background:url(assets/ui/k_line.png) bottom/100% 6px no-repeat}
+.tag{background:none;border:6px solid transparent;border-image:url(assets/ui/k_pill.png) 16 fill / 6px stretch;padding:0 4px;border-radius:0;color:#fbecd2}
+.money::before{content:'';width:1.1em;height:1.1em;line-height:1;border:0;border-radius:0;margin-right:4px;vertical-align:-.18em;background:url(assets/ui/k_coin.png) center/contain no-repeat}
+#qline{border:8px solid transparent;border-image:url(assets/ui/k_plank.png) 16 fill / 7px stretch;background:none;border-radius:0}
+.jobbox{border:10px solid transparent;border-image:url(assets/ui/k_plank.png) 16 fill / 10px stretch;background:none}
