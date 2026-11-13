@@ -601,6 +601,7 @@ function draw(t) {
   const inside = (x, y) => !A || (x >= A.x && x <= A.x + A.w && y >= A.y && y <= A.y + A.h + .5);
   const tm = t / 1000;
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
+  if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
   for (const s of G.stations) {
@@ -622,6 +623,7 @@ function draw(t) {
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
+  if (!myRoom) drawCastShadows(ents, X, Y, night);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
     else if (k === 1) spr(e.s, e.x, e.y, X, Y);
@@ -645,6 +647,7 @@ function draw(t) {
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
   if (myRoom) drawRoomLabels(myRoom, X, Y, t);
+  if (!myRoom) drawSunlight(t, night);
   if (!myRoom) drawRain(t);
   // inside: no day/night, but the office turns its lights off after work hours
   let dark = myRoom ? 0 : night;
@@ -1535,6 +1538,113 @@ function drawBuildingSign(b, X, Y) {
   const open = isOpen(b.id);
   sign(`${b.icon} ${b.label}${open ? '' : ' · ปิด'}`, cx, top - TS * .15, { size: TS * .34, bg: open ? 'rgba(18,22,28,.9)' : 'rgba(90,30,30,.92)', border: '#ffc94d88' });
   const o = G.hours[b.id]; if (o && o[1] - o[0] < 24) sign(`${hhmm(o[0])}–${hhmm(o[1])}`, cx, top + TS * .32, { size: TS * .22, bg: 'rgba(0,0,0,.55)' });
+}
+// ------------------------------------------------------------------ depth: soft tile edges, cast shadows, sunlight
+// material of a tile for edge blending (trees and buildings stand on grass)
+const MAT = c => c === '=' ? 'road' : ',ckp'.includes(c) ? 'pave' : c === 's' ? 'sand' : c === 'w' ? 'water' : c === 'f' ? 'soil' : c === ' ' || c === '#' || c === 'i' || c === 'D' || c === 'o' ? null : 'grass';
+let edgeTS = 0; const EDGE = {};
+// one small canvas per edge kind, drawn for the top side and rotated for the others
+function edgeCanvas(kind) {
+  if (edgeTS !== TS) { edgeTS = TS; for (const k in EDGE) delete EDGE[k]; }
+  if (EDGE[kind]) return EDGE[kind];
+  const S = Math.ceil(TS) + 1, c = document.createElement('canvas'); c.width = S; c.height = S;
+  const g = c.getContext('2d'), lin = (h, stops) => { const gr = g.createLinearGradient(0, 0, 0, h); stops.forEach(([o, col]) => gr.addColorStop(o, col)); g.fillStyle = gr; g.fillRect(0, 0, S, h); };
+  const px = Math.max(2, Math.round(TS / 16));
+  if (kind === 'curbShadow') {          // road below a kerb: the kerb casts a soft shadow onto the asphalt
+    lin(TS * .34, [[0, 'rgba(0,0,0,.42)'], [.35, 'rgba(0,0,0,.16)'], [1, 'rgba(0,0,0,0)']]);
+  } else if (kind === 'curbLip') {      // pavement next to a road: a raised kerb stone with a lit top and a dark face
+    g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(0, 0, S, px * 2);
+    g.fillStyle = 'rgba(70,60,50,.55)'; g.fillRect(0, 0, S, px * .8);
+    lin(TS * .25, [[0, 'rgba(0,0,0,0)'], [.3, 'rgba(0,0,0,.08)'], [1, 'rgba(0,0,0,0)']]);
+  } else if (kind === 'grassOver' || kind === 'grassSand') {   // grass spilling over a paved/sandy edge: soft, ragged
+    lin(TS * .28, kind === 'grassOver' ? [[0, 'rgba(20,50,10,.38)'], [1, 'rgba(20,50,10,0)']] : [[0, 'rgba(80,140,40,.55)'], [1, 'rgba(80,140,40,0)']]);
+    let r = 7; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
+    for (let x = 0; x < S; x += px) {
+      const h = px * (1 + Math.floor(rnd() * 3));
+      g.fillStyle = rnd() < .5 ? '#5da535' : '#4c912a'; g.fillRect(x, 0, px, h);
+      if (rnd() < .3) { g.fillStyle = '#76bf45'; g.fillRect(x, h - px, px, px); }
+    }
+  } else if (kind === 'grassLift') {    // grass next to a lower surface: a light rim so the lawn reads as raised
+    lin(TS * .14, [[0, 'rgba(255,255,220,.22)'], [1, 'rgba(255,255,220,0)']]);
+  }
+  return EDGE[kind] = c;
+}
+function edgeDraw(kind, side, px, py) {
+  const c = edgeCanvas(kind), S = c.width;
+  if (side === 0) { ctx.drawImage(c, px, py); return; }
+  ctx.save(); ctx.translate(px + S / 2, py + S / 2); ctx.rotate(side * Math.PI / 2); ctx.drawImage(c, -S / 2, -S / 2); ctx.restore();
+}
+// sides: 0 top, 1 right, 2 bottom, 3 left (rotation of the top-edge canvas)
+const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+function drawEdges(tx, ty, px, py) {
+  const me = MAT(tileAt(tx, ty)); if (!me || me === 'water') return;
+  for (let d = 0; d < 4; d++) {
+    const nb = MAT(tileAt(tx + SIDES[d][0], ty + SIDES[d][1])); if (!nb || nb === me) continue;
+    if (me === 'road') edgeDraw('curbShadow', d, px, py);
+    else if (me === 'pave' && nb === 'road') edgeDraw('curbLip', d, px, py);
+    else if ((me === 'pave' || me === 'soil') && nb === 'grass') edgeDraw('grassOver', d, px, py);
+    else if (me === 'sand' && nb === 'grass') edgeDraw('grassSand', d, px, py);
+    else if (me === 'grass' && (nb === 'road' || nb === 'pave')) edgeDraw('grassLift', d, px, py);
+  }
+}
+// cast shadows: every standing sprite is drawn once as a black silhouette, sheared along the sun direction
+let shadowAtlas = null, shadowBuf = null;
+function silhouettes() {
+  if (shadowAtlas || !atlasImg) return shadowAtlas;
+  const c = document.createElement('canvas'); c.width = atlasImg.width; c.height = atlasImg.height;
+  const g = c.getContext('2d'); g.drawImage(atlasImg, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+  return shadowAtlas = c;
+}
+const FLAT = /^(f_rug|flowerbed|fl_|g_|pond|grass_tuft|sign_walk)/;
+function drawCastShadows(ents, X, Y, night) {
+  const sa = silhouettes(); if (!sa) return;
+  const day = 1 - night / 0.55; if (day < 0.05) return;
+  const h = hourNow(), off = clamp((h - 12) / 6, -1.2, 1.2);
+  const k = 0.45 - off * 0.75, d = 0.32 + Math.abs(off) * 0.28;      // morning: long shadows to the right; evening: to the left
+  const W = Math.ceil(VW * DPR), H = Math.ceil(VH * DPR);
+  if (!shadowBuf) shadowBuf = document.createElement('canvas');
+  if (shadowBuf.width !== W || shadowBuf.height !== H) { shadowBuf.width = W; shadowBuf.height = H; }
+  const g = shadowBuf.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.imageSmoothingEnabled = false;
+  const one = (name, cx, by, scale = 1) => {
+    const s = atlas.sprites[name]; if (!s || FLAT.test(name)) return;
+    const w = s[2] / atlas.tile * TS * scale, hh = s[3] / atlas.tile * TS * scale;
+    if (hh < TS * .7) return;
+    const ox = (cx * TS + X) * DPR, oy = (by * TS + Y) * DPR;
+    g.setTransform(DPR, 0, -k * DPR, -d * DPR, ox, oy);
+    g.drawImage(sa, s[0], s[1], s[2], s[3], -w / 2, -hh, w, hh);   // the sprite's top is sheared down and sideways, away from its base
+  };
+  for (const [, kind, e] of ents) {
+    if (kind === 0) one(e.sprite, e.x + e.w / 2, e.y + e.h + .02);
+    else if (kind === 1) one(e.s, e.x, e.y);
+    else if (kind === 2) one(e[2], e[0] + .5, e[1] + 1.05);
+    else if (kind === 4 && e.rx != null) {          // people: a body-shaped blob
+      g.setTransform(DPR, 0, -k * DPR, -d * DPR, ((e.rx) * TS + X) * DPR, ((e.ry + .32) * TS + Y) * DPR);
+      g.fillStyle = '#000'; g.beginPath(); g.ellipse(0, -TS * .55, TS * .2, TS * .55, 0, 0, 7); g.fill();
+    }
+  }
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.26 * day; ctx.drawImage(shadowBuf, 0, 0); ctx.restore();
+}
+// warm sunlight from the top-left, golden at dawn/dusk, with a soft vignette and slow light shafts
+function drawSunlight(t, night) {
+  const day = 1 - night / 0.55; if (day < 0.05) return;
+  const h = hourNow(), gold = clamp(Math.abs(h - 12) / 6, 0, 1);
+  const warm = ctx.createLinearGradient(0, 0, VW, VH);
+  warm.addColorStop(0, `rgba(255,${226 - gold * 40},${150 - gold * 60},${(.16 + gold * .14) * day})`);
+  warm.addColorStop(.55, 'rgba(255,220,150,0)');
+  warm.addColorStop(1, `rgba(60,30,80,${.12 * day})`);
+  ctx.fillStyle = warm; ctx.fillRect(0, 0, VW, VH);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const ph = t / 9000;
+  for (let i = 0; i < 4; i++) {            // light shafts
+    const x = ((i * .31 + ph * .05) % 1.2 - .1) * VW * 1.3, w = VW * (.06 + .04 * Math.sin(ph + i * 2));
+    const a = (.035 + .02 * Math.sin(ph * 2 + i)) * day;
+    ctx.globalAlpha = Math.max(0, a); ctx.fillStyle = '#ffe2a8';
+    ctx.beginPath(); ctx.moveTo(x, -10); ctx.lineTo(x + w, -10); ctx.lineTo(x + w + VH * .9, VH + 10); ctx.lineTo(x + VH * .9, VH + 10); ctx.fill();
+  }
+  ctx.restore();
+  const v = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .35, VW / 2, VH / 2, Math.hypot(VW, VH) * .62);
+  v.addColorStop(0, 'rgba(20,10,0,0)'); v.addColorStop(1, `rgba(20,10,0,${.32 * day + .1})`);
+  ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
 }
 function drawLights(X, Y, dark) {
   ctx.globalCompositeOperation = 'lighter';
