@@ -75,7 +75,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
 
   // west main road, north side (doors on row 30)
   B('toolshop', 'b_shop', 4, 30, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
-  pathDown(B('dealer', 'b_dealer', 11, 28, { label: 'โชว์รูมรถ & ใบขับขี่', icon: '🚗', st: 'dealer' }), 30);
+  pathDown(B('dealer', 'b_dealer', 11, 28, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true }), 30);
   B('school', 'b_school', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
   pathDown(B('bank', 'b_bank', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
   // east main road, north side
@@ -106,13 +106,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // empty lots kept for careers added later
   for (const [x, y] of [[66, 12], [75, 12], [84, 12]]) { rect(x - 2, y - 3, 6, 3, 'm'); prop('signpost', x + .5, y + .2); }
 
-  // town square: fountain, picnic tables you can sit at, benches, flowers
+  // town square: fountain, benches, flowers
   prop('fountain', 50, 33.6);
   rect(48, 32, 4, 2, 'o');
-  for (const [x, y] of [[45, 27.6], [55, 27.6], [45, 37.4], [55, 37.4]]) {
-    prop('picnic', x, y); set(Math.floor(x) - 1, Math.floor(y - .5), 'o'); set(Math.floor(x) + 1, Math.floor(y - .5), 'o');
-    STATIONS.push({ id: `seat${x}_${y}`, type: 'seat', label: 'โต๊ะนั่งเล่น', icon: '🪑', x, y: y + .75, r: 1.3, area: 'town' });
-  }
   for (const [x, y, s] of [[43.6, 32.6, 'bench'], [56.4, 32.6, 'bench2']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
   prop('flowerbed', 44, 25.4); prop('flowerbed2', 56, 25.4); prop('lamp3', 42.6, 30); prop('lamp3', 57.4, 30); prop('lamp3', 42.6, 36); prop('lamp3', 57.4, 36);
   prop('noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
@@ -124,7 +120,6 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   // a dark alley behind the cinema: where thieves find work
   prop('barrel2', 42.5, 11.4); prop('crate', 44.2, 10.4); prop('bin_grey', 41.4, 12.2);
-  STATIONS.push({ id: 'hideout', type: 'hideout', label: 'ซอยมืดหลังโรงหนัง', icon: '🕶️', x: 43, y: 12.4, r: 1.4, area: 'town' });
   // street furniture
   for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
@@ -132,7 +127,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('busstop', 39, 30.2); prop('vending', 41.2, 29.9);
   for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
   prop('phonebooth', 57.3, 23.9); prop('bin_blue', 36, 29.95); prop('bin_green', 75, 33.95);
-  prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95); prop('bus', 30, 18.2);
+  prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95);
   // parks, the lake and the beach
   prop('gazebo', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
@@ -256,13 +251,16 @@ const LAYOUT = {
   restaurant: [['f_counter_micro', 7, 2.3], ['menuboard', 12.4, 2.7], ['f_plant4', 1.6, 2.6], ['f_table_chairs', 3, 5.4], ['f_round_table', 11, 5.4], ['f_table_check', 3, 8.4], ['f_table_check', 11, 8.4]],
   kitchen: [['f_counter_micro', 2.7, 2.6], ['f_stove', 4.9, 2.6], ['f_counter_toast', 7, 2.3], ['f_counter_oven', 9.6, 2.6], ['f_fridge', 12, 2.7], ['f_shelf_pots', 2.6, 6.4], ['f_bench', 10.5, 6.6]],
   hospital: [['f_counter', 3.5, 2.3], ['f_shelf_jars', 1.8, 6.4], ['f_plant', 1.5, 9.7], ['f_window', 6.4, 1.1]],
-  school: [['f_bookshelf_wide', 2.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_desk', 3.6, 5.4], ['f_desk', 10.4, 5.4], ['f_desk', 3.6, 7.9], ['f_desk', 10.4, 7.9], ['f_clock', 9.4, .95]],
+  school: [['f_bookshelf_wide', 2.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_clock', 9.4, .95]],
   police: [['f_desk', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 3, 2.6], ['f_pictures', 10, 1.05], ['f_bunk', 11.5, 7.4], ['f_bunk', 9.5, 7.4], ['f_plant', 1.6, 8.7]],
   bank: [['f_cabinet', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_plant2', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
   house: [['f_bed_blue', 2.6, 3.4], ['f_window', 6, 1.1], ['f_welcome', 6, 8.2]],
 };
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_chair', cx, by + 1.25]);
+// university classroom: 4 desks, two students each
+const SCHOOL_DESKS = [[3.6, 4.6], [10.4, 4.6], [3.6, 7.0], [10.4, 7.0]];
+for (const [cx, by] of SCHOOL_DESKS) LAYOUT.school.push(['f_desk', cx, by], ['f_chair', cx - .45, by + 1.25], ['f_chair', cx + .45, by + 1.25]);
 const ROOMS = [];
 let slot = 0;
 for (const b of BUILDINGS) {
@@ -287,8 +285,8 @@ for (const b of BUILDINGS) {
     const w = SPR(s).w, row = ry + Math.floor(y - 0.45);
     for (let i = Math.floor(rx + x - w / 2 + 0.3); i <= Math.floor(rx + x + w / 2 - 0.3); i++) if (get(i, row) === 'i') set(i, row, 'o');
   }
-  STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + mx, y: ry + RH - 1.5, r: 1.2 });
-  STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: front.x, y: front.y + 0.6, r: 1.5, area: b.area || 'town', bld: b.id, house: b.house });
+  STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + mx, y: ry + RH - 0.55, r: 1.2 });
+  STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: front.x, y: front.y + 0.6, r: 1.5, area: b.area || 'town', bld: b.id, house: b.house, renov: b.renov || undefined });
   if (kind === 'house') {
     STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 2.6, y: ry + 3.7, r: 1.4 });
     continue;
@@ -303,6 +301,10 @@ for (const b of BUILDINGS) {
     });
   }
   STATIONS.push(s);
+  if (kind === 'school') {
+    let n = 0;
+    for (const [cx, by] of SCHOOL_DESKS) for (const dx of [-.45, .45]) STATIONS.push({ id: 'sdesk' + n, type: 'sdesk', idx: n++, room: room.id, label: 'โต๊ะเรียน', icon: '📖', x: rx + cx + dx, y: ry + by + .95, r: .7 });
+  }
   if (kind === 'office') {
     let n = 0;
     for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) STATIONS.push({ id: 'chair' + n, type: 'chair', idx: n++, room: room.id, label: 'โต๊ะทำงาน', icon: '💺', x: rx + cx, y: ry + by + .95, r: .9 });
@@ -323,16 +325,28 @@ function blocked(x, y, r = RADIUS) {
 const SPAWN = { x: 50, y: 36.6 };
 
 // ================================================================= time
-// One in-game day lasts 24 real minutes (1 game hour = 1 real minute).
+// One in-game day lasts 24 real minutes. Nights pass twice as fast as days:
+// 05:00-20:00 (15 game hours) take 19.5 real minutes, 20:00-05:00 (9 game hours) take 4.5 real minutes.
 const DAY_MS = 24 * 60 * 1000;
 const TIME_OFF = +process.env.TIME_OFFSET_MS || 0;           // testing aid: shift the in-game clock
-const hourAt = t => (((t + TIME_OFF) % DAY_MS) / DAY_MS) * 24;
-const dayAt = t => Math.floor((t + TIME_OFF) / DAY_MS);
+const CLOCK = { dawn: 5, dusk: 20, dayMin: 19.5 };            // the client gets the same numbers
+const hourOfPhase = m => {                                    // m = real minutes into the day (0-24)
+  const nightH = 24 - (CLOCK.dusk - CLOCK.dawn), nightMin = 24 - CLOCK.dayMin;
+  return m < CLOCK.dayMin ? CLOCK.dawn + m * (CLOCK.dusk - CLOCK.dawn) / CLOCK.dayMin : (CLOCK.dusk + (m - CLOCK.dayMin) * nightH / nightMin) % 24;
+};
+const hourAt = t => hourOfPhase((((t + TIME_OFF) % DAY_MS) + DAY_MS) % DAY_MS / 60000);
+// the date turns over at midnight (21.5 real minutes into the cycle)
+const MIDNIGHT_MS = (CLOCK.dayMin + (24 - CLOCK.dusk) * (24 - CLOCK.dayMin) / (24 - (CLOCK.dusk - CLOCK.dawn))) * 60000;
+const dayAt = t => Math.floor((t + TIME_OFF + DAY_MS - MIDNIGHT_MS) / DAY_MS);
+// game hours that pass per real second at hour h
+const gameRate = h => (h >= CLOCK.dawn && h < CLOCK.dusk) ? (CLOCK.dusk - CLOCK.dawn) / (CLOCK.dayMin * 60) : (24 - (CLOCK.dusk - CLOCK.dawn)) / ((24 - CLOCK.dayMin) * 60);
 // opening hours [open, close) in game hours
-const HOURS = { fashion: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [5, 22], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+const HOURS = { fashion: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
+// doctors are paid for every game hour they spend inside the hospital during their shift
+const DOCTOR = { start: 8, end: 20, wage: [45, 52, 60, 70, 82, 95, 110] };
 // calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
 const MONTH_DAYS = 5;
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -399,6 +413,7 @@ const FISH = {
   sea:   [[null, 28], ['sfish', 25], ['squid', 18], ['seabass', 12], ['tuna', 3], ['shark', 0.5], ['chest', 0.15]],
 };
 const BIG_FISH = ['seabass', 'tuna', 'shark', 'chest', 'snakehead', 'squid'];
+const FISHING = { rod: 150, xpPerLv: 8, maxLv: 10, zone: [0.2, 0.26, 0.32, 0.4] };   // zone = width of the timing window per rod tier
 
 // ================================================================= careers
 // Nobody picks a career at the start: you walk into the right building and apply.
@@ -406,14 +421,12 @@ const CAREERS = {
   none:     { name: 'ว่างงาน', icon: '🙂', where: null, desc: 'ยังไม่มีงานทำ ไปสมัครงานตามอาคารต่างๆ' },
   office:   { name: 'พนักงานบริษัท', icon: '👔', where: 'office', need: ['degree'], desc: 'เข้างาน 08:00–17:00 นั่งที่โต๊ะทำงาน ได้เงินตามชั่วโมงที่นั่งทำงาน มาสายโดนหักเงินและอาจถูกเลิกจ้าง' },
   farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
-  fisher:   { name: 'ชาวประมง', icon: '🎣', where: 'fishclub', need: [], desc: 'ตกปลาตามแหล่งน้ำ แม่น้ำ ทะเลสาบ และทะเล แต่ละที่ได้ปลาไม่เหมือนกัน' },
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
-  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รักษาคนไข้บนเตียงในโรงพยาบาล ทั้งผู้เล่นและชาวเมือง ต้องวินิจฉัยจากอาการให้ถูก' },
+  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'อยู่ในโรงพยาบาลช่วงเวลางาน 08:00–20:00 ได้เงินเดือนตามชั่วโมง + ค่ารักษาคนไข้บนเตียง (ต้องวินิจฉัยจากอาการให้ถูก)' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ลาดตระเวนได้เบี้ยเลี้ยง รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
-  thief:    { name: 'โจร', icon: '🕶️', where: 'hideout', need: [], desc: 'ล้วงกระเป๋าคนเดินผ่านไปมาหรือในฝูงชน ถ้ามีคนเห็นแล้วแจ้งตำรวจ หรือตำรวจอยู่แถวนั้น อาจถูกจับเข้าคุก' },
-  beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'นั่งขอทานตามจุดต่างๆ ได้เศษเงินจากคนผ่านไปมา ผู้เล่นที่บริจาคให้จะมีความสุขเพิ่ม' },
-  rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], vehicle: 'scooter', desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วขี่ไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป' },
+  beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'นั่งขอทานได้ทุกที่ (ปุ่ม 🥣) ได้เศษเงินจากคนผ่านไปมา ที่คนพลุกพล่านได้บ่อยกว่า ผู้เล่นที่บริจาคให้จะมีความสุขเพิ่ม' },
+  rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
 // the degree comes from classes at the university; other licences are bought
 const LICENSES = {
@@ -422,7 +435,7 @@ const LICENSES = {
   policeExam: { name: 'ผลสอบนายสิบตำรวจ', icon: '👮', price: 1000, need: 'hs', where: 'school', test: true },
   cooking:  { name: 'ใบรับรองเชฟ', icon: '📜', price: 1800, where: 'school' },
   medicine: { name: 'ใบประกอบวิชาชีพเวชกรรม', icon: '⚕️', price: 15000, need: 'degree', where: 'school' },
-  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 1200, where: 'dealer', test: true },
+  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 1200, where: 'school', test: true, renew: 600 },
 };
 const DRIVING_TEST = [
   { q: 'สัญญาณไฟสีเหลือง หมายถึงอะไร', a: ['เร่งความเร็วผ่านไป', 'เตรียมหยุดรถ', 'จอดรถได้ทันที'], ok: 1 },
@@ -439,11 +452,11 @@ const POLICE_TEST = [
   { q: 'ของกลางที่ยึดคืนได้จากโจร ควรทำอย่างไร', a: ['เก็บไว้เอง', 'แบ่งกับเพื่อน', 'คืนให้ผู้เสียหาย'], ok: 2 },
 ];
 // changing careers too often makes you wait longer (minutes); index = changes in the last 24 h
-const JOB_COOLDOWN_MIN = [0, 10, 30, 60, 120, 240, 480];
+const JOB_COOLDOWN_MIN = [0, 5];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
 const OFFICE_WAGE = [55, 65, 78, 92, 110, 130, 155];            // per game hour seated
 const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
-const POLICE = { patrolWage: 18, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6 };
+const POLICE = { patrolWage: 18, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 2.7 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
 const EVENTS = [
@@ -466,12 +479,12 @@ const TOOL_PRICES = [4000, 15000, 50000];
 const TOOLS = {
   office:   { name: 'ชุดสูทหรู', icon: '👔', fx: ['ค่าแรง +10%', 'ค่าแรง +20%', 'ค่าแรง +30%'] },
   farmer:   { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
-  fisher:   { name: 'เบ็ดตกปลา', icon: '🎣', fx: ['ขยะน้อยลง, ปลาใหญ่บ่อยขึ้น', 'ขยะน้อยมาก, ปลาใหญ่บ่อยขึ้นมาก', 'แทบไม่เจอขยะ, ปลาใหญ่บ่อยสุด'] },
+  fisher:   { name: 'อัปเกรดเบ็ดตกปลา', icon: '🎣', fx: ['ขยะน้อยลง, ปลาใหญ่บ่อยขึ้น', 'ขยะน้อยมาก, ปลาใหญ่บ่อยขึ้นมาก', 'แทบไม่เจอขยะ, ปลาใหญ่บ่อยสุด'] },
   merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
   chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
   police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['เบี้ยเลี้ยง +15%', 'เบี้ยเลี้ยง +30%', 'เบี้ยเลี้ยง +50%'] },
-  thief:    { name: 'ถุงมือโจร', icon: '🧤', fx: ['ล้วงสำเร็จง่ายขึ้น', 'ล้วงสำเร็จง่ายขึ้นมาก', 'ล้วงแทบไม่พลาด'] },
+  thief:    { name: 'ถุงมือล้วงกระเป๋า', icon: '🧤', fx: ['ล้วงสำเร็จง่ายขึ้น', 'ล้วงสำเร็จง่ายขึ้นมาก', 'ล้วงแทบไม่พลาด'] },
   beggar:   { name: 'ป้ายกระดาษซึ้งๆ', icon: '🪧', fx: ['คนให้เงินบ่อยขึ้น 15%', 'คนให้เงินบ่อยขึ้น 30%', 'คนให้เงินบ่อยขึ้น 50%'] },
   rider:    { name: 'กล่องเก็บความร้อน', icon: '📦', fx: ['ค่าส่ง +10%', 'ค่าส่ง +20%', 'ค่าส่ง +35%'] },
 };
@@ -524,6 +537,8 @@ const SHIRTS = ['white', 'blue', 'green', 'red'];       // starter choices
 const NPC_LINES = ['วันนี้อากาศดีจังเลย', 'ตลาดวันนี้คนเยอะมาก', 'หิวจัง ไปกินก๋วยเตี๋ยวดีกว่า', 'ระวังโจรล้วงกระเป๋านะ', 'ได้ยินว่าที่ทะเลมีฉลามด้วย',
   'ค่าไฟเดือนนี้แพงจัง', 'ไปนั่งเล่นที่จัตุรัสกัน', 'หมอที่โรงพยาบาลเก่งมาก', 'อยากได้บ้านในหมู่บ้านจัดสรรจัง', 'ข้าวโพดปีนี้หวานมาก', 'สวัสดีจ้า', 'วันนี้ทำงานเหนื่อยมาก'];
 
+// outfits you can wear instead of your job's clothes (rewards)
+const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ตกปลาจนถึงเลเวลสูงสุด' } };
 const ACHIEVEMENTS = [
   { id: 'off1', c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
   { id: 'off2', c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
@@ -531,9 +546,9 @@ const ACHIEVEMENTS = [
   { id: 'far1', c: 'farmer', stat: 'harvest', n: 15, title: 'มือใหม่หัดปลูก', desc: 'เก็บเกี่ยว 15 ครั้ง' },
   { id: 'far2', c: 'farmer', stat: 'plots', n: 6, title: 'เจ้าของไร่', desc: 'ขยายสวนจนครบ 6 แปลง' },
   { id: 'far3', c: 'farmer', stat: 'durian', n: 10, title: 'ราชาทุเรียน', desc: 'เก็บทุเรียน 10 ครั้ง' },
-  { id: 'fis1', c: 'fisher', stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
-  { id: 'fis2', c: 'fisher', stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
-  { id: 'fis3', c: 'fisher', stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
+  { id: 'fis1', c: null, stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
+  { id: 'fis2', c: null, stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
+  { id: 'fis3', c: null, stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
   { id: 'mer1', c: 'merchant', stat: 'wholesale', n: 50, title: 'พ่อค้าหน้าใหม่', desc: 'ซื้อสินค้าจากคลัง 50 ชิ้น' },
   { id: 'mer2', c: 'merchant', stat: 'psold', n: 100, title: 'เจ้าสัว', desc: 'ขายของให้ผู้เล่นอื่น 100 ชิ้น' },
   { id: 'che1', c: 'chef', stat: 'cooked', n: 20, title: 'แม่ครัวหัวป่าก์', desc: 'ปรุงอาหาร 20 จาน' },
@@ -545,8 +560,8 @@ const ACHIEVEMENTS = [
   { id: 'rid2', c: 'rider', stat: 'delivered', n: 60, title: 'ขาซิ่งประจำเมือง', desc: 'ส่งอาหารสำเร็จ 60 ออเดอร์' },
   { id: 'pol1', c: 'police', stat: 'arrests', n: 3, title: 'มือปราบ', desc: 'จับโจรได้ 3 ครั้ง' },
   { id: 'pol2', c: 'police', stat: 'arrests', n: 20, title: 'ผู้พิทักษ์เมือง', desc: 'จับโจรได้ 20 ครั้ง' },
-  { id: 'thi1', c: 'thief', stat: 'stolen', n: 10, title: 'มือไว', desc: 'ล้วงกระเป๋าสำเร็จ 10 ครั้ง' },
-  { id: 'thi2', c: 'thief', stat: 'stolen', n: 50, title: 'จอมโจรเงา', desc: 'ล้วงกระเป๋าสำเร็จ 50 ครั้ง' },
+  { id: 'thi1', c: null, stat: 'stolen', n: 10, title: 'มือไว', desc: 'ล้วงกระเป๋าสำเร็จ 10 ครั้ง' },
+  { id: 'thi2', c: null, stat: 'stolen', n: 50, title: 'จอมโจรเงา', desc: 'ล้วงกระเป๋าสำเร็จ 50 ครั้ง' },
   { id: 'beg1', c: 'beggar', stat: 'alms', n: 20, title: 'ผู้ยากไร้', desc: 'ได้รับเงินบริจาค 20 ครั้ง' },
   { id: 'gen5', c: null, stat: 'donated', n: 5, title: 'ใจบุญ', desc: 'บริจาคให้ขอทาน 5 ครั้ง' },
   { id: 'gen6', c: null, stat: 'cravings', n: 10, title: 'นักชิม', desc: 'กินของที่อยากกินได้ทันเวลา 10 ครั้ง' },
@@ -556,7 +571,21 @@ const ACHIEVEMENTS = [
   { id: 'gen4', c: null, stat: 'degree', n: 1, title: 'บัณฑิต', desc: 'เรียนจบปริญญาตรี' },
 ];
 
+// ================================================================= job staff: an NPC at every place that hires (and the rod seller)
+// Each gets its own talk spot next to the place's counter, so talking to staff and using the place are separate.
+{
+  const near = (s, x, y) => STATIONS.some(o => o !== s && o.area === s.area && Math.hypot(o.x - x, o.y - y) < 1.7);
+  const spots = [[2.6, 0], [-2.6, 0], [2.6, 1.2], [-2.6, 1.2], [3.2, -1], [-3.2, -1], [0, 2.2], [3.4, 2], [-3.4, 2], [1.6, 2.4], [-1.6, 2.4]];
+  const want = [...Object.entries(CAREERS).filter(([, c]) => c.where).map(([k, c]) => [k, c.where]), ['fishing', 'fishclub']];
+  for (const [key, where] of want) {
+    const s = STATIONS.find(x => x.id === where); if (!s) continue;
+    const ok = spots.map(([dx, dy]) => [s.x + dx, s.y + dy]).find(([x, y]) => areaAt(x, y)?.id === s.area && !blocked(x, y, 0.36) && !near(s, x, y)) || [s.x + 1.5, s.y];
+    STATIONS.push({ id: 'staff_' + key, type: 'staff', career: key, at: where, label: 'เจ้าหน้าที่', icon: '💬', x: ok[0], y: ok[1], r: 1.3, area: s.area });
+  }
+}
+
 module.exports = {
+  CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,

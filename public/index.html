@@ -21,10 +21,10 @@
     <button id="cardToggle" title="ย่อ/ขยายสถานะ"></button>
     <div class="who"><img id="mePortrait" src="assets/ui/face_m.png" alt=""><div><b id="meName"></b><span id="meCareer"></span><div class="money" id="meMoney"></div></div></div>
     <div class="bars">
-      <div class="bar" title="พลังงาน"><img src="assets/ui/i_bolt.png" alt="⚡"><s><u id="bE"></u></s><em id="vE"></em></div>
-      <div class="bar" title="ความอิ่ม"><img src="assets/ui/i_leg.png" alt="🍗"><s><u id="bH"></u></s><em id="vH"></em></div>
-      <div class="bar" title="สุขภาพ"><img src="assets/ui/i_hp.png" alt="❤️"><s><u id="bL"></u></s><em id="vL"></em></div>
-      <div class="bar" title="ความสุข"><img src="assets/ui/i_calm.png" alt="😊"><s><u id="bJ"></u></s><em id="vJ"></em></div>
+      <div class="bar" data-bar="energy" title="พลังงาน (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_bolt.png" alt="⚡"><s><u id="bE"></u></s><em id="vE"></em></div>
+      <div class="bar" data-bar="hunger" title="ความอิ่ม (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_leg.png" alt="🍗"><s><u id="bH"></u></s><em id="vH"></em></div>
+      <div class="bar" data-bar="health" title="สุขภาพ (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_hp.png" alt="❤️"><s><u id="bL"></u></s><em id="vL"></em></div>
+      <div class="bar" data-bar="happy" title="ความสุข (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_calm.png" alt="😊"><s><u id="bJ"></u></s><em id="vJ"></em></div>
     </div>
     <div id="statusBox"><div class="st">สถานะปัจจุบัน</div><div id="dzChips"></div></div>
     <button id="qline" data-open="quests">เควสต์ 0/3</button>
@@ -32,20 +32,27 @@
   <div id="topRight">
     <div id="clock"></div>
     <div id="miniWrap"><canvas id="mini" width="120" height="88"></canvas><span id="miniName">🗺️ แผนที่</span></div>
+  </div>
+  <!-- the menu runs along the top of the screen -->
+  <div id="topBar">
     <button id="menuToggle" class="tile" title="ซ่อนเมนู"></button>
     <div id="menu">
       <button class="tile" data-open="career" title="งาน"><img src="assets/ui/b_job.png" alt="งาน"><i>งาน</i></button>
       <button class="tile" data-open="bag" title="กระเป๋า"><img src="assets/ui/b_bag.png" alt="กระเป๋า"><i>กระเป๋า</i></button>
       <button class="tile" data-open="phone" id="phoneBtn" title="มือถือ"><img src="assets/ui/b_phone.png" alt="มือถือ"><i>มือถือ</i></button>
+      <button class="tile" data-open="friends" id="friendsBtn" title="เพื่อนที่ออนไลน์"><b class="q">👥</b><i>เพื่อน</i></button>
       <button class="tile" data-open="quests" id="qBtn" title="เควสต์"><img src="assets/ui/b_quest.png" alt="เควสต์"><i>เควสต์</i></button>
       <button class="tile" data-open="ach" title="ความสำเร็จ/ฉายา"><img src="assets/ui/i_medal.png" alt="ฉายา"><i>ฉายา</i></button>
       <button class="tile" data-open="rank" title="อันดับ"><img src="assets/ui/b_rank.png" alt="อันดับ"><i>อันดับ</i></button>
       <button class="tile full" data-open="chat" title="คุยกับคนใกล้ๆ"><img src="assets/ui/b_chat.png" alt="แชท"><i>แชท</i></button>
-      <button class="tile" id="fsBtn" title="เต็มจอ / แนวนอน"><b class="q">⛶</b><i>เต็มจอ</i></button>
-      <button class="tile" data-open="help" title="วิธีเล่น"><b class="q">?</b><i>วิธีเล่น</i></button>
-      <button class="tile" id="muteBtn" title="เปิด/ปิดเสียง"><b class="q">🔊</b><i>เสียง</i></button>
+      <button class="tile" data-open="settings" title="ตั้งค่า"><b class="q">⚙️</b><i>ตั้งค่า</i></button>
+      <button class="tile" data-open="bug" title="แจ้งบัค"><b class="q">🐞</b><i>แจ้งบัค</i></button>
+      <button class="tile hidden" data-open="god" id="godBtn" title="God mode (แอดมิน)"><b class="q">👑</b><i>God</i></button>
     </div>
   </div>
+  <div id="ticker" class="hidden"><span>📢 เซิฟนี้เป็น CBT เมื่อเกมสมบูรณ์ข้อมูลจะถูกรีเซ็ต</span></div>
+  <div id="updBar" class="hidden">🆕 มีอัปเดตเกมใหม่ <button id="updBtn" class="primary">🔄 รีเฟรช</button></div>
+  <button id="navX" class="hidden"></button>
   <div id="eventBar" class="hidden"></div>
   <div id="log"></div>
   <div id="toasts"></div>
@@ -53,8 +60,15 @@
   <button id="callChip" class="hidden"></button>
   <div id="downView" class="hidden"></div>
   <div id="stick"><i></i></div>
-  <button id="restBtn" title="นั่งพักหลับตา (R)">😌 พัก</button>
-  <button id="actBtn" class="hidden"><span class="medal"><span id="actIcon">👆</span></span><small id="actLabel"></small></button>
+  <!-- right-thumb controls -->
+  <div id="thumbs">
+    <button id="actBtn" class="idle" title="ใช้งาน / เข้าอาคาร (E)"><span id="actIcon">👆</span><small id="actLabel">ใช้งาน</small></button>
+    <button id="talkBtn" class="round" title="พูดคุยกับคนใกล้ๆ (F)"><span>💬</span><small>คุย</small></button>
+    <button id="restBtn" class="round sm" title="นั่งพักหลับตา (R)"><span>😌</span><small>พัก</small></button>
+    <button id="emoBtn" class="round sm" title="อิโมจิบนหัว"><span>😀</span><small>อิโมจิ</small></button>
+    <button id="begBtn" class="round sm hidden" title="นั่งขอทานตรงนี้"><span>🥣</span><small>ขอทาน</small></button>
+  </div>
+  <div id="emoPick" class="hidden"></div>
 </div>
 
 <div id="panel" class="hidden"><div class="sheet"><button class="x" id="panelX" title="ปิด"></button><div id="panelBody"></div></div></div>
@@ -72,6 +86,8 @@
     <div id="loginErr"></div>
     <button class="primary" type="submit">เข้าเมือง</button>
     <div class="sub">ยังไม่มีบัญชี? ตั้ง ID และ PIN ใหม่ได้เลย แล้วจะได้ตั้งชื่อและสร้างตัวละครครั้งเดียว</div>
+    <div class="cbt">📢 เซิฟนี้เป็น CBT เมื่อเกมสมบูรณ์ข้อมูลจะถูกรีเซ็ต</div>
+    <button type="button" class="shareBtn">📤 ชวนเพื่อนมาเล่น</button>
   </form>
   <div id="createBox" class="box hidden">
     <div class="logo"><img src="assets/ui/pin.png" alt=""><h1>สร้างตัวละคร<small id="createName"></small></h1></div>

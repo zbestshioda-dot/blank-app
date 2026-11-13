@@ -64,13 +64,11 @@ button.x{width:38px;height:38px;padding:0;border:0;background:url(assets/ui/b_cl
 #miniWrap{position:relative;cursor:pointer;border:4px solid var(--wood);border-radius:12px;box-shadow:0 0 0 2px var(--woodDk),0 4px 10px rgba(0,0,0,.35);background:var(--woodDk)}
 #mini{display:block;width:120px;height:auto;border-radius:7px;cursor:pointer}
 #miniWrap span{position:absolute;left:4px;right:4px;bottom:3px;text-align:center;font-size:10px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000;pointer-events:none}
-#menu{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:min(560px,70vw)}
 .tile{position:relative;width:46px;height:46px;padding:4px;border-radius:10px;border:2px solid #3e2414;background:linear-gradient(#b67c46,#7f4c26);box-shadow:inset 0 2px 0 rgba(255,255,255,.28),inset 0 -3px 0 rgba(0,0,0,.2),0 3px 0 #3e2414;display:flex;align-items:center;justify-content:center}
 .tile img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 1px 0 rgba(0,0,0,.35))}
 .tile.full{padding:0;background:none;border:0;box-shadow:none}.tile.full img{border-radius:9px}
 .tile b.q{font-family:var(--ui);font-weight:600;font-size:24px;color:#fbecd2;text-shadow:0 2px 0 #3e2414}
 .tile i{position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);font-style:normal;font-size:10px;font-weight:600;color:#fbecd2;text-shadow:0 1px 2px #000,0 0 3px #000;white-space:nowrap;pointer-events:none}
-#menu{row-gap:19px;padding-bottom:12px}
 #menuToggle{background:linear-gradient(#b67c46,#7f4c26) ;}
 #menuToggle::after{content:'';position:absolute;inset:4px;background:url(assets/ui/b_close.png) center/contain no-repeat}
 #menuToggle.closed::after{background:none;content:'☰';display:flex;align-items:center;justify-content:center;font-size:24px;color:#fbecd2;inset:0;text-shadow:0 2px 0 #3e2414}
@@ -95,17 +93,6 @@ body.hasEvent #callChip{top:88px}
 #stick{position:fixed;width:120px;height:120px;border-radius:50%;background:rgba(246,230,194,.18);border:3px solid rgba(246,230,194,.45);display:none;pointer-events:none;z-index:3}
 #stick i{position:absolute;left:33px;top:33px;width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f3dcab,#b67c46);border:2px solid #5a3620}
 
-/* the big wooden action plank with a round medallion (ref "เข้า ตลาดกลาง") */
-#actBtn{position:absolute;right:10px;bottom:calc(14px + env(safe-area-inset-bottom));width:150px;height:96px;padding:0;border:0;background:none;box-shadow:none;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
-#actBtn::before{content:'';position:absolute;left:0;right:0;top:22px;bottom:12px;border-radius:12px;border:3px solid #3e2414;background:repeating-linear-gradient(0deg,rgba(0,0,0,.07) 0 2px,transparent 2px 13px),linear-gradient(#a8703f,#7b4a26);box-shadow:inset 0 2px 0 rgba(255,255,255,.25),0 5px 12px rgba(0,0,0,.45)}
-#actBtn .medal{position:absolute;left:50%;top:0;transform:translateX(-50%);width:64px;height:64px;border-radius:50%;background:radial-gradient(#fbf1da 55%,#e6c58c);border:4px solid #8b5a33;box-shadow:0 0 0 3px #3e2414,0 4px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
-#actIcon{font-size:32px;line-height:1}
-#actBtn small{position:relative;z-index:1;margin-bottom:4px;max-width:142px;padding:2px 12px;font-size:12px;font-weight:600;line-height:1.25;color:var(--ink);background:linear-gradient(#f6e0b0,#dfbe82);border:2px solid #8b5a33;border-radius:6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 0 #3e2414}
-#actBtn.closed small{background:linear-gradient(#e8a08a,#c26b55);color:#fff}
-#actBtn{animation:none}#actBtn .medal{animation:breathe 1.6s ease-in-out infinite}
-@keyframes breathe{50%{box-shadow:0 0 0 3px #3e2414,0 0 0 9px rgba(255,201,77,.35),0 4px 8px rgba(0,0,0,.4)}}
-#restBtn{position:absolute;right:170px;bottom:calc(26px + env(safe-area-inset-bottom));padding:9px 16px;border-radius:24px;background:#2d3037;color:#fff;border:2px solid #15171b;font-weight:600;font-size:15px;box-shadow:0 4px 0 #15171b,0 6px 12px rgba(0,0,0,.35)}
-#restBtn.on{background:#3f6b8f;border-color:#1f3a50}
 #callChip{position:absolute;left:50%;transform:translateX(-50%);top:46px;background:linear-gradient(#8aa54a,#5f7a2c);color:#fff;border-color:#3d4e1a;font-weight:600;border-radius:20px;padding:6px 14px}
 #downView{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);padding:6px 10px;text-align:center;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:90vw;filter:drop-shadow(0 8px 18px rgba(0,0,0,.55))}
 #downView b{font-size:18px}#downView span{color:var(--mut)}
@@ -215,11 +202,8 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
   #statusBox{padding:3px}#statusBox .st{display:none}
   #qline{margin-top:4px;padding:2px 6px;font-size:11.5px}
   #mini{width:84px}
-  #menu{flex-direction:column;flex-wrap:nowrap;row-gap:3px;padding-bottom:0}
   .tile{width:38px;height:38px;padding:3px;border-radius:8px}.tile i{display:none}.tile b.q{font-size:20px}
   #toasts{top:auto;bottom:calc(126px + env(safe-area-inset-bottom));flex-direction:column-reverse}
-  #actBtn{width:128px;height:88px;right:6px}#actBtn .medal{width:56px;height:56px}#actIcon{font-size:28px}#actBtn small{font-size:11px;max-width:122px}
-  #restBtn{right:140px;padding:8px 12px;font-size:14px}
   #log{width:min(240px,55vw);font-size:11.5px}
 }
 
@@ -252,13 +236,9 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
   #miniWrap{order:0}#mini{width:96px}
   #clock{order:-1;width:auto;font-size:10.5px;padding:3px 6px;line-height:1.35;text-align:center}
   #clock span{display:block;white-space:nowrap}#clock i{display:none}
-  #menu{display:grid;grid-template-columns:repeat(2,36px);gap:4px;row-gap:4px;padding-bottom:0;max-height:calc(100vh - 16px)}
-  #menu .tile,#menuToggle{width:36px;height:36px;padding:3px;border-radius:8px}.tile i{display:none}.tile b.q{font-size:18px}
   #topRight{right:6px;top:6px}
   body.hasEvent #card,body.hasEvent #topRight{top:40px}
   #eventBar{padding:3px 10px;font-size:12px}
-  #actBtn{width:122px;height:84px;right:92px}#actBtn .medal{width:52px;height:52px}#actIcon{font-size:26px}
-  #restBtn{right:224px;bottom:calc(16px + env(safe-area-inset-bottom));padding:7px 12px;font-size:13px}
   .sheet{max-height:86vh;width:min(640px,100%)}
   #toasts{top:auto;bottom:10px;left:40%;width:min(380px,55vw)}
   #log{width:min(260px,40vw)}
@@ -274,3 +254,116 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
 .npcSay{display:flex;gap:8px;align-items:center;background:var(--paper3);border:2px solid var(--line);border-radius:12px;padding:6px 10px 6px 4px;margin:4px 0 8px;font-size:13px}
 .npcSay b{color:var(--wood);margin-right:2px}
 .npcFace{width:40px;height:46px;flex:none;image-rendering:pixelated}
+
+
+/* ================================================================ v4 HUD: menu along the top, controls under the right thumb */
+#topBar{position:absolute;top:6px;left:224px;right:140px;display:flex;align-items:flex-start;gap:5px;justify-content:center;pointer-events:none!important}
+#topBar>*{pointer-events:auto}
+#menu{display:flex;flex-wrap:nowrap;gap:5px;overflow-x:auto;overflow-y:hidden;padding:0 2px 16px;scrollbar-width:none;max-width:100%}
+#menu::-webkit-scrollbar{display:none}
+#menu .tile,#menuToggle{flex:none}
+#menuToggle{flex:none}
+body.hasEvent #topBar{top:46px}
+
+/* status card extras */
+.bar{cursor:pointer}
+#navX{position:absolute;left:8px;font-size:12px;padding:3px 10px;border-radius:14px;background:linear-gradient(#ffd96b,#e9a92c);max-width:min(260px,60vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.study{background:#3f6b8f;border-color:#1f3a50}.chip.duty{background:#2e7d5a;border-color:#174532}
+
+/* premium admin name: a rainbow that keeps moving */
+#card.admin #meName{background:linear-gradient(90deg,#ff5e5e,#ffbd3d,#5fe07a,#45c2ff,#b06bff,#ff5e5e);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:admName 3s linear infinite;filter:drop-shadow(0 0 2px rgba(255,220,120,.55))}
+@keyframes admName{to{background-position:200% 0}}
+
+/* right-thumb cluster */
+#thumbs{position:absolute;right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));width:230px;height:170px;pointer-events:none!important}
+#thumbs>button{position:absolute;pointer-events:auto;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;border:3px solid #3e2414;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 4px 0 #3e2414,0 6px 12px rgba(0,0,0,.35)}
+#thumbs>button span{font-size:24px;line-height:1.05}
+#thumbs>button small{font-size:10px;font-weight:600;line-height:1.1;color:#fbecd2;text-shadow:0 1px 1px #000}
+#thumbs .round{border-radius:50%;background:linear-gradient(#b67c46,#7f4c26)}
+#actBtn{right:0;bottom:0;width:88px;height:88px;border-radius:26px;background:radial-gradient(circle at 50% 35%,#ffe9a8,#e9a92c 70%);border-color:#6b3f12!important}
+#actBtn span{font-size:36px!important}
+#actBtn small{color:#3a2410!important;text-shadow:none!important;max-width:82px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px!important;padding:0 3px}
+#actBtn.idle{filter:grayscale(.85) brightness(.9);opacity:.7}
+#actBtn.closed{background:radial-gradient(circle at 50% 35%,#f3c0b0,#c26b55 70%)}
+#actBtn:not(.idle) span{animation:actPop 1.6s ease-in-out infinite}
+@keyframes actPop{50%{transform:scale(1.12)}}
+#talkBtn{right:98px;bottom:6px;width:60px;height:60px}
+#restBtn{right:104px;bottom:78px;width:50px;height:50px}
+#emoBtn{right:19px;bottom:100px;width:50px;height:50px}
+#begBtn{right:166px;bottom:10px;width:50px;height:50px}
+#thumbs .sm span{font-size:20px}
+#restBtn.on,#begBtn.on{background:linear-gradient(#5c8fb8,#2f5878)}
+#emoPick{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(170px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,44px);gap:6px;padding:8px;border-radius:14px;background:rgba(43,29,18,.9);border:2px solid #3e2414;z-index:6}
+#emoPick button{width:44px;height:44px;padding:0;font-size:24px;border-radius:12px}
+
+/* scrolling CBT notice and the update banner */
+#ticker{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top));height:24px;overflow:hidden;background:rgba(120,20,20,.82);color:#fff3d6;font-size:13px;font-weight:600;z-index:7;pointer-events:none!important;border-bottom:2px solid #3e2414}
+#ticker span{position:absolute;white-space:nowrap;top:3px;left:100%;animation:tick 16s linear forwards}
+@keyframes tick{to{transform:translateX(calc(-100vw - 100%))}}
+#updBar{position:absolute;left:50%;transform:translateX(-50%);top:calc(30px + env(safe-area-inset-top));z-index:8;background:var(--paper3);border:3px solid var(--wood);border-radius:14px;padding:6px 8px 6px 12px;font-weight:600;display:flex;gap:8px;align-items:center;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.cbt{background:#7a1f1f;color:#fff3d6;border-radius:10px;padding:6px 10px;font-size:12.5px;text-align:center;font-weight:600}
+.shareBtn{margin-top:2px}
+
+/* fishing timing bar */
+.fbar{position:relative;height:34px;margin:12px 0 8px;border-radius:12px;background:#3a2a1c;border:3px solid var(--woodDk);overflow:hidden;cursor:pointer;touch-action:manipulation}
+.fbar .zone{position:absolute;top:0;bottom:0;background:linear-gradient(#8fe36a,#4f9a2c);box-shadow:inset 0 0 0 2px #e8ffd0}
+.fbar .mark{position:absolute;top:-2px;bottom:-2px;width:6px;margin-left:-3px;background:#fff;border-radius:3px;box-shadow:0 0 6px #fff,0 0 0 2px #e0453a}
+.fishHelp{text-align:center;font-size:13px;color:var(--mut)}
+
+/* settings / god / bug panels */
+textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-height:110px;resize:vertical;user-select:text;-webkit-user-select:text}
+.setRow{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--paper3);border:2px solid var(--line);border-radius:10px;padding:7px 10px;margin:6px 0}
+.setRow b{font-weight:600}.setRow small{display:block;color:var(--mut);font-weight:400}
+.secT{margin:12px 0 4px;font-weight:600;font-size:14px}
+.bugItem{background:var(--paper3);border:2px solid var(--line);border-radius:10px;padding:6px 9px;margin:5px 0;font-size:13px;white-space:pre-wrap;word-break:break-word}
+.bugItem small{display:block;color:var(--mut)}
+.treat{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}.treat button{font-size:12.5px;padding:7px 5px}
+
+/* phones (portrait): menu becomes a scrollable strip across the very top; card and minimap sit below it */
+@media(max-width:600px) and (orientation:portrait){
+  #topBar{left:6px;right:6px;top:4px;justify-content:flex-start}
+  #menu{padding-bottom:2px;gap:4px}
+  #menu .tile,#menuToggle{width:36px;height:36px;padding:3px;border-radius:8px}.tile i{display:none}.tile b.q{font-size:18px}
+  #card{top:48px}#topRight{top:48px}
+  body.hasEvent #topBar{top:44px}body.hasEvent #card,body.hasEvent #topRight{top:88px}
+  #toasts{bottom:calc(186px + env(safe-area-inset-bottom))}
+  #thumbs{transform:scale(.92);transform-origin:bottom right}
+}
+
+/* landscape phones: a wide, flat status card (nothing hidden), compact controls */
+@media (max-height:520px) and (orientation:landscape){
+  #card,#card.mini{width:auto;max-width:420px;border-width:10px;border-image-width:10px;display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center}
+  #card .who{margin:-4px 0 0;grid-column:1}#card .who>div{padding-right:0}
+  #card .bars{grid-column:2;display:grid;grid-template-columns:1fr 1fr;column-gap:10px;row-gap:3px;min-width:230px}
+  #card #statusBox,#card #qline{grid-column:1/-1}
+  #mePortrait{width:36px;height:36px}
+  #card.mini #statusBox,#card.mini #qline,#card.mini .bar em,#card.mini #meCareer{display:revert!important}
+  #card.mini #mePortrait{display:block}
+  #cardToggle{display:none}
+  #statusBox{margin-top:3px;padding:2px 4px}#statusBox .st{display:none}
+  #qline{margin-top:3px;padding:1px 6px;font-size:11px}
+  #topBar{left:calc(var(--cardW,330px) + 10px);right:130px;top:4px}
+  #menu .tile,#menuToggle{width:34px;height:34px;padding:3px;border-radius:8px}.tile i{display:none}.tile b.q{font-size:17px}
+  #menu{padding-bottom:2px;gap:4px}
+  #topRight{flex-direction:column;align-items:flex-end}
+  #thumbs{transform:scale(.86);transform-origin:bottom right}
+  #emoPick{bottom:150px}
+  .sheet{max-height:94vh;max-height:94dvh}
+  #tradeWin .sheet{max-height:94vh}
+  .tutCard{max-height:92vh;overflow:auto}
+  #toasts{bottom:10px;left:42%;width:min(360px,50vw)}
+}
+@media (max-height:520px) and (orientation:landscape) and (max-width:760px){#card .bars{min-width:190px}}
+.tutCard{max-height:94vh;overflow:auto}
+
+/* the map in landscape: legend beside the map, map uses the full height */
+@media (orientation:landscape) and (max-width:1100px){
+  .mapBody{flex-direction:row}
+  #mapLegend{display:flex;flex-direction:column;width:200px;max-height:calc(100vh - 92px);max-height:calc(100dvh - 92px)}
+  #mapScroll{max-height:calc(100vh - 92px);max-height:calc(100dvh - 92px);max-width:calc(100vw - 240px)}
+  .mapHead span{display:none}.mapHead{margin-bottom:3px}#mapTabs{margin:0 0 3px}#mapTabs button{padding:3px 6px;font-size:12px}
+  .mapBox{max-height:100vh;max-height:100dvh}
+  #mapView{padding:4px}
+}
+#mapLegend .lgSec{font-size:12px;font-weight:600;color:var(--ink);padding:6px 4px 2px;grid-column:1/-1}
+#mapLegend button i.k-staff{background:#8b4fc4}#mapLegend button i.k-player{background:#e0453a}

@@ -4,7 +4,7 @@ const DEFS = {
   // career quests: [min,max] target, reward per unit (kept small: quests should not flood the town with money)
   work:    { cat: 'career', career: 'office',   text: 'นั่งทำงานที่บริษัท {n} ชั่วโมง', n: [4, 8], per: 30 },
   harvest: { cat: 'career', career: 'farmer',   text: 'เก็บเกี่ยวผลผลิต {n} ครั้ง', n: [3, 6], per: 60 },
-  fish:    { cat: 'career', career: 'fisher',   text: 'ตกปลาให้ได้ {n} ตัว', n: [5, 10], per: 25 },
+  fish:    { cat: 'general', text: 'ตกปลาให้ได้ {n} ตัว', n: [4, 8], per: 25 },
   buy:     { cat: 'career', career: 'merchant', text: 'ซื้อสินค้าจากคลัง {n} ชิ้น', n: [10, 20], per: 12 },
   cook:    { cat: 'career', career: 'chef',     text: 'ปรุงอาหาร {n} จาน', n: [3, 6], per: 60 },
   treat:   { cat: 'career', career: 'doctor',   text: 'รักษาคนไข้หาย {n} คน', n: [2, 4], per: 120 },
