@@ -16,7 +16,8 @@ OUT = 'public/assets/pchar'
 # outfit -> (sheet, which layers are recoloured). Outfits other than 'base' keep their clothes and only dye the hair.
 SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',)),
           'police': ('tools/sheets/pixel_police.jpg', ()),
-          'farmer': ('tools/sheets/pixel_farmer.jpg', ())}
+          'farmer': ('tools/sheets/pixel_farmer.jpg', ()),
+          'chef': ('tools/sheets/pixel_chef.jpg', ())}
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'police': {'left2': 6}}
 TARGET_H = 96
