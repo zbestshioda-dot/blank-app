@@ -275,8 +275,8 @@ for (const a of [TOWN, FARM, HOUSING]) {
   for (let x = a.x; x < a.x + a.w; x++) { set(x, a.y, 'T'); set(x, a.y + a.h - 1, 'T'); }
   for (let y = a.y; y < a.y + a.h; y++) { if (get(a.x, y) !== 'w') set(a.x, y, 'T'); if (get(a.x + a.w - 1, y) !== 'w') set(a.x + a.w - 1, y, 'T'); }
   // trees grow in groves (parks and edges), not sprinkled everywhere, and keep two tiles clear of any road or path
-  const groves = a === TOWN ? [[78, 44, 5], [88, 40, 4], [70, 56, 5], [86, 66, 6], [14, 20, 5], [32, 20, 5], [70, 20, 6], [12, 38, 4], [32, 38, 5], [60, 66, 5], [8, 60, 5], [44, 60, 5]] : [];
-  for (let g = 0; g < (a === TOWN ? 22 : 12); g++) groves.push([a.x + 2 + rand() * (a.w - 4), a.y + 3 + rand() * (a.h - 5), 3.5 + rand() * 3.5]);
+  const groves = a === HOUSING ? [[192, 28, 4.5], [200, 30, 4], [250, 28, 4.5], [243, 30, 4], [196, 44, 5], [246, 44, 5], [212, 8, 6], [234, 8, 6]] : a === FARM ? [[118, 8, 5], [150, 6, 5], [176, 8, 4], [120, 32, 4]] : a === TOWN ? [[78, 44, 5], [88, 40, 4], [70, 56, 5], [86, 66, 6], [14, 20, 5], [32, 20, 5], [70, 20, 6], [12, 38, 4], [32, 38, 5], [60, 66, 5], [8, 60, 5], [44, 60, 5]] : [];
+  for (let g = 0; g < (a === TOWN ? 22 : 6); g++) groves.push([a.x + 2 + rand() * (a.w - 4), a.y + 3 + rand() * (a.h - 5), 3.5 + rand() * 3.5]);
   const nearWay = (x, y) => { for (let j = -2; j <= 2; j++) for (let k = -2; k <= 2; k++) if ('=,ckp'.includes(get(x + k, y + j) || '.')) return true; return false; };
   const n = a.w * a.h / 5;
   for (let i = 0; i < n; i++) {
@@ -296,7 +296,7 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [12, 9] };
+const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [14, 10] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_cabinet2', 14.4, 2.7], ['f_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['f_clock', 10.6, .95], ['f_corkboard', 5.5, 1.15, false], ['i_calendar', 2.8, 1.05, false], ['f_extinguisher', 12.6, 2.4], ['i_painting', 7.8, 1.05, false], ['i_news', 3.4, 10.7, false], ['i_bin_yellow', 12.7, 10.7, false]],
@@ -311,7 +311,12 @@ const LAYOUT = {
   school: [['f_books', 1.8, 2.6], ['f_bookshelf_wide', 3.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_clock', 9.4, .95], ['i_calendar', 4.8, 1.05, false], ['i_poster', 13.2, 1.05, false], ['i_backpack', 7, 8.6, false], ['i_news', 12.4, 8.6, false], ['i_laptop', 7, 2.0, false], ['i_painting', 1.8, 1.05, false]],
   police: [['f_police_desk', 7, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_locker', 3, 2.7], ['f_corkboard', 10, 1.15, false], ['f_bunk', 11.5, 7.4], ['f_bunk2', 9.5, 7.4], ['f_plant', 1.6, 8.7], ['f_extinguisher', 13.2, 2.5], ['f_water', 4.4, 2.6], ['i_painting', 5.4, 1.05, false], ['i_cone', 13.2, 8.7, false], ['i_news', 6.2, 8.7, false]],
   bank: [['f_reception', 7, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_cactus', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05], ['i_cashbox', 9.4, 2.4, false], ['i_clock', 7, 1.0, false], ['i_bell', 5.4, 2.5, false], ['i_plant', 9.6, 8.7], ['i_vase', 4.4, 8.7]],
-  house: [['f_bed_blue', 2.6, 3.4], ['f_window', 6, 1.1], ['f_welcome', 6, 8.2], ['f_window_flower', 9.5, 1.15, false], ['i_painting', 4, 1.05, false], ['i_teddy', 4.4, 3.6, false], ['i_guitar', 10.8, 3.0], ['i_books', 9.4, 2.6], ['i_console', 8.2, 5.6, false], ['i_ball', 9.8, 6.8, false], ['i_skate', 2.8, 7.4, false], ['i_umbrella', 4.2, 8.4], ['i_shoe_rack', 8.2, 8.4]],
+  // a small home: bedroom (top left), living room (middle), bathroom (top right), kitchen (bottom left); bought furniture fills its own spots (client FURN_POS)
+  house: [['f_wardrobe', 1.4, 2.9], ['f_bed_blue', 3.4, 3.3], ['i_teddy', 3.9, 2.7, false], ['f_drawer', 5.1, 2.5], ['i_books', 5.1, 1.55, false], ['i_painting', 3.4, 1.05, false],
+    ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false],
+    ['f_sink', 10.0, 2.6], ['f_toilet', 11.1, 2.6], ['f_shower', 12.3, 2.7],
+    ['f_rug_red', 8, 6.0], ['f_armchair', 5.6, 5.8], ['f_floorlamp', 12.4, 8.7],
+    ['f_fridge', 1.2, 8.7], ['f_counter_micro', 2.95, 8.7], ['f_stove', 4.75, 8.7], ['f_welcome', 7, 9.25]],
 };
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
@@ -349,7 +354,7 @@ for (const b of BUILDINGS) {
   STATIONS.push({ id: 'exit_' + b.id, type: 'exit', room: room.id, label: 'ออกนอกอาคาร', icon: '🚪', x: rx + mx, y: ry + RH - 0.55, r: 1.2 });
   STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: front.x, y: front.y + 0.6, r: 1.5, area: b.area || 'town', bld: b.id, house: b.house, renov: b.renov || undefined });
   if (kind === 'house') {
-    STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 2.6, y: ry + 3.7, r: 1.4 });
+    STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 3.4, y: ry + 3.7, r: 1.4 });
     continue;
   }
   const s = { id: b.st, type: b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };

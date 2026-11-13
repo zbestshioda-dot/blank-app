@@ -1609,7 +1609,8 @@ function spr(name, cx, by, X, Y, scale = 1) {
 function tex(name, tx, ty, px, py) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const q = atlas.tile;
-  ctx.drawImage(atlasImg, s[0] + (tx & 1) * q, s[1] + (ty & 1) * q, q, q, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
+  // sample 1px inside each quarter: the lossy atlas bleeds a little at sprite edges, which showed as lines between tiles
+  ctx.drawImage(atlasImg, s[0] + (tx & 1) * q + 1, s[1] + (ty & 1) * q + 1, q - 2, q - 2, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
   return true;
 }
 const FLOOR = { fashion: 'fl_marble', police: 'fl_concrete', office: 'fl_carpet_blue', market: 'fl_beige', warehouse: 'fl_concrete', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_concrete',
@@ -2065,7 +2066,8 @@ function showDriveTest(m) {
 // ------------------------------------------------------------------ areas, interiors
 let roomGrid = [], roomFurniture = [];
 const FURN_SPRITE = { plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
-const FURN_SLOTS = [[10.4, 7.6], [8, 2.6], [10, 2.6], [10.2, 5.2], [4.5, 1.05], [1.8, 6.2], [5, 2.6], [1.8, 7.8]];
+// where each piece of bought furniture stands in the house (by kind, so a home always looks arranged)
+const FURN_POS = { tv: [8, 2.9], sofa: [8, 6.7], plant: [11, 8.7], aqua: [9.6, 8.7], art: [9.2, 1.05], piano: [1.1, 5.9], bed: [2.2, 6.2], jacuzzi: [11.8, 5.5] };
 function buildAreas() {
   AREA = Object.fromEntries(G.areas.map(a => [a.id, a]));
   roomGrid = new Array(G.map.w * G.map.h);
@@ -2077,7 +2079,7 @@ function layoutFurniture() {
   for (const r of G.areas) {
     if (r.kind !== 'room') continue;
     for (const f of r.furniture || []) roomFurniture.push(f);
-    if (r.rk === 'house') { const h = wd?.houses?.[r.house]; if (h) h[2].forEach((k, i) => FURN_SLOTS[i] && roomFurniture.push([FURN_SPRITE[k], r.x + FURN_SLOTS[i][0], r.y + FURN_SLOTS[i][1]])); }
+    if (r.rk === 'house') { const h = wd?.houses?.[r.house]; if (h) h[2].forEach(k => FURN_POS[k] && roomFurniture.push([FURN_SPRITE[k], r.x + FURN_POS[k][0], r.y + FURN_POS[k][1]])); }
   }
 }
 function drawRoomLabels(r, X, Y, t) {
