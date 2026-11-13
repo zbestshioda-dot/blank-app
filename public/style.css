@@ -454,3 +454,37 @@ body.hasEvent #topBar{top:186px!important}
 .money::before{content:'';width:1.1em;height:1.1em;line-height:1;border:0;border-radius:0;margin-right:4px;vertical-align:-.18em;background:url(assets/ui/k_coin.png) center/contain no-repeat}
 #qline{border:8px solid transparent;border-image:url(assets/ui/k_plank.png) 16 fill / 7px stretch;background:none;border-radius:0}
 .jobbox{border:10px solid transparent;border-image:url(assets/ui/k_plank.png) 16 fill / 10px stretch;background:none}
+
+/* =================================================================== layout v2: one place for where HUD pieces sit
+   left column: status card → nav pill → notifications (toasts, then chat/system lines)
+   right column: minimap + clock → menu strip → thumb buttons
+   the CBT ticker runs in the gap between the card and the minimap, so it never covers anything */
+#feed{position:absolute;left:calc(8px + env(safe-area-inset-left));top:150px;width:min(300px,calc(100vw - 80px));display:flex;flex-direction:column;gap:4px;pointer-events:none!important;z-index:6}
+#feed #toasts{position:static;transform:none;width:auto;align-items:flex-start;gap:4px;top:auto;bottom:auto;left:auto;flex-direction:column}
+#feed #log{position:static;width:auto;top:auto}
+.toast{font-size:12.5px;line-height:1.35;padding:5px 10px 5px 9px;border-radius:10px;border:0;border-left:4px solid var(--ok);background:rgba(255,248,232,.96);box-shadow:0 2px 8px rgba(0,0,0,.28);max-width:100%;width:fit-content}
+.toast.bad{border-left-color:var(--bad);background:rgba(255,236,228,.97)}
+#ticker{left:calc(var(--cardW,220px) + 8px)!important;right:118px!important;top:calc(8px + env(safe-area-inset-top))!important;height:22px;border-radius:11px;border:0!important;background:rgba(110,24,24,.85);font-size:12px}
+#ticker span{top:3px}
+#reqs{top:auto!important;bottom:calc(200px + env(safe-area-inset-bottom));left:50%;width:min(360px,92vw)}
+/* the "more" grid */
+.moreGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.moreTile{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;padding:10px 12px;border:8px solid transparent;border-image:url(assets/ui/k_plank.png) 16 fill / 8px stretch;background:none;box-shadow:none}
+.moreTile b{grid-row:1/3;font-size:26px;line-height:1}
+.moreTile span{font-weight:600;font-size:14px}.moreTile small{color:var(--mut);font-size:11px}
+.moreTile .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e04a35;vertical-align:middle}
+@media (max-height:520px) and (orientation:landscape){
+  #feed{top:100px;width:min(300px,36vw)}
+  #ticker{right:150px!important}
+  #reqs{bottom:12px;left:50%}
+  .sheet .item{border-width:5px;border-image-width:5px;padding:1px 4px}
+  .sheet .grid2{gap:5px}
+  .moreGrid{grid-template-columns:repeat(3,1fr)}
+  .moreTile{padding:6px 8px}
+}
+/* town events: a pill in the top gap (under the ticker); nothing else moves when one is running */
+#eventBar{left:calc(var(--cardW,220px) + 8px)!important;right:118px!important;top:calc(34px + env(safe-area-inset-top))!important;padding:3px 10px!important;font-size:11.5px!important;border-radius:11px!important;white-space:normal!important;line-height:1.3;max-height:2.7em;overflow:hidden}
+body.hasEvent #card,body.hasEvent #topRight{top:6px!important}
+body.hasEvent #topBar{top:146px!important}
+@media (max-width:600px) and (orientation:portrait){body.hasEvent #topBar{top:174px!important}body.hasEvent #card,body.hasEvent #topRight{top:6px!important}}
+@media (max-height:520px) and (orientation:landscape){body.hasEvent #topBar{top:4px!important}#eventBar{right:150px!important}}

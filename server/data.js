@@ -68,6 +68,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   rect(49, 40, 2, 36, '=');                                                           // south avenue
   rect(4, 46, 45, 2, '='); rect(4, 45, 45, 1, ',');                                   // south-west lane
   rect(49, 76, 2, 2, '=');                                                            // corner: avenue -> south road
+  rect(14, 16, 74, 1, ','); rect(4, 48, 45, 1, ',');                                   // sidewalks on the far side of the north street and the south-west lane
   rect(2, 14, 12, 2, '='); rect(2, 16, 2, 15, '=');                                   // north street west end joins the main road
   rect(88, 14, 8, 2, '='); rect(94, 16, 2, 15, '=');                                  // north street east end joins the coast road
   // town square
@@ -111,7 +112,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
-  [[54, 76], [61, 75], [68, 76], [76, 75], [83, 76], [3, 13], [8, 12], [55, 62], [86, 46], [60, 52], [12, 85], [20, 85], [30, 85], [70, 85], [80, 85]].forEach(([x, f], i) => {
+  [[54, 76], [61, 75], [68, 76], [76, 75], [83, 76], [3, 13], [8, 12], [12, 85], [20, 85], [30, 85], [70, 85], [80, 85]].forEach(([x, f], i) => {
     const b = B('vh' + i, HS[i % 6], x, f, { label: '', icon: '🏡', deco: true });
     pathDown(b, f + 1);
     prop(i % 2 ? 'flowerbox' : 'hedge', x + (i % 2 ? 4.5 : -0.8), f + .02, false);
@@ -136,6 +137,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('bin_grey', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
   for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
+  // street trees on the grass verge behind the sidewalk, between the lamps
+  const verge = (y, x0, x1) => { for (let x = x0; x < x1; x += 9) if (get(x, y) === '.' && get(x, y - 1) !== '=' && !BUILDINGS.some(b => x >= b.x - 1 && x <= b.x + b.w && y >= b.y - 1 && y <= b.y + b.h + 1)) prop(['tree2', 'tree3', 'tree4', 'tree'][(x >> 3) % 4], x + .5, y + .95); };
+  verge(35, 9, 40); verge(35, 65, 92); verge(18, 20, 46); verge(18, 56, 86); verge(50, 10, 46);
   for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('lamp2', x + .5, 17);
   prop('busstop', 39, 30.2); prop('vending', 41.2, 29.9);
@@ -143,6 +147,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('phonebooth', 57.3, 23.9); prop('bin_blue', 36, 29.95); prop('bin_green', 75, 33.95);
   prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95);
   // parks, the lake and the beach
+  prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 84.5, 47.2, false);
   prop('b_pavilion', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
   prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
@@ -250,8 +255,7 @@ function scatter(A, kinds, n, flat) {
     prop(kinds[i % kinds.length], x + .5, y + .95, !flat); i++;
   }
 }
-scatter(TOWN, ['rock', 'stump', 'bench_stone', 'flowerbox', 'rock_big', 'barrel', 'crates'], 16);
-scatter(TOWN, ['tuft', 'tuft', 'puddle'], 14, true);
+scatter(TOWN, ['tuft'], 10, true);                     // the town stays tidy: no junk lying around in the grass
 scatter(FARM, ['wheelbarrow', 'hay', 'crate_apple', 'firewood', 'ladder', 'barrel', 'hose', 'faucet', 'crate', 'rock'], 14);
 scatter(FARM, ['tuft'], 10, true);
 scatter(HOUSING, ['gnome', 'gnome2', 'flowerbox', 'stump', 'bench_stone', 'rock', 'hose'], 14);
@@ -271,10 +275,15 @@ const TREE_KINDS = ['tree', 'tree2', 'pine', 'tree_oak', 'tree_pink', 'tree3', '
 for (const a of [TOWN, FARM, HOUSING]) {
   for (let x = a.x; x < a.x + a.w; x++) { set(x, a.y, 'T'); set(x, a.y + a.h - 1, 'T'); }
   for (let y = a.y; y < a.y + a.h; y++) { if (get(a.x, y) !== 'w') set(a.x, y, 'T'); if (get(a.x + a.w - 1, y) !== 'w') set(a.x + a.w - 1, y, 'T'); }
-  const n = a.w * a.h / 6;
+  // trees grow in groves (parks and edges), not sprinkled everywhere, and keep two tiles clear of any road or path
+  const groves = a === TOWN ? [[78, 44, 5], [88, 40, 4], [70, 56, 5], [86, 66, 6], [14, 20, 5], [32, 20, 5], [70, 20, 6], [12, 38, 4], [32, 38, 5], [60, 66, 5], [8, 60, 5], [44, 60, 5]] : [];
+  for (let g = 0; g < (a === TOWN ? 22 : 12); g++) groves.push([a.x + 2 + rand() * (a.w - 4), a.y + 3 + rand() * (a.h - 5), 3.5 + rand() * 3.5]);
+  const nearWay = (x, y) => { for (let j = -2; j <= 2; j++) for (let k = -2; k <= 2; k++) if ('=,ckp'.includes(get(x + k, y + j) || '.')) return true; return false; };
+  const n = a.w * a.h / 5;
   for (let i = 0; i < n; i++) {
     const x = a.x + 1 + Math.floor(rand() * (a.w - 2)), y = a.y + 2 + Math.floor(rand() * (a.h - 3));
     if (get(x, y) !== '.') continue;
+    if (!groves.some(([gx, gy, r]) => Math.hypot(gx - x, gy - y) < r) || nearWay(x, y)) continue;
     let ok = true;
     for (let j = -2; j <= 1 && ok; j++) for (let k = -1; k <= 1; k++) { const c = get(x + k, y + j); if (c && c !== '.' && c !== 'T') { ok = false; break; } }
     if (ok && BUILDINGS.some(b => x >= b.x - 1 && x < b.x + b.w + 1 && y >= b.y - 1 && y < b.y + b.h + 3)) ok = false;   // keep building fronts clear

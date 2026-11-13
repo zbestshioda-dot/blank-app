@@ -228,7 +228,7 @@ function toast(msg, icon = '✅', ok = true) {
   if (recentToasts.get(key) > t0 - 8000) return;
   recentToasts.set(key, t0); if (recentToasts.size > 50) recentToasts.delete(recentToasts.keys().next().value);
   const d = document.createElement('div'); d.className = 'toast' + (ok ? '' : ' bad'); d.textContent = `${icon} ${msg}`;
-  const t = $('#toasts'); t.appendChild(d); while (t.children.length > (innerWidth < 600 ? 2 : 4)) t.firstChild.remove();
+  const t = $('#toasts'); t.appendChild(d); while (t.children.length > 3) t.firstChild.remove();
   setTimeout(() => d.remove(), 3800);
 }
 function popup(html, buttons, ms = 20000) {
@@ -287,7 +287,7 @@ function paintHud() {
   $('#begBtn').classList.toggle('hidden', me.career !== 'beggar');
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
   $('#begBtn').innerHTML = me.pose === 'beg' ? '<span>🧍</span><small>ลุก</small>' : '<span>🥣</span><small>ขอทาน</small>';
-  $('#godBtn').classList.toggle('hidden', !me.admin);
+
   paintNav();
   $('#phoneBtn').classList.toggle('has', me.career === 'rider' && (me.jobs || []).some(j => j.state === 'open'));
   const dn = $('#downView');
@@ -335,7 +335,7 @@ document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPane
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // the status card folds down to a small strip (face, money, slim bars); folded by default on phones
-const placeLog = () => { const cd = $('#card'); $('#log').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); };
+const placeLog = () => { const cd = $('#card'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); };
 addEventListener('resize', () => placeLog());
 const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
 $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard(!$('#card').classList.contains('mini')); };
@@ -1457,6 +1457,18 @@ function renderPanel(p) {
         <div class="grid2">${B('💯 สเตตัสเต็ม', { fn: 'god', op: 'fill' }, 'primary')}${B('💰 เงิน 999,999', { fn: 'god', op: 'money' }, 'primary')}</div>
         <div class="secT">🐞 รายงานบัคจากผู้เล่น</div><div class="grid2">${B('📥 โหลดรายงาน', { fn: 'god', op: 'bugs' })}${B('🗑️ ล้างทั้งหมด', { fn: 'god', op: 'bugclear' }, 'warn', !bugList?.length)}</div>${bl}`;
     }
+    case 'more': {                                   // everything that is not an everyday button
+      const tile = (kind, icon, label, sub, badge) => `<button class="moreTile" data-m='${JSON.stringify({ fn: 'open', kind })}'><b>${icon}</b><span>${label}${badge ? ' <i class="dot"></i>' : ''}</span><small>${sub}</small></button>`;
+      return `<h2>⋯ เมนูเพิ่มเติม</h2><div class="moreGrid">
+        ${tile('profile', '🪪', 'โปรไฟล์', 'รูป · ฉายา · สถิติ')}
+        ${tile('friends', '👥', 'เพื่อน', 'ใครออนไลน์อยู่')}
+        ${tile('rank', '🏆', 'อันดับ', 'เศรษฐีของเมือง')}
+        ${tile('help', '❔', 'วิธีเล่น', 'ปุ่มและระบบต่างๆ')}
+        ${tile('settings', '⚙️', 'ตั้งค่า', 'เสียง · จอ · รีเซ็ต')}
+        ${tile('bug', '🐞', 'แจ้งบัค', 'ส่งถึงทีมงาน')}
+        ${me.admin ? tile('god', '👑', 'God mode', 'แอดมินเท่านั้น') : ''}
+      </div>`;
+    }
     case 'settings': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⚙️ ตั้งค่า</h2>
@@ -1702,6 +1714,11 @@ function edgeCanvas(kind) {
       g.fillStyle = rnd() < .5 ? '#5da535' : '#4c912a'; g.fillRect(x, 0, px, h);
       if (rnd() < .3) { g.fillStyle = '#76bf45'; g.fillRect(x, h - px, px, px); }
     }
+  } else if (kind === 'shore') {        // water next to land: a light shallow band with a foam line at the edge
+    lin(TS * .42, [[0, 'rgba(170,230,240,.55)'], [.35, 'rgba(120,200,230,.25)'], [1, 'rgba(120,200,230,0)']]);
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(0, 0, S, Math.max(2, px));
+    let r = 3; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
+    for (let x = 0; x < S; x += px * 2) if (rnd() < .45) { g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(x, px * (1 + Math.floor(rnd() * 3)), px * 2, px); }
   } else if (kind === 'grassLift') {    // grass next to a lower surface: a light rim so the lawn reads as raised
     lin(TS * .14, [[0, 'rgba(255,255,220,.22)'], [1, 'rgba(255,255,220,0)']]);
   }
@@ -1715,7 +1732,8 @@ function edgeDraw(kind, side, px, py) {
 // sides: 0 top, 1 right, 2 bottom, 3 left (rotation of the top-edge canvas)
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 function drawEdges(tx, ty, px, py) {
-  const me = MAT(tileAt(tx, ty)); if (!me || me === 'water') return;
+  const me = MAT(tileAt(tx, ty)); if (!me) return;
+  if (me === 'water') { for (let d = 0; d < 4; d++) { const nb = MAT(tileAt(tx + SIDES[d][0], ty + SIDES[d][1])); if (nb && nb !== 'water') edgeDraw('shore', d, px, py); } return; }
   for (let d = 0; d < 4; d++) {
     const nb = MAT(tileAt(tx + SIDES[d][0], ty + SIDES[d][1])); if (!nb || nb === me) continue;
     if (me === 'road') edgeDraw('curbShadow', d, px, py);
