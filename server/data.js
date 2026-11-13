@@ -241,23 +241,23 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
 const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [12, 9] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
-  office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_desk', 8, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 14.4, 2.6], ['f_plant', 1.6, 10.7], ['f_plant2', 14.4, 10.7], ['f_clock', 10, .95]],
-  market: [['f_shelf_jars', 2.6, 2.6], ['f_shelf_plants', 11.4, 2.6], ['f_counter', 7, 2.3], ['stall_green', 3.4, 6.6], ['stall_red', 10.6, 6.6], ['f_plant3', 1.6, 8.7]],
+  office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_cabinet2', 14.4, 2.7], ['f_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['f_clock', 10.6, .95], ['f_corkboard', 5.5, 1.15, false], ['i_calendar', 2.8, 1.05, false], ['f_extinguisher', 12.6, 2.4]],
+  market: [['f_shelf_a', 1.8, 2.8], ['f_shelf_b', 3.3, 2.8], ['f_shelf_c', 11.4, 2.8], ['f_cashdesk', 7, 2.4], ['stall_green', 3.4, 6.6], ['stall_red', 10.6, 6.6], ['i_crate_apple', 12.6, 8.6], ['i_crate_carrot', 1.6, 8.6], ['i_rice_sack', 6, 8.7], ['i_open', 9.5, 1.05, false]],
   warehouse: [['crate', 1.8, 3.2], ['crate', 3, 3.2], ['barrel', 4.2, 3.2], ['f_cabinet', 7, 2.3], ['hay2', 11.5, 3.4], ['hay', 11.6, 6.6], ['sack', 2.2, 6.6], ['barrel2', 3.3, 6.6], ['crate', 12.2, 8.6]],
-  fashion: [['f_mirror', 2.6, 2.6], ['f_wardrobe', 11.6, 2.7], ['f_counter', 7, 2.3], ['f_display', 3, 6.4], ['f_display', 11, 6.4], ['f_rug_round', 7, 6.6], ['f_plant3', 1.6, 8.7], ['f_plant', 12.4, 8.7]],
-  rider: [['f_window', 10.5, 1.1], ['f_counter', 7, 2.3], ['f_display', 2.6, 2.6], ['f_bench', 10.6, 5.6], ['f_coffee', 12.4, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7]],
+  fashion: [['f_mirror', 2.4, 2.8], ['f_cabinet2', 12, 2.7], ['f_cashdesk', 7, 2.4], ['f_clothes_rack', 3, 6.4], ['f_clothes_rack', 11, 6.4], ['f_rug_round', 7, 6.6], ['f_shoe_rack', 1.8, 8.7], ['f_vase', 12.4, 8.7], ['i_poster', 5, 1.05, false]],
+  rider: [['f_window', 10.5, 1.1], ['f_cashdesk', 7, 2.4], ['f_display', 2.6, 2.7], ['f_bench_back', 10.6, 5.6], ['f_coffee', 12.6, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7], ['i_backpack', 12.4, 8.6], ['i_bike', 4, 8.6, false]],
   dealer: [['f_desk', 7, 2.3], ['car_red', 3, 4.8], ['car_blue', 11, 4.8], ['car_green', 3, 8.3], ['f_plant', 1.5, 2.6], ['f_plant2', 12.5, 2.6]],
-  toolshop: [['f_shelf_pots', 2.6, 2.6], ['f_bookshelf3', 11.6, 2.7], ['f_counter', 7, 2.3], ['cart', 3, 7.2], ['crate', 11.4, 6.6], ['barrel', 12.4, 6.6], ['f_trash', 12.4, 8.7]],
-  restaurant: [['f_counter_micro', 7, 2.3], ['menuboard', 12.4, 2.7], ['f_plant4', 1.6, 2.6], ['f_table_chairs', 3, 5.4], ['f_round_table', 11, 5.4], ['f_table_check', 3, 8.4], ['f_table_check', 11, 8.4]],
-  kitchen: [['f_counter_micro', 2.7, 2.6], ['f_stove', 4.9, 2.6], ['f_counter_toast', 7, 2.3], ['f_counter_oven', 9.6, 2.6], ['f_fridge', 12, 2.7], ['f_shelf_pots', 2.6, 6.4], ['f_bench', 10.5, 6.6]],
-  hospital: [['f_counter', 3.5, 2.3], ['f_shelf_jars', 1.8, 6.4], ['f_plant', 1.5, 9.7], ['f_window', 6.4, 1.1]],
-  school: [['f_bookshelf_wide', 2.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_clock', 9.4, .95]],
-  police: [['f_desk', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_blue', 3, 2.6], ['f_pictures', 10, 1.05], ['f_bunk', 11.5, 7.4], ['f_bunk', 9.5, 7.4], ['f_plant', 1.6, 8.7]],
-  bank: [['f_cabinet', 7, 2.3], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_plant2', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
-  house: [['f_bed_blue', 2.6, 3.4], ['f_window', 6, 1.1], ['f_welcome', 6, 8.2]],
+  toolshop: [['f_shelf_pots', 2.6, 2.6], ['f_shelf_c', 11.6, 2.8], ['f_cashdesk', 7, 2.4], ['cart', 3, 7.2], ['crate', 11.4, 6.6], ['barrel', 12.4, 6.6], ['i_watering', 1.6, 8.7, false], ['i_pot', 12.4, 8.7]],
+  restaurant: [['f_counter_micro', 7, 2.3], ['menuboard', 12.4, 2.7], ['f_plant', 1.6, 2.7], ['f_table_chairs', 3, 5.4], ['f_table_chairs2', 11, 5.6], ['f_table_chairs2', 3, 8.8], ['f_round_table', 11, 8.4], ['i_cake', 9.4, 2.4, false], ['f_wine_rack', 4.6, 2.6]],
+  kitchen: [['f_counter_micro', 2.7, 2.6], ['f_stove_pot', 4.9, 2.4], ['f_counter2', 7.4, 2.5], ['f_counter_oven', 9.9, 2.6], ['f_fridge', 12, 2.7], ['f_shelf_pots', 2.6, 6.4], ['f_bench', 10.5, 6.6], ['i_rice_sack', 1.4, 8.6], ['i_fish_ice', 12.4, 8.6, false], ['f_extinguisher', 13.6, 6.4]],
+  hospital: [['f_reception2', 3.5, 2.5], ['f_shelf_jars', 1.8, 6.4], ['f_plant', 1.5, 9.7], ['f_window', 6.4, 1.1], ['f_firstaid', 9.2, 1.1, false], ['f_wheelchair', 14.5, 9.7], ['f_iv', 14.6, 6.6], ['f_water', 1.5, 8.2]],
+  school: [['f_books', 1.8, 2.6], ['f_bookshelf_wide', 3.6, 2.6], ['f_bookshelf', 11.8, 2.6], ['f_desk', 7, 2.3], ['f_clock', 9.4, .95], ['i_calendar', 4.8, 1.05, false]],
+  police: [['f_police_desk', 7, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_locker', 3, 2.7], ['f_corkboard', 10, 1.15, false], ['f_bunk', 11.5, 7.4], ['f_bunk2', 9.5, 7.4], ['f_plant', 1.6, 8.7], ['f_extinguisher', 13.2, 2.5], ['f_water', 4.4, 2.6]],
+  bank: [['f_reception', 7, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_filing_grey', 12.4, 2.6], ['f_rug_blue', 7, 6.6], ['f_plant', 1.6, 8.7], ['f_cactus', 12.4, 8.7], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05], ['i_cashbox', 9.4, 2.4, false]],
+  house: [['f_bed_blue', 2.6, 3.4], ['f_window', 6, 1.1], ['f_welcome', 6, 8.2], ['f_window_flower', 9.5, 1.15, false]],
 };
 // office: 8 work desks with a chair in front of each
-for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_chair', cx, by + 1.25]);
+for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
 // university classroom: 4 desks, two students each
 const SCHOOL_DESKS = [[3.6, 4.6], [10.4, 4.6], [3.6, 7.0], [10.4, 7.0]];
 for (const [cx, by] of SCHOOL_DESKS) LAYOUT.school.push(['f_desk', cx, by], ['f_chair', cx - .45, by + 1.25], ['f_chair', cx + .45, by + 1.25]);
@@ -296,7 +296,7 @@ for (const b of BUILDINGS) {
   if (kind === 'hospital') {
     s.x = rx + 3.5;
     [[8.5, 3.6], [11, 3.6], [13.5, 3.6], [8.5, 7.4], [11, 7.4], [13.5, 7.4]].forEach(([dx, dy], i) => {
-      room.furniture.push(['f_bed_blue', rx + dx, ry + dy - .3]);
+      room.furniture.push(['f_bed_hosp', rx + dx, ry + dy - .2]);
       STATIONS.push({ id: 'bed' + i, type: 'bed', idx: i, room: room.id, label: 'เตียงคนไข้', icon: '🛏️', x: rx + dx, y: ry + dy, r: 1.2 });
     });
   }

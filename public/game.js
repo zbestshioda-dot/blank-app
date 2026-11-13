@@ -1594,8 +1594,8 @@ function tex(name, tx, ty, px, py) {
   ctx.drawImage(atlasImg, s[0] + (tx & 1) * q, s[1] + (ty & 1) * q, q, q, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
   return true;
 }
-const FLOOR = { fashion: 'fl_beige', police: 'fl_wood', office: 'fl_checker', market: 'fl_beige', warehouse: 'g_pavers', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_brick',
-  restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_white', school: 'fl_wood', bank: 'fl_beige', house: 'fl_wood' };
+const FLOOR = { fashion: 'fl_marble', police: 'fl_concrete', office: 'fl_carpet_blue', market: 'fl_beige', warehouse: 'fl_concrete', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_concrete',
+  restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_mint', school: 'fl_tatami', bank: 'fl_marble', house: 'fl_wood' };
 const WALL = { fashion: '#f6d6e4', police: '#c7d3e6', office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', rider: '#3f6b63', dealer: '#dfe6ec', toolshop: '#b9a17f',
   restaurant: '#e9cfa4', kitchen: '#f3f3f3', hospital: '#e6f1f6', school: '#cfe0c4', bank: '#efe2bb', house: '#ecd2b2' };
 function under(tx, ty) {
