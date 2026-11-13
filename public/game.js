@@ -2173,6 +2173,6 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
-window.__lt = { P, camera, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+window.__lt = { P, camera, walkTo, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();

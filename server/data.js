@@ -32,6 +32,14 @@ for (const a of [TOWN, FARM, HOUSING]) rect(a.x, a.y, a.w, a.h, '.');
 
 const BUILDINGS = [], STATIONS = [], PROPS = [];
 const prop = (s, x, y, solid = true) => { PROPS.push({ s, x, y }); if (solid) set(Math.floor(x), Math.floor(y - 0.5), 'o'); };
+// a straight run of fence pieces from x0 to x1 along row y (bottom edge); solid fences block the grass tiles they stand on
+function fenceRow(s, x0, x1, y, solid = true) {
+  const w = SPR(s).w;
+  for (let x = x0; x + w <= x1 + 0.05; x += w) {
+    PROPS.push({ s, x: x + w / 2, y });
+    if (solid) for (let i = Math.floor(x + .15); i <= Math.floor(x + w - .15); i++) if ('.mT'.includes(get(i, Math.floor(y - .5)))) set(i, Math.floor(y - .5), 'o');
+  }
+}
 // a building whose door opens onto row `front` (the first walkable row in front of it)
 function B(id, sprite, x, front, extra = {}) {
   const sp = SPR(sprite), w = Math.ceil(sp.w - 0.05), h = Math.max(2, Math.round(sp.h - 0.4));
@@ -177,9 +185,10 @@ const GARDEN = { lotPrice: 2500, startPlots: 2, maxPlots: 6, expand: [0, 0, 900,
     lot.sign = { x: sx, y: sy };
     STATIONS.push({ id: `lot${i}`, type: 'lot', lot: i, label: `สวนแปลงที่ ${i + 1}`, icon: '🪧', x: sx, y: north ? sy + .1 : sy + .5, r: 1.3, area: 'farm' });
     // fence along the far side
-    for (let fx = lx + 1.5; fx < lx + 9; fx += 3) prop('fence_wood', fx, north ? ly + .9 : ly + 10.4, false);
+    fenceRow('fence_rope', lx + .3, lx + 8.8, north ? ly + .9 : ly + 10.4, false);
     LOTS.push(lot);
   }
+  for (const [a, b] of [[1, 19.5], [22.5, 33.5], [37.5, 47.5], [50.5, 69]]) fenceRow('fence_bamboo', X + a, X + b, 40.95);   // riverbank, piers left open
   STATIONS.push({ id: 'pier_r1', type: 'pier', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 21, y: 43.3, r: 1.8, area: 'farm' });
   STATIONS.push({ id: 'pier_r2', type: 'pier', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 49, y: 43.3, r: 1.8, area: 'farm' });
   STATIONS.push({ id: 'gate_town_f', type: 'gate', to: 'town_from_farm', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 66.5, y: 25, r: 1.6, area: 'farm' });
@@ -209,6 +218,9 @@ const HOUSE_PRICES = [], HOUSE_RENT = [];
   prop('bench', X + 29, 27, false); prop('bench2', X + 41, 27, false); prop('tree_pink', X + 27.5, 31.6); prop('tree_pink', X + 42.5, 31.6);
   prop('kiosk', X + 3.5, 30); STATIONS.push({ id: 'estate', type: 'estate', label: 'สำนักงานอสังหาฯ', icon: '🏡', x: X + 3.5, y: 30.7, r: 1.5, area: 'housing' });
   STATIONS.push({ id: 'gate_town_h', type: 'gate', to: 'town_from_housing', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 3, y: 22, r: 1.6, area: 'housing' });
+  fenceRow('fence_white', X + 8, X + 62, 16.95); fenceRow('fence_white', X + 9, X + 62, 33.95);   // back gardens
+  for (const y of [24.95, 32.95]) { fenceRow('fence_iron', X + 25, X + 33.3, y); fenceRow('fence_iron', X + 36.7, X + 45, y); prop('gate_iron', X + 33.8, y, false); prop('gate_iron', X + 36.2, y, false); }
+  for (let y = 25; y <= 32; y++) { prop('fence_post', X + 25.4, y + .95); prop('fence_post', X + 44.6, y + .95); }
   for (const [x, y] of [[X + 15, 45], [X + 55, 45]]) STATIONS.push({ id: 'seat_h' + x, type: 'seat', label: 'ม้านั่งในสวน', icon: '🪑', x, y: y - .25, r: 1.1, area: 'housing' }), prop('bench', x, y, false);
 }
 
