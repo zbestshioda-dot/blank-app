@@ -456,6 +456,8 @@ const JOB_COOLDOWN_MIN = [0, 5];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
 const OFFICE_WAGE = [55, 65, 78, 92, 110, 130, 155];            // per game hour seated
 const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
+// running: faster, costs energy per tile; you stop running when energy gets low
+const RUN = { mul: 1.6, energyPerTile: 0.3, minEnergy: 5 };
 const POLICE = { patrolWage: 18, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 2.7 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
@@ -585,7 +587,7 @@ const ACHIEVEMENTS = [
 }
 
 module.exports = {
-  CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
+  RUN, CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,

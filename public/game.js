@@ -126,7 +126,7 @@ function handle(m) {
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
-      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; lastInput = performance.now();
+      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
@@ -372,6 +372,11 @@ $('#mapX').onclick = closeMap;
 $('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapView') closeMap(); });
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
 $('#restBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); send({ t: 'rest', on: me.pose !== 'rest' }); };
+// running: toggle with the 🏃 button, or hold Shift on a keyboard
+let running = false, shiftRun = false, runSetT = 0;
+const canRun = () => !!me && me.energy > G.run.minEnergy && !me.down;
+function setRun(on) { if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#runBtn').classList.toggle('on', on); }
+$('#runBtn').onclick = () => { FX.play('click'); setRun(!running); };
 $('#begBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); send({ t: 'beg', on: me.pose !== 'beg' }); };
 $('#talkBtn').onclick = () => talk();
 $('#updBtn').onclick = () => location.reload();
@@ -412,9 +417,10 @@ addEventListener('keydown', e => {
   if (e.key === 'p') openPanel({ kind: 'phone' });
   if (e.key === 'r') $('#restBtn').click();
   if (e.key === 'f') talk();
+  if (e.key === 'Shift' && !running) { shiftRun = true; setRun(true); }
   if (e.key === 'c' || e.key === 't') { e.preventDefault(); openPanel({ kind: 'chat' }); }
 });
-addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 const cv = $('#cv'), ctx = cv.getContext('2d');
@@ -541,7 +547,8 @@ function frame(t) {
     const l = Math.hypot(dx, dy); meMoving = false;
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
-      const sp = G.speed * (me.speed || 1) * dt;
+      if (running && (!canRun() || me.run === false && performance.now() - runSetT > 1500)) setRun(false);
+      const sp = G.speed * (me.speed || 1) * (running ? G.run.mul : 1) * dt;
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
       const nx = r2(m.x + dx * sp); if (!blockedAt(nx, m.y)) m.x = nx;
@@ -678,7 +685,7 @@ function drawPlayer(p, X, Y, t) {
   if (dir !== p.view) { p.view = dir; p.viewT = performance.now(); }
   if (sitting || lying) dir = 'down';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
-  p.walk = (p.walk || 0) + (moving ? .2 : 0);
+  p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) : 0);
   const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
   const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;

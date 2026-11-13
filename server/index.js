@@ -179,7 +179,8 @@ const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
 const comfort = a => houseOf(a) >= 0 ? (a.furniture || []).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0) : 0;
 const speedOf = a => dzProd(a, 'speed');           // vehicles were removed from the game
-const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
+const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
+const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
 function accrue(a) {
   const t = now(), days = (t - (a.bankT || t)) / 86400e3; a.bankT = t;
   if (a.bank > 0 && days > 0) a.bank += Math.min(a.bank, D.BANK.cap) * (Math.pow(1 + D.BANK.rate, days) - 1);
@@ -1647,7 +1648,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', outfits: a.outfits || [], wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', outfits: a.outfits || [], wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     docShift: a.career === 'doctor' && a.doc ? { day: a.doc.day, hours: +(a.doc.hours || 0).toFixed(2) } : null,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
@@ -1732,7 +1733,7 @@ function login(ws, m) {
     t: 'init', id: a.id,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
     shop: { tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, bank: D.BANK },
   });
@@ -1788,12 +1789,16 @@ function move(a, m) {
   a.lastPosT = t;
   // budget refills at the player's speed (+35% slack); it can bank ~4 s of walking, so a phone that stalls and then
   // sends a burst of moves is not pulled back to where it was
-  a.mvb = Math.min(moveCap(a), (a.mvb ?? moveCap(a)) + SPEED * speedOf(a) * 1.35 * dt);
+  a.mvb = Math.min(moveCap(a), (a.mvb ?? moveCap(a)) + SPEED * speedOf(a) * Math.max(runMul(a), a.runT > t - 1500 ? D.RUN.mul : 1) * 1.35 * dt);
   const d = Math.hypot(x - a.x, y - a.y);
   if (d > a.mvb + 0.05 || !pathClear(a.x, a.y, x, y)) return place(a, a.x, a.y);
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0)) standUp(a);
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
+  if (a.run && !godLock(a)) {               // running burns energy; too tired = back to walking
+    a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); a.runT = t;
+    if (a.energy <= D.RUN.minEnergy) { a.run = false; markMe(a); toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหวแล้ว พักหรือกินอะไรก่อน', '🥵', false); }
+  }
   if (x !== a.x || y !== a.y) { a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; }
   a.f = clamp(Math.floor(+m.f) || 0, 0, 7);
   if (a.cast && Math.hypot(a.x - ST[a.cast.st].x, a.y - ST[a.cast.st].y) > ST[a.cast.st].r + 1.2) { a.cast = null; markMe(a); }
@@ -1842,6 +1847,12 @@ function onMessage(ws, raw) {
       standUp(a); a.pose = 'beg'; a.seat = null; markMe(a); sendRoster();
       const m2 = begSpot(a);
       return toast(a, `นั่งขอทานตรงนี้แล้ว ${m2 >= 1.1 ? '— ทำเลดี คนผ่านเยอะ 👍' : m2 >= 0.9 ? '— คนผ่านพอสมควร' : '— ที่นี่คนผ่านน้อย ลองไปหน้าร้านหรือจัตุรัส'} (เดินเพื่อลุก)`, '🥣');
+    }
+    case 'run': {
+      const on = !!m.on && a.energy > D.RUN.minEnergy;
+      if (m.on && !on) toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false);
+      if (a.run && !on) a.runT = now();        // moves already in flight were sent at running speed
+      a.run = on; return markMe(a);
     }
     case 'afk': { const on = !!m.on; if (a.afk !== on) { a.afk = on; sendRoster(); } return; }
     case 'emo': {                           // an emoji over your head for everyone nearby

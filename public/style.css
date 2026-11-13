@@ -291,6 +291,8 @@ body.hasEvent #topBar{top:46px}
 #restBtn{right:104px;bottom:78px;width:50px;height:50px}
 #emoBtn{right:19px;bottom:100px;width:50px;height:50px}
 #begBtn{right:166px;bottom:10px;width:50px;height:50px}
+#runBtn{right:164px;bottom:70px;width:50px;height:50px}
+#runBtn.on{background:linear-gradient(#e8763c,#a8401a)}
 #thumbs .sm span{font-size:20px}
 #restBtn.on,#begBtn.on{background:linear-gradient(#5c8fb8,#2f5878)}
 #emoPick{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(170px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,44px);gap:6px;padding:8px;border-radius:14px;background:rgba(43,29,18,.9);border:2px solid #3e2414;z-index:6}
