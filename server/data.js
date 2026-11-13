@@ -90,9 +90,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   pathDown(B('bank', 'b_bank2', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
   // east main road, north side
   B('market', 'b_mart', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' });
-  B('hospital', 'b_hospital', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
-  pathDown(B('office', 'b_office', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
-  B('flower', 'b_flower', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
+  B('hospital', 'b_hospital2', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
+  pathDown(B('office', 'b_tower', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
+  B('flower', 'b_salon', 87, 30, { label: 'ร้านตัดผม', icon: '💈', deco: true, renov: true });
   // north street
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
@@ -101,7 +101,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // south-west lane (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
   pathDown(B('restaurant', 'b_cafe2', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
-  B('kitchen', 'b_bakery', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
+  B('kitchen', 'b_kitchen', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_rider', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
   B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
   B('fishstall', 'b_fishstall', 20, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake

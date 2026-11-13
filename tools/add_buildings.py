@@ -15,7 +15,8 @@ TILE = 48
 ITEMS = {'b_rider': ('a', 0, 0, 5.6), 'b_toolshop': ('a', 1, 0, 5), 'b_market': ('a', 0, 1, 5), 'b_fishing': ('a', 1, 1, 5.5),
          'b_cafe2': ('b', 0, 0, 5), 'b_school2': ('b', 1, 0, 6.4), 'b_inn2': ('b', 0, 1, 5.4), 'b_bank2': ('b', 1, 1, 5.6),
          'b_showroom': ('c', 0, 0, 6.4), 'b_cinema': ('c', 1, 0, 5.2), 'b_library': ('c', 0, 1, 5.4), 'b_factory': ('c', 1, 1, 5.6),
-         'b_pavilion': ('d', 0, 0, 4.4), 'b_boutique': ('d', 1, 0, 5), 'b_fishstall': ('d', 0, 1, 4.4), 'b_stilthouse': ('d', 1, 1, 6)}
+         'b_pavilion': ('d', 0, 0, 4.4), 'b_boutique': ('d', 1, 0, 5), 'b_fishstall': ('d', 0, 1, 4.4), 'b_stilthouse': ('d', 1, 1, 6),
+         'b_kitchen': ('e', 0, 0, 5), 'b_salon': ('e', 1, 0, 5), 'b_hospital2': ('e', 0, 1, 7.4), 'b_tower': ('e', 1, 1, 6.4)}
 SHEET = lambda k: os.path.join(ROOT, 'tools', 'sheets', f'pixel_buildings_{k}.jpg')
 
 def cut(sheet, col, row):
@@ -24,6 +25,13 @@ def cut(sheet, col, row):
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     bg = (g < np.minimum(r, b) * 0.6) & (np.abs(r - b) < 90)          # magenta and its fringe
     rgba = np.dstack([a, np.where(bg, 0, 255)]).astype(np.uint8)
+    from scipy import ndimage
+    lab, n = ndimage.label(~bg)
+    if n > 1:
+        sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
+        big = 1 + int(np.argmax(sizes))
+        keep = ndimage.binary_dilation(lab == big, iterations=2) & ~bg
+        rgba[..., 3] = np.where(keep, 255, 0)
     im = Image.fromarray(rgba)
     return im.crop(im.getbbox())
 
