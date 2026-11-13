@@ -84,31 +84,32 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   shore(T);
   rect(94, 60, 2, 2, '=');
 
-  // west main road, north side (doors on row 30)
-  B('toolshop', 'b_toolshop', 4, 30, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
-  pathDown(B('dealer', 'b_showroom', 11, 28, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true }), 30);
-  B('school', 'b_school2', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
-  pathDown(B('bank', 'b_bank2', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
+  // ---- districts: shopping street by the square (west main road), civic street (north), services lane (south-west),
+  // health & business (east main road), the waterfront by the lake. Declaration order is kept: rooms are laid out in this order.
+  B('toolshop', 'b_toolshop', 28, 45, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
+  B('dealer', 'b_showroom', 35, 45, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true });
+  B('school', 'b_school2', 34, 13, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
+  B('bank', 'b_bank2', 43, 13, { label: 'ธนาคาร', icon: '🏦', st: 'bank' });
   // east main road, north side
   B('market', 'b_market2', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market', outdoor: true });   // an open stall: trade right at the counter, no interior
   B('hospital', 'b_hospital2', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
   pathDown(B('office', 'b_tower', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
-  B('flower', 'b_flower2', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
-  // north street
+  B('flower', 'b_flower2', 13, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
+  // north street: the civic street
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
-  B('cinema', 'b_cinema', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
-  B('barber', 'b_salon', 42, 13, { label: 'ร้านตัดผม', icon: '💈', deco: true });            // barber shop on the north street
+  B('cinema', 'b_cinema', 27, 30, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
+  B('barber', 'b_salon', 35, 30, { label: 'ร้านตัดผม', icon: '💈', deco: true });
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
-  // south-west lane (doors on row 45)
+  // south-west lane: services and trade (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
-  pathDown(B('restaurant', 'b_cafe2', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
-  B('kitchen', 'b_kitchen', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
-  B('rider', 'b_rider2', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
+  B('restaurant', 'b_cafe2', 20, 30, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' });
+  B('kitchen', 'b_kitchen', 13, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
+  B('rider', 'b_rider2', 20, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
   B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
   B('fishstall', 'b_fishstall', 20, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
   B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
-  B('fashion', 'b_boutique', 38, 45, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
+  B('fashion', 'b_boutique', 6, 30, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
@@ -140,9 +141,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   verge(35, 9, 40); verge(35, 65, 92); verge(18, 20, 46); verge(18, 56, 86); verge(50, 10, 46);
   for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('lamp2', x + .5, 17);
-  prop('busstop', 39, 30.2); prop('vending', 41.2, 29.9);
+  prop('busstop', 38.5, 35.2); prop('vending', 41.2, 29.9);
   for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
-  prop('phonebooth', 57.3, 23.9); prop('bin_blue', 36, 29.95); prop('bin_green', 75, 33.95);
+  prop('phonebooth', 57.3, 23.9); prop('bin_blue', 33.8, 29.95); prop('bin_green', 75, 33.95);
   prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95);
   // parks, the lake and the beach
   prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 84.5, 47.2, false);
