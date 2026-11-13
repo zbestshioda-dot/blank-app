@@ -103,9 +103,10 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   pathDown(B('restaurant', 'b_cafe2', 13, 44, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' }), 45);
   B('kitchen', 'b_bakery', 21, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_rider', 29, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
-  B('fishhut', 'b_fishing', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });         // the fishing club's hut by the lake
+  B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
+  B('fishstall', 'b_fishstall', 20, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
   B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
-  B('fashion', 'b_flower', 38, 45, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
+  B('fashion', 'b_boutique', 38, 45, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
@@ -141,7 +142,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('phonebooth', 57.3, 23.9); prop('bin_blue', 36, 29.95); prop('bin_green', 75, 33.95);
   prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95);
   // parks, the lake and the beach
-  prop('gazebo', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
+  prop('b_pavilion', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
   prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
   prop('kiosk', 26.5, 54.6); prop('crate', 23.5, 55.5); prop('barrel', 29.5, 55.5);
