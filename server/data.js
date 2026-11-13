@@ -69,7 +69,6 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   wiggle(51, 16, [[1, 0, 4], [0, 1, 3], [1, 0, 6], [0, 1, 3]]);
   rect(20, 56, 2, 7, 'p'); rect(31, 56, 2, 7, 'p');                 // lake piers
   rect(96, 60, 10, 2, 'p');                                          // sea pier
-  rect(49, 38, 2, 2, '=');                                           // avenue meets the square
   shore(T);
   rect(94, 60, 2, 2, '=');
 
