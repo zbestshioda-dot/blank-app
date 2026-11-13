@@ -97,6 +97,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
   B('cinema', 'b_cinema', 35, 13, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
+  B('barber', 'b_salon', 42, 13, { label: 'ร้านตัดผม', icon: '💈', deco: true });            // barber shop on the north street
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
   // south-west lane (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
@@ -132,7 +133,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด'], ['crowd3', 11, 51.5, 'แผงลอย']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   // a dark alley behind the cinema: where thieves find work
-  prop('barrel2', 42.5, 11.4); prop('crate', 44.2, 10.4); prop('bin_grey', 41.4, 12.2);
+  prop('bin_grey', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
   for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
   for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
@@ -244,6 +245,7 @@ function scatter(A, kinds, n, flat) {
     const x = A.x + 2 + Math.floor(rand() * (A.w - 4)), y = A.y + 3 + Math.floor(rand() * (A.h - 5));
     let ok = true;
     for (let j = -2; j <= 1 && ok; j++) for (let k = -1; k <= 1; k++) if (!'.m'.includes(get(x + k, y + j) || '#')) { ok = false; break; }
+    if (ok && BUILDINGS.some(b => x >= b.x - 1 && x <= b.x + b.w && y >= b.y - 1 && y <= b.y + b.h + 1)) ok = false;
     if (!ok || STATIONS.some(s => Math.hypot(s.x - x - .5, s.y - y - .5) < 3) || PROPS.some(p => Math.hypot(p.x - x - .5, p.y - y - .5) < 3)) continue;
     prop(kinds[i % kinds.length], x + .5, y + .95, !flat); i++;
   }
