@@ -16,14 +16,15 @@ ITEMS = {'b_rider': ('a', 0, 0, 5.6), 'b_toolshop': ('a', 1, 0, 5), 'b_market': 
          'b_cafe2': ('b', 0, 0, 5), 'b_school2': ('b', 1, 0, 6.4), 'b_inn2': ('b', 0, 1, 5.4), 'b_bank2': ('b', 1, 1, 5.6),
          'b_showroom': ('c', 0, 0, 6.4), 'b_cinema': ('c', 1, 0, 5.2), 'b_library': ('c', 0, 1, 5.4), 'b_factory': ('c', 1, 1, 5.6),
          'b_pavilion': ('d', 0, 0, 4.4), 'b_boutique': ('d', 1, 0, 5), 'b_fishstall': ('d', 0, 1, 4.4), 'b_stilthouse': ('d', 1, 1, 6),
-         'b_kitchen': ('e', 0, 0, 5), 'b_salon': ('e', 1, 0, 5), 'b_hospital2': ('e', 0, 1, 7.4), 'b_tower': ('e', 1, 1, 6.4)}
+         'b_kitchen': ('e', 0, 0, 5), 'b_salon': ('e', 1, 0, 5), 'b_hospital2': ('e', 0, 1, 7.4), 'b_tower': ('e', 1, 1, 6.4),
+         'b_rider2': ('f', 0, 0, 5.6), 'b_market2': ('f', 1, 0, 5.4), 'b_flower2': ('f', 0, 1, 5)}
 SHEET = lambda k: os.path.join(ROOT, 'tools', 'sheets', f'pixel_buildings_{k}.jpg')
 
 def cut(sheet, col, row):
     c = sheet.width // 2
     a = np.asarray(sheet.crop((col * c, row * c, (col + 1) * c, (row + 1) * c)).convert('RGB')).astype(int)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    bg = (g < np.minimum(r, b) * 0.6) & (np.abs(r - b) < 90)          # magenta and its fringe
+    bg = (g < np.minimum(r, b) * 0.6) & (np.abs(r - b) < 90) & (np.minimum(r, b) > 110)   # bright magenta and its fringe (not dark purple outlines)
     rgba = np.dstack([a, np.where(bg, 0, 255)]).astype(np.uint8)
     from scipy import ndimage
     lab, n = ndimage.label(~bg)
