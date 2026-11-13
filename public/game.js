@@ -126,7 +126,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, veh: p.veh, dz: p.dz || [], pose: p.pose, title: p.title, g: p.g, lk: p.lk, npc: p.npc, w: p.w, sad: p.sad });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, veh: p.veh, dz: p.dz || [], pose: p.pose, title: p.title, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -227,6 +227,7 @@ const CAREER_ICON = c => G?.careers[c]?.icon || '';
 function paintHud() {
   if (!me) return;
   const c = G.careers[me.career];
+  $('#card').classList.toggle('admin', !!me.admin);
   $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} Lv.${me.lv}`;
   // status pills (icons from the UI sheet where we have one)
   const ic = (f, alt) => f ? `<img src="assets/ui/${f}.png" alt="">` : alt;
@@ -602,7 +603,7 @@ function npcPatient(b, s) {
   n.rx = n.x = s.x; n.ry = n.y = s.y; return n;
 }
 function nameAndBubble(p, px, top, mine) {
-  sign(`${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
+  sign(`${p.adm ? '👑 ' : ''}${p.npc ? '🏘️' : CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;

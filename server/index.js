@@ -13,6 +13,9 @@ const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, '..', 'public');
 const SPEED = 3.0;                          // tiles / second on foot
 const TICK = 100;
+// admins (lower-case names): stats are locked full, never sick / knocked out / jailed. Extra names via ADMINS=a,b
+const ADMINS = new Set(['james2324', ...String(process.env.ADMINS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean)]);
+const isAdmin = a => !!a && ADMINS.has(String(a.name).toLowerCase());
 const VERSION = 3;                          // save-format version (2 = new world, 3 = happiness/bills/ม.6)
 
 // ------------------------------------------------------------------ state
@@ -86,6 +89,7 @@ const titleOf = a => D.ACHIEVEMENTS.find(x => x.id === a.title)?.title || '';
 const DZ = D.DISEASES;
 const dzProd = (a, key) => (a.dz || []).reduce((m, d) => m * (DZ[d]?.[key] || 1), 1);
 function infect(a, id, chance = 1) {
+  if (isAdmin(a)) return false;
   if (Math.random() > chance || !DZ[id] || (a.dz || []).includes(id) || (a.dz || []).length >= 3 || a.down) return false;
   if ((a.immune?.[id] || 0) > now()) return false;
   a.dz = [...(a.dz || []), id];
@@ -392,6 +396,7 @@ function spawnPatient() {
 
 // ------------------------------------------------------------------ knocked out
 function knockOut(a) {
+  if (isAdmin(a)) { a.health = 100; return; }
   a.cast = null; standUp(a);
   if (a.trade) tradeClose(a.trade, `${a.name} หมดสติ`);
   if (a.hunger <= 5) {               // starving: collapse right where you are
@@ -1133,6 +1138,7 @@ function startTest(a, lic, s) {
 // ------------------------------------------------------------------ happiness
 const depressed = a => (a.happy ?? 80) < D.HAPPY.low;
 function joy(a, n) {
+  if (isAdmin(a)) { a.happy = 100; return; }
   const was = depressed(a);
   a.happy = clamp((a.happy ?? 80) + n, 0, 100); markMe(a);
   if (!was && depressed(a)) { toast(a, 'คุณรู้สึกซึมเศร้า ไม่มีจิตใจจะทำอะไร... ทำงานไม่ได้จนกว่าจะมีความสุขขึ้น', '😞', false); sendRoster(); }
@@ -1252,6 +1258,7 @@ function steal(a, m) {
   if (+m.to < 0) return stealNpc(a, +m.to);
   const o = nearPlayer(a, m.to, 1.8);
   if (!o) return toast(a, 'ต้องเข้าไปใกล้ๆ เป้าหมาย (ประชิดตัว)', '🕶️', false);
+  if (isAdmin(o)) return toast(a, `${o.name} เป็นแอดมิน ล้วงไม่ได้`, '👑', false);
   if (o.down) return toast(a, 'เป้าหมายไม่อยู่ในสภาพที่จะล้วงได้', '🕶️', false);
   if (!cd(a, 'steal', 45000) || !spend(a, 8)) return;
   let chance = 0.55 + 0.1 * tier(a, 'thief') + (o.pose ? 0.2 : 0) - (o.career === 'police' ? 0.35 : 0);
@@ -1290,6 +1297,7 @@ function arrest(a, m) {
   if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำอะไร...', '😞', false);
   const o = nearPlayer(a, m.to, 2);
   if (!o) return toast(a, 'ต้องเข้าไปใกล้ผู้ต้องสงสัยก่อน', '👮', false);
+  if (isAdmin(o)) return toast(a, `${o.name} เป็นแอดมิน`, '👑', false);
   if (!(o.wanted > now())) return toast(a, `ไม่มีหลักฐานหรือการแจ้งความเกี่ยวกับ ${o.name} จับไม่ได้`, '👮', false);
   if (!cd(a, 'arrest', 3000)) return;
   const recent = (o.crimes || []).filter(c => now() - c.t < 10 * 60000);
@@ -1385,7 +1393,7 @@ function stealNpc(a, id) {
 // ------------------------------------------------------------------ public views
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), veh: bestVehicle(a), dz: (a.dz || []).map(d => DZ[d].icon),
-    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look };
+    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0 };
 }
 function sendRoster() { broadcast({ t: 'roster', players: [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f })).concat(npcs.map(npcInfo)) }); }
 function meView(a) {
@@ -1399,7 +1407,7 @@ function meView(a) {
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
-    gender: a.gender, look: a.look, wardrobe: a.wardrobe,
+    gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
@@ -1633,6 +1641,12 @@ function tick() {
   const flu = ev('flu');
   for (const a of online.values()) {
     const indoors = !!D.roomAt(a.x, a.y);
+    if (isAdmin(a)) {   // locked stats
+      a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
+      if ((a.dz || []).length) { a.dz = []; sendRoster(); }
+      if (a.down) { a.down = null; sendRoster(); }
+      a.craving = null; a.utilOff = false; a.wanted = 0;
+    }
     // ---- energy, hunger, health
     const restMul = a.pose === 'rest' ? 3 : a.pose === 'seat' ? 2 : a.pose === 'bed' ? 2 : 1;
     if (a.pose !== 'chair') a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt);
@@ -1681,6 +1695,7 @@ function tick() {
       else if (a.cast.state === 'bite' && t > a.cast.expire) { a.cast = null; markMe(a); toast(a, 'ปลาหนีไปแล้ว ช้าเกิน!', '💨', false); }
     }
     if (a.trade && (dist(a.trade.a, a.trade.b) > 8 || areaId(a.trade.a) !== areaId(a.trade.b))) tradeClose(a.trade, 'อยู่ไกลกันเกินไป ยกเลิกการแลกเปลี่ยน');
+    if (isAdmin(a)) a.energy = a.hunger = a.health = a.happy = 100;
     if (a.meDirty || t % 2000 < TICK) { a.meDirty = false; send(a, meView(a)); }
   }
   if (slow) {

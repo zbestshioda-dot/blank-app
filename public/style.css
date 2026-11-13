@@ -241,3 +241,4 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
   #clock{order:-1;width:92px;padding:3px 4px;font-size:10.5px;line-height:1.35;text-align:center;border-radius:10px}
   #clock span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#clock i{display:none}
 }
+#card.admin #meName::before{content:'👑 ';font-size:13px}
