@@ -89,7 +89,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('school', 'b_school2', 20, 30, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
   pathDown(B('bank', 'b_bank2', 30, 27, { label: 'ธนาคาร', icon: '🏦', st: 'bank' }), 30);
   // east main road, north side
-  B('market', 'b_market2', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market' });
+  B('market', 'b_market2', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market', outdoor: true });   // an open stall: trade right at the counter, no interior
   B('hospital', 'b_hospital2', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
   pathDown(B('office', 'b_tower', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
   B('flower', 'b_flower2', 87, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
@@ -284,7 +284,6 @@ const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [12, 9] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_cabinet2', 14.4, 2.7], ['f_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['f_clock', 10.6, .95], ['f_corkboard', 5.5, 1.15, false], ['i_calendar', 2.8, 1.05, false], ['f_extinguisher', 12.6, 2.4]],
-  market: [['f_shelf_a', 1.8, 2.8], ['f_shelf_b', 3.3, 2.8], ['f_shelf_c', 11.4, 2.8], ['f_cashdesk', 7, 2.4], ['stall_green', 3.4, 6.6], ['stall_red', 10.6, 6.6], ['i_crate_apple', 12.6, 8.6], ['i_crate_carrot', 1.6, 8.6], ['i_rice_sack', 6, 8.7], ['i_open', 9.5, 1.05, false]],
   warehouse: [['crate', 1.8, 3.2], ['crate', 3, 3.2], ['barrel', 4.2, 3.2], ['f_cabinet', 7, 2.3], ['hay2', 11.5, 3.4], ['hay', 11.6, 6.6], ['sack', 2.2, 6.6], ['barrel2', 3.3, 6.6], ['crate', 12.2, 8.6]],
   fashion: [['f_mirror', 2.4, 2.8], ['f_cabinet2', 12, 2.7], ['f_cashdesk', 7, 2.4], ['f_clothes_rack', 3, 6.4], ['f_clothes_rack', 11, 6.4], ['f_rug_round', 7, 6.6], ['f_shoe_rack', 1.8, 8.7], ['f_vase', 12.4, 8.7], ['i_poster', 5, 1.05, false]],
   rider: [['f_window', 10.5, 1.1], ['f_cashdesk', 7, 2.4], ['f_display', 2.6, 2.7], ['f_bench_back', 10.6, 5.6], ['f_coffee', 12.6, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7], ['i_backpack', 12.4, 8.6], ['i_bike', 4, 8.6, false]],
@@ -310,6 +309,10 @@ for (const b of BUILDINGS) {
   const kind = b.house !== undefined ? 'house' : b.id;
   const [RW, RH] = ROOM_SIZE[kind] || [14, 10];
   const rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14; slot++;
+  if (b.outdoor) {                     // served from the street: the counter is in front of the building (its room slot stays unused so other rooms keep their place)
+    STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
+    continue;
+  }
   rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i');
   const mx = Math.floor(RW / 2);
   rect(rx + mx - 1, ry + RH - 1, 2, 1, 'D');

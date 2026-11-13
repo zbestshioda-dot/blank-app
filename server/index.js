@@ -1567,7 +1567,7 @@ const WORKERS = [
   { career: 'office', name: 'คุณเก่ง (พนักงาน)', area: 'r_office', look: { hair: 'black', shirt: 'white', pants: 'black' },
     pts: () => D.STATIONS.filter(s => s.type === 'chair' && !chairs[s.idx]).map(s => [s.x, s.y]), pose: () => (hourNow() >= D.SHIFT.start && hourNow() < D.SHIFT.end ? 'chair' : null), stay: () => rnd(40, 90) },
   { career: 'farmer', name: 'ลุงสม (ชาวไร่)', area: 'farm', pts: () => D.STATIONS.filter(s => s.type === 'gplot' && !lots[s.lot]).map(s => [s.x, s.y + 1.1]).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(6, 12) },
-  { career: 'merchant', name: 'เจ๊หมวย (แม่ค้า)', area: 'r_market', pts: () => roomPts('r_market', [[7, 3.4], [4, 4.6], [10, 4.6], [7, 7.6]]), stay: () => rnd(5, 12) },
+  { career: 'merchant', name: 'เจ๊หมวย (แม่ค้า)', area: 'town', pts: () => { const m = ST.market; return [[m.x - 2.4, m.y], [m.x + 2.4, m.y], [m.x - 1.2, m.y + .3], [m.x + 1.2, m.y + .3]].filter(([x, y]) => !D.blocked(x, y)); }, stay: () => rnd(5, 12) },
   { career: 'chef', name: 'เชฟต้อม', area: 'r_kitchen', pts: () => roomPts('r_kitchen', [[4.9, 3.4], [9.6, 3.4], [7, 3.4], [7, 5.4]]), stay: () => rnd(4, 9) },
   { career: 'doctor', name: 'หมอแนน (แพทย์เวร)', area: 'r_hospital', always: true, pts: () => D.STATIONS.filter(s => s.type === 'bed').map(s => [s.x, s.y + .95]).concat(roomPts('r_hospital', [[5, 5]])).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 8), job: npcDoctor },
   { career: 'rider', name: 'พี่บอย (ไรเดอร์)', area: 'town', pts: () => [ST_XY('door_restaurant'), ...D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined).map(s => [s.x, s.y + .3])].filter(p => p && !D.blocked(p[0], p[1])), stay: () => rnd(3, 6), speed: 2.4 },
