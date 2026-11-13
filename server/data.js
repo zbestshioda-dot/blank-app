@@ -99,7 +99,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('police', 'b_police', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   pathDown(B('fire', 'b_fire', 26, 12, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true }), 13);
   B('cinema', 'b_cinema', 27, 30, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
-  B('barber', 'b_salon', 35, 30, { label: 'ร้านตัดผม', icon: '💈', deco: true });
+  B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', outdoor: true, noSlot: true });   // hair dye at the counter outside
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
   // south-west lane: services and trade (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
@@ -109,7 +109,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
   B('fishstall', 'b_fishstall', 20, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
   B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
-  B('fashion', 'b_boutique', 6, 30, { label: 'ร้านแฟชั่น & ทำผม', icon: '💇', st: 'fashion' });
+  B('fashion', 'b_boutique', 6, 30, { label: 'ร้านแฟชั่น', icon: '👕', st: 'fashion' });
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
@@ -332,6 +332,10 @@ const ROOMS = [];
 let slot = 0;
 for (const b of BUILDINGS) {
   if (!b.st) continue;
+  if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
+    STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
+    continue;
+  }
   const kind = b.house !== undefined ? 'house' : b.id;
   const [RW, RH] = ROOM_SIZE[kind] || [14, 10];
   const rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14; slot++;
@@ -412,7 +416,7 @@ const dayAt = t => Math.floor((t + TIME_OFF + DAY_MS - MIDNIGHT_MS) / DAY_MS);
 // game hours that pass per real second at hour h
 const gameRate = h => (h >= CLOCK.dawn && h < CLOCK.dusk) ? (CLOCK.dusk - CLOCK.dawn) / (CLOCK.dayMin * 60) : (24 - (CLOCK.dusk - CLOCK.dawn)) / ((24 - CLOCK.dayMin) * 60);
 // opening hours [open, close) in game hours
-const HOURS = { fashion: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+const HOURS = { fashion: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
@@ -601,7 +605,7 @@ const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้อง�
 
 // ================================================================= achievements -> titles shown over your head
 // ================================================================= looks (pixel character in public/assets/pchar.*, recoloured per player)
-// everyone starts with the same brown hair; hair dye, shirts and shorts are bought at the fashion shop
+// everyone starts with the same brown hair; hair dye at the barber's, shirts and shorts at the fashion shop
 const LOOKS = {
   hair:  { brown: { name: 'ผมสีน้ำตาล (เริ่มต้น)', price: 0, color: '#6e4528' }, black: { name: 'ย้อมผมดำ', price: 800, color: '#2e2622' },
            blonde: { name: 'ย้อมผมบลอนด์', price: 1200, color: '#e6bd55' }, ginger: { name: 'ย้อมผมส้มแดง', price: 1200, color: '#c0552d' },

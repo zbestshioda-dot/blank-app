@@ -657,7 +657,8 @@ function act(a, m) {
       return toast(a, 'ล้วงพลาด! คนรู้ตัวทัน รีบเดินหนีไป', '😰', false);
     }
     case 'bank.bills': return payBills(a);
-    case 'fashion.buy': {
+    case 'fashion.buy': case 'barber.buy': {
+      if ((s.type === 'barber') !== (m.cat === 'hair')) return toast(a, s.type === 'barber' ? 'ร้านทำผมทำได้แค่ผม' : 'ย้อมผมได้ที่ร้านทำผม 💈', '💈', false);
       const cat = D.LOOKS[m.cat], it = cat && cat[m.id]; if (!it) return;
       const W = a.wardrobe; if (W[m.cat].includes(m.id)) return wear(a, m);
       if (!pay(a, it.price)) return;
@@ -1477,7 +1478,7 @@ function jail(o, by) {
 // ------------------------------------------------------------------ looks
 function wear(a, m) {
   const cat = m.cat; if (!D.LOOKS[cat]) return;
-  if (m.id && !a.wardrobe[cat].includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่นก่อน', '💇', false);
+  if (m.id && !a.wardrobe[cat].includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่น (ผมที่ร้านทำผม) ก่อน', '💇', false);
   if (!m.id) return;
   a.look = { ...a.look, [cat]: m.id || '' }; markMe(a); sendRoster();
 }
