@@ -144,7 +144,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('busstop', 38.5, 35.2); prop('vending', 41.2, 29.9);
   for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
   prop('phonebooth', 57.3, 23.9); prop('bin_blue', 33.8, 29.95); prop('bin_green', 75, 33.95);
-  prop('car_red', 16.5, 34.9); prop('car_blue', 70.5, 34.95); prop('taxi', 92.5, 29.95);
+  // (no parked cars: real traffic drives the roads now)
   // parks, the lake and the beach
   prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 84.5, 47.2, false);
   prop('b_pavilion', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);

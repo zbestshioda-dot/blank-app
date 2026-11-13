@@ -696,7 +696,7 @@ function draw(t) {
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
-  if (A?.id === 'town') { stepTraffic(); for (const c of traffic) if (c.y > c.y0 + .3 && c.y < c.y1 - .3 && vis(c.x, c.y, 3)) ents.push([c.y, 5, c]); }   // cars only show on their own stretch of road
+  if (A?.id === 'town') { stepTraffic(); for (const c of traffic) if (vis(c.x, c.y, 4)) ents.push([c.y + halfY(c), 5, c]); }
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
   if (!myRoom) drawCastShadows(ents, X, Y, night);
@@ -705,7 +705,7 @@ function draw(t) {
     else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) spr(e[2], e[0] + .5, e[1] + 1.05, X, Y);
     else if (k === 3) spr(e[0], e[1], e[2], X, Y);
-    else if (k === 5) spr(e.s, e.x, e.y + .35, X, Y, .78);
+    else if (k === 5) drawCar(e, X, Y);
     else drawPlayer(e, X, Y, t);
   }
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) drawBuildingSign(b, X, Y);
@@ -1849,7 +1849,7 @@ function drawCastShadows(ents, X, Y, night) {
     if (kind === 0) one(e.sprite, e.x + e.w / 2, e.y + e.h + .02);
     else if (kind === 1 && !e.z) one(e.s, e.x, e.y);
     else if (kind === 2) one(e[2], e[0] + .5, e[1] + 1.05);
-    else if (kind === 5) one(e.s, e.x, e.y + .35, .78);
+    else if (kind === 5) { const [n, sc] = carSprite(e); one(n, e.x, e.y + halfY(e), sc); }
     else if (kind === 4 && e.rx != null) {          // people: a body-shaped blob
       g.setTransform(DPR, 0, -k * DPR, -d * DPR, ((e.rx) * TS + X) * DPR, ((e.ry + .32) * TS + Y) * DPR);
       g.fillStyle = '#000'; g.beginPath(); g.ellipse(0, -TS * .55, TS * .2, TS * .55, 0, 0, 7); g.fill();
@@ -1879,22 +1879,98 @@ function drawSunlight(t, night) {
   v.addColorStop(0, 'rgba(20,10,0,0)'); v.addColorStop(1, `rgba(20,10,0,${.32 * day + .1})`);
   ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
 }
-// ---- ambient traffic: cosmetic cars on the vertical roads (left lane drives down toward you, right lane up); they wait for people in the way
-const LANES = [[49.5, 4, 23.5], [49.5, 40, 75.5], [2.5, 14, 31.5], [94.5, 16, 77.5]];
+// ---- traffic: cars and buses drive on the left (Thai roads) along fixed routes, turn at corners, keep their distance,
+// take turns at crossings and stop for people. Cosmetic only: they never block anyone.
+const ROUTES = [
+  [[2.5, 32.5], [2.5, 14.5], [95.5, 14.5], [95.5, 77.5], [49.5, 77.5], [49.5, 40.6], [50.5, 40.6], [50.5, 76.5], [94.5, 76.5], [94.5, 15.5], [3.5, 15.5], [3.5, 31.5], [41.4, 31.5], [41.4, 32.5]],
+  [[92.5, 32.5], [58.6, 32.5], [58.6, 31.5], [92.5, 31.5]],
+  [[4.6, 46.5], [47.6, 46.5], [47.6, 47.5], [4.6, 47.5]],
+];
+// sprites per kind: side view (faces left, mirrored for right), front (coming toward you), back (driving away)
+const VEH = {
+  red:    { side: 'v_red_side', front: ['car_red', .45], back: 'v_red_back', len: 1.9, v: 3.2 },
+  blue:   { side: 'v_blue_side', front: ['car_blue', .45], back: 'v_blue_back', len: 1.9, v: 3.0 },
+  taxi:   { side: 'v_taxi_side', front: ['taxi', .41], back: 'v_taxi_back', len: 1.9, v: 3.4 },
+  yellow: { side: 'v_yellow_side', front: 'v_yellow_front', back: 'v_yellow_back', len: 1.9, v: 3.1 },
+  police: { side: 'v_police_side', front: 'v_police_front', back: 'v_police_front', len: 1.9, v: 3.3 },
+  bus:    { side: 'v_bus_side', front: 'v_bus_front', back: 'v_bus_back', len: 3.8, v: 2.4, deep: 1.7 },
+};
+const FLEET = [['bus', 'red', 'taxi', 'blue', 'yellow', 'police', 'red', 'taxi', 'bus', 'blue', 'yellow', 'taxi', 'red', 'blue'], ['taxi', 'red', 'blue'], ['yellow', 'red', 'blue']];
 let traffic = [], trafT = 0;
+const routeLen = r => r.reduce((t, a, i) => { const b = r[(i + 1) % r.length]; return t + Math.hypot(b[0] - a[0], b[1] - a[1]); }, 0);
+function routePos(r, d) {                     // point and heading at distance d along a closed route
+  const L = routeLen(r); d = ((d % L) + L) % L;
+  for (let i = 0; i < r.length; i++) {
+    const a = r[i], b = r[(i + 1) % r.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (d <= l) return { x: a[0] + (b[0] - a[0]) * d / l, y: a[1] + (b[1] - a[1]) * d / l, dx: Math.sign(b[0] - a[0]), dy: Math.sign(b[1] - a[1]) };
+    d -= l;
+  }
+  return { x: r[0][0], y: r[0][1], dx: 1, dy: 0 };
+}
+// half of the car's size along each axis, from its heading
+// corners and U-turns: only one car at a time inside a small zone around each turning point
+const CORNERS = ROUTES.map(r => { let d = 0; return r.map((a, i) => { const p = r[(i + r.length - 1) % r.length]; d += i ? Math.hypot(a[0] - p[0], a[1] - p[1]) : 0; return { x: a[0], y: a[1], d }; }); });
+const ZONE = 1.9;
+// corners close to each other (the two lanes turning at the same junction) share one zone
+const CLUSTER = (() => { const pts = CORNERS.flat(), id = new Map(); let n = 0;
+  for (const p of pts) { const near = pts.find(q => id.has(q.x + ',' + q.y) && Math.hypot(q.x - p.x, q.y - p.y) < 2.6); id.set(p.x + ',' + p.y, near ? id.get(near.x + ',' + near.y) : n++); }
+  const groups = {}; for (const [k, v] of id) (groups[v] = groups[v] || []).push(pts.find(q => q.x + ',' + q.y === k));
+  return Object.fromEntries([...id].map(([k, v]) => [k, groups[v]])); })();   // one shared array per cluster
+// o is behind me in my own lane (following me): it does not stop me from turning
+const behind = (c, o) => o.r === c.r && ((c.d - o.d) % routeLen(c.r) + routeLen(c.r)) % routeLen(c.r) < 6;
+function cornerAhead(c) {                    // the next turning point on my route, and how far away it is
+  const L = routeLen(c.r), d = ((c.d % L) + L) % L; let best = null;
+  for (const k of CORNERS[ROUTES.indexOf(c.r)]) { const ahead = ((k.d - d) % L + L) % L; if (!best || ahead < best.ahead) best = { ...k, ahead }; }
+  return best;
+}
+const halfX = c => c.dx ? VEH[c.k].len / 2 : .45, halfY = c => c.dx ? .4 : (VEH[c.k].deep || 1.1) / 2;
 function stepTraffic() {
   const t = performance.now(), dt = Math.min(.1, (t - (trafT || t)) / 1000); trafT = t;
   if (!traffic.length) {
-    const kinds = ['car_red', 'car_blue', 'taxi', 'car_green'];
-    LANES.forEach(([x, y0, y1], li) => { for (const dir of [1, -1]) { const n = Math.max(1, Math.round((y1 - y0) / 14)); for (let i = 0; i < n; i++) traffic.push({ s: kinds[(li * 3 + i + (dir > 0 ? 0 : 2)) % 4], x: x + (dir > 0 ? -.5 : .5), y0, y1, dir, y: y0 + (y1 - y0) * ((i + (dir > 0 ? 0 : .5)) / n), v: 2.6 + (li % 3) * .3 }); } });
+    let id = 0;
+    ROUTES.forEach((r, ri) => { const L = routeLen(r), n = FLEET[ri].length; FLEET[ri].forEach((k, i) => { const c = { id: id++, k, r, d: L * i / n, v: 0 }; Object.assign(c, routePos(r, c.d)); traffic.push(c); }); });
   }
+  const people = [...P.values()];
   for (const c of traffic) {
-    const ahead = c.y + c.dir * 1.3;
-    const blocked = [...P.values()].some(p => Math.abs(p.rx - c.x) < .8 && Math.abs(p.ry - ahead) < 1) || traffic.some(o => o !== c && o.x === c.x && (o.y - c.y) * c.dir > 0 && Math.abs(o.y - c.y) < 2.2);
-    if (!blocked) c.y += c.dir * c.v * dt;
-    if (c.dir > 0 && c.y > c.y1) c.y = c.y0;
-    if (c.dir < 0 && c.y < c.y0) c.y = c.y1;
+    const V = VEH[c.k], look = .55 + c.v * .35;
+    // blocked if any car's box overlaps the stretch of road just ahead of mine (same lane, or crossing my path)
+    const ax = c.x + c.dx * (halfX(c) + look / 2), ay = c.y + c.dy * (halfY(c) + look / 2);
+    const bx = c.dx ? look / 2 : .42, by = c.dy ? look / 2 : .42;
+    let blocker = null;
+    for (const o of traffic) {
+      if (o === c) continue;
+      if (Math.abs(o.x - ax) < bx + halfX(o) && Math.abs(o.y - ay) < by + halfY(o)) { blocker = o; break; }
+    }
+    // wait before a corner while another car is turning there (or still inside the turn)
+    if (!blocker) {
+      const k = cornerAhead(c), near = k.ahead < halfX(c) + ZONE + .3;
+      if (near && c.holds !== k.x + ',' + k.y) {
+        const zone = CLUSTER[k.x + ',' + k.y];
+        const busy = traffic.find(o => o !== c && !behind(c, o) && (o.holds && CLUSTER[o.holds] === zone || o.waitZone !== zone && zone.some(q => Math.hypot(o.x - q.x, o.y - q.y) < ZONE + Math.max(halfX(o), halfY(o)))));
+        if (busy) { blocker = busy; c.waitZone = zone; } else { c.holds = k.x + ',' + k.y; c.waitZone = null; }
+      }
+      if (!near && c.holds && k.ahead > halfX(c) + ZONE + 1) c.holds = null;
+    }
+    if (!blocker) for (const p of people) if (Math.abs(p.rx - ax) < bx + .3 && Math.abs(p.ry - ay) < by + .3) { blocker = p; break; }
+    // two cars waiting on each other at a crossing: the lower id goes first
+    c.blockedBy = blocker; c.wait = blocker ? (c.wait || 0) + dt : 0;
+    const want = blocker ? 0 : V.v * (c.dx && c.dy ? .5 : 1);
+    c.v += Math.max(-9 * dt, Math.min(2.4 * dt, want - c.v));      // gentle speed-up, firm braking
+    if (c.v > 0) { c.d += c.v * dt; Object.assign(c, routePos(c.r, c.d)); }
   }
+}
+function carSprite(c) {
+  const V = VEH[c.k];
+  if (c.dx) return [V.side, 1, c.dx > 0];
+  const f = c.dy > 0 ? V.front : V.back;
+  return Array.isArray(f) ? [f[0], f[1], false] : [f, 1, false];
+}
+function drawCar(c, X, Y) {
+  const [name, sc, flip] = carSprite(c), s = atlas && atlasImg && atlas.sprites[name]; if (!s) return;
+  const w = s[2] / atlas.tile * TS * sc, h = s[3] / atlas.tile * TS * sc;
+  const cx = Math.round(c.x * TS + X), by = Math.round((c.y + halfY(c) * (c.dx ? 1.1 : .9)) * TS + Y);
+  ctx.save(); ctx.translate(cx, by); if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
 }
 function drawLights(X, Y, dark) {
   ctx.globalCompositeOperation = 'lighter';
@@ -1904,7 +1980,7 @@ function drawLights(X, Y, dark) {
   // homes with someone living in them have lit windows
   for (const b of G.map.buildings) if (b.house !== undefined && wd?.houses?.[b.house]?.[0]) glow((b.x + b.w / 2) * TS + X, (b.y + b.h - 1.2) * TS + Y, TS * 1.6, `rgba(255,210,130,${dark * .6})`);
   // cars: headlights ahead, red tail lights behind
-  if (drawArea?.id === 'town') for (const c of traffic) if (c.y > c.y0 + .3 && c.y < c.y1 - .3) { const px = c.x * TS + X, py = c.y * TS + Y; glow(px, py + c.dir * TS * 1.3, TS * 1.6, c.dir > 0 ? `rgba(255,245,200,${dark * .9})` : `rgba(255,60,40,${dark * .6})`); }
+  if (drawArea?.id === 'town') for (const c of traffic) { const px = c.x * TS + X, py = c.y * TS + Y, fx = c.dx * (halfX(c) + .9), fy = c.dy * (halfY(c) + .9); glow(px + fx * TS, py + fy * TS, TS * 1.5, `rgba(255,245,200,${dark * .85})`); glow(px - c.dx * halfX(c) * TS, py - c.dy * halfY(c) * TS, TS * .7, `rgba(255,50,30,${dark * .55})`); }
   for (const p of G.props) if (/^lamp/.test(p.s)) {
     const px = p.x * TS + X, py = (p.y - 1.6) * TS + Y; if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) continue;
     const g = ctx.createRadialGradient(px, py, 0, px, py, TS * 2.4);
@@ -2292,6 +2368,6 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
-window.__lt = { P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+window.__lt = { get traffic() { return traffic; }, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();
