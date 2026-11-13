@@ -130,7 +130,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
   STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47, y: 26.4, r: 1.4, area: 'town' });
   // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
-  for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด'], ['crowd3', 11, 51.5, 'แผงลอย']])
+  for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   // a dark alley behind the cinema: where thieves find work
   prop('bin_grey', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
@@ -156,7 +156,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
   prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
   prop('kiosk', 26.5, 54.6); prop('crate', 23.5, 55.5); prop('barrel', 29.5, 55.5);
-  prop('stall_red', 9, 52); prop('stall_green', 13, 52); prop('cartstall', 41, 55);
+  prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
   STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง · ร้านขายปลา', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
