@@ -28,7 +28,7 @@ const nameKey = n => String(n).normalize('NFKC').toLowerCase().replace(/[\s._\-\
 const impersonates = n => { const k = nameKey(n); return RESERVED.some(r => { const rk = nameKey(r); return rk.length <= 3 ? k === rk : k.includes(rk); }); };
 const VERSION = 4;                          // save-format version (2 = new world, 3 = happiness/bills/ม.6, 4 = no thief/fisher jobs, no vehicles)
 // a hash of the client files: when it changes (a new deploy) open games are told to refresh
-const BUILD = crypto.createHash('sha1').update(['index.html', 'game.js', 'style.css', 'fx.js'].map(f => { try { return fs.readFileSync(path.join(__dirname, '..', 'public', f)); } catch { return ''; } }).join('|')).digest('hex').slice(0, 10);
+const BUILD = crypto.createHash('sha1').update(['index.html', 'game.js', 'style.css', 'fx.js', 'assets/atlas.json'].map(f => { try { return fs.readFileSync(path.join(__dirname, '..', 'public', f)); } catch { return ''; } }).join('|')).digest('hex').slice(0, 10);
 
 // ------------------------------------------------------------------ state
 const accounts = new Map();                 // lowercase name -> account

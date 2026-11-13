@@ -218,7 +218,7 @@ const GATES = {
 };
 
 // ================================================================= trees (scatter on free grass)
-const TREE_KINDS = ['tree', 'tree', 'pine', 'tree_orange', 'tree_pink', 'tree', 'bush'];
+const TREE_KINDS = ['tree', 'tree2', 'pine', 'tree_oak', 'tree_pink', 'tree3', 'bush', 'tree4', 'pine2', 'tree_cone', 'tree_twin', 'tree_pink2', 'bush2', 'tree_white'];
 for (const a of [TOWN, FARM, HOUSING]) {
   for (let x = a.x; x < a.x + a.w; x++) { set(x, a.y, 'T'); set(x, a.y + a.h - 1, 'T'); }
   for (let y = a.y; y < a.y + a.h; y++) { if (get(a.x, y) !== 'w') set(a.x, y, 'T'); if (get(a.x + a.w - 1, y) !== 'w') set(a.x + a.w - 1, y, 'T'); }

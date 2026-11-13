@@ -1477,11 +1477,11 @@ function drawTile(ch, tx, ty, px, py, tm) {
     case ',': {
       tex('g_sidewalk', tx, ty, px, py);
       const hz = tileAt(tx - 1, ty) === '=' && tileAt(tx + 1, ty) === '=', vt = tileAt(tx, ty - 1) === '=' && tileAt(tx, ty + 1) === '=';
-      if (hz || vt) { ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S); ctx.fillStyle = '#eef0f2'; for (let i = 0; i < 4; i++) hz ? ctx.fillRect(px + 2, py + i * TS / 4 + 2, TS - 4, TS / 8) : ctx.fillRect(px + i * TS / 4 + 2, py + 2, TS / 8, TS - 4); }
+      if (hz || vt) { if (!tex('g_asphalt', tx, ty, px, py)) { ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S); } ctx.fillStyle = '#eef0f2'; for (let i = 0; i < 4; i++) hz ? ctx.fillRect(px + 2, py + i * TS / 4 + 2, TS - 4, TS / 8) : ctx.fillRect(px + i * TS / 4 + 2, py + 2, TS / 8, TS - 4); }
       return;
     }
     case '=': {
-      ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S);
+      if (!tex('g_asphalt', tx, ty, px, py)) { ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S); }
       const v = hash(tx, ty); ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(px + v * TS * .7, py + (1 - v) * TS * .7, 3, 3);
       ctx.fillStyle = '#f2d25c';
       const up = tileAt(tx, ty - 1) === '=', dn = tileAt(tx, ty + 1) === '=', left = tileAt(tx - 1, ty) === '=', right = tileAt(tx + 1, ty) === '=';
