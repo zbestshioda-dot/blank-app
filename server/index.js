@@ -813,7 +813,9 @@ function act(a, m) {
   switch (key) {
     // ---------------- getting around
     case 'gate.go': {
-      const g = D.GATES[s.to]; if (!g || !cd(a, 'door', 1200, true)) return;
+      const g = D.GATES[s.to]; if (!g) return;
+      if (s.renov && !(isAdmin(a) && a.god?.doors)) return toast(a, 'ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
+      if (!cd(a, 'door', 1200, true)) return;
       return teleport(a, g.x, g.y);
     }
     case 'seat.sit': {
@@ -2263,6 +2265,7 @@ function login(ws, m) {
   const daily = dailyLogin(a);
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
+  if (D.areaAt(a.x, a.y)?.id === 'farm' && !isAdmin(a)) { const g = D.GATES.town_from_farm; a.x = g.x; a.y = g.y; }   // the farm is closed for renovation: back to the town gate
   if (a.down && a.down.kind === 'jail') { const r = ROOM.r_police; a.x = r.x + 10.5; a.y = r.y + 7.8; }
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);

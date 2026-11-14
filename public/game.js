@@ -797,6 +797,7 @@ function onAction() {
     return send({ t: 'enter', st: near.id });
   }
   if (near.type === 'exit') { if (t < actCd) return; actCd = t + 1300; return send({ t: 'exit' }); }
+  if (near.type === 'gate' && near.renov && !master) return toast('ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
@@ -873,7 +874,7 @@ function frame(t) {
     if (stf) { $('#actIcon').textContent = '💬'; staffGreet(stf); }
     if (near.type === 'pier' && me.cast) $('#actIcon').textContent = me.cast.state === 'bite' ? '‼️' : '⏳';
     $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
-      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? near.label : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
+      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
       : near.type === 'pier' && me.cast ? (me.cast.state === 'bite' ? 'กดตอนเข้าเขียว!' : 'รอปลา...') : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); $('#actIcon').textContent = '👆'; $('#actLabel').textContent = 'ใช้งาน'; }
@@ -1623,6 +1624,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15a', d: '15 พ.ย.', items: [
+    '🚧 <b>ไร่ชานเมืองปิดปรับปรุงชั่วคราว</b> ประตูทางไปไร่ปิดอยู่ ใครที่อยู่ในไร่จะกลับมาที่ประตูเมืองตอนเข้าเกม' ] },
   { v: '2026-11-14d', d: '14 พ.ย. (รอบ 3)', items: [
     '🪑 จัตุรัส: ย้ายม้านั่งไปชิดแนวพุ่มไม้ทั้งสองฝั่ง (4 ตัว หันหาน้ำพุ ไม่ขวางทางเดิน) เอากระถางต้นไม้ข้างม้านั่งออก',
     '🌷 แต่งทั้งเมือง: หลังร้านค้าทุกร้านมีสวนหลังบ้านล้อมรั้วไม้ขาว แนวพุ่มไม้ แปลงดอกไม้ · สนามหญ้าโล่งๆ มีมุมสวน พุ่มไม้ ดอกไม้ ม้านั่ง' ] },
@@ -2811,7 +2814,7 @@ function openMap(mapId, keepScroll) {
     if (s.area !== A.id || !/^(pier|gate|coop|farmbuy|estate|fishclub|lot|square)$/.test(s.type)) continue;
     if (s.type === 'lot' && !(me.garden?.lot === s.lot) && !(!wd?.lots?.[s.lot] && me.career === 'farmer')) continue;
     const [x, y] = L(s.x, s.y);
-    places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
+    places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.renov ? '🚧 ปิดปรับปรุงชั่วคราว' : s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
   }
   if (mapId === 'town') { const [x, y] = L(50, 32); places.push({ key: 'seatb43.6', icon: '⛲', label: 'จัตุรัสกลางเมือง', sub: 'นั่งเล่น พูดคุย', x, y, kind: 'spot' }); }
   // job staff (where you apply / change jobs) are their own markers, kept apart from the places
