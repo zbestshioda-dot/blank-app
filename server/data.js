@@ -629,7 +629,16 @@ const NPC_LINES = ['วันนี้อากาศดีจังเลย', 
   'ค่าไฟเดือนนี้แพงจัง', 'ไปนั่งเล่นที่จัตุรัสกัน', 'หมอที่โรงพยาบาลเก่งมาก', 'อยากได้บ้านในหมู่บ้านจัดสรรจัง', 'ข้าวโพดปีนี้หวานมาก', 'สวัสดีจ้า', 'วันนี้ทำงานเหนื่อยมาก'];
 
 // outfits you can wear instead of your job's clothes (rewards)
-const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ตกปลาจนถึงเลเวลสูงสุด' } };
+const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ตกปลาจนถึงเลเวลสูงสุด' },
+  // sold at the fashion shop (price = how fancy / rare the outfit is)
+  pajama:    { name: 'ชุดนอนหมีน้อย', how: 'ซื้อที่ร้านแฟชั่น', price: 10000 },
+  tracksuit: { name: 'ชุดวอร์มสปอร์ต', how: 'ซื้อที่ร้านแฟชั่น', price: 25000 },
+  hoodie:    { name: 'ชุดฮู้ดดี้สตรีท', how: 'ซื้อที่ร้านแฟชั่น', price: 45000 },
+  cowboy:    { name: 'ชุดคาวบอยนายอำเภอ', how: 'ซื้อที่ร้านแฟชั่น', price: 120000 },
+  devil:     { name: 'ชุดปีศาจน้อย', how: 'ซื้อที่ร้านแฟชั่น', price: 250000 },
+  pilot:     { name: 'ชุดนักบินขับไล่', how: 'ซื้อที่ร้านแฟชั่น', price: 400000 },
+  magician:  { name: 'ชุดสุภาพบุรุษนักมายากล', how: 'ซื้อที่ร้านแฟชั่น', price: 650000 },
+  thai:      { name: 'ชุดไทยทองคำ', how: 'ซื้อที่ร้านแฟชั่น', price: 1000000 } };
 const ACHIEVEMENTS = [
   { id: 'off1', r: 1, c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
   { id: 'off2', r: 2, c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },

@@ -42,7 +42,7 @@ function paintSw() {
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
-fetch('assets/pchar.json?v=f2').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=f2'; });
+fetch('assets/pchar.json?v=s1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=s1'; });
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
 // starter colours are known before login (the creator screen); everything else comes from the server
 const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
@@ -50,22 +50,23 @@ const lookColor = (cat, id) => G?.looks?.[cat]?.[id]?.color || STARTER_COLORS[ca
 // one tinted frame, cached per (frame, colours)
 function charFrame(frame, lk) {
   const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
-  const { w, h, rows } = CH_ATLAS, row = rows[frame] ?? 0;
+  const { w, h, rows, per } = CH_ATLAS, r0 = rows[frame] ?? 0, bx = per ? Math.floor(r0 / per) * w * 4 : 0, row = per ? r0 % per : r0;   // frames wrap into blocks of `per` rows
   c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
-  g.drawImage(chImg, 0, row * h, w, h, 0, 0, w, h);
+  g.drawImage(chImg, bx, row * h, w, h, 0, 0, w, h);
   const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
   [['shirt', 1], ['pants', 2], ['hair', 3]].forEach(([cat, col]) => {
     t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h);
-    t.drawImage(chImg, col * w, row * h, w, h, 0, 0, w, h);
+    t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
     t.globalCompositeOperation = 'multiply'; t.fillStyle = lookColor(cat, lk[cat]); t.fillRect(0, 0, w, h);
-    t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, col * w, row * h, w, h, 0, 0, w, h);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
     g.drawImage(tmp, 0, 0);
   });
   chCache.set(key, c); if (chCache.size > 400) chCache.delete(chCache.keys().next().value);
   return c;
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief' };
+const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
+  pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 const SEAT_LEGS = .45;
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
@@ -1179,6 +1180,9 @@ function bindPanel(root) {
     const [cat, id] = c.dataset.look.split(':'), lk = { ...(me.look || {}), [cat]: id }, g = c.getContext('2d');
     drawCharTo(g, { g: me.gender, lk }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
+  root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
+  }));
   const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); };
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
@@ -1574,7 +1578,11 @@ function renderPanel(p) {
       }).join('')}</div>`;
       if (p.kind === 'barber') return `<h2>💈 ร้านทำผม</h2><div class="sub">${hoursTxt('barber')} · ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน มาย้อมสีผมได้ที่นี่ (ทำผมใหม่แล้วมีความสุขเพิ่ม) · สีที่เคยทำแล้วเปลี่ยนกลับได้ฟรี</div>${sec('hair', '💇 ย้อมสีผม')}`;
       return `<h2>👕 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · เปลี่ยนเสื้อและกางเกง (แต่งตัวใหม่แล้วมีความสุขเพิ่ม) · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี · ย้อมผมที่ร้านทำผม 💈</div>
-        ${sec('shirt', '👕 เสื้อ')}${sec('pants', '👖 กางเกง')}`;
+        ${sec('shirt', '👕 เสื้อ')}${sec('pants', '👖 กางเกง')}
+        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([, o]) => o.price).map(([id, o]) => {
+          const has = (me.outfits || []).includes(id), on = me.outfit === id;
+          return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
+        }).join('')}</div>`;
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ขอทานนั่งได้ทุกที่ (ปุ่ม 🥣) ที่คนพลุกพล่านอย่างหน้าร้าน/จัตุรัสได้เงินบ่อยกว่า</div>${staffHint('beggar')}`;

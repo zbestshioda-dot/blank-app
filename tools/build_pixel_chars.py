@@ -25,12 +25,20 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'beggar': ('tools/sheets/pixel_beggar.jpg', ()),
           'thief': ('tools/sheets/pixel_thief.jpg', ()),
           'fpolice': ('tools/sheets/pixel_police_f.jpg', ()),          # women's uniforms: used when p.g == 'f'
-          'fdoctor': ('tools/sheets/pixel_doctor_f.jpg', ('hair',))}
+          'fdoctor': ('tools/sheets/pixel_doctor_f.jpg', ('hair',)),
+          # fashion-shop outfits (bought with money, worn from the settings / the shop)
+          'pajama': ('tools/sheets/pixel_pajama.jpg', ('hair',)), 'tracksuit': ('tools/sheets/pixel_tracksuit.jpg', ('hair',)),
+          'hoodie': ('tools/sheets/pixel_hoodie.jpg', ('hair',)), 'cowboy': ('tools/sheets/pixel_cowboy.jpg', ()),
+          'devil': ('tools/sheets/pixel_devil.jpg', ()), 'pilot': ('tools/sheets/pixel_pilot.jpg', ('hair',)),
+          'magician': ('tools/sheets/pixel_magician.jpg', ()), 'thai': ('tools/sheets/pixel_thai.jpg', ('hair',))}
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 'left0': -5, 'left1': -7, 'left2': -6},   # female base: its side views face right
              'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}, 'beggar': {'up0': 19, 'up1': 19},
              'fpolice': {'down0': 0, 'down1': 6, 'down2': 11, 'up0': 19, 'up1': 4, 'left0': -17, 'left1': -7, 'left2': -12},   # side views face right
              'fdoctor': {'down0': 0, 'down1': 6, 'down2': 11, 'up0': 19, 'up1': 4, 'left0': -17, 'left1': -7, 'left2': -12},
+             **{o: {'down0': 0, 'down1': 10, 'down2': 11, 'up0': 19, 'up1': 14, 'left0': -17, 'left1': -7, 'left2': -12}
+                for o in ('pajama', 'tracksuit', 'hoodie', 'cowboy', 'devil', 'magician', 'thai')},
+             'pilot': {'down0': 0, 'down1': 5, 'down2': 1, 'up0': 19, 'up1': 9, 'left0': -17, 'left1': -7, 'left2': -12},
              'thief': {'down1': 10, 'down2': 15, 'up0': 4, 'up1': 9, 'left1': 6, 'left2': -7}}   # negative = use that cell mirrored
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
@@ -153,10 +161,13 @@ for name in frames:
         # the stand's chin/neck may hang a row or two below the cut: keep it on top
         st = stand[ny:ny + 3]; keep = st[..., 3] > 60; step[ny:ny + 3][keep] = st[keep]
         canv[name][ln] = Image.fromarray(step, 'RGBA')
-atlas = Image.new('RGBA', (cw * len(ORDER), ch * len(frames)), (0, 0, 0, 0)); meta = {}
+# WebP is limited to 16383px a side: frames wrap into blocks of PER rows, laid side by side (4 layer columns per block)
+PER = 16000 // ch; blocks = -(-len(frames) // PER)
+atlas = Image.new('RGBA', (cw * len(ORDER) * blocks, ch * min(PER, len(frames))), (0, 0, 0, 0)); meta = {}
 for row, name in enumerate(frames):
-    for col, ln in enumerate(ORDER): atlas.alpha_composite(canv[name][ln].resize((cw, ch), Image.LANCZOS), (col * cw, row * ch))
+    bx, by = (row // PER) * cw * len(ORDER), (row % PER) * ch
+    for col, ln in enumerate(ORDER): atlas.alpha_composite(canv[name][ln].resize((cw, ch), Image.LANCZOS), (bx + col * cw, by))
     meta[name] = row
 atlas.save(OUT + '.webp', 'WEBP', lossless=True)
-json.dump({'w': cw, 'h': ch, 'feet': [cw / 2, ch - 3 * sc], 'layers': ORDER, 'rows': meta}, open(OUT + '.json', 'w'))
+json.dump({'w': cw, 'h': ch, 'feet': [cw / 2, ch - 3 * sc], 'layers': ORDER, 'rows': meta, 'per': PER}, open(OUT + '.json', 'w'))
 print('atlas', atlas.size, 'frame', cw, ch)

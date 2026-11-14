@@ -697,6 +697,14 @@ function act(a, m) {
       W[m.cat] = [...W[m.cat], m.id]; joy(a, 8); wear(a, m);
       return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย!`, '💇');
     }
+    case 'fashion.outfit': {                // whole outfits: bought once, then worn / taken off from here or the settings
+      const it = D.OUTFITS[m.id]; if (!it || !it.price) return;
+      if ((a.outfits || []).includes(m.id)) { a.outfit = a.outfit === m.id ? '' : m.id; markMe(a); return sendRoster(); }
+      if (!pay(a, it.price)) return;
+      a.outfits = [...(a.outfits || []), m.id]; a.outfit = m.id; joy(a, 15); markMe(a); sendRoster();
+      if (it.price >= 250000) feed(`👗 ${a.name} ถอย${it.name}มาใส่ ราคา ${money(it.price)}!`);
+      return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย! (ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า หรือที่ร้านนี้)`, '👗');
+    }
     // ---------------- office
     case 'trash.dig': {                     // beggars rummage through bins: some coins, leftover food, or something nasty
       if (a.career !== 'beggar') return toast(a, 'คุ้ยถังขยะได้เฉพาะขอทาน', '🗑️', false);
