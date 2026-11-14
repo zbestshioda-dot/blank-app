@@ -14,7 +14,7 @@ from scipy import ndimage as ndi
 
 OUT = 'public/assets/pchar'
 # outfit -> (sheet, which layers are recoloured). Outfits other than 'base' keep their clothes and only dye the hair.
-SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',)),
+SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), 'f': ('tools/sheets/pixel_char_f.jpg', ('shirt', 'pants', 'hair')), 'doctor': ('tools/sheets/pixel_doctor.jpg', ('hair',)),
           'police': ('tools/sheets/pixel_police.jpg', ()),
           'farmer': ('tools/sheets/pixel_farmer.jpg', ()),
           'chef': ('tools/sheets/pixel_chef.jpg', ()),
@@ -25,7 +25,8 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'beggar': ('tools/sheets/pixel_beggar.jpg', ()),
           'thief': ('tools/sheets/pixel_thief.jpg', ())}
 # per-sheet frame overrides (some sheets put the poses in different cells)
-FRAME_FIX = {'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}, 'beggar': {'up0': 19, 'up1': 19},
+FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 'left0': -5, 'left1': -7, 'left2': -6},   # female base: its side views face right
+             'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}, 'beggar': {'up0': 19, 'up1': 19},
              'thief': {'down1': 10, 'down2': 15, 'up0': 4, 'up1': 9, 'left1': 6, 'left2': -7}}   # negative = use that cell mirrored
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left
@@ -37,7 +38,9 @@ def load(src):
     """returns A (pixels) and FR: per frame (x, y, w, h, mask). Each frame is cut from its own grid cell,
     so sprites whose hats touch a neighbour are still separated."""
     global A, FR
-    im = Image.open(src).convert('RGB'); A = np.array(im).astype(int)
+    im = Image.open(src).convert('RGB')
+    if im.width != 1024: im = im.resize((1024, 1024), Image.LANCZOS)     # cells are measured on a 1024 sheet
+    A = np.array(im).astype(int)
     R, G, B = A[..., 0], A[..., 1], A[..., 2]
     bg = (R > 150) & (B > 150) & (G < 120)
     grid = (R > 80) & (B > 80) & (G < 70) & (abs(R - B) < 70)
