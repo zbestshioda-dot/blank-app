@@ -253,9 +253,34 @@ function toast(msg, icon = '✅', ok = true) {
   const key = icon + msg, t0 = performance.now();
   if (recentToasts.get(key) > t0 - 8000) return;
   recentToasts.set(key, t0); if (recentToasts.size > 50) recentToasts.delete(recentToasts.keys().next().value);
-  const d = document.createElement('div'); d.className = 'toast' + (ok ? '' : ' bad'); d.textContent = `${icon} ${msg}`;
-  const t = $('#toasts'); t.appendChild(d); while (t.children.length > 3) t.firstChild.remove();
-  setTimeout(() => d.remove(), 3800);
+  // notices float above your own character's head (the CBT ticker stays at the top of the screen)
+  heads.push({ text: `${icon} ${msg}`, ok, t: t0, life: Math.min(7000, 3200 + msg.length * 45) });
+  while (heads.length > 2) heads.shift();
+}
+const heads = [];
+function wrapText(text, maxW) {
+  const out = []; let line = '';
+  for (const ch of [...text]) { const tryL = line + ch; if (ctx.measureText(tryL).width > maxW && line) { out.push(line); line = ch.trim() ? ch : ''; } else line = tryL; }
+  if (line) out.push(line); return out.slice(0, 4);
+}
+function drawHeads(X, Y) {
+  const m = P.get(myId), now = performance.now(); if (!m) { heads.length = 0; return; }
+  for (let i = heads.length - 1; i >= 0; i--) if (now - heads[i].t > heads[i].life) heads.splice(i, 1);
+  if (!heads.length) return;
+  const fs = Math.max(11, Math.round(TS * .27)), lh = fs * 1.3, maxW = Math.min(VW - 40, TS * 6.5);
+  ctx.save(); ctx.font = `600 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let by = (m.ry + (m.oy || 0)) * TS + Y - TS * 2.15 - (m.pose ? 0 : 0);
+  const cx = clamp((m.rx + (m.ox || 0)) * TS + X, maxW / 2 + 8, VW - maxW / 2 - 8);
+  for (let i = heads.length - 1; i >= 0; i--) {                    // newest closest to the head, older ones above
+    const h = heads[i], age = now - h.t, a = Math.min(1, age / 180, (h.life - age) / 450);
+    const lines = wrapText(h.text, maxW - 18), w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 18, hh = lines.length * lh + 8;
+    by -= hh + 4; const y = by + (1 - Math.min(1, age / 180)) * 8;
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.fillStyle = h.ok ? 'rgba(255,248,232,.96)' : 'rgba(255,232,224,.97)'; ctx.strokeStyle = h.ok ? '#6b8f2c' : '#b8452f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(cx - w / 2, y, w, hh, 9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#3a2410'; lines.forEach((l, k) => ctx.fillText(l, cx, y + 4 + lh * (k + .5)));
+  }
+  ctx.restore();
 }
 function popup(html, buttons, ms = 20000) {
   const d = document.createElement('div'); d.className = 'req';
@@ -818,6 +843,7 @@ function draw(t) {
   let dark = myRoom ? 0 : night;
   if (myRoom && myRoom.rk === 'office') { const h = hourNow(); if (h >= G.shift.end || h < 6) dark = 0.62; }
   if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); if (!myRoom) drawLights(X, Y, dark); }
+  drawHeads(X, Y);
   if (myRoom && myRoom.rk === 'office' && dark > 0) sign('💡 ไฟปิดแล้ว (เลิกงาน 17:00)', VW / 2, VH * .2, { size: 14 });
   // short fade through black when you go through a door or a gate
   const fp = (performance.now() - fadeT) / 350;
