@@ -1022,7 +1022,7 @@ function buildStaff() {
   }
 }
 const KEEPERS = [
-  { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: 2.2, dy: -0.5, of: 'chef', lk: { hair: 'black' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
+  { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: -1.9, dy: 0.7, of: 'chef', lk: { hair: 'black' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
   { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', g: 'f', dx: 1.5, dy: .1, lk: { hair: 'pink', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมคะ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ค่ะ'] },
   { st: 'market', name: 'เจ๊ศรี (ผู้ดูแลตลาดกลาง)', short: 'เจ๊ศรี', icon: '🏪', g: 'f', dx: 2.6, dy: .35, of: 'merchant', lk: { hair: 'black' }, hi: ['ซื้อขายที่นี่ ราคายุติธรรม', 'วางขายของได้นะ คนซื้อเยอะ', 'ของสดๆ ทั้งนั้นจ้า'] },
   { st: 'estate', name: 'คุณบอย (นายหน้าอสังหาฯ)', short: 'คุณบอย', icon: '🏡', dx: 1.4, dy: 0, of: 'office', lk: { hair: 'black' }, hi: ['บ้านสวย ทำเลดี ราคาคุ้มครับ', 'สนใจซื้อหรือเช่าบ้านไหมครับ', 'ปล่อยเช่าบ้านก็มีรายได้นะครับ'] },
@@ -1211,6 +1211,9 @@ function bindPanel(root) {
     const [cat, id] = c.dataset.look.split(':'), lk = { ...(me.look || {}), [cat]: id }, g = c.getContext('2d');
     drawCharTo(g, { g: me.gender, lk }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
+  root.querySelectorAll('[data-spr]').forEach(c => { const draw = () => { const sp = atlas?.sprites?.[c.dataset.spr]; if (!sp || !atlasImg) return setTimeout(draw, 300);
+    const g = c.getContext('2d'), k = Math.min((c.width - 8) / sp[2], (c.height - 6) / sp[3], 1.6); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+    g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (c.width - sp[2] * k) / 2, c.height - 3 - sp[3] * k, sp[2] * k, sp[3] * k); }; draw(); });
   root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
@@ -1651,9 +1654,13 @@ function renderPanel(p) {
     }
     case 'door': return houseDoor(STN(st), st);
     case 'furnshop': {
-      const own = me.house >= 0;
-      const rows = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price))).join('');
-      return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งไปวางที่บ้านของคุณทันที · ยิ่งบ้านสบาย นอนแล้วพลังงานฟื้นเร็วขึ้น${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}<div class="list">${rows}</div>`;
+      const own = me.house >= 0, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง']];
+      const tab = cats.some(c => c[0] === p.ftab) ? p.ftab : 'basic';
+      const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => a[1].price - b[1].price);
+      const cards = list.map(([k, f]) => { const has = me.furniture.includes(k);
+        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price)}</div>`; }).join('');
+      return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งเข้าคลังที่บ้าน จัดวางเองด้วยปุ่ม 🛋️ จัดบ้าน · ความสบายรวมสูงสุด ⭐30${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}
+        <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
     case 'barber':
     case 'fashion': {
@@ -1857,7 +1864,7 @@ function houseDoor(s, st) {
   const days = r => `<div class="grid3">${[1, 3, 7].map(d => B(`${d} วัน ${money(r * d)}`, { t: 'act', st, a: 'rent', days: d }, 'good')).join('')}</div>`;
   const left = until ? Math.max(0, Math.round((until - Date.now() - clockOff) / G.dayMs * 10) / 10) : 0;
   if (mine) {
-    const rows = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('');
+    const rows = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && !f.cat).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('') + '<div class="sub">🛋️ เฟอร์นิเจอร์อีกกว่า 70 แบบ ที่ร้านเฟอร์นิเจอร์ในเมือง</div>';
     return `<h2>🏠 บ้านของคุณ (เลขที่ ${i + 1})</h2><div class="sub">ความสบาย ⭐ <b>${me.comfort}</b> → พลังงานฟื้นเร็วขึ้น +${me.comfort * 3}% · ${tenant ? `ผู้เช่า: ${esc(tenant)} (อีก ${left} วัน)` : 'ไม่มีผู้เช่า'}</div>${enter}
       <div class="sub" style="margin-top:12px"><b>🪧 ประกาศขายให้ผู้เล่น</b> ${me.houseSale ? `(ตอนนี้ ${money(me.houseSale)})` : ''}</div>
       <div class="rowf"><input id="saleIn" type="number" value="${me.houseSale || price}">${B('ประกาศขาย', { fn: 'price', st, op: 'list', inp: 'saleIn' }, 'good')}${me.houseSale ? B('ยกเลิก', { fn: 'price', st, op: 'list', zero: 1 }) : ''}</div>
@@ -1949,7 +1956,7 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
-fetch('assets/atlas.json?v=h1').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=h1'; });
+fetch('assets/atlas.json?v=f2').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=f2'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
@@ -2606,6 +2613,7 @@ function buildAreas() {
   buildMini(); layoutFurniture();
 }
 // where a piece stands: [floor, x, y] in room tiles; [0] = put away; unplaced old pieces keep their default spot on floor 1
+const furnSpr = k => FURN_SPRITE[k] || G?.shop?.furniture?.[k]?.spr;
 const furnPos = (h, k) => { const p = h[7]?.[k]; if (p) return p[0] ? p : null; return FURN_POS[k] ? [1, FURN_POS[k][0], FURN_POS[k][1]] : null; };
 // ---- arranging your home: pick a piece, tap the floor to move it, then confirm
 let placing = null;
@@ -2647,9 +2655,9 @@ function layoutFurniture() {
       const h = wd?.houses?.[r.house], fl = r.floor || 1; if (!h) continue;
       for (const k of h[2]) {
         if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
-        const pos = furnPos(h, k); if (pos && pos[0] === fl && FURN_SPRITE[k]) roomFurniture.push([FURN_SPRITE[k], r.x + pos[1], r.y + pos[2]]);
+        const pos = furnPos(h, k), sp = furnSpr(k); if (pos && pos[0] === fl && sp) roomFurniture.push([sp, r.x + pos[1], r.y + pos[2]]);
       }
-      if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([FURN_SPRITE[placing.k], r.x + placing.x, r.y + placing.y, 'ghost']);
+      if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost']);
     }
   }
 }

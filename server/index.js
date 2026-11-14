@@ -188,7 +188,8 @@ const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
 const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];   // bought furniture + login-reward pieces (kept even without a house)
-const comfort = a => houseOf(a) >= 0 ? furnOf(a).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0) : 0;
+const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
+const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0)) : 0;
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const speedOf = a => dzProd(a, 'speed') * godSpeed(a);           // vehicles were removed from the game
@@ -2014,7 +2015,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 60) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb,
   };

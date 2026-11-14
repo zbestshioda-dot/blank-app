@@ -693,3 +693,8 @@ body.hasEvent #topBar{top:146px!important}
 #crop .sheet{width:min(380px,100%);max-height:94dvh;overflow:auto;user-select:none;-webkit-user-select:none}
 #cropCv{display:block;width:min(300px,78vw);height:auto;aspect-ratio:1;margin:10px auto;border-radius:12px;touch-action:none;cursor:grab;background:#222}
 .cropZ{display:flex;align-items:center;gap:8px;margin:0 6px 10px}.cropZ input{flex:1}
+
+/* furniture shop cards */
+.ftabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.ftabs::-webkit-scrollbar{display:none}.ftabs button{flex:none;white-space:nowrap;font-size:12px;padding:5px 10px}
+.look.fcard canvas{width:96px;height:80px;image-rendering:pixelated}
+.look.fcard em{display:block;font-style:normal;font-size:10.5px;color:var(--mut);margin:-2px 0 4px}
