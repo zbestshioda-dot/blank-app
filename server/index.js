@@ -280,7 +280,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'house', 'furniture', 'hlv', 'fpos', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -1146,16 +1146,17 @@ function act(a, m) {
       const v = D.VEHICLES[m.v]; if (!v) return;
       const own = (a.vehicles || []).includes(m.v);
       if (m.a === 'sell') {
-        if (!own) return; const back = Math.round(v.price * .6);
+        if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false); const back = Math.round(v.price * .6);
         a.vehicles = a.vehicles.filter(x => x !== m.v); if (a.ride === m.v) a.ride = ''; a.money += back; markMe(a); sendRoster();
         return toast(a, `ขาย${v.name}ให้โชว์รูม ได้ ${money(back)} (60%)`, '💰');
       }
       if (own) return toast(a, `มี${v.name}แล้ว`, 'ℹ️', false);
       if (v.job && a.career !== v.job) return toast(a, `${v.name} ขายเฉพาะตำรวจ`, '🚓', false);
       if (v.license && !(a.licenses || []).includes(v.license)) return toast(a, 'ต้องมีใบขับขี่ก่อน สอบได้ที่มหาวิทยาลัย 🪪', '🪪', false);
-      if (!pay(a, v.price)) return;
+      if (v.gem) { if ((a.gems || 0) < v.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${v.gem} (มี 💎${a.gems || 0})`, '💎', false); a.gems -= v.gem; }
+      else if (!pay(a, v.price)) return;
       a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
-      if (v.price >= 250000) feed(`${v.icon} ${a.name} ถอย${v.name}ป้ายแดง!`);
+      if (v.gem || v.price >= 250000) feed(`${v.gem ? '💎' : ''}${v.icon} ${a.name} ถอย${v.name}${v.gem ? ' รุ่นพิเศษ!' : 'ป้ายแดง!'}`);
       return toast(a, `ได้${v.name}แล้ว! กดปุ่ม ${v.icon} ขี่/ลงรถ ได้ทุกที่นอกอาคาร`, v.icon);
     }
     case 'hstair.go': case 'hstair.build': {   // house floors: stairs up/down, and building the next floor
@@ -2007,7 +2008,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2143,27 +2144,28 @@ function dailyLogin(a) {
   if (a.lastLogin === today) return null;
   a.loginStreak = a.lastLogin === yesterday ? (a.loginStreak || 0) + 1 : 1;
   a.lastLogin = today; a.loginDays = (a.loginDays || 0) + 1;
-  const reward = loginReward(a.loginStreak);
-  a.money += reward; a.earned += reward; dirty = true;
+  const reward = loginReward(a.loginStreak), gems = a.loginStreak % 7 === 0 ? 10 : 2;
+  a.money += reward; a.earned += reward; a.gems = (a.gems || 0) + gems; dirty = true;
   let big = null;
   if (a.loginDays % BIG_EVERY === 0) {
-    big = bigReward(a, a.loginDays / BIG_EVERY);
+    big = bigReward(a, a.loginDays / BIG_EVERY); a.gems += 50; big.gems = 50;
     a.money += big.cash; a.earned += big.cash;
     if (big.item) a.keep = [...(a.keep || []), big.item];
     setTimeout(() => feed(`🎉 ${a.name} เข้าเกมครบ ${a.loginDays} วัน ได้รางวัลใหญ่${big.item ? ` ${D.FURNITURE[big.item].icon}${D.FURNITURE[big.item].name}` : ''}!`), 2000);
   }
   setTimeout(() => a.ws && stat(a, 'loginDays', a.loginDays, true), 2500);
-  return { streak: a.loginStreak, reward, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
+  return { streak: a.loginStreak, reward, gems, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
 }
 // achievements: each one has a cash reward by rarity, collected from the achievements page
-const ACH_REWARD = [0, 300, 800, 2000, 5000, 12000];
+const ACH_REWARD = [0, 300, 800, 2000, 5000, 12000], ACH_GEMS = [0, 2, 5, 10, 25, 50];   // 💎 diamonds by rarity
 function achClaim(a, id) {
   const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
   if (!todo.length) return toast(a, 'ไม่มีรางวัลให้รับ', '🏅', false);
   let sum = 0;
-  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) sum += ACH_REWARD[ac.r || 1]; }
-  a.achGot = [...got, ...todo]; earn(a, sum); markMe(a); dirty = true;
-  toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ ${money(sum)} 🏅`, '🏅');
+  let gem = 0;
+  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) { sum += ACH_REWARD[ac.r || 1]; gem += ACH_GEMS[ac.r || 1]; } }
+  a.achGot = [...got, ...todo]; a.gems = (a.gems || 0) + gem; earn(a, sum); markMe(a); dirty = true;
+  toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ ${money(sum)} + 💎${gem}`, '🏅');
 }
 
 function detach(a) {
@@ -2300,7 +2302,7 @@ function onMessage(ws, raw) {
     case 'steal': return steal(a, m);
     case 'ride': {                           // get on / off one of your vehicles
       const k = String(m.v || '');
-      if (!k || a.ride === k && !m.on) { a.ride = ''; }
+      if (!k || a.ride === k && !m.on) { if (D.VEHICLES[a.ride]?.fly && D.blocked(a.x, a.y)) return toast(a, 'หาที่โล่งลงจอดก่อน 🚁', '🚁', false); a.ride = ''; }
       else {
         const v = D.VEHICLES[k]; if (!v || !(a.vehicles || []).includes(k)) return;
         if (v.license && !hasLic(a, v.license)) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุ! ต่ออายุที่มหาวิทยาลัยก่อนขับ' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);

@@ -703,3 +703,7 @@ body.hasEvent #topBar{top:146px!important}
 #rideBtn{right:104px;bottom:136px;width:50px;height:50px}
 #rideBtn.on{background:linear-gradient(#5c8fb8,#2f5878)}
 .look.vcard canvas{width:100%;max-width:150px;height:auto;aspect-ratio:15/8}
+
+#meGems{font-size:11px;color:#9fe8ff;white-space:nowrap;flex:none}#meGems::before{content:'💎';margin-right:2px}
+#card.v2 .sInfo .l3 #meMoney{flex:none}
+#card.v2 .sInfo .l3 #cOn{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right}

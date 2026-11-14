@@ -593,6 +593,15 @@ const VEHICLES = {   // bought at the car showroom; ride outdoors (🛵 button) 
   van:     { name: 'รถตู้', icon: '🚐', price: 420000, speed: 1.7, kind: 'car', license: 'driving' },
   suv:     { name: 'SUV ออฟโรด', icon: '🚙', price: 750000, speed: 1.85, kind: 'car', license: 'driving' },
   sports:  { name: 'ซูเปอร์คาร์เปิดประทุน', icon: '🏎️', price: 1500000, speed: 2.1, kind: 'car', license: 'driving' },
+  // 💎 specials: bought with diamonds only, a glowing aura while driving; helicopters fly over everything outdoors
+  lambo:   { name: 'ซูเปอร์คาร์แดงเพลิง', icon: '🏎️', gem: 300, speed: 2.2, kind: 'car', license: 'driving', aura: '#ff4a3a' },
+  mclaren: { name: 'ไฮเปอร์คาร์ส้มสายฟ้า', icon: '🏎️', gem: 350, speed: 2.25, kind: 'car', license: 'driving', aura: '#ffa12e' },
+  phantom: { name: 'แฟนธอมดำ', icon: '🏎️', gem: 400, speed: 2.25, kind: 'car', license: 'driving', aura: '#a46bff' },
+  porsche: { name: 'คลาสสิกเงินยวง', icon: '🚗', gem: 450, speed: 2.2, kind: 'car', license: 'driving', aura: '#cfe3ff' },
+  jag:     { name: 'โรดสเตอร์เขียวมรกต', icon: '🚗', gem: 500, speed: 2.2, kind: 'car', license: 'driving', aura: '#3fe08a' },
+  spider:  { name: 'สไปเดอร์ขาวทองคำ', icon: '🏎️', gem: 650, speed: 2.3, kind: 'car', license: 'driving', aura: '#ffd34d' },
+  heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', gem: 1500, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
+  heli2:   { name: 'เฮลิคอปเตอร์กู้ภัยแดง', icon: '🚁', gem: 2000, speed: 2.6, kind: 'heli', license: 'driving', aura: '#ff6a8a', fly: 1 },
   police:  { name: 'รถสายตรวจ', icon: '🚓', price: 150000, speed: 1.9, kind: 'car', license: 'driving', job: 'police' },
 };
 const TOOL_PRICES = [4000, 15000, 50000];

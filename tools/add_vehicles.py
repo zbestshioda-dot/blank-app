@@ -21,6 +21,10 @@ VEH = {
     'mini': ('cars', 2, 3, 4, True, 2.4), 'sedan': ('cars', 8, 9, 10, True, 2.6), 'pickup': ('cars', 13, 14, 16, False, 2.8),
     'van': ('cars', 28, 29, 30, True, 2.9), 'suv': ('cars', 18, 19, 20, True, 2.7), 'sports': ('cars', 23, 24, 25, True, 2.7),
     'taxi': ('cars', 34, 35, 36, True, 2.6), 'police': ('cars', 40, 41, 42, True, 2.6),
+    # diamond-only specials (tools/sheets/pixel_super.jpg)
+    'lambo': ('super', 2, 2, 0, False, 2.9), 'mclaren': ('super', 8, 8, 1, True, 2.9), 'phantom': ('super', 7, 7, 6, False, 2.9),
+    'porsche': ('super', 16, 16, 15, False, 2.8), 'jag': ('super', 18, 18, 17, False, 2.9), 'spider': ('super', 29, 30, 25, True, 2.9),
+    'heli': ('super', 31, 31, 32, True, 3.6), 'heli2': ('super', 38, 38, 36, False, 3.6),
 }
 
 def cut(sheet, box):
@@ -34,6 +38,11 @@ def cut(sheet, box):
     if n > 1:
         sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
         fg = np.isin(lab, [i + 1 for i, s in enumerate(sizes) if s > sizes.max() * .05]) & fg
+    filled = ndimage.binary_fill_holes(fg); holes = filled & ~fg
+    hl, hn = ndimage.label(holes)
+    if hn:
+        hs = ndimage.sum(np.ones_like(hl), hl, range(1, hn + 1)); small = np.isin(hl, [i + 1 for i, v in enumerate(hs) if v < 600])
+        a[small] = [70, 78, 92]; fg = fg | small
     # pink wheel hubs: the sheet's magenta shows through the rims, paint it grey
     hub = fg & (g < np.minimum(r, b) * 0.75) & (np.minimum(r, b) > 90)
     a[hub] = [150, 150, 160]
@@ -42,7 +51,7 @@ def cut(sheet, box):
 def main():
     atlas = Image.open(IMG).convert('RGBA'); data = json.load(open(JS))
     x, y, rowh = 0, data['size'][1] + 2, 0; placed = []
-    sheets = {k: Image.open(os.path.join(ROOT, 'tools', 'sheets', f'pixel_{k}.jpg')).convert('RGB') for k in ('moto', 'cars')}
+    sheets = {k: Image.open(os.path.join(ROOT, 'tools', 'sheets', f'pixel_{k}.jpg')).convert('RGB') for k in ('moto', 'cars', 'super')}
     for key, (sh, f, b, s, flip, tiles) in VEH.items():
         side = cut(sheets[sh], BOX[sh][s]); k = tiles * TILE / side.width
         if flip: side = side.transpose(Image.FLIP_LEFT_RIGHT)
