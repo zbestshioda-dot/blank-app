@@ -937,7 +937,8 @@ function drawPlayer(p, X, Y, t) {
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : .32), TS * .11, 0, 0, 7); ctx.fill();
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
-  else if (sitting) drawCharTo(ctx, p, px, py, k, 'front', 0, false, true);   // seated: whole body, legs folded else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
+  else if (sitting) drawCharTo(ctx, p, px, py, k, 'front', 0, false, true);   // seated: whole body, legs folded
+  else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
   ctx.restore();
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
