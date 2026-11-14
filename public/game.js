@@ -322,9 +322,14 @@ function toast(msg, icon = '✅', ok = true) {
   while (heads.length > 2) heads.shift();
 }
 const heads = [];
-function wrapText(text, maxW) {
+const wrapCache = new Map();
+function wrapText(text, maxW) {   // cached: the same bubble is wrapped every frame while it is shown
+  const key = ctx.font + '|' + maxW + '|' + text, hit = wrapCache.get(key); if (hit) return hit;
+  const r = wrapRaw(text, maxW); if (wrapCache.size > 300) wrapCache.clear(); wrapCache.set(key, r); return r;
+}
+function wrapRaw(text, maxW) {
   const out = []; let line = '';
-  for (const ch of [...text]) { const tryL = line + ch; if (ctx.measureText(tryL).width > maxW && line) { out.push(line); line = ch.trim() ? ch : ''; } else line = tryL; }
+  for (const ch of [...text]) { const tryL = line + ch; if (textW(tryL) > maxW && line) { out.push(line); line = ch.trim() ? ch : ''; } else line = tryL; }
   if (line) out.push(line); return out.slice(0, 4);
 }
 function drawHeads(X, Y) {
@@ -337,7 +342,7 @@ function drawHeads(X, Y) {
   const cx = clamp((m.rx + (m.ox || 0)) * TS + X, maxW / 2 + 8, VW - maxW / 2 - 8);
   for (let i = heads.length - 1; i >= 0; i--) {                    // newest closest to the head, older ones above
     const h = heads[i], age = now - h.t, a = Math.min(1, age / 180, (h.life - age) / 450);
-    const lines = wrapText(h.text, maxW - 18), w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 18, hh = lines.length * lh + 8;
+    const lines = wrapText(h.text, maxW - 18), w = Math.max(...lines.map(l => textW(l))) + 18, hh = lines.length * lh + 8;
     by -= hh + 4; const y = by + (1 - Math.min(1, age / 180)) * 8;
     ctx.globalAlpha = Math.max(0, a);
     ctx.fillStyle = h.ok ? 'rgba(255,248,232,.96)' : 'rgba(255,232,224,.97)'; ctx.strokeStyle = h.ok ? '#6b8f2c' : '#b8452f'; ctx.lineWidth = 2;
@@ -580,7 +585,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
-const cv = $('#cv'), ctx = cv.getContext('2d');
+const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
 let TS = 40, VW = 0, VH = 0, DPR = 1;
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -862,9 +867,15 @@ function draw(t) {
       drawTile(ch === 'w' ? 'w' : ch === 's' ? 's' : '.', tx, ty, tx * TS + X, ty * TS + Y, tm);
     }
   }
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
-  if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
-  else for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
+  if (A && !myRoom && atlasImg) {
+    const k = TS + '|' + DPR; if (k !== gKey) { gKey = k; gCache.clear(); }
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (G.map.tiles[ty][tx] === 'w') drawTile('w', tx, ty, tx * TS + X, ty * TS + Y, tm);
+    for (let cy = Math.floor(y0 / GCH); cy <= Math.floor(y1 / GCH); cy++) for (let cx = Math.floor(x0 / GCH); cx <= Math.floor(x1 / GCH); cx++) ctx.drawImage(groundChunk(A, cx, cy), cx * GCH * TS + X, cy * GCH * TS + Y, GCH * TS, GCH * TS);
+  } else {
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
+    if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
+  }
+  if (myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
   for (const s of G.stations) {
@@ -1116,7 +1127,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.title) {
     ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58);
     // title colour = rarity; legendary titles (and the mayor's) shimmer
-    if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = ctx.measureText(`«${p.title}»`).width, g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
+    if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
     else ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d';
     ctx.fillText(`«${p.title}»`, px, top - TS * .58);
   }
@@ -1127,7 +1138,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
-    const w = ctx.measureText(txt).width + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
+    const w = textW(txt) + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
     ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
     ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + 1);
@@ -1137,7 +1148,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
 function premiumName(text, x, y, t) {
   const fs = Math.max(10, Math.round(TS * .29));
   ctx.font = `800 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const w = ctx.measureText(text).width + fs * 1.1, h = fs * 1.6;
+  const w = textW(text) + fs * 1.1, h = fs * 1.6;
   ctx.save();
   ctx.shadowColor = `hsla(${(t / 8) % 360},100%,60%,.9)`; ctx.shadowBlur = 10;
   ctx.fillStyle = 'rgba(20,14,30,.92)'; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
@@ -1202,7 +1213,7 @@ function drawPlayerPixel(p, X, Y, t) {
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
-    const w = ctx.measureText(txt).width + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
+    const w = textW(txt) + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
     ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
     ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + 1);
@@ -2051,7 +2062,7 @@ function shade(hex, f) {
 function sign(text, x, y, o = {}) {
   const fs = Math.max(10, Math.round(o.size || TS * .36));
   ctx.font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const w = ctx.measureText(text).width + fs * .9, h = fs * 1.55;
+  const w = textW(text) + fs * .9, h = fs * 1.55;
   ctx.fillStyle = o.bg || 'rgba(58,36,20,.88)';
   ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
   if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 2; ctx.stroke(); }
@@ -2090,6 +2101,29 @@ function waterDepth(tx, ty) {
     const c = tileAt(x, y); if (c !== 'w' && c !== ' ') { d = r - 1; break; }
   }
   depthCache.set(k, d); return d;
+}
+// text widths are measured once per font+text (labels and name tags are redrawn every frame)
+const textWCache = new Map();
+function textW(text) {
+  const k = ctx.font + '|' + text; let w = textWCache.get(k);
+  if (w === undefined) { w = ctx.measureText(text).width; if (textWCache.size > 3000) textWCache.clear(); textWCache.set(k, w); }
+  return w;
+}
+// the ground outdoors never changes: bake it into 8x8-tile chunks once and blit those (water stays live for its ripples)
+const GCH = 8; const gCache = new Map(); let gKey = '';
+function groundChunk(A, cx, cy) {
+  const key = A.id + ':' + cx + ',' + cy; let c = gCache.get(key);
+  if (c) { gCache.delete(key); gCache.set(key, c); return c; }
+  c = document.createElement('canvas'); c.width = c.height = Math.ceil(GCH * TS * DPR);
+  const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0); g.imageSmoothingEnabled = false;
+  const tx0 = cx * GCH, ty0 = cy * GCH, tx1 = Math.min(tx0 + GCH, A.x + A.w), ty1 = Math.min(ty0 + GCH, A.y + A.h);
+  ctx = g;
+  try {
+    for (let ty = Math.max(ty0, A.y); ty < ty1; ty++) for (let tx = Math.max(tx0, A.x); tx < tx1; tx++) { const ch = G.map.tiles[ty][tx]; if (ch !== 'w') drawTile(ch, tx, ty, (tx - tx0) * TS, (ty - ty0) * TS, 0); }
+    for (let ty = Math.max(ty0, A.y); ty < ty1; ty++) for (let tx = Math.max(tx0, A.x); tx < tx1; tx++) drawEdges(tx, ty, (tx - tx0) * TS, (ty - ty0) * TS);
+  } finally { ctx = mainCtx; }
+  gCache.set(key, c); if (gCache.size > 36) gCache.delete(gCache.keys().next().value);
+  return c;
 }
 function drawTile(ch, tx, ty, px, py, tm) {
   if (ch === 'B' || ch === 'T' || ch === 'o' && !roomGrid[ty * G.map.w + tx]) ch = under(tx, ty);
