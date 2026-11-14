@@ -307,7 +307,7 @@ const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['f_cabinet2', 14.4, 2.7], ['f_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['f_clock', 10.6, .95], ['f_corkboard', 5.5, 1.15, false], ['i_calendar', 2.8, 1.05, false], ['f_extinguisher', 12.6, 2.4], ['i_painting', 7.8, 1.05, false], ['i_news', 3.4, 10.7, false], ['i_bin_yellow', 12.7, 10.7, false]],
   warehouse: [['crate', 1.8, 3.2], ['crate', 3, 3.2], ['barrel', 4.2, 3.2], ['f_cabinet', 7, 2.3], ['hay2', 11.5, 3.4], ['hay', 11.6, 6.6], ['sack', 2.2, 6.6], ['barrel2', 3.3, 6.6], ['crate', 12.2, 8.6], ['i_crate_apple', 1.8, 8.6], ['i_crate_carrot', 3, 8.6], ['i_milk', 10.2, 8.6], ['i_rice_sack', 11.2, 8.6, false], ['i_basket', 8.2, 3.2, false]],
   fashion: [['f_mirror', 2.4, 2.8], ['f_cabinet2', 12, 2.7], ['f_cashdesk', 7, 2.4], ['f_clothes_rack', 3, 6.4], ['f_clothes_rack', 11, 6.4], ['f_rug_round', 7, 6.6], ['f_shoe_rack', 1.8, 8.7], ['f_vase', 12.4, 8.7], ['i_poster', 5, 1.05, false], ['i_rack', 12.6, 4.8], ['i_bag', 4.4, 8.6, false], ['i_gift1', 9.6, 8.6, false], ['i_gift2', 10.4, 8.6, false], ['i_hanging', 9.6, 1.25, false]],
-  rider: [['f_window', 10.5, 1.1], ['f_cashdesk', 7, 2.4], ['f_display', 2.6, 2.7], ['f_bench_back', 10.6, 5.6], ['f_coffee', 12.6, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7], ['i_backpack', 12.4, 8.6], ['i_bike', 4, 8.6, false], ['i_phone', 5.4, 2.3, false], ['i_news', 12.6, 4.6, false], ['i_cone', 2.2, 5.6, false], ['i_bag', 11.4, 8.6, false]],
+  rider: [['f_window', 10.5, 1.1], ['f_cashdesk', 7, 2.4], ['f_display', 2.6, 2.7], ['f_bench_back', 9.4, 8.95, false], ['f_coffee', 12.6, 2.6], ['f_rug_round', 7, 6.4], ['f_plant', 1.6, 8.7], ['i_backpack', 12.4, 8.6], ['i_bike', 4, 8.6, false], ['i_phone', 5.4, 2.3, false], ['i_news', 12.6, 4.6, false], ['i_bag', 11.4, 8.6, false]],
   dealer: [['f_desk', 7, 2.3], ['car_red', 3, 4.8], ['car_blue', 11, 4.8], ['car_green', 3, 8.3], ['f_plant', 1.5, 2.6], ['f_plant2', 12.5, 2.6]],
   toolshop: [['f_shelf_pots', 2.6, 2.6], ['f_shelf_c', 11.6, 2.8], ['f_cashdesk', 7, 2.4], ['cart', 3, 7.2], ['crate', 11.4, 6.6], ['barrel', 12.4, 6.6], ['i_watering', 1.6, 8.7, false], ['i_pot', 12.4, 8.7], ['i_lantern', 5, 1.15, false], ['i_basket', 9.4, 8.7, false], ['i_pricestand', 4.8, 6.4], ['i_clock', 9.4, 1.0, false]],
   restaurant: [['f_counter_micro', 7, 2.3], ['menuboard', 12.4, 2.7], ['f_plant', 1.6, 2.7], ['f_table_chairs', 3, 5.4], ['f_table_chairs2', 11, 5.6], ['f_table_chairs2', 3, 8.8], ['f_round_table', 11, 8.4], ['i_cake', 9.4, 2.4, false], ['f_wine_rack', 4.6, 2.6], ['i_painting', 2.8, 1.05, false], ['i_clock', 9.8, 1.0, false], ['i_bread', 5.6, 2.4, false], ['i_basket', 1.6, 5.4, false], ['i_hanging', 12.6, 1.25, false], ['i_bell', 8.2, 2.5, false]],
@@ -368,6 +368,8 @@ for (const b of BUILDINGS) {
   }
   const s = { id: b.st, type: b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
+  // the rider hub's waiting bench seats two side by side
+  if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
   if (kind === 'hospital') {
     s.x = rx + 3.5;
     [[8.5, 3.6], [11, 3.6], [13.5, 3.6], [8.5, 7.4], [11, 7.4], [13.5, 7.4]].forEach(([dx, dy], i) => {
