@@ -715,6 +715,8 @@ function frame(t) {
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
     if (autoPath) autoPath.stuck = Math.hypot(m.x - ox0, m.y - oy0) < .004 ? autoPath.stuck + dt : 0;
+    // walking into a gate's yellow circle takes you through it, no button needed
+    if ((dx || dy) && near?.type === 'gate' && Math.hypot(near.x - m.x, near.y - m.y) < near.r * .75 && performance.now() > actCd) { actCd = performance.now() + 2000; autoPath = null; doAct(near.id, 'go'); }
     // walking down onto the door mat takes you outside, no button needed
     if (dy > .3 && near?.type === 'exit' && Math.hypot(near.x - m.x, near.y - m.y) < Math.max(.7, near.r * .6) && performance.now() > actCd) { actCd = performance.now() + 1500; autoPath = null; send({ t: 'exit' }); }
     m.rx = m.x; m.ry = m.y;
