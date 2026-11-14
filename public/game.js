@@ -1999,7 +1999,7 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
-fetch('assets/atlas.json?v=v2').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v2'; });
+fetch('assets/atlas.json?v=v3').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v3'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
@@ -2402,8 +2402,8 @@ function drawLights(X, Y, dark) {
   for (const b of G.map.buildings) if (b.house !== undefined && wd?.houses?.[b.house]?.[0]) glow((b.x + b.w / 2) * TS + X, (b.y + b.h - 1.2) * TS + Y, TS * 1.6, `rgba(255,210,130,${dark * .6})`);
   // cars: headlights ahead, red tail lights behind
   if (drawArea?.id === 'town') for (const c of traffic) { const px = c.x * TS + X, py = c.y * TS + Y, fx = c.dx * (halfX(c) + .9), fy = c.dy * (halfY(c) + .9); glow(px + fx * TS, py + fy * TS, TS * 1.5, `rgba(255,245,200,${dark * .85})`); glow(px - c.dx * halfX(c) * TS, py - c.dy * halfY(c) * TS, TS * .7, `rgba(255,50,30,${dark * .55})`); }
-  for (const p of G.props) if (/^lamp/.test(p.s)) {
-    const px = p.x * TS + X, py = (p.y - 1.6) * TS + Y; if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) continue;
+  for (const p of G.props) if (/^(lamp|o_lamp|o_lantern)/.test(p.s)) {
+    const px = p.x * TS + X, py = (p.y - (p.s === 'o_lantern' ? .8 : p.s === 'o_lampball' ? 1.15 : 1.6)) * TS + Y; if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) continue;
     const g = ctx.createRadialGradient(px, py, 0, px, py, TS * 2.4);
     g.addColorStop(0, `rgba(255,200,110,${dark * .9})`); g.addColorStop(1, 'rgba(255,200,110,0)');
     ctx.fillStyle = g; ctx.fillRect(px - TS * 2.4, py - TS * 2.4, TS * 4.8, TS * 4.8);

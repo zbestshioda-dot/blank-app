@@ -124,30 +124,38 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('gas', 'b_gas', 65, 13, { label: 'ปั๊มน้ำมัน', icon: '⛽', deco: true });   // scenery (no vehicles in the game)
 
   // town square: fountain, benches, flowers
-  prop('fountain', 50, 33.6);
+  prop('o_fountain', 50, 33.6);
   rect(48, 32, 4, 2, 'o');
-  for (const [x, y, s] of [[43.6, 32.6, 'bench'], [56.4, 32.6, 'bench2']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
-  prop('flowerbed', 44, 25.4); prop('flowerbed2', 56, 25.4); prop('lamp3', 42.6, 30); prop('lamp3', 57.4, 30); prop('lamp3', 42.6, 36); prop('lamp3', 57.4, 36);
-  prop('noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
+  for (const [x, y, s] of [[43.6, 32.6, 'o_bench'], [56.4, 32.6, 'o_stonebench']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
+  prop('o_flowerbed', 44, 25.4); prop('o_flowerbed', 56, 25.4); prop('o_lamp', 42.6, 30); prop('o_lamp', 57.4, 30); prop('o_lamp', 42.6, 36); prop('o_lamp', 57.4, 36);
+  prop('o_tulips', 45, 38.9); prop('o_tulips', 55, 38.9); prop('o_topiary', 43, 38.95); prop('o_roses', 42.9, 27.9); prop('o_roses', 57.1, 27.9); prop('o_drinkfount', 44.6, 35.9);
+  prop('o_noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
   STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47, y: 26.4, r: 1.4, area: 'town' });
   // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
   for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
-  prop('bin_grey', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
+  prop('o_bin', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
-  for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
+  for (let x = 6; x < 40; x += 9) prop('o_lamp', x + .5, 34);
   // street trees on the grass verge behind the sidewalk, between the lamps
   const verge = (y, x0, x1) => { for (let x = x0; x < x1; x += 9) if (get(x, y) === '.' && get(x, y - 1) !== '=' && !BUILDINGS.some(b => x >= b.x - 1 && x <= b.x + b.w && y >= b.y - 1 && y <= b.y + b.h + 1)) prop(['tree2', 'tree3', 'tree4', 'tree'][(x >> 3) % 4], x + .5, y + .95); };
   verge(35, 9, 40); verge(35, 65, 92); verge(18, 20, 46); verge(18, 56, 86); verge(50, 10, 46);
-  for (let x = 62; x < 92; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
-  for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('lamp2', x + .5, 17);
-  prop('busstop', 38.5, 35.2); prop('vending', 41.2, 29.9);
-  for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('hydrant', 65.5, 33.95);
-  prop('phonebooth', 57.3, 23.9); prop('bin_blue', 33.8, 29.95); prop('bin_green', 75, 33.95);
+  for (let x = 62; x < 92; x += 9) prop('o_lamp', x + .5, 34);
+  for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('o_lampball', x + .5, 17);
+  prop('o_shelter2', 38.5, 35.2); prop('o_bikerack', 35.6, 35.9, false); prop('vending', 41.2, 29.9);
+  for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('o_hydrant', 65.5, 33.95); prop('o_hydrant', 28, 33.95);
+  prop('o_phonebooth', 57.3, 23.9); prop('o_bin_blue', 33.8, 29.95); prop('o_bin_green', 75, 33.95); prop('o_bin', 12.2, 33.95);
   // (no parked cars: real traffic drives the roads now)
   // parks, the lake and the beach
   prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 84.5, 47.2, false);
-  prop('b_pavilion', 66, 44); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
+  prop('b_pavilion', 66, 44);
+  // the east park: a rose arch over the path in, a fountain lawn, statues, lanterns by the pond, a playground and café tables by the fruit stall
+  prop('o_rosearch', 65, 39.95, false); prop('o_rosearch', 86.5, 40.95, false);
+  prop('o_fountain2', 59, 53.9); rect(58, 52, 3, 2, 'o'); prop('o_topiary', 56.4, 54); prop('o_topiary', 61.6, 54); prop('o_bench', 59, 56.9, false);
+  prop('o_birdstatue', 70, 48.9); prop('o_catstatue', 74.5, 45.4); prop('o_lantern', 72.4, 50.9); prop('o_lantern', 87.6, 50.9); prop('o_lantern', 75, 59.9);
+  prop('o_slide', 82, 64.9); rect(81, 64, 3, 1, 'o'); prop('o_hedgering', 88.5, 64.9); prop('o_stonebench', 78.6, 64.9, false);
+  prop('o_parasol', 69, 41.3); prop('o_parasol2', 79, 41.3); prop('o_pergola', 89, 44.95, false); prop('o_woodtable', 89, 44.5);
+  prop('o_planter', 54, 40.9, false); prop('o_hedgecube', 62.6, 39.95); prop('o_hedgecube', 67.4, 39.95); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
   // the beach: umbrellas with loungers, palms, rocks at the waterline, a lifebuoy stand by the pier
   for (const [y, k] of [[20, 0], [27, 1], [35, 0], [44, 1], [55, 0], [67, 1], [74, 0], [83, 1]]) { prop(k ? 'parasol2' : 'parasol', 99.2, y); prop('deckchair', 98.3, y + 1.6); }
   for (const y of [16, 31, 49, 64, 79, 87]) prop(y % 2 ? 'palm_small' : 'palm', 98.2, y);
@@ -155,6 +163,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('i_ball', 100.2, 37.6, false); prop('i_lantern', 96.6, 61.2, false); prop('bench2', 98.6, 59.2, false);
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
   prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
+  prop('o_flowercart', 18.5, 29.95, false);
   prop('kiosk', 26.5, 54.6); prop('crate', 23.5, 55.5); prop('barrel', 29.5, 55.5);
   prop('cartstall', 41, 55);
 
@@ -231,14 +240,14 @@ const HOUSE_PRICES = [], HOUSE_RENT = [];
     prop(i % 2 ? 'hedge_flower' : 'hedge', x - 1, front - .1, false);
     if (i % 3 === 0) prop('postbox', x + 5.3, front + .05);
   }
-  prop('fountain', X + 35, 30.4); rect(X + 33, 29, 4, 2, 'o');
-  prop('bench', X + 29, 27, false); prop('bench2', X + 41, 27, false); prop('tree_pink', X + 27.5, 31.6); prop('tree_pink', X + 42.5, 31.6);
+  prop('o_fountain', X + 35, 30.4); rect(X + 33, 29, 4, 2, 'o');
+  prop('o_bench', X + 29, 27, false); prop('o_bench', X + 41, 27, false); prop('o_tulips', X + 31.6, 26.9); prop('o_tulips', X + 38.4, 26.9); prop('o_lampball', X + 27, 26.9); prop('o_lampball', X + 43, 26.9); prop('tree_pink', X + 27.5, 31.6); prop('tree_pink', X + 42.5, 31.6);
   prop('kiosk', X + 3.5, 30); STATIONS.push({ id: 'estate', type: 'estate', label: 'สำนักงานอสังหาฯ', icon: '🏡', x: X + 3.5, y: 30.7, r: 1.5, area: 'housing' });
   STATIONS.push({ id: 'gate_town_h', type: 'gate', to: 'town_from_housing', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 3, y: 22, r: 1.6, area: 'housing' });
   fenceRow('fence_white', X + 8, X + 62, 16.95); fenceRow('fence_white', X + 9, X + 62, 33.95);   // back gardens
   for (const y of [24.95, 32.95]) { fenceRow('fence_iron', X + 25, X + 33.3, y); fenceRow('fence_iron', X + 36.7, X + 45, y); prop('gate_iron', X + 33.8, y, false); prop('gate_iron', X + 36.2, y, false); }
   for (let y = 25; y <= 32; y++) { prop('fence_post', X + 25.4, y + .95); prop('fence_post', X + 44.6, y + .95); }
-  for (const [x, y] of [[X + 15, 45], [X + 55, 45]]) STATIONS.push({ id: 'seat_h' + x, type: 'seat', label: 'ม้านั่งในสวน', icon: '🪑', x, y: y - .25, r: 1.1, area: 'housing' }), prop('bench', x, y, false);
+  for (const [x, y] of [[X + 15, 45], [X + 55, 45]]) STATIONS.push({ id: 'seat_h' + x, type: 'seat', label: 'ม้านั่งในสวน', icon: '🪑', x, y: y - .25, r: 1.1, area: 'housing' }), prop('o_bench', x, y, false);
 }
 
 // where gates drop you
@@ -260,13 +269,13 @@ function scatter(A, kinds, n, flat) {
   }
 }
 scatter(TOWN, ['tuft'], 10, true);                     // the town stays tidy: no junk lying around in the grass
-scatter(FARM, ['wheelbarrow', 'hay', 'crate_apple', 'firewood', 'ladder', 'barrel', 'hose', 'faucet', 'crate', 'rock'], 14);
+scatter(FARM, ['wheelbarrow', 'hay', 'crate_apple', 'firewood', 'ladder', 'barrel', 'hose', 'o_tap', 'crate', 'rock'], 14);
 scatter(FARM, ['tuft'], 10, true);
-scatter(HOUSING, ['gnome', 'gnome2', 'flowerbox', 'stump', 'bench_stone', 'rock', 'hose'], 14);
+scatter(HOUSING, ['gnome', 'o_potflower', 'flowerbox', 'o_birdstatue', 'o_roses', 'o_cactus', 'o_catstatue', 'gnome2', 'o_bowlpot', 'o_fountain3', 'o_topiary', 'hose'], 16);
 scatter(HOUSING, ['tuft'], 8, true);
 // manholes on the main roads, a news box and bollards by the square
 for (const [x, y] of [[50, 52], [50, 66], [30, 47], [70, 15], [25, 15], [50, 10]]) if (get(Math.floor(x), Math.floor(y - .5)) === '=') prop('manhole', x, y, false);
-prop('newsbox', 57.3, 38.9); prop('bollard', 47.6, 39.95); prop('bollard', 52.4, 39.95);
+prop('o_newsbox', 57.3, 38.9); prop('o_bollard', 47.6, 39.95); prop('o_bollard', 52.4, 39.95);
 // A-frame signs by the doors of open shops, produce on the market stall, a lantern at the fishing club
 for (const id of ['restaurant', 'fashion', 'toolshop', 'rider', 'kitchen']) { const b = BUILDINGS.find(x => x.id === id); if (b) prop('i_shopsign', b.x + b.w - .2, b.y + b.h + .05, false); }
 // neon OPEN signs hung beside the doors (lit only while the shop is open), and a cake on show outside the restaurant
@@ -703,6 +712,25 @@ const FURNITURE = {
   xcubby: { name: 'ชั้นช่องไม้', icon: '🗃️', price: 4000, comfort: 0, cat: 'deco', spr: 'x_cubby' },
   xpatio: { name: 'โต๊ะร่มสนาม', icon: '⛱️', price: 5000, comfort: 1, cat: 'deco', spr: 'x_patio' },
   xpbench: { name: 'ม้านั่งสวน', icon: '🪑', price: 3500, comfort: 0, cat: 'deco', spr: 'x_pbench' },
+  // garden & outdoor pieces (pixel_outdoor sheet)
+  xofount: { name: 'น้ำพุหินเล็ก', icon: '⛲', price: 18000, comfort: 2, cat: 'deco', spr: 'o_fountain3' },
+  xopalm: { name: 'ปาล์มกระถางใหญ่', icon: '🌴', price: 5500, comfort: 1, cat: 'deco', spr: 'o_potpalm' },
+  xotree: { name: 'ต้นไม้ทรงพุ่มกระถางสูง', icon: '🌳', price: 6000, comfort: 1, cat: 'deco', spr: 'o_pottree' },
+  xotopi: { name: 'ไม้ดัดทรงกลม', icon: '🌳', price: 3800, comfort: 1, cat: 'deco', spr: 'o_topiary' },
+  xotulip: { name: 'แท่นทิวลิป', icon: '🌷', price: 3200, comfort: 1, cat: 'deco', spr: 'o_tulips' },
+  xoroses: { name: 'กระถางกุหลาบหิน', icon: '🌹', price: 4200, comfort: 1, cat: 'deco', spr: 'o_roses' },
+  xopot: { name: 'กระถางดอกไม้ดินเผา', icon: '🌼', price: 900, comfort: 0, cat: 'deco', spr: 'o_potflower' },
+  xocactus: { name: 'แคคตัสกระถาง', icon: '🌵', price: 800, comfort: 0, cat: 'deco', spr: 'o_cactus' },
+  xobowl: { name: 'กระถางหินทรงชาม', icon: '🪴', price: 1500, comfort: 0, cat: 'deco', spr: 'o_bowlpot' },
+  xolantern: { name: 'โคมตะเกียงไม้ประดับ', icon: '🏮', price: 4500, comfort: 1, cat: 'deco', spr: 'o_lantern' },
+  xocat: { name: 'รูปปั้นแมว', icon: '🐈', price: 7000, comfort: 1, cat: 'deco', spr: 'o_catstatue' },
+  xobird: { name: 'รูปปั้นนกพิราบ', icon: '🕊️', price: 7000, comfort: 1, cat: 'deco', spr: 'o_birdstatue' },
+  xoplanter: { name: 'กระบะดอกไม้ขาว', icon: '💐', price: 2800, comfort: 1, cat: 'deco', spr: 'o_planter' },
+  xohedge: { name: 'พุ่มไม้สี่เหลี่ยม', icon: '🟩', price: 2500, comfort: 0, cat: 'deco', spr: 'o_hedgecube' },
+  xotable: { name: 'โต๊ะไม้กลมสนาม', icon: '🪵', price: 3000, comfort: 1, cat: 'deco', spr: 'o_woodtable' },
+  xobench: { name: 'ม้านั่งไม้ทาสี', icon: '🪑', price: 4000, comfort: 1, cat: 'deco', spr: 'o_bench' },
+  xoslide: { name: 'สไลเดอร์เด็กเล่น', icon: '🛝', price: 25000, comfort: 2, cat: 'fun', spr: 'o_slide' },
+  xoarch: { name: 'ซุ้มกุหลาบ', icon: '🌹', price: 22000, comfort: 2, cat: 'deco', spr: 'o_rosearch' },
   xeasel: { name: 'กระดานขาตั้ง', icon: '🖼️', price: 3000, comfort: 0, cat: 'deco', spr: 'x_easel' },
   xarcade: { name: 'ตู้เกมอาเขต', icon: '🕹️', price: 35000, comfort: 3, cat: 'fun', spr: 'x_arcade' },
   xpool: { name: 'โต๊ะพูล', icon: '🎱', price: 60000, comfort: 4, cat: 'fun', spr: 'x_pool' },
