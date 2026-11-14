@@ -900,9 +900,9 @@ const FURNITURE = {
   xmoto: { name: 'มอเตอร์ไซค์โชว์', icon: '🏍️', price: 80000, comfort: 2, cat: 'fun', spr: 'x_moto' },
   xtoolbox: { name: 'ตู้เครื่องมือช่าง', icon: '🧰', price: 6500, comfort: 0, cat: 'fun', spr: 'x_toolbox' },
 };
-// rates are per game day (24 real minutes): savings earn 0.25%/day, a loan costs a 2% fee up front plus 1%/day on what is still owed
+// rates are per game day (24 real minutes): savings earn 0.5%/day, a loan costs a 2% fee up front plus 1%/day on what is still owed
 // (the bank always charges more than it pays, so borrowing to save never pays off); at most 3 game days accrue while you are offline
-const BANK = { rate: 0.0025, cap: 200000, loanMax: 30000, loanFee: 0.02, loanRate: 0.01, repayShare: 0.25, offlineDays: 3 };
+const BANK = { rate: 0.005, cap: 200000, loanMax: 30000, loanFee: 0.02, loanRate: 0.01, repayShare: 0.25, offlineDays: 3 };
 
 // ================================================================= health
 const DISEASES = {
