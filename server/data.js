@@ -32,6 +32,7 @@ const rand = rng(20261112);
 for (const a of [TOWN, FARM, HOUSING]) rect(a.x, a.y, a.w, a.h, '.');
 
 const BUILDINGS = [], STATIONS = [], PROPS = [];
+let CS;   // adds a convenience-store branch (defined with the town)
 const prop = (s, x, y, solid = true) => { PROPS.push({ s, x, y }); if (solid) set(Math.floor(x), Math.floor(y - 0.5), solid === 'grass' ? 'g' : 'o'); };
 // a straight run of fence pieces from x0 to x1 along row y (bottom edge); solid fences block the grass tiles they stand on
 function fenceRow(s, x0, x1, y, solid = true) {
@@ -121,8 +122,11 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   });
   rect(52, 85, 40, 2, 'c'); rect(8, 85, 30, 2, 'c'); rect(37, 78, 2, 9, 'c'); rect(38, 78, 12, 2, 'c'); rect(60, 78, 2, 7, 'c');
   // empty lots kept for careers added later
-  for (const [x, y] of [[84, 12]]) { rect(x - 2, y - 3, 6, 3, 'm'); prop('signpost', x + .5, y + .2); }
-  B('cstore', 'b_cstore', 72, 13, { label: 'ร้านสะดวกซื้อ 24 ชม.', icon: '🏪', st: 'cstore', outdoor: true, noSlot: true });   // open round the clock, served at the counter out front
+  // 24-hour convenience stores: four branches, each with its own look and its own interior (rooms laid out after all older rooms: late)
+  CS = (id, spr, x, front, name, extra = {}) => B(id, spr, x, front, { label: `ร้านสะดวกซื้อ 24 ชม. · ${name}`, icon: '🏪', st: id, stype: 'cstore', rk: 'cstore', layout: id, late: true, ...extra });
+  CS('cstore', 'b_cs1', 72, 13, 'สาขาถนนเหนือ');
+  CS('cstore2', 'b_cs2', 81, 13, 'สาขาหัวมุม');
+  CS('cstore3', 'b_cs3', 42, 45, 'สาขาซอยใต้');
   B('gas', 'b_gas', 65, 13, { label: 'ปั๊มน้ำมัน', icon: '⛽', deco: true });   // scenery (no vehicles in the game)
 
   // town square: fountain, benches, flowers
@@ -244,6 +248,7 @@ const HOUSE_PRICES = [], HOUSE_RENT = [];
   }
   prop('o_fountain', X + 35, 30.4); rect(X + 33, 29, 4, 2, 'o');
   prop('o_bench', X + 29, 27, false); prop('o_bench', X + 41, 27, false); prop('o_tulips', X + 31.6, 26.9); prop('o_tulips', X + 38.4, 26.9); prop('o_lampball', X + 27, 26.9); prop('o_lampball', X + 43, 26.9); prop('tree_pink', X + 27.5, 31.6); prop('tree_pink', X + 42.5, 31.6);
+  CS('cstore4', 'b_cs4', X + 2, 20, 'สาขาหมู่บ้าน', { area: 'housing' });
   prop('kiosk', X + 3.5, 30); STATIONS.push({ id: 'estate', type: 'estate', label: 'สำนักงานอสังหาฯ', icon: '🏡', x: X + 3.5, y: 30.7, r: 1.5, area: 'housing' });
   STATIONS.push({ id: 'gate_town_h', type: 'gate', to: 'town_from_housing', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 3, y: 22, r: 1.6, area: 'housing' });
   fenceRow('fence_white', X + 8, X + 62, 16.95); fenceRow('fence_white', X + 9, X + 62, 33.95);   // back gardens
@@ -327,6 +332,15 @@ const LAYOUT = {
   school: [['x_board', 7, 1.75, false], ['x_tdesk', 7, 2.6], ['f_books', 1.8, 2.6], ['f_bookshelf_wide', 3.8, 2.6], ['x_globe', 10.0, 2.6], ['x_cubby', 12.0, 2.7], ['x_locker', 1.6, 5.4], ['x_locker', 1.6, 7.6], ['x_clock', 11.0, 1.0, false], ['i_calendar', 4.8, 1.05, false], ['x_plant', 12.6, 8.8], ['i_backpack', 7, 8.6, false]],
   police: [['x_pdesk', 7, 2.4], ['x_lockers', 2.2, 2.6], ['f_filing_grey', 4.2, 2.6], ['x_radio', 9.4, 2.7], ['f_corkboard', 10.4, 1.15, false], ['x_cuffs', 5.4, 1.15, false], ['x_alarm', 12.4, 1.2, false], ['x_pcdesk2', 3.0, 5.6], ['f_bunk', 11.5, 7.4], ['f_bunk2', 9.5, 7.4], ['x_metaldoor', 12.2, 4.6], ['x_cones', 2.2, 8.8], ['x_barricade', 4.4, 8.8], ['f_plant', 12.6, 8.7], ['x_wclock', 7, 0.95, false]],
   bank: [['x_safe', 1.8, 2.7], ['x_bankcounter', 4.5, 2.4], ['x_bankcounter', 7, 2.4], ['x_bankcounter', 9.5, 2.4], ['x_vault', 12.0, 2.6], ['x_clock', 7, 0.95, false], ['f_rug_blue', 7, 6.6], ['x_waitseats', 2.6, 6.2], ['x_waitseats', 11.4, 6.2], ['x_atm', 1.6, 8.8], ['x_atm', 2.8, 8.8], ['x_plant', 12.4, 8.8], ['x_magrack', 10.6, 8.8], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
+  // the four convenience-store branches (the counter is always top centre, where the till station stands)
+  cstore: [['c_cashier', 7, 2.5], ['c_hotdog', 3.6, 2.6], ['c_coffee', 9.6, 2.3], ['c_fridge', 12.3, 2.9], ['c_icebox', 1.9, 2.6], ['c_chips', 2.6, 5.7], ['c_noodles', 11.4, 5.7],
+    ['c_bread', 2.9, 8.4], ['c_cans', 11.1, 8.4], ['c_atm', 4.8, 8.8], ['c_umbrella', 9.3, 9.0], ['c_rug1', 7, 9.45, false], ['c_clock', 7, 1.0, false], ['c_cctv', 1.3, 1.2, false]],
+  cstore2: [['c_cashier', 7, 2.5], ['c_fridge', 1.6, 2.9], ['c_fridge', 3.6, 2.9], ['c_deli', 10.6, 2.7], ['c_toiletry', 2.8, 5.8], ['c_freezer', 11.2, 5.8],
+    ['c_cans', 2.9, 8.4], ['c_fruit', 5.0, 8.6], ['c_cart', 10.2, 8.9], ['c_water', 12.6, 8.7], ['c_rug2', 7, 9.45, false], ['c_clock', 7, 1.0, false], ['c_cctv', 12.8, 1.2, false]],
+  cstore3: [['c_cashier', 7, 2.5], ['c_lottery', 3.5, 2.7], ['c_safe', 1.5, 2.6], ['c_giftcards', 9.1, 2.4], ['c_shelfred', 11.4, 2.7], ['c_chips', 2.6, 5.8], ['c_bread', 11.4, 5.8],
+    ['c_noodles', 2.6, 8.4], ['c_hotdog2', 11.0, 8.6], ['c_icecream', 12.8, 8.7], ['c_stool', 4.8, 8.9], ['c_rug1', 7, 9.45, false], ['c_clock', 4.6, 1.0, false], ['c_fan', 12.6, 1.3, false]],
+  cstore4: [['c_cashier', 7, 2.5], ['c_cups', 9.4, 2.4], ['c_coffee', 10.5, 2.3], ['c_fridge', 12.4, 2.9], ['c_atm', 1.4, 2.8], ['c_bags', 2.8, 2.8], ['c_chips', 2.6, 5.8], ['c_boxes', 11.6, 6.0],
+    ['c_toiletry', 2.8, 8.4], ['c_freezer', 11.2, 8.4], ['c_mop', 5.0, 8.9], ['c_bin', 8.9, 9.0], ['c_rug2', 7, 9.45, false], ['c_clock', 7, 1.0, false], ['c_notice', 4.6, 1.6, false]],
   // a small home: bedroom (top left), living room (middle), bathroom (top right), kitchen (bottom left); bought furniture fills its own spots (client FURN_POS)
   house: [['f_wardrobe', 1.4, 2.9], ['f_bed_blue', 3.4, 3.3], ['i_teddy', 3.9, 2.7, false], ['f_drawer', 5.1, 2.5], ['i_books', 5.1, 1.55, false], ['i_painting', 3.4, 1.05, false],
     ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false],
@@ -344,13 +358,13 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of BUILDINGS) {
+for (const b of [...BUILDINGS.filter(b => !b.late), ...BUILDINGS.filter(b => b.late)]) {   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
     continue;
   }
-  const kind = b.house !== undefined ? 'house' : b.id;
+  const kind = b.rk || (b.house !== undefined ? 'house' : b.id);
   const [RW, RH] = ROOM_SIZE[kind] || [14, 10];
   const rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14; slot++;
   if (b.outdoor) {                     // served from the street: the counter is in front of the building (its room slot stays unused so other rooms keep their place)
@@ -367,7 +381,7 @@ for (const b of BUILDINGS) {
     outside: { x: front.x, y: front.y + 1.2 }, doorPt: { x: front.x, y: front.y + 0.32 }, hours: null,
   };
   ROOMS.push(room); b.room = room.id;
-  const items = LAYOUT[kind] || [];
+  const items = LAYOUT[b.layout || kind] || [];
   room.furniture = items.map(([s, x, y, solid]) => [s, rx + x, ry + y]);
   for (const [s, x, y, solid] of items) {
     if (solid === false || SOFT.test(s) || y < 1.3 || !ATLAS.sprites[s]) continue;
@@ -382,7 +396,7 @@ for (const b of BUILDINGS) {
     room.furniture.push(['~stairs', rx + STAIR_UP[0], ry + STAIR_UP[1]]);
     continue;
   }
-  const s = { id: b.st, type: b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
+  const s = { id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
   // the rider hub's waiting bench seats two side by side
   if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
