@@ -193,11 +193,11 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
 
   // where the gates and fishing spots are
   STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง · ร้านขายปลา', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
-  STATIONS.push({ id: 'pier_l1', type: 'pier', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 21, y: 62.2, r: 1.8, area: 'town' });
-  STATIONS.push({ id: 'pier_l2', type: 'pier', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 32, y: 62.2, r: 1.8, area: 'town' });
-  STATIONS.push({ id: 'pier_s1', type: 'pier', pool: 'sea', label: 'สะพานปลา (ทะเล)', icon: '🎣', x: 105, y: 61, r: 1.8, area: 'town' });
-  STATIONS.push({ id: 'pier_s2', type: 'pier', pool: 'sea', label: 'ริมหาด (ทะเล)', icon: '🎣', x: 101.2, y: 38, r: 1.6, area: 'town' });
-  STATIONS.push({ id: 'pier_p', type: 'pier', pool: 'lake', label: 'บ่อตกปลา', icon: '🎣', x: 80, y: 49.2, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'pier_l1', type: 'fishspot', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 21, y: 62.2, r: 1.8, area: 'town' });
+  STATIONS.push({ id: 'pier_l2', type: 'fishspot', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 32, y: 62.2, r: 1.8, area: 'town' });
+  STATIONS.push({ id: 'pier_s1', type: 'fishspot', pool: 'sea', label: 'สะพานปลา (ทะเล)', icon: '🎣', x: 105, y: 61, r: 1.8, area: 'town' });
+  STATIONS.push({ id: 'pier_s2', type: 'fishspot', pool: 'sea', label: 'ริมหาด (ทะเล)', icon: '🎣', x: 101.2, y: 38, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'pier_p', type: 'fishspot', pool: 'lake', label: 'บ่อตกปลา', icon: '🎣', x: 80, y: 49.2, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'gate_farm', type: 'gate', to: 'farm_in', label: 'ไปไร่ชานเมือง', icon: '🌾', x: 3, y: 32, r: 1.6, area: 'town', renov: true });   // the farm is closed for renovation
   STATIONS.push({ id: 'gate_housing', type: 'gate', to: 'housing_in', label: 'ไปหมู่บ้านจัดสรร', icon: '🏘️', x: 50, y: 5, r: 1.6, area: 'town' });
   prop('sign_walk', 4.6, 30.3); prop('signpost', 52.8, 7.4);
@@ -239,8 +239,8 @@ const GARDEN = { lotPrice: 2500, startPlots: 2, maxPlots: 6, expand: [0, 0, 900,
     LOTS.push(lot);
   }
   for (const [a, b] of [[1, 19.5], [22.5, 33.5], [37.5, 47.5], [50.5, 69]]) fenceRow('fence_bamboo', X + a, X + b, 40.95);   // riverbank, piers left open
-  STATIONS.push({ id: 'pier_r1', type: 'pier', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 21, y: 43.3, r: 1.8, area: 'farm' });
-  STATIONS.push({ id: 'pier_r2', type: 'pier', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 49, y: 43.3, r: 1.8, area: 'farm' });
+  STATIONS.push({ id: 'pier_r1', type: 'fishspot', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 21, y: 43.3, r: 1.8, area: 'farm' });
+  STATIONS.push({ id: 'pier_r2', type: 'fishspot', pool: 'river', label: 'ท่าตกปลา (แม่น้ำ)', icon: '🎣', x: X + 49, y: 43.3, r: 1.8, area: 'farm' });
   STATIONS.push({ id: 'gate_town_f', type: 'gate', to: 'town_from_farm', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 66.5, y: 25, r: 1.6, area: 'farm' });
   prop('signpost', X + 65, 23.3);
 }
@@ -648,6 +648,54 @@ const ITEMS = {
   hammerhead:{ name: 'ฉลามหัวค้อน', icon: '🦈', kind: 'fish', base: 1100, rar: 4 },
   shark:     { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200, rar: 4 },
   goldenfish:{ name: 'ปลาทองคำ', icon: '✨', kind: 'fish', base: 5000, rar: 5 },
+  // second sheet: freshwater (lake/river) and sea fish, plus a few sea creatures
+  bluegill:  { name: 'ปลาบลูกิล', icon: '🐟', kind: 'fish', base: 35, rar: 1, w: 'f' },
+  perch:     { name: 'ปลาเพิร์ช', icon: '🐟', kind: 'fish', base: 45, rar: 1, w: 'f' },
+  sunfish:   { name: 'ปลาซันฟิช', icon: '🐠', kind: 'fish', base: 85, rar: 2, w: 'f' },
+  bream:     { name: 'ปลาบรีม', icon: '🐟', kind: 'fish', base: 40, rar: 1, w: 'f' },
+  rudd:      { name: 'ปลาตะเพียนขาว', icon: '🐟', kind: 'fish', base: 35, rar: 1, w: 'f' },
+  btrout:    { name: 'ปลาเทราต์สีน้ำตาล', icon: '🐟', kind: 'fish', base: 150, rar: 2, w: 'f' },
+  chub:      { name: 'ปลาชับ', icon: '🐟', kind: 'fish', base: 45, rar: 1, w: 'f' },
+  whitefish: { name: 'ปลาไวท์ฟิช', icon: '🐟', kind: 'fish', base: 90, rar: 2, w: 'f' },
+  goby:      { name: 'ปลาบู่', icon: '🐟', kind: 'fish', base: 30, rar: 1, w: 'f' },
+  barbel:    { name: 'ปลาบาร์เบล', icon: '🐟', kind: 'fish', base: 120, rar: 2, w: 'f' },
+  pangasius: { name: 'ปลาสวาย', icon: '🐟', kind: 'fish', base: 110, rar: 2, w: 'f' },
+  roach:     { name: 'ปลาตะเพียน', icon: '🐟', kind: 'fish', base: 30, rar: 1, w: 'f' },
+  dace:      { name: 'ปลาซิวหางแดง', icon: '🐟', kind: 'fish', base: 25, rar: 1, w: 'f' },
+  zander:    { name: 'ปลาแซนเดอร์', icon: '🐟', kind: 'fish', base: 260, rar: 3, w: 'f' },
+  tench:     { name: 'ปลาเทนช์', icon: '🐟', kind: 'fish', base: 100, rar: 2, w: 'f' },
+  char:      { name: 'ปลาชาร์', icon: '🐟', kind: 'fish', base: 240, rar: 3, w: 'f' },
+  grayling:  { name: 'ปลาเกรย์ลิง', icon: '🐟', kind: 'fish', base: 130, rar: 2, w: 'f' },
+  lamprey:   { name: 'ปลาแลมป์เพรย์', icon: '🐍', kind: 'fish', base: 300, rar: 3, w: 'f' },
+  mullet:    { name: 'ปลากระบอก', icon: '🐟', kind: 'fish', base: 40, rar: 1, w: 's' },
+  anchovy:   { name: 'ปลากะตัก', icon: '🐟', kind: 'fish', base: 20, rar: 1, w: 's' },
+  flounder:  { name: 'ปลาตาเดียว', icon: '🐟', kind: 'fish', base: 120, rar: 2, w: 's' },
+  sole:      { name: 'ปลาลิ้นหมา', icon: '🐟', kind: 'fish', base: 140, rar: 2, w: 's' },
+  halibut:   { name: 'ปลาฮาลิบัต', icon: '🐟', kind: 'fish', base: 380, rar: 3, w: 's' },
+  shad:      { name: 'ปลาตะลุมพุก', icon: '🐟', kind: 'fish', base: 35, rar: 1, w: 's' },
+  turbot:    { name: 'ปลาเทอร์บอต', icon: '🐟', kind: 'fish', base: 330, rar: 3, w: 's' },
+  cod:       { name: 'ปลาค็อด', icon: '🐟', kind: 'fish', base: 150, rar: 2, w: 's' },
+  hake:      { name: 'ปลาเฮก', icon: '🐟', kind: 'fish', base: 110, rar: 2, w: 's' },
+  whiting:   { name: 'ปลาไวท์ติ้ง', icon: '🐟', kind: 'fish', base: 45, rar: 1, w: 's' },
+  saithe:    { name: 'ปลาพอลลอค', icon: '🐟', kind: 'fish', base: 95, rar: 2, w: 's' },
+  haddock:   { name: 'ปลาแฮดด็อก', icon: '🐟', kind: 'fish', base: 105, rar: 2, w: 's' },
+  bonito:    { name: 'ปลาโอแถบ', icon: '🐟', kind: 'fish', base: 160, rar: 2, w: 's' },
+  skipjack:  { name: 'ปลาทูน่าท้องแถบ', icon: '🐟', kind: 'fish', base: 220, rar: 3, w: 's' },
+  barracuda: { name: 'ปลาสาก', icon: '🐟', kind: 'fish', base: 340, rar: 3, w: 's' },
+  wahoo:     { name: 'ปลาอินทรี', icon: '🐟', kind: 'fish', base: 300, rar: 3, w: 's' },
+  marlin:    { name: 'ปลามาร์ลิน', icon: '🗡️', kind: 'fish', base: 1300, rar: 4, w: 's' },
+  tunny:     { name: 'ปลาโอดำ', icon: '🐟', kind: 'fish', base: 140, rar: 2, w: 's' },
+  threadfin: { name: 'ปลาทรายแดง', icon: '🐟', kind: 'fish', base: 90, rar: 2, w: 's' },
+  seabream:  { name: 'ปลาอีคุด', icon: '🐟', kind: 'fish', base: 110, rar: 2, w: 's' },
+  parrotfish:{ name: 'ปลานกแก้ว', icon: '🐠', kind: 'fish', base: 380, rar: 3, w: 's' },
+  damsel:    { name: 'ปลาสลิดหินฟ้า', icon: '🐠', kind: 'fish', base: 230, rar: 3, w: 's' },
+  moray:     { name: 'ปลาไหลมอเรย์', icon: '🐍', kind: 'fish', base: 400, rar: 3, w: 's' },
+  lanternfish:{ name: 'ปลาตะเกียง', icon: '🏮', kind: 'fish', base: 600, rar: 4, w: 's' },
+  angler:    { name: 'ปลาตกเบ็ด (ปลาแองเกลอร์)', icon: '🎣', kind: 'fish', base: 900, rar: 4, w: 's' },
+  starfish:  { name: 'ปลาดาว', icon: '⭐', kind: 'fish', base: 70, rar: 2, w: 's' },
+  jellyfish: { name: 'แมงกะพรุน', icon: '🪼', kind: 'fish', base: 15, rar: 1, w: 's' },
+  turtle:    { name: 'เต่าทะเล', icon: '🐢', kind: 'fish', base: 1500, rar: 4, w: 's' },
+  dolphin:   { name: 'โลมา', icon: '🐬', kind: 'fish', base: 4000, rar: 5, w: 's' },
   chest:    { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 3000, rar: 4 },
 
   fried_rice:   { name: 'ข้าวผัด', icon: '🍚', kind: 'meal', base: 150, eat: { hunger: 35, energy: 5 } },
@@ -693,12 +741,47 @@ const RECIPES = [
   { id: 'durian_sweet', in: { durian: 1, rice: 1 } },
 ];
 // fishing pools: [id, weight]. null = junk
+// what bites where. The first sheet's fish keep their hand-set weights; the second sheet's join every water of their kind
+// ('f' fresh: river + lake, 's' sea) with a weight by rarity. The nothing-bites weight is then set so a cast is worth about
+// the same on average as before (river ~38, lake ~56, sea ~72), so more species never means more money.
 const FISH = {
-  river: [[null, 28], ['sfish', 48], ['carp', 26], ['catfish', 24], ['tilapia', 10], ['snakehead', 4], ['eel', 3], ['guppy', 2.5], ['goldfish', 1], ['koi', 0.2], ['goldenfish', 0.02]],
-  lake:  [[null, 24], ['sfish', 34], ['carp', 20], ['tilapia', 24], ['snakehead', 9], ['seabass', 4], ['trout', 4], ['guppy', 3], ['goldfish', 2], ['salmon', 1.2], ['koi', 0.45], ['chest', 0.1], ['goldenfish', 0.03]],
-  sea:   [[null, 30], ['sardine', 26], ['mackerel', 18], ['herring', 14], ['shrimp', 9], ['crab', 6], ['squid', 9], ['puffer', 3], ['snapper', 3], ['seabass', 4],
+  river: [['sfish', 48], ['carp', 26], ['catfish', 24], ['tilapia', 10], ['snakehead', 4], ['eel', 3], ['guppy', 2.5], ['goldfish', 1], ['koi', 0.2], ['goldenfish', 0.02]],
+  lake:  [['sfish', 34], ['carp', 20], ['tilapia', 24], ['snakehead', 9], ['seabass', 4], ['trout', 4], ['guppy', 3], ['goldfish', 2], ['salmon', 1.2], ['koi', 0.45], ['chest', 0.1], ['goldenfish', 0.03]],
+  sea:   [['sardine', 26], ['mackerel', 18], ['herring', 14], ['shrimp', 9], ['crab', 6], ['squid', 9], ['puffer', 3], ['snapper', 3], ['seabass', 4],
           ['clownfish', 1.2], ['angelfish', 1.2], ['octopus', 1.2], ['grouper', 1.2], ['tuna', 1.6], ['stingray', 0.8], ['lionfish', 0.3], ['seahorse', 0.25], ['swordfish', 0.25], ['hammerhead', 0.2], ['shark', 0.35], ['chest', 0.15], ['goldenfish', 0.025]],
 };
+{
+  const RW = [0, 9, 3.5, 1.1, 0.22, 0.02], TARGET = { river: 38, lake: 56, sea: 72 };
+  for (const [k, it] of Object.entries(ITEMS)) if (it.w) for (const pool of it.w === 'f' ? ['river', 'lake'] : ['sea']) FISH[pool].push([k, RW[it.rar]]);
+  for (const pool in FISH) {
+    const wsum = FISH[pool].reduce((t, [, w]) => t + w, 0), vsum = FISH[pool].reduce((t, [id, w]) => t + w * ITEMS[id].base, 0);
+    FISH[pool].unshift([null, Math.max(10, vsum / TARGET[pool] - wsum)]);
+  }
+}
+// rods: bought from the fishing club, kept in the bag, one equipped. zone = width of the timing window, luck = how much
+// more often rare (and better) fish bite, junk = how often nothing/junk bites (x the base chance)
+const RODS = {
+  bamboo: { name: 'เบ็ดไม้ไผ่', icon: '🎋', price: 150, zone: 0.20, luck: 1.0, junk: 1.0, desc: 'เบ็ดเริ่มต้น' },
+  fiber:  { name: 'เบ็ดไฟเบอร์กลาส', icon: '🎣', price: 1500, zone: 0.24, luck: 1.25, junk: 0.75, desc: 'จังหวะกว้างขึ้นนิด ปลาหายากบ่อยขึ้น' },
+  carbon: { name: 'เบ็ดคาร์บอน', icon: '🎣', price: 6000, zone: 0.28, luck: 1.55, junk: 0.55, desc: 'เบา ไว ขยะน้อยลง' },
+  pro:    { name: 'เบ็ดโปรตกทะเล', icon: '🎣', price: 20000, zone: 0.33, luck: 1.9, junk: 0.4, desc: 'สำหรับปลาใหญ่ ปลาหายากบ่อยขึ้นมาก' },
+  gold:   { name: 'เบ็ดทองคำ', icon: '✨', price: 75000, zone: 0.38, luck: 2.4, junk: 0.25, desc: 'แทบไม่เจอขยะ' },
+  dragon: { name: 'เบ็ดมังกรทะเลลึก', icon: '🐉', price: 250000, zone: 0.44, luck: 3.2, junk: 0.12, desc: 'เบ็ดในตำนาน ปลามหากาพย์-ตำนานกินเบ็ดบ่อยที่สุด' },
+};
+const ROD_ORDER = Object.keys(RODS);
+// which water a spot fishes in: the sea along the east coast, the river in the farm, any other water is "lake" (the lake, ponds)
+function waterPool(x, y) {
+  let best = null, bd = 1.7;
+  for (let j = Math.floor(y) - 2; j <= Math.floor(y) + 2; j++) for (let i = Math.floor(x) - 2; i <= Math.floor(x) + 2; i++) {
+    if ((grid[j] || [])[i] !== 'w') continue;
+    const d = Math.hypot(Math.max(i - x, 0, x - i - 1), Math.max(j - y, 0, y - j - 1));
+    if (d < bd) { bd = d; best = [i, j]; }
+  }
+  if (!best) return null;
+  const a = AREAS.find(r => best[0] >= r.x && best[0] < r.x + r.w && best[1] >= r.y && best[1] < r.y + r.h);
+  if (!a || a.kind !== 'map') return null;
+  return a.id === 'farm' ? 'river' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
+}
 const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
 const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
 for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + k;
@@ -794,7 +877,6 @@ const TOOL_PRICES = [4000, 15000, 50000];
 const TOOLS = {
   office:   { name: 'ชุดสูทหรู', icon: '👔', fx: ['ค่าแรง +10%', 'ค่าแรง +20%', 'ค่าแรง +30%'] },
   farmer:   { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
-  fisher:   { name: 'อัปเกรดเบ็ดตกปลา', icon: '🎣', fx: ['ขยะน้อยลง, ปลาใหญ่บ่อยขึ้น', 'ขยะน้อยมาก, ปลาใหญ่บ่อยขึ้นมาก', 'แทบไม่เจอขยะ, ปลาใหญ่บ่อยสุด'] },
   merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
   chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
@@ -1134,6 +1216,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, RODS, ROD_ORDER, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

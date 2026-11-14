@@ -780,6 +780,13 @@ function findNear() {
     const tile = G.shop.furniture[fbase(k)].tile, x = ya.x + pos[1], y = ya.y + pos[2] - (tile ? .5 : .9), d = Math.hypot(x - m.x, y - m.y), rr = tile ? 1.0 : 1.6;
     if (d < rr && d < bd) { bd = d; best = { id: 'yf:' + k, type: 'yfield', k, house: ya.house, x, y, r: rr, icon: '🌱', label: tile ? 'แปลงดิน' : 'แปลงผัก', tile }; }
   } }
+  // the water's edge (with a rod): fish right here; keeps the spot while a cast is out
+  if (!best && (me?.rods || []).length) {
+    const pool = waterPoolAt(m.x, m.y);
+    if (pool) { waterNear = { id: 'water', type: 'pier', pool, label: `ตกปลา · ${POOL_NAME[pool]}`, icon: '🎣', x: m.x, y: m.y, r: 3, area: here }; best = waterNear; }
+    else if (me.cast && waterNear) best = waterNear;
+    else waterNear = null;
+  }
   // rider: hand the food to the customer you are standing next to
   if (me?.career === 'rider') for (const j of me.jobs || []) if (j.mine && j.state === 'picked') {
     const tgt = j.npc ? (j.area === here ? j.dest : null) : (() => { const p = P.get(j.custId); return p && areaOf(p.x, p.y)?.id === here ? p : null; })();
@@ -1433,6 +1440,30 @@ function fishBook() {
   return `<div class="secT" style="margin-top:14px">📖 สมุดภาพปลา ${got}/${all.length}</div>
     <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div><div class="fbookGrid">${cells}</div>`;
 }
+// rods: the shop list at the fishing club (st) or the bag list (no st): stats, buy, hold
+function rodRows(st) {
+  const have = me.rods || [];
+  return G.rodOrder.filter(k => st || have.includes(k)).map(k => {
+    const r = G.rods[k], own = have.includes(k), on = me.rodEq === k;
+    const stats = `แถบเขียว ${Math.round(r.zone * 100)}% · โชคปลาหายาก x${r.luck} · ขยะ ${Math.round(r.junk * 100)}%`;
+    const btn = own ? B(on ? 'ถืออยู่ ✓' : 'ถือเบ็ดนี้', { t: 'rod', id: k }, on ? 'primary' : 'good', on) : B(money(r.price), { t: 'act', st, a: 'rod', rod: k }, 'good', me.money < r.price);
+    return itemRowRaw(r.icon, `${esc(r.name)}${on ? ' <span class="tag">ในมือ</span>' : ''}`, `${esc(r.desc)} · ${stats}`, btn);
+  }).join('') || '<div class="sub">ยังไม่มีเบ็ด · ซื้อได้กับน้าเล็กที่สมาคมประมง</div>';
+}
+// fishing anywhere: standing at the water's edge with a rod makes a fishing spot right where you are
+function waterPoolAt(x, y) {
+  let best = null, bd = 1.7;
+  for (let j = Math.floor(y) - 2; j <= Math.floor(y) + 2; j++) for (let i = Math.floor(x) - 2; i <= Math.floor(x) + 2; i++) {
+    if (tileAt(i, j) !== 'w') continue;
+    const d = Math.hypot(Math.max(i - x, 0, x - i - 1), Math.max(j - y, 0, y - j - 1));
+    if (d < bd) { bd = d; best = [i, j]; }
+  }
+  if (!best) return null;
+  const a = areaOf(best[0] + .5, best[1] + .5); if (!a || a.kind !== 'map') return null;
+  return a.id === 'farm' ? 'river' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
+}
+let waterNear = null;
+const POOL_NAME = { sea: '🌊 ทะเล', lake: '🏞️ น้ำจืด (ทะเลสาบ/บ่อ)', river: '🐟 แม่น้ำ' };
 // draws atlas sprites into <canvas data-spr> (furniture/vehicles stand on the bottom edge, fish (.fspr) are centred and can scale up)
 function bindSpr(root) {
   root.querySelectorAll('[data-spr]').forEach(c => { const draw = () => { const sp = atlas?.sprites?.[c.dataset.spr]; if (!sp || !atlasImg) return setTimeout(draw, 300);
@@ -1648,6 +1679,11 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15c', d: '15 พ.ย. (รอบ 3)', items: [
+    '🎣 <b>ตกปลาได้ทุกที่ที่มีน้ำ</b> ไม่มีจุดตกปลาตายตัวแล้ว ยืนริมทะเลสาบ บ่อน้ำ ชายหาด หรือสะพาน แล้วกดปุ่ม 🎣 ได้เลย',
+    '🎋 <b>เบ็ดเป็นไอเท็ม</b> 6 แบบ ราคาต่างกัน: ไม้ไผ่ ฿150 · ไฟเบอร์กลาส ฿1,500 · คาร์บอน ฿6,000 · โปรตกทะเล ฿20,000 · ทองคำ ฿75,000 · มังกรทะเลลึก ฿250,000 (ซื้อกับน้าเล็ก เปลี่ยนเบ็ดได้ในกระเป๋า)',
+    '🐟 ปลาใหม่อีก 47 ชนิด รวม 79 ชนิด: น้ำจืดกับทะเลมีปลาคนละแบบ มีปลามาร์ลิน ปลาตกเบ็ด เต่าทะเล และ<b>โลมา (ตำนาน)</b>',
+    '🔄 ใครเคยอัปเกรดเบ็ดที่ร้านอุปกรณ์ ได้เบ็ดระดับที่เทียบเท่าไปแล้วในกระเป๋า' ] },
   { v: '2026-11-15b', d: '15 พ.ย. (รอบ 2)', items: [
     '🐟 <b>ปลาใหม่ 25 ชนิด</b> รวมเป็น 32 ชนิด มีรูปปลาของตัวเอง: ปลาทู ปลาทอง กุ้ง ปู ปลาหมึกยักษ์ ม้าน้ำ ปลากระโทงดาบ ฉลามหัวค้อน ปลาคาร์ป ฯลฯ',
     '⭐ ปลามี<b>ความหายาก</b> 5 ระดับ: ทั่วไป · ไม่ธรรมดา · หายาก · มหากาพย์ · ตำนาน (ปลาทองคำ ✨ ฿5,000)',
@@ -1856,13 +1892,14 @@ function renderPanel(p) {
     case 'bag': {
       const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
-      const rod = me.rod ? `🎣 เบ็ด${'★'.repeat((me.tools || {}).fisher || 0) || ' ธรรมดา'} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
+      const rod = G.rods[me.rodEq] ? `${G.rods[me.rodEq].icon} ${G.rods[me.rodEq].name} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
       const home = me.house >= 0 ? `บ้านเลขที่ ${me.house + 1} ⭐${me.comfort}` : me.rent ? `เช่าบ้านเลขที่ ${me.rent.idx + 1}` : 'ยังไม่มี';
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🎣 ตกปลา<small>${rod}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
       const job = me.career !== 'none' && G.careers[me.career]?.where;
       const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(G.outfitDefs[id]?.name || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
       return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>
+        <div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>
         <div class="secT">👕 ชุด</div>
         <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
         ${outfits || '<div class="sub">ชุดพิเศษ (รางวัล) จะมาอยู่ตรงนี้ เช่น 🎽 ชุดนักตกปลา (ตกปลาถึงเลเวลสูงสุด) · ชุดแฟชั่นจะมาเพิ่มในอนาคต</div>'}`;
@@ -1917,9 +1954,12 @@ function renderPanel(p) {
         <div class="item"><div class="nm">หนี้คงเหลือ<small><b style="color:${me.loan ? 'var(--bad)' : 'var(--ok)'};font-size:16px">${money(me.loan)}</b></small></div>${B('กู้', { fn: 'bank', st, op: 'borrow' })}${B('ใช้คืน', { fn: 'bank', st, op: 'repay' }, me.loan ? 'good' : '', !me.loan)}</div>`;
     }
     case 'pier': {
-      const s = STN(st), c = me.cast, pool = G.fish[s.pool] || [];
-      const fishes = pool.filter(([id]) => id && G.items[id].rar).sort((a, b) => G.items[a[0]].rar - G.items[b[0]].rar).map(([id]) => `${me.fishdex?.[id] ? '' : '❔'}${esc(G.items[id].name)}${rarTag(id)}`).join(' ');
-      const head = `<h2>🎣 ${esc(s.label)}</h2><div class="sub">ปลาแถวนี้: ${fishes} · ตกปลา Lv.${me.fishLv}${me.fishLv >= G.fishing.maxLv ? ' (สูงสุด)' : ` (${me.fishXp % G.fishing.xpPerLv}/${G.fishing.xpPerLv})`}</div>`;
+      const s = STN(st) || waterNear; if (!s) return '<div class="sub">เดินไปริมน้ำก่อนนะ</div>';
+      const c = me.cast, pool = G.fish[s.pool] || [];
+      const here = pool.filter(([id]) => id && G.items[id].rar), got = here.filter(([id]) => me.fishdex?.[id]).length;
+      const fishes = `${here.length} ชนิด (ตกได้แล้ว ${got}) ` + [1, 2, 3, 4, 5].map(r => [r, here.filter(([id]) => G.items[id].rar === r).length]).filter(([, n]) => n).map(([r, n]) => `<span class="rtag r${r}">${G.fishRarity[r]} ${n}</span>`).join('') + ' · ดูรายชื่อในสมุดภาพปลาที่สมาคมประมง';
+      const rod = G.rods[me.rodEq];
+      const head = `<h2>🎣 ${esc(s.label)}</h2><div class="sub">${rod ? `ในมือ: ${rod.icon} <b>${esc(rod.name)}</b> (เปลี่ยนได้ในกระเป๋า) · ` : ''}ปลาแถวนี้: ${fishes} · ตกปลา Lv.${me.fishLv}${me.fishLv >= G.fishing.maxLv ? ' (สูงสุด)' : ` (${me.fishXp % G.fishing.xpPerLv}/${G.fishing.xpPerLv})`}</div>`;
       if (!me.rod) return `${head}<div class="jobbox">🎣 ต้องมี<b>เบ็ดตกปลา</b>ก่อน ซื้อได้กับน้าเล็กที่สมาคมประมง (${money(G.fishing.rod)}) · ใครก็ตกปลาได้ ไม่ต้องสมัครงาน${B('📍 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good big')}</div>`;
       let btn;
       if (!c) btn = B('🎣 เหวี่ยงเบ็ด (⚡8)', { t: 'act', st, a: 'cast' }, 'primary big');
@@ -1938,13 +1978,10 @@ function renderPanel(p) {
     case 'staff': {
       const S = STN(st), key = S.career;
       if (key === 'fishing') {
-        const T = (me.tools || {}).fisher || 0, d = G.shop.tools.fisher;
-        const rod = me.rod ? itemRowRaw('🎣', 'เบ็ดตกปลาของคุณ', `ตกปลา Lv.${me.fishLv}/${G.fishing.maxLv} · ${T ? `อัปเกรดแล้ว ${'★'.repeat(T)}` : 'เบ็ดธรรมดา'}`, '<span class="tag">มีแล้ว ✓</span>')
-          : itemRowRaw('🎣', 'เบ็ดตกปลา', 'ตกปลาได้ทุกท่า ทุกเวลา ไม่ต้องสมัครงาน · ปลาขายได้ที่นี่หรือตลาดกลาง', B(`ซื้อ ${money(G.fishing.rod)}`, { t: 'act', st, a: 'rod' }, 'primary'));
-        const up = me.rod && T < 3 ? itemRowRaw(d.icon, `${d.name} ระดับ ${T + 1}`, d.fx[T], B(money(G.shop.toolPrices[T]), { t: 'act', st: 'toolshop', a: 'buy', career: 'fisher' }, 'good', true)) + '<div class="sub">อัปเกรดเบ็ดได้ที่ 🛠️ ร้านอุปกรณ์</div>' : '';
         const outfit = (me.outfits || []).includes('fisher') ? `<div class="jobbox ok">🎽 คุณได้ชุดนักตกปลาแล้ว! ใส่ได้ที่ ⚙️ ตั้งค่า</div>` : `<div class="sub">🏆 ตกปลาจนถึง Lv.${G.fishing.maxLv} ได้รางวัล <b>ชุดนักตกปลา</b></div>`;
-        return `<h2>🎣 น้าเล็ก · สมาคมประมง</h2><div class="list">${rod}</div>${up}${outfit}
-          <div class="sub" style="margin-top:8px">วิธีตก: ไปที่ท่าตกปลา 🎣 → เหวี่ยงเบ็ด → พอปลากินเบ็ด ขีดขาวจะวิ่งไปมา <b>กดตอนอยู่ในแถบเขียว</b></div>`;
+        return `<h2>🎣 น้าเล็ก · ร้านเบ็ดสมาคมประมง</h2><div class="sub">ตกปลา Lv.${me.fishLv}/${G.fishing.maxLv} · เบ็ดที่ดีขึ้น = แถบเขียวกว้างขึ้น ขยะน้อยลง ปลาหายากกินเบ็ดบ่อยขึ้น · ซื้อแล้วเก็บในกระเป๋า เปลี่ยนเบ็ดได้ตลอด</div>
+          <div class="list">${rodRows(st)}</div>${outfit}
+          <div class="sub" style="margin-top:8px">วิธีตก: เดินไปยืน<b>ริมน้ำที่ไหนก็ได้</b> (ทะเลสาบ บ่อน้ำ ชายหาด สะพาน) → ปุ่ม 🎣 ตกปลา → พอปลากินเบ็ด ขีดขาวจะวิ่งไปมา <b>กดตอนอยู่ในแถบเขียว</b> · ทะเลกับน้ำจืดมีปลาคนละชนิด</div>`;
       }
       return `<h2>💬 ${esc(STAFF_AT[st]?.name || 'เจ้าหน้าที่')}</h2>${applyBox(key, st)}`;
     }
@@ -2290,7 +2327,7 @@ function sign(text, x, y, o = {}) {
   if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 2; ctx.stroke(); }
   ctx.fillStyle = o.color || '#fff'; ctx.fillText(text, x, y + fs * .04);
 }
-const STN = id => G.stations.find(s => s.id === id);
+const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
 fetch('assets/atlas.json?v=v4').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v4'; });
 function spr(name, cx, by, X, Y, scale = 1) {
@@ -2735,7 +2772,7 @@ function targetOf(key) {
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
 const CAREER_TARGET = { police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
-const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'pier_l1', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
+const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
 function setGuide(key, quiet, auto) {
   const g = targetOf(key); if (!g) return;
   guide = g; autoNav = !!auto; autoPath = null;

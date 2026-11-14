@@ -334,6 +334,7 @@ const LICENSE_YEAR = 12 * D.MONTH_DAYS * D.DAY_MS;
 const licExpired = (a, id) => (a.licenses || []).includes(id) && !!D.LICENSES[id]?.renew && (a.licExp?.[id] || 0) < now();
 const hasLic = (a, id) => (a.licenses || []).includes(id) && !licExpired(a, id);
 // fishing is open to everyone; its own level comes from catches (stored as xp.fisher)
+const rodOf = a => D.RODS[(a.rods || []).includes(a.rodEq) ? a.rodEq : (a.rods || [])[0]] || null;   // the rod in hand
 const fishLv = a => Math.min(D.FISHING.maxLv, 1 + Math.floor((a.xp?.fisher || 0) / D.FISHING.xpPerLv));
 
 const NPC_BUY = 0.3;                         // NPC shops buy at a fraction of what players pay each other
@@ -378,7 +379,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex'];
 let nextListing = 1;
 async function load() {
   const rows = await store.loadAll();
@@ -436,6 +437,10 @@ function hydrate(r) {
   if (!isAdmin(a) && impersonates(a.name)) { a.name = 'ชาวเมือง' + String(a.login).slice(0, 8); a.sd = true; }   // nobody else may look like the admin
   if (!a.phone || byPhone.has(a.phone) && byPhone.get(a.phone) !== a) a.phone = newPhone();
   byPhone.set(a.phone, a);
+  if (a.rod && !(a.rods || []).length) {         // the old single rod + its three toolshop upgrades become rods in the bag
+    const T = (a.tools || {}).fisher || 0, top = [0, 2, 3, 4][T];
+    a.rods = D.ROD_ORDER.slice(0, top + 1); a.rodEq = D.ROD_ORDER[top];
+  }
   return a;
 }
 let saving = false;
@@ -786,11 +791,13 @@ function resign(a) {
 
 // ------------------------------------------------------------------ fishing
 function rollFish(a, pool) {
-  const l = fishLv(a), T = tier(a, 'fisher');
+  const l = fishLv(a), rod = rodOf(a) || D.RODS.bamboo;
   const table = D.FISH[pool] || D.FISH.lake;
   const ws = table.map(([id, w]) => {
-    if (id === null) w = Math.max(5, w - l) * [1, .6, .35, .15][T];
-    if (D.BIG_FISH.includes(id)) w *= [1, 1.3, 1.7, 2.2][T] * (ev('bloom') ? 2 : 1);
+    if (id === null) return Math.max(5, w - l) * rod.junk;
+    const r = D.ITEMS[id].rar || 1;
+    if (r >= 3) w *= rod.luck * (r >= 4 ? rod.luck : 1) ** .5 * (ev('bloom') ? 2 : 1);   // rarer fish gain the most from a good rod
+    else if (r === 2) w *= Math.sqrt(rod.luck);
     return w;
   });
   let r = Math.random() * ws.reduce((s, v) => s + v, 0);
@@ -799,8 +806,14 @@ function rollFish(a, pool) {
 }
 
 // ------------------------------------------------------------------ station actions
+// fishing from any water's edge: a spot made on the fly where the player stands
+function waterSpot(a) {
+  const pool = D.waterPool(a.x, a.y); if (!pool) return null;
+  return { id: 'water', type: 'pier', pool, label: 'ตกปลา', icon: '🎣', x: a.x, y: a.y, r: 3, area: areaId(a) };
+}
 function act(a, m) {
-  const s = ST[m.st];
+  const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
+  if (!s && m.st === 'water') { if (a.cast) { a.cast = null; markMe(a); } return toast(a, 'ต้องยืนติดริมน้ำก่อนถึงจะตกปลาได้', '🎣', false); }
   if (!s) return;
   if (a.down) return toast(a, a.down.kind === 'jail' ? 'คุณติดคุกอยู่ ทำอะไรไม่ได้' : 'คุณหมดสติอยู่ ทำอะไรไม่ได้', a.down.kind === 'jail' ? '⛓️' : '💤', false);
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
@@ -1147,19 +1160,21 @@ function act(a, m) {
     }
     // ---------------- fishing (anyone with a rod)
     case 'fishclub.info': return;
-    case 'fishclub.rod': case 'staff.rod': {
-      if (a.rod) return toast(a, 'คุณมีเบ็ดแล้ว (อัปเกรดได้ที่สมาคมประมงหรือร้านอุปกรณ์)', 'ℹ️', false);
-      if (!pay(a, D.FISHING.rod)) return;
-      a.rod = 1; markMe(a); joy(a, 4);
-      return toast(a, `ได้เบ็ดตกปลาแล้ว! ไปที่ท่าตกปลา 🎣 แล้วเหวี่ยงเบ็ด รอปลากินเบ็ดแล้วกดให้ตรงจังหวะ`, '🎣');
+    case 'fishclub.rod': case 'staff.rod': {                 // buy a rod (it goes into the bag and into your hand)
+      const id = D.RODS[m.rod] ? m.rod : 'bamboo', r = D.RODS[id];
+      a.rods = a.rods || [];
+      if (a.rods.includes(id)) return toast(a, `คุณมี${r.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, r.price)) return;
+      a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4);
+      return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่ม 🎣 ตกปลา`, '🎣');
     }
     case 'pier.cast': {
-      if (!a.rod) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (${money(D.FISHING.rod)})`, '🎣', false);
+      if (!rodOf(a)) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (เริ่ม ${money(D.RODS.bamboo.price)})`, '🎣', false);
       if (a.cast) return;
       if (!spend(a, 8)) return;
-      const bite = now() + rnd(2500, 7000), T = tier(a, 'fisher');
+      const bite = now() + rnd(2500, 7000);
       // timing game: a marker sweeps the bar; the catch zone is wider with a better rod and a higher level
-      const w = D.FISHING.zone[T] + 0.008 * (fishLv(a) - 1), z0 = rnd(0.05, 0.95 - w);
+      const w = Math.min(0.6, rodOf(a).zone + 0.008 * (fishLv(a) - 1)), z0 = rnd(0.05, 0.95 - w);
       a.cast = { state: 'wait', bite, expire: bite + 5200, st: s.id, zone: [+z0.toFixed(3), +(z0 + w).toFixed(3)], speed: +rnd(0.75, 1.15).toFixed(2) }; markMe(a);
       return;
     }
@@ -2193,7 +2208,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     docShift: a.career === 'doctor' && a.doc ? { day: a.doc.day, hours: +(a.doc.hours || 0).toFixed(2) } : null,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
@@ -2278,10 +2293,10 @@ function login(ws, m) {
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
     t: 'init', id: a.id,
-    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
+    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
@@ -2440,6 +2455,10 @@ function onMessage(ws, raw) {
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
     case 'use': return useItem(a, m.item);
+    case 'rod': {                                          // hold another rod from the bag
+      if (!(a.rods || []).includes(m.id) || a.cast) return;
+      a.rodEq = m.id; markMe(a); return toast(a, `ถือ${D.RODS[m.id].icon}${D.RODS[m.id].name}แล้ว`, '🎣');
+    }
     case 'rest': {
       if (a.down) return;
       if (m.on === false) { if (a.pose === 'rest') { a.pose = null; sendRoster(); markMe(a); } return; }
