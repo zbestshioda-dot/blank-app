@@ -172,6 +172,7 @@ function yardFarm(a, m) {
   if (!f?.field || !furnOf(a).includes(k) || !pos || pos[0] !== YARD_FL) return;
   if (Math.hypot(a.x - (yard.x + pos[1]), a.y - (yard.y + pos[2] - .5)) > 2.2) return toast(a, 'เดินเข้าไปใกล้แปลงผักก่อน', '⚠️', false);
   a.ycrops = { ...(a.ycrops || {}) }; const pl = a.ycrops[k];
+  if (f.tile) return soilFarm(a, k, m);
   if (m.op === 'plant') {
     const c = D.CROPS[m.crop]; if (!c) return;
     if (pl) return toast(a, 'แปลงนี้ปลูกอยู่แล้ว', '⚠️', false);
@@ -189,6 +190,38 @@ function yardFarm(a, m) {
     addItem(a, pl[0], n); delete a.ycrops[k]; addXp(a); markMe(a); quest(a, 'harvest'); stat(a, 'harvest'); wdAt = 0;
     if (pl[0] === 'durian') stat(a, 'durian');
     return toast(a, `เก็บเกี่ยว ${D.ITEMS[pl[0]].icon}${D.ITEMS[pl[0]].name} ได้ ${n} หน่วย`, '🧺');
+  }
+}
+// soil tiles: each cell grows one plant; 'all' works on the whole connected bed the tapped cell belongs to
+function soilBed(a, k) {
+  const cell = o => { const p = a.fpos[o]; return p && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.tile ? `${Math.floor(p[1])},${Math.round(p[2]) - 1}` : null; };
+  const at = new Map(); for (const o of furnOf(a)) { const c = cell(o); if (c) at.set(c, o); }
+  const out = [k], seen = new Set([cell(k)]);
+  for (let i = 0; i < out.length; i++) { const [x, y] = cell(out[i]).split(',').map(Number); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const c = `${x + dx},${y + dy}`; if (at.has(c) && !seen.has(c)) { seen.add(c); out.push(at.get(c)); } } }
+  return out;
+}
+function soilFarm(a, k, m) {
+  const keys = m.all ? soilBed(a, k) : [k];
+  if (m.op === 'plant') {
+    const c = D.CROPS[m.crop]; if (!c) return;
+    const empty = keys.filter(o => !a.ycrops[o]); if (!empty.length) return toast(a, 'แปลงนี้ปลูกเต็มแล้ว', '⚠️', false);
+    const seed = Math.ceil(c.seed / 3), cost = seed * empty.length, energy = Math.max(2, Math.ceil(empty.length * .8));
+    if (a.money < cost) return toast(a, `เงินไม่พอ (ค่าเมล็ด ${money(cost)})`, '💸', false);
+    if (!spend(a, energy)) return;
+    a.money -= cost;
+    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')) * (a.career === 'farmer' ? 1 : 1.25), ready = now() + c.grow * 1000 * g;
+    for (const o of empty) a.ycrops[o] = [m.crop, ready];
+    markMe(a); wdAt = 0;
+    return toast(a, `ปลูก${D.ITEMS[m.crop].name} ${empty.length} ช่อง (ค่าเมล็ด ${money(cost)})`, '🌱');
+  }
+  if (m.op === 'harvest') {
+    const ripe = keys.filter(o => a.ycrops[o] && a.ycrops[o][1] <= now()); if (!ripe.length) return toast(a, 'ยังไม่มีอะไรสุก', '🌱', false);
+    if (!spend(a, Math.max(2, Math.ceil(ripe.length * .8)))) return;
+    const got = {};
+    for (const o of ripe) { const id = a.ycrops[o][0]; got[id] = (got[id] || 0) + rint(1, 2) + (Math.random() < .15 * tier(a, 'farmer') ? 1 : 0); delete a.ycrops[o]; }
+    for (const [id, n] of Object.entries(got)) { addItem(a, id, n); if (id === 'durian') stat(a, 'durian'); }
+    addXp(a); markMe(a); quest(a, 'harvest'); stat(a, 'harvest'); wdAt = 0;
+    return toast(a, `เก็บเกี่ยว ${Object.entries(got).map(([id, n]) => `${D.ITEMS[id].icon}${D.ITEMS[id].name} ${n}`).join(' · ')}`, '🧺');
   }
 }
 function exitRoom(a) {
@@ -1261,13 +1294,16 @@ function act(a, m) {
       if (a.house < 0 || houses[a.house] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่หน้าบ้านแต่ละหลัง 🏡', '🛋️', false);
       const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
       let key = m.item;
-      if (f.multi) {                        // walls, doors and screens: buy as many as you need
-        if (a.furniture.filter(k => fbase(k) === m.item).length >= FURN_MULTI_MAX) return toast(a, `มี${f.name}ครบ ${FURN_MULTI_MAX} ชิ้นแล้ว`, 'ℹ️', false);
-        for (let n = 2; a.furniture.includes(key); n++) key = `${m.item}#${n}`;
+      if (f.multi) {                        // walls, doors, screens, garden pieces: buy as many as you need (up to 20 at a time)
+        const max = f.max || FURN_MULTI_MAX, have = a.furniture.filter(k => fbase(k) === m.item).length, q = Math.min(clamp(Math.floor(+m.qty) || 1, 1, 20), max - have);
+        if (q <= 0) return toast(a, `มี${f.name}ครบ ${max} ชิ้นแล้ว`, 'ℹ️', false);
+        if (!pay(a, f.price * q)) return;
+        const add = []; for (let n = 1, made = 0; made < q; n++) { const k = n === 1 ? m.item : `${m.item}#${n}`; if (!a.furniture.includes(k)) { add.push(k); made++; } }
+        a.furniture = [...a.furniture, ...add]; joy(a, 1); markMe(a); wdAt = 0;
+        return toast(a, `ซื้อ ${f.icon}${f.name} x${q} แล้ว (มี ${have + q} ชิ้น) · วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
       } else if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, f.price)) return;
-      a.furniture = [...a.furniture, key]; joy(a, f.multi ? 1 : 5); markMe(a); wdAt = 0;
-      if (f.multi) return toast(a, `ซื้อ ${f.icon}${f.name} แล้ว (มี ${a.furniture.filter(k => fbase(k) === m.item).length} ชิ้น) · วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
+      a.furniture = [...a.furniture, key]; joy(a, 5); markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)}) · จัดวางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
     }
     case 'dealer.buy': case 'dealer.sell': {   // the car showroom
@@ -2458,11 +2494,17 @@ function onMessage(ws, raw) {
         if (!fd?.multi || !a.furniture.includes(k)) return;
         a.furniture = a.furniture.filter(x => x !== k); delete a.fpos[k]; if (a.ycrops) delete a.ycrops[k]; credit(a, Math.round(fd.price / 2));
         toast(a, `ขาย${fd.name}คืน ได้ ${money(Math.round(fd.price / 2))}`, '♻️');
-      } else if (m.store) { a.fpos[k] = [0]; toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
+      } else if (m.store) { a.fpos[k] = [0]; if (fd?.tile) { if (a.ycrops) delete a.ycrops[k]; } else toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
       else {
         const fl = Math.round(+m.fl) || 1, x = +m.x, y = +m.y;
         if (fl === YARD_FL) {                 // out in the yard: only on ground that has been unlocked
           if (!(x >= .7 && x <= D.YARD.w - .7 && y >= 1.5 && y <= D.YARD.h - .8)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
+          if (fd?.tile) {                     // soil tiles sit on the grid, one per cell, and join up with their neighbours
+            const cx = Math.floor(x), cy = Math.round(y) - 1;
+            if (!yardOpen(a, D.yardZone(cx + .5, cy + .5))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
+            if (Object.entries(a.fpos).some(([o, p]) => o !== k && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.tile && Math.floor(p[1]) === cx && Math.round(p[2]) - 1 === cy)) return toast(a, 'ช่องนี้มีแปลงดินแล้ว', '🟫', false);
+            a.fpos[k] = [fl, cx + .5, cy + 1]; markMe(a); wdAt = 0; return;
+          }
           if (!yardOpen(a, D.yardZone(x, y))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
         } else if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
         a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20];

@@ -788,6 +788,7 @@ const FURNITURE = {
   xpatio: { name: 'โต๊ะร่มสนาม', icon: '⛱️', price: 5000, comfort: 1, cat: 'deco', spr: 'x_patio' },
   xpbench: { name: 'ม้านั่งสวน', icon: '🪑', price: 3500, comfort: 0, cat: 'deco', spr: 'x_pbench' },
   // home-yard garden pieces: buy as many as you like and lay them out in your yard (fields grow vegetables)
+  gsoil: { name: 'แปลงดินปลูกผัก (1 ช่อง · วางต่อกันได้)', icon: '🟫', price: 300, comfort: 0, cat: 'garden', spr: 'y_soil15', multi: 1, max: 200, field: 1, tile: 1 },
   gfield: { name: 'แปลงผัก (ปลูกพืชได้)', icon: '🌱', price: 2500, comfort: 0, cat: 'garden', spr: 'y_field', multi: 1, field: 1 },
   gtree: { name: 'ต้นไม้ใหญ่', icon: '🌳', price: 3000, comfort: 0, cat: 'garden', spr: 'tree', multi: 1, solid: 1, sw: 0.8 },
   gtreeoak: { name: 'ต้นโอ๊ก', icon: '🌳', price: 3500, comfort: 0, cat: 'garden', spr: 'tree_oak', multi: 1, solid: 1, sw: 0.8 },
