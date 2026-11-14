@@ -136,12 +136,12 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   prop('o_bin', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
-  for (let x = 6; x < 40; x += 9) prop('o_lamp', x + .5, 34);
+  for (let x = 6; x < 40; x += 9) prop('o_lamp', x + .5, 34.95, false);   // street lamps stand on the verge behind the sidewalk, clear of the road and the footpath
   // street trees on the grass verge behind the sidewalk, between the lamps
   const verge = (y, x0, x1) => { for (let x = x0; x < x1; x += 9) if (get(x, y) === '.' && get(x, y - 1) !== '=' && !BUILDINGS.some(b => x >= b.x - 1 && x <= b.x + b.w && y >= b.y - 1 && y <= b.y + b.h + 1)) prop(['tree2', 'tree3', 'tree4', 'tree'][(x >> 3) % 4], x + .5, y + .95); };
   verge(35, 9, 40); verge(35, 65, 92); verge(18, 20, 46); verge(18, 56, 86); verge(50, 10, 46);
-  for (let x = 62; x < 92; x += 9) prop('o_lamp', x + .5, 34);
-  for (let x = 17; x < 86; x += 11) if (x < 47 || x > 52) prop('o_lampball', x + .5, 17);
+  for (let x = 62; x < 92; x += 9) prop('o_lamp', x === 89 ? 90.6 : x + .5, 34.95, false);
+  for (const x of [16, 25, 34, 61, 70, 79, 88]) prop('o_lampball', x, 17.95, false);   // between the verge trees so their crowns don't hide them
   prop('o_shelter2', 38.5, 35.2); prop('o_bikerack', 35.6, 35.9, false); prop('vending', 41.2, 29.9);
   for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('o_hydrant', 65.5, 33.95); prop('o_hydrant', 28, 33.95);
   prop('o_phonebooth', 57.3, 23.9); prop('o_bin_blue', 33.8, 29.95); prop('o_bin_green', 75, 33.95); prop('o_bin', 12.2, 33.95);
