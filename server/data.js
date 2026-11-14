@@ -147,14 +147,16 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('o_topiary', 46.4, 37.95, false); prop('o_topiary', 53.6, 37.95, false);
   // the plaza: lamps at its four corners, benches facing the fountain, planters at the walkway mouths
   for (const [x, y] of [[47.3, 29.95], [52.7, 29.95], [47.3, 35.95], [52.7, 35.95]]) prop('o_lamp', x, y);
-  for (const [x, y, s] of [[43.6, 32.6, 'o_bench'], [56.4, 32.6, 'o_stonebench']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
-  prop('o_potflower', 42.4, 31.9, false); prop('o_potflower', 57.6, 31.9, false);
+  // benches sit against the lawn hedges on both sides, off the walkways (the first keeps its old id: quests and the map point at it)
+  for (const [id, x, y, s] of [['seatb43.6', 44.6, 29.95, 'o_bench'], ['seatbNE', 55.4, 29.95, 'o_bench'], ['seatbSW', 44.6, 35.95, 'o_stonebench'], ['seatbSE', 55.4, 35.95, 'o_stonebench']]) {
+    prop(s, x, y, false); STATIONS.push({ id, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' });
+  }
   prop('o_lplanter', 47.4, 31.4); prop('o_lplanter', 52.6, 31.4);
-  prop('o_drinkfount', 55.0, 30.95); prop('o_bin_green', 42.6, 34.95);
+  prop('o_drinkfount', 57.4, 30.95); prop('o_bin_green', 42.6, 34.95);
   prop('o_noticeboard', 47.9, 25.6);
   STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47.9, y: 26.4, r: 1.4, area: 'town' });
   // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
-  for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
+  for (const [id, x, y, l] of [['crowd1', 50, 30.6, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   prop('o_bin', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
@@ -329,6 +331,53 @@ for (const a of [TOWN, FARM, HOUSING]) {
 BUILDINGS.forEach(b => rect(b.x, b.y, b.w, b.h, 'B'));
 const TREES = [];
 for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
+
+// ================================================================= town dressing: fenced back gardens behind the shops and garden
+// patches on the open grass, so no stretch of town is a bare lawn. Laid out after the trees with its own random numbers
+// (the trees and everything older stay exactly where they were).
+{
+  const R = rng(20261114), pickR = a => a[Math.floor(R() * a.length)];
+  const T = TOWN, dropTree = (x, y) => { if (get(x, y) === 'T') { set(x, y, '.'); const i = TREES.findIndex(t => t[0] === x && t[1] === y); if (i >= 0) TREES.splice(i, 1); } };
+  const way = c => '=,ckpswD'.includes(c);
+  const nearWay = (x, y, r) => { for (let j = -r; j <= r; j++) for (let k = -r; k <= r; k++) if (way(get(x + k, y + j) || '.')) return true; return false; };
+  const propNear = (x, y, r) => PROPS.some(p => Math.hypot(p.x - x, p.y - y) < r) || STATIONS.some(s => s.area === 'town' && Math.hypot(s.x - x, s.y - y) < r + .5);
+  // 1) back gardens: every shop or service whose back faces open grass gets a 3-row garden behind it: a white picket
+  //    fence along the far edge, a hedge against the back wall, bushes in the corners and a flower bed in the middle
+  for (const b of BUILDINGS) {
+    if (b.area && b.area !== 'town' || b.house !== undefined || /^vh/.test(b.id) || b.x < T.x || b.x >= T.x + T.w) continue;
+    const x0 = b.x, x1 = b.x + b.w, y0 = b.y - 3;
+    let ok = y0 > 2;
+    for (let y = y0 - 1; y < b.y && ok; y++) for (let x = x0; x < x1 && ok; x++) if (!'.T'.includes(get(x, y))) ok = false;
+    if (!ok || propNear(b.x + b.w / 2, b.y - 1.5, 1.6)) continue;
+    for (let y = y0; y < b.y; y++) for (let x = x0; x < x1; x++) dropTree(x, y);
+    fenceRow('fence_white', x0, x1, y0 + .95);
+    fenceRow(b.w >= 6 ? 'hedge_flower' : 'hedge', x0 + .6, x1 - .6, b.y - .02);
+    prop(pickR(['bush', 'bush2', 'o_topiary']), x0 + .55, b.y - 1.1, false); prop(pickR(['bush2', 'bush', 'o_hedgecube']), x1 - .55, b.y - 1.1, false);
+    if (b.w >= 5) prop(pickR(['flowerbed', 'flowerbed2', 'o_flowerbed']), b.x + b.w / 2, b.y - 1.05, false);
+    if (b.w >= 7) { prop('o_potflower', x0 + 1.6, b.y - .9, false); prop('o_potflower', x1 - 1.6, b.y - .9, false); }
+  }
+  // 2) garden patches on the open grass (not on roads, paths, building fronts or next to anything else)
+  const KITS = [
+    [['bush', 0, 0], ['bush2', 1.1, .3], ['o_roses', -.9, .35, 1], ['tuft', .5, .9, 1]],
+    [['o_tulips', 0, 0, 1], ['o_tulips', .7, .15, 1], ['o_roses', 1.5, 0, 1], ['bush2', -1, .1]],
+    [['rock', 0, 0, 1], ['bush2', .9, -.1], ['tuft', -.6, .4, 1], ['o_potflower', 1.6, .3, 1]],
+    [['bench2', 0, 0, 1], ['bush', -1.5, -.1], ['bush2', 1.5, -.1], ['o_lampball', 2.4, -.2]],
+    [['o_topiary', 0, 0], ['o_topiary', 1.4, 0], ['flowerbox', .7, .6, 1]],
+    [['stump', 0, 0, 1], ['tuft', .8, .2, 1], ['bush2', -1, -.2], ['o_roses', 1.6, -.1, 1]],
+    [['flowerbed2', 0, 0, 1], ['bush', -1.8, 0], ['bush', 1.8, 0]],
+  ];
+  let n = 0;
+  for (let gy = T.y + 4; gy < T.y + T.h - 3; gy += 4) for (let gx = T.x + 3; gx < T.x + T.w - 4; gx += 5) {
+    const x = gx + Math.floor(R() * 3), y = gy + Math.floor(R() * 2), kit = pickR(KITS);
+    if (R() < .35) continue;
+    let ok = true;
+    for (let j = -2; j <= 1 && ok; j++) for (let k = -3; k <= 3 && ok; k++) if (get(x + k, y + j) !== '.') ok = false;
+    if (!ok || nearWay(x, y, 2) || propNear(x + .5, y + .5, 3)) continue;
+    if (BUILDINGS.some(b => x >= b.x - 3 && x <= b.x + b.w + 2 && y >= b.y - 1 && y <= b.y + b.h + 3)) continue;
+    for (const [s, dx, dy, flat] of kit) prop(s, x + .5 + dx, y + .95 + dy, !flat);
+    n++;
+  }
+}
 
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
