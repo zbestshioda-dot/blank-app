@@ -306,6 +306,7 @@ const CAREER_ICON = c => G?.careers[c]?.icon || '';
 function paintCardClock(h) {
   const dt = me?.date; if (dt) $('#cDate').textContent = `${dt.day} ${G.months[dt.month]}`;
   $('#cTime').textContent = hhmm(h);
+  if (wd) $('#cOn').textContent = `${wd.on} ออนไลน์`;
   $('#cWx').textContent = wd?.ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️';
 }
 // today's quests listed in the card: tap one and you walk there by yourself
@@ -327,7 +328,13 @@ function paintHud() {
   $('#card').classList.toggle('admin', !!me.admin);
   $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} ${c.name} Lv.${me.lv}`;
   // ring around the portrait: progress to the next job level
-  const per = me.career === 'office' ? 3 : 10, xp = (me.xp || {})[me.career] || 0, pct = me.career === 'none' ? 0 : (xp % per) / per * 100;
+  const jx = me.jx, pct = !jx ? 0 : jx.max ? 100 : Math.min(100, jx.cur / jx.need * 100);
+  $('#jx').classList.toggle('hidden', !jx);
+  if (jx) {
+    $('#jxL').textContent = `EXP ${c.name} Lv.${jx.L}${jx.pay ? ` · เงิน +${jx.pay}%` : ''}`;
+    $('#jxV').textContent = jx.max ? 'MAX' : `${(+jx.cur).toFixed(1)}/${jx.need}${jx.gain < 100 ? ` · ได้ ${jx.gain}%` : ''}`;
+    $('#jxU').style.width = pct + '%';
+  }
   $('#lvRing').style.background = `conic-gradient(#ffc94d ${pct}%, rgba(255,255,255,.12) 0)`; $('#lvPct').textContent = `★ ${pct.toFixed(1)}%`;
   paintQuestBox();
   // status pills (icons from the UI sheet where we have one)
@@ -1091,10 +1098,11 @@ function drawMini() {
 }
 
 // ------------------------------------------------------------------ panels
+let panelOpenT = 0;
 function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
-  panel = p; panelSig = ''; $('#panel').classList.remove('hidden'); refreshPanel(true);
+  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); refreshPanel(true);
   if (p.kind === 'chat') setTimeout(() => $('#chatIn')?.focus(), 50);
 }
 function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
@@ -1115,6 +1123,7 @@ function refreshPanel(force) {
 }
 function bindPanel(root) {
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+    if (performance.now() - panelOpenT < 450) return;      // the tap that opened this panel must not also press a button in it
     FX.play('click');
     const m = JSON.parse(b.dataset.m);
     if (m.fn) return FN[m.fn](m, root);
@@ -1385,7 +1394,7 @@ function renderPanel(p) {
       }).join('');
       const starter = `<div class="jobbox">💡 <b>เพิ่งเริ่มเล่น ยังไม่มีเงิน?</b> ไปซื้อเบ็ด ${money(G.fishing.rod)} กับน้าเล็กที่สมาคมประมง แล้ว<b>ตกปลาขาย</b> ทำได้ทุกคนทุกเวลาไม่ต้องสมัครงาน ${me.rod ? '' : B('🎣 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good')}</div>`;
       return `<h2>💼 งานของฉัน</h2>
-        <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}`}
+        <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(+me.jx.cur).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
         ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
         ${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา และ 🕶️ ล้วงกระเป๋า ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;

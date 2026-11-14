@@ -613,37 +613,13 @@ body.hasEvent #topBar{top:146px!important}
 
 #feed #toasts{display:none!important}
 
-/* status card v2, game skin: parchment panels with wooden frames, smaller */
-#card.v2{width:min(222px,calc(100vw - 128px))!important;filter:drop-shadow(0 3px 6px rgba(0,0,0,.4))}
-#card.v2 .sInfo,#card.v2 .bars,#card.v2 #qBox{background:none!important;border:9px solid transparent!important;border-image:url(assets/ui/parchment.png) 24 fill / 9px stretch!important;border-radius:0!important;color:var(--ink)!important}
-#card.v2 .pfp{width:54px;height:54px}
-#card.v2 #lvRing{box-shadow:0 0 0 2px #3e2414}
-#card.v2 #mePortrait{inset:4px;width:46px!important;height:46px!important;border:2px solid #3e2414}
-#card.v2 #lvPct{font-size:9px;bottom:-6px;background:linear-gradient(#b67c46,#7f4c26);border-color:#3e2414;color:#fbecd2}
-#card.v2 .sInfo{margin-left:-8px;padding:0 3px 0 9px!important}
-#card.v2 #meName{font-size:12.5px!important;color:#3a2410}
-#card.v2 #meCareer{font-size:9.5px;color:var(--mut)}
-#card.v2 .l2{font-size:10px;color:#5a3e22;gap:4px}
-#card.v2 #cTime{font-size:12px;color:#8a5a12}
-#card.v2 .money{font-size:12.5px;color:#8a5a12;margin-top:0}
-#card.v2 .bars{margin-top:3px;padding:0 1px!important;gap:4px}
-#card.v2 .bar label{font-size:9.5px;color:#5a3e22}
-#card.v2 .bar em{font-size:9px;color:#8a6a45}
-#card.v2 .bar s{height:6px;margin-top:1px;background:#5b3b2a;border:1px solid #3a2416}
-#card.v2 #qBox{margin-top:3px;padding:0 1px!important}
-#card.v2 .qHead{font-size:11px;color:#3a2410}
-#card.v2 #qCount{color:var(--mut)}
-#card.v2 #cardToggle{width:20px;height:17px;font-size:9px;background:linear-gradient(#b67c46,#7f4c26);border:1px solid #3e2414;color:#fbecd2}
-#card.v2 .qRow{font-size:10.5px;color:#3a2410;padding:2px 4px}
-#card.v2 .qRow i{color:#b07a1e}
-#card.v2 .qRow small,#card.v2 .qRow em{color:#8a6a45}
-#card.v2 .qRow.cur{background:rgba(201,164,90,.3);border:1px solid #b38955}
-#card.v2 .qRow.done span{color:#a08c70}
-#card.v2 .qRow.more{color:#8a5a12;font-size:9.5px}
-#card.v2 #statusBox{margin-top:3px}
-@media (max-height:520px) and (orientation:landscape){
-  #card.v2{width:210px!important}
-  #card.v2 .pfp{width:46px;height:46px}#card.v2 #mePortrait{inset:3px;width:40px!important;height:40px!important}
-}
-#card.v2 #meCareer{color:#fbecd2!important}
-@media (max-width:600px) and (orientation:portrait){#ticker{top:auto!important;bottom:calc(196px + env(safe-area-inset-bottom))!important}}
+/* job experience: a thin bar under the four status bars; online-players count beside the money */
+#card.v2 .l3{display:flex;align-items:center;gap:6px}
+#cOn{margin-left:auto;font-size:10.5px;color:#9be15d;white-space:nowrap}
+#cOn::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#5fd35f;margin-right:4px;box-shadow:0 0 4px #5fd35f}
+#card.v2 #jx{grid-column:1/-1;margin-top:1px}
+#card.v2 #jx.hidden{display:none}
+#card.v2 #jx label{display:flex;justify-content:space-between;font-size:9.5px;color:#d9c7a8;line-height:1.1}
+#card.v2 #jx em{font-style:normal;font-size:9px;color:#bfae92}
+#card.v2 #jx s{display:block;height:3px;margin-top:1px;background:#1a120a;border:1px solid #000;border-radius:3px;overflow:hidden;text-decoration:none}
+#card.v2 #jx u{display:block;height:100%;background:linear-gradient(90deg,#7fd3ff,#4a8cff);transition:width .4s;text-decoration:none}

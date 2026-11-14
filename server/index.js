@@ -54,7 +54,14 @@ const rint = (a, b) => Math.floor(rnd(a, b + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const ev = id => event && event.id === id;
-const lvl = (a, c = a.career) => 1 + Math.floor((a.xp[c] || 0) / (c === 'office' ? 3 : 10));
+// job levels: each level needs more experience than the last, and each action gives less the higher you are
+// (office keeps its own ladder: 3 good shifts per promotion)
+const JOB_MAX = 50;
+const xpNeed = L => Math.round(10 + 4 * Math.pow(L - 1, 1.4));
+function jobXp(xp) { let L = 1; xp = +xp || 0; while (L < JOB_MAX && xp >= xpNeed(L)) { xp -= xpNeed(L); L++; } return { L, cur: xp, need: xpNeed(L) }; }
+const lvl = (a, c = a.career) => c === 'office' ? 1 + Math.floor((a.xp[c] || 0) / 3) : jobXp(a.xp[c] || 0).L;
+const xpGain = L => 1 / (1 + 0.08 * (L - 1));          // Lv1 100% · Lv5 76% · Lv10 58% · Lv20 40%
+const jobPay = a => 1 + 0.06 * (lvl(a) - 1);            // every level pays 6% more
 const money = n => '฿' + Math.round(n).toLocaleString('en-US');
 const cleanText = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 const hourNow = () => D.hourAt(now());
@@ -221,7 +228,12 @@ function need(a, career) {
   }
   return true;
 }
-function addXp(a, n = 1) { a.xp[a.career] = (a.xp[a.career] || 0) + n; }
+function addXp(a, n = 1) {
+  const c = a.career; if (!c || c === 'none') return;
+  const before = lvl(a), g = c === 'office' ? n : n * xpGain(before);
+  a.xp[c] = +((a.xp[c] || 0) + g).toFixed(3); markMe(a);
+  if (c !== 'office' && lvl(a) > before) { toast(a, `🎉 เลเวลอาชีพ${D.CAREERS[c].name}อัปเป็น Lv.${lvl(a)}! ได้เงินจากงานเพิ่มเป็น +${Math.round((jobPay(a) - 1) * 100)}%`, '⭐'); if (lvl(a) % 5 === 0) feed(`⭐ ${a.name} เลเวล${D.CAREERS[c].name}ถึง Lv.${lvl(a)}`); }
+}
 // licences that expire: the driving licence must be renewed every in-game year (1 real day)
 const LICENSE_YEAR = 12 * D.MONTH_DAYS * D.DAY_MS;
 const licExpired = (a, id) => (a.licenses || []).includes(id) && !!D.LICENSES[id]?.renew && (a.licExp?.[id] || 0) < now();
@@ -393,7 +405,7 @@ function finishOrder(o, rider) {
   orders.delete(o.id);
   if (o.cust) { addItem(o.cust, o.item, 1); markMe(o.cust); o.cust.sd = true; }
   if (rider) {
-    const got = earn(rider, (o.fee * (1 + [0, .1, .2, .35][tier(rider, 'rider')]) + o.tip) * wellbeing(rider));
+    const got = earn(rider, (o.fee * (1 + [0, .1, .2, .35][tier(rider, 'rider')]) * jobPay(rider) + o.tip) * wellbeing(rider));
     addXp(rider); stat(rider, 'delivered'); quest(rider, 'deliver');
     toast(rider, `ส่งอาหารให้ ${o.custName} สำเร็จ! ได้ ${money(got)}${o.tip ? ` (รวมทิป ${money(o.tip)})` : ''}`, '🛵');
     if (o.cust) toast(o.cust, `${rider.name} มาส่ง ${D.ITEMS[o.item].icon}${D.ITEMS[o.item].name} แล้ว! (อยู่ในกระเป๋า 🎒)`, '🛵');
@@ -740,6 +752,7 @@ function act(a, m) {
       let total = 0;
       for (let i = 0; i < q; i++) { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); }
       addItem(a, id, -q);
+      if ({ merchant: 'goods', farmer: 'crop', chef: 'meal' }[a.career] === it.kind) total *= jobPay(a);   // your own trade's goods sell better the higher your job level
       const got = earn(a, total); quest(a, 'sell', q);
       return toast(a, `ขาย ${it.icon}${it.name} x${q} ให้ NPC ได้ ${money(got)} (วางขายให้ผู้เล่นที่ตลาดกลางได้ราคาดีกว่ามาก)`, '💰');
     }
@@ -905,7 +918,7 @@ function act(a, m) {
       const pt = beds[s.idx];
       if (!pt || pt === a) return toast(a, 'เตียงนี้ยังไม่มีคนไข้', '🛏️', false);
       if (!cd(a, 'treat', 1500) || !spend(a, 8)) return;
-      const boost = (1 + BOOST[tier(a, 'doctor')]) * (1 + 0.04 * (lvl(a, 'doctor') - 1)) * wb;
+      const boost = (1 + BOOST[tier(a, 'doctor')]) * jobPay(a) * wb;
       if (m.a === 'revive') {
         if (!pt.down) return toast(a, 'คนไข้รู้สึกตัวดีอยู่แล้ว', 'ℹ️', false);
         const fee = Math.min(400, Math.floor(pt.money)); pt.money -= fee;
@@ -1153,6 +1166,8 @@ function tradeConfirm(a) {
 }
 function request(a, m) {
   if (a.down) return;
+  const bn = botById(+m.to);
+  if (bn) { if (dist(a, bn) > 6) return toast(a, 'เดินเข้าไปใกล้ผู้เล่นคนนั้นก่อน', '⚠️', false); botSay(bn, pick(['ขอโทษนะ ตอนนี้ไม่ว่าง 🙏', 'ไว้ทีหลังนะ กำลังทำงานอยู่', 'ยังไม่สะดวกอะ'])); return toast(a, `${bn.name} ปฏิเสธคำขอ (ไม่ว่าง)`, '🙅', false); }
   const o = nearPlayer(a, m.to, 6);
   if (!o) return toast(a, 'เดินเข้าไปใกล้ผู้เล่นคนนั้นก่อน', '⚠️', false);
   if (m.kind === 'trade') {
@@ -1319,12 +1334,12 @@ function moodTick(a, t, indoors) {
   billUp(a);
   // begging: passers-by drop coins now and then
   if (a.pose === 'beg' && a.career === 'beggar' && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
-    const c = rint(4, 14); earn(a, c); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
+    const c = Math.round(rint(4, 14) * jobPay(a)); earn(a, c); if (Math.random() < .5) addXp(a, .5); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
   }
   // police on patrol (outside, on their feet) earn a small allowance
   if (a.career === 'police' && !indoors && !a.pose && t - (a.lastMoveT || 0) < 15000) {
     a.patrol = (a.patrol || 0) + D.POLICE.patrolWage / 60 * (1 + BOOST[tier(a, 'police')]);
-    if (a.patrol >= D.POLICE.patrolWage) { earn(a, a.patrol); a.patrol = 0; }
+    if (a.patrol >= D.POLICE.patrolWage) { earn(a, a.patrol * jobPay(a)); a.patrol = 0; addXp(a, .5); }
   }
 }
 
@@ -1372,6 +1387,8 @@ function payBills(a) {
 // ------------------------------------------------------------------ beggars, thieves and police
 function donate(a, m) {
   if (a.down) return;
+  const bn = botById(+m.to);
+  if (bn && bn.c === 'beggar' && dist(a, bn) <= 5) { const amt = clamp(Math.floor(+m.amt) || 0, 1, 100000); if (a.money < amt) return toast(a, 'เงินไม่พอ', '💸', false); a.money -= amt; markMe(a); joy(a, 4); botSay(bn, pick(['ขอบคุณมากครับ 🙏', 'ขอให้รวยๆ นะ', 'บุญรักษานะครับ'])); return toast(a, `บริจาคให้ ${bn.name} ${money(amt)} อิ่มบุญ 😇`, '🥣'); }
   const o = nearPlayer(a, m.to, 5);
   if (!o) return toast(a, 'เดินเข้าไปใกล้ก่อน', '⚠️', false);
   if (o.career !== 'beggar') return toast(a, `${o.name} ไม่ได้เป็นขอทาน`, '⚠️', false);
@@ -1459,7 +1476,7 @@ function arrest(a, m) {
   if (!(o.wanted > now())) return toast(a, `ไม่มีหลักฐานหรือการแจ้งความเกี่ยวกับ ${o.name} จับไม่ได้`, '👮', false);
   if (!cd(a, 'arrest', 3000)) return;
   const back = jail(o, `ตำรวจ${a.name}`);
-  const got = earn(a, D.POLICE.bounty * (1 + BOOST[tier(a, 'police')]) + Math.max(0, back) * 0.3); stat(a, 'arrests'); addXp(a, 2); joy(a, 6);
+  const got = earn(a, D.POLICE.bounty * (1 + BOOST[tier(a, 'police')]) * jobPay(a) + Math.max(0, back) * 0.3); stat(a, 'arrests'); addXp(a, 2); joy(a, 6);
   return toast(a, `จับกุม ${o.name} สำเร็จ! ได้ค่าหัว ${money(got)}`, '👮');
 }
 // fine the thief, give the loot back to the victims and lock them up; returns what is left of the fine
@@ -1560,6 +1577,137 @@ function folkArrive(n) {
   }
   return false;
 }
+// ------------------------------------------------------------------ AI players
+// 3–6 make-believe townspeople who behave like players: they come and go, walk to a job's staff to apply,
+// go to work, fish, shop, take a break, chat (and answer when you talk to them). They show up as ordinary
+// online players everywhere (roster, map, online count, profiles); they just never trade or take calls.
+const BOT_NAMES = ['มิ้นท์ตี้', 'BossKung', 'น้องพลอย', 'ต้นกล้า99', 'JayZ_TH', 'ปลาทูน่า', 'KaiJeaw', 'แพรวา', 'NongBam', 'อาร์มแกร่ง', 'Fern.ny', 'บอสหนุ่ม',
+  'PimPim', 'โอ๊ตคุง', 'MaxPower', 'จุ๊บแจง', 'Toey_Nara', 'เก่งกาจ', 'บีมมี่', 'Kanomtom', 'ไอซ์ซี่', 'Nutty_99', 'ฟ้าใส', 'GolfGG'];
+const BOT_SAY = {
+  any: ['มีใครว่างบ้าง', 'วันนี้เงินเข้าดีมาก 555', 'เหนื่อยจัง', 'ใครรู้ที่ตกปลาดีๆ บ้าง', 'หิวแล้วอะ', 'เดินหลงอีกแล้ว 😅', 'สวัสดีทุกคน', 'เมืองนี้น่าอยู่ดี', 'ใกล้จะเลเวลอัปแล้ว!', 'ใครอยู่แถวนี้บ้าง'],
+  none: ['หางานอยู่ มีงานไหนดีบ้าง', 'ว่างงานอะ ไปสมัครงานก่อนดีกว่า'],
+  rider: ['ส่งของรอบที่สิบแล้ว 🛵', 'ทิปวันนี้ดีมาก'], farmer: ['ผักโตไวมากวันนี้', 'เดี๋ยวไปรดน้ำผักก่อน'], merchant: ['ของราคาส่งขึ้นอีกแล้ว', 'ใครอยากซื้อของบ้าง ราคาดี'],
+  chef: ['ทำต้มยำขายดีมาก', 'วัตถุดิบหมดอีกแล้ว'], doctor: ['ใครป่วยมาหาหมอได้นะ', 'เวรวันนี้ยาวมาก'], police: ['ระวังโจรนะทุกคน', 'ลาดตระเวนอยู่ 👮'],
+  office: ['ประชุมอีกแล้ว', 'เงินเดือนออกพอดี'], beggar: ['ขอเศษเงินหน่อยครับ 🙏', 'วันนี้ได้นิดเดียวเอง'],
+};
+const BOT_REPLY = [
+  [/สวัสดี|หวัดดี|ดีจ้า|hello|hi\b|ทัก/i, ['สวัสดีครับ 😄', 'หวัดดีจ้า', 'ดีครับบ', 'ทักทายย 👋']],
+  [/งาน|สมัคร|อาชีพ/, ['ไปคุยกับเจ้าหน้าที่ตามตึกได้เลย', 'ไรเดอร์เงินดีนะ แต่ต้องมีใบขับขี่', 'ลองเป็นชาวไร่ดู ไม่ต้องมีวุฒิ']],
+  [/เงิน|รวย|จน/, ['ตกปลาขายก็ได้เงินนะ', 'ทำงานไปเรื่อยๆ เดี๋ยวก็รวย 555', 'จนเหมือนกัน 😭']],
+  [/ปลา|ตก/, ['ท่าตกปลาริมทะเลได้ปลาใหญ่', 'ต้องกดตอนเข้าแถบเขียวนะ']],
+  [/หิว|กิน|ข้าว/, ['ร้านอาหารอยู่ใจกลางเมือง', 'ไปกินด้วยกันมั้ย']],
+  [/เพื่อน|แอด/, ['ได้เลย 😊', 'ยินดีที่ได้รู้จักนะ']],
+  [/555|ฮา|lol/i, ['555+', 'ขำ 😂']],
+  [/บาย|ไปก่อน|bye/i, ['บายย 👋', 'ไว้เจอกันใหม่']],
+];
+const BOT_DEFAULT = ['อืมๆ', 'จริงด้วย', 'ใช่ๆ', 'โอเคเลย 👍', 'งั้นเหรอ', '😄'];
+const BOT_JOBS = Object.keys(D.CAREERS).filter(k => k !== 'none' && ST['staff_' + k] && (D.AREAS.find(r => r.id === ST['staff_' + k].area)?.kind === 'room' || ST['staff_' + k].area === 'town'));
+let botSeq = 0, botEventAt = now() + 60000, botWorldAt = now() + 90000;
+const bots = () => npcs.filter(n => n.bot);
+const botById = id => npcs.find(n => n.bot && n.id === id);
+// nearest free tile to a point inside an area (somewhere a bot can stand)
+function standNear(area, x, y) {
+  let best = null, bd = 1e9;
+  for (const [tx, ty] of walkableIn(area)) { const d = Math.hypot(tx + .5 - x, ty + .5 - y); if (d < bd && d > .6) { bd = d; best = [tx + .5, ty + .5]; } }
+  return best;
+}
+const stepAt = (st, d, stay, say) => { const s = ST[st]; if (!s) return null; const p = standNear(s.area, s.x, s.y + .8); return p && { area: s.area, x: p[0], y: p[1], d, stay, say, st }; };
+// what a bot does next: get a job first, then mostly work, with breaks for fishing, shopping and hanging around
+function botPlan(n) {
+  const b = n.bot, plan = [];
+  if (n.c === 'none' || Math.random() < .04) {
+    const job = pick(BOT_JOBS.filter(j => j !== n.c));
+    const s = job && stepAt('staff_' + job, 'apply', rnd(3, 6)); if (s) { s.job = job; plan.push(s); }
+  }
+  const r = Math.random(), work = D.CAREERS[plan[0]?.job || n.c]?.where;
+  if (work && r < .55) { const s = stepAt(work, 'work', rnd(40, 110)); if (s) plan.push(s); }
+  else if (r < .72) { const s = stepAt(pick(['pier_l1', 'pier_l2', 'pier_s1', 'pier_s2']), 'fish', rnd(30, 70)); if (s) plan.push(s); }
+  else if (r < .9) {
+    const d = pick(PUBLIC_DOORS.filter(s => buildingOpen(s.bld)));
+    const rm = d && ROOM[d.to], w = rm && walkableIn(rm.id); if (w?.length) { const [x, y] = pick(w); plan.push({ area: rm.id, x: x + .5, y: y + .5, d: 'shop', stay: rnd(8, 20) }); }
+  }
+  if (!plan.length) { const [x, y] = pick(walkableIn('town')); plan.push({ area: 'town', x: x + .5, y: y + .5, d: 'idle', stay: rnd(5, 15) }); }
+  b.plan = plan;
+}
+function botNext(n) {
+  const b = n.bot; if (!b.plan.length) botPlan(n);
+  const s = b.plan[0];
+  if (n.area === s.area) return [s.x, s.y];
+  if (n.inside) { n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y]; }
+  const door = PUBLIC_DOORS.find(d => d.to === s.area && buildingOpen(d.bld));
+  if (!door) { b.plan.shift(); return null; }
+  n.goingIn = door; return [door.x, door.y];
+}
+// reached the end of a walk: if it was the plan's spot, do the thing there and stay a while
+function botArrive(n) {
+  const b = n.bot, s = b.plan[0];
+  if (!s || n.area !== s.area || Math.hypot(n.x - s.x, n.y - s.y) > 1) return .4;
+  b.plan.shift();
+  if (s.d === 'apply') { n.c = s.job; b.xp = 0; b.lv = 1; botSay(n, pick([`สมัครเป็น${D.CAREERS[s.job].name}แล้ว!`, `ได้งาน${D.CAREERS[s.job].name}แล้ว เย้`, 'สมัครงานเรียบร้อย'])); npcRosterDirty = true; }
+  if (s.d === 'work' || s.d === 'fish') b.busy = { d: s.d, until: now() + s.stay * 1000 };
+  return s.stay;
+}
+function botSay(n, text) {
+  const msg = { t: 'chat', id: n.id, name: n.name, c: n.c, text, ts: now() };
+  for (const o of online.values()) if (areaId(o) === n.area && dist(o, n) <= 14) send(o, msg);
+}
+function botJoin(quiet) {
+  const used = new Set(bots().map(n => n.name)), free = BOT_NAMES.filter(x => !used.has(x)), name = pick(free.length ? free : BOT_NAMES);
+  if (!name) return;
+  const sp = standNear('town', D.SPAWN.x + rnd(-3, 3), D.SPAWN.y + rnd(-2, 2)) || [D.SPAWN.x, D.SPAWN.y];
+  const g = Math.random() < .5 ? 'f' : 'm', lv = rint(1, 9);
+  const n = { id: -(500 + botSeq++), bot: { plan: [], xp: rnd(0, 1), lv, days: rint(1, 40), worth: rint(800, 25000), fishLv: rint(1, 6), title: Math.random() < .5 ? pick(D.ACHIEVEMENTS.filter(x => x.r <= 2)) : null },
+    name, area: 'town', x: sp[0], y: sp[1], f: 6, path: [], wait: rnd(1, 3), g, look: randLook(), speed: rnd(1.5, 2.1), pickedAt: 0,
+    c: Math.random() < .5 ? 'none' : pick(BOT_JOBS) };
+  if (n.c === 'none') n.bot.lv = 1;
+  n.next = () => botNext(n); n.stay = () => botArrive(n);
+  npcs.push(n); npcRosterDirty = true;
+  if (!quiet) feed(`👋 ${name} เข้าเมือง`);
+}
+function botLeave(n) {
+  const i = npcs.indexOf(n); if (i < 0) return;
+  npcs.splice(i, 1); npcRosterDirty = true; feed(`🚪 ${n.name} ออกจากเมือง`);
+}
+// every so often someone logs off or a new one arrives, keeping 3–6 around; bots level up and chat
+let botLastT = now();
+function botTick(t) {
+  const dt = Math.min(2, (t - botLastT) / 1000); botLastT = t;
+  for (const n of bots()) {
+    const b = n.bot;
+    if (b.busy && t > b.busy.until) b.busy = null;
+    if (b.busy?.d === 'work' && n.c !== 'none' && Math.random() < dt / 60) {                 // about one bit of work a minute, levels slow down like a player's
+      b.xp += 1 / (4 + 1.5 * (b.lv - 1));
+      if (b.xp >= 1) { b.xp = 0; b.lv++; npcRosterDirty = true; if (Math.random() < .5) botSay(n, pick(['เลเวลอัปแล้ว! 🎉', `Lv.${b.lv} แล้ว เย้`, 'อัปเลเวลอีกแล้ว 😆'])); }
+    }
+    if (Math.random() < dt / 150) botSay(n, pick(Math.random() < .5 ? BOT_SAY.any : BOT_SAY[n.c] || BOT_SAY.any));
+  }
+  if (t > botWorldAt) {
+    botWorldAt = t + rnd(120, 300) * 1000;
+    const n = pick(bots());
+    if (n && online.size) { const wm = { t: 'chat', w: 1, id: n.id, name: n.name, c: n.c, text: pick([...BOT_SAY.any, ...(BOT_SAY[n.c] || [])]), ts: now() }; chatLog.push(wm); if (chatLog.length > 40) chatLog.shift(); broadcast(wm); }
+  }
+  if (t > botEventAt) {
+    botEventAt = t + rnd(150, 420) * 1000;
+    const k = bots().length, want = rint(3, 6);
+    if (k < want) botJoin(); else if (k > want) botLeave(pick(bots().filter(n => !n.inside)) || pick(bots()));
+  }
+}
+// a player said something near a bot (or named it in world chat): it answers after a moment, like a person typing
+function botHear(a, text, world) {
+  const cand = world ? bots().filter(n => text.includes(n.name)) : bots().filter(n => n.area === areaId(a) && dist(n, a) <= 8);
+  const n = pick(cand); if (!n || n.bot.replyAt > now() || (!world && Math.random() < .35)) return;
+  n.bot.replyAt = now() + 6000;
+  const hit = BOT_REPLY.find(([re]) => re.test(text)), line = pick(hit ? hit[1] : BOT_DEFAULT);
+  setTimeout(() => {
+    if (!npcs.includes(n)) return;
+    if (world) { const wm = { t: 'chat', w: 1, id: n.id, name: n.name, c: n.c, text: `@${a.name} ${line}`, ts: now() }; chatLog.push(wm); if (chatLog.length > 40) chatLog.shift(); broadcast(wm); }
+    else botSay(n, line);
+  }, rnd(1500, 4000));
+}
+const botPub = n => ({ id: n.id, name: n.name, av: 0, c: n.c, lv: n.bot.lv, dz: [], pose: null, title: n.bot.title?.title || '', tr: n.bot.title?.r || 0, pic: 0, w: 0, sad: 0, g: n.g, lk: n.look, adm: 0,
+  of: D.CAREERS[n.c]?.where ? n.c : '', th: 0, afk: 0, x: n.x, y: n.y, f: n.f });
+for (let i = rint(3, 6); i > 0; i--) botJoin(true);
+
 // worker NPCs: where they walk and what they do there (only while no player has that job)
 const ST_XY = id => { const s = ST[id]; return s ? [s.x, s.y] : null; };
 const roomPts = (rid, pts) => { const r = ROOM[rid]; return pts.map(([dx, dy]) => [r.x + dx, r.y + dy]).filter(([x, y]) => !D.blocked(x, y)); };
@@ -1620,13 +1768,13 @@ function npcTick(dt, ps) {
     if (!n.path.length) {
       if (n.pose) { n.pose = null; npcRosterDirty = true; }
       const goal = n.next(); n.path = goal ? routeTo(n, goal, n.area) || [] : [];
-      if (!n.path.length && n.folk) { n.goingIn = null; if (n.leaving) folkArrive(n); }   // could not reach the door: give up (or just step outside)
+      if (!n.path.length && (n.folk || n.bot)) { n.goingIn = null; if (n.leaving) folkArrive(n); else if (n.bot && goal) n.bot.plan.shift(); }   // could not reach the door: give up (or just step outside)
       n.wait = n.path.length ? 0 : 2; if (!n.path.length) continue;
     }
     const [tx, ty] = n.path[0], dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy), st = n.speed * dt;
     if (d <= st) {
       n.x = tx; n.y = ty; n.path.shift();
-      if (!n.path.length && n.folk && folkArrive(n)) { ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]); continue; }
+      if (!n.path.length && (n.folk || n.bot) && folkArrive(n)) { ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]); continue; }
       if (!n.path.length && !n.chase) { n.wait = n.stay(); const pose = n.worker?.pose?.(); if (pose) { n.pose = pose; n.f = 6; npcRosterDirty = true; } }
     } else { n.x += dx / d * st; n.y += dy / d * st; }
     if (d > 0.01) n.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
@@ -1644,10 +1792,10 @@ function npcTick(dt, ps) {
   }
 }
 const npcVisible = n => !n.worker || n.on;
-const npcInfo = n => ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, x: n.x, y: n.y, f: n.f, title: '',
+const npcInfo = n => n.bot ? botPub(n) : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0 });
 function stealNpc(a, id) {
-  const n = npcs.find(x => x.id === id && x.folk);
+  const n = npcs.find(x => x.id === id && (x.folk || x.bot));
   if (!n || areaId(a) !== 'town' || Math.hypot(a.x - n.x, a.y - n.y) > 1.8) return toast(a, 'ต้องเข้าไปใกล้ๆ เป้าหมาย (ประชิดตัว)', '🕶️', false);
   if (now() - n.pickedAt < 5 * 60000) return toast(a, `${n.name} ระวังตัวแจ ล้วงไม่ได้ (เพิ่งโดนล้วงไป)`, '🕶️', false);
   if (!cd(a, 'steal', 45000) || !spend(a, 8)) return;
@@ -1683,13 +1831,18 @@ function sendRoster() {
     else o.ws.send(pub);
   }
 }
+function jobView(a) {
+  const c = a.career; if (!c || c === 'none') return null;
+  if (c === 'office') { const x = a.xp.office || 0; return { L: lvl(a), cur: x % 3, need: 3, gain: 100, pay: 0 }; }
+  const j = jobXp(a.xp[c] || 0); return { L: j.L, cur: +j.cur.toFixed(2), need: j.need, gain: Math.round(xpGain(j.L) * 100), pay: Math.round((jobPay(a) - 1) * 100), max: j.L >= JOB_MAX ? 1 : 0 };
+}
 function meView(a) {
   const isRider = a.career === 'rider';
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
   const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
-    career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, inv: a.inv, phone: a.phone, contacts: a.contacts || [],
+    career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, house: a.house, furniture: a.furniture, comfort: comfort(a), speed: speedOf(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
@@ -1711,7 +1864,7 @@ function worldView() {
   const lb = [...accounts.values()].map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
     .sort((x, y) => y.w - x.w).slice(0, 10);
   return {
-    t: 'wd', now: t, toff: D.TIME_OFF, on: online.size, mk: marketView(),
+    t: 'wd', now: t, toff: D.TIME_OFF, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
@@ -1874,13 +2027,14 @@ function onMessage(ws, raw) {
         if (!cd(a, 'wchat', 3000)) return;
         const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };
         chatLog.push(wm); if (chatLog.length > 40) chatLog.shift();
-        return broadcast(wm);
+        broadcast(wm); return botHear(a, text, true);
       }
       if (!cd(a, 'chat', 800)) return;
       const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now() };
       const here = areaId(a);
       let heard = 0;
       for (const o of online.values()) if (areaId(o) === here && dist(o, a) <= 14) { send(o, msg); if (o !== a) heard++; }
+      const nb = bots().filter(n => n.area === here && dist(n, a) <= 14).length; heard += nb; botHear(a, text, false);
       if (!heard) toast(a, 'ไม่มีใครอยู่ใกล้พอจะได้ยิน (โทรหาเพื่อนได้ใน 📱)', '💬', false);
       else if (cd(a, 'chatjoy', 20000, true)) joy(a, 2);
       return quest(a, 'chat');
@@ -1952,6 +2106,8 @@ function onMessage(ws, raw) {
       return toast(a, d ? 'เปลี่ยนรูปโปรไฟล์แล้ว' : 'ลบรูปโปรไฟล์แล้ว', '🖼️');
     }
     case 'info': {                          // someone's profile: tap a player
+      const bn = botById(+m.id);
+      if (bn) { const b = bn.bot; return send(a, { t: 'info', id: bn.id, name: bn.name, pic: '', c: bn.c, lv: b.lv, title: b.title?.title || '', tr: b.title?.r || 0, adm: 0, ach: b.title ? [[b.title.title, b.title.r]] : [], worth: b.worth, days: b.days, fishLv: b.fishLv, home: 0, degree: 0, phone: '' }); }
       const o = playerById(m.id); if (!o || o.npc) return;
       const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(Boolean).sort((x, y) => y.r - x.r);
       return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
@@ -1961,6 +2117,8 @@ function onMessage(ws, raw) {
     case 'mail': {                          // letters: reach anyone, online or not
       const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
       if (!text || !to) return toast(a, 'ใส่ชื่อผู้รับและข้อความ', '✉️', false);
+      const bm = bots().find(x => x.name === to);
+      if (bm) { if (!cd(a, 'mail', 5000)) return; stat(a, 'mails'); if (Math.random() < .6) setTimeout(() => { if (!a.ws) return; a.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: bm.name, text: pick(['ได้รับจดหมายแล้วนะ ขอบคุณที่ทักมา 😊', 'สวัสดีครับ ไว้เจอกันในเมืองนะ', 'ขอบคุณจ้า ว่างๆ ไปตกปลาด้วยกัน']), t: now(), read: 0 }, ...(a.mail || [])].slice(0, 50); markMe(a); send(a, { t: 'mail', list: a.mail }); toast(a, `📬 จดหมายใหม่จาก ${bm.name}`, '📬'); }, rnd(20, 60) * 1000); return toast(a, `ส่งจดหมายถึง ${bm.name} แล้ว`, '📨'); }
       const o = [...accounts.values()].find(x => x.name === to);
       if (!o) return toast(a, `ไม่พบผู้เล่นชื่อ "${to}"`, '✉️', false);
       if (o === a) return toast(a, 'ส่งจดหมายถึงตัวเองไม่ได้', '✉️', false);
@@ -2182,7 +2340,7 @@ function tick() {
   // positions
   const ps = [];
   for (const a of online.values()) if (a.moved) { a.moved = false; ps.push([a.id, +a.x.toFixed(2), +a.y.toFixed(2), a.f]); }
-  if (online.size) npcTick(dt, ps);
+  if (online.size) { botTick(t); npcTick(dt, ps); }
   if (ps.length) {
     const hid = new Set([...online.values()].filter(hidden).map(a => a.id));
     if (!hid.size) broadcast({ t: 'ps', p: ps });
