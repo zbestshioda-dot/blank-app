@@ -559,3 +559,51 @@ body.hasEvent #topBar{top:146px!important}
 #talkBtn,#emoBtn{display:none!important}
 #bagBtn{right:98px!important;bottom:6px!important;width:60px!important;height:60px!important}
 #restBtn{right:100px!important;bottom:74px!important;width:54px!important;height:54px!important}
+
+/* =================================================================== status card v2: portrait with level ring, date/time, money, bars, today's quests */
+#card.v2{border:0!important;border-image:none!important;background:none!important;padding:0!important;display:block!important;width:min(268px,calc(100vw - 132px))!important;max-width:none!important;filter:drop-shadow(0 3px 8px rgba(0,0,0,.45))}
+#card.v2>*{pointer-events:auto}
+#card.v2 .sTop{display:flex;align-items:center;gap:0}
+#card.v2 .pfp{position:relative;flex:none;width:70px;height:70px;border-radius:50%;cursor:pointer;z-index:2}
+#card.v2 #lvRing{position:absolute;inset:0;border-radius:50%}
+#card.v2 #mePortrait{position:absolute;inset:5px;width:60px!important;height:60px!important;border-radius:50%;border:2px solid #6b4a1e;background:#e9d4ad;object-fit:cover;display:block!important}
+#card.v2 #lvPct{position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);background:#2a1d10;color:#ffd770;border:1.5px solid #c9a45a;border-radius:9px;font-size:10px;font-weight:700;padding:0 6px;white-space:nowrap}
+#card.v2 .sInfo{flex:1;min-width:0;margin-left:-10px;padding:5px 8px 5px 16px;background:rgba(30,22,14,.86);border:1.5px solid #c9a45a;border-radius:0 12px 12px 0;color:#fbecd2}
+#card.v2 .l1{display:flex;align-items:baseline;gap:6px;min-width:0}
+#card.v2 #meName{font-size:14px!important;font-weight:700!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff3d6}
+#card.v2 #meCareer{font-size:10.5px;color:#d9c7a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline!important}
+#card.v2 .l2{display:flex;align-items:center;gap:5px;font-size:11px;color:#e8dcc4}
+#card.v2 #cTime{margin-left:auto;color:#ffc94d;font-size:14px;font-family:var(--px)}
+#card.v2 .money{color:#ffd770;font-size:15px;margin-top:1px}
+#card.v2 .bars{display:grid!important;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:6px;padding:5px 8px 6px;background:rgba(30,22,14,.86);border:1.5px solid #c9a45a;border-radius:12px;min-width:0!important}
+#card.v2 .bar{display:block;cursor:pointer}
+#card.v2 .bar label{display:flex;justify-content:space-between;font-size:10.5px;color:#e8dcc4;cursor:pointer}
+#card.v2 .bar em{font-style:normal;font-size:10px;color:#bfae92;width:auto;font-family:inherit}
+#card.v2 .bar s{display:block;height:7px;margin-top:2px;background:#1a120a;border:1px solid #000;border-radius:5px;overflow:hidden}
+#card.v2 .bar u{display:block;height:100%;border-radius:4px;background:linear-gradient(#7be07b,#3f9a3f)}
+#card.v2 #bE{background:linear-gradient(#ffe07a,#e3a325)}#card.v2 #bL{background:linear-gradient(#ff7a6a,#c8372a)}#card.v2 #bH{background:linear-gradient(#9be15d,#4f9a2a)}
+#card.v2 #statusBox{margin-top:5px;padding:3px 5px;background:rgba(30,22,14,.8);border:1px solid #c9a45a88;border-radius:10px}
+#card.v2 #qBox{margin-top:6px;background:rgba(30,22,14,.86);border:1.5px solid #c9a45a;border-radius:12px;padding:4px 6px 5px;color:#fbecd2}
+#card.v2 .qHead{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#ffd770}
+#card.v2 #qCount{color:#bfae92;font-weight:400}
+#card.v2 #cardToggle{position:static!important;margin-left:auto;width:24px;height:20px;border-radius:6px;background:#3a2a18;border:1px solid #c9a45a;color:#ffd770;font-size:11px;padding:0;display:flex!important;align-items:center;justify-content:center;box-shadow:none}
+#card.v2 #cardToggle::after{content:'▲'}#card.v2.mini #cardToggle::after{content:'▼'}
+#card.v2 #qList{display:flex;flex-direction:column;gap:2px;margin-top:3px}
+#card.v2.mini #qList{display:none}
+#card.v2 .qRow{display:flex;gap:6px;align-items:flex-start;text-align:left;background:none;border:0;box-shadow:none;color:#fbecd2;font-size:11.5px;padding:3px 5px;border-radius:7px;line-height:1.3;width:100%}
+#card.v2 .qRow i{font-style:normal;color:#ffc94d;width:12px;flex:none}
+#card.v2 .qRow small{color:#bfae92}
+#card.v2 .qRow em{display:block;font-style:normal;font-size:10px;color:#d9c7a8}
+#card.v2 .qRow.cur{background:rgba(201,164,90,.28);border:1px solid #c9a45a}
+#card.v2 .qRow.done span{text-decoration:line-through;color:#9c8c72}
+#card.v2 .qRow.more{justify-content:flex-end;color:#ffd770;font-size:10.5px;padding:1px 5px}
+#clock{display:none!important}
+@media (max-height:520px) and (orientation:landscape){
+  #card.v2{width:250px!important}
+  #card.v2 .pfp{width:54px;height:54px}#card.v2 #mePortrait{inset:4px;width:46px!important;height:46px!important}
+  #card.v2 .sInfo{padding:3px 7px 3px 14px}#card.v2 .money{font-size:13px}
+  #card.v2 .bars{margin-top:4px;padding:3px 7px 4px}
+  #card.v2 .qRow{padding:2px 4px;font-size:10.5px}
+}
+#card.v2 .bar em{display:inline!important}
+@media (max-width:600px) and (orientation:portrait){#ticker{left:8px!important;right:8px!important;top:calc(2px + env(safe-area-inset-top))!important;z-index:9}}

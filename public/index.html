@@ -17,17 +17,27 @@
 <canvas id="cv"></canvas>
 
 <div id="hud" class="hidden">
-  <div id="card">
-    <button id="cardToggle" title="ย่อ/ขยายสถานะ"></button>
-    <div class="who"><img id="mePortrait" data-open="profile" src="assets/ui/face_m.png" alt=""><div><b id="meName"></b><span id="meCareer"></span><div class="money" id="meMoney"></div></div></div>
-    <div class="bars">
-      <div class="bar" data-bar="energy" title="พลังงาน (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_bolt.png" alt="⚡"><s><u id="bE"></u></s><em id="vE"></em></div>
-      <div class="bar" data-bar="hunger" title="ความอิ่ม (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_leg.png" alt="🍗"><s><u id="bH"></u></s><em id="vH"></em></div>
-      <div class="bar" data-bar="health" title="สุขภาพ (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_hp.png" alt="❤️"><s><u id="bL"></u></s><em id="vL"></em></div>
-      <div class="bar" data-bar="happy" title="ความสุข (แตะดูวิธีเพิ่ม)"><img src="assets/ui/i_calm.png" alt="😊"><s><u id="bJ"></u></s><em id="vJ"></em></div>
+  <div id="card" class="v2">
+    <div class="sTop">
+      <div class="pfp" data-open="profile" title="โปรไฟล์"><i id="lvRing"></i><img id="mePortrait" src="assets/ui/face_m.png" alt=""><span id="lvPct">★ 0%</span></div>
+      <div class="sInfo">
+        <div class="l1"><b id="meName"></b><span id="meCareer"></span></div>
+        <div class="l2"><span id="cWx">☀️</span><span id="cDate"></span><b id="cTime"></b></div>
+        <div class="money" id="meMoney"></div>
+      </div>
     </div>
-    <div id="statusBox"><div class="st">สถานะปัจจุบัน</div><div id="dzChips"></div></div>
-    <button id="qline" data-open="quests">เควสต์ 0/3</button>
+    <div class="bars">
+      <div class="bar" data-bar="hunger" title="ความอิ่ม (แตะดูวิธีเพิ่ม)"><label>อิ่ม<em id="vH"></em></label><s><u id="bH"></u></s></div>
+      <div class="bar" data-bar="energy" title="พลังงาน (แตะดูวิธีเพิ่ม)"><label>พลัง<em id="vE"></em></label><s><u id="bE"></u></s></div>
+      <div class="bar" data-bar="health" title="สุขภาพ (แตะดูวิธีเพิ่ม)"><label>เลือด<em id="vL"></em></label><s><u id="bL"></u></s></div>
+      <div class="bar" data-bar="happy" title="ความสุข (แตะดูวิธีเพิ่ม)"><label>สุข<em id="vJ"></em></label><s><u id="bJ"></u></s></div>
+    </div>
+    <div id="statusBox"><div id="dzChips"></div></div>
+    <div id="qBox">
+      <div class="qHead"><span>📜 เควสต์วันนี้</span><small id="qCount"></small><button id="cardToggle" title="ย่อ/ขยาย"></button></div>
+      <div id="qList"></div>
+    </div>
+    <button id="qline" class="hidden" data-open="quests"></button>
   </div>
   <div id="topRight">
     <div id="clock"></div>

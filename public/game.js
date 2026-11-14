@@ -278,11 +278,33 @@ $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
 // ------------------------------------------------------------------ HUD
+function paintCardClock(h) {
+  const dt = me?.date; if (dt) $('#cDate').textContent = `${dt.day} ${G.months[dt.month]}`;
+  $('#cTime').textContent = hhmm(h);
+  $('#cWx').textContent = wd?.ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️';
+}
+// today's quests listed in the card: tap one and you walk there by yourself
+function paintQuestBox() {
+  const q = me.quests, box = $('#qList'); if (!q || !box) return;
+  const done = q.list.filter(x => x.done).length; $('#qCount').textContent = `${done}/3`;
+  const first = q.list.findIndex(x => !x.done);
+  const html = q.list.map((x, i) => {
+    const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
+    return `<button class="qRow ${x.done ? 'done' : ''} ${i === first ? 'cur' : ''}" data-q="${x.done ? '' : tgt || ''}"><i>${x.done ? '☑' : i === first ? '◆' : '☐'}</i><span>${esc(x.text)} <small>(${Math.min(x.p, x.n)}/${x.n})</small>${i === first && tgt ? '<em>› แตะเพื่อเดินไปอัตโนมัติ</em>' : ''}</span></button>`;
+  }).join('') + `<button class="qRow more" data-open-q="1"><span>ดูทั้งหมด · รางวัล ›</span></button>`;
+  if (box.dataset.h === html) return; box.dataset.h = html; box.innerHTML = html;
+  box.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { FX.play('click'); if (b.dataset.q) setGuide(b.dataset.q, false, true); else openPanel({ kind: 'quests' }); });
+  box.querySelector('[data-open-q]').onclick = () => { FX.play('click'); openPanel({ kind: 'quests' }); };
+}
 function paintHud() {
   if (!me) return;
   const c = G.careers[me.career];
   $('#card').classList.toggle('admin', !!me.admin);
-  $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} Lv.${me.lv}`;
+  $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} ${c.name} Lv.${me.lv}`;
+  // ring around the portrait: progress to the next job level
+  const per = me.career === 'office' ? 3 : 10, xp = (me.xp || {})[me.career] || 0, pct = me.career === 'none' ? 0 : (xp % per) / per * 100;
+  $('#lvRing').style.background = `conic-gradient(#ffc94d ${pct}%, rgba(255,255,255,.12) 0)`; $('#lvPct').textContent = `★ ${pct.toFixed(1)}%`;
+  paintQuestBox();
   // status pills (icons from the UI sheet where we have one)
   const ic = (f, alt) => f ? `<img src="assets/ui/${f}.png" alt="">` : alt;
   const DZ_IC = { cold: 'i_cold', flu: 'i_cold', poison: 'i_belly', insomnia: 'i_sleepy', exhaust: 'i_sad', malnut: 'i_meal' };
@@ -346,6 +368,7 @@ const isOpen = (kind, h = hourNow()) => { const o = G?.hours[kind]; return !o ||
 setInterval(() => {
   if (!wd || !G) return;
   const h = hourNow();
+  paintCardClock(h);
   const dt = me?.date; $('#clock').innerHTML = `${dt ? `<span>📅 ${dt.day}/${G.monthDays} ${G.months[dt.month]}</span><i> · </i>` : ''}<span>🕐 ${hhmm(h)} · 👥 ${wd.on}</span>`;
   document.querySelectorAll('.qcd').forEach(el => {
     const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
