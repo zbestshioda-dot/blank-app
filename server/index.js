@@ -334,6 +334,7 @@ function worth(a) {
   for (const [, t] of Object.entries(a.tools || {})) for (let i = 0; i < t; i++) w += D.TOOL_PRICES[i] * 0.5;
   if (a.house >= 0) { w += D.HOUSE_PRICES[a.house] * 0.7; for (const f of a.furniture || []) w += (D.FURNITURE[fbase(f)]?.price || 0) * 0.5; }
   for (const f of a.keep || []) w += (D.FURNITURE[f]?.price || 0) * 0.5;
+  w += stockValue(a);
   if (a.garden) w += D.GARDEN.lotPrice * 0.6;
   return w;
 }
@@ -341,7 +342,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -415,6 +416,54 @@ async function save(force) {
     changed.forEach(a => { if (!a.ws) a.sd = false; });
   } catch (e) { dirty = true; if (wroteBugs) bugsDirty = true; console.error('save failed:', e.message); }
   saving = false;
+}
+
+// ------------------------------------------------------------------ stock market
+const sHash = (i, k) => { let h = Math.imul(i, 374761393) ^ Math.imul(k + 1, 668265263) ^ 0x5bd1e995; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+const sGauss = (i, k) => Math.sqrt(-2 * Math.log(Math.max(1e-9, sHash(i, k)))) * Math.cos(2 * Math.PI * sHash(i, k + 7919));
+const mkt = D.STOCKS.map(s => ({ ...s, lp: Math.log(s.base), hist: [] }));
+let stockI = 0;                                         // index of the last finished candle
+function stockCandle(i, bias) {
+  for (let si = 0; si < mkt.length; si++) {
+    const s = mkt[si], fair = Math.log(s.base) + 0.3 * Math.sin(i / 1700 + si * 2.1) + 0.12 * Math.sin(i / 370 + si);
+    const trend = (sHash(Math.floor(i / 160), si * 13 + 3) - 0.5) * s.vol * 0.35;
+    const o = Math.exp(s.lp); let hi = o, lo = o;
+    for (let k = 0; k < 5; k++) {
+      s.lp += 0.004 * (fair - s.lp) + (trend + (bias?.[si] || 0)) / 5 + s.vol / 2.2 * sGauss(i * 5 + k, si * 101);
+      const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p);
+    }
+    if (sHash(i, si * 31 + 5) < 0.003) { s.lp += (sHash(i, si * 31 + 6) < 0.5 ? -1 : 1) * s.vol * (4 + 4 * sHash(i, si * 31 + 7)); const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p); }   // news
+    s.lp = Math.max(Math.log(s.base * 0.12), Math.min(Math.log(s.base * 8), s.lp));
+    const c = Math.exp(s.lp), v = Math.round(1000 * (0.5 + sHash(i, si * 57)) * (1 + Math.abs(Math.log(c / o)) * 60));
+    s.hist.push([+o.toFixed(2), +hi.toFixed(2), +lo.toFixed(2), +c.toFixed(2), v]); if (s.hist.length > D.STOCK.keep) s.hist.shift();
+  }
+}
+{ const n = Math.floor((Date.now() - D.STOCK.epoch) / D.STOCK.candleMs); for (let i = 1; i <= n; i++) stockCandle(i); stockI = n; }
+const stockPrice = id => { const s = mkt.find(x => x.id === id); return s ? s.hist[s.hist.length - 1][3] : 0; };
+function stockTick() {
+  const n = Math.floor((Date.now() - D.STOCK.epoch) / D.STOCK.candleMs);
+  while (stockI < n) { stockI++; stockCandle(stockI, mkt.map(s => (event && s.ev?.[event.id]) || 0)); wdAt = 0; }
+}
+const stockView = () => ({ i: stockI, ms: D.STOCK.candleMs, l: mkt.map(s => { const h = s.hist, c = h[h.length - 1][3], p = h[Math.max(0, h.length - 49)][3]; return [s.id, c, +((c / p - 1) * 100).toFixed(2), h.slice(-24).map(x => x[3])]; }) });
+const stockValue = a => Object.entries(a.stocks || {}).reduce((t, [id, [q]]) => t + q * stockPrice(id), 0);
+function stockTrade(a, m) {
+  const s = mkt.find(x => x.id === m.id); if (!s) return;
+  const p = stockPrice(s.id), q = Math.floor(+m.qty);
+  if (!(q > 0) || q > 100000) return toast(a, 'ใส่จำนวนหุ้นให้ถูกต้อง', '📈', false);
+  const gross = p * q, fee = Math.max(D.STOCK.feeMin, Math.round(gross * D.STOCK.fee));
+  a.stocks = { ...(a.stocks || {}) }; const cur = a.stocks[s.id] || [0, 0];
+  if (m.op === 'buy') {
+    if (!pay(a, Math.ceil(gross) + fee)) return;
+    a.stocks[s.id] = [cur[0] + q, +((cur[0] * cur[1] + gross) / (cur[0] + q)).toFixed(4)]; stat(a, 'trades');
+    toast(a, `ซื้อ ${s.icon}${s.id} ${q.toLocaleString()} หุ้น @${p.toFixed(2)} รวม ${money(Math.ceil(gross) + fee)} (ค่าธรรมเนียม ${money(fee)})`, '📈');
+  } else {
+    if (cur[0] < q) return toast(a, `มี ${s.id} แค่ ${cur[0].toLocaleString()} หุ้น`, '📉', false);
+    const get = Math.floor(gross) - fee, pl = Math.round(gross - q * cur[1]) - fee;
+    a.money += get; if (cur[0] - q > 0) a.stocks[s.id] = [cur[0] - q, cur[1]]; else delete a.stocks[s.id]; stat(a, 'trades');
+    if (pl >= 5000) feed(`📈 ${a.name} ขายหุ้น ${s.id} กำไร ${money(pl)}!`);
+    toast(a, `ขาย ${s.icon}${s.id} ${q.toLocaleString()} หุ้น @${p.toFixed(2)} ได้ ${money(get)} · ${pl >= 0 ? 'กำไร' : 'ขาดทุน'} ${money(Math.abs(pl))}`, pl >= 0 ? '💹' : '📉');
+  }
+  markMe(a); dirty = true;
 }
 
 // ------------------------------------------------------------------ world objects owned by players
@@ -583,7 +632,7 @@ function docPickup(a) {
   }
   const pool = DOC_DESTS.filter(s => s.id !== a.lastDoc), dest = pick(pool);
   const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), d = Math.hypot(dest.x - OFFICE_DOOR.x, dest.y - OFFICE_DOOR.y);
-  a.docjob = { dest: dest.id, pay: Math.round(D.OFFICE_WAGE[l - 1] * (0.2 + d / 100))   // ~฿45/min of walking at Lv.1, day, t };
+  a.docjob = { dest: dest.id, pay: Math.round(D.OFFICE_WAGE[l - 1] * (0.2 + d / 100)), day, t };   // ~฿45/min of walking at Lv.1
   a.lastDoc = dest.id; markMe(a);
   return toast(a, `📄 รับเอกสารแล้ว ส่งที่ ${dest.label} · ค่าส่ง ~${money(a.docjob.pay)}${h >= D.SHIFT.end ? ` (โอที x${D.SHIFT.otMul})` : ''}`, '📄');
 }
@@ -955,6 +1004,7 @@ function act(a, m) {
       markMe(a); joy(a, 10);
       return toast(a, T.lic === 'driving' ? 'สอบใบขับขี่ผ่าน! สมัครไรเดอร์ได้แล้ว (ต้องต่ออายุทุกปีในเกม = ทุก 1 วันจริง)' : 'สอบนายสิบตำรวจผ่าน! ไปสมัครเป็นตำรวจได้ที่สถานีตำรวจ', T.lic === 'driving' ? '🪪' : '👮');
     }
+    case 'bank.stock': return stockTrade(a, m);
     case 'bank.deposit': case 'bank.withdraw': case 'bank.borrow': case 'bank.repay': {
       accrue(a);
       let amt = Math.floor(+m.amt) || 0;
@@ -2102,7 +2152,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2129,7 +2179,7 @@ function worldView() {
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
     houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}]),
     chairs: chairs.map(c => c ? c.name : ''),
-    ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb,
+    ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(),
   };
 }
 function marketView() {
@@ -2194,7 +2244,7 @@ function login(ws, m) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
@@ -2470,6 +2520,7 @@ function onMessage(ws, raw) {
       send(a, { t: 'mailsent', to: o.name });
       return toast(a, `ส่งข้อความถึง ${o.name} แล้ว`, '✅');
     }
+    case 'stockhist': { const s = mkt.find(x => x.id === m.id); if (s) send(a, { t: 'stockhist', id: s.id, i: stockI, c: s.hist }); return; }
     case 'mailget': return send(a, { t: 'mail', list: a.mail || [] });
     case 'mailread': { let ch = false; for (const x of a.mail || []) if (!x.read) { x.read = 1; ch = true; } if (ch) markMe(a); return; }
     case 'maildel': { a.mail = (a.mail || []).filter(x => x.id !== m.id); markMe(a); return send(a, { t: 'mail', list: a.mail }); }
@@ -2553,6 +2604,7 @@ function resetChar(a, m) {
 // ------------------------------------------------------------------ simulation
 let lastTick = now(), wdAt = 0, saveAt = 0, slowAt = 0, marketAt = 0, lastHour = hourNow();
 function tick() {
+  stockTick();
   const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;
   const h = hourNow();
 

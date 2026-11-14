@@ -488,6 +488,19 @@ const dayAt = t => Math.floor((t + TIME_OFF + DAY_MS - MIDNIGHT_MS) / DAY_MS);
 // game hours that pass per real second at hour h
 const gameRate = h => (h >= CLOCK.dawn && h < CLOCK.dusk) ? (CLOCK.dusk - CLOCK.dawn) / (CLOCK.dayMin * 60) : (24 - (CLOCK.dusk - CLOCK.dawn)) / ((24 - CLOCK.dayMin) * 60);
 // opening hours [open, close) in game hours
+// ---------------------------------------------------------------- stock market (traded at the bank)
+// Prices are a deterministic random walk from a fixed start date (so restarts keep the same history): mean-reverting around a slowly
+// drifting fair value, with trend regimes and the odd news shock. One candle every 30 real seconds.
+const STOCKS = [
+  { id: 'TTECH', name: 'ไทยเทค', icon: '🏢', base: 120, vol: 0.016, desc: 'บริษัทไอทีที่พนักงานในเมืองทำงานอยู่' },
+  { id: 'LTB', name: 'ธนาคารไลฟ์ทาวน์', icon: '🏦', base: 85, vol: 0.008, desc: 'หุ้นปันผลมั่นคง ขึ้นลงช้า' },
+  { id: 'FARM', name: 'สหกรณ์การเกษตร', icon: '🌾', base: 42, vol: 0.013, desc: 'ราคาพุ่งช่วงภัยแล้ง', ev: { drought: 0.004, rain: -0.002 } },
+  { id: 'SEAFD', name: 'ประมงทองคำ', icon: '🐟', base: 28, vol: 0.015, desc: 'ธุรกิจปลาและอาหารทะเล' },
+  { id: 'RIDE', name: 'ส่งไวเดลิเวอรี่', icon: '🛵', base: 65, vol: 0.02, desc: 'ขึ้นแรงช่วงเทศกาลและคนหิว', ev: { festival: 0.004, hungry: 0.004 } },
+  { id: 'FUEL', name: 'พลังงานไทย', icon: '⛽', base: 150, vol: 0.011, desc: 'ปั๊มน้ำมันและพลังงาน' },
+  { id: 'MOON', name: 'มูนคอยน์', icon: '🚀', base: 12, vol: 0.045, desc: 'เสี่ยงสูงมาก ขึ้นลงทีละหลายสิบ%' },
+];
+const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeMin: 5, keep: 240 };
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
@@ -996,7 +1009,7 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
 module.exports = {
   RUN, CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
-  W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
+  W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
