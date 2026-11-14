@@ -615,15 +615,40 @@ const ITEMS = {
   chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 65 },
   durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 220, eat: { hunger: 20, energy: 5 } },
 
-  sfish:    { name: 'ปลาเล็ก', icon: '🐟', kind: 'fish', base: 25 },
-  catfish:  { name: 'ปลาดุก', icon: '🐟', kind: 'fish', base: 45 },
-  tilapia:  { name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 60 },
-  snakehead:{ name: 'ปลาช่อน', icon: '🐠', kind: 'fish', base: 95 },
-  squid:    { name: 'ปลาหมึก', icon: '🦑', kind: 'fish', base: 80 },
-  seabass:  { name: 'ปลากะพง', icon: '🐡', kind: 'fish', base: 110 },
-  tuna:     { name: 'ทูน่า', icon: '🐋', kind: 'fish', base: 300 },
-  shark:    { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200 },
-  chest:    { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 3000 },
+  // fish (rar = rarity 1 ทั่วไป · 2 ไม่ธรรมดา · 3 หายาก · 4 มหากาพย์ · 5 ตำนาน; spr = sprite in the atlas)
+  sfish:     { name: 'ปลาซิว', icon: '🐟', kind: 'fish', base: 25, rar: 1 },
+  sardine:   { name: 'ปลาซาร์ดีน', icon: '🐟', kind: 'fish', base: 30, rar: 1 },
+  herring:   { name: 'ปลาหลังเขียว', icon: '🐟', kind: 'fish', base: 35, rar: 1 },
+  carp:      { name: 'ปลาไน', icon: '🐟', kind: 'fish', base: 40, rar: 1 },
+  catfish:   { name: 'ปลาดุก', icon: '🐟', kind: 'fish', base: 45, rar: 1 },
+  mackerel:  { name: 'ปลาทู', icon: '🐟', kind: 'fish', base: 45, rar: 1 },
+  shrimp:    { name: 'กุ้ง', icon: '🦐', kind: 'fish', base: 55, rar: 1 },
+  tilapia:   { name: 'ปลานิล', icon: '🐠', kind: 'fish', base: 60, rar: 1 },
+  crab:      { name: 'ปู', icon: '🦀', kind: 'fish', base: 75, rar: 2 },
+  squid:     { name: 'ปลาหมึก', icon: '🦑', kind: 'fish', base: 80, rar: 2 },
+  guppy:     { name: 'ปลาหางนกยูง', icon: '🐠', kind: 'fish', base: 90, rar: 2 },
+  snakehead: { name: 'ปลาช่อน', icon: '🐠', kind: 'fish', base: 95, rar: 2 },
+  seabass:   { name: 'ปลากะพง', icon: '🐟', kind: 'fish', base: 110, rar: 2 },
+  eel:       { name: 'ปลาไหล', icon: '🐍', kind: 'fish', base: 120, rar: 2 },
+  puffer:    { name: 'ปลาปักเป้า', icon: '🐡', kind: 'fish', base: 130, rar: 2 },
+  trout:     { name: 'ปลาเทราต์', icon: '🐟', kind: 'fish', base: 140, rar: 2 },
+  snapper:   { name: 'ปลากะพงแดง', icon: '🐟', kind: 'fish', base: 160, rar: 2 },
+  goldfish:  { name: 'ปลาทอง', icon: '🐠', kind: 'fish', base: 220, rar: 3 },
+  angelfish: { name: 'ปลาเทวดา', icon: '🐠', kind: 'fish', base: 240, rar: 3 },
+  clownfish: { name: 'ปลาการ์ตูน', icon: '🐠', kind: 'fish', base: 250, rar: 3 },
+  octopus:   { name: 'ปลาหมึกยักษ์', icon: '🐙', kind: 'fish', base: 260, rar: 3 },
+  salmon:    { name: 'ปลาแซลมอน', icon: '🐟', kind: 'fish', base: 280, rar: 3 },
+  tuna:      { name: 'ทูน่า', icon: '🐋', kind: 'fish', base: 300, rar: 3 },
+  grouper:   { name: 'ปลาเก๋า', icon: '🐟', kind: 'fish', base: 320, rar: 3 },
+  stingray:  { name: 'ปลากระเบน', icon: '🐟', kind: 'fish', base: 360, rar: 3 },
+  lionfish:  { name: 'ปลาสิงโต', icon: '🐠', kind: 'fish', base: 550, rar: 4 },
+  koi:       { name: 'ปลาคาร์ป (โคอิ)', icon: '🎏', kind: 'fish', base: 650, rar: 4 },
+  seahorse:  { name: 'ม้าน้ำ', icon: '🐉', kind: 'fish', base: 750, rar: 4 },
+  swordfish: { name: 'ปลากระโทงดาบ', icon: '🗡️', kind: 'fish', base: 900, rar: 4 },
+  hammerhead:{ name: 'ฉลามหัวค้อน', icon: '🦈', kind: 'fish', base: 1100, rar: 4 },
+  shark:     { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200, rar: 4 },
+  goldenfish:{ name: 'ปลาทองคำ', icon: '✨', kind: 'fish', base: 5000, rar: 5 },
+  chest:    { name: 'หีบสมบัติ', icon: '💎', kind: 'fish', base: 3000, rar: 4 },
 
   fried_rice:   { name: 'ข้าวผัด', icon: '🍚', kind: 'meal', base: 150, eat: { hunger: 35, energy: 5 } },
   corn_soup:    { name: 'ซุปข้าวโพด', icon: '🥣', kind: 'meal', base: 300, eat: { hunger: 30, energy: 8 } },
@@ -669,11 +694,15 @@ const RECIPES = [
 ];
 // fishing pools: [id, weight]. null = junk
 const FISH = {
-  river: [[null, 25], ['sfish', 40], ['catfish', 26], ['tilapia', 12], ['snakehead', 4]],
-  lake:  [[null, 22], ['sfish', 30], ['tilapia', 28], ['snakehead', 12], ['seabass', 6], ['chest', 0.1]],
-  sea:   [[null, 28], ['sfish', 25], ['squid', 18], ['seabass', 12], ['tuna', 3], ['shark', 0.5], ['chest', 0.15]],
+  river: [[null, 28], ['sfish', 48], ['carp', 26], ['catfish', 24], ['tilapia', 10], ['snakehead', 4], ['eel', 3], ['guppy', 2.5], ['goldfish', 1], ['koi', 0.2], ['goldenfish', 0.02]],
+  lake:  [[null, 24], ['sfish', 34], ['carp', 20], ['tilapia', 24], ['snakehead', 9], ['seabass', 4], ['trout', 4], ['guppy', 3], ['goldfish', 2], ['salmon', 1.2], ['koi', 0.45], ['chest', 0.1], ['goldenfish', 0.03]],
+  sea:   [[null, 30], ['sardine', 26], ['mackerel', 18], ['herring', 14], ['shrimp', 9], ['crab', 6], ['squid', 9], ['puffer', 3], ['snapper', 3], ['seabass', 4],
+          ['clownfish', 1.2], ['angelfish', 1.2], ['octopus', 1.2], ['grouper', 1.2], ['tuna', 1.6], ['stingray', 0.8], ['lionfish', 0.3], ['seahorse', 0.25], ['swordfish', 0.25], ['hammerhead', 0.2], ['shark', 0.35], ['chest', 0.15], ['goldenfish', 0.025]],
 };
-const BIG_FISH = ['seabass', 'tuna', 'shark', 'chest', 'snakehead', 'squid'];
+const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
+const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
+for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + k;
+ITEMS.chest.spr = null;
 const FISHING = { rod: 150, xpPerLv: 8, maxLv: 10, zone: [0.2, 0.26, 0.32, 0.4] };   // zone = width of the timing window per rod tier
 
 // ================================================================= careers
@@ -1059,6 +1088,9 @@ const ACHIEVEMENTS = [
   { id: 'gen4', r: 3, c: null, stat: 'degree', n: 1, title: 'บัณฑิต', desc: 'เรียนจบปริญญาตรี' },
   { id: 'fis4', r: 4, c: null, stat: 'fish', n: 300, title: 'เจ้าแห่งท้องน้ำ', desc: 'ตกปลาได้ 300 ตัว' },
   { id: 'fis6', r: 5, c: null, stat: 'shark', n: 10, title: 'ราชาฉลาม', desc: 'ตกฉลามได้ 10 ตัว' },
+  { id: 'fis7', r: 3, c: null, stat: 'fishdex', n: 15, title: 'นักสะสมปลา', desc: 'ตกปลาได้ครบ 15 ชนิด' },
+  { id: 'fis8', r: 4, c: null, stat: 'epicfish', n: 5, title: 'ตำนานริมน้ำ', desc: 'ตกปลาระดับมหากาพย์ขึ้นไปได้ 5 ตัว' },
+  { id: 'fis9', r: 5, c: null, stat: 'goldenfish', n: 1, title: 'ผู้ครอบครองปลาทองคำ', desc: 'ตกปลาทองคำได้' },
   { id: 'far4', r: 4, c: 'farmer', stat: 'harvest', n: 200, title: 'เทพเกษตร', desc: 'เก็บเกี่ยว 200 ครั้ง' },
   { id: 'che3', r: 5, c: 'chef', stat: 'cooked', n: 500, title: 'ยอดเชฟแห่งเมือง', desc: 'ปรุงอาหาร 500 จาน' },
   { id: 'doc4', r: 5, c: 'doctor', stat: 'treated', n: 200, title: 'แพทย์ในตำนาน', desc: 'รักษาคนไข้หาย 200 คน' },
@@ -1102,6 +1134,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

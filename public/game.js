@@ -249,6 +249,7 @@ function handle(m) {
       break;
     }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
+    case 'catch': catchPop(m.item, m.first); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
@@ -1374,9 +1375,7 @@ function bindPanel(root) {
     const [cat, id] = c.dataset.look.split(':'), lk = { ...(me.look || {}), [cat]: id }, g = c.getContext('2d');
     drawCharTo(g, { g: me.gender, lk }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
-  root.querySelectorAll('[data-spr]').forEach(c => { const draw = () => { const sp = atlas?.sprites?.[c.dataset.spr]; if (!sp || !atlasImg) return setTimeout(draw, 300);
-    const g = c.getContext('2d'), k = Math.min((c.width - 8) / sp[2], (c.height - 6) / sp[3], 1.6); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
-    g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (c.width - sp[2] * k) / 2, c.height - 3 - sp[3] * k, sp[2] * k, sp[3] * k); }; draw(); });
+  bindSpr(root);
   root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
@@ -1426,7 +1425,32 @@ const FN = {
   stealP(m) { send({ t: 'steal', to: m.to }); },
 };
 let bugList = null;
-const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${it.icon}</div><div class="nm">${esc(it.name)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
+// 📖 fish book: every species with its sprite; ones you have not caught yet are dark silhouettes
+function fishBook() {
+  const all = Object.entries(G.items).filter(([, it]) => it.kind === 'fish' && it.rar && it.spr).sort((a, b) => a[1].rar - b[1].rar || a[1].base - b[1].base);
+  const dex = me.fishdex || {}, got = all.filter(([id]) => dex[id]).length;
+  const cells = all.map(([id, it]) => `<div class="fbook ${dex[id] ? 'got' : ''} r${it.rar}" title="${esc(it.name)}"><canvas class="fspr" data-spr="${it.spr}" width="56" height="40"></canvas><small>${dex[id] ? esc(it.name) : '???'}</small>${dex[id] ? `<em>x${dex[id]}</em>` : ''}</div>`).join('');
+  return `<div class="secT" style="margin-top:14px">📖 สมุดภาพปลา ${got}/${all.length}</div>
+    <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div><div class="fbookGrid">${cells}</div>`;
+}
+// draws atlas sprites into <canvas data-spr> (furniture/vehicles stand on the bottom edge, fish (.fspr) are centred and can scale up)
+function bindSpr(root) {
+  root.querySelectorAll('[data-spr]').forEach(c => { const draw = () => { const sp = atlas?.sprites?.[c.dataset.spr]; if (!sp || !atlasImg) return setTimeout(draw, 300);
+    const fish = c.classList.contains('fspr'), g = c.getContext('2d'), k = fish ? Math.min((c.width - 2) / sp[2], (c.height - 2) / sp[3]) : Math.min((c.width - 8) / sp[2], (c.height - 6) / sp[3], 1.6);
+    g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = !fish || k < 1;
+    g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (c.width - sp[2] * k) / 2, fish ? (c.height - sp[3] * k) / 2 : c.height - 3 - sp[3] * k, sp[2] * k, sp[3] * k); }; draw(); });
+}
+function catchPop(id, first) {
+  const it = G.items[id]; if (!it?.spr) return;
+  document.querySelector('.catchPop')?.remove();
+  const d = document.createElement('div'); d.className = `catchPop r${it.rar}`;
+  d.innerHTML = `<canvas class="fspr" data-spr="${it.spr}" width="150" height="100"></canvas><b>${esc(it.name)}</b>${rarTag(id)}${first ? '<small>📖 ชนิดใหม่! บันทึกลงสมุดภาพปลาแล้ว</small>' : `<small>~${money(it.base)}</small>`}`;
+  document.body.appendChild(d); bindSpr(d); setTimeout(() => d.classList.add('out'), 2600); setTimeout(() => d.remove(), 3200);
+}
+// item icon: fish have their own pixel sprite; everything else is an emoji. Fish also carry a rarity tag.
+const itemIco = (id, w = 40, h = 30) => { const it = G.items[id]; return it?.spr ? `<canvas class="fspr" data-spr="${it.spr}" width="${w}" height="${h}"></canvas>` : (it?.icon || ''); };
+const rarTag = id => { const r = G.items[id]?.rar; return r ? `<span class="rtag r${r}">${G.fishRarity?.[r] || ''}</span>` : ''; };
+const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(it.name)}${rarTag(id)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
 let chatTab = 'near';
@@ -1624,6 +1648,11 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15b', d: '15 พ.ย. (รอบ 2)', items: [
+    '🐟 <b>ปลาใหม่ 25 ชนิด</b> รวมเป็น 32 ชนิด มีรูปปลาของตัวเอง: ปลาทู ปลาทอง กุ้ง ปู ปลาหมึกยักษ์ ม้าน้ำ ปลากระโทงดาบ ฉลามหัวค้อน ปลาคาร์ป ฯลฯ',
+    '⭐ ปลามี<b>ความหายาก</b> 5 ระดับ: ทั่วไป · ไม่ธรรมดา · หายาก · มหากาพย์ · ตำนาน (ปลาทองคำ ✨ ฿5,000)',
+    '📖 <b>สมุดภาพปลา</b> ที่สมาคมประมง ดูว่าตกชนิดไหนได้แล้ว · ตกได้แล้วมีป๊อปอัปโชว์ปลา',
+    '🏅 ฉายาใหม่: นักสะสมปลา · ตำนานริมน้ำ · ผู้ครอบครองปลาทองคำ' ] },
   { v: '2026-11-15a', d: '15 พ.ย.', items: [
     '🚧 <b>ไร่ชานเมืองปิดปรับปรุงชั่วคราว</b> ประตูทางไปไร่ปิดอยู่ ใครที่อยู่ในไร่จะกลับมาที่ประตูเมืองตอนเข้าเกม' ] },
   { v: '2026-11-14d', d: '14 พ.ย. (รอบ 3)', items: [
@@ -1688,7 +1717,7 @@ function renderPanel(p) {
           const own = (me.listings || []).filter(L => L.item === id).reduce((t, L) => t + L.qty, 0);
           const n = Math.max(0, (m2.n || 0) - own);
           const pl = n ? `<b style="color:var(--ok)">ผู้เล่น ${money(m2.best)}</b> (${n} ชิ้น)` : '<span style="opacity:.6">ไม่มีผู้เล่นวางขาย</span>';
-          return itemRow(id, `<div class="col2">${B(n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}${B(`NPC ${money(m2.sell || 0)}`, { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div>`, `${pl} · ร้าน NPC ${money(m2.sell || 0)}`);
+          return itemRow(id, `<div class="col2">${B(n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}${(G.items[id].rar || 0) >= 3 ? '' : B(`NPC ${money(m2.sell || 0)}`, { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div>`, `${pl}${(G.items[id].rar || 0) >= 3 ? ' · ปลาหายาก ร้าน NPC ไม่มีขาย' : ` · ร้าน NPC ${money(m2.sell || 0)}`}`);
         }).join('');
         body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div>${search}${cats}<div class="list">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
       } else if (tab === 'sell') {
@@ -1889,7 +1918,7 @@ function renderPanel(p) {
     }
     case 'pier': {
       const s = STN(st), c = me.cast, pool = G.fish[s.pool] || [];
-      const fishes = pool.filter(([id]) => id).map(([id]) => `${G.items[id].icon}${G.items[id].name}`).join(' · ');
+      const fishes = pool.filter(([id]) => id && G.items[id].rar).sort((a, b) => G.items[a[0]].rar - G.items[b[0]].rar).map(([id]) => `${me.fishdex?.[id] ? '' : '❔'}${esc(G.items[id].name)}${rarTag(id)}`).join(' ');
       const head = `<h2>🎣 ${esc(s.label)}</h2><div class="sub">ปลาแถวนี้: ${fishes} · ตกปลา Lv.${me.fishLv}${me.fishLv >= G.fishing.maxLv ? ' (สูงสุด)' : ` (${me.fishXp % G.fishing.xpPerLv}/${G.fishing.xpPerLv})`}</div>`;
       if (!me.rod) return `${head}<div class="jobbox">🎣 ต้องมี<b>เบ็ดตกปลา</b>ก่อน ซื้อได้กับน้าเล็กที่สมาคมประมง (${money(G.fishing.rod)}) · ใครก็ตกปลาได้ ไม่ต้องสมัครงาน${B('📍 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good big')}</div>`;
       let btn;
@@ -1901,9 +1930,10 @@ function renderPanel(p) {
     case 'fishclub': {
       const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id].kind === 'fish');
       const rows = fish.map(([id, q]) => itemRow(id, B(`ขาย ${money((wd?.mk[id]?.farm || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' }, 'good'), `มี ${q} · รับซื้อ ${money(wd?.mk[id]?.farm || 0)}/ตัว`)).join('');
+      const book = fishBook();
       return `<h2>🎣 สมาคมประมง · ร้านขายปลา</h2><div class="sub">${hoursTxt('fishclub')} · แหล่งตกปลา: 🏞️ ทะเลสาบ (ใต้เมือง) · 🌊 ทะเล (ฝั่งตะวันออก) · 🐟 แม่น้ำ (ไร่ชานเมือง)</div>
         <div class="jobbox">💬 ซื้อเบ็ด/อัปเกรดเบ็ด คุยกับ <b>น้าเล็ก</b> ที่ยืนอยู่ข้างๆ</div>
-        ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}`;
+        ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}${book}`;
     }
     case 'staff': {
       const S = STN(st), key = S.career;
@@ -2262,7 +2292,7 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
-fetch('assets/atlas.json?v=v3').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v3'; });
+fetch('assets/atlas.json?v=v4').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v4'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;

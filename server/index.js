@@ -378,7 +378,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
+  'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex'];
 let nextListing = 1;
 async function load() {
   const rows = await store.loadAll();
@@ -923,7 +923,7 @@ function act(a, m) {
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ${money(unit * q)} · ขอบคุณที่ใช้บริการ 🙏`, '🏪');
     }
     case 'market.npcbuy': {
-      const id = m.item, it = D.ITEMS[id]; if (!it || it.kind === 'fish' && it.base >= 1000 || it.menu) return;
+      const id = m.item, it = D.ITEMS[id]; if (!it || it.kind === 'fish' && (it.base >= 1000 || it.rar >= 3) || it.menu) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = npcSellPrice(id);
       if (!pay(a, unit * q)) return;
       addItem(a, id, q); markMe(a);
@@ -1183,10 +1183,14 @@ function act(a, m) {
       if (ev('rain')) infect(a, 'cold', 0.03);
       if (!id) { markMe(a); return toast(a, 'ได้ขยะ 🥫 ... ไม่มีราคา', '🥫', false); }
       addItem(a, id, 1); markMe(a); quest(a, 'fish'); stat(a, 'fish');
-      if (id === 'shark') stat(a, 'shark'); if (id === 'chest') stat(a, 'chest');
-      const it = D.ITEMS[id];
-      if (it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name}!!`);
-      return toast(a, `ได้ ${it.icon}${it.name} (~${money(it.base)})`, it.icon);
+      if (id === 'shark') stat(a, 'shark'); if (id === 'chest') stat(a, 'chest'); if (id === 'goldenfish') stat(a, 'goldenfish');
+      const it = D.ITEMS[id], rar = it.rar || 1, rn = D.FISH_RARITY[rar] || '';
+      if (rar >= 4) stat(a, 'epicfish');
+      a.fishdex = a.fishdex || {}; const first = !a.fishdex[id]; a.fishdex[id] = (a.fishdex[id] || 0) + 1;
+      stat(a, 'fishdex', Object.keys(a.fishdex).filter(k => D.ITEMS[k]?.rar).length, true);
+      if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
+      send(a, { t: 'catch', item: id, first });
+      return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
     }
     // ---------------- gardens
     case 'lot.buy': {
@@ -2189,7 +2193,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', outfits: a.outfits || [], wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     docShift: a.career === 'doctor' && a.doc ? { day: a.doc.day, hours: +(a.doc.hours || 0).toFixed(2) } : null,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
@@ -2277,7 +2281,7 @@ function login(ws, m) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
