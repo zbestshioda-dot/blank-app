@@ -1153,7 +1153,8 @@ function act(a, m) {
       if (own) return toast(a, `มี${v.name}แล้ว`, 'ℹ️', false);
       if (v.job && a.career !== v.job) return toast(a, `${v.name} ขายเฉพาะตำรวจ`, '🚓', false);
       if (v.license && !(a.licenses || []).includes(v.license)) return toast(a, 'ต้องมีใบขับขี่ก่อน สอบได้ที่มหาวิทยาลัย 🪪', '🪪', false);
-      if (v.gem) { if ((a.gems || 0) < v.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${v.gem} (มี 💎${a.gems || 0})`, '💎', false); a.gems -= v.gem; }
+      if (v.gem && isAdmin(a)) { /* admins: unlimited diamonds */ }
+      else if (v.gem) { if ((a.gems || 0) < v.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${v.gem} (มี 💎${a.gems || 0})`, '💎', false); a.gems -= v.gem; }
       else if (!pay(a, v.price)) return;
       a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
       if (v.gem || v.price >= 250000) feed(`${v.gem ? '💎' : ''}${v.icon} ${a.name} ถอย${v.name}${v.gem ? ' รุ่นพิเศษ!' : 'ป้ายแดง!'}`);
@@ -2008,7 +2009,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,

@@ -418,7 +418,7 @@ function paintHud() {
   paintPortrait(); $('#mailBtn').classList.toggle('has', (me.mailN || 0) > 0);
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
-  $('#meMoney').textContent = Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = (me.gems || 0).toLocaleString('en-US');
+  $('#meMoney').textContent = Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
@@ -1604,11 +1604,11 @@ function renderPanel(p) {
     case 'dealer': {
       const tab = ['car', 'gem'].includes(p.vtab) ? p.vtab : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
       const cards = Object.entries(G.shop.vehicles).filter(([, v]) => (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
-        const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? (me.gems || 0) >= v.gem : me.money >= v.price;
+        const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
         const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
         return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
       return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่มหาวิทยาลัย'}</div>
-        <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${(me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
+        <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${me.gemInf ? '∞ (แอดมิน)' : (me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
     }
     case 'garage': {
       const rows = (me.vehicles || []).filter(k => G.shop.vehicles[k]).map(k => { const v = G.shop.vehicles[k], on = me.ride === k;
