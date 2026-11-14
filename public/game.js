@@ -161,6 +161,7 @@ function handle(m) {
       break;
     }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
+    case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
     case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
@@ -696,6 +697,8 @@ function draw(t) {
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
+  { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
+  for (const a of ambs) if (a.area === A?.id) { if (!a.body.gone) ents.push([a.body.ry + .3, 4, a.body]); ents.push([a.y + halfY(a), 5, a]); }
   if (A?.id === 'town') { stepTraffic(); for (const c of traffic) if (vis(c.x, c.y, 4)) ents.push([c.y + halfY(c), 5, c]); }
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
@@ -721,6 +724,7 @@ function draw(t) {
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
   }
   drawBobber(X, Y, t);
+  drawSirens(X, Y);
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
   if (autoPath) {                          // tap-to-walk route: dotted line and a marker where you tapped
@@ -1893,6 +1897,7 @@ const VEH = {
   taxi:   { side: 'v_taxi_side', front: ['taxi', .41], back: 'v_taxi_back', len: 1.9, v: 3.4 },
   yellow: { side: 'v_yellow_side', front: 'v_yellow_front', back: 'v_yellow_back', len: 1.9, v: 3.1 },
   police: { side: 'v_police_side', front: 'v_police_front', back: 'v_police_front', len: 1.9, v: 3.3 },
+  amb:    { side: 'v_amb_side', front: 'v_amb_back', back: 'v_amb_back', len: 2.3, v: 6, deep: 1.2 },
   bus:    { side: 'v_bus_side', front: 'v_bus_front', back: 'v_bus_back', len: 3.8, v: 2.4, deep: 1.7 },
 };
 const FLEET = [['bus', 'red', 'taxi', 'blue', 'yellow', 'police', 'red', 'taxi', 'bus', 'blue', 'yellow', 'taxi', 'red', 'blue'], ['taxi', 'red', 'blue'], ['yellow', 'red', 'blue']];
@@ -1951,6 +1956,7 @@ function stepTraffic() {
       }
       if (!near && c.holds && k.ahead > halfX(c) + ZONE + 1) c.holds = null;
     }
+    if (!blocker) for (const o of ambs) if (Math.abs(o.x - ax) < bx + halfX(o) && Math.abs(o.y - ay) < by + halfY(o)) { blocker = o; break; }
     if (!blocker) for (const p of people) if (Math.abs(p.rx - ax) < bx + .3 && Math.abs(p.ry - ay) < by + .3) { blocker = p; break; }
     // two cars waiting on each other at a crossing: the lower id goes first
     c.blockedBy = blocker; c.wait = blocker ? (c.wait || 0) + dt : 0;
@@ -1958,6 +1964,56 @@ function stepTraffic() {
     c.v += Math.max(-9 * dt, Math.min(2.4 * dt, want - c.v));      // gentle speed-up, firm braking
     if (c.v > 0) { c.d += c.v * dt; Object.assign(c, routePos(c.r, c.d)); }
   }
+}
+// ---- ambulance: drives along the roads to where someone collapsed, parks over them, then drives off toward the hospital
+let ambs = [];
+const DRIVE = '=,ckps';
+function ambStart(m) {
+  const src = P.get(m.id); if (!src || !G) return;
+  const A = G.areas.find(a => a.id === m.area); if (!A) return;
+  const W = G.map.w, inA = (x, y) => x >= A.x && y >= A.y && x < A.x + A.w && y < A.y + A.h, key = (x, y) => y * W + x;
+  // 1) from the spot, over anything walkable, to the nearest road
+  const sx = Math.floor(m.x), sy = Math.floor(m.y), road = A.id === 'farm' ? 'c' : '=';
+  const prev = new Map([[key(sx, sy), -1]]), q = [[sx, sy]]; let entry = null;
+  for (let i = 0; i < q.length && i < 8000; i++) {
+    const [x, y] = q[i]; if (tileAt(x, y) === road) { entry = [x, y]; break; }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = key(nx, ny); if (!prev.has(k) && inA(nx, ny) && (!blockedAt(nx + .5, ny + .5) || DRIVE.includes(tileAt(nx, ny)))) { prev.set(k, key(x, y)); q.push([nx, ny]); } }
+  }
+  if (!entry) return;
+  const tail = []; for (let k = key(entry[0], entry[1]); k !== -1; k = prev.get(k)) tail.push([k % W + .5, Math.floor(k / W) + .5]);   // entry → spot
+  // 2) along the road, from a point ~30 tiles away (toward the hospital in town) to the entry
+  const p2 = new Map([[key(entry[0], entry[1]), [-1, 0]]]), q2 = [entry]; let far = entry, best = -1;
+  const hosp = G.map.buildings.find(b => b.id === 'hospital'), hx = hosp ? hosp.x + hosp.w / 2 : entry[0], hy = hosp ? hosp.y + hosp.h + 2 : entry[1];
+  for (let i = 0; i < q2.length; i++) {
+    const [x, y] = q2[i], dep = p2.get(key(x, y))[1];
+    const score = Math.min(dep, 30) * 10 - (A.id === 'town' ? Math.hypot(x - hx, y - hy) : 0);
+    if (dep <= 30 && score > best) { best = score; far = [x, y]; }
+    if (dep >= 30) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = key(nx, ny); if (!p2.has(k) && inA(nx, ny) && tileAt(nx, ny) === road) { p2.set(k, [key(x, y), dep + 1]); q2.push([nx, ny]); } }
+  }
+  const head = []; for (let k = key(far[0], far[1]); k !== -1; k = p2.get(k)[0]) head.push([k % W + .5, Math.floor(k / W) + .5]);   // far → entry
+  const path = head.concat(tail.slice(1).reverse()); path[path.length - 1] = [m.x, m.y + .3];
+  const body = { ...src, id: 'down' + m.id, x: m.x, y: m.y, rx: m.x, ry: m.y, pose: 'hosp', bubble: null, emo: null, ox: 0, oy: 0 };
+  ambs = ambs.filter(a => a.body.id !== body.id);
+  ambs.push({ k: 'amb', path, d: 0, v: 0, phase: 'in', t: 0, body, area: m.area, x: path[0][0], y: path[0][1], dx: 0, dy: 0 });
+}
+function pathPos(path, d) {
+  for (let i = 0; i < path.length - 1; i++) { const a = path[i], b = path[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d <= l) return { x: a[0] + (b[0] - a[0]) * d / l, y: a[1] + (b[1] - a[1]) * d / l, dx: Math.sign(b[0] - a[0]), dy: b[0] === a[0] ? Math.sign(b[1] - a[1]) : 0, end: false }; d -= l; }
+  const z = path[path.length - 1]; return { x: z[0], y: z[1], end: true };
+}
+function stepAmbs(dt) {
+  for (const a of ambs) {
+    if (a.phase === 'stop') { a.t += dt; if (a.t > .7) a.body.gone = true; if (a.t > 2.6) { a.phase = 'out'; a.path = a.path.slice().reverse(); a.d = 0; a.v = 0; } continue; }
+    // emergency vehicle: only waits for a car that is not itself waiting for the ambulance
+    const ax = a.x + a.dx * 1.6, ay = a.y + a.dy * 1.2;
+    const car = traffic.find(o => o.blockedBy !== a && Math.abs(o.x - ax) < .5 + halfX(o) && Math.abs(o.y - ay) < .5 + halfY(o));
+    const want = car ? 0 : a.phase === 'in' && pathPos(a.path, a.d + 3).end ? 2.5 : VEH.amb.v;   // slow down to park
+    a.v += Math.max(-12 * dt, Math.min(4 * dt, want - a.v));
+    a.d += a.v * dt; const p = pathPos(a.path, a.d);
+    a.x = p.x; a.y = p.y; if (!p.end) { a.dx = p.dx; a.dy = p.dy; }
+    if (p.end) { if (a.phase === 'in') { a.phase = 'stop'; a.t = 0; } else a.done = true; }
+  }
+  ambs = ambs.filter(a => !a.done);
 }
 function carSprite(c) {
   const V = VEH[c.k];
@@ -1971,6 +2027,14 @@ function drawCar(c, X, Y) {
   const cx = Math.round(c.x * TS + X), by = Math.round((c.y + halfY(c) * (c.dx ? 1.1 : .9)) * TS + Y);
   ctx.save(); ctx.translate(cx, by); if (flip) ctx.scale(-1, 1);
   ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
+}
+function drawSirens(X, Y) {
+  if (!ambs.length) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const on = Math.floor(performance.now() / 220) % 2;
+  for (const a of ambs) { if (a.area !== drawArea?.id) continue; const px = a.x * TS + X, py = (a.y - .9) * TS + Y, g = ctx.createRadialGradient(px, py, 0, px, py, TS * 1.1);
+    g.addColorStop(0, on ? 'rgba(255,40,40,.75)' : 'rgba(60,110,255,.75)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(px - TS * 1.1, py - TS * 1.1, TS * 2.2, TS * 2.2); }
+  ctx.restore();
 }
 function drawLights(X, Y, dark) {
   ctx.globalCompositeOperation = 'lighter';
@@ -2368,6 +2432,6 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
-window.__lt = { get traffic() { return traffic; }, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+window.__lt = { get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();

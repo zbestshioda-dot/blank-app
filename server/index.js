@@ -443,6 +443,9 @@ function knockOut(a) {
     toast(a, 'คุณหิวจนหมดแรง ล้มลงนอนเป็นผัก... รอสักพักร่างกายจะฟื้นขึ้นมาเอง', '🥬', false);
     feed(`🥬 ${a.name} หิวจนล้มลงข้างทาง`);
   } else {                           // otherwise an ambulance takes you to hospital
+    // people nearby see an ambulance come for you (you are already at the hospital on your own screen)
+    const here = D.areaAt(a.x, a.y);
+    if (here && here.kind === 'map') { const ev = { t: 'amb', id: a.id, x: +a.x.toFixed(2), y: +a.y.toFixed(2), area: here.id }; for (const o of online.values()) if (o !== a && areaId(o) === here.id) send(o, ev); }
     const docsOn = [...online.values()].some(o => o.career === 'doctor' && o !== a && !o.down);
     a.down = { kind: 'hosp', t: now(), until: now() + (docsOn ? 120000 : 60000) };
     let i = beds.findIndex(b => !b);
