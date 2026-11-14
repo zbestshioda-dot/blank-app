@@ -89,6 +89,22 @@ function drawAura(px, py, H, t, front) {
   }
   ctx.restore();
 }
+// ---- vehicles: atlas sprites w_<key>_s (side, faces left) / _f (front) / _b (back)
+const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's' : view === 'front' ? 'f' : 'b'}`];
+const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
+function drawVeh(key, view, faceLeft, px, py) {
+  const s = vehSpr(key, view); if (!s || !atlasImg) return;
+  const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS;
+  ctx.save(); ctx.translate(px, py + TS * .06); if (view === 'side' && !faceLeft) ctx.scale(-1, 1);
+  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
+}
+function drawRide(p, v, px, py, k, view, dir) {
+  const faceLeft = dir === 'left';
+  if (v.kind === 'car') return drawVeh(p.veh, view, faceLeft, px, py);          // in a car you only see the car
+  const lift = p.veh === 'escoot' ? TS * .12 : TS * .32;                          // sit on the seat / stand on the deck
+  drawCharTo(ctx, p, px + (view === 'side' ? (faceLeft ? TS * .12 : -TS * .12) : 0), py - lift, k, view, 0, faceLeft);
+  drawVeh(p.veh, view, faceLeft, px, py);                                        // the bike in front hides the legs
+}
 const SEAT_LEGS = .45;
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
@@ -171,7 +187,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '' });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -737,7 +753,7 @@ let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meM
 let homeBtnT = 0;
 function frame(t) {
   requestAnimationFrame(frame);
-  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); $('#homeBtn').classList.toggle('hidden', !(r0 && r0.rk === 'house' && r0.house === me.house) || !!placing); if (placing && !(r0 && r0.rk === 'house')) endPlace(); }
+  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } $('#homeBtn').classList.toggle('hidden', !(r0 && r0.rk === 'house' && r0.house === me.house) || !!placing); if (placing && !(r0 && r0.rk === 'house')) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   const m = P.get(myId);
@@ -755,7 +771,7 @@ function frame(t) {
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
       if (running && (!canRun() || me.run === false && performance.now() - runSetT > 1500)) setRun(false);
-      const sp = G.speed * (me.speed || 1) * (running ? G.run.mul : 1) * dt;
+      const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, sp = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * dt;
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
       const nx = r2(m.x + dx * sp); if (!blockedAt(nx, m.y)) m.x = nx;
@@ -964,7 +980,9 @@ function drawPlayer(p, X, Y, t) {
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
   const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
   let px = px0, py = py0;
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : .32), TS * .11, 0, 0, 7); ctx.fill();
+  const RV = p.veh && !lying && !sitting && G.shop?.vehicles?.[p.veh] && !roomOf(p.x, p.y) ? G.shop.vehicles[p.veh] : null;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : RV ? (RV.kind === 'car' ? (view === 'side' ? 1.2 : .75) : view === 'side' ? .8 : .4) : .32), TS * .11, 0, 0, 7); ctx.fill();
+  if (RV) { drawRide(p, RV, px, py, k, view, dir); nameAndBubble(p, px, py - (RV.kind === 'car' ? vehH(p.veh, view) + TS * .15 : H * .97 + TS * (p.veh === 'escoot' ? .12 : .32)), p.id === myId, t); return; }
   const aura = p.of === 'admin' && !lying, now0 = performance.now();
   if (aura) drawAura(px, py, H, now0, false);
   ctx.save();
@@ -1571,7 +1589,20 @@ function renderPanel(p) {
       }).join('');
       return `<h2>🛠️ ร้านอุปกรณ์</h2><div class="sub">${hoursTxt('toolshop')} · อัปเกรดอุปกรณ์ให้หาเงินได้มากขึ้น · อัปได้ 3 ระดับ</div><div class="list">${rows}</div>`;
     }
-    case 'dealer': return `<h2>🚧 โชว์รูมรถ</h2><div class="sub">ปิดปรับปรุงชั่วคราว · สอบ/ต่ออายุใบขับขี่ได้ที่มหาวิทยาลัย</div>`;
+    case 'dealer': {
+      const tab = p.vtab === 'car' ? 'car' : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
+      const cards = Object.entries(G.shop.vehicles).filter(([, v]) => v.kind === tab && (!v.job || v.job === me.career)).sort((a, b) => a[1].price - b[1].price).map(([key, v]) => {
+        const has = mine.includes(key), on = me.ride === key, need = v.license && !lic;
+        const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : money(v.price), { t: 'act', st, a: 'buy', v: key }, need ? '' : 'good', need || me.money < v.price);
+        return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}</em>${btn}</div>`; }).join('');
+      return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่มหาวิทยาลัย'}</div>
+        <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}</div><div class="looks">${cards}</div>`;
+    }
+    case 'garage': {
+      const rows = (me.vehicles || []).filter(k => G.shop.vehicles[k]).map(k => { const v = G.shop.vehicles[k], on = me.ride === k;
+        return `<div class="look fcard vcard ${on ? 'on' : ''}"><canvas data-spr="w_${k}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small>${B(on ? '🚶 ลงรถ' : `${v.icon} ขี่`, { t: 'ride', v: k, on: on ? 0 : 1 }, on ? '' : 'good')}</div>`; }).join('');
+      return `<h2>🔑 รถของฉัน</h2><div class="sub">เลือกคันที่จะขี่ · ซื้อเพิ่มที่ 🚗 โชว์รูมรถ</div><div class="looks">${rows || '<div class="sub">ยังไม่มีรถ</div>'}</div>`;
+    }
     case 'bank': {
       const bk = G.shop.bank;
       return `<h2>🏦 ธนาคาร</h2>${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (บนยอดไม่เกิน ${money(bk.cap)})</div>
@@ -1956,7 +1987,7 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
-fetch('assets/atlas.json?v=f2').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=f2'; });
+fetch('assets/atlas.json?v=v1').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v1'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
@@ -2809,6 +2840,8 @@ function mgClose() { mgStop(); $('#mg').classList.add('hidden'); }
 $('#mgX').onclick = () => { FX.play('click'); mgClose(); };
 $('#mgBtn').onclick = () => { FX.play('click'); mgMenu(); };
 $('#homeBtn').onclick = () => { FX.play('click'); openPanel({ kind: 'homedeco' }); };
+$('#rideBtn').onclick = () => { FX.play('click'); const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]);
+  if (me.ride) send({ t: 'ride', v: me.ride, on: 0 }); else if (vs.length === 1) send({ t: 'ride', v: vs[0], on: 1 }); else openPanel({ kind: 'garage' }); };
 function mgMenu() {
   mgStop(); $('#mg').classList.remove('hidden');
   const study = me.desk != null && me.desk >= 0;

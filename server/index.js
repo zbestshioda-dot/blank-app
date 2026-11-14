@@ -192,7 +192,8 @@ const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
 const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0)) : 0;
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
-const speedOf = a => dzProd(a, 'speed') * godSpeed(a);           // vehicles were removed from the game
+const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
+const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1);   // riding a vehicle outdoors
 const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
 const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
 function accrue(a) {
@@ -279,7 +280,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'house', 'furniture', 'hlv', 'fpos', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'house', 'furniture', 'hlv', 'fpos', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -327,7 +328,7 @@ function hydrate(r) {
   if ((a.v || 3) < 4) {                           // thief and fisher stopped being jobs; vehicles were removed (refunded in full)
     if (a.career === 'thief' || a.career === 'fisher') { if (a.career === 'fisher') a.rod = 1; a.career = 'none'; }
     if ((a.xp?.fisher || 0) > 0) a.rod = Math.max(a.rod || 0, 1);
-    a.money += (a.vehicles || []).reduce((t, v) => t + (D.VEHICLES[v]?.price || 0), 0); a.vehicles = [];
+    a.money += (a.vehicles || []).reduce((t, v) => t + ({ skate: 2000, bike: 6500, scooter: 22000, car: 75000 }[v] || 0), 0); a.vehicles = [];
     if ((a.licenses || []).includes('driving')) a.licExp = { ...(a.licExp || {}), driving: now() + LICENSE_YEAR };
     a.v = 4;
   }
@@ -1140,6 +1141,22 @@ function act(a, m) {
       if (!pay(a, f.price)) return;
       a.furniture = [...a.furniture, m.item]; joy(a, 5); markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)}) · จัดวางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
+    }
+    case 'dealer.buy': case 'dealer.sell': {   // the car showroom
+      const v = D.VEHICLES[m.v]; if (!v) return;
+      const own = (a.vehicles || []).includes(m.v);
+      if (m.a === 'sell') {
+        if (!own) return; const back = Math.round(v.price * .6);
+        a.vehicles = a.vehicles.filter(x => x !== m.v); if (a.ride === m.v) a.ride = ''; a.money += back; markMe(a); sendRoster();
+        return toast(a, `ขาย${v.name}ให้โชว์รูม ได้ ${money(back)} (60%)`, '💰');
+      }
+      if (own) return toast(a, `มี${v.name}แล้ว`, 'ℹ️', false);
+      if (v.job && a.career !== v.job) return toast(a, `${v.name} ขายเฉพาะตำรวจ`, '🚓', false);
+      if (v.license && !(a.licenses || []).includes(v.license)) return toast(a, 'ต้องมีใบขับขี่ก่อน สอบได้ที่มหาวิทยาลัย 🪪', '🪪', false);
+      if (!pay(a, v.price)) return;
+      a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
+      if (v.price >= 250000) feed(`${v.icon} ${a.name} ถอย${v.name}ป้ายแดง!`);
+      return toast(a, `ได้${v.name}แล้ว! กดปุ่ม ${v.icon} ขี่/ลงรถ ได้ทุกที่นอกอาคาร`, v.icon);
     }
     case 'hstair.go': case 'hstair.build': {   // house floors: stairs up/down, and building the next floor
       const i = s.idx, o = houses[i], tn = tenants[i], master = isAdmin(a) && a.god?.doors;
@@ -1967,7 +1984,7 @@ function outfitOf(a) {
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), th: a.thiefUntil > now() ? 1 : 0, afk: a.afk ? 1 : 0 };
+    of: outfitOf(a), th: a.thiefUntil > now() ? 1 : 0, afk: a.afk ? 1 : 0, veh: a.ride || '' };
 }
 function sendRoster() {
   const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
@@ -1990,7 +2007,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2083,7 +2100,7 @@ function login(ws, m) {
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
-    shop: { tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
+    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
   send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
@@ -2178,7 +2195,7 @@ function move(a, m) {
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0)) standUp(a);
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
-  if (a.run && !godLock(a)) {               // running burns energy; too tired = back to walking
+  if (a.run && !godLock(a) && !riding(a)) {               // running burns energy; too tired = back to walking
     a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); a.runT = t;
     if (a.energy <= D.RUN.minEnergy) { a.run = false; markMe(a); toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหวแล้ว พักหรือกินอะไรก่อน', '🥵', false); }
   }
@@ -2281,6 +2298,16 @@ function onMessage(ws, raw) {
     case 'paybills': return payBills(a);
     case 'donate': return donate(a, m);
     case 'steal': return steal(a, m);
+    case 'ride': {                           // get on / off one of your vehicles
+      const k = String(m.v || '');
+      if (!k || a.ride === k && !m.on) { a.ride = ''; }
+      else {
+        const v = D.VEHICLES[k]; if (!v || !(a.vehicles || []).includes(k)) return;
+        if (v.license && !hasLic(a, v.license)) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุ! ต่ออายุที่มหาวิทยาลัยก่อนขับ' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
+        a.ride = k;
+      }
+      a.mvb = moveCap(a); markMe(a); return sendRoster();
+    }
     case 'wear': return wear(a, m);
     case 'hplace': {                        // arrange your own furniture: put a piece on a floor of your house, or put it away
       const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);

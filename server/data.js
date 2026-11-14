@@ -87,7 +87,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // ---- districts: shopping street by the square (west main road), civic street (north), services lane (south-west),
   // health & business (east main road), the waterfront by the lake. Declaration order is kept: rooms are laid out in this order.
   B('toolshop', 'b_toolshop', 28, 45, { label: 'ร้านอุปกรณ์', icon: '🛠️', st: 'toolshop' });
-  B('dealer', 'b_showroom', 35, 45, { label: 'โชว์รูมรถ', icon: '🚧', st: 'dealer', renov: true });
+  B('dealer', 'b_showroom', 35, 45, { label: 'โชว์รูมรถ', icon: '🚗', st: 'dealer' });
   B('school', 'b_school2', 34, 13, { label: 'มหาวิทยาลัย', icon: '🎓', st: 'school' });
   B('bank', 'b_bank2', 43, 13, { label: 'ธนาคาร', icon: '🏦', st: 'bank' });
   // east main road, north side
@@ -308,7 +308,7 @@ const LAYOUT = {
   warehouse: [['x_storage', 2.4, 2.7], ['x_mshelf2', 4.6, 2.7], ['f_cabinet', 7, 2.3], ['x_storage', 9.6, 2.7], ['x_water', 11.9, 2.6], ['x_crate', 2.0, 5.6], ['crate', 3.4, 5.6], ['x_fruit', 11.4, 5.6], ['x_eggs', 2.2, 8.7], ['x_cart2', 4.4, 8.7], ['barrel', 9.6, 8.6], ['x_drum', 10.6, 8.7], ['i_rice_sack', 11.6, 8.6, false], ['x_tires2', 12.5, 8.7]],
   fashion: [['x_shoes', 2.4, 2.7], ['x_bags', 4.6, 2.7], ['x_cashdesk', 7, 2.5], ['x_mirror', 9.4, 2.6], ['x_curtain', 11.6, 2.7], ['x_clothes', 3, 5.8], ['x_clothes', 11, 5.8], ['f_rug_round', 7, 6.6], ['x_mannequin2', 5.0, 6.6], ['x_mannequin3', 9.0, 6.6], ['x_hats', 1.6, 8.8], ['x_jewelcase', 3.6, 8.7], ['x_hats2', 12.4, 8.8], ['x_fabric', 10.6, 8.8], ['i_poster', 5, 1.05, false], ['x_wclock', 9.4, 0.95, false], ['x_pos', 7.6, 1.75, false]],
   rider: [['f_window', 10.5, 1.1], ['x_pcdesk2', 7, 2.5], ['x_lockers', 2.4, 2.6], ['x_water', 4.5, 2.6], ['f_coffee', 10.4, 2.6], ['x_vending', 12.2, 2.8], ['x_helmets', 4.4, 1.0, false], ['x_moto', 3.2, 6.2], ['f_rug_round', 7, 6.4], ['x_tirerack2', 11.6, 6.0], ['f_bench_back', 9.4, 8.95, false], ['f_plant', 1.6, 8.7], ['i_bike', 4, 8.6, false], ['x_airpump', 12.4, 8.8], ['x_wclock', 7, 0.95, false]],
-  dealer: [['x_cardesk', 7, 2.4], ['car_red', 3, 4.8], ['car_blue', 11, 4.8], ['car_green', 3, 8.3], ['x_plant', 1.5, 2.7], ['x_keys', 9.6, 1.1, false], ['x_tirerack2', 12.0, 2.7], ['x_tools', 11.4, 8.7], ['x_aboard2', 9.0, 8.8, false], ['x_wclock', 4.6, 1.0, false]],
+  dealer: [['x_cardesk', 7, 2.4], ['w_sports_s', 3.2, 5.6], ['w_suv_s', 10.8, 5.6], ['w_cruiser_s', 2.6, 8.7], ['w_sport_s', 11.4, 8.7], ['x_plant', 1.5, 2.7], ['x_keys', 9.6, 1.1, false], ['x_tirerack2', 12.0, 2.7], ['x_tools', 11.4, 8.7], ['x_aboard2', 9.0, 8.8, false], ['x_wclock', 4.6, 1.0, false]],
   toolshop: [['x_toolbox', 2.2, 2.6], ['x_mshelf', 4.3, 2.7], ['x_cashdesk', 7, 2.5], ['x_workbench', 9.6, 2.6], ['f_shelf_c', 11.9, 2.8], ['x_storage', 2.4, 6.4], ['x_seeds', 4.8, 6.0, false], ['x_barrow', 10.8, 6.4], ['x_bucket2', 1.8, 8.7], ['x_jack', 4.0, 8.6], ['x_ghose', 10.4, 8.7], ['x_ladder2', 12.5, 8.7], ['i_lantern', 5, 1.15, false], ['i_clock', 9.4, 1.0, false]],
   restaurant: [['x_plant', 1.6, 2.8], ['x_coffeebar', 3.9, 2.5], ['x_counter', 7, 2.4], ['x_cakecase', 9.9, 2.5], ['x_drinkfridge', 12.1, 2.7], ['x_wclock', 5.4, 0.95, false], ['i_hanging', 12.6, 1.25, false], ['x_cafeset', 3.4, 5.7], ['x_cafeset', 10.6, 5.7], ['x_cafeset', 3.4, 8.6], ['x_cafeset', 10.6, 8.6], ['x_menu', 5.4, 9.15, false], ['x_bell', 7.9, 1.75, false]],
   kitchen: [['x_hood', 4.6, 1.45, false], ['x_oven', 2.4, 2.6], ['x_souppot', 4.6, 2.6], ['x_prep', 7.2, 2.5], ['x_sink', 10.3, 2.5], ['x_breadrack', 2.0, 6.4], ['f_bench', 10.5, 6.6], ['x_tray', 10.5, 5.75, false], ['x_freezer', 2.6, 8.7], ['i_rice_sack', 4.4, 8.6], ['x_ice', 10.0, 8.8], ['f_fridge', 12.3, 8.7], ['x_ext', 12.6, 5.0], ['i_clock', 7.4, 1.0, false], ['x_dishrack', 12.0, 1.95, false]],
@@ -577,11 +577,23 @@ const EVENTS = [
 ];
 
 // ================================================================= things to spend money on
-const VEHICLES = {
-  skate:  { name: 'สเก็ตบอร์ด', icon: '🛹', price: 2000,  speed: 1.15 },
-  bike:   { name: 'จักรยาน', icon: '🚲', price: 6500,  speed: 1.3 },
-  scooter:{ name: 'มอเตอร์ไซค์', icon: '🛵', price: 22000, speed: 1.5, license: 'driving' },
-  car:    { name: 'รถยนต์', icon: '🚗', price: 75000, speed: 1.75, license: 'driving' },
+const VEHICLES = {   // bought at the car showroom; ride outdoors (🛵 button) — faster than walking, no running needed
+  escoot:  { name: 'สกู๊ตเตอร์ไฟฟ้า', icon: '🛴', price: 9000, speed: 1.25, kind: 'moto' },
+  cub:     { name: 'มอเตอร์ไซค์คับ', icon: '🛵', price: 28000, speed: 1.5, kind: 'moto', license: 'driving' },
+  vespa:   { name: 'เวสป้าวินเทจ', icon: '🛵', price: 55000, speed: 1.55, kind: 'moto', license: 'driving' },
+  delivery:{ name: 'มอไซค์ส่งอาหาร', icon: '🛵', price: 35000, speed: 1.55, kind: 'moto', license: 'driving', rider: 1 },
+  dirt:    { name: 'วิบากออฟโรด', icon: '🏍️', price: 85000, speed: 1.65, kind: 'moto', license: 'driving' },
+  cafe:    { name: 'คาเฟ่เรเซอร์', icon: '🏍️', price: 120000, speed: 1.7, kind: 'moto', license: 'driving' },
+  cruiser: { name: 'ครุยเซอร์ฮาร์เลย์', icon: '🏍️', price: 280000, speed: 1.75, kind: 'moto', license: 'driving' },
+  sport:   { name: 'บิ๊กไบค์สปอร์ต', icon: '🏍️', price: 450000, speed: 1.9, kind: 'moto', license: 'driving' },
+  mini:    { name: 'มินิคูเปอร์', icon: '🚗', price: 180000, speed: 1.7, kind: 'car', license: 'driving' },
+  sedan:   { name: 'รถเก๋งซีดาน', icon: '🚘', price: 260000, speed: 1.75, kind: 'car', license: 'driving' },
+  taxi:    { name: 'แท็กซี่', icon: '🚕', price: 300000, speed: 1.75, kind: 'car', license: 'driving' },
+  pickup:  { name: 'กระบะ', icon: '🛻', price: 350000, speed: 1.75, kind: 'car', license: 'driving' },
+  van:     { name: 'รถตู้', icon: '🚐', price: 420000, speed: 1.7, kind: 'car', license: 'driving' },
+  suv:     { name: 'SUV ออฟโรด', icon: '🚙', price: 750000, speed: 1.85, kind: 'car', license: 'driving' },
+  sports:  { name: 'ซูเปอร์คาร์เปิดประทุน', icon: '🏎️', price: 1500000, speed: 2.1, kind: 'car', license: 'driving' },
+  police:  { name: 'รถสายตรวจ', icon: '🚓', price: 150000, speed: 1.9, kind: 'car', license: 'driving', job: 'police' },
 };
 const TOOL_PRICES = [4000, 15000, 50000];
 const TOOLS = {

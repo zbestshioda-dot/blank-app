@@ -698,3 +698,8 @@ body.hasEvent #topBar{top:146px!important}
 .ftabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.ftabs::-webkit-scrollbar{display:none}.ftabs button{flex:none;white-space:nowrap;font-size:12px;padding:5px 10px}
 .look.fcard canvas{width:96px;height:80px;image-rendering:pixelated}
 .look.fcard em{display:block;font-style:normal;font-size:10.5px;color:var(--mut);margin:-2px 0 4px}
+
+/* vehicles */
+#rideBtn{right:104px;bottom:136px;width:50px;height:50px}
+#rideBtn.on{background:linear-gradient(#5c8fb8,#2f5878)}
+.look.vcard canvas{width:100%;max-width:150px;height:auto;aspect-ratio:15/8}
