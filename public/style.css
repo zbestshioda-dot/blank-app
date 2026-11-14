@@ -681,3 +681,15 @@ body.hasEvent #topBar{top:146px!important}
 #card.v2 .sInfo .l3{margin-top:1px;line-height:1}
 #card.v2 .sInfo .money{font-size:13px!important;margin-top:0}
 #card.v2 .sInfo #jx label{font-size:8.5px}
+
+/* arranging the house */
+#homeBtn{right:40px;bottom:160px;width:50px;height:50px}
+#placeBar{position:fixed;left:50%;bottom:calc(190px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:40;background:rgba(30,22,14,.94);border:2px solid #c9a45a;border-radius:14px;padding:8px 10px;color:#fbecd2;text-align:center;max-width:calc(100vw - 24px);box-shadow:0 6px 18px rgba(0,0,0,.45)}
+#placeBar b{display:block;font-size:14px;color:#ffd770}#placeBar small{display:block;font-size:11px;color:#d9c7a8;margin:2px 0 6px}
+#placeBar .pb{display:flex;gap:5px;justify-content:center;flex-wrap:wrap}#placeBar .pb button{padding:6px 9px;font-size:13px;min-width:38px}
+
+/* profile photo crop */
+#crop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;background:rgba(20,12,6,.6);padding:10px}
+#crop .sheet{width:min(380px,100%);max-height:94dvh;overflow:auto;user-select:none;-webkit-user-select:none}
+#cropCv{display:block;width:min(300px,78vw);height:auto;aspect-ratio:1;margin:10px auto;border-radius:12px;touch-action:none;cursor:grab;background:#222}
+.cropZ{display:flex;align-items:center;gap:8px;margin:0 6px 10px}.cropZ input{flex:1}

@@ -278,7 +278,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'house', 'furniture', 'hlv', 'fpos', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -299,7 +299,7 @@ function newPhone() { let p; do p = String(rint(100000, 999999)); while (byPhone
 function hydrate(r) {
   const a = Object.assign({
     avatar: 0, money: 1000, energy: 100, hunger: 100, health: 100, career: 'none', licenses: [], xp: {},
-    inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1,
+    inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1, hlv: 0, fpos: {},
     furniture: [], bank: 0, bankT: now(), loan: 0, dz: [], awake: 0, listings: [], contacts: [], stats: {}, ach: [], title: '', jobChanges: [],
     enrolled: false, classes: 0, office: null, garden: null, rent: null, houseSale: 0, houseRent: 0, down: null,
     gender: 'm', look: null, wardrobe: null, god: null, rod: 0, hideJob: false, outfit: '', outfits: [], licExp: {}, phoneAsk: {}, school: null,
@@ -309,7 +309,7 @@ function hydrate(r) {
     if (!D.CAREERS[a.career]) a.career = 'none';
     a.licenses = (a.licenses || []).filter(l => D.LICENSES[l]);
     if (a.licenses.includes('medicine') || a.career === 'office') a.licenses = [...new Set([...a.licenses, 'degree'])];
-    if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; }   // the old houses were demolished: refund
+    if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; }   // the old houses were demolished: refund
     a.x = D.SPAWN.x; a.y = D.SPAWN.y; a.v = 2;
   }
   if (!a.look || !a.look.pants) {                   // looks moved to the pixel character: refund the old hairstyles/hats, keep the shirt colour
@@ -1089,9 +1089,9 @@ function act(a, m) {
       if (o && !o.houseSale) return toast(a, `บ้านของ ${o.name} ไม่ได้ประกาศขาย`, '🏠', false);
       const price = o ? o.houseSale : D.HOUSE_PRICES[i];
       if (!pay(a, price)) return;
-      if (o) { credit(o, price); o.house = -1; o.furniture = []; o.houseSale = 0; o.houseRent = 0; if (o.ws) toast(o, `${a.name} ซื้อบ้านของคุณแล้ว ได้ ${money(price)}`, '🏠'); }
+      if (o) { credit(o, price); o.house = -1; o.furniture = []; o.hlv = 0; o.fpos = {}; o.houseSale = 0; o.houseRent = 0; if (o.ws) toast(o, `${a.name} ซื้อบ้านของคุณแล้ว ได้ ${money(price)}`, '🏠'); }
       if (tenants[i] === a) { tenants[i] = null; a.rent = null; }
-      houses[i] = a; a.house = i; a.furniture = []; a.houseSale = 0; a.houseRent = 0; markMe(a); wdAt = 0;
+      houses[i] = a; a.house = i; a.furniture = []; a.hlv = 0; a.fpos = {}; a.houseSale = 0; a.houseRent = 0; markMe(a); wdAt = 0;
       feed(`🏠 ${a.name} ซื้อบ้านหลังใหม่ในหมู่บ้านจัดสรร!`);
       return toast(a, 'ยินดีด้วย! ได้บ้านแล้ว แต่งบ้านเพื่อเพิ่มความสบาย และนอนที่นี่ได้', '🏠');
     }
@@ -1114,7 +1114,7 @@ function act(a, m) {
       if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
       if (tenants[s.house]) return toast(a, 'มีผู้เช่าอยู่ ขายไม่ได้จนกว่าจะหมดสัญญา', '🏠', false);
       const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + D.FURNITURE[k].price * 0.4, 0));
-      houses[s.house] = null; a.house = -1; a.furniture = []; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
+      houses[s.house] = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
       return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
     }
     case 'house.list': case 'house.rentout': {
@@ -1138,7 +1138,28 @@ function act(a, m) {
       if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, f.price)) return;
       a.furniture = [...a.furniture, m.item]; joy(a, 5); markMe(a); wdAt = 0;
-      return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
+      return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)}) · จัดวางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
+    }
+    case 'hstair.go': case 'hstair.build': {   // house floors: stairs up/down, and building the next floor
+      const i = s.idx, o = houses[i], tn = tenants[i], master = isAdmin(a) && a.god?.doors;
+      const to = s.down ? s.fl - 1 : s.fl + 1;
+      if (m.a === 'build') {
+        if (o !== a) return toast(a, 'ขยายบ้านได้เฉพาะเจ้าของบ้าน', '🔒', false);
+        if (to !== 2 + (a.hlv || 0) || to > D.HOUSE_FLOORS) return;
+        if (!pay(a, D.FLOOR_PRICE[to])) return;
+        a.hlv = (a.hlv || 0) + 1; joy(a, 20); markMe(a); wdAt = 0;
+        feed(`🏗️ ${a.name} ต่อเติมบ้านเป็น ${to} ชั้นแล้ว!`);
+        toast(a, `สร้างชั้น ${to} เสร็จแล้ว! ขึ้นบันไดไปจัดห้องใหม่ได้เลย`, '🏗️');
+      }
+      if (!s.down) {
+        if (!master && !((o === a && (!tn || tn === a)) || tn === a)) return toast(a, 'ขึ้นชั้นบนได้เฉพาะเจ้าของบ้านและผู้เช่า', '🔒', false);
+        if (!master && to > 1 + ((o && o.hlv) || 0)) return toast(a, o === a ? `ยังไม่มีชั้น ${to} — ต่อเติมได้ ${money(D.FLOOR_PRICE[to])}` : `บ้านหลังนี้ยังไม่มีชั้น ${to}`, '🏗️', false);
+      }
+      const r = D.floorRoom(i, to); if (!r) return;
+      if (!cd(a, 'door', 800, true)) return;
+      standUp(a);
+      const st = D.STATIONS.find(x => x.type === 'hstair' && x.idx === i && x.fl === to && (s.down ? !x.down : x.down));
+      return st ? teleport(a, st.x + (s.down ? (st.x < r.x + 7 ? 1.3 : -1.3) : -1.4), st.y - .1) : teleport(a, r.spawn.x, r.spawn.y);
     }
     case 'hbed.sleep': {
       const i = s.idx, own = houses[i] === a && !tenants[i], rent = tenants[i] === a;
@@ -1968,7 +1989,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, house: a.house, furniture: a.furniture, comfort: comfort(a), speed: speedOf(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -1993,7 +2014,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 14) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 60) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb,
   };
@@ -2061,7 +2082,7 @@ function login(ws, m) {
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
-    shop: { tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, bank: D.BANK },
+    shop: { tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
   send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
@@ -2260,6 +2281,18 @@ function onMessage(ws, raw) {
     case 'donate': return donate(a, m);
     case 'steal': return steal(a, m);
     case 'wear': return wear(a, m);
+    case 'hplace': {                        // arrange your own furniture: put a piece on a floor of your house, or put it away
+      const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);
+      const k = String(m.k || ''); if (!furnOf(a).includes(k)) return;
+      a.fpos = { ...(a.fpos || {}) };
+      if (m.store) { a.fpos[k] = [0]; toast(a, `เก็บ${D.FURNITURE[k]?.name || ''}เข้าคลังแล้ว`, '📦'); }
+      else {
+        const fl = Math.round(+m.fl) || 1, x = +m.x, y = +m.y;
+        if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
+        a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20];
+      }
+      markMe(a); wdAt = 0; return;
+    }
     case 'report': return report(a, m);
     case 'arrest': return arrest(a, m);
     case 'title': { if (!m.id || (a.ach || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }

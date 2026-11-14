@@ -11,7 +11,7 @@ const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, 
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
 const RX0 = 256;                                         // interiors start here
-const W = RX0 + 6 * 18 + 2, H = 90;
+const W = RX0 + 10 * 18 + 2, H = 90;                     // 6 columns of interiors + 4 columns of upstairs floors (house expansions)
 
 // ---------------------------------------------------------------- grid helpers
 // tile codes: . grass  = road  , sidewalk  c cobble path  k plaza bricks  w water  p pier/bridge
@@ -320,7 +320,7 @@ const LAYOUT = {
   house: [['f_wardrobe', 1.4, 2.9], ['f_bed_blue', 3.4, 3.3], ['i_teddy', 3.9, 2.7, false], ['f_drawer', 5.1, 2.5], ['i_books', 5.1, 1.55, false], ['i_painting', 3.4, 1.05, false],
     ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false],
     ['f_sink', 10.0, 2.6], ['f_toilet', 11.1, 2.6], ['f_shower', 12.3, 2.7],
-    ['f_rug_red', 8, 6.0], ['f_armchair', 5.6, 5.8], ['f_floorlamp', 12.4, 8.7],
+    ['f_rug_red', 8, 6.0], ['f_armchair', 5.6, 5.8],
     ['f_fridge', 1.2, 8.7], ['f_counter_micro', 2.95, 8.7], ['f_stove', 4.75, 8.7], ['f_welcome', 7, 9.25]],
 };
 // office: 8 work desks with a chair in front of each
@@ -330,6 +330,9 @@ const SCHOOL_DESKS = [[3.6, 4.6], [10.4, 4.6], [3.6, 7.0], [10.4, 7.0]];
 for (const [cx, by] of SCHOOL_DESKS) LAYOUT.school.push(['f_desk', cx, by], ['f_chair', cx - .45, by + 1.25], ['f_chair', cx + .45, by + 1.25]);
 const ROOMS = [];
 let slot = 0;
+// house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
+const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
+const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
 for (const b of BUILDINGS) {
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
@@ -364,6 +367,8 @@ for (const b of BUILDINGS) {
   STATIONS.push({ id: 'door_' + b.id, type: 'door', to: room.id, label: b.label, icon: b.icon, x: front.x, y: front.y + 0.6, r: 1.5, area: b.area || 'town', bld: b.id, house: b.house, renov: b.renov || undefined });
   if (kind === 'house') {
     STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 3.4, y: ry + 3.7, r: 1.4 });
+    STATIONS.push({ id: `hstair${b.house}_1`, type: 'hstair', idx: b.house, fl: 1, room: room.id, label: 'บันไดขึ้นชั้น 2', icon: '🪜', x: rx + STAIR_UP[0], y: ry + STAIR_UP[1] + .4, r: 1.1 });
+    room.furniture.push(['~stairs', rx + STAIR_UP[0], ry + STAIR_UP[1]]);
     continue;
   }
   const s = { id: b.st, type: b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
@@ -387,6 +392,24 @@ for (const b of BUILDINGS) {
     for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) STATIONS.push({ id: 'chair' + n, type: 'chair', idx: n++, room: room.id, label: 'โต๊ะทำงาน', icon: '💺', x: rx + cx, y: ry + by + .95, r: .9 });
   }
 }
+{
+  let fslot = 0;
+  for (const g of ROOMS.filter(r => r.rk === 'house')) for (let fl = 2; fl <= HOUSE_FLOORS; fl++) {
+    const RW = 14, RH = 10, rx = RX0 + 6 * 18 + (fslot % 4) * 18, ry = 1 + Math.floor(fslot / 4) * 14; fslot++;
+    rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i');
+    const room = { ...g, id: `${g.id}_f${fl}`, floor: fl, x: rx, y: ry, w: RW, h: RH,
+      spawn: { x: rx + STAIR_DOWN[0] - 1.4, y: ry + STAIR_DOWN[1] + .3 }, exit: { x: -99, y: -99 },
+      furniture: [['f_window', rx + 4, ry + 1.1], ['f_window', rx + 10, ry + 1.1], ['~stairs_d', rx + STAIR_DOWN[0], ry + STAIR_DOWN[1]]] };
+    ROOMS.push(room);
+    STATIONS.push({ id: `hstair${g.house}_${fl}d`, type: 'hstair', idx: g.house, fl, down: 1, room: room.id, label: `บันไดลงชั้น ${fl - 1}`, icon: '🪜', x: rx + STAIR_DOWN[0], y: ry + STAIR_DOWN[1] + .4, r: 1.1 });
+    if (fl < HOUSE_FLOORS) {
+      room.furniture.push(['~stairs', rx + STAIR_UP2[0], ry + STAIR_UP2[1]]);
+      STATIONS.push({ id: `hstair${g.house}_${fl}`, type: 'hstair', idx: g.house, fl, room: room.id, label: `บันไดขึ้นชั้น ${fl + 1}`, icon: '🪜', x: rx + STAIR_UP2[0], y: ry + STAIR_UP2[1] + .4, r: 1.1 });
+    }
+  }
+}
+// the room a house floor lives in, and where you arrive on it
+const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house === house && (r.floor || 1) === fl);
 const AREAS = [TOWN, FARM, HOUSING, ...ROOMS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
@@ -588,6 +611,22 @@ const FURNITURE = {
   art:    { name: 'ภาพวาด', icon: '🖼️', price: 18000, comfort: 3 },
   piano:  { name: 'เปียโน', icon: '🎹', price: 25000, comfort: 4 },
   jacuzzi:{ name: 'อ่างจากุซซี่', icon: '🛁', price: 40000, comfort: 5 },
+  // decor: cheap pieces to arrange your own way (bought at the furniture shop or from your house)
+  rugr:   { name: 'พรมกลม', icon: '🟠', price: 800, comfort: 0 },
+  rugb:   { name: 'พรมสีฟ้า', icon: '🟦', price: 900, comfort: 0 },
+  cactus: { name: 'กระบองเพชร', icon: '🌵', price: 600, comfort: 0 },
+  plant2: { name: 'ต้นไม้ใหญ่', icon: '🌿', price: 2200, comfort: 1 },
+  lamp:   { name: 'โคมไฟตั้งพื้น', icon: '🛋️', price: 2500, comfort: 1 },
+  table:  { name: 'โต๊ะกินข้าว', icon: '🍽️', price: 4500, comfort: 1 },
+  rtable: { name: 'โต๊ะกลม', icon: '☕', price: 2000, comfort: 0 },
+  shelf:  { name: 'ชั้นหนังสือ', icon: '📖', price: 3500, comfort: 1 },
+  desk:   { name: 'โต๊ะทำงาน', icon: '💻', price: 5000, comfort: 1 },
+  wardrobe2: { name: 'ตู้เสื้อผ้า', icon: '🚪', price: 4000, comfort: 1 },
+  mirror: { name: 'กระจกบานใหญ่', icon: '🪞', price: 3000, comfort: 1 },
+  armchair: { name: 'อาร์มแชร์', icon: '💺', price: 3800, comfort: 1 },
+  bunk:   { name: 'เตียงสองชั้น', icon: '🛏️', price: 6500, comfort: 1 },
+  coffee: { name: 'เครื่องชงกาแฟ', icon: '☕', price: 7000, comfort: 1 },
+  winer:  { name: 'ชั้นวางไวน์', icon: '🍷', price: 15000, comfort: 2 },
 };
 const BANK = { rate: 0.003, cap: 100000, loanMax: 8000, loanFee: 0.12, repayShare: 0.25 };
 
@@ -715,5 +754,5 @@ module.exports = {
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
-  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
+  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

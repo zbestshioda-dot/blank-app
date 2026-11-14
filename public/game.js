@@ -164,7 +164,7 @@ function handle(m) {
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       break;
     case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
-    case 'wd': { const hs = JSON.stringify(m.houses.map(h => h[2])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
+    case 'wd': { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
     case 'roster': {
       const ids = new Set();
       for (const p of m.players) {
@@ -601,6 +601,7 @@ function onTap(sx, sy) {
   $('#emoPick').classList.add('hidden');
   if (!G || !me || sx == null) return;
   const c = camera(), wx = (sx + c.x) / TS, wy = (sy + c.y) / TS, m = P.get(myId); if (!m) return;
+  if (placing) return placeTap(wx, wy);
   const here = areaOf(m.x, m.y)?.id;
   let hit = null, hd = .8;
   for (const p of P.values()) {
@@ -733,8 +734,10 @@ function onAction() {
 
 // ------------------------------------------------------------------ main loop
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
+let homeBtnT = 0;
 function frame(t) {
   requestAnimationFrame(frame);
+  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); $('#homeBtn').classList.toggle('hidden', !(r0 && r0.rk === 'house' && r0.house === me.house) || !!placing); if (placing && !(r0 && r0.rk === 'house')) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   const m = P.get(myId);
@@ -839,7 +842,7 @@ function draw(t) {
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
   for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
-  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
+  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3, 4, p]);
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
@@ -852,7 +855,11 @@ function draw(t) {
     if (k === 0) drawBuildingSprite(e, X, Y);
     else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) spr(e[2], e[0] + .5, e[1] + 1.05, X, Y);
-    else if (k === 3) spr(e[0], e[1], e[2], X, Y);
+    else if (k === 3) {
+      if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
+      else if (e[3] === 'ghost') { ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; spr(e[0], e[1], e[2], X, Y); ctx.globalAlpha = 1; ctx.strokeStyle = '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      else spr(e[0], e[1], e[2], X, Y);
+    }
     else if (k === 5) drawCar(e, X, Y);
     else drawPlayer(e, X, Y, t);
   }
@@ -1213,6 +1220,7 @@ const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="$
 const FN = {
   titles: () => { panel.titles = !panel.titles; refreshPanel(true); if (panel.titles) setTimeout(() => { const t = document.querySelector('#panelBody .secT'); t && t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); },
   photo: () => pickPhoto(),
+  place: m => startPlace(m.k),
   photoDel: () => send({ t: 'pic', data: '' }),
   chatTab: m => { chatTab = m.tab; panel.sig = 'x' + m.tab; refreshPanel(true); setTimeout(() => $('#chatIn')?.focus(), 30); },
   mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); $('#mailText').value = ''; },
@@ -1272,16 +1280,48 @@ function pickPhoto() {
   inp.onchange = () => {
     const f = inp.files?.[0]; if (!f) return;
     const url = URL.createObjectURL(f), im = new Image();
-    im.onload = () => {
-      const S = 128, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
-      const k = Math.min(im.width, im.height); g.drawImage(im, (im.width - k) / 2, (im.height - k) / 2, k, k, 0, 0, S, S);
-      let q = .82, d = c.toDataURL('image/jpeg', q); while (d.length > 22000 && q > .3) { q -= .12; d = c.toDataURL('image/jpeg', q); }
-      URL.revokeObjectURL(url); send({ t: 'pic', data: d });
-    };
+    im.onload = () => { URL.revokeObjectURL(url); cropOpen(im); };
     im.onerror = () => toast('เปิดรูปนี้ไม่ได้', '🖼️', false);
     im.src = url;
   };
   inp.click();
+}
+// ---- crop the picked photo: drag to move, pinch / wheel / slider to zoom; the circle is what others see
+let crop = null;
+function cropOpen(im) {
+  const C = $('#cropCv'), S = C.width;
+  crop = { im, z: 1, cx: im.width / 2, cy: im.height / 2, pts: new Map(), pinch: 0 };
+  const base = () => S / Math.min(im.width, im.height), k = () => base() * crop.z;
+  const fix = () => { const h = S / 2 / k(); crop.cx = clamp(crop.cx, h, im.width - h); crop.cy = clamp(crop.cy, h, im.height - h); };
+  crop.draw = () => {
+    fix(); const g = C.getContext('2d'), kk = k();
+    g.fillStyle = '#222'; g.fillRect(0, 0, S, S);
+    g.drawImage(im, S / 2 - crop.cx * kk, S / 2 - crop.cy * kk, im.width * kk, im.height * kk);
+    g.save(); g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.rect(0, 0, S, S); g.moveTo(S - 4, S / 2); g.arc(S / 2, S / 2, S / 2 - 4, 0, Math.PI * 2); g.fill('evenodd');
+    g.strokeStyle = '#ffd770'; g.lineWidth = 3; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 4, 0, 7); g.stroke(); g.restore();
+  };
+  const zoomTo = z => { crop.z = clamp(z, 1, 5); $('#cropZoom').value = crop.z; crop.draw(); };
+  const sc = () => S / C.getBoundingClientRect().width;   // css px -> canvas px
+  C.onpointerdown = e => { C.setPointerCapture(e.pointerId); crop.pts.set(e.pointerId, [e.clientX, e.clientY]); if (crop.pts.size === 2) { const [a, b] = [...crop.pts.values()]; crop.pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); crop.pz = crop.z; } };
+  C.onpointermove = e => {
+    const old = crop.pts.get(e.pointerId); if (!old) return;
+    crop.pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (crop.pts.size === 2) { const [a, b] = [...crop.pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (crop.pinch) zoomTo(crop.pz * d / crop.pinch); return; }
+    crop.cx -= (e.clientX - old[0]) * sc() / k(); crop.cy -= (e.clientY - old[1]) * sc() / k(); crop.draw();
+  };
+  C.onpointerup = C.onpointercancel = e => { crop.pts.delete(e.pointerId); if (crop.pts.size < 2) crop.pinch = 0; };
+  C.onwheel = e => { e.preventDefault(); zoomTo(crop.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); };
+  $('#cropZoom').oninput = e => zoomTo(+e.target.value);
+  $('#cropZoom').value = 1;
+  $('#cropX').onclick = $('#cropNo').onclick = () => { $('#crop').classList.add('hidden'); crop = null; };
+  $('#cropOk').onclick = () => {
+    const O = 160, c = document.createElement('canvas'); c.width = c.height = O; const g = c.getContext('2d'), kk = k() * O / S;
+    g.fillStyle = '#fff'; g.fillRect(0, 0, O, O);
+    g.drawImage(im, O / 2 - crop.cx * kk, O / 2 - crop.cy * kk, im.width * kk, im.height * kk);
+    let q = .85, d = c.toDataURL('image/jpeg', q); while (d.length > 22000 && q > .3) { q -= .1; d = c.toDataURL('image/jpeg', q); }
+    send({ t: 'pic', data: d }); $('#crop').classList.add('hidden'); crop = null;
+  };
+  $('#crop').classList.remove('hidden'); crop.draw();
 }
 const achTodo = () => (me?.ach || []).filter(x => !(me.achGot || []).includes(x));
 const achRew = a => (me.achReward || [])[a.r || 1] || 0;
@@ -1447,6 +1487,23 @@ function renderPanel(p) {
       if (b && b[1] === myId) return `<h2>🛏️ คุณนอนรอหมออยู่</h2><div class="sub">หมอออนไลน์จะได้รับแจ้งเตือน · เดินออกเพื่อลุกจากเตียง</div>${(me.dz || []).map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, G.diseases[d].sym.join(' · '), '')).join('')}`;
       if (b) return `<h2>🛏️ เตียงนี้มีคนไข้แล้ว</h2><div class="sub">${esc(b[0])} นอนรอหมออยู่</div>`;
       return `<h2>🛏️ เตียงคนไข้</h2><div class="sub">นอนรอให้หมอผู้เล่นมาวินิจฉัยและรักษา (ถูกกว่าเคาน์เตอร์มาก)</div>${B('🛏️ นอนรอหมอ', { t: 'act', st, a: 'lie' }, 'primary big')}`;
+    }
+    case 'hstair': {
+      const s = STN(st), h = wd?.houses?.[s.idx], lv = h?.[8] || 0, to = s.down ? s.fl - 1 : s.fl + 1, mine = me.house === s.idx;
+      if (s.down) return `<h2>🪜 ${esc(s.label)}</h2>${B(`⬇️ ลงไปชั้น ${to}`, { t: 'act', st, a: 'go' }, 'primary big')}${mine ? B('🛋️ จัดบ้าน', { fn: 'open', kind: 'homedeco' }) : ''}`;
+      const built = to <= 1 + lv;
+      return `<h2>🪜 ${esc(s.label)}</h2><div class="sub">บ้านหลังนี้มี ${1 + lv} ชั้น (สูงสุด ${G.shop.floors} ชั้น) · ชั้นใหม่เป็นห้องว่างขนาดเท่าชั้นล่าง จัดวางเฟอร์นิเจอร์ได้ตามใจ</div>
+        ${built ? B(`⬆️ ขึ้นไปชั้น ${to}`, { t: 'act', st, a: 'go' }, 'primary big') : mine ? `<div class="jobbox">🏗️ ต่อเติมชั้น ${to}<br><small>สร้างเสร็จทันที · ชั้นบนเป็นของบ้านหลังนี้ (ถ้าขายบ้าน ชั้นที่ต่อเติมจะหายไปด้วย)</small>${B(`🏗️ สร้างชั้น ${to} ${money(G.shop.floorPrice[to])}`, { t: 'act', st, a: 'build' }, 'good big', me.money < G.shop.floorPrice[to])}</div>` : `<div class="sub">🔒 ยังไม่มีชั้น ${to}</div>`}
+        ${mine ? B('🛋️ จัดบ้าน', { fn: 'open', kind: 'homedeco' }) : ''}`;
+    }
+    case 'homedeco': {
+      if (me.house < 0) return '<h2>🛋️ จัดบ้าน</h2><div class="sub">ต้องมีบ้านของตัวเองก่อน</div>';
+      const h = wd?.houses?.[me.house]; if (!h) return '';
+      const own = [...new Set([...(me.furniture || []), ...(me.keep || [])])];
+      const rows = own.map(k => { const f = G.shop.furniture[k]; if (!f) return ''; const pos = furnPos(h, k);
+        return itemRowRaw(f.icon, f.name, pos ? `วางอยู่ชั้น ${pos[0]}` : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos ? B('📦', { t: 'hplace', k, store: 1 }) : ''}</div>`); }).join('');
+      return `<h2>🛋️ จัดบ้าน</h2><div class="sub">เลือกชิ้นที่จะวาง แล้วแตะพื้นห้องในชั้นที่คุณยืนอยู่ · ของในคลังยังนับความสบาย ⭐ · ซื้อเพิ่มที่ 🛋️ ร้านเฟอร์นิเจอร์ในเมือง · บ้านมี ${1 + (h[8] || 0)}/${G.shop.floors} ชั้น (ต่อเติมที่บันได 🪜)</div>
+        <div class="list">${rows || '<div class="sub">ยังไม่มีเฟอร์นิเจอร์ ซื้อได้ที่ร้านเฟอร์นิเจอร์ในเมือง</div>'}</div>`;
     }
     case 'hbed': {
       const s = STN(st), h = wd?.houses?.[s.idx], own = me.house === s.idx && !(h && h[5]), rent = me.rent && me.rent.idx === s.idx;
@@ -2538,7 +2595,8 @@ function showDriveTest(m) {
 
 // ------------------------------------------------------------------ areas, interiors
 let roomGrid = [], roomFurniture = [];
-const FURN_SPRITE = { bookcase: 'f_bookshelf_wide', gclock: 'f_clock', teddy: 'i_teddy', flamp: 'f_floorlamp', vase: 'f_vase', plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
+const FURN_SPRITE = { rugr: 'f_rug_round', rugb: 'f_rug_blue', cactus: 'f_cactus', plant2: 'f_plant2', lamp: 'f_floorlamp', table: 'f_table_chairs', rtable: 'f_round_table', shelf: 'f_bookshelf', desk: 'f_laptop_desk', wardrobe2: 'f_wardrobe', mirror: 'f_mirror', armchair: 'f_armchair', bunk: 'f_bunk', coffee: 'f_coffee', winer: 'f_wine_rack',
+  bookcase: 'f_bookshelf_wide', gclock: 'f_clock', teddy: 'i_teddy', flamp: 'f_floorlamp', vase: 'f_vase', plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
 // where each piece of bought furniture stands in the house (by kind, so a home always looks arranged)
 const FURN_POS = { bookcase: [4.6, 1.6], gclock: [6.3, 1.5], teddy: [2.9, 6.8], flamp: [10.2, 6.6], vase: [4.9, 4.3], tv: [8, 2.9], sofa: [8, 6.7], plant: [11, 8.7], aqua: [9.6, 8.7], art: [9.2, 1.05], piano: [1.1, 5.9], bed: [2.2, 6.2], jacuzzi: [11.8, 5.5] };
 function buildAreas() {
@@ -2547,20 +2605,60 @@ function buildAreas() {
   for (const r of G.areas) if (r.kind === 'room') for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomGrid[y * G.map.w + x] = r;
   buildMini(); layoutFurniture();
 }
+// where a piece stands: [floor, x, y] in room tiles; [0] = put away; unplaced old pieces keep their default spot on floor 1
+const furnPos = (h, k) => { const p = h[7]?.[k]; if (p) return p[0] ? p : null; return FURN_POS[k] ? [1, FURN_POS[k][0], FURN_POS[k][1]] : null; };
+// ---- arranging your home: pick a piece, tap the floor to move it, then confirm
+let placing = null;
+function startPlace(k) {
+  const m = P.get(myId), r = m && areaOf(m.x, m.y);
+  if (!r || r.rk !== 'house' || r.house !== me.house) return toast('เข้าไปในบ้านของคุณก่อน แล้วค่อยจัดวาง', '🏠', false);
+  closePanel();
+  placing = { k, house: r.house, fl: r.floor || 1, x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
+  const f = G.shop.furniture[k];
+  $('#placeBar').innerHTML = `<b>${f.icon} ${esc(f.name)}</b><small>แตะพื้นห้องเพื่อเลื่อน · ปุ่มลูกศรขยับละเอียด</small><div class="pb">${['⬅️', '⬆️', '⬇️', '➡️'].map((a, i) => `<button data-nud="${i}">${a}</button>`).join('')}<button id="plOk" class="primary">✓ วาง</button><button id="plStore">📦 เก็บ</button><button id="plX">✕</button></div>`;
+  $('#placeBar').classList.remove('hidden');
+  $('#placeBar').querySelectorAll('[data-nud]').forEach(b => b.onclick = () => { const d = [[-.25, 0], [0, -.25], [0, .25], [.25, 0]][+b.dataset.nud]; placing.x = clamp(placing.x + d[0], .7, 13.3); placing.y = clamp(placing.y + d[1], 1.2, 9.5); layoutFurniture(); });
+  $('#plOk').onclick = () => { send({ t: 'hplace', k, fl: placing.fl, x: placing.x, y: placing.y }); endPlace(); FX.play('click'); };
+  $('#plStore').onclick = () => { send({ t: 'hplace', k, store: 1 }); endPlace(); };
+  $('#plX').onclick = () => endPlace();
+  layoutFurniture();
+}
+function endPlace() { placing = null; $('#placeBar').classList.add('hidden'); layoutFurniture(); }
+function placeTap(wx, wy) {
+  const r = AREA[`r_house${placing.house}` + (placing.fl > 1 ? `_f${placing.fl}` : '')]; if (!r) return;
+  placing.x = clamp(Math.round((wx - r.x) * 4) / 4, .7, 13.3); placing.y = clamp(Math.round((wy - r.y + .3) * 4) / 4, 1.2, 9.5); layoutFurniture();
+}
+function drawStairs(x, y, down, X, Y) {   // a little staircase drawn on the floor (no sprite for it in the atlas)
+  const px = x * TS + X, py = y * TS + Y, w = TS * 1.3, n = 5, sh = TS * .2;
+  for (let i = 0; i < n; i++) {
+    const k = down ? i : n - 1 - i, yy = py - (n - i) * sh;
+    ctx.fillStyle = k % 2 ? '#a0703f' : '#b9834c'; ctx.fillRect(px - w / 2, yy, w, sh);
+    ctx.fillStyle = '#6b4423'; ctx.fillRect(px - w / 2, yy + sh - 2, w, 2);
+  }
+  ctx.fillStyle = '#5a3a1e'; ctx.fillRect(px - w / 2 - 3, py - n * sh, 3, n * sh); ctx.fillRect(px + w / 2, py - n * sh, 3, n * sh);
+  ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr',sans-serif`; ctx.textAlign = 'center'; ctx.fillText(down ? '⬇' : '⬆', px, py - n * sh - 4);
+}
 function layoutFurniture() {
   roomFurniture = [];
   for (const r of G.areas) {
     if (r.kind !== 'room') continue;
     for (const f of r.furniture || []) roomFurniture.push(f);
-    if (r.rk === 'house') { const h = wd?.houses?.[r.house]; if (h) h[2].forEach(k => FURN_POS[k] && roomFurniture.push([FURN_SPRITE[k], r.x + FURN_POS[k][0], r.y + FURN_POS[k][1]])); }
+    if (r.rk === 'house') {
+      const h = wd?.houses?.[r.house], fl = r.floor || 1; if (!h) continue;
+      for (const k of h[2]) {
+        if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
+        const pos = furnPos(h, k); if (pos && pos[0] === fl && FURN_SPRITE[k]) roomFurniture.push([FURN_SPRITE[k], r.x + pos[1], r.y + pos[2]]);
+      }
+      if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([FURN_SPRITE[placing.k], r.x + placing.x, r.y + placing.y, 'ghost']);
+    }
   }
 }
 function drawRoomLabels(r, X, Y, t) {
   const px = r.x * TS + X, py = r.y * TS + Y;
   const h = r.rk === 'house' ? wd?.houses?.[r.house] : null;
-  sign(r.rk === 'house' ? (h && h[0] ? `🏠 บ้านของ ${h[0]}` : `🏠 บ้านเลขที่ ${r.house + 1}`) : `${r.icon} ${r.label}`, px + r.w * TS / 2, py - TS * .1, { size: TS * .34, border: '#ffc94d88' });
+  sign(r.rk === 'house' ? (h && h[0] ? `🏠 บ้านของ ${h[0]}` : `🏠 บ้านเลขที่ ${r.house + 1}`) + (r.floor ? ` · ชั้น ${r.floor}` : (h && h[8] ? ' · ชั้น 1' : '')) : `${r.icon} ${r.label}`, px + r.w * TS / 2, py - TS * .1, { size: TS * .34, border: '#ffc94d88' });
   ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
-  ctx.fillText('⬇ ทางออก', px + Math.floor(r.w / 2) * TS, py + (r.h + .45) * TS + Math.sin(t / 300) * 2);
+  if (!r.floor) ctx.fillText('⬇ ทางออก', px + Math.floor(r.w / 2) * TS, py + (r.h + .45) * TS + Math.sin(t / 300) * 2);
 }
 let rainDrops = null;
 function drawRain(t) {
@@ -2702,6 +2800,7 @@ function mgStop() { clearInterval(MG.timer); MG.timer = 0; MG.cur = null; }
 function mgClose() { mgStop(); $('#mg').classList.add('hidden'); }
 $('#mgX').onclick = () => { FX.play('click'); mgClose(); };
 $('#mgBtn').onclick = () => { FX.play('click'); mgMenu(); };
+$('#homeBtn').onclick = () => { FX.play('click'); openPanel({ kind: 'homedeco' }); };
 function mgMenu() {
   mgStop(); $('#mg').classList.remove('hidden');
   const study = me.desk != null && me.desk >= 0;
