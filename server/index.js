@@ -1929,6 +1929,7 @@ function stealNpc(a, id) {
 // what you are wearing: the thief outfit while pickpocketing, else a reward outfit you picked, else your job's clothes (unless hidden)
 function outfitOf(a) {
   if (a.thiefUntil > now()) return 'thief';
+  if (a.god?.cloak && isAdmin(a)) return 'admin';           // admin-only cloak + aura (god mode)
   if (a.outfit && (a.outfits || []).includes(a.outfit)) return a.outfit;
   if (!a.hideJob && D.CAREERS[a.career]?.where) return a.career;
   return '';
@@ -2335,7 +2336,8 @@ function godAct(a, m) {
     for (const d of [...(a.dz || [])]) cure(a, d);
     if (a.down && a.down.kind !== 'jail') revive(a, 100);
     toast(a, 'สเตตัสเต็มแล้ว', '💯');
-  } else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
+  } else if (m.op === 'cloak') { a.god.cloak = !a.god.cloak; markMe(a); sendRoster(); toast(a, a.god.cloak ? 'สวมชุดคลุมแอดมิน + ออร่า' : 'ถอดชุดคลุมแอดมิน', '🌑'); }
+  else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
   else if (m.op === 'speed') { a.god.speed = clamp(+m.v || 1, 1, 5); a.mvb = moveCap(a); }
   else if (m.op === 'warp') { a.god.warp = !a.god.warp; toast(a, a.god.warp ? 'วาร์ป: เปิดแผนที่แล้วแตะจุดที่ต้องการ' : 'ปิดวาร์ป', '✨'); }
   else if (m.op === 'warpto') {

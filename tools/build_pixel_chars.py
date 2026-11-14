@@ -30,7 +30,8 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'pajama': ('tools/sheets/pixel_pajama.jpg', ('hair',)), 'tracksuit': ('tools/sheets/pixel_tracksuit.jpg', ('hair',)),
           'hoodie': ('tools/sheets/pixel_hoodie.jpg', ('hair',)), 'cowboy': ('tools/sheets/pixel_cowboy.jpg', ()),
           'devil': ('tools/sheets/pixel_devil.jpg', ()), 'pilot': ('tools/sheets/pixel_pilot.jpg', ('hair',)),
-          'magician': ('tools/sheets/pixel_magician.jpg', ()), 'thai': ('tools/sheets/pixel_thai.jpg', ('hair',))}
+          'magician': ('tools/sheets/pixel_magician.jpg', ()), 'thai': ('tools/sheets/pixel_thai.jpg', ('hair',)),
+          'admin': ('tools/sheets/pixel_admin.jpg', ())}   # admin-only hooded cloak (god mode)
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 'left0': -5, 'left1': -7, 'left2': -6},   # female base: its side views face right
              'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}, 'beggar': {'up0': 19, 'up1': 19},
@@ -38,6 +39,7 @@ FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 
              'fdoctor': {'down0': 0, 'down1': 6, 'down2': 11, 'up0': 19, 'up1': 4, 'left0': -17, 'left1': -7, 'left2': -12},
              **{o: {'down0': 0, 'down1': 10, 'down2': 11, 'up0': 19, 'up1': 14, 'left0': -17, 'left1': -7, 'left2': -12}
                 for o in ('pajama', 'tracksuit', 'hoodie', 'cowboy', 'devil', 'magician', 'thai')},
+             'admin': {'down0': 0, 'down1': 10, 'down2': 11, 'up0': 19, 'up1': 9, 'left0': -17, 'left1': -7, 'left2': -12},
              'pilot': {'down0': 0, 'down1': 5, 'down2': 1, 'up0': 19, 'up1': 9, 'left0': -17, 'left1': -7, 'left2': -12},
              'thief': {'down1': 10, 'down2': 15, 'up0': 4, 'up1': 9, 'left1': 6, 'left2': -7}}   # negative = use that cell mirrored
 TARGET_H = 96
