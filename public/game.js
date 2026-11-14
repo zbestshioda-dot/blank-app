@@ -1601,12 +1601,14 @@ function renderPanel(p) {
         return `<div class="look ${on ? 'on' : ''}"><canvas data-look="${cat}:${id}" width="72" height="96"></canvas><small>${esc(it.name)}</small>${on ? '<span class="tag">ใส่อยู่</span>' : has ? B('ใส่', { t: 'wear', cat, id }, 'good') : B(money(it.price), { t: 'act', st, a: 'buy', cat, id }, '')}</div>`;
       }).join('')}</div>`;
       if (p.kind === 'barber') return `<h2>💈 ร้านทำผม</h2><div class="sub">${hoursTxt('barber')} · ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน มาย้อมสีผมได้ที่นี่ (ทำผมใหม่แล้วมีความสุขเพิ่ม) · สีที่เคยทำแล้วเปลี่ยนกลับได้ฟรี</div>${sec('hair', '💇 ย้อมสีผม')}`;
-      return `<h2>👕 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · เปลี่ยนเสื้อและกางเกง (แต่งตัวใหม่แล้วมีความสุขเพิ่ม) · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี · ย้อมผมที่ร้านทำผม 💈</div>
-        ${sec('shirt', '👕 เสื้อ')}${sec('pants', '👖 กางเกง')}
+      const ft = ['shirt', 'pants', 'outfit'].includes(p.ftab) ? p.ftab : 'shirt';
+      const ftabs = `<div class="tabs">${[['shirt', '👕 เสื้อ'], ['pants', '👖 กางเกง'], ['outfit', '👗 ชุด']].map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, ft === k ? 'primary' : '')).join('')}</div>`;
+      return `<h2>👕 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี · ย้อมผมที่ร้านทำผม 💈</div>${ftabs}
+        ${ft !== 'outfit' ? sec(ft, ft === 'shirt' ? '👕 เสื้อ' : '👖 กางเกง') : `
         <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([, o]) => o.price).map(([id, o]) => {
           const has = (me.outfits || []).includes(id), on = me.outfit === id;
           return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
-        }).join('')}</div>`;
+        }).join('')}</div>`}`;
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ขอทานนั่งได้ทุกที่ (ปุ่ม 🥣) ที่คนพลุกพล่านอย่างหน้าร้าน/จัตุรัสได้เงินบ่อยกว่า</div>${staffHint('beggar')}`;
