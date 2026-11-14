@@ -474,7 +474,7 @@ function camera() {
   }
   return { x: x * TS - VW / 2, y: y * TS - VH / 2 + camLift };
 }
-// tap the map: a person under your finger opens their profile, anywhere else walks you there
+// tap the screen: a person under your finger opens their profile (walking somewhere is done from the 🗺️ map)
 function onTap(sx, sy) {
   $('#emoPick').classList.add('hidden');
   if (!G || !me || sx == null) return;
@@ -486,10 +486,27 @@ function onTap(sx, sy) {
     const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
   }
   if (hit) { FX.play('click'); return openPanel({ kind: 'player', pid: hit.id }); }
-  walkTo(wx, wy);
 }
 // ---- tap-to-walk: breadth-first path over free tiles of the current area, followed by the movement loop
-let autoPath = null;
+let autoPath = null, autoNav = false, autoT = 0;
+// walking by itself to a place picked on the map: one hop at a time (room exit → gate → door → place), using the doors on the way
+function autoGuide(m) {
+  const tg = nextHop(m, guide); if (!tg) { autoNav = false; return; }
+  const d = Math.hypot(tg.x - m.x, tg.y - m.y), t = performance.now();
+  if (tg.final) { if (d < 1.2) { autoNav = false; autoPath = null; return; } }
+  else if (d < 1.1 && t > autoT) {                          // at a way point: go through it
+    autoT = t + 1600; autoPath = null;
+    const A = areaOf(m.x, m.y);
+    if (A?.kind === 'room') return send({ t: 'exit' });
+    const gt = G.stations.find(s => s.type === 'gate' && s.area === A?.id && Math.hypot(s.x - tg.x, s.y - tg.y) < .2);
+    if (gt) return doAct(gt.id, 'go');
+    const door = G.stations.find(s => s.type === 'door' && s.area === A?.id && Math.hypot(s.x - m.x, s.y - m.y) < s.r + .6);
+    if (door) return send({ t: 'enter', st: door.id });
+    return;
+  }
+  if (t < autoT) return;
+  if (!autoPath || Math.hypot(autoPath.tx - tg.x, autoPath.ty - tg.y) > .5) { walkTo(tg.x, tg.y); if (!autoPath) { autoNav = false; toast('เดินไปเองไม่ได้ ลองเดินเองตามลูกศร', '📍', false); } }
+}
 function walkTo(wx, wy) {
   const m = P.get(myId), A = areaOf(m.x, m.y); if (!A || me.down) return;
   const W = G.map.w, free = (x, y) => x >= A.x && y >= A.y && x < A.x + A.w && y < A.y + A.h && !blockedAt(x + .5, y + .5);
@@ -601,8 +618,9 @@ function frame(t) {
     let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
     let dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
     if (joy && Math.hypot(joy.dx, joy.dy) > 0.15) { dx = joy.dx; dy = joy.dy; }
-    if (dx || dy) autoPath = null;
-    else if (autoPath && !me.down) { const st = autoStep(m, dt); if (st) [dx, dy] = st; }
+    if (dx || dy) { autoPath = null; autoNav = false; }
+    else if (autoNav && guide && !me.down) autoGuide(m);
+    if (!dx && !dy && autoPath && !me.down) { const st = autoStep(m, dt); if (st) [dx, dy] = st; }
     const ox0 = m.x, oy0 = m.y;
     if (holdAfterTp) { if (!dx && !dy && !joy) holdAfterTp = false; else { dx = 0; dy = 0; } }
     if (me.down) { dx = 0; dy = 0; }
@@ -1448,7 +1466,7 @@ function renderPanel(p) {
     }
     case 'help':
       return `<h2>❔ วิธีเล่น</h2><div class="sub" style="font-size:14px;line-height:1.7">
-        👣 <b>เดิน</b>: มือถือแตะค้างแล้วลาก หรือ<b>แตะพื้น</b>ให้ตัวละครเดินไปเอง (มีเส้นนำทาง) · แตะตัวคนอื่นเพื่อดูข้อมูล · คอม WASD/ลูกศร<br>
+        👣 <b>เดิน</b>: มือถือแตะค้างแล้วลาก · เปิด 🗺️ แผนที่แล้ว<b>แตะสถานที่</b> ตัวละครจะเดินไปเอง (มีเส้นนำทาง) · แตะตัวคนอื่นเพื่อดูข้อมูล · คอม WASD/ลูกศร<br>
         🟡 <b>ปุ่มใหญ่ขวาล่าง</b>: แตะ = เข้าอาคาร/ใช้งาน/ดึงเบ็ด (คอม: E) · <b>กดค้าง = วิ่ง</b> (คอม: Shift) · ออกจากอาคารแค่เดินลงไปที่พรมหน้าประตู · 💬 <b>คุย</b> กับคนใกล้ๆ (F) · 😌 <b>พัก</b> (R) · 😀 อิโมจิบนหัว<br>
         💰 <b>เริ่มต้นไม่มีเงิน?</b> ซื้อเบ็ดที่สมาคมประมงแล้ว<b>ตกปลาขาย</b> · กดตอนขีดขาวอยู่ในแถบเขียว<br>
         💼 <b>หางาน</b>: คุยกับ NPC เจ้าหน้าที่ (💬) ที่ยืนข้างเคาน์เตอร์ของแต่ละที่ · เปลี่ยนงานแล้วรอ 5 นาที<br>
@@ -2070,11 +2088,11 @@ function targetOf(key) {
 }
 const CAREER_TARGET = { police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'pier_l1', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
-function setGuide(key, quiet) {
+function setGuide(key, quiet, auto) {
   const g = targetOf(key); if (!g) return;
-  guide = g;
+  guide = g; autoNav = !!auto; autoPath = null;
   if (g.label === 'เจ้าหน้าที่' && STAFF_AT[key]) g.label = STAFF_AT[key].short;
-  if (!quiet) { toast(`นำทางไป ${g.label} — เดินตามลูกศรสีเหลือง (ยกเลิกได้ที่ปุ่มใต้สถานะ)`, '📍'); FX.play('notice'); }
+  if (!quiet) { toast(auto ? `กำลังเดินไป ${g.label} (ขยับจอยเพื่อหยุดเดินเอง)` : `นำทางไป ${g.label} — เดินตามลูกศรสีเหลือง (ยกเลิกได้ที่ปุ่มใต้สถานะ)`, '📍'); FX.play('notice'); }
   paintNav(); placeLog();
 }
 // the next point to walk to: room exit -> gate to the right map -> building door -> target
@@ -2232,13 +2250,13 @@ function openMap(mapId, keepScroll) {
     + (staffPl.length ? `<div class="lgSec">👤 NPC สมัครงาน / เปลี่ยนอาชีพ</div>${staffPl.map(row).join('')}` : '')
     + `<div class="lgSec">📍 สถานที่</div>${places.map(row).join('')}`;
   places.push(...staffPl);
-  $('#mapLegend').querySelectorAll('[data-key]').forEach(b => b.onclick = () => { closeMap(); setGuide(b.dataset.key); });
+  $('#mapLegend').querySelectorAll('[data-key]').forEach(b => b.onclick = () => { closeMap(); setGuide(b.dataset.key, false, true); });
   if (!keepScroll && mapZoom > 1) { const q = outPos(m.x, m.y), [x, y] = L(q.x, q.y), box = $('#mapScroll'); box.scrollLeft = x - box.clientWidth / 2; box.scrollTop = y - box.clientHeight / 2; }
   c.onclick = e => {
     const rc = c.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
     if (me.admin && me.god?.warp) { closeMap(); send({ t: 'god', op: 'warpto', x: +(A.x + x / k).toFixed(2), y: +(A.y + y / k).toFixed(2) }); return; }   // god mode: warp
     const hit = places.map(pl => [pl, Math.hypot(pl.x - x, pl.y - y)]).sort((a, b) => a[1] - b[1])[0];
-    if (hit && hit[1] < r * 2.2) { closeMap(); setGuide(hit[0].key); }
+    if (hit && hit[1] < r * 2.2) { closeMap(); setGuide(hit[0].key, false, true); }
   };
 }
 function closeMap() { $('#mapView').classList.add('hidden'); }
