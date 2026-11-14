@@ -761,3 +761,20 @@ body.hasEvent #topBar{top:146px!important}
 .questPop{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%) scale(.7);z-index:61;display:flex;gap:12px;align-items:center;max-width:min(420px,92vw);background:var(--paper3);border:4px solid var(--wood);border-radius:18px;padding:10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.45);animation:cpIn .35s ease-out forwards;pointer-events:none}
 .questPop>div>b{display:block}.questPop span{display:block;font-size:14px;margin:2px 0}.questPop small{display:block;color:var(--mut)}
 .questPop.out{opacity:0;transition:opacity .5s}
+/* dialog box: portrait + name + typing text + choices, docked at the bottom of the screen */
+#dlg{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:55;width:min(640px,calc(100vw - 24px));display:flex;gap:12px;align-items:flex-start;
+  background:linear-gradient(#fff8ea,#f3e3c4);border:4px solid var(--wood);border-radius:18px;padding:12px 14px 12px 12px;box-shadow:0 0 0 2px var(--woodDk),0 10px 28px rgba(0,0,0,.45);cursor:pointer;animation:dlgIn .22s ease-out}
+#dlg.hidden{display:none}
+@keyframes dlgIn{from{transform:translate(-50%,30px);opacity:0}}
+.dlgPic{flex:none;border-radius:14px!important;box-shadow:0 0 0 3px var(--wood),0 3px 8px rgba(0,0,0,.3)}
+.dlgPix{background:radial-gradient(circle at 50% 35%,#fff,#e9d6b2);image-rendering:pixelated}
+.dlgBody{flex:1;min-width:0;position:relative}
+.dlgName{display:inline-block;background:var(--wood);color:#fff;font-size:13px;padding:2px 10px;border-radius:8px;margin-bottom:4px}
+.dlgText{margin:0;min-height:44px;font-size:16px;line-height:1.5;color:#3a2614}
+.dlgNext{position:absolute;right:0;bottom:-4px;font-style:normal;color:var(--wood);animation:dlgBob .8s infinite}
+@keyframes dlgBob{50%{transform:translateY(3px)}}
+.dlgCh{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.dlgCh:empty{display:none}
+.dlgCh button{padding:6px 12px;font-size:14px}
+.dlgX{position:absolute;top:-12px;right:-12px;width:30px;height:30px;border-radius:50%;padding:0;font-size:14px}
+.item .em[data-m]{cursor:pointer}
+@media(max-width:600px){#dlg{bottom:calc(150px + env(safe-area-inset-bottom))}.dlgPix{width:64px;height:64px}.dlgText{font-size:14.5px}}

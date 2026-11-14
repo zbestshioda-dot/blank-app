@@ -689,7 +689,7 @@ function onTap(sx, sy) {
     if (p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
     const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
   }
-  if (hit) { FX.play('click'); return openPanel({ kind: 'player', pid: hit.id }); }
+  if (hit) { FX.play('click'); if (hit.npc && !hit.tf && !hit.bot) return talkToTown(hit); return openPanel({ kind: 'player', pid: hit.id }); }
 }
 // ---- tap-to-walk: breadth-first path over free tiles of the current area, followed by the movement loop
 let autoPath = null, autoNav = false, autoT = 0;
@@ -817,6 +817,8 @@ function onAction() {
   if (near.type === 'pier' && me.cast) return reel();                // the big button reels in too
   if (near.type === 'pier' && !me.cast && me.rod && panel?.st === near.id) return doAct(near.id, 'cast');
   if (panel?.st === near.id) { closePanel(); return; }
+  if (dlgQ) { dlgTap(); return; }
+  if (STAFF_AT[near.id]) return talkTo(STAFF_AT[near.id], near.id);
   openPanel({ kind: near.type, st: near.id });
 }
 // the big button: tap = use / enter, press and hold = run while held
@@ -832,7 +834,7 @@ function onAction() {
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
 function frame(t) {
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); dlgTick();
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
@@ -1175,9 +1177,9 @@ function buildStaff() {
 }
 const KEEPERS = [
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: -1.9, dy: 0.7, of: 'chef', lk: { hair: 'black' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
-  { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'pink', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมคะ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ค่ะ'] },
+  { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', dx: .6, dy: -1.15, lk: { hair: 'silver', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมครับ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ครับ'] },
   { st: 'furnshop', name: 'เฮียเล้ง (ร้านเฟอร์นิเจอร์)', short: 'เฮียเล้ง', icon: '🛋️', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'blue' }, hi: ['โซฟาตัวนี้นั่งสบายมากครับ', 'จัดบ้านสวย อยู่แล้วมีความสุขนะ', 'ซื้อแล้วส่งถึงบ้านเลยครับ'] },
-  { st: 'police', name: 'ดาบสมชาย (เวรประจำโต๊ะ)', short: 'ดาบสมชาย', icon: '👮', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'black' }, hi: ['มีอะไรให้ช่วยครับ', 'เห็นโจรล้วงกระเป๋า โทร 191 ได้เลย', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะ'] },
+  { st: 'police', name: 'ดาบหญิงสมศรี (เวรประจำโต๊ะ)', short: 'ดาบสมศรี', icon: '👮', g: 'f', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'black' }, hi: ['มีอะไรให้ช่วยครับ', 'เห็นโจรล้วงกระเป๋า โทร 191 ได้เลย', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะ'] },
   { st: 'school', name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', short: 'ผอ.ประเสริฐ', icon: '🎓', dx: .5, dy: -1.1, of: 'office', lk: { hair: 'silver' }, hi: ['ตั้งใจเรียนนะ อนาคตอยู่ในมือเธอ', 'นั่งโต๊ะเรียนครบชั่วโมงได้ 1 คาบ', 'ยินดีต้อนรับสู่มหาวิทยาลัย'] },
   { st: 'dealer', name: 'เซลส์ต้น (โชว์รูมรถ)', short: 'เซลส์ต้น', icon: '🚗', dx: .5, dy: -1.1, of: 'office', lk: { hair: 'black' }, hi: ['รุ่นใหม่ล่าสุดเลยครับ', 'ทดลองนั่งได้นะครับ', 'ผ่อนสบายๆ ครับพี่'] },
   { st: 'cstore', name: 'น้องฝน (พนักงานร้าน)', short: 'น้องฝน', icon: '🏪', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'black', shirt: 'green' }, hi: ['สวัสดีค่ะ ยินดีต้อนรับค่ะ', 'รับขนมจีบซาลาเปาเพิ่มไหมคะ', 'สะสมแต้มไหมคะ'] },
@@ -1419,6 +1421,7 @@ const FN = {
   donate(m, root) { send({ t: 'donate', to: m.to, amt: +root.querySelector('#donIn').value || 0 }); },
   order(m, root) { send({ t: 'order', item: m.item, tip: +(root.querySelector('#tipIn')?.value || 0) }); },
   open(m) { openPanel({ kind: m.kind, ...(m.set || {}) }); },
+  qtalk(m) { talkQuest(m.type); },
   share() { shareGame(); },
   look(m) { send({ t: 'look', ...m.set }); },
   reel() { reel(); },
@@ -1448,7 +1451,7 @@ const QUEST_GIVER = {
   sit:      { f: 'teacher_f', name: 'ครูจิ๋ม', ask: 'ทำงานหนักแล้ว ไปนั่งพักที่จัตุรัสบ้างนะ', thx: 'พักผ่อนบ้าง ชีวิตจะได้สมดุลจ้ะ' },
   sell:     { f: 'market_f',  name: 'เจ๊ศรี (ตลาดกลาง)', ask: 'ตลาดขาดของ เอาของมาขายหน่อยสิ', thx: 'ของดีขายหมดเกลี้ยง ขอบใจนะ!' },
   earn:     { f: 'banker_f',  name: 'คุณนิด (ธนาคาร)', ask: 'ลองตั้งเป้าเก็บเงินวันนี้ดูไหมคะ', thx: 'ยอดเงินสวยมาก เก็บออมต่อนะคะ' },
-  dailyall: { f: 'elder_m',   name: 'ผู้ใหญ่ประเสริฐ (ผู้นำชุมชน)', ask: 'ช่วยเหลือชาวเมืองให้ครบทุกวัน เมืองเราจะน่าอยู่ขึ้น', thx: 'เมืองนี้โชคดีที่มีเธอ!' },
+  dailyall: { f: 'elder_m',   name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', ask: 'ช่วยเหลือชาวเมืองให้ครบทุกวัน เมืองเราจะน่าอยู่ขึ้น', thx: 'เมืองนี้โชคดีที่มีเธอ!' },
 };
 let FACES = null;
 fetch('assets/portraits.json?v=1').then(r => r.json()).then(j => { FACES = j; }).catch(() => { });
@@ -1460,6 +1463,105 @@ function questPop(type, title, line, reward) {
   const d = document.createElement('div'); d.className = 'questPop';
   d.innerHTML = `${faceHtml(type, 64)}<div><b>${esc(g.name)}</b><span>“${esc(line)}”</span><small>${esc(title)} · <b style="color:var(--acc)">+${money(reward)}</b></small></div>`;
   document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 3800); setTimeout(() => d.remove(), 4400);
+}
+// ------------------------------------------------------------------ dialog box (talking to people)
+// A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
+// the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
+const NPC_FACE = { staff_office: 'office_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
+  keep_market: 'market_f', keep_bank: 'banker_f', keep_restaurant: 'shop_f', keep_toolshop: 'worker_m', keep_school: 'elder_m', keep_police: 'police_f', keep_barber: 'barber_m' };
+// what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
+const TALK = {
+  staff_office: [['บริษัทเราส่งเอกสารไปทั่วเมืองทุกวันเลยค่ะ', 'ยิ่งส่งไกล ค่าส่งยิ่งเยอะนะคะ', 'หลังห้าโมงเย็นยังทำโอทีได้ถึงสามทุ่ม ได้เงินเพิ่มอีกด้วย'], ['ใครอยากเข้ามาทำงานที่นี่ต้องจบปริญญาตรีก่อนนะคะ', 'ไปเรียนที่มหาวิทยาลัยได้ นั่งเรียนครบชั่วโมงก็ได้หนึ่งคาบ'], ['ช่วงนี้ดิฉันอยากได้เก้าอี้ทำงานตัวใหม่จัง', 'ตัวเก่านั่งแล้วปวดหลังมากเลยค่ะ 😅']],
+  staff_fishing: [['ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', 'ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', 'ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วย'], ['สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['มีสมุดภาพปลาที่สมาคมด้วยนะ', 'ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย']],
+  staff_chef: [['อาหารดีเริ่มที่วัตถุดิบดี', 'ปลาสดจากชาวประมง ผักจากชาวไร่ ทำอะไรก็อร่อย'], ['อยากเป็นเชฟต้องมีใบรับรองเชฟก่อนนะ', 'ซื้อได้ที่มหาวิทยาลัย'], ['ต้มยำหม้อนี้ใส่พริกไปสามกำมือ', 'ใครกินไม่ไหวไม่ใช่ความผิดฉันนะ 🌶️']],
+  staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่มหาวิทยาลัย'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
+  staff_merchant: [['ซื้อของจากคลังราคาส่ง', 'แล้วไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง ง่ายๆ'], ['ของแต่ละอย่างมีสต็อกจำกัดนะ', 'มาเช้าได้ของเยอะกว่า'], ['เฮียค้าขายมาสามสิบปี', 'เคล็ดลับคือ ยิ้มเข้าไว้ ลูกค้ามาเอง 😄']],
+  staff_police: [['เห็นใครล้วงกระเป๋า โทร 191 ได้ทันที', 'สายตรวจจะรีบไปจับ'], ['อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', 'ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['เมืองนี้สงบสุขได้ เพราะทุกคนช่วยกันดูแล']],
+  staff_doctor: [['ป่วยแล้วอย่าฝืน มาโรงพยาบาลนะ', 'บอกอาการให้ชัดๆ หมอจะได้รักษาถูก'], ['กินให้ครบ นอนให้พอ', 'ภูมิคุ้มกันจะดีขึ้นเอง']],
+  staff_farmer: [['ไร่ชานเมืองปิดปรับปรุงอยู่นะหลาน', 'อีกไม่นานคงได้กลับไปปลูกผักกันอีก'], ['ทุเรียนปลูกนานหน่อย แต่ราคาดีมาก', 'ข้าวโตเร็ว ขายได้ทุกวัน']],
+  staff_beggar: [['ป้าไม่มีอะไรเลย มีแต่ใจ', 'แต่คนในเมืองนี้ใจดีนะลูก'], ['นั่งตรงที่คนพลุกพล่าน', 'ได้เศษเงินบ่อยกว่า']],
+  keep_market: [['ตลาดเปิดยี่สิบสี่ชั่วโมงจ้า', 'ซื้อจากผู้เล่นถูกกว่าร้าน NPC นะ ลองดูก่อน'], ['วางขายของได้นะ ตั้งราคาเองเลย', 'แต่อย่าตั้งแพงเกิน เดี๋ยวไม่มีคนซื้อ'], ['ทุเรียนวันนี้หอมมาก', 'เจ๊แอบกินไปลูกนึงแล้ว 🤫']],
+  keep_bank: [['ฝากเงินได้ดอกเบี้ยทุกวันเกมนะคะ', 'เก็บไว้กับตัวเยอะๆ ระวังโดนล้วงกระเป๋านะคะ'], ['ที่นี่มีตลาดหุ้นด้วยนะคะ', 'ซื้อตอนถูก ขายตอนแพง... พูดง่ายทำยากค่ะ 😅'], ['กู้เงินได้ แต่ระหว่างเป็นหนี้ รายได้ส่วนหนึ่งจะถูกหักไปใช้หนี้นะคะ']],
+  keep_restaurant: [['หิวไหมจ๊ะ วันนี้มีกะเพราไข่ดาว', 'ซื้อตุนใส่กระเป๋าไว้กินทีหลังก็ได้นะ'], ['ถ้าตัวละครอยากกินอะไร', 'รีบมากินนะ ความสุขเพิ่มเยอะเลย']],
+  keep_toolshop: [['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดอุปกรณ์อาชีพได้ที่นี่ เงินเข้าเพิ่มขึ้นแน่นอน'], ['ร้านนี้ไม่ขายเบ็ดแล้วนะ', 'ไปซื้อกับน้าเล็กที่สมาคมประมง']],
+  keep_school: [['การศึกษาคือการลงทุนที่คุ้มที่สุด', 'เรียนจบ ม.6 ก่อน แล้วค่อยต่อปริญญาตรี'], ['นั่งโต๊ะเรียนครบหนึ่งชั่วโมงในเกม ได้หนึ่งคาบ', 'อย่าโดดเรียนล่ะ ครูเห็นนะ 👀'], ['สอบใบขับขี่ สอบนายสิบ ก็ที่นี่']],
+  keep_police: [['มีอะไรให้ช่วยไหมคะ', 'ของหาย โดนขโมย มาแจ้งได้เลย'], ['ช่วงค่ำระวังโจรด้วยนะคะ', 'อย่าพกเงินสดเยอะ ฝากธนาคารไว้ปลอดภัยกว่า']],
+  keep_barber: [['ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน', 'มาย้อมสีใหม่ ให้ตัวเองดูโดดเด่นสิครับ'], ['สีที่เคยทำไปแล้ว เปลี่ยนกลับได้ฟรีนะ'], ['ทำผมใหม่แล้วความสุขเพิ่มด้วยนะ', 'วิทยาศาสตร์ยืนยัน... มั้งครับ 😆']],
+  keep_furnshop: [['ซื้อเฟอร์นิเจอร์แล้วส่งถึงบ้านเลยครับ', 'จัดวางเองได้ด้วยปุ่ม 🛋️ จัดบ้าน'], ['บ้านสบาย นอนหลับสบาย', 'ความสุขก็เพิ่มขึ้นครับ']],
+  keep_dealer: [['โชว์รูมปิดปรับปรุงอยู่ครับ', 'รถรุ่นใหม่กำลังจะมา รอติดตามนะครับ']],
+  keep_estate: [['บ้านในหมู่บ้านจัดสรร ซื้อหรือเช่าก็ได้', 'มีลานบ้านไว้ทำสวนด้วยนะครับ'], ['ปล่อยเช่าบ้าน มีรายได้ทุกเดือนครับ']],
+  cstore: [['เปิดยี่สิบสี่ชั่วโมงทุกวันค่ะ', 'น้ำ ขนม ข้าวกล่อง ยา มีครบ'], ['ดึกๆ หิวก็แวะมาได้นะคะ'], ['รับถุงไหมคะ... อ๋อ ไม่รับ ช่วยโลกด้วย ดีมากค่ะ 🌱']],
+  town: [['วันนี้อากาศดีจังเลย', 'เหมาะกับการไปนั่งเล่นที่จัตุรัส'], ['ได้ยินว่ามีคนตกปลาทองคำได้ด้วยนะ', 'ฉันลองมาทั้งเดือนยังไม่เคยเห็นเลย'], ['ค่าไฟเดือนนี้แพงจัง', 'คงต้องเปิดแอร์น้อยลงหน่อย'], ['ระวังโจรล้วงกระเป๋านะ', 'ช่วงนี้มีข่าวบ่อย'], ['เคยไปทะเลฝั่งตะวันออกหรือยัง', 'ตอนเย็นสวยมากเลย'], ['หมอที่โรงพยาบาลเก่งมาก', 'รักษาไข้หวัดหายในวันเดียว']],
+};
+let dlgQ = null;
+function dlgFace(face, npc) {
+  const z = innerWidth <= 600 ? 64 : 84;
+  if (face && FACES?.faces?.[face] !== undefined) { const i = FACES.faces[face], n = Object.keys(FACES.faces).length; return `<i class="qface dlgPic" style="width:${z}px;height:${z}px;background-size:${n * z}px ${z}px;background-position:-${i * z}px 0"></i>`; }
+  return npc ? `<canvas class="dlgPic dlgPix" data-dlg="${esc(npc)}" width="84" height="84"></canvas>` : '';
+}
+// opts: { name, face (painted face id), npc (staff id or player id for the pixel portrait), lines: [], choices: [{ label, fn, cls }] }
+function dialog(opts) {
+  closePanel();
+  dlgQ = { ...opts, i: 0, shown: 0, t0: performance.now() };
+  let d = $('#dlg');
+  if (!d) { d = document.createElement('div'); d.id = 'dlg'; document.body.appendChild(d); d.onclick = e => { if (e.target.closest('button')) return; dlgTap(); }; }
+  d.innerHTML = `${dlgFace(opts.face, opts.npc)}<div class="dlgBody"><b class="dlgName">${esc(opts.name)}</b><p class="dlgText"></p><div class="dlgCh"></div><i class="dlgNext">▼</i></div><button class="dlgX">✕</button>`;
+  d.querySelector('.dlgX').onclick = () => dialogClose();
+  d.classList.remove('hidden');
+  const c = d.querySelector('[data-dlg]');
+  if (c) whenChars(() => { const n = STAFF.find(x => x.id === c.dataset.dlg) || P.get(+c.dataset.dlg); if (!n) return; const g = c.getContext('2d'); g.clearRect(0, 0, 84, 84); drawCharTo(g, n, 42, 150, 150 / CH_ATLAS.h, 'front', 0); });
+  dlgRender();
+}
+function dialogClose() { dlgQ = null; $('#dlg')?.classList.add('hidden'); }
+function dlgRender() {
+  const d = $('#dlg'); if (!d || !dlgQ) return;
+  const line = dlgQ.lines[dlgQ.i] || '', last = dlgQ.i >= dlgQ.lines.length - 1, done = dlgQ.shown >= line.length;
+  d.querySelector('.dlgText').textContent = line.slice(0, Math.floor(dlgQ.shown));
+  d.querySelector('.dlgNext').style.visibility = done && !last ? 'visible' : 'hidden';
+  const ch = d.querySelector('.dlgCh');
+  if (done && last && !ch.dataset.on) {
+    ch.dataset.on = 1;
+    const list = dlgQ.choices?.length ? dlgQ.choices : [{ label: '👋 ลาก่อน', fn: () => dialogClose() }];
+    ch.innerHTML = list.map((c, k) => `<button data-k="${k}" class="${c.cls || ''}">${esc(c.label)}</button>`).join('');
+    ch.querySelectorAll('button').forEach(b => b.onclick = () => { FX.play('click'); const c = list[+b.dataset.k]; c.fn ? c.fn() : dialogClose(); });
+  }
+}
+function dlgTick() {   // called every frame: types the current line out
+  if (!dlgQ) return;
+  const line = dlgQ.lines[dlgQ.i] || '';
+  if (dlgQ.shown < line.length) { dlgQ.shown = Math.min(line.length, dlgQ.shown + 0.9); dlgRender(); }
+}
+function dlgTap() {
+  if (!dlgQ) return;
+  const line = dlgQ.lines[dlgQ.i] || '';
+  if (dlgQ.shown < line.length) { dlgQ.shown = line.length; return dlgRender(); }
+  if (dlgQ.i < dlgQ.lines.length - 1) { dlgQ.i++; dlgQ.shown = 0; FX.play('click'); dlgRender(); }
+  else if (!dlgQ.choices?.length) dialogClose();
+}
+// talking to a shop or job NPC: greeting, then choose: use the place / chat more / bye. Quick repeat visits skip the chat.
+const talkedAt = {};
+function talkTo(n, st) {
+  const now = performance.now(), quick = now - (talkedAt[n.id] || -1e9) < 90000; talkedAt[n.id] = now;
+  const openIt = () => { dialogClose(); openPanel({ kind: STN(st)?.type || 'staff', st }); };
+  if (quick) return openIt();
+  const key = n.id.startsWith('keep_cstore') ? 'cstore' : n.id, topics = TALK[key] || TALK.town;
+  const act = n.keeper ? '🛒 ดูร้าน / ใช้บริการ' : n.career === 'fishing' ? '🎣 ดูเบ็ด' : me.career === n.career ? '📋 ดูงาน' : '📝 สมัครงาน';
+  const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
+  const base = { name: n.name, face: NPC_FACE[n.id], npc: n.id };
+  const choices = [{ label: act, fn: openIt, cls: 'primary' }, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
+  const hi = (n.line ? n.line(me) : '').trim() || 'สวัสดี';
+  dialog({ ...base, lines: [hi], choices });
+}
+// tapping a townsperson NPC: a short chat, with the profile one tap away
+function talkToTown(o) {
+  const t = TALK.town[(o.id * 7 + Math.floor(performance.now() / 60000)) % TALK.town.length];
+  dialog({ name: o.name, npc: o.id, lines: ['สวัสดีจ้า', ...t], choices: [{ label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, { label: '💬 คุยต่อ', fn: () => talkToTown({ ...o, id: o.id + 1 }) }, { label: '👋 ลาก่อน', fn: dialogClose }] });
+}
+// quest givers talk too (tap their portrait in the quest list)
+function talkQuest(type) {
+  const g = QUEST_GIVER[type], x = me.quests?.list.find(q => q.type === type) || me.wquests?.list.find(q => q.type === type); if (!g) return;
+  const lines = x?.done ? [g.thx, 'มีอะไรให้ช่วยอีกก็มาบอกนะ'] : [g.ask, x ? `ฝากด้วยนะ: ${x.text} (ตอนนี้ ${x.p.toLocaleString()}/${x.n.toLocaleString()})` : 'ฝากด้วยนะ', `ทำสำเร็จ ได้รางวัล ${money(x?.reward || 0)}`];
+  dialog({ name: g.name, face: g.f, lines, choices: [{ label: '📜 กลับไปหน้าเควสต์', fn: () => { dialogClose(); openPanel({ kind: 'quests' }); }, cls: 'primary' }, { label: '👋 ลาก่อน', fn: dialogClose }] });
 }
 // 📖 fish book: every species with its sprite; ones you have not caught yet are dark silhouettes
 function fishBook() {
@@ -1708,6 +1810,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15e', d: '15 พ.ย. (รอบ 5)', items: [
+    '💬 <b>กล่องบทสนทนา</b> คุยกับเจ้าของร้าน เจ้าหน้าที่ และชาวเมืองแล้วจะขึ้นกล่องคุย มีรูปตัวละคร ข้อความค่อยๆ พิมพ์ขึ้น แตะเพื่ออ่านต่อ',
+    '🗨️ ทุกคนมีเรื่องคุยของตัวเอง กด <b>คุยต่อ</b> ฟังเคล็ดลับและมุกของแต่ละคน · แตะรูปผู้ให้เควสต์เพื่อคุยได้ด้วย' ] },
   { v: '2026-11-15d', d: '15 พ.ย. (รอบ 4)', items: [
     '📜 <b>เควสต์มีผู้ให้เควสต์แล้ว</b> แต่ละเควสต์มาจากชาวเมืองที่มีรูปวาดของตัวเอง เช่น ยายศรีชวนกินข้าว น้าเล็กอยากได้ปลาสด เจ๊ศรีอยากได้ของมาขาย',
     '🎉 ทำเควสต์สำเร็จ ผู้ให้เควสต์จะเด้งขึ้นมาขอบคุณ' ] },
@@ -2107,7 +2212,7 @@ function renderPanel(p) {
         const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
         const btn = x.done ? '<span class="tag">สำเร็จ</span>' : `<div class="col2">${tgt ? B('📍 ไป', { fn: 'guide', key: tgt }, 'good') : ''}${B('🔄', { t: 'quest_reroll', i }, '', q.rerolled)}</div>`;
         const g = QUEST_GIVER[x.type];
-        return `<div class="item qitem ${x.done ? 'done' : ''}"><div class="em">${faceHtml(x.type) || icon}</div><div class="nm">${g ? `<span class="qgiver">${esc(g.name)}</span><span class="qsay">“${esc(x.done ? g.thx : g.ask)}”</span>` : ''}${x.done ? '✅ ' : ''}${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
+        return `<div class="item qitem ${x.done ? 'done' : ''}"><div class="em" ${QUEST_GIVER[x.type] ? `data-m='${JSON.stringify({ fn: 'qtalk', type: x.type })}'` : ''}>${faceHtml(x.type) || icon}</div><div class="nm">${g ? `<span class="qgiver">${esc(g.name)}</span><span class="qsay">“${esc(x.done ? g.thx : g.ask)}”</span>` : ''}${x.done ? '✅ ' : ''}${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
       }).join('');
       return `<h2>📜 เควสต์ประจำวัน</h2>${qtabs}<div class="sub">เควสต์ใหม่ในอีก <b class="qcd" data-t="${q.resetAt}"></b> (เที่ยงคืนเวลาไทย)${q.streak ? ` · 🔥 ทำครบติดต่อกัน ${q.streak} วัน` : ''}</div>
         <div class="list">${rows}</div>
