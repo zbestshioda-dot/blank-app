@@ -11,7 +11,8 @@ const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, 
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
 const RX0 = 256;                                         // interiors start here
-const W = RX0 + 10 * 18 + 2, H = 90;                     // 6 columns of interiors + 4 columns of upstairs floors (house expansions)
+const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
+const W = YX0 + 4 * 34, H = 90;                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
 
 // ---------------------------------------------------------------- grid helpers
 // tile codes: . grass  = road  , sidewalk  c cobble path  k plaza bricks  w water  p pier/bridge
@@ -417,9 +418,45 @@ for (const b of BUILDINGS) {
     }
   }
 }
+// ================================================================= home yards
+// Every house stands in its own big private yard (Hay Day style): the door on the estate street leads into the yard,
+// the house's own door in the yard leads inside. The yard is 3x3 zones; the middle column (house, lawn, gate) is open
+// from the start and the six side zones are unlocked one by one for a rising price. Owners plant vegetable fields and
+// lay out their garden with the same placement tool as the furniture indoors (floor 9 = the yard).
+const YARD = { x0: YX0, w: 32, h: 26, zw: 10, zh: 8, start: [1, 4, 7], price: [25000, 40000, 60000, 85000, 115000, 150000] };
+const YARDS = [];
+for (const room of ROOMS.filter(r => r.rk === 'house' && !r.floor)) {
+  const i = room.house, x = YX0 + (i % 4) * 34, y = 1 + Math.floor(i / 4) * 28, ox = x + 1, oy = y + 1;
+  const yard = { id: 'yard' + i, kind: 'map', yard: 1, house: i, name: `สวนบ้านเลขที่ ${i + 1}`, x, y, w: YARD.w, h: YARD.h, ox, oy };
+  rect(x, y, YARD.w, YARD.h, '.');
+  for (let k = 0; k < YARD.w; k++) { set(x + k, y, 'T'); set(x + k, y + YARD.h - 1, 'T'); }
+  for (let k = 0; k < YARD.h; k++) { set(x, y + k, 'T'); set(x + YARD.w - 1, y + k, 'T'); }
+  const hb = BUILDINGS.find(b => b.house === i), sp = SPR(hb.sprite), front = oy + 6;
+  const b = B('yh' + i, hb.sprite, ox + 10 + Math.floor((10 - sp.w) / 2), front, { label: '', icon: '🏠', deco: true, area: yard.id, yhouse: i });
+  rect(b.x, b.y, b.w, b.h, 'B');
+  pathDown(b, y + YARD.h - 1);
+  const cx = Math.floor(b.x + b.w / 2);
+  rect(cx - 2, y + YARD.h - 1, 4, 1, 'c');                            // a gap in the hedge of trees for the gate
+  const door = { x: b.x + b.w / 2, y: front + .6 };
+  STATIONS.push({ id: 'ydoor' + i, type: 'door', to: room.id, label: 'เข้าบ้าน', icon: '🏠', x: door.x, y: door.y, r: 1.5, area: yard.id, house: i, bld: hb.id });
+  room.outside = { x: door.x, y: front + 1.2 };                       // walking out of the house puts you in your yard
+  yard.spawn = { x: cx, y: y + YARD.h - 3 };
+  const street = STATIONS.find(t => t.id === 'door_' + hb.id);
+  street.yspawn = yard.spawn;                                          // the estate-street door opens onto the yard
+  GATES['yardout' + i] = { x: street.x, y: street.y + .6 };
+  STATIONS.push({ id: 'ygate' + i, type: 'gate', to: 'yardout' + i, label: 'ออกไปถนนหมู่บ้าน', icon: '🏘️', x: cx, y: y + YARD.h - 1.7, r: 1.4, area: yard.id });
+  for (const z of [0, 2, 3, 5, 6, 8]) {
+    const c = z % 3, r = Math.floor(z / 3);
+    STATIONS.push({ id: `yzone${i}_${z}`, type: 'yzone', idx: i, z, label: 'ขยายพื้นที่สวน', icon: '🔓', x: c === 0 ? ox + 10.9 : ox + 19.1, y: oy + r * YARD.zh + (r === 0 ? 7.2 : 4), r: 1.2, area: yard.id });
+  }
+  for (let ty = y; ty < y + YARD.h; ty++) for (let tx = x; tx < x + YARD.w; tx++) if (grid[ty][tx] === 'T') TREES.push([tx, ty, TREE_KINDS[(tx * 7 + ty * 13) % TREE_KINDS.length]]);
+  YARDS.push(yard);
+}
+// which zone of a yard a spot (in yard-relative tiles) falls in
+const yardZone = (x, y) => Math.max(0, Math.min(2, Math.floor((x - 1) / YARD.zw))) + 3 * Math.max(0, Math.min(2, Math.floor((y - 1) / YARD.zh)));
 // the room a house floor lives in, and where you arrive on it
 const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house === house && (r.floor || 1) === fl);
-const AREAS = [TOWN, FARM, HOUSING, ...ROOMS];
+const AREAS = [TOWN, FARM, HOUSING, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
 for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;
@@ -712,6 +749,58 @@ const FURNITURE = {
   xcubby: { name: 'ชั้นช่องไม้', icon: '🗃️', price: 4000, comfort: 0, cat: 'deco', spr: 'x_cubby' },
   xpatio: { name: 'โต๊ะร่มสนาม', icon: '⛱️', price: 5000, comfort: 1, cat: 'deco', spr: 'x_patio' },
   xpbench: { name: 'ม้านั่งสวน', icon: '🪑', price: 3500, comfort: 0, cat: 'deco', spr: 'x_pbench' },
+  // home-yard garden pieces: buy as many as you like and lay them out in your yard (fields grow vegetables)
+  gfield: { name: 'แปลงผัก (ปลูกพืชได้)', icon: '🌱', price: 2500, comfort: 0, cat: 'garden', spr: 'y_field', multi: 1, field: 1 },
+  gtree: { name: 'ต้นไม้ใหญ่', icon: '🌳', price: 3000, comfort: 0, cat: 'garden', spr: 'tree', multi: 1, solid: 1, sw: 0.8 },
+  gtreeoak: { name: 'ต้นโอ๊ก', icon: '🌳', price: 3500, comfort: 0, cat: 'garden', spr: 'tree_oak', multi: 1, solid: 1, sw: 0.8 },
+  gsakura: { name: 'ต้นซากุระ', icon: '🌸', price: 4500, comfort: 0, cat: 'garden', spr: 'tree_pink', multi: 1, solid: 1, sw: 0.8 },
+  gtreew: { name: 'ต้นดอกขาว', icon: '🌳', price: 4500, comfort: 0, cat: 'garden', spr: 'tree_white', multi: 1, solid: 1, sw: 0.8 },
+  gpine: { name: 'ต้นสน', icon: '🌲', price: 3000, comfort: 0, cat: 'garden', spr: 'pine', multi: 1, solid: 1, sw: 0.7 },
+  gpalm: { name: 'ต้นมะพร้าว', icon: '🌴', price: 3500, comfort: 0, cat: 'garden', spr: 'palm', multi: 1, solid: 1, sw: 0.6 },
+  gbush: { name: 'พุ่มไม้', icon: '🌿', price: 900, comfort: 0, cat: 'garden', spr: 'bush', multi: 1, solid: 1 },
+  gbush2: { name: 'พุ่มไม้กลม', icon: '🌿', price: 900, comfort: 0, cat: 'garden', spr: 'bush2', multi: 1, solid: 1 },
+  ghedge: { name: 'รั้วต้นไม้', icon: '🌳', price: 1200, comfort: 0, cat: 'garden', spr: 'hedge', multi: 1, solid: 1 },
+  ghedgef: { name: 'รั้วต้นไม้ดอก', icon: '🌺', price: 1500, comfort: 0, cat: 'garden', spr: 'hedge_flower', multi: 1, solid: 1 },
+  ghcube: { name: 'พุ่มไม้สี่เหลี่ยม', icon: '🟩', price: 1500, comfort: 0, cat: 'garden', spr: 'o_hedgecube', multi: 1, solid: 1 },
+  gtopiary: { name: 'ไม้ดัดทรงกลม', icon: '🌳', price: 1800, comfort: 0, cat: 'garden', spr: 'o_topiary', multi: 1, solid: 1 },
+  ghring: { name: 'วงพุ่มไม้', icon: '⭕', price: 2500, comfort: 0, cat: 'garden', spr: 'o_hedgering', multi: 1, solid: 1 },
+  gfwhite: { name: 'รั้วไม้สีขาว', icon: '🪵', price: 800, comfort: 0, cat: 'garden', spr: 'fence_white', multi: 1, solid: 1 },
+  gfbamboo: { name: 'รั้วไม้ไผ่', icon: '🎋', price: 700, comfort: 0, cat: 'garden', spr: 'fence_bamboo', multi: 1, solid: 1 },
+  gfiron: { name: 'รั้วเหล็กดัด', icon: '⛓️', price: 1500, comfort: 0, cat: 'garden', spr: 'fence_iron', multi: 1, solid: 1 },
+  gfgate: { name: 'ประตูรั้ว', icon: '🚪', price: 1500, comfort: 0, cat: 'garden', spr: 'o_gate', multi: 1 },
+  gfbed: { name: 'กระบะดอกไม้ขาว', icon: '💐', price: 2000, comfort: 0, cat: 'garden', spr: 'o_flowerbed', multi: 1, solid: 1 },
+  gfbed2: { name: 'แปลงดอกไม้หลากสี', icon: '🌷', price: 2200, comfort: 0, cat: 'garden', spr: 'flowerbed', multi: 1, solid: 1 },
+  gplanter: { name: 'กระบะดอกไม้', icon: '🌼', price: 1500, comfort: 0, cat: 'garden', spr: 'o_planter', multi: 1, solid: 1 },
+  glplanter: { name: 'กระบะดอกไม้รูปตัวแอล', icon: '🌼', price: 1800, comfort: 0, cat: 'garden', spr: 'o_lplanter', multi: 1, solid: 1 },
+  groses: { name: 'กระถางกุหลาบหิน', icon: '🌹', price: 1500, comfort: 0, cat: 'garden', spr: 'o_roses', multi: 1, solid: 1 },
+  gtulips: { name: 'แท่นทิวลิป', icon: '🌷', price: 1200, comfort: 0, cat: 'garden', spr: 'o_tulips', multi: 1, solid: 1 },
+  gfbox: { name: 'กล่องดอกไม้', icon: '🌸', price: 900, comfort: 0, cat: 'garden', spr: 'flowerbox', multi: 1, solid: 1 },
+  gpot: { name: 'กระถางดอกไม้', icon: '🌼', price: 400, comfort: 0, cat: 'garden', spr: 'o_potflower', multi: 1 },
+  ggrass: { name: 'กอหญ้า', icon: '🌾', price: 200, comfort: 0, cat: 'garden', spr: 'o_grass', multi: 1 },
+  gfount: { name: 'น้ำพุใหญ่สามชั้น', icon: '⛲', price: 25000, comfort: 0, cat: 'garden', spr: 'o_fountain', multi: 1, solid: 1 },
+  gfount2: { name: 'น้ำพุกลม', icon: '⛲', price: 15000, comfort: 0, cat: 'garden', spr: 'o_fountain2', multi: 1, solid: 1 },
+  gfount3: { name: 'น้ำพุเล็ก', icon: '⛲', price: 8000, comfort: 0, cat: 'garden', spr: 'o_fountain3', multi: 1, solid: 1 },
+  gpond: { name: 'บ่อปลา', icon: '🐟', price: 12000, comfort: 0, cat: 'garden', spr: 'pond', multi: 1, solid: 1 },
+  gwell: { name: 'บ่อน้ำ', icon: '🪣', price: 6000, comfort: 0, cat: 'garden', spr: 'well', multi: 1, solid: 1, sw: 0.9 },
+  gbench: { name: 'ม้านั่งไม้', icon: '🪑', price: 2500, comfort: 0, cat: 'garden', spr: 'o_bench', multi: 1, solid: 1 },
+  gsbench: { name: 'ม้านั่งหิน', icon: '🪑', price: 2500, comfort: 0, cat: 'garden', spr: 'o_stonebench', multi: 1, solid: 1 },
+  gparasol: { name: 'โต๊ะร่มสนาม', icon: '⛱️', price: 4000, comfort: 0, cat: 'garden', spr: 'o_parasol', multi: 1, solid: 1, sw: 0.6 },
+  gwtable: { name: 'โต๊ะไม้กลม', icon: '🪵', price: 2000, comfort: 0, cat: 'garden', spr: 'o_woodtable', multi: 1, solid: 1 },
+  glamp: { name: 'เสาไฟสวน', icon: '💡', price: 2500, comfort: 0, cat: 'garden', spr: 'o_lamp', multi: 1, solid: 1, sw: 0.4 },
+  glampb: { name: 'โคมไฟหัวกลม', icon: '💡', price: 2000, comfort: 0, cat: 'garden', spr: 'o_lampball', multi: 1, solid: 1, sw: 0.4 },
+  glantern: { name: 'ตะเกียงประดับ', icon: '🏮', price: 1800, comfort: 0, cat: 'garden', spr: 'o_lantern', multi: 1 },
+  garch: { name: 'ซุ้มกุหลาบ', icon: '🌹', price: 6000, comfort: 0, cat: 'garden', spr: 'o_rosearch', multi: 1 },
+  gpergola: { name: 'ซุ้มไม้เลื้อย', icon: '🌿', price: 7000, comfort: 0, cat: 'garden', spr: 'o_pergola', multi: 1 },
+  gslide: { name: 'สไลเดอร์เด็กเล่น', icon: '🛝', price: 9000, comfort: 0, cat: 'garden', spr: 'o_slide', multi: 1, solid: 1 },
+  gbird: { name: 'รูปปั้นนก', icon: '🕊️', price: 3500, comfort: 0, cat: 'garden', spr: 'o_birdstatue', multi: 1, solid: 1 },
+  gcat: { name: 'รูปปั้นแมว', icon: '🐈', price: 3500, comfort: 0, cat: 'garden', spr: 'o_catstatue', multi: 1, solid: 1 },
+  ggnome: { name: 'ตุ๊กตาคนแคระ', icon: '🧙', price: 600, comfort: 0, cat: 'garden', spr: 'gnome', multi: 1 },
+  gfcart: { name: 'รถเข็นดอกไม้', icon: '🛒', price: 6000, comfort: 0, cat: 'garden', spr: 'o_flowercart', multi: 1, solid: 1 },
+  ghay: { name: 'ฟางมัด', icon: '🌾', price: 500, comfort: 0, cat: 'garden', spr: 'hay', multi: 1, solid: 1 },
+  gtap: { name: 'ก๊อกน้ำสนาม', icon: '🚰', price: 800, comfort: 0, cat: 'garden', spr: 'o_tap', multi: 1, solid: 1 },
+  gmailbox: { name: 'ตู้จดหมาย', icon: '📫', price: 800, comfort: 0, cat: 'garden', spr: 'o_mailbox', multi: 1, solid: 1 },
+  gstump: { name: 'ตอไม้', icon: '🪵', price: 400, comfort: 0, cat: 'garden', spr: 'stump', multi: 1, solid: 1 },
+  grock: { name: 'ก้อนหิน', icon: '🪨', price: 300, comfort: 0, cat: 'garden', spr: 'rock', multi: 1, solid: 1 },
   // room partitions (pixel_walls sheet): buy as many as you like and build your own rooms; walls and screens block the way, doors and curtains let you through
   wpink: { name: 'ผนังสีชมพู', icon: '🧱', price: 1200, comfort: 0, cat: 'wall', spr: 'pw_pink', multi: 1, solid: 1 },
   wcream: { name: 'ผนังสีครีม', icon: '🧱', price: 1200, comfort: 0, cat: 'wall', spr: 'pw_cream', multi: 1, solid: 1 },
@@ -896,7 +985,7 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
 module.exports = {
   RUN, CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
-  W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, SPAWN, RADIUS, SOLID,
+  W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,

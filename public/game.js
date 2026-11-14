@@ -191,7 +191,7 @@ function handle(m) {
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       break;
     case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
-    case 'wd': { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
+    case 'wd': { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
     case 'roster': {
       const ids = new Set();
       for (const p of m.players) {
@@ -554,7 +554,11 @@ const mapOf = id => { const a = AREA[id]; return a ? (a.kind === 'room' ? a.area
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.map.w || y >= G.map.h) ? ' ' : G.map.tiles[y][x];
 const solid = (x, y) => G.solid.includes(tileAt(Math.floor(x), Math.floor(y)));
 // the client checks with the full radius; the server allows a hair less, so rounding never causes a rejection
-const blockedAt = (x, y) => { const r = G.radius; return solid(x - r, y - r) || solid(x + r, y - r) || solid(x - r, y + r) || solid(x + r, y + r) || roomWalls.some(b => x + r > b[0] && x - r < b[1] && y + r > b[2] && y - r < b[3]); };
+// home yards: which zone a spot is in, and whether the owner has opened it up yet
+const yZone = (x, y) => clamp(Math.floor((x - 1) / G.yard.zw), 0, 2) + 3 * clamp(Math.floor((y - 1) / G.yard.zh), 0, 2);
+const yzOpen = (house, z) => G.yard.start.includes(z) || (wd?.houses?.[house]?.[9] || []).includes(z);
+const yardLocked = (x, y) => { if (x < G.yard.x0) return false; const a = areaOf(x, y); return !!a?.yard && !yzOpen(a.house, yZone(x - a.x, y - a.y)); };
+const blockedAt = (x, y) => { const r = G.radius; return yardLocked(x, y) || solid(x - r, y - r) || solid(x + r, y - r) || solid(x - r, y + r) || solid(x + r, y + r) || roomWalls.some(b => x + r > b[0] && x - r < b[1] && y + r > b[2] && y - r < b[3]); };
 
 // ------------------------------------------------------------------ input
 const keys = {};
@@ -716,10 +720,17 @@ function findNear() {
   const here = areaOf(m.x, m.y)?.id;
   let best = null, bd = 1e9;
   for (const s of G.stations) {
-    if (s.area !== here || s.type === 'exit' && false) continue;
+    if (s.area !== here || s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
     const d = Math.hypot(s.x - m.x, s.y - m.y);
     if (d <= s.r && d < bd) { bd = d; best = s; }
   }
+  // vegetable fields laid out in a home yard
+  const ya = AREA[here];
+  if (ya?.yard) { const h = wd?.houses?.[ya.house]; if (h) for (const k of h[2]) {
+    const pos = furnPos(h, k); if (!pos || pos[0] !== 9 || !G.shop.furniture[fbase(k)]?.field) continue;
+    const x = ya.x + pos[1], y = ya.y + pos[2] - .9, d = Math.hypot(x - m.x, y - m.y);
+    if (d < 1.6 && d < bd) { bd = d; best = { id: 'yf:' + k, type: 'yfield', k, house: ya.house, x, y, r: 1.6, icon: '🌱', label: 'แปลงผัก' }; }
+  } }
   // rider: hand the food to the customer you are standing next to
   if (me?.career === 'rider') for (const j of me.jobs || []) if (j.mine && j.state === 'picked') {
     const tgt = j.npc ? (j.area === here ? j.dest : null) : (() => { const p = P.get(j.custId); return p && areaOf(p.x, p.y)?.id === here ? p : null; })();
@@ -764,7 +775,7 @@ let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meM
 let homeBtnT = 0;
 function frame(t) {
   requestAnimationFrame(frame);
-  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } $('#homeBtn').classList.toggle('hidden', !(r0 && r0.rk === 'house' && r0.house === me.house) || !!placing); if (placing && !(r0 && r0.rk === 'house')) endPlace(); }
+  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   const m = P.get(myId);
@@ -886,11 +897,12 @@ function draw(t) {
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
       else if (e[3] === 'ghost') { ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; spr(e[0], e[1], e[2], X, Y); ctx.globalAlpha = 1; ctx.strokeStyle = '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
-      else spr(e[0], e[1], e[2], X, Y);
+      else { spr(e[0], e[1], e[2], X, Y); if (e[4]) drawYardCrop(e, X, Y, t); }
     }
     else if (k === 5) drawCar(e, X, Y);
     else drawPlayer(e, X, Y, t);
   }
+  if (A?.yard) drawYardLocks(A, X, Y, t);
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) drawBuildingSign(b, X, Y);
   for (const s of G.stations) {
     if (s.type === 'gplot' || !inside(s.x, s.y)) continue;
@@ -899,6 +911,7 @@ function draw(t) {
     const isNear = near && near.id === s.id;
     if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash)$/.test(s.type) && !isNear) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
+    if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
@@ -933,6 +946,37 @@ function draw(t) {
   const fp = (performance.now() - fadeT) / 350;
   if (fp < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fp})`; ctx.fillRect(0, 0, VW, VH); }
   drawMini();
+}
+// home yard: locked zones lie under a hazy overgrown fog with a lock and the price of the next unlock
+function drawYardLocks(A, X, Y, t) {
+  const yz = wd?.houses?.[A.house]?.[9] || [], price = G.yard.price[yz.length];
+  for (let z = 0; z < 9; z++) {
+    if (yzOpen(A.house, z)) continue;
+    const c = z % 3, r = Math.floor(z / 3), x0 = (A.x + 1 + c * G.yard.zw) * TS + X, y0 = (A.y + 1 + r * G.yard.zh) * TS + Y, w = G.yard.zw * TS, h = G.yard.zh * TS;
+    if (x0 > VW || y0 > VH || x0 + w < 0 || y0 + h < 0) continue;
+    ctx.fillStyle = 'rgba(28,46,24,.62)'; ctx.fillRect(x0, y0, w, h);
+    ctx.strokeStyle = 'rgba(255,230,160,.55)'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.strokeRect(x0 + 3, y0 + 3, w - 6, h - 6); ctx.setLineDash([]);
+    ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .9)}px serif`; ctx.fillText('🔒', x0 + w / 2, y0 + h / 2 - TS * .4 + Math.sin(t / 500 + z) * 2);
+    if (A.house === me.house && price) sign(`ปลดล็อก ${money(price)}`, x0 + w / 2, y0 + h / 2 + TS * .55, { size: TS * .3 });
+  }
+}
+// a vegetable field in a home yard: seedlings that grow, then the ripe crop bobbing on top
+function drawYardCrop(e, X, Y, t) {
+  const pl = wd?.houses?.[e[4].house]?.[10]?.[e[4].k], px = e[1] * TS + X, py = (e[2] - 1) * TS + Y;
+  if (near?.id === 'yf:' + e[4].k) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.strokeRect(px - TS - 2, py - TS - 2, TS * 2 + 4, TS * 2 + 4); }
+  if (!pl) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = `700 ${Math.round(TS * .6)}px sans-serif`; ctx.fillText('+', px, py); return; }
+  const [crop, readyAt] = pl, it = G.items[crop], total = G.crops[crop].grow * 1000, left = readyAt - (Date.now() + clockOff), prog = clamp(1 - left / total, 0, 1);
+  for (const [dx, dy] of [[-.5, -.4], [0, -.4], [.5, -.4], [-.5, .4], [0, .4], [.5, .4]]) {
+    const cx = px + dx * TS, cy = py + dy * TS, sway = Math.sin(t / 600 + dx * 3 + dy) * TS * .02;
+    if (left > 0) {
+      const h = TS * (.12 + prog * .38);
+      ctx.fillStyle = '#3f8a2a'; ctx.fillRect(cx - 1 + sway, cy - h, 2, h); ctx.fillStyle = prog < .5 ? '#7cc843' : '#4fa632';
+      ctx.beginPath(); ctx.ellipse(cx - h * .35 + sway, cy - h * .7, h * .38, h * .2, -.5, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + h * .35 + sway, cy - h * .85, h * .38, h * .2, .5, 0, 7); ctx.fill();
+    } else { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .48)}px serif`; ctx.fillText(it.icon, cx, cy - TS * .12 + Math.sin(t / 260 + dx * 4) * 1.5); }
+  }
+  if (left <= 0) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText('✨', px + TS * .8, py - TS * .85 + Math.sin(t / 200) * 3); }
+  else { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(px - TS * .85, py + TS * .8, TS * 1.7, 4); ctx.fillStyle = '#9be15d'; ctx.fillRect(px - TS * .85, py + TS * .8, TS * 1.7 * prog, 4); }
 }
 // a garden bed: wooden frame, dark tilled soil in furrows, crops planted in two rows that grow and ripen
 function drawPlot(s, px, py, t) {
@@ -1529,12 +1573,28 @@ function renderPanel(p) {
         ${built ? B(`⬆️ ขึ้นไปชั้น ${to}`, { t: 'act', st, a: 'go' }, 'primary big') : mine ? `<div class="jobbox">🏗️ ต่อเติมชั้น ${to}<br><small>สร้างเสร็จทันที · ชั้นบนเป็นของบ้านหลังนี้ (ถ้าขายบ้าน ชั้นที่ต่อเติมจะหายไปด้วย)</small>${B(`🏗️ สร้างชั้น ${to} ${money(G.shop.floorPrice[to])}`, { t: 'act', st, a: 'build' }, 'good big', me.money < G.shop.floorPrice[to])}</div>` : `<div class="sub">🔒 ยังไม่มีชั้น ${to}</div>`}
         ${mine ? B('🛋️ จัดบ้าน', { fn: 'open', kind: 'homedeco' }) : ''}`;
     }
+    case 'yzone': {
+      const s = STN(st), mine = me.house === s.idx, n = (me.yz || []).length, price = G.yard.price[n];
+      if (!mine) return '<h2>🔒 พื้นที่สวน</h2><div class="sub">เฉพาะเจ้าของบ้านเท่านั้นที่ขยายสวนได้</div>';
+      return `<h2>🌳 ขยายสวนรอบบ้าน</h2><div class="sub">เปิดพื้นที่ใหม่ ${G.yard.zw}×${G.yard.zh} ช่อง ไว้ปลูกผักและจัดสวน · ตอนนี้มี ${3 + n}/9 ส่วน</div>${B(`🔓 ปลดล็อก ${money(price)}`, { t: 'act', st, a: 'unlock' }, 'primary big', me.money < price)}`;
+    }
+    case 'yfield': {
+      const k = st.slice(3), h = wd?.houses?.[me.house];
+      if (near?.house !== me.house || !h) return '<h2>🌱 แปลงผัก</h2><div class="sub">แปลงผักของเจ้าของบ้าน</div>';
+      const pl = (h[10] || {})[k], slow = me.career !== 'farmer';
+      if (!pl) {
+        const rows = Object.entries(G.crops).map(([id, c]) => itemRow(id, B(`ปลูก ${money(c.seed)}`, { t: 'yfarm', k, op: 'plant', crop: id }), `โต ~${Math.round(c.grow * (slow ? 1.25 : 1) / 60 * 10) / 10} นาที · ได้ ${c.min}-${c.max} · ราคาตลาด ~${money(wd?.mk[id]?.ref || G.items[id].base)}`)).join('');
+        return `<h2>🌱 แปลงผักในสวน</h2><div class="sub">เลือกพืชที่จะปลูก (⚡5)${slow ? ' · ชาวสวนปลูกโตเร็วกว่า 25%' : ''}</div><div class="list">${rows}</div>`;
+      }
+      const it = G.items[pl[0]];
+      return `<h2>${it.icon} ${esc(it.name)}</h2><div class="sub"><span class="cd" data-t="${pl[1]}"></span></div>${B('🧺 เก็บเกี่ยว (⚡6)', { t: 'yfarm', k, op: 'harvest' }, 'primary big')}`;
+    }
     case 'homedeco': {
       if (me.house < 0) return '<h2>🛋️ จัดบ้าน</h2><div class="sub">ต้องมีบ้านของตัวเองก่อน</div>';
       const h = wd?.houses?.[me.house]; if (!h) return '';
       const own = [...new Set([...(me.furniture || []), ...(me.keep || [])])];
       const rows = own.map(k => { const f = G.shop.furniture[fbase(k)]; if (!f) return ''; const pos = furnPos(h, k), n = k.split('#')[1] || (f.multi ? 1 : 0);
-        return itemRowRaw(f.icon, f.name + (n ? ` #${n}` : ''), pos ? `วางอยู่ชั้น ${pos[0]}` : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos ? B('📦', { t: 'hplace', k, store: 1 }) : ''}${f.multi && !pos ? B('♻️', { t: 'hplace', k, del: 1 }) : ''}</div>`); }).join('');
+        return itemRowRaw(f.icon, f.name + (n ? ` #${n}` : ''), pos ? (pos[0] === 9 ? '🌳 วางอยู่ในสวน' : `วางอยู่ชั้น ${pos[0]}`) : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos ? B('📦', { t: 'hplace', k, store: 1 }) : ''}${f.multi && !pos ? B('♻️', { t: 'hplace', k, del: 1 }) : ''}</div>`); }).join('');
       return `<h2>🛋️ จัดบ้าน</h2><div class="sub">เลือกชิ้นที่จะวาง แล้วแตะพื้นห้องในชั้นที่คุณยืนอยู่ · ของในคลังยังนับความสบาย ⭐ · ซื้อเพิ่มที่ 🛋️ ร้านเฟอร์นิเจอร์ในเมือง · บ้านมี ${1 + (h[8] || 0)}/${G.shop.floors} ชั้น (ต่อเติมที่บันได 🪜)</div>
         <div class="list">${rows || '<div class="sub">ยังไม่มีเฟอร์นิเจอร์ ซื้อได้ที่ร้านเฟอร์นิเจอร์ในเมือง</div>'}</div>`;
     }
@@ -1697,7 +1757,7 @@ function renderPanel(p) {
     }
     case 'door': return houseDoor(STN(st), st);
     case 'furnshop': {
-      const own = me.house >= 0, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง']];
+      const own = me.house >= 0, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน']];
       const tab = cats.some(c => c[0] === p.ftab) ? p.ftab : 'basic';
       const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => a[1].price - b[1].price);
       const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
@@ -2664,13 +2724,20 @@ const furnPos = (h, k) => { const p = h[7]?.[k]; if (p) return p[0] ? p : null; 
 let placing = null;
 function startPlace(k) {
   const m = P.get(myId), r = m && areaOf(m.x, m.y);
-  if (!r || r.rk !== 'house' || r.house !== me.house) return toast('เข้าไปในบ้านของคุณก่อน แล้วค่อยจัดวาง', '🏠', false);
+  if (!r || !(r.rk === 'house' || r.yard) || r.house !== me.house) return toast('เข้าไปในบ้านหรือสวนของคุณก่อน แล้วค่อยจัดวาง', '🏠', false);
   closePanel();
-  placing = { k, house: r.house, fl: r.floor || 1, x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
+  if (r.yard) {                                  // out in the yard
+    placing = { k, house: r.house, fl: 9, bx: [.7, r.w - .7, 1.5, r.h - .8], x: clamp(Math.round((m.x - r.x) * 2) / 2, .7, r.w - .7), y: clamp(Math.round((m.y - r.y - .8) * 2) / 2, 1.5, r.h - .8) };
+    return placeBar(k);
+  }
+  placing = { k, house: r.house, fl: r.floor || 1, bx: [.7, 13.3, 1.2, 9.5], x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
+  placeBar(k);
+}
+function placeBar(k) {
   const f = G.shop.furniture[fbase(k)];
   $('#placeBar').innerHTML = `<b>${f.icon} ${esc(f.name)}</b><small>แตะพื้นห้องเพื่อเลื่อน · ปุ่มลูกศรขยับละเอียด</small><div class="pb">${['⬅️', '⬆️', '⬇️', '➡️'].map((a, i) => `<button data-nud="${i}">${a}</button>`).join('')}<button id="plOk" class="primary">✓ วาง</button><button id="plStore">📦 เก็บ</button><button id="plX">✕</button></div>`;
   $('#placeBar').classList.remove('hidden');
-  $('#placeBar').querySelectorAll('[data-nud]').forEach(b => b.onclick = () => { const d = [[-.25, 0], [0, -.25], [0, .25], [.25, 0]][+b.dataset.nud]; placing.x = clamp(placing.x + d[0], .7, 13.3); placing.y = clamp(placing.y + d[1], 1.2, 9.5); layoutFurniture(); });
+  $('#placeBar').querySelectorAll('[data-nud]').forEach(b => b.onclick = () => { const d = [[-.25, 0], [0, -.25], [0, .25], [.25, 0]][+b.dataset.nud]; placing.x = clamp(placing.x + d[0], placing.bx[0], placing.bx[1]); placing.y = clamp(placing.y + d[1], placing.bx[2], placing.bx[3]); layoutFurniture(); });
   $('#plOk').onclick = () => { send({ t: 'hplace', k, fl: placing.fl, x: placing.x, y: placing.y }); endPlace(); FX.play('click'); };
   $('#plStore').onclick = () => { send({ t: 'hplace', k, store: 1 }); endPlace(); };
   $('#plX').onclick = () => endPlace();
@@ -2678,8 +2745,8 @@ function startPlace(k) {
 }
 function endPlace() { placing = null; $('#placeBar').classList.add('hidden'); layoutFurniture(); }
 function placeTap(wx, wy) {
-  const r = AREA[`r_house${placing.house}` + (placing.fl > 1 ? `_f${placing.fl}` : '')]; if (!r) return;
-  placing.x = clamp(Math.round((wx - r.x) * 4) / 4, .7, 13.3); placing.y = clamp(Math.round((wy - r.y + .3) * 4) / 4, 1.2, 9.5); layoutFurniture();
+  const r = AREA[placing.fl === 9 ? `yard${placing.house}` : `r_house${placing.house}` + (placing.fl > 1 ? `_f${placing.fl}` : '')]; if (!r) return;
+  placing.x = clamp(Math.round((wx - r.x) * 4) / 4, placing.bx[0], placing.bx[1]); placing.y = clamp(Math.round((wy - r.y + .3) * 4) / 4, placing.bx[2], placing.bx[3]); layoutFurniture();
 }
 function drawStairs(x, y, down, X, Y) {   // a little staircase drawn on the floor (no sprite for it in the atlas)
   const px = x * TS + X, py = y * TS + Y, w = TS * 1.3, n = 5, sh = TS * .2;
@@ -2691,9 +2758,25 @@ function drawStairs(x, y, down, X, Y) {   // a little staircase drawn on the flo
   ctx.fillStyle = '#5a3a1e'; ctx.fillRect(px - w / 2 - 3, py - n * sh, 3, n * sh); ctx.fillRect(px + w / 2, py - n * sh, 3, n * sh);
   ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr',sans-serif`; ctx.textAlign = 'center'; ctx.fillText(down ? '⬇' : '⬆', px, py - n * sh - 4);
 }
+function addWall(f, sp, x, y) {               // solid pieces block a strip along their base (sw: a narrower trunk for trees, lamps...)
+  if (!f?.solid) return; const a = atlas?.sprites?.[sp], hw = f.sw ? f.sw / 2 : (a ? a[2] / atlas.tile / 2 : 1.4) - .1;
+  roomWalls.push([x - hw, x + hw, y - .45, y]);
+}
 function layoutFurniture() {
   roomFurniture = []; roomWalls = [];
   for (const r of G.areas) {
+    if (r.yard) {                              // the owner's garden pieces out in the yard (floor 9)
+      const h = wd?.houses?.[r.house]; if (!h) continue;
+      for (const k of h[2]) {
+        if (placing && placing.house === r.house && placing.k === k) continue;
+        const pos = furnPos(h, k), sp = furnSpr(k); if (!(pos && pos[0] === 9 && sp)) continue;
+        const f = G.shop.furniture[fbase(k)];
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, f?.field ? { k, house: r.house } : null]);
+        addWall(f, sp, r.x + pos[1], r.y + pos[2]);
+      }
+      if (placing && placing.house === r.house && placing.fl === 9) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost']);
+      continue;
+    }
     if (r.kind !== 'room') continue;
     for (const f of r.furniture || []) roomFurniture.push(f);
     if (r.rk === 'house') {
@@ -2702,7 +2785,7 @@ function layoutFurniture() {
         if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
         const pos = furnPos(h, k), sp = furnSpr(k); if (!(pos && pos[0] === fl && sp)) continue;
         roomFurniture.push([sp, r.x + pos[1], r.y + pos[2]]);
-        const a = atlas?.sprites?.[sp]; if (G.shop.furniture[fbase(k)]?.solid) { const hw = a ? a[2] / atlas.tile / 2 : 1.4; roomWalls.push([r.x + pos[1] - hw + .1, r.x + pos[1] + hw - .1, r.y + pos[2] - .45, r.y + pos[2]]); }
+        addWall(G.shop.furniture[fbase(k)], sp, r.x + pos[1], r.y + pos[2]);
       }
       if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost']);
     }

@@ -161,7 +161,35 @@ function enterRoom(a, m) {
     if (o !== a && tn !== a && !master) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
   }
   if (!cd(a, 'door', 1200, true)) return;
+  if (s.yspawn) return teleport(a, s.yspawn.x, s.yspawn.y);   // the estate-street door opens onto the house's own yard
   teleport(a, room.spawn.x, room.spawn.y);
+}
+// vegetable fields in your own yard: anyone with a house can farm here (farmers grow faster and harvest more)
+function yardFarm(a, m) {
+  if (a.down) return;
+  const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องเป็นเจ้าของบ้านก่อน', '🏡', false);
+  const k = String(m.k || ''), f = D.FURNITURE[fbase(k)], pos = a.fpos?.[k], yard = D.YARDS[i];
+  if (!f?.field || !furnOf(a).includes(k) || !pos || pos[0] !== YARD_FL) return;
+  if (Math.hypot(a.x - (yard.x + pos[1]), a.y - (yard.y + pos[2] - .5)) > 2.2) return toast(a, 'เดินเข้าไปใกล้แปลงผักก่อน', '⚠️', false);
+  a.ycrops = { ...(a.ycrops || {}) }; const pl = a.ycrops[k];
+  if (m.op === 'plant') {
+    const c = D.CROPS[m.crop]; if (!c) return;
+    if (pl) return toast(a, 'แปลงนี้ปลูกอยู่แล้ว', '⚠️', false);
+    if (!pay(a, c.seed)) return;
+    if (!spend(a, 5)) { a.money += c.seed; return; }
+    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')) * (a.career === 'farmer' ? 1 : 1.25);
+    a.ycrops[k] = [m.crop, now() + c.grow * 1000 * g]; markMe(a); wdAt = 0;
+    return toast(a, `ปลูก${D.ITEMS[m.crop].name}แล้ว`, '🌱');
+  }
+  if (m.op === 'harvest') {
+    if (!pl) return toast(a, 'แปลงว่าง', '⚠️', false);
+    if (pl[1] > now()) return toast(a, 'พืชยังไม่โต', '🌱', false);
+    if (!spend(a, 6)) return;
+    const c = D.CROPS[pl[0]], n = rint(c.min, c.max) + Math.floor(lvl(a) / 3) + tier(a, 'farmer');
+    addItem(a, pl[0], n); delete a.ycrops[k]; addXp(a); markMe(a); quest(a, 'harvest'); stat(a, 'harvest'); wdAt = 0;
+    if (pl[0] === 'durian') stat(a, 'durian');
+    return toast(a, `เก็บเกี่ยว ${D.ITEMS[pl[0]].icon}${D.ITEMS[pl[0]].name} ได้ ${n} หน่วย`, '🧺');
+  }
 }
 function exitRoom(a) {
   if (a.down) return;
@@ -189,7 +217,14 @@ const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
 const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];
 const fbase = k => String(k).split('#')[0];   // partition pieces can be owned many times: wdoor, wdoor#2, wdoor#3 ...
-const FURN_MULTI_MAX = 40;   // bought furniture + login-reward pieces (kept even without a house)
+const FURN_MULTI_MAX = 40;
+const YARD_FL = 9;                                   // fpos floor number that means "out in the yard"
+// every new home comes with two vegetable fields already laid out either side of the path
+function starterYard(a) {
+  a.yfree = 1; a.fpos = { ...(a.fpos || {}) };
+  for (const [k, x] of [['gfield', 12.5], ['gfield#2', 19.5]]) if (!(a.furniture || []).includes(k)) { a.furniture = [...(a.furniture || []), k]; a.fpos[k] = [YARD_FL, x, 16]; }
+}
+const yardOpen = (a, z) => D.YARD.start.includes(z) || (a.yz || []).includes(z);   // bought furniture + login-reward pieces (kept even without a house)
 const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
 const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) : 0;
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
@@ -282,7 +317,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -303,7 +338,7 @@ function newPhone() { let p; do p = String(rint(100000, 999999)); while (byPhone
 function hydrate(r) {
   const a = Object.assign({
     avatar: 0, money: 1000, energy: 100, hunger: 100, health: 100, career: 'none', licenses: [], xp: {},
-    inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1, hlv: 0, fpos: {},
+    inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1, hlv: 0, fpos: {}, yz: [], ycrops: {},
     furniture: [], bank: 0, bankT: now(), loan: 0, dz: [], awake: 0, listings: [], contacts: [], stats: {}, ach: [], title: '', jobChanges: [],
     enrolled: false, classes: 0, office: null, garden: null, rent: null, houseSale: 0, houseRent: 0, down: null,
     gender: 'm', look: null, wardrobe: null, god: null, rod: 0, hideJob: false, outfit: '', outfits: [], licExp: {}, phoneAsk: {}, school: null,
@@ -313,9 +348,10 @@ function hydrate(r) {
     if (!D.CAREERS[a.career]) a.career = 'none';
     a.licenses = (a.licenses || []).filter(l => D.LICENSES[l]);
     if (a.licenses.includes('medicine') || a.career === 'office') a.licenses = [...new Set([...a.licenses, 'degree'])];
-    if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; }   // the old houses were demolished: refund
+    if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; }   // the old houses were demolished: refund
     a.x = D.SPAWN.x; a.y = D.SPAWN.y; a.v = 2;
   }
+  if (a.house >= 0 && !a.yfree) starterYard(a);    // homes bought before yards existed get their two starter fields too
   if (!a.look || !a.look.pants) {                   // looks moved to the pixel character: refund the old hairstyles/hats, keep the shirt colour
     const OLD = { swept: 900, m: 600, pony: 1400, bun: 1400, braid: 1800, beanie: 900, straw: 700, beret: 1600, green: 1600, hood: 2500 };
     const W = a.wardrobe || {}; a.money += [...(W.hair || []), ...(W.hat || [])].reduce((t, k) => t + (OLD[k] || 0), 0) + Math.max(0, (W.shirt || []).length - 1) * 500;
@@ -1093,11 +1129,11 @@ function act(a, m) {
       if (o && !o.houseSale) return toast(a, `บ้านของ ${o.name} ไม่ได้ประกาศขาย`, '🏠', false);
       const price = o ? o.houseSale : D.HOUSE_PRICES[i];
       if (!pay(a, price)) return;
-      if (o) { credit(o, price); o.house = -1; o.furniture = []; o.hlv = 0; o.fpos = {}; o.houseSale = 0; o.houseRent = 0; if (o.ws) toast(o, `${a.name} ซื้อบ้านของคุณแล้ว ได้ ${money(price)}`, '🏠'); }
+      if (o) { credit(o, price); o.house = -1; o.furniture = []; o.hlv = 0; o.fpos = {}; o.yz = []; o.ycrops = {}; o.houseSale = 0; o.houseRent = 0; if (o.ws) toast(o, `${a.name} ซื้อบ้านของคุณแล้ว ได้ ${money(price)}`, '🏠'); }
       if (tenants[i] === a) { tenants[i] = null; a.rent = null; }
-      houses[i] = a; a.house = i; a.furniture = []; a.hlv = 0; a.fpos = {}; a.houseSale = 0; a.houseRent = 0; markMe(a); wdAt = 0;
+      houses[i] = a; a.house = i; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.houseSale = 0; a.houseRent = 0; starterYard(a); markMe(a); wdAt = 0;
       feed(`🏠 ${a.name} ซื้อบ้านหลังใหม่ในหมู่บ้านจัดสรร!`);
-      return toast(a, 'ยินดีด้วย! ได้บ้านแล้ว แต่งบ้านเพื่อเพิ่มความสบาย และนอนที่นี่ได้', '🏠');
+      return toast(a, 'ยินดีด้วย! ได้บ้านแล้ว พร้อมสวนรอบบ้านและแปลงผัก 2 แปลง · ขยายสวนได้ที่ป้าย 🔓 ซื้อของแต่งสวนที่ร้านเฟอร์นิเจอร์', '🏠');
     }
     case 'house.rent': {
       const i = s.house, o = houses[i], days = [1, 3, 7].includes(+m.days) ? +m.days : 1;
@@ -1117,8 +1153,8 @@ function act(a, m) {
     case 'house.sell': {
       if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
       if (tenants[s.house]) return toast(a, 'มีผู้เช่าอยู่ ขายไม่ได้จนกว่าจะหมดสัญญา', '🏠', false);
-      const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0));
-      houses[s.house] = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
+      const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
+      houses[s.house] = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
       return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
     }
     case 'house.list': case 'house.rentout': {
@@ -1166,6 +1202,14 @@ function act(a, m) {
       a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
       if (v.gem || v.price >= 250000) feed(`${v.gem ? '💎' : ''}${v.icon} ${a.name} ถอย${v.name}${v.gem ? ' รุ่นพิเศษ!' : 'ป้ายแดง!'}`);
       return toast(a, `ได้${v.name}แล้ว! กดปุ่ม ${v.icon} ขี่/ลงรถ ได้ทุกที่นอกอาคาร`, v.icon);
+    }
+    case 'yzone.unlock': {                    // home yard: open up one more zone of ground
+      const i = s.idx; if (houses[i] !== a) return toast(a, 'เฉพาะเจ้าของบ้านเท่านั้นที่ขยายสวนได้', '🔒', false);
+      if (yardOpen(a, s.z)) return toast(a, 'พื้นที่นี้ปลดล็อกแล้ว', 'ℹ️', false);
+      const price = D.YARD.price[(a.yz || []).length]; if (!pay(a, price)) return;
+      a.yz = [...(a.yz || []), s.z]; markMe(a); wdAt = 0; joy(a, 6);
+      feed(`🌳 ${a.name} ขยายสวนรอบบ้านเป็น ${3 + a.yz.length}/9 ส่วน`);
+      return toast(a, `ปลดล็อกพื้นที่สวนแล้ว! (${3 + a.yz.length}/9) จัดวางของและแปลงผักได้ด้วยปุ่ม 🛋️ จัดบ้าน`, '🌳');
     }
     case 'hstair.go': case 'hstair.build': {   // house floors: stairs up/down, and building the next floor
       const i = s.idx, o = houses[i], tn = tenants[i], master = isAdmin(a) && a.god?.doors;
@@ -2016,7 +2060,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2041,7 +2085,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb,
   };
@@ -2108,7 +2152,7 @@ function login(ws, m) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
@@ -2318,6 +2362,7 @@ function onMessage(ws, raw) {
       a.mvb = moveCap(a); markMe(a); return sendRoster();
     }
     case 'wear': return wear(a, m);
+    case 'yfarm': return yardFarm(a, m);
     case 'hplace': {                        // arrange your own furniture: put a piece on a floor of your house, or put it away
       const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);
       const k = String(m.k || ''); if (!furnOf(a).includes(k)) return;
@@ -2325,12 +2370,15 @@ function onMessage(ws, raw) {
       const fd = D.FURNITURE[fbase(k)];
       if (m.del) {                          // throw away a spare partition piece for half its price back
         if (!fd?.multi || !a.furniture.includes(k)) return;
-        a.furniture = a.furniture.filter(x => x !== k); delete a.fpos[k]; credit(a, Math.round(fd.price / 2));
+        a.furniture = a.furniture.filter(x => x !== k); delete a.fpos[k]; if (a.ycrops) delete a.ycrops[k]; credit(a, Math.round(fd.price / 2));
         toast(a, `ขาย${fd.name}คืน ได้ ${money(Math.round(fd.price / 2))}`, '♻️');
       } else if (m.store) { a.fpos[k] = [0]; toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
       else {
         const fl = Math.round(+m.fl) || 1, x = +m.x, y = +m.y;
-        if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
+        if (fl === YARD_FL) {                 // out in the yard: only on ground that has been unlocked
+          if (!(x >= .7 && x <= D.YARD.w - .7 && y >= 1.5 && y <= D.YARD.h - .8)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
+          if (!yardOpen(a, D.yardZone(x, y))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
+        } else if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
         a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20];
       }
       markMe(a); wdAt = 0; return;
