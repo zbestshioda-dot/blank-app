@@ -299,6 +299,7 @@ function handle(m) {
     case 'daily': if (tutPending) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
     case 'quest': {
       const s = P.get(myId);
+      if ((m.kind === 'done' || m.kind === 'wdone') && QUEST_GIVER[m.type]) questPop(m.type, m.text, QUEST_GIVER[m.type].thx, m.reward);
       if (m.kind === 'wdone') { toast(`เควสต์รายสัปดาห์สำเร็จ: ${m.text} · รางวัล ${money(m.reward)}`, '🗓️'); FX.play('levelup'); break; }
       if (m.kind === 'wall') { toast(`ทำเควสต์รายสัปดาห์ครบทั้งหมด! โบนัส ${money(m.reward)} 🎉`, '🗓️'); FX.play('chime'); if (s) FX.burst(s.x, s.y, '#7fd3ff', 30); break; }
       if (m.kind === 'done') { toast(`เควสต์สำเร็จ: ${m.text} · รางวัล ${money(m.reward)}`, '📜'); FX.play('levelup'); if (s) { FX.ring(s.x, s.y, '#ffd34d', 900, 1.4); FX.float(s.x, s.y - .7, 'เควสต์สำเร็จ!', '#ffd34d', .5); } }
@@ -1432,6 +1433,34 @@ const FN = {
   stealP(m) { send({ t: 'steal', to: m.to }); },
 };
 let bugList = null;
+// quest givers: every quest comes from a townsperson with a painted portrait (public/assets/portraits.*)
+const QUEST_GIVER = {
+  work:     { f: 'office_f',  name: 'คุณนภา (ฝ่ายบุคคล)', ask: 'ช่วยเคลียร์งานเอกสารที่บริษัทหน่อยนะคะ', thx: 'งานเสร็จทันเวลา ขอบคุณมากค่ะ!' },
+  harvest:  { f: 'farmer_f',  name: 'พี่ข้าวหอม (ชาวไร่)', ask: 'ผักสุกเต็มแปลงเลย มาช่วยเก็บหน่อยสิ', thx: 'ได้ผลผลิตเต็มตะกร้า ขอบใจจ้า!' },
+  fish:     { f: 'fisher_m',  name: 'น้าเล็ก (สมาคมประมง)', ask: 'ตลาดอยากได้ปลาสด ช่วยตกมาหน่อยนะ', thx: 'ปลาสดๆ แบบนี้แหละ เก่งมาก!' },
+  buy:      { f: 'grocer_m',  name: 'เฮียชัย (คลังสินค้า)', ask: 'ของในคลังล้น ช่วยรับไปขายหน่อย', thx: 'ขายคล่องแบบนี้ เดี๋ยวเฮียลดให้อีก!' },
+  cook:     { f: 'chef_m',    name: 'เชฟหมี (ครัวใหญ่)', ask: 'ออเดอร์เข้ารัวๆ มาช่วยครัวหน่อย', thx: 'ฝีมือใช้ได้นี่ มาช่วยอีกนะ!' },
+  treat:    { f: 'doctor_f',  name: 'หมอแพร (โรงพยาบาล)', ask: 'คนไข้รอคิวเยอะ ช่วยดูแลด้วยนะคะ', thx: 'คนไข้หายดีแล้ว ขอบคุณค่ะคุณหมอ' },
+  deliver:  { f: 'rider_m',   name: 'พี่ต่อ (หัวหน้าไรเดอร์)', ask: 'ออเดอร์ค้างเพียบ ช่วยวิ่งส่งหน่อย!', thx: 'ส่งไวทันใจ ลูกค้าชมใหญ่เลย!' },
+  trade:    { f: 'girl',      name: 'น้องมะปราง', ask: 'อยากลองแลกของกับคนอื่นจัง ช่วยหน่อยได้ไหม', thx: 'เย้! แลกของสนุกจังเลย' },
+  chat:     { f: 'student_m', name: 'น้องภูมิ (นักศึกษา)', ask: 'มาเมืองนี้ใหม่ ยังไม่รู้จักใครเลย ช่วยทักคนแถวนี้ให้หน่อย', thx: 'ได้เพื่อนใหม่แล้ว ขอบคุณครับ!' },
+  eat:      { f: 'grandma',   name: 'ยายศรี', ask: 'ผอมลงนะหลาน กินข้าวกินปลาบ้างสิ', thx: 'อิ่มท้องแล้ว ยายก็สบายใจจ้ะ' },
+  sit:      { f: 'teacher_f', name: 'ครูจิ๋ม', ask: 'ทำงานหนักแล้ว ไปนั่งพักที่จัตุรัสบ้างนะ', thx: 'พักผ่อนบ้าง ชีวิตจะได้สมดุลจ้ะ' },
+  sell:     { f: 'market_f',  name: 'เจ๊ศรี (ตลาดกลาง)', ask: 'ตลาดขาดของ เอาของมาขายหน่อยสิ', thx: 'ของดีขายหมดเกลี้ยง ขอบใจนะ!' },
+  earn:     { f: 'banker_f',  name: 'คุณนิด (ธนาคาร)', ask: 'ลองตั้งเป้าเก็บเงินวันนี้ดูไหมคะ', thx: 'ยอดเงินสวยมาก เก็บออมต่อนะคะ' },
+  dailyall: { f: 'elder_m',   name: 'ผู้ใหญ่ประเสริฐ (ผู้นำชุมชน)', ask: 'ช่วยเหลือชาวเมืองให้ครบทุกวัน เมืองเราจะน่าอยู่ขึ้น', thx: 'เมืองนี้โชคดีที่มีเธอ!' },
+};
+let FACES = null;
+fetch('assets/portraits.json?v=1').then(r => r.json()).then(j => { FACES = j; }).catch(() => { });
+const faceHtml = (type, px = 46) => { const g = QUEST_GIVER[type], i = FACES?.faces?.[g?.f]; if (i === undefined) return ''; const n = Object.keys(FACES.faces).length;
+  return `<i class="qface" style="width:${px}px;height:${px}px;background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>`; };
+function questPop(type, title, line, reward) {
+  const g = QUEST_GIVER[type]; if (!g || !FACES) return;
+  document.querySelector('.questPop')?.remove();
+  const d = document.createElement('div'); d.className = 'questPop';
+  d.innerHTML = `${faceHtml(type, 64)}<div><b>${esc(g.name)}</b><span>“${esc(line)}”</span><small>${esc(title)} · <b style="color:var(--acc)">+${money(reward)}</b></small></div>`;
+  document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 3800); setTimeout(() => d.remove(), 4400);
+}
 // 📖 fish book: every species with its sprite; ones you have not caught yet are dark silhouettes
 function fishBook() {
   const all = Object.entries(G.items).filter(([, it]) => it.kind === 'fish' && it.rar && it.spr).sort((a, b) => a[1].rar - b[1].rar || a[1].base - b[1].base);
@@ -1679,6 +1708,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15d', d: '15 พ.ย. (รอบ 4)', items: [
+    '📜 <b>เควสต์มีผู้ให้เควสต์แล้ว</b> แต่ละเควสต์มาจากชาวเมืองที่มีรูปวาดของตัวเอง เช่น ยายศรีชวนกินข้าว น้าเล็กอยากได้ปลาสด เจ๊ศรีอยากได้ของมาขาย',
+    '🎉 ทำเควสต์สำเร็จ ผู้ให้เควสต์จะเด้งขึ้นมาขอบคุณ' ] },
   { v: '2026-11-15c', d: '15 พ.ย. (รอบ 3)', items: [
     '🎣 <b>ตกปลาได้ทุกที่ที่มีน้ำ</b> ไม่มีจุดตกปลาตายตัวแล้ว ยืนริมทะเลสาบ บ่อน้ำ ชายหาด หรือสะพาน แล้วกดปุ่ม 🎣 ได้เลย',
     '🎋 <b>เบ็ดเป็นไอเท็ม</b> 6 แบบ ราคาต่างกัน: ไม้ไผ่ ฿150 · ไฟเบอร์กลาส ฿1,500 · คาร์บอน ฿6,000 · โปรตกทะเล ฿20,000 · ทองคำ ฿75,000 · มังกรทะเลลึก ฿250,000 (ซื้อกับน้าเล็ก เปลี่ยนเบ็ดได้ในกระเป๋า)',
@@ -2063,7 +2095,8 @@ function renderPanel(p) {
       if (p.tab === 'week' && me.wquests) {
         const w = me.wquests;
         const wr = w.list.map(x => { const c = x.career ? G.careers[x.career] : null, pc = Math.min(100, x.p / x.n * 100);
-          return `<div class="item ${x.done ? 'done' : ''}"><div class="em">${x.done ? '✅' : x.type === 'dailyall' ? '📜' : c ? c.icon : { earn: '💰', fish: '🎣', eat: '🍛', chat: '💬', sell: '🏪' }[x.type] || '🗓️'}</div><div class="nm">${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${c && me.career !== x.career ? ` · ต้องเป็น${c.name}` : ''}</small><div class="wbar"><u style="width:${pc}%"></u></div></div>${x.done ? '<span class="tag">สำเร็จ</span>' : ''}</div>`; }).join('');
+          const g = QUEST_GIVER[x.type];
+          return `<div class="item qitem ${x.done ? 'done' : ''}"><div class="em">${faceHtml(x.type) || (x.done ? '✅' : x.type === 'dailyall' ? '📜' : c ? c.icon : { earn: '💰', fish: '🎣', eat: '🍛', chat: '💬', sell: '🏪' }[x.type] || '🗓️')}</div><div class="nm">${g ? `<span class="qgiver">${esc(g.name)}</span>` : ''}${x.done ? '✅ ' : ''}${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${c && me.career !== x.career ? ` · ต้องเป็น${c.name}` : ''}</small><div class="wbar"><u style="width:${pc}%"></u></div></div>${x.done ? '<span class="tag">สำเร็จ</span>' : ''}</div>`; }).join('');
         return `<h2>🗓️ เควสต์รายสัปดาห์</h2>${qtabs}<div class="sub">เป้าหมายระยะยาว นับจากสิ่งที่ทำทุกวัน (รวมเควสต์รายวัน) · รีเซ็ตทุกวันจันทร์ ในอีก <b class="qcd" data-t="${w.resetAt}"></b></div>
           <div class="list">${wr}</div>
           <div class="item ${w.bonus ? 'done' : ''}" style="margin-top:10px"><div class="em">🏆</div><div class="nm">ทำครบทั้ง 3 ข้อในสัปดาห์นี้<small>โบนัส <b style="color:var(--acc)">${money(w.bonusAmount)}</b> · นับรวมไปปลดล็อกฉายา "นักล่าเควสต์"</small></div>${w.bonus ? '<span class="tag">ได้แล้ว</span>' : ''}</div>`;
@@ -2073,7 +2106,8 @@ function renderPanel(p) {
         const icon = x.done ? '✅' : c ? c.icon : { trade: '🤝', chat: '💬', eat: '🍛', sell: '🏪', earn: '💰', sit: '🪑' }[x.type] || '📜';
         const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
         const btn = x.done ? '<span class="tag">สำเร็จ</span>' : `<div class="col2">${tgt ? B('📍 ไป', { fn: 'guide', key: tgt }, 'good') : ''}${B('🔄', { t: 'quest_reroll', i }, '', q.rerolled)}</div>`;
-        return `<div class="item ${x.done ? 'done' : ''}"><div class="em">${icon}</div><div class="nm">${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
+        const g = QUEST_GIVER[x.type];
+        return `<div class="item qitem ${x.done ? 'done' : ''}"><div class="em">${faceHtml(x.type) || icon}</div><div class="nm">${g ? `<span class="qgiver">${esc(g.name)}</span><span class="qsay">“${esc(x.done ? g.thx : g.ask)}”</span>` : ''}${x.done ? '✅ ' : ''}${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
       }).join('');
       return `<h2>📜 เควสต์ประจำวัน</h2>${qtabs}<div class="sub">เควสต์ใหม่ในอีก <b class="qcd" data-t="${q.resetAt}"></b> (เที่ยงคืนเวลาไทย)${q.streak ? ` · 🔥 ทำครบติดต่อกัน ${q.streak} วัน` : ''}</div>
         <div class="list">${rows}</div>

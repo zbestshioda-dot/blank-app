@@ -72,7 +72,7 @@ function progress(a, type, amount = 1) {
     if (x.p >= x.n) {
       x.done = true; x.p = x.n;
       a.money += x.reward; a.earned += x.reward;
-      out.push({ kind: 'done', text: DEFS[x.type].text.replace('{n}', x.type === 'earn' ? x.n.toLocaleString('en-US') : x.n), reward: x.reward });
+      out.push({ kind: 'done', type: x.type, text: DEFS[x.type].text.replace('{n}', x.type === 'earn' ? x.n.toLocaleString('en-US') : x.n), reward: x.reward });
     }
   }
   if (!q.bonus && q.list.every(x => x.done)) {
@@ -146,7 +146,7 @@ function wprogress(a, type, amount) {
   for (const x of w.list) {
     if (x.done || x.type !== type) continue;
     x.p += amount;
-    if (x.p >= x.n) { x.done = true; x.p = x.n; a.money += x.reward; a.earned += x.reward; out.push({ kind: 'wdone', text: wtext(x), reward: x.reward }); }
+    if (x.p >= x.n) { x.done = true; x.p = x.n; a.money += x.reward; a.earned += x.reward; out.push({ kind: 'wdone', type: x.type, text: wtext(x), reward: x.reward }); }
   }
   if (!w.bonus && w.list.every(x => x.done)) { w.bonus = true; a.money += WBONUS; a.earned += WBONUS; a.gems = (a.gems || 0) + 20; out.push({ kind: 'wall', reward: WBONUS }); }
   return out;

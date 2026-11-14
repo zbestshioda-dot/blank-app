@@ -753,3 +753,11 @@ body.hasEvent #topBar{top:146px!important}
 .catchPop.r3{border-color:#1d7fd6}.catchPop.r4{border-color:#9a45d6;box-shadow:0 0 30px #b26bffaa}.catchPop.r5{border-color:#ffb43c;box-shadow:0 0 40px #ffcf5acc}
 .catchPop.out{opacity:0;transition:opacity .5s}
 @keyframes cpIn{to{transform:translate(-50%,-50%) scale(1)}}
+/* quest givers */
+.qface{display:inline-block;border-radius:50%;background:url(assets/portraits.webp?v=1) no-repeat;box-shadow:0 0 0 2px var(--wood),0 2px 6px rgba(0,0,0,.3);flex:none;vertical-align:middle}
+.item.qitem .em{width:52px}
+.qgiver{display:block;font-size:11px;font-weight:700;color:var(--wood)}
+.qsay{display:block;font-size:11.5px;font-style:italic;color:var(--mut);margin-bottom:2px}
+.questPop{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%) scale(.7);z-index:61;display:flex;gap:12px;align-items:center;max-width:min(420px,92vw);background:var(--paper3);border:4px solid var(--wood);border-radius:18px;padding:10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.45);animation:cpIn .35s ease-out forwards;pointer-events:none}
+.questPop>div>b{display:block}.questPop span{display:block;font-size:14px;margin:2px 0}.questPop small{display:block;color:var(--mut)}
+.questPop.out{opacity:0;transition:opacity .5s}
