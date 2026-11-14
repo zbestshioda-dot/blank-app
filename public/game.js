@@ -141,7 +141,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -178,16 +178,21 @@ function handle(m) {
     case 'req': showReq(m); break;
     case 'ring': showRing(m); break;
     case 'call': {
-      if (m.open) { call = { with: m.with, phone: m.phone }; callLog.length = 0; FX.play('chime'); openPanel({ kind: 'phone', tab: 'call' }); }
+      if (m.open) { call = { with: m.with, phone: m.phone, fee: m.fee || 0, payer: !!m.payer, paid: 0, mins: 0, unread: 0 }; callLog.length = 0; FX.play('chime'); openPanel({ kind: 'phone', tab: 'call' }); }
       else { if (call) toast(`📞 ${m.why || 'วางสายแล้ว'}`, '📵', false); call = null; if (panel?.kind === 'phone') refreshPanel(true); }
       paintCallChip(); break;
     }
     case 'call_msg': {
       callLog.push(m); if (callLog.length > 50) callLog.shift();
-      if (!m.me) { const c = { call: 1, name: m.name, text: m.text }; chatLog.push(c); paintChatBox(c); FX.play('pop'); }
+      if (!m.me) {
+        const c = { call: 1, name: m.name, text: m.text }; chatLog.push(c); paintChatBox(c); FX.play('pop');
+        // call window minimised: count it on the chip and show the line over your head
+        if (call && !(panel?.kind === 'phone' && panel.tab === 'call')) { call.unread = (call.unread || 0) + 1; toast(`📞 ${m.name}: ${m.text}`, '📞'); if (navigator.vibrate) navigator.vibrate(60); paintCallChip(); }
+      }
       if (panel?.kind === 'phone') refreshPanel(true);
       break;
     }
+    case 'call_fee': if (call) { call.mins = m.mins; call.paid = m.paid; if (panel?.kind === 'phone') refreshPanel(true); } break;
     case 'dtest': showDriveTest(m); break;
     case 'emo': { const s = P.get(m.id); if (s) { s.emo = m.e; s.emoT = performance.now() + 4200; } if (m.id !== myId) FX.play('pop'); break; }
     case 'bugs': bugList = m.list; if (panel?.kind === 'god') refreshPanel(true); break;
@@ -300,7 +305,7 @@ function showRing(r) {
   popup(`📞 สายเรียกเข้าจาก <b>${esc(r.name)}</b> <small>(${r.phone}${r.known ? '' : ' · ไม่อยู่ในรายชื่อ'})</small>`, [['📞 รับสาย', 'good', () => send({ t: 'req_ans', id: r.id, ok: true })], ['ไม่รับ', 'warn', () => send({ t: 'req_ans', id: r.id, ok: false })]], 25000);
   FX.play('ding'); setTimeout(() => FX.play('ding'), 600); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
-function paintCallChip() { const c = $('#callChip'); if (call) { c.classList.remove('hidden'); c.textContent = `📞 คุยกับ ${call.with}`; } else c.classList.add('hidden'); }
+function paintCallChip() { const c = $('#callChip'); if (call) { c.classList.remove('hidden'); c.classList.toggle('unread', !!call.unread); c.textContent = call.unread ? `📞 ${call.with} · 💬 ${call.unread} ใหม่` : `📞 คุยกับ ${call.with}`; } else c.classList.add('hidden'); }
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -365,7 +370,7 @@ function paintHud() {
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
-  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0; $('#mgBtn').classList.toggle('hidden', !atDesk); if (!atDesk && !$('#mg').classList.contains('hidden')) mgClose();
+  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.toggle('hidden', !atDesk); if (!atDesk && !$('#mg').classList.contains('hidden')) mgClose();
   $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
   $('#begBtn').classList.toggle('hidden', me.career !== 'beggar');
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
@@ -678,6 +683,8 @@ function onAction() {
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
+  if (near.type === 'trash' && me.career === 'beggar') return doAct(near.id, 'dig');
+  if (near.type === 'trash') return toast('ถังขยะ · ขอทานคุ้ยหาของได้', '🗑️', false);
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
   if (near.type === 'pier' && me.cast) return reel();                // the big button reels in too
@@ -825,7 +832,7 @@ function draw(t) {
     const px = s.x * TS + X, py = s.y * TS + Y;
     if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
     const isNear = near && near.id === s.id;
-    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk)$/.test(s.type) && !isNear) continue;
+    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash)$/.test(s.type) && !isNear) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
@@ -967,13 +974,29 @@ function buildStaff() {
       x, y, rx: x, ry: y, f: 6, dz: [], line: m => (m.career === s.career || s.career === 'fishing' && m.rod) ? ` ${d.yes}` : ` ${d.hi}`, greetT: 0 };
     STAFF.push(n); STAFF_AT[s.id] = n;
   }
+  // shopkeepers: stand by their counter; talking to them is the same as using the place
+  for (const d of KEEPERS) {
+    const s = G.stations.find(x => x.id === d.st); if (!s) continue;
+    const x = s.x + d.dx, y = s.y + d.dy;
+    const n = { id: 'keep_' + d.st, staff: 1, keeper: 1, career: d.c || '', c: d.c || '', of: d.of || '', name: d.name, short: d.short, st: s.id, g: d.g || 'm', lk: { hair: 'brown', shirt: 'white', pants: 'gray', ...(d.lk || {}) },
+      x, y, rx: x, ry: y, f: 6, dz: [], line: () => ` ${n.cur || d.hi[0]}`, greetT: 0, icon: d.icon, his: d.hi };
+    STAFF.push(n); STAFF_AT[s.id] = n;
+  }
 }
+const KEEPERS = [
+  { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: 2.2, dy: -0.5, of: 'chef', lk: { hair: 'black' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
+  { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', g: 'f', dx: 1.5, dy: .1, lk: { hair: 'pink', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมคะ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ค่ะ'] },
+  { st: 'market', name: 'เจ๊ศรี (ผู้ดูแลตลาดกลาง)', short: 'เจ๊ศรี', icon: '🏪', g: 'f', dx: 2.6, dy: .35, of: 'merchant', lk: { hair: 'black' }, hi: ['ซื้อขายที่นี่ ราคายุติธรรม', 'วางขายของได้นะ คนซื้อเยอะ', 'ของสดๆ ทั้งนั้นจ้า'] },
+  { st: 'estate', name: 'คุณบอย (นายหน้าอสังหาฯ)', short: 'คุณบอย', icon: '🏡', dx: 1.4, dy: 0, of: 'office', lk: { hair: 'black' }, hi: ['บ้านสวย ทำเลดี ราคาคุ้มครับ', 'สนใจซื้อหรือเช่าบ้านไหมครับ', 'ปล่อยเช่าบ้านก็มีรายได้นะครับ'] },
+  { st: 'toolshop', name: 'ช่างเปี๊ยก (ร้านอุปกรณ์)', short: 'ช่างเปี๊ยก', icon: '🛠️', dx: 2.0, dy: -0.5, of: 'farmer', hi: ['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดเบ็ดหรือยัง?', 'ของแท้ทุกชิ้นรับประกัน'] },
+  { st: 'bank', name: 'คุณนิด (พนักงานธนาคาร)', short: 'คุณนิด', icon: '🏦', g: 'f', dx: -2.4, dy: -0.4, of: 'office', lk: { hair: 'black' }, hi: ['ฝากเงินไว้ได้ดอกเบี้ยนะคะ', 'ยินดีต้อนรับสู่ธนาคารค่ะ', 'กู้เงินได้ แต่อย่าลืมคืนนะคะ'] },
+];
 function staffGreet(n) {
   const t = performance.now(); if (t - n.greetT < 20000) return;
-  n.greetT = t; n.bubble = n.line(me).trim(); n.bt = t + 5000;
+  n.greetT = t; if (n.his) n.cur = n.his[Math.floor(Math.random() * n.his.length)]; n.bubble = n.line(me).trim(); n.bt = t + 5000;
 }
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
-  const icon = p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
+  const icon = p.keeper ? p.icon : p.tf ? '🕶️' : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
@@ -1090,11 +1113,17 @@ function drawMini() {
   const mini = $('#mini'); if (mini.width !== base.width) { mini.width = base.width; mini.height = base.height; }
   const g = mini.getContext('2d'); g.drawImage(base, 0, 0);
   for (const p of P.values()) {
-    if (p.npc) continue;
+    if (p.npc || p.id === myId) continue;
     const q = outPos(p.rx, p.ry); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
-    const s = p.id === myId ? 6 : 5, mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2;
+    const s = 5, mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2;
     g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2);
-    g.fillStyle = p.id === myId ? '#ff6b3d' : p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
+    g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
+  }
+  { // you: drawn last, bigger, with a pulsing ring so you can always find yourself
+    const q = outPos(m.rx, m.ry), mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2, k = (performance.now() % 1200) / 1200;
+    g.strokeStyle = `rgba(255,230,60,${1 - k})`; g.lineWidth = 4; g.beginPath(); g.arc(mx, my, 9 + k * 16, 0, 7); g.stroke();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 9, 0, 7); g.fill();
+    g.fillStyle = '#ff2a10'; g.beginPath(); g.arc(mx, my, 6.5, 0, 7); g.fill();
   }
   if (me?.career === 'police') for (const rp of me.reports || []) { const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp; if (mapOf(rp.area) !== mapId) continue; g.fillStyle = (performance.now() / 300 | 0) % 2 ? '#ff2b2b' : '#fff'; g.fillRect((q.x - A.x) * 2 - 4, (q.y - A.y) * 2 - 4, 8, 8); }
   $('#miniName').textContent = `🗺️ ${A.name}`;
@@ -1113,7 +1142,7 @@ function refreshPanel(force) {
   if (!panel || !me) return;
   let html = renderPanel(panel);
   const stf = panel.st && STAFF_AT[panel.st];
-  if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.career}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
+  if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.id}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
   if (!force && html === panelSig) return;
   const ae = document.activeElement;
   if (!force && ae && ae.tagName === 'INPUT' && $('#panelBody').contains(ae)) { if (panel.kind === 'chat') { const box = $('#chatMsgs'); if (box) box.innerHTML = chatHtml(); } return; }
@@ -1137,7 +1166,7 @@ function bindPanel(root) {
   const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value, ch: chatTab }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
   root.querySelectorAll('[data-staff]').forEach(c => whenChars(() => {
-    const n = STAFF.find(x => x.career === c.dataset.staff); if (!n) return;
+    const n = STAFF.find(x => x.id === c.dataset.staff) || STAFF.find(x => x.career === c.dataset.staff); if (!n) return;
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, n, 24, 98, 100 / CH_ATLAS.h, 'front', 0);
   }));
   root.querySelectorAll('[data-look]').forEach(c => whenChars(() => {
@@ -1156,6 +1185,7 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  callMin() { closePanel(); toast('ย่อสายไว้แล้ว แตะแถบ 📞 ด้านบนเพื่อเปิด', '📞'); },
   list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
   price(m, root) { send({ t: 'act', st: m.st, a: m.op, price: m.zero ? 0 : +root.querySelector('#' + m.inp).value || 0 }); },
@@ -1271,7 +1301,7 @@ const licExp = id => lic(id) && !!G.licenses[id]?.renew && (me.licExp?.[id] || 0
 const licOk = id => lic(id) && !licExp(id);
 // buildings point you to their staff NPC (a separate spot) for applying
 function staffHint(career) {
-  const c = G.careers[career], n = STAFF.find(x => x.career === career);
+  const c = G.careers[career], n = STAFF.find(x => x.career === career && !x.keeper);
   if (me.career === career) return `<div class="jobbox ok">${c.icon} คุณทำงานเป็น<b>${c.name}</b> · Lv.${me.lv}</div>`;
   return `<div class="jobbox">💬 อยากเป็น ${c.icon} <b>${c.name}</b>? คุยกับ <b>${esc(n?.name || 'เจ้าหน้าที่')}</b> ที่ยืนอยู่ข้างๆ เพื่อสมัครงาน</div>`;
 }
@@ -1426,7 +1456,7 @@ function renderPanel(p) {
     case 'career': {
       const cur = G.careers[me.career];
       const rows = Object.entries(G.careers).filter(([id]) => id !== 'none').map(([id, c]) => {
-        const where = STN(c.where), stf = STAFF.find(x => x.career === id);
+        const where = STN(c.where), stf = STAFF.find(x => x.career === id && !x.keeper);
         const miss = (c.need || []).filter(l => !licOk(l)).map(l => G.licenses[l].name + (licExp(l) ? ' (หมดอายุ)' : ''));
         return itemRowRaw(c.icon, `${c.name}${me.career === id ? ' <span class="tag">ปัจจุบัน</span>' : ''}`, `สมัคร: คุยกับ <b>${esc(stf?.short || 'เจ้าหน้าที่')}</b> ที่${where?.label || '-'}${miss.length ? ` · <span style="color:var(--bad)">ต้องมี ${miss.join(', ')}</span>` : ''}<br>${c.desc}`, B('🚶 เดินไปสมัคร', { fn: 'guide', key: stf ? stf.st : c.where }, 'good'));
       }).join('');
@@ -1627,6 +1657,8 @@ function renderPanel(p) {
       const m = P.get(myId), d = Math.hypot(o.x - m.x, o.y - m.y), far = d > 5.5, canSteal = me.career !== 'police';
       const stealBtn = canSteal ? B('🕶️ ล้วงกระเป๋า (ต้องประชิดตัว · ใส่ชุดโจร)', { fn: 'stealP', to: o.id }, 'warn', d > 1.8) : '';
       if (o.npc) {
+        if (o.tf) return `<h2>🕶️ โจรขโมย <span class="tag">NPC</span></h2><div class="sub">โจรล้วงกระเป๋าที่ป้วนเปี้ยนในเมือง! วิ่งเข้าไปใกล้ๆ แล้วจับ ได้เงินที่ถูกขโมยคืนและรางวัลนำจับ</div>${B('👊 จับโจร!', { t: 'catchthief' }, 'warn big pulse', d > 1.8)}${d > 1.8 ? '<div class="sub">⚠️ ต้องเข้าไปใกล้กว่านี้ (กดค้างปุ่มใหญ่เพื่อวิ่ง)</div>' : ''}`;
+        if (o.wk && o.desc) return `<h2>${esc(o.name)} <span class="tag">NPC</span></h2><div class="sub">${esc(o.desc)}</div>`;
         if (o.wk) return `<h2>${CAREER_ICON(o.c)} ${esc(o.name)} <span class="tag">NPC</span></h2><div class="sub">ทำงาน${G.careers[o.c]?.name || ''}แทน เพราะตอนนี้ไม่มีผู้เล่นทำงานนี้ออนไลน์${o.c === 'police' ? ' · สายตรวจจะวิ่งไล่จับคนที่ถูกแจ้งความ' : ''}</div>`;
         return `<h2>🏘️ ${esc(o.name)} <span class="tag">ชาวเมือง</span></h2><div class="sub">ชาวบ้านที่เดินไปมาในเมือง ทักทายกันได้ในแชท</div>${stealBtn}`;
       }
@@ -1780,8 +1812,9 @@ function phonePanel(p) {
       <div class="list">${rows || '<div class="sub">ยังไม่มีรายชื่อ</div>'}</div>`;
   } else if (tab === 'call') {
     if (!call) body = '<div class="sub">ยังไม่มีสาย — โทรหาเพื่อนจากแท็บรายชื่อ (เพื่อนต้องออนไลน์)</div>';
-    else body = `<div class="jobbox ok">📞 กำลังคุยกับ <b>${esc(call.with)}</b></div><div id="callMsgs">${callLog.map(m => `<div class="${m.me ? 'me' : ''}"><b>${m.me ? 'คุณ' : esc(m.name)}</b>: ${esc(m.text)}</div>`).join('')}</div>
-      <form id="callForm" class="rowf"><input id="callIn" maxlength="120" placeholder="พิมพ์คุยในสาย..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>${B('📵 วางสาย', { t: 'call_end' }, 'warn big')}`;
+    else { call.unread = 0; setTimeout(paintCallChip, 0); }
+    if (call) body = `<div class="jobbox ok">📞 กำลังคุยกับ <b>${esc(call.with)}</b><div class="sub">${call.payer ? `คุณเป็นคนโทร · ค่าโทร ${money(call.fee)}/นาที · จ่ายแล้ว ${money(call.paid)} (${call.mins} นาที)` : 'อีกฝ่ายเป็นคนจ่ายค่าโทร'}</div></div><div id="callMsgs">${callLog.map(m => `<div class="${m.me ? 'me' : ''}"><b>${m.me ? 'คุณ' : esc(m.name)}</b>: ${esc(m.text)}</div>`).join('')}</div>
+      <form id="callForm" class="rowf"><input id="callIn" maxlength="120" placeholder="พิมพ์คุยในสาย..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form><div class="grid2">${B('➖ ย่อหน้าต่าง (คุยต่อได้)', { fn: 'callMin' })}${B('📵 วางสาย', { t: 'call_end' }, 'warn big')}</div>`;
   } else if (tab === 'food') {
     const open = isOpen('restaurant');
     const rows = Object.entries(G.items).filter(([, it]) => it.menu).map(([id, it]) => itemRow(id, B(`สั่ง ${money(it.base)}+ส่ง`, { fn: 'order', item: id }, 'good', !open), eatText(it.eat))).join('');
@@ -2347,6 +2380,7 @@ function openMap(mapId, keepScroll) {
   // job staff (where you apply / change jobs) are their own markers, kept apart from the places
   const staffPl = [];
   for (const n of STAFF) {
+    if (n.keeper) continue;
     const s = STN(n.st); if (!s) continue;
     const room = AREA[s.area]?.kind === 'room' ? AREA[s.area] : null, q = room ? room.doorPt : s;
     if (mapOf(s.area) !== mapId) continue;
@@ -2624,7 +2658,8 @@ $('#mgX').onclick = () => { FX.play('click'); mgClose(); };
 $('#mgBtn').onclick = () => { FX.play('click'); mgMenu(); };
 function mgMenu() {
   mgStop(); $('#mg').classList.remove('hidden');
-  $('#mgBody').innerHTML = `<h2>🎮 มินิเกมฆ่าเวลา</h2><div class="sub">เล่นได้ระหว่างนั่งทำงาน ค่าแรงยังเดินตามปกติ · ได้คะแนนดีมีโบนัสเล็กน้อยและความสุขเพิ่ม (โบนัสสูงสุดวันละ ฿300)</div>
+  const study = me.desk != null && me.desk >= 0;
+  $('#mgBody').innerHTML = `<h2>🎮 มินิเกมฆ่าเวลา</h2><div class="sub">${study ? 'เล่นแก้เบื่อระหว่างนั่งเรียน คาบเรียนยังนับต่อตามปกติ · เล่นจบได้ความสุขเพิ่ม' : 'เล่นได้ระหว่างนั่งทำงาน ค่าแรงยังเดินตามปกติ · ได้คะแนนดีมีโบนัสเล็กน้อยและความสุขเพิ่ม (โบนัสสูงสุดวันละ ฿300)'}</div>
     <div class="mgList">${Object.entries(MG_GAMES).map(([k, g]) => `<button data-g="${k}"><i>${g.icon}</i><span><b>${g.name}</b><small>${g.desc} · สถิติ ${mgBest(k)}</small></span></button>`).join('')}</div>`;
   $('#mgBody').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { FX.play('click'); mgStart(b.dataset.g); });
 }
@@ -2704,6 +2739,6 @@ function mgEnd(key, score) {
 }
 FN.mgAgain = m => mgStart(m.key);
 FN.mgMenu = () => mgMenu();
-window.__lt = { mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+window.__lt = { send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();

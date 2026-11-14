@@ -97,10 +97,10 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('flower', 'b_flower2', 13, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
   // north street: the civic street
   B('police', 'b_police2', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
-  B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true });
+  B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true, renov: true });
   B('cinema', 'b_cinema', 27, 30, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
   B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', outdoor: true, noSlot: true });   // hair dye at the counter outside
-  B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true });
+  B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true, renov: true });
   // south-west lane: services and trade (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
   B('restaurant', 'b_cafe2', 20, 30, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' });
@@ -541,7 +541,7 @@ const OFFICE_WAGE = [55, 65, 78, 92, 110, 130, 155];            // per game hour
 const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
 // running: faster, costs energy per tile; you stop running when energy gets low
 const RUN = { mul: 1.6, energyPerTile: 0.3, minEnergy: 5 };
-const POLICE = { patrolWage: 24, bounty: 250, jailSec: 150, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 2.7 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
+const POLICE = { patrolWage: 24, bounty: 250, jailSec: 75, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 4.3, begMax: 5000 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
 const EVENTS = [
@@ -685,6 +685,8 @@ const ACHIEVEMENTS = [
 // title rarity: common → legendary (colour on the name tag)
 const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: 'ไม่ธรรมดา', col: '#7be07b' }, { name: 'หายาก', col: '#62b8ff' }, { name: 'มหากาพย์', col: '#d08cff' }, { name: 'ตำนาน', col: '#ffb43c' }];
 
+// trash bins beggars can dig through (one station in front of each bin in town)
+PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p, i) => STATIONS.push({ id: 'trash' + i, type: 'trash', label: 'ถังขยะ', icon: '🗑️', x: p.x, y: p.y + .7, r: 1.1, area: 'town' }));
 // ================================================================= job staff: an NPC at every place that hires (and the rod seller)
 // Each gets its own talk spot next to the place's counter, so talking to staff and using the place are separate.
 {
