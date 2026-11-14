@@ -575,11 +575,11 @@ body.hasEvent #topBar{top:146px!important}
 #card.v2 .l2{display:flex;align-items:center;gap:5px;font-size:11px;color:#e8dcc4}
 #card.v2 #cTime{margin-left:auto;color:#ffc94d;font-size:14px;font-family:var(--px)}
 #card.v2 .money{color:#ffd770;font-size:15px;margin-top:1px}
-#card.v2 .bars{display:grid!important;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:6px;padding:5px 8px 6px;background:rgba(30,22,14,.86);border:1.5px solid #c9a45a;border-radius:12px;min-width:0!important}
-#card.v2 .bar{display:block;cursor:pointer}
-#card.v2 .bar label{display:flex;justify-content:space-between;font-size:10.5px;color:#e8dcc4;cursor:pointer}
+#card.v2 .bars{display:grid!important;grid-template-columns:1fr;gap:2px;margin-top:6px;padding:5px 8px 6px;background:rgba(30,22,14,.86);border:1.5px solid #c9a45a;border-radius:12px;min-width:0!important}
+#card.v2 .bar{display:flex;align-items:center;gap:7px;cursor:pointer}   /* one stat per row: พลัง, อิ่ม, เลือด, สุข */
+#card.v2 .bar label{display:flex;justify-content:space-between;flex:none;width:58px;font-size:10.5px;color:#e8dcc4;cursor:pointer}
 #card.v2 .bar em{font-style:normal;font-size:10px;color:#bfae92;width:auto;font-family:inherit}
-#card.v2 .bar s{display:block;height:7px;margin-top:2px;background:#1a120a;border:1px solid #000;border-radius:5px;overflow:hidden}
+#card.v2 .bar s{display:block;flex:1;height:7px;margin-top:0;background:#1a120a;border:1px solid #000;border-radius:5px;overflow:hidden}
 #card.v2 .bar u{display:block;height:100%;border-radius:4px;background:linear-gradient(#7be07b,#3f9a3f)}
 #card.v2 #bE{background:linear-gradient(#ffe07a,#e3a325)}#card.v2 #bL{background:linear-gradient(#ff7a6a,#c8372a)}#card.v2 #bH{background:linear-gradient(#9be15d,#4f9a2a)}
 #card.v2 #statusBox{margin-top:5px;padding:3px 5px;background:rgba(30,22,14,.8);border:1px solid #c9a45a88;border-radius:10px}
