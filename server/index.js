@@ -245,6 +245,19 @@ function quest(a, type, n = 1) {
   }
   markMe(a);
 }
+// each merchant has their own allocation at the warehouse that refills over time, so merchants never empty the shelves on each other
+function wstock(a, id) {
+  const it = D.ITEMS[id], t = now(); a.wst = a.wst || {};
+  const e = a.wst[id] || (a.wst[id] = [it.stock, t]);
+  e[0] = Math.min(it.stock, e[0] + (t - e[1]) / 1000 / it.refill); e[1] = t;
+  return e[0];
+}
+const wstockView = a => Object.fromEntries(Object.keys(D.ITEMS).filter(k => D.ITEMS[k].wholesale).map(k => [k, Math.floor(wstock(a, k))]));
+// shops get tired of the same goods from the same seller: each merchant has their own price pressure per item (recovers ~0.4%/s)
+function msat(a, id) {
+  const t = now(); a.msat = a.msat || {}; const e = a.msat[id] || (a.msat[id] = [1, t]);
+  e[0] = Math.min(1, e[0] + (t - e[1]) / 1000 * 0.004); e[1] = t; return e;
+}
 function spend(a, e) {
   if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) กินอาหารหรือนั่งพักก่อน`, '😴', false); return false; }
   a.energy -= e;
@@ -318,7 +331,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -553,16 +566,17 @@ function officeTick(a, t, h, dt) {
     }
   }
   if (seated && depressed(a)) { standUp(a); toast(a, 'ไม่มีจิตใจจะทำงานต่อ... (ความสุขต่ำมาก) ไปทำอะไรให้มีความสุขก่อน', '😞', false); return; }
-  if (seated && o.day === day && h >= D.SHIFT.start && h < D.SHIFT.end) {
-    const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length);
+  if (seated && o.day === day && h >= D.SHIFT.start && h < D.SHIFT.ot) {
+    const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), ot = h >= D.SHIFT.end;
+    if (ot && o.otNote !== day) { o.otNote = day; toast(a, `17:00 หมดเวลางานปกติ · นั่งต่อเป็นโอทีได้ถึง ${hhmm(D.SHIFT.ot)} ค่าแรง x${D.SHIFT.otMul} (ลุกเมื่อไหร่ก็เลิกงาน)`, '🌆'); }
     const gh = dt * D.gameRate(h);                        // game hours that passed (nights run faster)
-    o.pend += D.OFFICE_WAGE[l - 1] * gh * (o.late ? 0.7 : 1) * wellbeing(a) * (1 + [0, .1, .2, .3][tier(a, 'office')]);
+    o.pend += D.OFFICE_WAGE[l - 1] * gh * (ot ? D.SHIFT.otMul : 1) * (o.late ? 0.7 : 1) * wellbeing(a) * (1 + [0, .1, .2, .3][tier(a, 'office')]);
     o.hours += gh;
     a.energy = Math.max(0, a.energy - 0.06 * dt);
     if (a.energy <= 1) { toast(a, 'หมดแรง! ลุกไปพักกินอะไรก่อน', '😵', false); infect(a, 'exhaust', 0.3); standUp(a); }
     if (o.pend >= D.OFFICE_WAGE[l - 1]) { earn(a, o.pend); o.pend = 0; quest(a, 'work'); }
   }
-  if (o.day === day && h >= D.SHIFT.end && o.closed !== day) {
+  if (o.day === day && o.closed !== day && (h >= D.SHIFT.ot || h >= D.SHIFT.end && !seated)) {   // the day ends when you leave after 17:00, or at 21:00
     o.closed = day;
     if (o.pend > 0) { earn(a, o.pend); o.pend = 0; }
     const before = lvl(a, 'office');
@@ -762,7 +776,7 @@ function act(a, m) {
     case 'chair.sit': {
       if (!need(a, 'office')) return;
       if (chairs[s.idx] && chairs[s.idx] !== a) return toast(a, 'โต๊ะนี้มีคนนั่งแล้ว', '💺', false);
-      if (h >= D.SHIFT.end || h < D.SHIFT.start - 1) return toast(a, `ตอนนี้ไม่ใช่เวลางาน (เข้างาน ${hhmm(D.SHIFT.start)}–${hhmm(D.SHIFT.end)})`, '🕗', false);
+      if (h >= D.SHIFT.ot || h < D.SHIFT.start - 1 || h >= D.SHIFT.end && a.office?.day !== D.dayAt(now())) return toast(a, h >= D.SHIFT.end && h < D.SHIFT.ot ? 'โอทีทำได้เฉพาะคนที่เข้างานวันนี้แล้ว' : `ตอนนี้ไม่ใช่เวลางาน (เข้างาน ${hhmm(D.SHIFT.start)}–${hhmm(D.SHIFT.end)})`, '🕗', false);
       if (a.office?.closed === D.dayAt(now())) return toast(a, 'วันนี้เลิกงานแล้ว พรุ่งนี้ค่อยมาใหม่', '🏢', false);
       standUp(a); chairs[s.idx] = a; a.chair = s.idx; a.pose = 'chair'; place(a, s.x, s.y); sendRoster(); markMe(a);
       return toast(a, h < D.SHIFT.start ? 'นั่งรอเข้างาน 08:00 เมื่อถึงเวลาจะเริ่มนับชั่วโมงอัตโนมัติ' : 'นั่งทำงานแล้ว ได้ค่าแรงทุกชั่วโมงที่นั่ง (เดินเพื่อลุก)', '💺');
@@ -825,7 +839,8 @@ function act(a, m) {
       if (!cd(a, 'sell', 300)) return;
       const rate = s.type === 'market' ? NPC_BUY : s.type === 'fishclub' ? FISH_RATE : 0.5;   // the fish club and the farm buyer pay far better than the market's NPC
       let total = 0;
-      for (let i = 0; i < q; i++) { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); }
+      const own = a.career === 'merchant' && it.kind === 'goods' ? msat(a, id) : null;   // a merchant's restock sales only press their own price, not everyone's
+      for (let i = 0; i < q; i++) { if (own) { total += npcBuyPrice(a, id, rate) * own[0]; own[0] = Math.max(0.55, own[0] * 0.985); } else { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); } }
       addItem(a, id, -q);
       if ({ merchant: 'goods', farmer: 'crop', chef: 'meal' }[a.career] === it.kind) total *= jobPay(a);   // your own trade's goods sell better the higher your job level
       const got = earn(a, total); quest(a, 'sell', q);
@@ -837,13 +852,14 @@ function act(a, m) {
       const id = m.item, it = D.ITEMS[id];
       if (!it || !it.wholesale) return;
       let q = clamp(Math.floor(+m.qty) || 1, 1, 10);
-      if (stock[id] < q) q = Math.floor(stock[id]);
+      const myStock = wstock(a, id);
+      if (myStock < q) q = Math.floor(myStock);
       if (q <= 0) return toast(a, 'สินค้าหมดสต็อก รอเติมของหน่อย', '📦', false);
       const unit = Math.round(it.wholesale * (1 - 0.06 * tier(a, 'merchant')));
       if (a.money < unit * q) return toast(a, `เงินไม่พอ (ต้องใช้ ${money(unit * q)})`, '💸', false);
       if (!spend(a, 4)) return;
       a.money -= unit * q;
-      stock[id] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a); quest(a, 'buy', q); stat(a, 'wholesale', q);
+      a.wst[id][0] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a); quest(a, 'buy', q); stat(a, 'wholesale', q);
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(unit * q)}`, '📦');
     }
     // ---------------- food
@@ -2061,7 +2077,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2538,7 +2554,7 @@ function tick() {
     const room = D.ROOMS.find(r => r.rk === kind);
     if (room) for (const a of online.values()) if (D.roomAt(a.x, a.y) === room && !(isAdmin(a) && a.god?.doors)) { teleport(a, room.outside.x, room.outside.y); toast(a, `${room.label}ปิดทำการแล้ว (${hhmm(close)}) เปิดอีกครั้ง ${hhmm(open)}`, '🔒'); }
   }
-  if (crossed(D.SHIFT.end)) feed('🏢 17:00 เลิกงานแล้ว ไฟในออฟฟิศปิด');
+  if (crossed(D.SHIFT.end)) feed('🏢 17:00 หมดเวลางานปกติ ใครยังนั่งอยู่ได้ค่าโอที x1.25 ถึง 21:00');
   if (crossed(D.SHIFT.start - 0.5)) for (const a of online.values()) if (a.career === 'office') toast(a, 'อีก 30 นาทีเข้างาน (08:00) ไปนั่งที่โต๊ะทำงานในบริษัทให้ทัน', '⏰');
   lastHour = h;
 

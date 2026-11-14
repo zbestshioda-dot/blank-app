@@ -950,10 +950,10 @@ function draw(t) {
   if (!myRoom) drawRain(t);
   // inside: no day/night, but the office turns its lights off after work hours
   let dark = myRoom ? 0 : night;
-  if (myRoom && myRoom.rk === 'office') { const h = hourNow(); if (h >= G.shift.end || h < 6) dark = 0.62; }
+  if (myRoom && myRoom.rk === 'office') { const h = hourNow(); if (h >= G.shift.ot || h < 6) dark = 0.62; }
   if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); if (!myRoom) drawLights(X, Y, dark); }
   drawHeads(X, Y);
-  if (myRoom && myRoom.rk === 'office' && dark > 0) sign('💡 ไฟปิดแล้ว (เลิกงาน 17:00)', VW / 2, VH * .2, { size: 14 });
+  if (myRoom && myRoom.rk === 'office' && dark > 0) sign(`💡 ไฟปิดแล้ว (เลิกงาน ${hhmm(G.shift.ot)})`, VW / 2, VH * .2, { size: 14 });
   // short fade through black when you go through a door or a gate
   const fp = (performance.now() - fadeT) / 350;
   if (fp < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fp})`; ctx.fillRect(0, 0, VW, VH); }
@@ -1491,17 +1491,17 @@ function renderPanel(p) {
       if (me.career === 'office') {
         const state = o && o.day === today ? (o.closed === today ? '✅ เลิกงานแล้ว' : `🟢 เข้างานแล้ว${o.late ? ' (สาย)' : ''} · ${o.hours.toFixed(1)} ชม.`) : '⚪ ยังไม่ลงเวลาเข้างาน';
         status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าแรง <b>${money(wage)}</b>/ชม.<br>วันนี้: ${state}<br>มาสาย/ขาดงานสะสม: <b style="color:${(o?.strikes || 0) >= 2 ? 'var(--bad)' : 'inherit'}">${o?.strikes || 0}</b> ครั้ง (3 ครั้งขึ้นไปมีโอกาสถูกเลิกจ้าง)</div>
-          <div class="sub" style="margin-top:8px">💺 เดินไปที่ <b>โต๊ะทำงาน</b> ตัวไหนก็ได้แล้วกดนั่ง · เข้างาน ${hhmm(G.shift.start)} (สายได้ถึง ${hhmm(G.shift.grace)}) · เลิก ${hhmm(G.shift.end)}</div>
+          <div class="sub" style="margin-top:8px">💺 เดินไปที่ <b>โต๊ะทำงาน</b> ตัวไหนก็ได้แล้วกดนั่ง · เข้างาน ${hhmm(G.shift.start)} (สายได้ถึง ${hhmm(G.shift.grace)}) · เลิก ${hhmm(G.shift.end)} · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าแรง x${G.shift.otMul})</div>
           ${B('📦 ลาออก', { t: 'resign' }, 'warn')}`;
       }
-      return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} · ได้เงินตามชั่วโมงที่นั่งทำงาน (ต้องจบปริญญาตรี)</div>${status}${me.career === 'office' ? '' : staffHint('office')}`;
+      return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามชั่วโมงที่นั่งทำงาน (ต้องจบปริญญาตรี)</div>${status}${me.career === 'office' ? '' : staffHint('office')}`;
     }
     case 'sdesk': {
       const L = me.enrolled && G.licenses[me.enrolled];
       return `<h2>📖 โต๊ะเรียน</h2>${L ? `<div class="sub">กำลังเรียน${L.name} ${me.classes}/${L.classes} คาบ · นั่งครบ 1 ชั่วโมงในเกม = 1 คาบ</div>${B('📖 นั่งเรียน', { t: 'act', st, a: 'sit' }, 'primary big')}` : '<div class="sub">ต้องลงทะเบียนเรียนที่เคาน์เตอร์มหาวิทยาลัยก่อน (ม.6 / ปริญญาตรี)</div>'}`;
     }
     case 'chair':
-      return `<h2>💺 โต๊ะทำงาน</h2><div class="sub">สำหรับพนักงานบริษัท นั่งในเวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} เพื่อรับค่าแรง</div>${needCareer('office')}`;
+      return `<h2>💺 โต๊ะทำงาน</h2><div class="sub">สำหรับพนักงานบริษัท นั่งในเวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} (โอทีต่อได้ถึง ${hhmm(G.shift.ot)}) เพื่อรับค่าแรง</div>${needCareer('office')}`;
     case 'market': {
       const tab = p.tab || 'buy', mk = wd?.mk || {}, cat = p.cat || 'all', q = (p.q || '').trim().toLowerCase();
       const tabs = `<div class="tabs">${[['buy', '🛍️ ซื้อ'], ['sell', '🏷️ ขาย'], ['mine', `📋 ของฉัน (${(me.listings || []).length})`]].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;
@@ -1535,8 +1535,8 @@ function renderPanel(p) {
     case 'warehouse': {
       const rows = Object.entries(G.items).filter(([, it]) => it.wholesale).map(([id, it]) =>
         itemRow(id, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: id, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 })}${B('x10', { t: 'act', st, a: 'buy', item: id, qty: 10 })}</div>`,
-          `ราคาส่ง ${money(it.wholesale)} · ราคาตลาด ~${money(it.base)} · สต็อก ${wd?.stock[id] ?? '-'}`)).join('');
-      return `<h2>📦 คลังสินค้าราคาส่ง</h2><div class="sub">${hoursTxt('warehouse')} · สต็อกจำกัด ทุกคนแย่งกัน · ซื้อแต่ละครั้งเสีย ⚡4 · เอาไปวางขายที่ตลาดกลาง</div>${staffHint('merchant')}${me.career === 'merchant' ? `<div class="list">${rows}</div>` : ''}`;
+          `ราคาส่ง ${money(it.wholesale)} · ราคาตลาด ~${money(it.base)} · สต็อกของคุณ ${me.wstock?.[id] ?? '-'}/${it.stock}`)).join('');
+      return `<h2>📦 คลังสินค้าราคาส่ง</h2><div class="sub">${hoursTxt('warehouse')} · พ่อค้าแต่ละคนมีโควตาสต็อกของตัวเอง เติมใหม่เรื่อยๆ ไม่ต้องแย่งกับใคร · ซื้อแต่ละครั้งเสีย ⚡4 · เอาไปวางขายที่ตลาดกลาง</div>${staffHint('merchant')}${me.career === 'merchant' ? `<div class="list">${rows}</div>` : ''}`;
     }
     case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${me.career === 'rider' ? riderJobs() : ''}`;
     case 'restaurant': {
