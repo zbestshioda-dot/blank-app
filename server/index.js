@@ -186,7 +186,8 @@ function credit(o, amount) {          // pay someone who may be offline
 const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
-const comfort = a => houseOf(a) >= 0 ? (a.furniture || []).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0) : 0;
+const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];   // bought furniture + login-reward pieces (kept even without a house)
+const comfort = a => houseOf(a) >= 0 ? furnOf(a).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0) : 0;
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const speedOf = a => dzProd(a, 'speed') * godSpeed(a);           // vehicles were removed from the game
@@ -200,6 +201,7 @@ function quest(a, type, n = 1) {
   for (const e of Q.progress(a, type, n)) {
     send(a, { t: 'quest', ...e });
     if (e.kind === 'all') feed(`📜 ${a.name} ทำเควสต์ประจำวันครบทั้ง 3 ข้อ! (ติดต่อกัน ${e.streak} วัน)`);
+    if (e.kind === 'wall') { feed(`🗓️ ${a.name} ทำเควสต์รายสัปดาห์ครบทั้งหมด!`); stat(a, 'weekAll'); }
   }
   markMe(a);
 }
@@ -267,6 +269,7 @@ function worth(a) {
   for (const L of a.listings || []) w += (D.ITEMS[L.item]?.base || 0) * L.qty * 0.5;
   for (const [, t] of Object.entries(a.tools || {})) for (let i = 0; i < t; i++) w += D.TOOL_PRICES[i] * 0.5;
   if (a.house >= 0) { w += D.HOUSE_PRICES[a.house] * 0.7; for (const f of a.furniture || []) w += (D.FURNITURE[f]?.price || 0) * 0.5; }
+  for (const f of a.keep || []) w += (D.FURNITURE[f]?.price || 0) * 0.5;
   if (a.garden) w += D.GARDEN.lotPrice * 0.6;
   return w;
 }
@@ -274,7 +277,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'house', 'furniture', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail'];
 let nextListing = 1;
@@ -1091,7 +1094,7 @@ function act(a, m) {
     }
     case 'house.furnish': {
       if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
-      const f = D.FURNITURE[m.item]; if (!f) return;
+      const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
       if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, f.price)) return;
       a.furniture = [...a.furniture, m.item]; markMe(a); wdAt = 0;
@@ -1856,7 +1859,7 @@ function meView(a) {
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
-    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a),
+    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_REWARD,
   };
 }
 function worldView() {
@@ -1868,7 +1871,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? (h.furniture || []).slice(0, 8) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 14) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb,
   };
@@ -1958,14 +1961,48 @@ setInterval(() => { const t = now(); for (const [k, v] of loginFails) if (v.rese
 
 // daily login bonus: grows each consecutive day, capped at day 7 (kept small to fight inflation)
 const LOGIN_BONUS = [50, 80, 100, 120, 150, 200, 300];
+// daily bonus grows for 7 days in a row, then keeps rising slowly (+฿10 a day up to ฿500);
+// every 30 days you have logged in (in total, a missed day does not reset it) there is a big reward:
+// cash plus a piece of gift furniture you can only get this way (cash instead once you own them all)
+const loginReward = s => s <= 7 ? LOGIN_BONUS[s - 1] : Math.min(500, 300 + 10 * (s - 7));
+const BIG_EVERY = 30, BIG_ITEMS = ['bookcase', 'gclock', 'teddy', 'flamp', 'vase'];
+function bigReward(a, n) {        // the n-th big reward (1, 2, ...)
+  const item = BIG_ITEMS.find(k => !(a.keep || []).includes(k)) || null;
+  return { cash: 3000 + 1000 * Math.min(n - 1, 5) + (item ? 0 : 5000), item };
+}
+function loginView(a) {
+  const days = a.loginDays || 0, s = a.loginStreak || 0, next = BIG_EVERY - (days % BIG_EVERY);
+  const nb = bigReward(a, Math.floor(days / BIG_EVERY) + 1);
+  return { streak: s, days, today: a.lastLogin === Q.dayKey() ? loginReward(Math.max(1, s)) : 0, tomorrow: loginReward(s + 1), toBig: next === BIG_EVERY && a.lastLogin === Q.dayKey() && days ? BIG_EVERY : next,
+    big: { cash: nb.cash, item: nb.item }, table: LOGIN_BONUS, every: BIG_EVERY, keep: a.keep || [] };
+}
 function dailyLogin(a) {
   const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
+  if (a.loginDays == null) a.loginDays = a.loginStreak || 0;     // older saves: start the total from the streak
   if (a.lastLogin === today) return null;
   a.loginStreak = a.lastLogin === yesterday ? (a.loginStreak || 0) + 1 : 1;
-  a.lastLogin = today;
-  const reward = LOGIN_BONUS[Math.min(a.loginStreak, 7) - 1];
+  a.lastLogin = today; a.loginDays = (a.loginDays || 0) + 1;
+  const reward = loginReward(a.loginStreak);
   a.money += reward; a.earned += reward; dirty = true;
-  return { streak: a.loginStreak, reward, table: LOGIN_BONUS };
+  let big = null;
+  if (a.loginDays % BIG_EVERY === 0) {
+    big = bigReward(a, a.loginDays / BIG_EVERY);
+    a.money += big.cash; a.earned += big.cash;
+    if (big.item) a.keep = [...(a.keep || []), big.item];
+    setTimeout(() => feed(`🎉 ${a.name} เข้าเกมครบ ${a.loginDays} วัน ได้รางวัลใหญ่${big.item ? ` ${D.FURNITURE[big.item].icon}${D.FURNITURE[big.item].name}` : ''}!`), 2000);
+  }
+  setTimeout(() => a.ws && stat(a, 'loginDays', a.loginDays, true), 2500);
+  return { streak: a.loginStreak, reward, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
+}
+// achievements: each one has a cash reward by rarity, collected from the achievements page
+const ACH_REWARD = [0, 300, 800, 2000, 5000, 12000];
+function achClaim(a, id) {
+  const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
+  if (!todo.length) return toast(a, 'ไม่มีรางวัลให้รับ', '🏅', false);
+  let sum = 0;
+  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) sum += ACH_REWARD[ac.r || 1]; }
+  a.achGot = [...got, ...todo]; earn(a, sum); markMe(a); dirty = true;
+  toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ ${money(sum)} 🏅`, '🏅');
 }
 
 function detach(a) {
@@ -2040,6 +2077,7 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'achclaim': return achClaim(a, String(m.id || 'all'));
     case 'minigame': {                      // office mini-games: a small bonus for a good score while seated at your desk (capped per day)
       if (a.career !== 'office' || !(a.chair >= 0)) return;
       const max = { math: 40, mail: 45, memo: 30 }[m.game]; if (!max || !cd(a, 'minigame', 15000, true)) return;

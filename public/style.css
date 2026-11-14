@@ -646,3 +646,13 @@ body.hasEvent #topBar{top:146px!important}
 .mgGrid button.dn{background:linear-gradient(#b67c46,#7f4c26);color:transparent}
 .mgGrid button.got{opacity:.45}
 .mgEnd{text-align:center;padding:8px 0}.mgEnd .big{font-size:40px;font-weight:700;color:#8a5a12;font-family:var(--px)}
+
+/* rewards / achievements / weekly quests */
+.wbar{height:5px;background:#5b3b2a33;border-radius:3px;overflow:hidden;margin-top:3px}
+.wbar u{display:block;height:100%;background:linear-gradient(90deg,#ffd96b,#e9a92c);text-decoration:none}
+.wbar.big{height:10px;margin:6px 0 4px;background:#5b3b2a55}
+.gifts{display:flex;gap:6px;margin:6px 0 2px;flex-wrap:wrap}
+.gift{position:relative;width:40px;height:40px;border-radius:9px;border:2px solid var(--line);background:var(--paper3);display:flex;align-items:center;justify-content:center;font-size:22px;filter:grayscale(1);opacity:.55}
+.gift.own{filter:none;opacity:1;border-color:var(--acc)}
+.gift small{position:absolute;right:2px;bottom:0;font-size:10px;color:#2f8a3a;font-weight:700}
+.bigGift{background:#ffe8a8;border:2px solid var(--acc);border-radius:10px;padding:8px;margin:6px 0;font-size:13px}

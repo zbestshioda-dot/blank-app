@@ -574,6 +574,12 @@ const TOOLS = {
   rider:    { name: 'กล่องเก็บความร้อน', icon: '📦', fx: ['ค่าส่ง +10%', 'ค่าส่ง +20%', 'ค่าส่ง +35%'] },
 };
 const FURNITURE = {
+  // gift: only from the 30-day login rewards (never sold in the shop); you keep them even without a house
+  bookcase: { name: 'ตู้หนังสือหายาก', icon: '📚', price: 20000, comfort: 3, gift: 1 },
+  gclock:   { name: 'นาฬิกาตั้งพื้นโบราณ', icon: '🕰️', price: 30000, comfort: 4, gift: 1 },
+  teddy:    { name: 'ตุ๊กตาหมียักษ์', icon: '🧸', price: 40000, comfort: 4, gift: 1 },
+  flamp:    { name: 'โคมไฟหรู', icon: '💡', price: 50000, comfort: 5, gift: 1 },
+  vase:     { name: 'แจกันลายครามโบราณ', icon: '🏺', price: 80000, comfort: 6, gift: 1 },
   plant:  { name: 'ต้นไม้', icon: '🪴', price: 1500,  comfort: 1 },
   sofa:   { name: 'โซฟา', icon: '🛋️', price: 3000,  comfort: 1 },
   tv:     { name: 'ทีวีจอใหญ่', icon: '📺', price: 6000,  comfort: 2 },
@@ -669,6 +675,12 @@ const ACHIEVEMENTS = [
   { id: 'gen10', r: 2, c: null, stat: 'calls', n: 50, title: 'คนช่างคุย', desc: 'โทรคุยกับเพื่อน 50 ครั้ง' },
   { id: 'gen11', r: 3, c: null, stat: 'cravings', n: 50, title: 'นักชิมระดับมิชลิน', desc: 'กินของที่อยากกินได้ทันเวลา 50 ครั้ง' },
   { id: 'gen12', r: 2, c: null, stat: 'mails', n: 10, title: 'นักเขียนจดหมาย', desc: 'ส่งจดหมายถึงผู้เล่นอื่น 10 ฉบับ' },
+  // loyalty and long-term goals
+  { id: 'log7', r: 1, stat: 'loginDays', n: 7, title: 'ขาประจำ', desc: 'เข้าเกมรวม 7 วัน' },
+  { id: 'log30', r: 3, stat: 'loginDays', n: 30, title: 'ชาวเมืองตัวจริง', desc: 'เข้าเกมรวม 30 วัน' },
+  { id: 'log100', r: 5, stat: 'loginDays', n: 100, title: 'ตำนานแห่งเมือง', desc: 'เข้าเกมรวม 100 วัน' },
+  { id: 'wk1', r: 2, stat: 'weekAll', n: 1, title: 'นักล่าเควสต์', desc: 'ทำเควสต์รายสัปดาห์ครบ 1 สัปดาห์' },
+  { id: 'wk4', r: 4, stat: 'weekAll', n: 4, title: 'ยอดนักผจญภัย', desc: 'ทำเควสต์รายสัปดาห์ครบ 4 สัปดาห์' },
 ];
 // title rarity: common → legendary (colour on the name tag)
 const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: 'ไม่ธรรมดา', col: '#7be07b' }, { name: 'หายาก', col: '#62b8ff' }, { name: 'มหากาพย์', col: '#d08cff' }, { name: 'ตำนาน', col: '#ffb43c' }];

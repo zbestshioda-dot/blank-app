@@ -203,6 +203,8 @@ function handle(m) {
     case 'daily': if (tutPending) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
     case 'quest': {
       const s = P.get(myId);
+      if (m.kind === 'wdone') { toast(`เควสต์รายสัปดาห์สำเร็จ: ${m.text} · รางวัล ${money(m.reward)}`, '🗓️'); FX.play('levelup'); break; }
+      if (m.kind === 'wall') { toast(`ทำเควสต์รายสัปดาห์ครบทั้งหมด! โบนัส ${money(m.reward)} 🎉`, '🗓️'); FX.play('chime'); if (s) FX.burst(s.x, s.y, '#7fd3ff', 30); break; }
       if (m.kind === 'done') { toast(`เควสต์สำเร็จ: ${m.text} · รางวัล ${money(m.reward)}`, '📜'); FX.play('levelup'); if (s) { FX.ring(s.x, s.y, '#ffd34d', 900, 1.4); FX.float(s.x, s.y - .7, 'เควสต์สำเร็จ!', '#ffd34d', .5); } }
       else { toast(`ทำเควสต์ครบทั้ง 3 ข้อ! โบนัส ${money(m.reward)} · ติดต่อกัน ${m.streak} วัน 🔥`, '🏆'); setTimeout(() => FX.play('chime'), 500); if (s) { FX.burst(s.x, s.y, '#ffd34d', 30); FX.ring(s.x, s.y, '#ffffff', 1100, 2.2); } }
       break;
@@ -405,7 +407,7 @@ setInterval(() => {
   const dt = me?.date; $('#clock').innerHTML = `${dt ? `<span>📅 ${dt.day}/${G.monthDays} ${G.months[dt.month]}</span><i> · </i>` : ''}<span>🕐 ${hhmm(h)} · 👥 ${wd.on}</span>`;
   document.querySelectorAll('.qcd').forEach(el => {
     const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
-    el.textContent = `${Math.floor(s / 3600)} ชม. ${Math.floor(s % 3600 / 60)} นาที`;
+    el.textContent = s >= 86400 ? `${Math.floor(s / 86400)} วัน ${Math.floor(s % 86400 / 3600)} ชม.` : `${Math.floor(s / 3600)} ชม. ${Math.floor(s % 3600 / 60)} นาที`;
   });
   document.querySelectorAll('.cd').forEach(el => {
     const left = Math.max(0, Math.ceil((+el.dataset.t - (Date.now() + clockOff)) / 1000));
@@ -1153,6 +1155,7 @@ const FN = {
   mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); $('#mailText').value = ''; },
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
   price(m, root) { send({ t: 'act', st: m.st, a: m.op, price: m.zero ? 0 : +root.querySelector('#' + m.inp).value || 0 }); },
@@ -1215,6 +1218,40 @@ function pickPhoto() {
     im.src = url;
   };
   inp.click();
+}
+const achTodo = () => (me?.ach || []).filter(x => !(me.achGot || []).includes(x));
+const achRew = a => (me.achReward || [])[a.r || 1] || 0;
+function achvPanel() {
+  const todo = achTodo(), sum = todo.reduce((t, id) => t + achRew(G.ach.find(x => x.id === id) || {}), 0), got = (me.ach || []).length;
+  const st = a => (me.achGot || []).includes(a.id) ? 2 : (me.ach || []).includes(a.id) ? 0 : 1;
+  const pct = a => Math.min(1, (me.stats?.[a.stat] || 0) / a.n);
+  const rows = G.ach.slice().sort((x, y) => st(x) - st(y) || (st(x) === 1 ? pct(y) - pct(x) : 0) || (x.r || 1) - (y.r || 1)).map(a => {
+    const s2 = st(a), c = a.c ? G.careers[a.c] : null, pv = Math.min(a.n, me.stats?.[a.stat] || 0);
+    const btn = s2 === 0 ? B(`🎁 รับ ${money(achRew(a))}`, { t: 'achclaim', id: a.id }, 'primary') : s2 === 2 ? '<span class="tag">รับแล้ว ✓</span>' : `<span class="tag">${money(achRew(a))}</span>`;
+    return `<div class="item ${s2 === 2 ? 'done' : ''}"><div class="em">${s2 === 1 ? '🔒' : '🏅'}</div><div class="nm">${titleHtml(a.title, a.r)} <span class="rtag r${a.r || 1}">${RAR[a.r || 1]}</span>${c ? ` <span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${pv.toLocaleString()}/${a.n.toLocaleString()}</small><div class="wbar"><u style="width:${pct(a) * 100}%"></u></div></div>${btn}</div>`;
+  }).join('');
+  return `<h2>🏅 ความสำเร็จ</h2><div class="sub">ปลดล็อกแล้ว ${got}/${G.ach.length} · ทุกความสำเร็จมีรางวัลเงินตามความหายาก และใช้เป็นฉายาบนหัวได้</div>
+    ${todo.length ? `<div class="jobbox">🎁 รอรับรางวัล ${todo.length} รายการ รวม <b>${money(sum)}</b>${B('รับทั้งหมด', { t: 'achclaim', id: 'all' }, 'primary big')}</div>` : ''}
+    <div class="list">${rows}</div>`;
+}
+function rewardsPanel() {
+  const L = me.login; if (!L) return '';
+  const it = L.big.item && G.shop.furniture[L.big.item], into = L.every - L.toBig;
+  const gifts = Object.entries(G.shop.furniture).filter(([, f]) => f.gift).map(([k, f]) => `<span class="gift ${(me.keep || []).includes(k) ? 'own' : ''}" title="${esc(f.name)}">${f.icon}<small>${(me.keep || []).includes(k) ? '✓' : ''}</small></span>`).join('');
+  const w = me.wquests, todo = achTodo();
+  return `<h2>🎁 รางวัลและความคืบหน้า</h2>
+    <div class="secT">📅 โบนัสเข้าเกม</div>
+    <div class="grid2"><div class="item"><div class="nm">🔥 ติดต่อกัน<small>${L.streak} วัน</small></div></div><div class="item"><div class="nm">📆 เข้าเกมรวม<small>${L.days} วัน</small></div></div>
+      <div class="item"><div class="nm">✅ วันนี้ได้แล้ว<small>${money(L.today)}</small></div></div><div class="item"><div class="nm">⏭️ พรุ่งนี้จะได้<small><b style="color:var(--acc)">${money(L.tomorrow)}</b> (ถ้าเข้าต่อเนื่อง)</small></div></div></div>
+    <div class="days">${L.table.map((v, i) => `<div class="${i + 1 < Math.min(L.streak, 7) ? 'got' : i + 1 === Math.min(L.streak, 7) ? 'now' : ''}"><small>วัน ${i + 1}${i === 6 ? '+' : ''}</small><b>฿${i === 6 ? Math.max(v, L.today) : v}</b></div>`).join('')}</div>
+    <div class="sub">หลังวันที่ 7 ได้เพิ่มวันละ ฿10 จนถึง ฿500/วัน · ขาดหนึ่งวัน โบนัสรายวันเริ่มนับใหม่</div>
+    <div class="jobbox"><b>🎉 รางวัลใหญ่ทุก ${L.every} วันที่เข้าเกม</b> (นับรวม ขาดได้ไม่หาย)
+      <div class="wbar big"><u style="width:${into / L.every * 100}%"></u></div>
+      <div class="sub">${into}/${L.every} วัน · <b>อีก ${L.toBig} วัน</b> ได้ ${money(L.big.cash)}${it ? ` + ${it.icon} <b>${it.name}</b> (เฟอร์นิเจอร์พิเศษ ความสบาย +${it.comfort})` : ''}</div>
+      <div class="gifts">${gifts}</div><div class="sub">ของพิเศษหาซื้อไม่ได้ ได้จากรางวัลใหญ่เท่านั้น เก็บไว้ตลอดแม้ยังไม่มีบ้าน มีบ้านเมื่อไหร่จะตั้งให้อัตโนมัติ</div></div>
+    ${w ? `<div class="secT">🗓️ เควสต์รายสัปดาห์ ${w.list.filter(x => x.done).length}/3</div>${w.list.map(x => `<div class="sub">${x.done ? '✅' : '◻️'} ${esc(x.text)} · ${x.p.toLocaleString()}/${x.n.toLocaleString()}</div>`).join('')}${B('ดูเควสต์รายสัปดาห์', { fn: 'open', kind: 'quests', set: { tab: 'week' } }, 'good')}` : ''}
+    <div class="secT">🏅 ความสำเร็จ ${(me.ach || []).length}/${G.ach.length}</div>
+    ${B(todo.length ? `🎁 รับรางวัลความสำเร็จ (${todo.length})` : 'ดูความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo.length ? 'primary' : '')}`;
 }
 function achRows() {
   const has = id => (me.ach || []).includes(id) ? 0 : 1;   // unlocked titles first, then by rarity
@@ -1510,6 +1547,15 @@ function renderPanel(p) {
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;
     case 'quests': {
       const q = me.quests; if (!q) return '';
+      const qtabs = `<div class="tabs">${B('📜 รายวัน', { fn: 'qtab', set: { tab: 'day' } }, p.tab !== 'week' ? 'primary' : '')}${B(`🗓️ รายสัปดาห์${me.wquests ? ` (${me.wquests.list.filter(x => x.done).length}/3)` : ''}`, { fn: 'qtab', set: { tab: 'week' } }, p.tab === 'week' ? 'primary' : '')}${B('🎁 รางวัล', { fn: 'open', kind: 'rewards' })}</div>`;
+      if (p.tab === 'week' && me.wquests) {
+        const w = me.wquests;
+        const wr = w.list.map(x => { const c = x.career ? G.careers[x.career] : null, pc = Math.min(100, x.p / x.n * 100);
+          return `<div class="item ${x.done ? 'done' : ''}"><div class="em">${x.done ? '✅' : x.type === 'dailyall' ? '📜' : c ? c.icon : { earn: '💰', fish: '🎣', eat: '🍛', chat: '💬', sell: '🏪' }[x.type] || '🗓️'}</div><div class="nm">${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${c && me.career !== x.career ? ` · ต้องเป็น${c.name}` : ''}</small><div class="wbar"><u style="width:${pc}%"></u></div></div>${x.done ? '<span class="tag">สำเร็จ</span>' : ''}</div>`; }).join('');
+        return `<h2>🗓️ เควสต์รายสัปดาห์</h2>${qtabs}<div class="sub">เป้าหมายระยะยาว นับจากสิ่งที่ทำทุกวัน (รวมเควสต์รายวัน) · รีเซ็ตทุกวันจันทร์ ในอีก <b class="qcd" data-t="${w.resetAt}"></b></div>
+          <div class="list">${wr}</div>
+          <div class="item ${w.bonus ? 'done' : ''}" style="margin-top:10px"><div class="em">🏆</div><div class="nm">ทำครบทั้ง 3 ข้อในสัปดาห์นี้<small>โบนัส <b style="color:var(--acc)">${money(w.bonusAmount)}</b> · นับรวมไปปลดล็อกฉายา "นักล่าเควสต์"</small></div>${w.bonus ? '<span class="tag">ได้แล้ว</span>' : ''}</div>`;
+      }
       const rows = q.list.map((x, i) => {
         const c = x.career ? G.careers[x.career] : null, wrong = c && me.career !== x.career;
         const icon = x.done ? '✅' : c ? c.icon : { trade: '🤝', chat: '💬', eat: '🍛', sell: '🏪', earn: '💰', sit: '🪑' }[x.type] || '📜';
@@ -1517,10 +1563,12 @@ function renderPanel(p) {
         const btn = x.done ? '<span class="tag">สำเร็จ</span>' : `<div class="col2">${tgt ? B('📍 ไป', { fn: 'guide', key: tgt }, 'good') : ''}${B('🔄', { t: 'quest_reroll', i }, '', q.rerolled)}</div>`;
         return `<div class="item ${x.done ? 'done' : ''}"><div class="em">${icon}</div><div class="nm">${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
       }).join('');
-      return `<h2>📜 เควสต์ประจำวัน</h2><div class="sub">เควสต์ใหม่ในอีก <b class="qcd" data-t="${q.resetAt}"></b> (เที่ยงคืนเวลาไทย)${q.streak ? ` · 🔥 ทำครบติดต่อกัน ${q.streak} วัน` : ''}</div>
+      return `<h2>📜 เควสต์ประจำวัน</h2>${qtabs}<div class="sub">เควสต์ใหม่ในอีก <b class="qcd" data-t="${q.resetAt}"></b> (เที่ยงคืนเวลาไทย)${q.streak ? ` · 🔥 ทำครบติดต่อกัน ${q.streak} วัน` : ''}</div>
         <div class="list">${rows}</div>
         <div class="item ${q.bonus ? 'done' : ''}" style="margin-top:10px"><div class="em">🏆</div><div class="nm">ทำครบทั้ง 3 ข้อ<small>โบนัส <b style="color:var(--acc)">${money(q.bonusAmount)}</b> · ทำครบติดต่อกันทุกวัน โบนัส +10%/วัน</small></div>${q.bonus ? '<span class="tag">ได้แล้ว</span>' : ''}</div>`;
     }
+    case 'achv': return achvPanel();
+    case 'rewards': return rewardsPanel();
     case 'ach':
     case 'profile': {
       const ti = G.ach.find(x => x.id === me.title), got = (me.ach || []).length;
@@ -1528,6 +1576,9 @@ function renderPanel(p) {
         <div class="prof"><div class="phCol"><img class="ph" src="${myPic || facePng()}" alt="">${B(p.titles ? '▲ ซ่อนฉายา' : '🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
         <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div></div>
+        ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
+          return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
+          <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
         ${p.titles ? `<div class="secT">🏅 เปลี่ยนฉายา · สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
         <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="list">${achRows()}</div>` : ''}`;
     }
@@ -1627,6 +1678,7 @@ function renderPanel(p) {
       const tile = (kind, icon, label, sub, badge) => `<button class="moreTile" data-m='${JSON.stringify({ fn: 'open', kind })}'><b>${icon}</b><span>${label}${badge ? ' <i class="dot"></i>' : ''}</span><small>${sub}</small></button>`;
       return `<h2>⋯ เมนูเพิ่มเติม</h2><div class="moreGrid">
         ${tile('profile', '🪪', 'โปรไฟล์', 'รูป · ฉายา · สถิติ')}
+        ${tile('rewards', '🎁', 'รางวัล', 'เข้าเกมรายวัน · ความสำเร็จ', achTodo().length > 0)}
         ${tile('friends', '👥', 'เพื่อน', 'ใครออนไลน์อยู่')}
         ${tile('rank', '🏆', 'อันดับ', 'เศรษฐีของเมือง')}
         ${tile('help', '❔', 'วิธีเล่น', 'ปุ่มและระบบต่างๆ')}
@@ -1670,13 +1722,14 @@ function houseDoor(s, st) {
   const days = r => `<div class="grid3">${[1, 3, 7].map(d => B(`${d} วัน ${money(r * d)}`, { t: 'act', st, a: 'rent', days: d }, 'good')).join('')}</div>`;
   const left = until ? Math.max(0, Math.round((until - Date.now() - clockOff) / G.dayMs * 10) / 10) : 0;
   if (mine) {
-    const rows = Object.entries(G.shop.furniture).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('');
+    const rows = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('');
     return `<h2>🏠 บ้านของคุณ (เลขที่ ${i + 1})</h2><div class="sub">ความสบาย ⭐ <b>${me.comfort}</b> → พลังงานฟื้นเร็วขึ้น +${me.comfort * 3}% · ${tenant ? `ผู้เช่า: ${esc(tenant)} (อีก ${left} วัน)` : 'ไม่มีผู้เช่า'}</div>${enter}
       <div class="sub" style="margin-top:12px"><b>🪧 ประกาศขายให้ผู้เล่น</b> ${me.houseSale ? `(ตอนนี้ ${money(me.houseSale)})` : ''}</div>
       <div class="rowf"><input id="saleIn" type="number" value="${me.houseSale || price}">${B('ประกาศขาย', { fn: 'price', st, op: 'list', inp: 'saleIn' }, 'good')}${me.houseSale ? B('ยกเลิก', { fn: 'price', st, op: 'list', zero: 1 }) : ''}</div>
       <div class="sub" style="margin-top:8px"><b>🔑 ปล่อยเช่า</b> ต่อวัน ${me.houseRent ? `(ตอนนี้ ${money(me.houseRent)})` : ''}</div>
       <div class="rowf"><input id="rentIn" type="number" value="${me.houseRent || rent}">${B('ปล่อยเช่า', { fn: 'price', st, op: 'rentout', inp: 'rentIn' }, 'good')}${me.houseRent ? B('ยกเลิก', { fn: 'price', st, op: 'rentout', zero: 1 }) : ''}</div>
       <div class="sub" style="margin-top:12px"><b>🛋️ แต่งบ้าน</b></div><div class="list">${rows}</div>
+      ${(me.keep || []).length ? `<div class="sub" style="margin-top:8px"><b>🎁 ของพิเศษจากรางวัลเข้าเกม</b> ${me.keep.map(k => `${G.shop.furniture[k].icon} ${G.shop.furniture[k].name}`).join(' · ')} (ตั้งในบ้านอัตโนมัติ)</div>` : ''}
       <div style="margin-top:14px">${B('ขายบ้านคืนโครงการ (ได้คืน ~70%)', { t: 'act', st, a: 'sell' }, 'warn')}</div>`;
   }
   let body = `<div class="sub">ความสบาย ⭐ ${cf} ${furn.length ? furn.map(k => G.shop.furniture[k].icon).join('') : ''}</div>`;
@@ -2379,11 +2432,16 @@ function endTut() {
 }
 function showDaily(d) {
   const box = $('#daily');
-  box.innerHTML = `<div class="tutIcon">🎁</div><h2>โบนัสเข้าเกมวันที่ ${d.streak}</h2><p>เข้าเล่นทุกวันติดต่อกัน รางวัลจะเพิ่มขึ้นเรื่อยๆ</p>
-    <div class="days">${d.table.map((v, i) => `<div class="${i + 1 < Math.min(d.streak, 7) ? 'got' : i + 1 === Math.min(d.streak, 7) ? 'now' : ''}"><small>วัน ${i + 1}</small><b>฿${v.toLocaleString()}</b></div>`).join('')}</div>
-    <div class="big-reward">+${money(d.reward)}</div><button class="primary big" id="dailyOk">รับเลย!</button>`;
+  const L = d.login, bigIt = d.big?.item && G.shop.furniture[d.big.item];
+  box.innerHTML = `<div class="tutIcon">${d.big ? '🎉' : '🎁'}</div><h2>โบนัสเข้าเกมวันที่ ${d.streak}</h2><p>เข้าเล่นทุกวันติดต่อกัน รางวัลจะเพิ่มขึ้นเรื่อยๆ${d.streak > 7 ? ' (หลังวันที่ 7 เพิ่มวันละ ฿10 สูงสุด ฿500)' : ''}</p>
+    <div class="days">${d.table.map((v, i) => `<div class="${i + 1 < Math.min(d.streak, 7) ? 'got' : i + 1 === Math.min(d.streak, 7) ? 'now' : ''}"><small>วัน ${i + 1}${i === 6 ? '+' : ''}</small><b>฿${(i === 6 ? Math.max(v, d.reward) : v).toLocaleString()}</b></div>`).join('')}</div>
+    <div class="big-reward">+${money(d.reward)}</div>
+    ${d.big ? `<div class="bigGift">🎉 <b>รางวัลใหญ่ เข้าเกมครบ ${d.days} วัน!</b><br>+${money(d.big.cash)}${bigIt ? ` และ ${bigIt.icon} <b>${bigIt.name}</b> (เฟอร์นิเจอร์พิเศษ ความสบาย +${bigIt.comfort} ตั้งในบ้านให้อัตโนมัติ)` : ''}</div>` : ''}
+    ${L ? `<div class="sub">พรุ่งนี้ได้ <b>${money(L.tomorrow)}</b> · อีก <b>${L.toBig}</b> วันถึงรางวัลใหญ่ 🎉</div>` : ''}
+    <div class="rowf" style="margin-top:8px"><button id="dailyMore">📅 ดูความคืบหน้า</button><button class="primary big" id="dailyOk" style="flex:1">รับเลย!</button></div>`;
   $('#dailyWrap').classList.remove('hidden');
   $('#dailyOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); FX.play('coin', true); };
+  $('#dailyMore').onclick = () => { $('#dailyWrap').classList.add('hidden'); FX.play('coin', true); openPanel({ kind: 'rewards' }); };
 }
 // driving test
 function showDriveTest(m) {
@@ -2400,9 +2458,9 @@ function showDriveTest(m) {
 
 // ------------------------------------------------------------------ areas, interiors
 let roomGrid = [], roomFurniture = [];
-const FURN_SPRITE = { plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
+const FURN_SPRITE = { bookcase: 'f_bookshelf_wide', gclock: 'f_clock', teddy: 'i_teddy', flamp: 'f_floorlamp', vase: 'f_vase', plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
 // where each piece of bought furniture stands in the house (by kind, so a home always looks arranged)
-const FURN_POS = { tv: [8, 2.9], sofa: [8, 6.7], plant: [11, 8.7], aqua: [9.6, 8.7], art: [9.2, 1.05], piano: [1.1, 5.9], bed: [2.2, 6.2], jacuzzi: [11.8, 5.5] };
+const FURN_POS = { bookcase: [4.6, 1.6], gclock: [6.3, 1.5], teddy: [2.9, 6.8], flamp: [10.2, 6.6], vase: [4.9, 4.3], tv: [8, 2.9], sofa: [8, 6.7], plant: [11, 8.7], aqua: [9.6, 8.7], art: [9.2, 1.05], piano: [1.1, 5.9], bed: [2.2, 6.2], jacuzzi: [11.8, 5.5] };
 function buildAreas() {
   AREA = Object.fromEntries(G.areas.map(a => [a.id, a]));
   roomGrid = new Array(G.map.w * G.map.h);
