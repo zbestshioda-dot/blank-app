@@ -387,15 +387,16 @@ function paintQuestBox() {
   const html = q.list.map((x, i) => {
     const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
     return `<button class="qRow ${x.done ? 'done' : ''} ${i === first ? 'cur' : ''}" data-q="${x.done ? '' : tgt || ''}"><i>${x.done ? '☑' : i === first ? '◆' : '☐'}</i><span>${esc(x.text)} <small>(${Math.min(x.p, x.n)}/${x.n})</small>${i === first && tgt ? '<em>› แตะเพื่อเดินไปอัตโนมัติ</em>' : ''}</span></button>`;
-  }).join('') + `<button class="qRow more" data-open-q="1"><span>ดูทั้งหมด · รางวัล ›</span></button>`;
+  }).join('') + `<button class="qRow rew" data-open-r="1"><i>🎁</i><span>รางวัลความคืบหน้า${achTodo().length ? ' <i class="dot"></i>' : ''} <small>เข้าเกม ${me.login?.streak || 0} วันติด</small></span></button><button class="qRow more" data-open-q="1"><span>ดูเควสต์ทั้งหมด ›</span></button>`;
   if (box.dataset.h === html) return; box.dataset.h = html; box.innerHTML = html;
   box.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { FX.play('click'); if (b.dataset.q) setGuide(b.dataset.q, false, true); else openPanel({ kind: 'quests' }); });
   box.querySelector('[data-open-q]').onclick = () => { FX.play('click'); openPanel({ kind: 'quests' }); };
+  box.querySelector('[data-open-r]').onclick = () => { FX.play('click'); openPanel({ kind: 'rewards' }); };
 }
 function paintHud() {
   if (!me) return;
   const c = G.careers[me.career];
-  $('#card').classList.toggle('admin', !!me.admin);
+  $('#card').classList.toggle('admin', !!me.admin); $('#godBtn').classList.toggle('hidden', !me.admin);
   $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} ${c.name} Lv.${me.lv}`;
   // ring around the portrait: progress to the next job level
   const jx = me.jx, pct = !jx ? 0 : jx.max ? 100 : Math.min(100, jx.cur / jx.need * 100);
@@ -2973,6 +2974,7 @@ function mgStop() { clearInterval(MG.timer); MG.timer = 0; MG.cur = null; }
 function mgClose() { mgStop(); $('#mg').classList.add('hidden'); }
 $('#mgX').onclick = () => { FX.play('click'); mgClose(); };
 $('#mgBtn').onclick = () => { FX.play('click'); mgMenu(); };
+$('#godBtn').onclick = () => { FX.play('click'); panel?.kind === 'god' ? closePanel() : openPanel({ kind: 'god' }); };
 $('#homeBtn').onclick = () => { FX.play('click'); openPanel({ kind: 'homedeco' }); };
 $('#rideBtn').onclick = () => { FX.play('click'); const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]);
   if (me.ride) send({ t: 'ride', v: me.ride, on: 0 }); else if (vs.length === 1) send({ t: 'ride', v: vs[0], on: 1 }); else openPanel({ kind: 'garage' }); };
