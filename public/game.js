@@ -396,6 +396,7 @@ function paintQuestBox() {
 function paintHud() {
   if (!me) return;
   const c = G.careers[me.career];
+  if ((me.docjob?.dest || '') !== (window.__docDest || '')) { window.__docDest = me.docjob?.dest || ''; if (me.docjob) setGuide(me.docjob.dest, true); }   // a new envelope: point the way
   $('#card').classList.toggle('admin', !!me.admin); $('#godBtn').classList.toggle('hidden', !me.admin);
   $('#meCareer').textContent = me.career === 'none' ? '🙂 ว่างงาน' : `${c.icon} ${c.name} Lv.${me.lv}`;
   // ring around the portrait: progress to the next job level
@@ -1490,19 +1491,20 @@ function renderPanel(p) {
       const o = me.office, today = dayNow();
       let status = '';
       if (me.career === 'office') {
-        const state = o && o.day === today ? (o.closed === today ? '✅ เลิกงานแล้ว' : `🟢 เข้างานแล้ว${o.late ? ' (สาย)' : ''} · ${o.hours.toFixed(1)} ชม.`) : '⚪ ยังไม่ลงเวลาเข้างาน';
-        status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าแรง <b>${money(wage)}</b>/ชม.<br>วันนี้: ${state}<br>มาสาย/ขาดงานสะสม: <b style="color:${(o?.strikes || 0) >= 2 ? 'var(--bad)' : 'inherit'}">${o?.strikes || 0}</b> ครั้ง (3 ครั้งขึ้นไปมีโอกาสถูกเลิกจ้าง)</div>
-          <div class="sub" style="margin-top:8px">💺 เดินไปที่ <b>โต๊ะทำงาน</b> ตัวไหนก็ได้แล้วกดนั่ง · เข้างาน ${hhmm(G.shift.start)} (สายได้ถึง ${hhmm(G.shift.grace)}) · เลิก ${hhmm(G.shift.end)} · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าแรง x${G.shift.otMul})</div>
+        const state = o && o.day === today ? (o.closed === today ? '✅ เลิกงานแล้ว' : `🟢 เข้างานแล้ว${o.late ? ' (สาย)' : ''} · ส่งไปแล้ว ${o.n || 0} งาน`) : '⚪ ยังไม่ลงเวลาเข้างาน (รับงานแรก = ลงเวลา)';
+        status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าส่งเอกสาร <b>~${money(Math.round(wage * .3))}–${money(Math.round(wage * .95))}</b>/งาน (ยิ่งไกลยิ่งได้มาก)<br>วันนี้: ${state}<br>มาสาย/ขาดงานสะสม: <b style="color:${(o?.strikes || 0) >= 2 ? 'var(--bad)' : 'inherit'}">${o?.strikes || 0}</b> ครั้ง (3 ครั้งขึ้นไปมีโอกาสถูกเลิกจ้าง)</div>
+          ${me.docjob ? `<div class="jobbox ok">📄 กำลังส่งเอกสารไปที่ <b>${esc(STN(me.docjob.dest)?.label || '')}</b> · ค่าส่ง ~${money(me.docjob.pay)}${B('📍 นำทาง', { fn: 'guide', key: me.docjob.dest }, 'good')}</div>` : B('📄 รับงานส่งเอกสาร', { t: 'act', st, a: 'job' }, 'primary big')}
+          <div class="sub" style="margin-top:8px">📄 รับซองเอกสารที่นี่ เดินไปส่งให้ถึงหน้าอาคารปลายทาง ได้เงินทันที (ไกลได้มาก) แล้วกลับมารับงานต่อ · เข้างาน ${hhmm(G.shift.start)} (สายได้ถึง ${hhmm(G.shift.grace)}) · เลิก ${hhmm(G.shift.end)} · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าส่ง x${G.shift.otMul})</div>
           ${B('📦 ลาออก', { t: 'resign' }, 'warn')}`;
       }
-      return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามชั่วโมงที่นั่งทำงาน (ต้องจบปริญญาตรี)</div>${status}${me.career === 'office' ? '' : staffHint('office')}`;
+      return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${me.career === 'office' ? '' : staffHint('office')}`;
     }
     case 'sdesk': {
       const L = me.enrolled && G.licenses[me.enrolled];
       return `<h2>📖 โต๊ะเรียน</h2>${L ? `<div class="sub">กำลังเรียน${L.name} ${me.classes}/${L.classes} คาบ · นั่งครบ 1 ชั่วโมงในเกม = 1 คาบ</div>${B('📖 นั่งเรียน', { t: 'act', st, a: 'sit' }, 'primary big')}` : '<div class="sub">ต้องลงทะเบียนเรียนที่เคาน์เตอร์มหาวิทยาลัยก่อน (ม.6 / ปริญญาตรี)</div>'}`;
     }
     case 'chair':
-      return `<h2>💺 โต๊ะทำงาน</h2><div class="sub">สำหรับพนักงานบริษัท นั่งในเวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} (โอทีต่อได้ถึง ${hhmm(G.shift.ot)}) เพื่อรับค่าแรง</div>${needCareer('office')}`;
+      return `<h2>💺 โต๊ะทำงาน</h2><div class="sub">สำหรับพนักงานบริษัท ตอนนี้งานบริษัทคือส่งเอกสาร 📄 รับงานที่ฝ่ายบุคคล (เคาน์เตอร์หน้าออฟฟิศ)</div>${needCareer('office')}`;
     case 'market': {
       const tab = p.tab || 'buy', mk = wd?.mk || {}, cat = p.cat || 'all', q = (p.q || '').trim().toLowerCase();
       const tabs = `<div class="tabs">${[['buy', '🛍️ ซื้อ'], ['sell', '🏷️ ขาย'], ['mine', `📋 ของฉัน (${(me.listings || []).length})`]].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;

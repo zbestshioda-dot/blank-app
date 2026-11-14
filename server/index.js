@@ -560,49 +560,60 @@ function revive(a, hp, by) {
   toast(a, by ? `${by} ช่วยให้คุณฟื้นแล้ว` : 'คุณฟื้นขึ้นมาแล้ว รีบหาอะไรกินและดูแลสุขภาพด้วย', '💓');
 }
 
-// ------------------------------------------------------------------ office work (shift 08:00–17:00, sit at a desk)
+// ------------------------------------------------------------------ office work: run documents around town (shift 08:00–17:00, overtime to 21:00)
+// Pick up an envelope at the office's front desk, carry it to the building it is addressed to, come back for the next one.
+// Each run pays by distance from the level's wage; the first pick-up of the day is the clock-in (late after 08:15 = -30%).
+const DOC_DESTS = D.STATIONS.filter(s => s.type === 'door' && s.house === undefined && s.area === 'town' && !s.renov && s.bld !== 'office' && D.ROOMS.some(r => r.bld === s.bld))
+  .concat(D.STATIONS.filter(s => ['market', 'furnshop', 'barber', 'cstore'].includes(s.type)));
+const OFFICE_DOOR = ST.door_office || D.STATIONS.find(s => s.id === 'door_office');
+function officeDay(a, day) { return a.office || (a.office = { strikes: 0, day: -1, late: false, pend: 0, hours: 0, n: 0, closed: -1, absent: -1 }); }
+function docPickup(a) {
+  const h = hourNow(), t = now(), day = D.dayAt(t), o = officeDay(a, day);
+  if (h >= D.SHIFT.ot || h < D.SHIFT.start - 1) return toast(a, `ตอนนี้ไม่ใช่เวลางาน (${hhmm(D.SHIFT.start)}–${hhmm(D.SHIFT.end)} · โอทีถึง ${hhmm(D.SHIFT.ot)})`, '🕗', false);
+  if (h >= D.SHIFT.end && o.day !== day) return toast(a, 'โอทีทำได้เฉพาะคนที่เข้างานวันนี้แล้ว', '🕗', false);
+  if (o.closed === day) return toast(a, 'วันนี้เลิกงานแล้ว พรุ่งนี้ค่อยมาใหม่', '🏢', false);
+  if (a.docjob) return toast(a, `ยังมีเอกสารต้องไปส่งที่ ${ST[a.docjob.dest]?.label || ''}`, '📄', false);
+  if (h < D.SHIFT.start) return toast(a, `รอเข้างาน ${hhmm(D.SHIFT.start)} ก่อนนะ`, '🕗', false);
+  if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำงาน... (ความสุขต่ำมาก)', '😞', false);
+  if (!spend(a, 2)) return;
+  if (o.day !== day) {                                 // first envelope of the day = clocking in
+    o.day = day; o.late = h > D.SHIFT.grace; o.pend = 0; o.hours = 0; o.n = 0;
+    if (o.late) { o.strikes++; toast(a, `มาสาย! (${hhmm(h)}) ค่าส่งเอกสารวันนี้ลด 30% · ถูกบันทึกมาสาย ${o.strikes} ครั้ง${o.strikes >= 2 ? ' ⚠️ ระวังถูกเลิกจ้าง' : ''}`, '⏰', false); if (fireCheck(a)) return; }
+    else { o.strikes = Math.max(0, o.strikes - 1); stat(a, 'ontime'); }
+  }
+  const pool = DOC_DESTS.filter(s => s.id !== a.lastDoc), dest = pick(pool);
+  const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), d = Math.hypot(dest.x - OFFICE_DOOR.x, dest.y - OFFICE_DOOR.y);
+  a.docjob = { dest: dest.id, pay: Math.round(D.OFFICE_WAGE[l - 1] * (0.2 + d / 100))   // ~฿45/min of walking at Lv.1, day, t };
+  a.lastDoc = dest.id; markMe(a);
+  return toast(a, `📄 รับเอกสารแล้ว ส่งที่ ${dest.label} · ค่าส่ง ~${money(a.docjob.pay)}${h >= D.SHIFT.end ? ` (โอที x${D.SHIFT.otMul})` : ''}`, '📄');
+}
 function officeTick(a, t, h, dt) {
-  const day = D.dayAt(t), o = a.office || (a.office = { strikes: 0, day: -1, late: false, pend: 0, hours: 0, closed: -1, absent: -1 });
-  const seated = a.chair >= 0;
-  if (seated && h >= D.SHIFT.start - 1 && h < D.SHIFT.end && o.day !== day) {
-    o.day = day; o.late = h > D.SHIFT.grace; o.pend = 0; o.hours = 0;
-    if (o.late) {
-      o.strikes++;
-      toast(a, `มาสาย! (${hhmm(h)}) ค่าแรงวันนี้ลด 30% · ถูกบันทึกมาสาย ${o.strikes} ครั้ง${o.strikes >= 2 ? ' ⚠️ ระวังถูกเลิกจ้าง' : ''}`, '⏰', false);
-      if (fireCheck(a)) return;
-    } else {
-      o.strikes = Math.max(0, o.strikes - 1); stat(a, 'ontime');
-      toast(a, `ลงเวลาเข้างาน ${hhmm(h)} ตรงเวลา 👍 นั่งทำงานไปจนถึง 17:00`, '🕗');
+  const day = D.dayAt(t), o = officeDay(a, day), j = a.docjob;
+  if (j) {
+    const s = ST[j.dest];
+    if (j.day !== day || h >= D.SHIFT.ot || !s) { a.docjob = null; markMe(a); toast(a, 'หมดเวลางาน เอกสารที่ยังไม่ได้ส่งถูกเก็บคืนบริษัท', '📄', false); }
+    else if (D.roomAt(a.x, a.y)?.bld === s.bld || areaId(a) === s.area && Math.hypot(a.x - s.x, a.y - s.y) < 2.2) {
+      const ot = h >= D.SHIFT.end;
+      const got = earn(a, j.pay * (ot ? D.SHIFT.otMul : 1) * (o.late ? 0.7 : 1) * wellbeing(a) * (1 + [0, .1, .2, .3][tier(a, 'office')]));
+      a.docjob = null; o.n = (o.n || 0) + 1; o.hours += 1; quest(a, 'work'); stat(a, 'docs'); joy(a, 1); markMe(a);
+      toast(a, `ส่งเอกสารที่ ${s.label} เรียบร้อย ได้ ${money(got)}${ot ? ' (โอที)' : ''} · กลับไปรับงานต่อที่บริษัท (วันนี้ ${o.n} งาน)`, '✅');
     }
   }
-  if (seated && depressed(a)) { standUp(a); toast(a, 'ไม่มีจิตใจจะทำงานต่อ... (ความสุขต่ำมาก) ไปทำอะไรให้มีความสุขก่อน', '😞', false); return; }
-  if (seated && o.day === day && h >= D.SHIFT.start && h < D.SHIFT.ot) {
-    const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), ot = h >= D.SHIFT.end;
-    if (ot && o.otNote !== day) { o.otNote = day; toast(a, `17:00 หมดเวลางานปกติ · นั่งต่อเป็นโอทีได้ถึง ${hhmm(D.SHIFT.ot)} ค่าแรง x${D.SHIFT.otMul} (ลุกเมื่อไหร่ก็เลิกงาน)`, '🌆'); }
-    const gh = dt * D.gameRate(h);                        // game hours that passed (nights run faster)
-    o.pend += D.OFFICE_WAGE[l - 1] * gh * (ot ? D.SHIFT.otMul : 1) * (o.late ? 0.7 : 1) * wellbeing(a) * (1 + [0, .1, .2, .3][tier(a, 'office')]);
-    o.hours += gh;
-    a.energy = Math.max(0, a.energy - 0.06 * dt);
-    if (a.energy <= 1) { toast(a, 'หมดแรง! ลุกไปพักกินอะไรก่อน', '😵', false); infect(a, 'exhaust', 0.3); standUp(a); }
-    if (o.pend >= D.OFFICE_WAGE[l - 1]) { earn(a, o.pend); o.pend = 0; quest(a, 'work'); }
-  }
-  if (o.day === day && o.closed !== day && (h >= D.SHIFT.ot || h >= D.SHIFT.end && !seated)) {   // the day ends when you leave after 17:00, or at 21:00
+  if (o.day === day && h >= D.SHIFT.ot && o.closed !== day) {
     o.closed = day;
-    if (o.pend > 0) { earn(a, o.pend); o.pend = 0; }
     const before = lvl(a, 'office');
-    if (o.hours >= 4) { addXp(a); stat(a, 'shifts'); }
-    let msg = `เลิกงานแล้ว! วันนี้ทำงาน ${o.hours.toFixed(1)} ชม.`;
+    if ((o.n || 0) >= 4) { addXp(a); stat(a, 'shifts'); }
+    let msg = `เลิกงานแล้ว! วันนี้ส่งเอกสาร ${o.n || 0} งาน`;
     if (lvl(a, 'office') > before && lvl(a, 'office') <= D.OFFICE_TITLES.length) {
       msg += ` 🎊 เลื่อนเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`; stat(a, 'promo');
       feed(`🎊 ${a.name} ได้เลื่อนตำแหน่งเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`);
     }
-    toast(a, msg + ' · ไฟในออฟฟิศปิดแล้ว ตึกปิด 21:00', '🏢');
-    if (a.chair >= 0) standUp(a);
+    toast(a, msg, '🏢');
   }
-  // online during the shift but never showed up -> absent
+  // online during the shift but never picked up an envelope -> absent
   if (h >= 12 && h < D.SHIFT.end && o.day !== day && o.absent !== day && (now() - (a.loginAt || 0)) > 4 * 60000) {
     o.absent = day; o.strikes++;
-    toast(a, `วันนี้คุณขาดงาน! (ต้องเข้างานก่อน 08:15 และนั่งที่โต๊ะทำงาน) ถูกบันทึก ${o.strikes} ครั้ง`, '📋', false);
+    toast(a, `วันนี้คุณขาดงาน! (ต้องรับงานส่งเอกสารที่บริษัทก่อน 08:15) ถูกบันทึก ${o.strikes} ครั้ง`, '📋', false);
     fireCheck(a);
   }
 }
@@ -783,15 +794,11 @@ function act(a, m) {
       if (r < .8) { infect(a, 'poison', .5); joy(a, -3); return toast(a, 'เจอแต่ของเน่า เหม็นมาก! 🤢 (ระวังท้องเสีย)', '🗑️', false); }
       return toast(a, 'ไม่เจออะไรเลย มีแต่ถุงพลาสติก', '🗑️', false);
     }
-    case 'chair.sit': {
-      if (!need(a, 'office')) return;
-      if (chairs[s.idx] && chairs[s.idx] !== a) return toast(a, 'โต๊ะนี้มีคนนั่งแล้ว', '💺', false);
-      if (h >= D.SHIFT.ot || h < D.SHIFT.start - 1 || h >= D.SHIFT.end && a.office?.day !== D.dayAt(now())) return toast(a, h >= D.SHIFT.end && h < D.SHIFT.ot ? 'โอทีทำได้เฉพาะคนที่เข้างานวันนี้แล้ว' : `ตอนนี้ไม่ใช่เวลางาน (เข้างาน ${hhmm(D.SHIFT.start)}–${hhmm(D.SHIFT.end)})`, '🕗', false);
-      if (a.office?.closed === D.dayAt(now())) return toast(a, 'วันนี้เลิกงานแล้ว พรุ่งนี้ค่อยมาใหม่', '🏢', false);
-      standUp(a); chairs[s.idx] = a; a.chair = s.idx; a.pose = 'chair'; place(a, s.x, s.y); sendRoster(); markMe(a);
-      return toast(a, h < D.SHIFT.start ? 'นั่งรอเข้างาน 08:00 เมื่อถึงเวลาจะเริ่มนับชั่วโมงอัตโนมัติ' : 'นั่งทำงานแล้ว ได้ค่าแรงทุกชั่วโมงที่นั่ง (เดินเพื่อลุก)', '💺');
+    case 'chair.sit': {                       // the desks are just furniture now: office work is running documents
+      return toast(a, 'งานบริษัทตอนนี้คือส่งเอกสาร 📄 รับงานได้ที่ฝ่ายบุคคล (เคาน์เตอร์หน้าออฟฟิศ)', '📄', false);
     }
     case 'office.resign': return resign(a);
+    case 'office.job': if (!need(a, 'office')) return; return docPickup(a);
     // ---------------- market
     case 'market.list': {
       const id = m.item, it = D.ITEMS[id];
@@ -2095,7 +2102,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2572,8 +2579,8 @@ function tick() {
     const room = D.ROOMS.find(r => r.rk === kind);
     if (room) for (const a of online.values()) if (D.roomAt(a.x, a.y) === room && !(isAdmin(a) && a.god?.doors)) { teleport(a, room.outside.x, room.outside.y); toast(a, `${room.label}ปิดทำการแล้ว (${hhmm(close)}) เปิดอีกครั้ง ${hhmm(open)}`, '🔒'); }
   }
-  if (crossed(D.SHIFT.end)) feed('🏢 17:00 หมดเวลางานปกติ ใครยังนั่งอยู่ได้ค่าโอที x1.25 ถึง 21:00');
-  if (crossed(D.SHIFT.start - 0.5)) for (const a of online.values()) if (a.career === 'office') toast(a, 'อีก 30 นาทีเข้างาน (08:00) ไปนั่งที่โต๊ะทำงานในบริษัทให้ทัน', '⏰');
+  if (crossed(D.SHIFT.end)) feed('🏢 17:00 หมดเวลางานปกติ พนักงานที่ยังส่งเอกสารต่อได้ค่าโอที x1.25 ถึง 21:00');
+  if (crossed(D.SHIFT.start - 0.5)) for (const a of online.values()) if (a.career === 'office') toast(a, 'อีก 30 นาทีเข้างาน (08:00) ไปรับงานส่งเอกสารที่บริษัทให้ทัน', '⏰');
   lastHour = h;
 
   const slow = t > slowAt; if (slow) slowAt = t + 1000;
