@@ -524,3 +524,34 @@ body.hasEvent #topBar{top:146px!important}
 @keyframes tick2{from{transform:translateX(100cqw)}to{transform:translateX(-100%)}}
 #topBar,body.hasEvent #topBar{top:calc(136px + env(safe-area-inset-top))!important}
 @media (max-height:520px) and (orientation:landscape){#topBar,body.hasEvent #topBar{top:calc(4px + env(safe-area-inset-top))!important}}
+
+/* chat box under the status card (tabs, foldable) */
+#feed #log{display:none}
+#chatBox{pointer-events:auto;background:rgba(28,20,14,.72);border:1.5px solid rgba(255,214,140,.35);border-radius:12px;padding:4px 6px 6px;color:#fbecd2;width:100%;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+.cbHead{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.cbHead::-webkit-scrollbar{display:none}
+.cbHead button{background:none;border:0;box-shadow:none;color:#d9c7a8;padding:3px 7px;font-size:12px;border-radius:8px;white-space:nowrap}
+.cbHead button.on{background:#f0c25a;color:#3a2410;font-weight:600}
+#cbFold{color:#fbecd2;font-weight:600}
+.cbHead button[data-ct=world]{color:#8fd3ff}.cbHead button[data-ct=sys]{color:#9be15d}
+.cbHead button.on[data-ct]{color:#3a2410}
+#cbMsgs{max-height:96px;overflow-y:auto;font-size:12px;line-height:1.4;margin:3px 2px;word-break:break-word}
+#cbMsgs .sys{color:#ffd98a}#cbMsgs .w b{color:#8fd3ff}#cbMsgs .call b{color:#b7e58e}
+#cbForm{display:flex;gap:4px}
+#cbIn{flex:1;padding:4px 8px;font-size:12.5px;background:rgba(255,248,232,.12);color:#fbecd2;border:1px solid rgba(255,214,140,.3);border-radius:8px}
+#cbIn::placeholder{color:#bfae92}
+#cbForm button{padding:3px 10px;font-size:12px}
+#cbOpen{pointer-events:auto;align-self:flex-start;background:rgba(28,20,14,.78);color:#fbecd2;border:1.5px solid rgba(255,214,140,.35);font-size:12.5px;padding:4px 10px;border-radius:14px;box-shadow:none}
+#cbNew{background:#e04a35;color:#fff;border-radius:9px;padding:0 6px;font-size:11px}#cbNew:empty{display:none}
+/* thumb cluster: run above the big button, bag beside it */
+#runBtn{right:19px;bottom:100px;width:50px;height:50px}
+#runBtn.on{background:linear-gradient(#5fc46a,#2f8a3a);box-shadow:0 0 0 3px #7be07b inset,0 4px 0 #3e2414}
+#bagBtn{right:100px;bottom:74px;width:54px;height:54px}
+#emoBtn{right:166px;bottom:70px;width:48px;height:48px}
+#restBtn{right:168px;bottom:10px;width:48px;height:48px}
+#begBtn{right:40px;bottom:160px;width:48px;height:48px}
+@media (max-height:520px) and (orientation:landscape){#cbMsgs{max-height:64px}#chatBox{padding:3px 5px 4px}}
+/* the chat box stays put; action messages float just under it instead of pushing it around */
+#feed{display:flex;flex-direction:column}
+#feed #chatBox,#feed #cbOpen{order:1}
+#feed #toasts{order:2;margin-top:4px}

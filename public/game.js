@@ -126,10 +126,10 @@ function handle(m) {
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
-      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); lastInput = performance.now();
+      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds));
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
-      chatLog.length = 0; m.chat.forEach(c => chatLog.push(c));
+      chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       break;
@@ -168,7 +168,7 @@ function handle(m) {
     case 'tchat': tradeChat.push(m); if (tradeChat.length > 30) tradeChat.shift(); paintTradeChat(); if (!m.mine) FX.play('pop'); break;
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
-      logLine(m.sys ? m.text : `${m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}`, m.sys ? 'sys' : '', !m.sys);
+      paintChatBox(m);
       const s = P.get(m.id); if (s && !m.sys && !m.w) { s.bubble = m.text; s.bt = performance.now() + 6500; }
       if (m.sys) { if (/🦈|💎|🎊|🏅|🎓/.test(m.text)) FX.play('notice'); } else if (m.id !== myId) FX.play('pop');
       if (panel?.kind === 'chat') refreshPanel(true);
@@ -184,7 +184,7 @@ function handle(m) {
     }
     case 'call_msg': {
       callLog.push(m); if (callLog.length > 50) callLog.shift();
-      if (!m.me) { logLine(`📞 <b>${esc(m.name)}</b>: ${esc(m.text)}`, 'call', false); FX.play('pop'); }
+      if (!m.me) { const c = { call: 1, name: m.name, text: m.text }; chatLog.push(c); paintChatBox(c); FX.play('pop'); }
       if (panel?.kind === 'phone') refreshPanel(true);
       break;
     }
@@ -215,6 +215,31 @@ function handle(m) {
     }
   }
 }
+// ---- the chat box under the status card: tabs, foldable, type straight into it
+let cbTab = 'all', cbFolded = false, cbUnread = 0;
+try { cbFolded = localStorage.getItem('lt_cb') === '1'; } catch { }
+const cbShow = m => cbTab === 'all' || (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : !m.sys && !m.w);
+function paintChatBox(added) {
+  const box = $('#cbMsgs'); if (!box) return;
+  box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
+    : `<div class="${m.call ? 'call' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
+  box.scrollTop = box.scrollHeight;
+  if (added && cbFolded && !added.sys) { cbUnread++; $('#cbNew').textContent = cbUnread; }
+}
+function foldChat(f) {
+  cbFolded = f; $('#chatBox').classList.toggle('hidden', f); $('#cbOpen').classList.toggle('hidden', !f);
+  if (!f) { cbUnread = 0; $('#cbNew').textContent = ''; paintChatBox(); }
+  try { localStorage.setItem('lt_cb', f ? '1' : '0'); } catch { }
+}
+$('#cbFold').onclick = () => { FX.play('click'); foldChat(true); };
+$('#cbOpen').onclick = () => { FX.play('click'); foldChat(false); };
+document.querySelectorAll('#chatBox [data-ct]').forEach(b => b.onclick = () => {
+  cbTab = b.dataset.ct; document.querySelectorAll('#chatBox [data-ct]').forEach(x => x.classList.toggle('on', x === b));
+  $('#cbIn').placeholder = cbTab === 'world' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
+  paintChatBox();
+});
+$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (i.value.trim()) send({ t: 'chat', text: i.value, ch: cbTab === 'world' ? 'world' : 'near' }); i.value = ''; i.blur(); };
+foldChat(cbFolded);
 function logLine(html, cls, bubbleOnly) {
   const l = $('#log'); const d = document.createElement('div');
   if (cls) d.className = cls; d.innerHTML = html;
@@ -332,7 +357,8 @@ setInterval(() => {
   });
 }, 500);
 
-document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openPanel({ kind: b.dataset.open }));
+document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => b.dataset.open === 'chat' ? openChatBox() : openPanel({ kind: b.dataset.open }));
+function openChatBox() { foldChat(false); setTimeout(() => $('#cbIn').focus(), 30); }
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // the status card folds down to a small strip (face, money, slim bars); folded by default on phones
@@ -380,7 +406,9 @@ $('#restBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); se
 // running: toggle with the 🏃 button, or hold Shift on a keyboard
 let running = false, shiftRun = false, runSetT = 0;
 const canRun = () => !!me && me.energy > G.run.minEnergy && !me.down;
-function setRun(on) { if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#actBtn').classList.toggle('run', on); }
+function setRun(on) { if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#actBtn').classList.toggle('run', on); $('#runBtn').classList.toggle('on', on); }
+$('#runBtn').onclick = () => { FX.play('click'); setRun(!running); };
+$('#bagBtn').onclick = () => { FX.play('click'); panel?.kind === 'bag' ? closePanel() : openPanel({ kind: 'bag' }); };
 $('#begBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); send({ t: 'beg', on: me.pose !== 'beg' }); };
 $('#talkBtn').onclick = () => talk();
 $('#updBtn').onclick = () => location.reload();
@@ -415,14 +443,15 @@ addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') { if (e.key === 'Escape') e.target.blur(); return; }
   keys[e.key.toLowerCase()] = true;
   if (!G) return;
-  if (e.key === 'e' || e.key === ' ' || e.key === 'Enter' && !panel) { e.preventDefault(); onAction(); }
+  if (e.key === 'e' || e.key === ' ') { e.preventDefault(); onAction(); }
+  if (e.key === 'Enter' && !panel) { e.preventDefault(); openChatBox(); }
   if (e.key === 'Escape') { closePanel(); }
   if (e.key === 'b') openPanel({ kind: 'bag' });
   if (e.key === 'p') openPanel({ kind: 'phone' });
   if (e.key === 'r') $('#restBtn').click();
   if (e.key === 'f') talk();
   if (e.key === 'Shift' && !running) { shiftRun = true; setRun(true); }
-  if (e.key === 'c' || e.key === 't') { e.preventDefault(); openPanel({ kind: 'chat' }); }
+  if (e.key === 'c' || e.key === 't' || e.key === 'Enter' && panel) { e.preventDefault(); openChatBox(); }
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });

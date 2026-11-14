@@ -38,7 +38,6 @@
     <button id="menuToggle" class="tile" title="ซ่อนเมนู"></button>
     <div id="menu">
       <button class="tile" data-open="career" title="งาน"><img src="assets/ui/b_job.png" alt="งาน"><i>งาน</i></button>
-      <button class="tile" data-open="bag" title="กระเป๋า"><img src="assets/ui/b_bag.png" alt="กระเป๋า"><i>กระเป๋า</i></button>
       <button class="tile" data-open="phone" id="phoneBtn" title="มือถือ"><img src="assets/ui/b_phone.png" alt="มือถือ"><i>มือถือ</i></button>
       <button class="tile" data-open="quests" id="qBtn" title="เควสต์"><img src="assets/ui/b_quest.png" alt="เควสต์"><i>เควสต์</i></button>
       <button class="tile" data-open="mail" id="mailBtn" title="กล่องจดหมาย"><b class="q">📬</b><i>จดหมาย</i></button>
@@ -51,7 +50,14 @@
   <button id="navX" class="hidden"></button>
   <div id="eventBar" class="hidden"></div>
   <!-- notifications: action results (toasts) on top, chat/system lines under them; the column sits under the status card -->
-  <div id="feed"><div id="toasts"></div><div id="log"></div></div>
+  <div id="feed"><div id="toasts"></div><div id="log"></div>
+    <div id="chatBox">
+      <div class="cbHead"><button id="cbFold" title="หุบ/ขยายแชท">‹ หุบ</button><button data-ct="all" class="on">แชทรวม</button><button data-ct="near">ใกล้ๆ</button><button data-ct="world">แชทโลก</button><button data-ct="sys">ระบบ</button><span id="cbOn"></span></div>
+      <div id="cbMsgs"></div>
+      <form id="cbForm" autocomplete="off"><input id="cbIn" maxlength="120" placeholder="แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ"><button type="submit" class="primary">ส่ง</button></form>
+    </div>
+    <button id="cbOpen" class="hidden">💬 แชท <b id="cbNew"></b></button>
+  </div>
   <div id="reqs"></div>
   <button id="callChip" class="hidden"></button>
   <div id="downView" class="hidden"></div>
@@ -59,6 +65,8 @@
   <!-- right-thumb controls -->
   <div id="thumbs">
     <button id="actBtn" class="idle" title="แตะ = ใช้งาน / เข้าอาคาร (E) · กดค้าง = วิ่ง (Shift)"><span id="actIcon">👆</span><small id="actLabel">ใช้งาน</small></button>
+    <button id="runBtn" class="round sm" title="วิ่ง (Shift) · กดค้างปุ่มใหญ่ก็วิ่งได้"><span>👟</span><small>วิ่ง</small></button>
+    <button id="bagBtn" class="round sm" title="กระเป๋า"><span>🎒</span><small>กระเป๋า</small></button>
     <button id="talkBtn" class="round" title="พูดคุยกับคนใกล้ๆ (F)"><span>💬</span><small>คุย</small></button>
     <button id="restBtn" class="round sm" title="นั่งพักหลับตา (R)"><span>😌</span><small>พัก</small></button>
     <button id="emoBtn" class="round sm" title="อิโมจิบนหัว"><span>😀</span><small>อิโมจิ</small></button>
