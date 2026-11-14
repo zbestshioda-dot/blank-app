@@ -830,6 +830,13 @@ function act(a, m) {
       addItem(a, id, bought); markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${it.icon}${it.name} x${bought} จากผู้เล่น รวม ${money(spent)}`, '🛍️');
     }
+    case 'cstore.buy': {                      // the 24-hour convenience store: always stocked, a little dearer than the market
+      const id = m.item, it = D.ITEMS[id]; if (!it || !D.CSTORE.items.includes(id)) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = Math.ceil(it.base * D.CSTORE.markup);
+      if (!pay(a, unit * q)) return;
+      addItem(a, id, q); markMe(a); quest(a, 'buy', q);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ${money(unit * q)} · ขอบคุณที่ใช้บริการ 🙏`, '🏪');
+    }
     case 'market.npcbuy': {
       const id = m.item, it = D.ITEMS[id]; if (!it || it.kind === 'fish' && it.base >= 1000 || it.menu) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = npcSellPrice(id);
@@ -1282,6 +1289,7 @@ function useItem(a, id) {
   if (e.hunger) { a.hunger = Math.min(100, a.hunger + e.hunger); quest(a, 'eat'); }
   if (e.energy) a.energy = Math.min(100, a.energy + e.energy);
   if (e.health) a.health = Math.min(100, a.health + e.health);
+  if (e.happy) joy(a, e.happy);
   const healed = (it.cures || []).filter(d => cure(a, d));
   if (healed.length) toast(a, `หายจาก${healed.map(d => DZ[d].name).join(', ')}แล้ว`, '💊');
   if (id === 'snack') infect(a, 'poison', 0.04);
@@ -2179,7 +2187,7 @@ function login(ws, m) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS, areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());

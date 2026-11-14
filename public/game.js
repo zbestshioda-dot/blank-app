@@ -1533,6 +1533,12 @@ function renderPanel(p) {
       }
       return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')}</div>${tabs}${body}`;
     }
+    case 'cstore': {
+      const rows = (G.cstore?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.cstore.markup), e = it.eat || {};
+        return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
+          [e.hunger && `อิ่ม +${e.hunger}`, e.energy && `พลัง +${e.energy}`, e.health && `เลือด +${e.health}`, e.happy && `สุข +${e.happy}`].filter(Boolean).join(' · ') + ` · มีอยู่ ${me.inv[id] || 0}`); }).join('');
+      return `<h2>🏪 ร้านสะดวกซื้อ 24 ชม.</h2><div class="sub">เปิดตลอด 24 ชั่วโมง ของมีเสมอ ไม่ต้องรอใครวางขาย · ราคาสูงกว่าตลาดนิดหน่อย</div><div class="list">${rows}</div>`;
+    }
     case 'warehouse': {
       const rows = Object.entries(G.items).filter(([, it]) => it.wholesale).map(([id, it]) =>
         itemRow(id, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: id, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 })}${B('x10', { t: 'act', st, a: 'buy', item: id, qty: 10 })}</div>`,
