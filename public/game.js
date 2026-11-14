@@ -219,6 +219,7 @@ function handle(m) {
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       if (tutPending) setTimeout(() => me && showTut(0), 400);
+      else setTimeout(() => me && checkNews(), 900);
       break;
     case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
     case 'wd': { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
@@ -1164,10 +1165,18 @@ function buildStaff() {
 }
 const KEEPERS = [
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: -1.9, dy: 0.7, of: 'chef', lk: { hair: 'black' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
-  { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', g: 'f', dx: 1.5, dy: .1, lk: { hair: 'pink', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมคะ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ค่ะ'] },
+  { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'pink', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมคะ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ค่ะ'] },
+  { st: 'furnshop', name: 'เฮียเล้ง (ร้านเฟอร์นิเจอร์)', short: 'เฮียเล้ง', icon: '🛋️', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'blue' }, hi: ['โซฟาตัวนี้นั่งสบายมากครับ', 'จัดบ้านสวย อยู่แล้วมีความสุขนะ', 'ซื้อแล้วส่งถึงบ้านเลยครับ'] },
+  { st: 'police', name: 'ดาบสมชาย (เวรประจำโต๊ะ)', short: 'ดาบสมชาย', icon: '👮', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'black' }, hi: ['มีอะไรให้ช่วยครับ', 'เห็นโจรล้วงกระเป๋า โทร 191 ได้เลย', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะ'] },
+  { st: 'school', name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', short: 'ผอ.ประเสริฐ', icon: '🎓', dx: .5, dy: -1.1, of: 'office', lk: { hair: 'silver' }, hi: ['ตั้งใจเรียนนะ อนาคตอยู่ในมือเธอ', 'นั่งโต๊ะเรียนครบชั่วโมงได้ 1 คาบ', 'ยินดีต้อนรับสู่มหาวิทยาลัย'] },
+  { st: 'dealer', name: 'เซลส์ต้น (โชว์รูมรถ)', short: 'เซลส์ต้น', icon: '🚗', dx: .5, dy: -1.1, of: 'office', lk: { hair: 'black' }, hi: ['รุ่นใหม่ล่าสุดเลยครับ', 'ทดลองนั่งได้นะครับ', 'ผ่อนสบายๆ ครับพี่'] },
+  { st: 'cstore', name: 'น้องฝน (พนักงานร้าน)', short: 'น้องฝน', icon: '🏪', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'black', shirt: 'green' }, hi: ['สวัสดีค่ะ ยินดีต้อนรับค่ะ', 'รับขนมจีบซาลาเปาเพิ่มไหมคะ', 'สะสมแต้มไหมคะ'] },
+  { st: 'cstore2', name: 'น้องบีม (พนักงานร้าน)', short: 'น้องบีม', icon: '🏪', dx: .7, dy: -1.15, lk: { hair: 'black', shirt: 'green' }, hi: ['สวัสดีครับ ยินดีต้อนรับครับ', 'รับถุงไหมครับ', 'กาแฟกระป๋องเย็นๆ ครับ'] },
+  { st: 'cstore3', name: 'น้องแพร (พนักงานร้าน)', short: 'น้องแพร', icon: '🏪', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'ginger', shirt: 'green' }, hi: ['สวัสดีค่ะ เปิด 24 ชั่วโมงค่ะ', 'ข้าวกล่องอุ่นให้ไหมคะ', 'ลอตเตอรี่งวดนี้มาแล้วค่ะ'] },
+  { st: 'cstore4', name: 'น้องโอ๊ต (พนักงานร้าน)', short: 'น้องโอ๊ต', icon: '🏪', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'green' }, hi: ['สวัสดีครับ ร้านในหมู่บ้านครับ', 'น้ำดื่มเย็นๆ ครับ', 'มาซื้อของทุกวันเลยนะครับ'] },
   { st: 'market', name: 'เจ๊ศรี (ผู้ดูแลตลาดกลาง)', short: 'เจ๊ศรี', icon: '🏪', g: 'f', dx: 2.6, dy: .35, of: 'merchant', lk: { hair: 'black' }, hi: ['ซื้อขายที่นี่ ราคายุติธรรม', 'วางขายของได้นะ คนซื้อเยอะ', 'ของสดๆ ทั้งนั้นจ้า'] },
   { st: 'estate', name: 'คุณบอย (นายหน้าอสังหาฯ)', short: 'คุณบอย', icon: '🏡', dx: 1.4, dy: 0, of: 'office', lk: { hair: 'black' }, hi: ['บ้านสวย ทำเลดี ราคาคุ้มครับ', 'สนใจซื้อหรือเช่าบ้านไหมครับ', 'ปล่อยเช่าบ้านก็มีรายได้นะครับ'] },
-  { st: 'toolshop', name: 'ช่างเปี๊ยก (ร้านอุปกรณ์)', short: 'ช่างเปี๊ยก', icon: '🛠️', dx: 2.0, dy: -0.5, of: 'farmer', hi: ['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดเบ็ดหรือยัง?', 'ของแท้ทุกชิ้นรับประกัน'] },
+  { st: 'toolshop', name: 'ช่างเปี๊ยก (ร้านอุปกรณ์)', short: 'ช่างเปี๊ยก', icon: '🛠️', dx: .5, dy: -1.1, of: 'farmer', hi: ['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดเบ็ดหรือยัง?', 'ของแท้ทุกชิ้นรับประกัน'] },
   { st: 'bank', name: 'คุณนิด (พนักงานธนาคาร)', short: 'คุณนิด', icon: '🏦', g: 'f', dx: -2.4, dy: -0.4, of: 'office', lk: { hair: 'black' }, hi: ['ฝากเงินไว้ได้ดอกเบี้ยนะคะ', 'ยินดีต้อนรับสู่ธนาคารค่ะ', 'กู้เงินได้ แต่อย่าลืมคืนนะคะ'] },
 ];
 function staffGreet(n) {
@@ -1282,6 +1291,13 @@ function buildMini() {
   for (const a of G.areas.filter(a => a.kind === 'map')) {
     const c = document.createElement('canvas'); c.width = a.w * 2; c.height = a.h * 2; const g = c.getContext('2d');
     for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) { g.fillStyle = MINI_COLORS[G.map.tiles[a.y + y][a.x + x]] || '#5e9b57'; g.fillRect(x * 2, y * 2, 2, 2); }
+    // buildings as clean blocks in the same colours as the big map (shops/services, scenery, homes)
+    for (const b of G.map.buildings) {
+      if (b.x < a.x || b.x >= a.x + a.w || b.y < a.y || b.y >= a.y + a.h) continue;
+      g.fillStyle = b.deco ? '#b9a48f' : b.house !== undefined ? '#d98f6a' : '#4d5b7a';
+      g.fillRect((b.x - a.x) * 2, (b.y - a.y) * 2, b.w * 2, b.h * 2);
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect((b.x - a.x) * 2, (b.y - a.y + b.h) * 2 - 1, b.w * 2, 1);
+    }
     miniBase[a.id] = c;
   }
 }
@@ -1605,9 +1621,31 @@ function applyBox(career, st) {
 }
 const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
 
+// what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
+const NEWS = [
+  { v: '2026-11-14b', d: '14 พ.ย.', items: [
+    '👮 โต๊ะสถานีตำรวจมี <b>ดาบสมชาย</b> นั่งเวรประจำโต๊ะ',
+    '🎓 มหาวิทยาลัยมี <b>ผอ.ประเสริฐ</b> ผู้อำนวยการยืนที่โต๊ะ',
+    '🏪 ร้านสะดวกซื้อทั้ง 4 สาขามีพนักงานประจำเคาน์เตอร์',
+    '🛋️ ร้านเฟอร์นิเจอร์ และ 💈 ร้านทำผม <b>เดินเข้าไปในร้านได้แล้ว</b> จัดร้านใหม่ (โซฟา ชุดห้องนอน โต๊ะอาหาร / เก้าอี้ทำผม กระจก อ่างสระผม)',
+    '🚗 โชว์รูมรถ และ 🛠️ ร้านอุปกรณ์ มีพนักงานยืนหลังเคาน์เตอร์',
+    '🐟 เอาตู้ข้างร้านขายปลาออก ย้ายร้านขายปลาไปตั้งแทนที่',
+    '🗺️ แผนที่: เอาวงกลมดำมีตัวเลขออก ใช้สัญลักษณ์ของแต่ละที่แทน · มินิแมพแสดงตัวอาคารชัดขึ้น',
+    '🆕 มีหน้าสรุปอัปเดตแบบนี้ทุกครั้งที่อัปเดตเกม' ] },
+];
+function newsHtml() {
+  return `<h2>🆕 อัปเดตล่าสุด</h2>` + NEWS.slice(0, 5).map((n, i) => `<div class="sub" style="margin-top:${i ? 12 : 4}px"><b>${n.d}</b></div><ul style="margin:4px 0 0;padding-left:20px;line-height:1.7;font-size:14px">${n.items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('');
+}
+function checkNews() {
+  let seen = ''; try { seen = localStorage.getItem('lt_news') || ''; } catch { }
+  if (seen === NEWS[0].v) return;
+  try { localStorage.setItem('lt_news', NEWS[0].v); } catch { }
+  if (!panel) openPanel({ kind: 'news' });
+}
 function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
+    case 'news': return newsHtml();
     case 'office': {
       const l = Math.min(me.career === 'office' ? me.lv : 1, G.titles.length), wage = G.wages[l - 1];
       const o = me.office, today = dayNow();
@@ -2095,7 +2133,7 @@ function renderPanel(p) {
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}
         ${me.admin ? `<div class="secT">👑 แอดมิน</div>${B('👑 เปิด God mode', { fn: 'open', kind: 'god' }, 'primary big')}` : ''}
         <div class="secT">🎮 อื่นๆ</div>
-        <div class="grid2">${B('📤 ชวนเพื่อน', { fn: 'share' }, 'good')}${B('🐞 แจ้งบัค', { fn: 'open', kind: 'bug' })}${B('❔ วิธีเล่น', { fn: 'open', kind: 'help' })}${B('📖 บทช่วยสอน', { fn: 'tut' })}</div>
+        <div class="grid2">${B('📤 ชวนเพื่อน', { fn: 'share' }, 'good')}${B('🐞 แจ้งบัค', { fn: 'open', kind: 'bug' })}${B('❔ วิธีเล่น', { fn: 'open', kind: 'help' })}${B('📖 บทช่วยสอน', { fn: 'tut' })}${B('🆕 อัปเดต', { fn: 'open', kind: 'news' })}</div>
         <div class="secT" style="color:var(--bad)">♻️ รีเซ็ตตัวละคร (เริ่มใหม่)</div>
         <div class="sub">ล้างเงิน ของ บ้าน สวน งาน วุฒิ และความสำเร็จทั้งหมด เริ่มใหม่ที่จัตุรัส (ID, PIN, ชื่อ, เบอร์โทร และรายชื่อเพื่อนยังอยู่)</div>
         <div class="grid2"><input id="resetPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN ของคุณ"><input id="resetOk" placeholder='พิมพ์ "รีเซ็ต"'></div>
@@ -2779,13 +2817,13 @@ function openMap(mapId, keepScroll) {
     const [x, y] = L(q.x + (room ? 1.4 : 0), q.y + (room ? -1.2 : 0)), c = G.careers[n.career];
     staffPl.push({ key: n.st, icon: '👤', label: n.short, sub: n.career === 'fishing' ? '🎣 ซื้อเบ็ด (ตกปลาได้ทุกคน)' : `${c?.icon || ''} สมัคร/เปลี่ยนเป็น${c?.name || ''}${room ? ` · ใน${room.label}` : ''}`, x, y, kind: 'staff', hl: me.career === n.career, ci: n.career === 'fishing' ? '🎣' : c?.icon || '👤' });
   }
-  // numbered markers (job staff are person pins with their career's symbol)
+  // place markers: the place's own symbol on a light badge (no numbered black dots); job staff are person pins with their career's symbol
   const r = clamp(k * .95, 8, 13);
-  places.forEach((pl, i) => {
-    pl.n = i + 1;
-    dot(pl.x, pl.y, r + 2, 'rgba(0,0,0,.45)');
-    dot(pl.x, pl.y, r, pl.hl ? '#ffc94d' : pl.kind === 'gate' ? '#2f7fd1' : pl.kind === 'home' ? '#c0623e' : pl.kind === 'spot' ? '#2e8a57' : '#1f2630');
-    g.fillStyle = pl.hl ? '#222' : '#fff'; g.font = `800 ${Math.round(r * 1.05)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  places.forEach(pl => {
+    pl.n = pl.icon;
+    dot(pl.x, pl.y, r + 2, pl.hl ? '#ffc94d' : pl.kind === 'gate' ? '#2f7fd1' : pl.kind === 'home' ? '#c0623e' : pl.kind === 'spot' ? '#2e8a57' : 'rgba(255,255,255,.55)');
+    dot(pl.x, pl.y, r, 'rgba(255,255,255,.92)');
+    g.font = `${Math.round(r * 1.25)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(pl.n, pl.x, pl.y + 1);
   });
   staffPl.forEach((pl, i) => {
@@ -2816,7 +2854,7 @@ function openMap(mapId, keepScroll) {
   if (guide) { const hop = guide.player ? null : guide; if (hop && mapOf(hop.area) === mapId) { const q = AREA[hop.area]?.kind === 'room' ? AREA[hop.area].outside : hop, [x, y] = L(q.x, q.y); g.strokeStyle = '#ffc94d'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(x, y, r * 1.9, 0, 7); g.stroke(); g.setLineDash([]); } }
   // legend
   const here = roomOf(m.x, m.y);
-  const row = pl => `<button data-key="${esc(pl.key)}" class="${pl.hl ? 'hl' : ''}"><i class="k-${pl.kind}">${pl.n}</i><span>${pl.kind === 'staff' ? '' : pl.icon + ' '}${esc(pl.label)}${pl.sub ? `<small>${esc(pl.sub)}</small>` : ''}</span></button>`;
+  const row = pl => `<button data-key="${esc(pl.key)}" class="${pl.hl ? 'hl' : ''}"><i class="k-${pl.kind}">${pl.n}</i><span>${esc(pl.label)}${pl.sub ? `<small>${esc(pl.sub)}</small>` : ''}</span></button>`;
   $('#mapLegend').innerHTML = `<div class="lgHead">⚪ คุณอยู่${here ? `ใน${esc(here.label)}` : 'ที่วงสีส้ม'} · 🟢 ผู้เล่นออนไลน์บนแผนที่นี้ ${onHere} คน · แตะชื่อเพื่อนำทาง</div>`
     + `<div class="lgSec">📍 สถานที่</div>${places.map(row).join('')}`;
   places.push(...staffPl);

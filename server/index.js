@@ -647,7 +647,7 @@ function revive(a, hp, by) {
 // Pick up an envelope at the office's front desk, carry it to the building it is addressed to, come back for the next one.
 // Each run pays by distance from the level's wage; the first pick-up of the day is the clock-in (late after 08:15 = -30%).
 const DOC_DESTS = D.STATIONS.filter(s => s.type === 'door' && s.house === undefined && s.area === 'town' && !s.renov && s.bld !== 'office' && D.ROOMS.some(r => r.bld === s.bld))
-  .concat(D.STATIONS.filter(s => ['market', 'furnshop', 'barber'].includes(s.type)));
+  .concat(D.STATIONS.filter(s => s.type === 'market'));
 const OFFICE_DOOR = ST.door_office || D.STATIONS.find(s => s.id === 'door_office');
 function officeDay(a, day) { return a.office || (a.office = { strikes: 0, day: -1, late: false, pend: 0, hours: 0, n: 0, closed: -1, absent: -1 }); }
 function docPickup(a) {

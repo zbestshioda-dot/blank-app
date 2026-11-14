@@ -164,8 +164,8 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
 #mapLegend .lgHead{font-size:12px;color:var(--mut);padding:2px 4px 6px}
 #mapLegend button{display:flex;align-items:center;gap:8px;text-align:left;padding:5px 8px;font-size:13px;box-shadow:none;border-width:1.5px;background:var(--paper3)}
 #mapLegend button.hl{border-color:var(--acc);background:#ffe8a8}
-#mapLegend button i{font-style:normal;min-width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;background:#1f2630;color:#fff;font-family:var(--px)}
-#mapLegend button i.k-gate{background:#2f7fd1}#mapLegend button i.k-home{background:#c0623e}#mapLegend button i.k-spot{background:#2e8a57}
+#mapLegend button i{font-style:normal;min-width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;background:#fff;color:#222;font-family:serif;box-shadow:inset 0 0 0 2px rgba(0,0,0,.18)}
+#mapLegend button i.k-gate{box-shadow:inset 0 0 0 2px #2f7fd1}#mapLegend button i.k-home{box-shadow:inset 0 0 0 2px #c0623e}#mapLegend button i.k-spot{box-shadow:inset 0 0 0 2px #2e8a57}
 #mapLegend button.hl i{background:#ffc94d;color:#222}
 #mapLegend small{display:block;color:var(--mut);font-size:11px}
 @media(min-width:821px){#mapScroll{max-width:calc(min(100vw,1180px) - 320px)}}

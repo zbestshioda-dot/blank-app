@@ -100,8 +100,8 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // north street: the civic street
   B('police', 'b_police2', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true, renov: true });
-  B('furnshop', 'b_furnshop', 27, 30, { label: 'ร้านเฟอร์นิเจอร์', icon: '🛋️', st: 'furnshop', outdoor: true, noSlot: true });   // furniture sold at the counter out front
-  B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', outdoor: true, noSlot: true });   // hair dye at the counter outside
+  B('furnshop', 'b_furnshop', 27, 30, { label: 'ร้านเฟอร์นิเจอร์', icon: '🛋️', st: 'furnshop', late: 2 });   // walk-in showroom (its room is laid out after the convenience stores)
+  B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', late: 2 });   // walk-in salon
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true, renov: true });
   // south-west lane: services and trade (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
@@ -109,7 +109,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('kitchen', 'b_kitchen', 13, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_rider2', 20, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
   B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
-  B('fishstall', 'b_fishstall', 20, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
+  B('fishstall', 'b_fishstall', 24, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
   B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
   B('fashion', 'b_boutique', 6, 30, { label: 'ร้านแฟชั่น', icon: '👕', st: 'fashion' });
 
@@ -170,7 +170,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('parasol', 99, 30); prop('parasol2', 99, 40); prop('deckchair', 98.6, 46); prop('deckchair', 99.8, 46); prop('palm', 98.7, 22); prop('palm_small', 98.5, 52); prop('palm', 99, 70);
   prop('foodtruck', 89, 74.6); prop('tent', 60, 70); prop('campfire', 63, 70.5, false);
   prop('o_flowercart', 18.5, 29.95, false);
-  prop('kiosk', 26.5, 54.6); prop('crate', 23.5, 55.5); prop('barrel', 29.5, 55.5);
+  prop('crate', 20.6, 55.5); prop('barrel', 29.5, 55.5);   // the kiosk was removed: the fish stall stands in its place
   prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
@@ -341,6 +341,14 @@ const LAYOUT = {
     ['c_noodles', 2.6, 8.4], ['c_hotdog2', 11.0, 8.6], ['c_icecream', 12.8, 8.7], ['c_stool', 4.8, 8.9], ['c_rug1', 7, 9.45, false], ['c_clock', 4.6, 1.0, false], ['c_fan', 12.6, 1.3, false]],
   cstore4: [['c_cashier', 7, 2.5], ['c_cups', 9.4, 2.4], ['c_coffee', 10.5, 2.3], ['c_fridge', 12.4, 2.9], ['c_atm', 1.4, 2.8], ['c_bags', 2.8, 2.8], ['c_chips', 2.6, 5.8], ['c_boxes', 11.6, 6.0],
     ['c_toiletry', 2.8, 8.4], ['c_freezer', 11.2, 8.4], ['c_mop', 5.0, 8.9], ['c_bin', 8.9, 9.0], ['c_rug2', 7, 9.45, false], ['c_clock', 7, 1.0, false], ['c_notice', 4.6, 1.6, false]],
+  // furniture showroom: sofa corner, bedroom set, dining set and lamps on display; the sales desk is top centre
+  furnshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.4, 1.1], ['f_window', 10.6, 1.1], ['x_wclock', 7, 0.95, false], ['f_bookshelf_wide', 1.9, 2.7], ['x_sideboard', 12.2, 2.6],
+    ['f_rug_red', 3.4, 6.3], ['f_sofa_red', 3.4, 5.6], ['f_armchair', 5.4, 6.2], ['f_floorlamp', 1.4, 6.0], ['f_bed_pink', 11.4, 5.9], ['f_drawer', 12.9, 5.6], ['x_flamp', 9.6, 5.8],
+    ['f_table_chairs', 3.4, 8.9], ['x_lsofa', 10.8, 8.9], ['f_plant', 1.3, 8.8], ['f_plant2', 12.9, 8.8], ['i_pricestand', 5.6, 8.9, false], ['i_pricestand', 8.8, 8.9, false]],
+  // hair salon: three styling chairs with mirrors along the left, wash basin and dryer on the right, waiting sofa by the door
+  barber: [['x_cashdesk', 7, 2.5], ['x_wclock', 7, 0.95, false], ['f_mirror', 1.4, 2.6], ['f_mirror', 3.0, 2.6], ['f_mirror', 4.6, 2.6], ['x_shelf_s', 10.2, 2.7], ['f_shelf_jars', 12.2, 2.4],
+    ['x_barstool', 1.4, 4.4], ['x_barstool', 3.0, 4.4], ['x_barstool', 4.6, 4.4], ['x_sink', 11.4, 5.6], ['x_dryer', 12.6, 7.6], ['x_fan', 9.6, 7.8], ['x_bonsai', 1.4, 8.8],
+    ['x_sofa2', 4.6, 8.9], ['f_plant', 12.8, 8.8], ['i_poster', 5, 1.05, false], ['i_poster', 9.6, 1.05, false], ['x_magrack', 9.4, 8.9]],
   // a small home: bedroom (top left), living room (middle), bathroom (top right), kitchen (bottom left); bought furniture fills its own spots (client FURN_POS)
   house: [['f_wardrobe', 1.4, 2.9], ['f_bed_blue', 3.4, 3.3], ['i_teddy', 3.9, 2.7, false], ['f_drawer', 5.1, 2.5], ['i_books', 5.1, 1.55, false], ['i_painting', 3.4, 1.05, false],
     ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false],
@@ -358,7 +366,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [...BUILDINGS.filter(b => !b.late), ...BUILDINGS.filter(b => b.late)]) {   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
