@@ -332,7 +332,7 @@ function paintHud() {
   $('#jx').classList.toggle('hidden', !jx);
   if (jx) {
     $('#jxL').textContent = `EXP ${c.name} Lv.${jx.L}${jx.pay ? ` · เงิน +${jx.pay}%` : ''}`;
-    $('#jxV').textContent = jx.max ? 'MAX' : `${(+jx.cur).toFixed(1)}/${jx.need}${jx.gain < 100 ? ` · ได้ ${jx.gain}%` : ''}`;
+    $('#jxV').textContent = jx.max ? 'MAX' : me.career === 'office' ? `${jx.cur}/${jx.need} กะ` : `${(+jx.cur).toFixed(1)}/${jx.need}${jx.gain < 100 ? ` · ได้ ${jx.gain}%` : ''}`;
     $('#jxU').style.width = pct + '%';
   }
   $('#lvRing').style.background = `conic-gradient(#ffc94d ${pct}%, rgba(255,255,255,.12) 0)`; $('#lvPct').textContent = `★ ${pct.toFixed(1)}%`;
@@ -363,6 +363,7 @@ function paintHud() {
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
+  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0; $('#mgBtn').classList.toggle('hidden', !atDesk); if (!atDesk && !$('#mg').classList.contains('hidden')) mgClose();
   $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
   $('#begBtn').classList.toggle('hidden', me.career !== 'beggar');
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
@@ -2549,6 +2550,102 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
-window.__lt = { get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+// ------------------------------------------------------------------ office mini-games (only while seated at your desk)
+// Something to do during long shifts. The score is sent to the server, which may add a small bonus (capped per day).
+const MG = { cur: null, timer: 0 };
+const MG_GAMES = {
+  math: { icon: '🧮', name: 'คิดเลขเร็ว', desc: '30 วินาที ตอบให้ถูกมากที่สุด (ตอบผิด -2 วิ)' },
+  mail: { icon: '📧', name: 'เคลียร์อีเมล', desc: '30 วินาที แยกอีเมลงานกับอีเมลขยะ' },
+  memo: { icon: '🗂️', name: 'จับคู่แฟ้ม', desc: 'เปิดการ์ดหาคู่ให้ครบ ยิ่งเปิดน้อยยิ่งได้คะแนน' },
+};
+const mgBest = k => { try { return +localStorage.getItem('lt_mg_' + k) || 0; } catch { return 0; } };
+const mgSetBest = (k, v) => { try { if (v > mgBest(k)) localStorage.setItem('lt_mg_' + k, v); } catch { } };
+function mgStop() { clearInterval(MG.timer); MG.timer = 0; MG.cur = null; }
+function mgClose() { mgStop(); $('#mg').classList.add('hidden'); }
+$('#mgX').onclick = () => { FX.play('click'); mgClose(); };
+$('#mgBtn').onclick = () => { FX.play('click'); mgMenu(); };
+function mgMenu() {
+  mgStop(); $('#mg').classList.remove('hidden');
+  $('#mgBody').innerHTML = `<h2>🎮 มินิเกมฆ่าเวลา</h2><div class="sub">เล่นได้ระหว่างนั่งทำงาน ค่าแรงยังเดินตามปกติ · ได้คะแนนดีมีโบนัสเล็กน้อยและความสุขเพิ่ม (โบนัสสูงสุดวันละ ฿300)</div>
+    <div class="mgList">${Object.entries(MG_GAMES).map(([k, g]) => `<button data-g="${k}"><i>${g.icon}</i><span><b>${g.name}</b><small>${g.desc} · สถิติ ${mgBest(k)}</small></span></button>`).join('')}</div>`;
+  $('#mgBody').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { FX.play('click'); mgStart(b.dataset.g); });
+}
+// a countdown game: draw() paints one round, the timer ends it
+function mgTimed(key, secs, round) {
+  const g = MG.cur = { key, score: 0, end: performance.now() + secs * 1000, secs };
+  const tick = () => {
+    if (MG.cur !== g) return;
+    const left = Math.max(0, g.end - performance.now());
+    const t = $('#mgT'), u = $('#mgU'); if (t) t.textContent = (left / 1000).toFixed(1); if (u) u.style.width = left / (secs * 10) + '%';
+    if (!left) mgEnd(key, g.score);
+  };
+  MG.timer = setInterval(tick, 100);
+  g.next = () => { round(g); tick(); };
+  g.next();
+}
+const mgHead = (g, name) => `<h2>${MG_GAMES[g.key].icon} ${name}</h2><div class="mgTop"><span>คะแนน ${g.score}</span><span class="tm">⏱ <b id="mgT"></b></span></div><div class="mgTimer"><u id="mgU"></u></div>`;
+function mgStart(key) {
+  mgStop(); $('#mg').classList.remove('hidden');
+  if (key === 'math') mgTimed('math', 30, g => {
+    const op = ['+', '-', '×'][Math.floor(Math.random() * 3)];
+    let a = 2 + Math.floor(Math.random() * 18), b = 2 + Math.floor(Math.random() * 12);
+    if (op === '-' && b > a) [a, b] = [b, a];
+    if (op === '×') { a = 2 + Math.floor(Math.random() * 10); b = 2 + Math.floor(Math.random() * 9); }
+    const ans = op === '+' ? a + b : op === '-' ? a - b : a * b;
+    const opts = new Set([ans]); while (opts.size < 4) opts.add(Math.max(0, ans + Math.floor(Math.random() * 11) - 5));
+    $('#mgBody').innerHTML = mgHead(g, 'คิดเลขเร็ว') + `<div class="mgQ">${a} ${op} ${b} = ?</div><div class="mgAns">${[...opts].sort(() => Math.random() - .5).map(v => `<button data-v="${v}">${v}</button>`).join('')}</div>`;
+    $('#mgBody').querySelectorAll('[data-v]').forEach(bt => bt.onclick = () => {
+      const ok = +bt.dataset.v === ans; bt.classList.add(ok ? 'ok' : 'bad'); FX.play(ok ? 'ding' : 'click');
+      if (ok) g.score++; else g.end -= 2000;
+      setTimeout(() => MG.cur === g && g.next(), ok ? 150 : 350);
+    });
+  });
+  if (key === 'mail') {
+    const WORK = ['สรุปยอดขายประจำเดือน', 'นัดประชุมทีมบ่ายสอง', 'ใบเสนอราคาลูกค้า', 'แก้ไขสัญญาฉบับใหม่', 'รายงานความคืบหน้าโปรเจกต์', 'ขออนุมัติงบประมาณ', 'ตารางเวรสัปดาห์หน้า', 'ไฟล์นำเสนอผู้บริหาร', 'ใบลาพักร้อน', 'ตรวจสอบใบแจ้งหนี้'];
+    const SPAM = ['คุณถูกรางวัล 10 ล้าน!!!', 'กดลิงก์รับเงินฟรีทันที', 'ลดน้ำหนัก 10 โล ใน 3 วัน', 'ยืนยันรหัสผ่านด่วน มิฉะนั้นบัญชีจะถูกปิด', 'เจ้าชายต่างแดนขอโอนเงิน', 'สินเชื่อด่วน ไม่ต้องค้ำ', 'ดูดวงแม่นๆ ฟรี', 'iPhone ราคา 99 บาท'];
+    const FROM = ['หัวหน้าฝ่าย', 'ฝ่ายบัญชี', 'ลูกค้า', 'HR', 'เพื่อนร่วมงาน'], SFROM = ['no-reply@w1n-prize.xyz', 'lucky@free-money.cc', 'admin@bank-verify.top', 'promo@deal99.biz'];
+    mgTimed('mail', 30, g => {
+      const spam = Math.random() < .45, subj = spam ? SPAM[Math.floor(Math.random() * SPAM.length)] : WORK[Math.floor(Math.random() * WORK.length)];
+      const from = spam ? SFROM[Math.floor(Math.random() * SFROM.length)] : FROM[Math.floor(Math.random() * FROM.length)];
+      $('#mgBody').innerHTML = mgHead(g, 'เคลียร์อีเมล') + `<div class="mgMail"><small>จาก: ${esc(from)}</small><b>${esc(subj)}</b></div><div class="mgAns"><button data-s="0">📥 งาน</button><button data-s="1">🗑️ ขยะ</button></div>`;
+      $('#mgBody').querySelectorAll('[data-s]').forEach(bt => bt.onclick = () => {
+        const ok = (bt.dataset.s === '1') === spam; bt.classList.add(ok ? 'ok' : 'bad'); FX.play(ok ? 'ding' : 'click');
+        if (ok) g.score++; else g.end -= 2000;
+        setTimeout(() => MG.cur === g && g.next(), ok ? 120 : 350);
+      });
+    });
+  }
+  if (key === 'memo') {
+    const icons = ['📁', '📎', '🖇️', '📊', '🖨️', '☕', '📌', '💼'], deck = [...icons, ...icons].sort(() => Math.random() - .5);
+    const g = MG.cur = { key, moves: 0, open: [], got: new Set(), t0: performance.now(), lock: false };
+    const draw = () => {
+      const secs = Math.floor((performance.now() - g.t0) / 1000);
+      $('#mgBody').innerHTML = `<h2>🗂️ จับคู่แฟ้ม</h2><div class="mgTop"><span>เปิดไป ${g.moves} ครั้ง · คู่ ${g.got.size / 2}/8</span><span class="tm">⏱ ${secs}</span></div>
+        <div class="mgGrid">${deck.map((ic, i) => { const up = g.open.includes(i) || g.got.has(i); return `<button data-i="${i}" class="${up ? (g.got.has(i) ? 'got' : '') : 'dn'}">${up ? ic : '?'}</button>`; }).join('')}</div>`;
+      $('#mgBody').querySelectorAll('[data-i]').forEach(bt => bt.onclick = () => {
+        const i = +bt.dataset.i; if (g.lock || g.open.includes(i) || g.got.has(i)) return;
+        FX.play('click'); g.open.push(i);
+        if (g.open.length === 2) {
+          g.moves++; const [x, y] = g.open;
+          if (deck[x] === deck[y]) { g.got.add(x); g.got.add(y); g.open = []; FX.play('ding'); if (g.got.size === 16) { draw(); return setTimeout(() => MG.cur === g && mgEnd('memo', Math.max(1, 30 - (g.moves - 8) * 2)), 400); } }
+          else { g.lock = true; setTimeout(() => { if (MG.cur !== g) return; g.open = []; g.lock = false; draw(); }, 650); }
+        }
+        draw();
+      });
+    };
+    draw(); MG.timer = setInterval(() => { const t = $('#mgBody .tm'); if (t && MG.cur === g) t.textContent = '⏱ ' + Math.floor((performance.now() - g.t0) / 1000); }, 1000);
+  }
+}
+function mgEnd(key, score) {
+  mgStop(); const best = mgBest(key), rec = score > best; mgSetBest(key, score);
+  send({ t: 'minigame', game: key, score });
+  FX.play('notice');
+  $('#mgBody').innerHTML = `<h2>${MG_GAMES[key].icon} ${MG_GAMES[key].name}</h2><div class="mgEnd"><div class="sub">คะแนนของคุณ</div><div class="big">${score}</div><div class="sub">${rec ? '🏆 สถิติใหม่!' : `สถิติ ${best}`}</div></div>
+    <div class="grid2">${B('🔁 เล่นอีกครั้ง', { fn: 'mgAgain', key }, 'primary')}${B('🎮 เลือกเกม', { fn: 'mgMenu' })}</div>`;
+  bindPanel($('#mgBody'));
+}
+FN.mgAgain = m => mgStart(m.key);
+FN.mgMenu = () => mgMenu();
+window.__lt = { mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();

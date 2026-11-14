@@ -81,6 +81,7 @@
     <button id="talkBtn" class="round" title="พูดคุยกับคนใกล้ๆ (F)"><span>💬</span><small>คุย</small></button>
     <button id="restBtn" class="round sm" title="นั่งพักหลับตา (R)"><span>😌</span><small>พัก</small></button>
     <button id="emoBtn" class="round sm" title="อิโมจิบนหัว"><span>😀</span><small>อิโมจิ</small></button>
+    <button id="mgBtn" class="round sm hidden" title="มินิเกมฆ่าเวลาตอนนั่งทำงาน"><span>🎮</span><small>มินิเกม</small></button>
     <button id="begBtn" class="round sm hidden" title="นั่งขอทานตรงนี้"><span>🥣</span><small>ขอทาน</small></button>
   </div>
   <div id="emoPick" class="hidden"></div>
@@ -89,6 +90,7 @@
 
 <div id="panel" class="hidden"><div class="sheet"><button class="x" id="panelX" title="ปิด"></button><div id="panelBody"></div></div></div>
 <div id="mapView" class="hidden"><div class="mapBox"><div class="mapHead"><b>🗺️ แผนที่</b><span>แตะสถานที่เพื่อนำทาง · ซูม: ปุ่ม / ล้อเมาส์ / สองนิ้ว</span><button id="mapOut">➖</button><b id="mapZoomLbl">100%</b><button id="mapIn">➕</button><button id="mapX" class="x" title="ปิด"></button></div><div id="mapTabs" class="tabs"></div><div class="mapBody"><div id="mapScroll"><canvas id="bigMap"></canvas></div><div id="mapLegend"></div></div></div></div>
+<div id="mg" class="hidden"><div class="sheet"><button class="x" id="mgX" title="ปิด"></button><div id="mgBody"></div></div></div>
 <div id="tut" class="hidden"><div class="tutCard"><div id="tutBody"></div><div class="rowf"><button id="tutSkip">ข้าม</button><button class="primary" id="tutNext" style="flex:1">ถัดไป →</button></div></div></div>
 <div id="dailyWrap" class="hidden"><div class="tutCard" id="daily"></div></div>
 <div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div><div class="tchat"><b>💬 คุยต่อรอง</b><div class="log" id="tchatLog"></div><form id="tchatForm" class="rowf"><input id="tchatIn" maxlength="120" placeholder="พิมพ์คุยกับอีกฝ่าย..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form></div></div></div>

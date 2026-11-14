@@ -623,3 +623,26 @@ body.hasEvent #topBar{top:146px!important}
 #card.v2 #jx em{font-style:normal;font-size:9px;color:#bfae92}
 #card.v2 #jx s{display:block;height:3px;margin-top:1px;background:#1a120a;border:1px solid #000;border-radius:3px;overflow:hidden;text-decoration:none}
 #card.v2 #jx u{display:block;height:100%;background:linear-gradient(90deg,#7fd3ff,#4a8cff);transition:width .4s;text-decoration:none}
+
+/* office mini-games: a button while seated at your desk, games in their own sheet */
+#mgBtn{right:40px;bottom:160px;width:50px;height:50px;animation:mgPulse 2.4s ease-in-out infinite}
+@keyframes mgPulse{50%{box-shadow:0 0 0 4px #ffd770aa,0 4px 0 #3e2414}}
+#mg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:6;background:rgba(20,12,6,.5);padding:8px}
+#mg.hidden{display:none}
+#mg .sheet{max-height:92vh;max-height:92dvh;width:min(440px,100%);user-select:none;-webkit-user-select:none}
+.mgList{display:grid;gap:8px;margin-top:6px}
+.mgList button{display:flex;align-items:center;gap:10px;text-align:left;padding:8px 10px}
+.mgList button b{font-size:15px}.mgList button i{font-style:normal;font-size:28px}.mgList small{display:block;font-size:11.5px;opacity:.8}
+.mgTop{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin:4px 0 8px;font-size:15px}
+.mgTop .tm{color:#b0451e;font-family:var(--px)}
+.mgTimer{height:6px;background:#5b3b2a;border-radius:4px;overflow:hidden;margin-bottom:10px}.mgTimer u{display:block;height:100%;background:linear-gradient(90deg,#ffd96b,#e9a92c);text-decoration:none;transition:width .2s linear}
+.mgQ{font-size:34px;text-align:center;font-weight:700;margin:10px 0 14px;font-family:var(--px);color:#3a2410}
+.mgAns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mgAns button{font-size:22px;padding:12px 0;font-weight:700}
+.mgAns button.ok{background:linear-gradient(#9be15d,#4f9a2a);color:#fff}.mgAns button.bad{background:linear-gradient(#ff7a6a,#c8372a);color:#fff}
+.mgMail{border:2px solid #b38955;background:#fff8e6;border-radius:10px;padding:12px;margin:6px 0 12px;min-height:74px}
+.mgMail small{color:#8a6a45;display:block}.mgMail b{font-size:16px;color:#3a2410}
+.mgGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mgGrid button{aspect-ratio:1;font-size:28px;padding:0;display:flex;align-items:center;justify-content:center}
+.mgGrid button.dn{background:linear-gradient(#b67c46,#7f4c26);color:transparent}
+.mgGrid button.got{opacity:.45}
+.mgEnd{text-align:center;padding:8px 0}.mgEnd .big{font-size:40px;font-weight:700;color:#8a5a12;font-family:var(--px)}

@@ -2040,6 +2040,16 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'minigame': {                      // office mini-games: a small bonus for a good score while seated at your desk (capped per day)
+      if (a.career !== 'office' || !(a.chair >= 0)) return;
+      const max = { math: 40, mail: 45, memo: 30 }[m.game]; if (!max || !cd(a, 'minigame', 15000, true)) return;
+      const sc = clamp(Math.floor(+m.score) || 0, 0, max), day = D.dayAt(now());
+      if (a.mgDay !== day) { a.mgDay = day; a.mgPaid = 0; }
+      const bonus = Math.min(300 - a.mgPaid, Math.round(sc * 2 * jobPay(a)));
+      joy(a, sc >= 10 ? 3 : 1);
+      if (bonus > 0) { a.mgPaid += bonus; earn(a, bonus); return toast(a, `🎮 คะแนน ${sc} · โบนัส ${money(bonus)} ความสุข +${sc >= 10 ? 3 : 1}${a.mgPaid >= 300 ? ' (ครบโบนัสวันนี้แล้ว)' : ''}`, '🎮'); }
+      return toast(a, `🎮 คะแนน ${sc} · ความสุขเพิ่มขึ้น (โบนัสเงินวันนี้ครบแล้ว)`, '🎮');
+    }
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
     case 'use': return useItem(a, m.item);
