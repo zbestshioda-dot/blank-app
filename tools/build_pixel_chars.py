@@ -31,6 +31,7 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'hoodie': ('tools/sheets/pixel_hoodie.jpg', ('hair',)), 'cowboy': ('tools/sheets/pixel_cowboy.jpg', ()),
           'devil': ('tools/sheets/pixel_devil.jpg', ()), 'pilot': ('tools/sheets/pixel_pilot.jpg', ('hair',)),
           'magician': ('tools/sheets/pixel_magician.jpg', ()), 'thai': ('tools/sheets/pixel_thai.jpg', ('hair',)),
+          'tuxedo': ('tools/sheets/pixel_tuxedo.jpg', ('hair',)),
           'admin': ('tools/sheets/pixel_admin.jpg', ())}   # admin-only hooded cloak (god mode)
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 'left0': -5, 'left1': -7, 'left2': -6},   # female base: its side views face right
@@ -41,6 +42,7 @@ FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 
                 for o in ('pajama', 'tracksuit', 'hoodie', 'cowboy', 'devil', 'magician', 'thai')},
              'admin': {'down0': 0, 'down1': 10, 'down2': 11, 'up0': 19, 'up1': 9, 'left0': -17, 'left1': -7, 'left2': -12},
              'pilot': {'down0': 0, 'down1': 5, 'down2': 1, 'up0': 19, 'up1': 9, 'left0': -17, 'left1': -7, 'left2': -12},
+             'tuxedo': {'down0': 0, 'down1': 11, 'down2': 16, 'up0': 19, 'up1': 14, 'left0': -2, 'left1': -7, 'left2': -12},
              'thief': {'down1': 10, 'down2': 15, 'up0': 4, 'up1': 9, 'left1': 6, 'left2': -7}}   # negative = use that cell mirrored
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left

@@ -129,14 +129,30 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   CS('cstore3', 'b_cs3', 42, 45, 'สาขาซอยใต้');
   B('gas', 'b_gas', 65, 13, { label: 'ปั๊มน้ำมัน', icon: '⛽', deco: true });   // scenery (no vehicles in the game)
 
-  // town square: fountain, benches, flowers
+  // town square (the first thing a new player sees): a paved cross of walkways meeting at the fountain, four fenced
+  // garden lawns in the corners (white picket fence on the outside, flowering hedges facing the plaza), shade trees,
+  // lamps at the plaza corners, benches facing the fountain
   prop('o_fountain', 50, 33.6);
   rect(48, 32, 4, 2, 'o');
+  for (const [x0, y0, h] of [[42, 24, 5], [53, 24, 5], [42, 36, 4], [53, 36, 4]]) rect(x0, y0, 5, h, '.');   // the four lawns
+  fenceRow('fence_white', 42, 47, 24.95); fenceRow('fence_white', 53, 58, 24.95);           // picket fence along the outer edges
+  fenceRow('fence_white', 42, 47, 39.95); fenceRow('fence_white', 53, 58, 39.95);
+  fenceRow('hedge_flower', 42, 47, 28.95); fenceRow('hedge_flower', 53, 58, 28.95);          // flowering hedges facing the plaza
+  fenceRow('hedge_flower', 42, 47, 36.95); fenceRow('hedge_flower', 53, 58, 36.95);
+  for (const x of [46.4, 53.6]) { prop('o_hedgecube', x, 26.95); prop('o_hedgecube', x, 27.95); prop('o_hedgecube', x, 38.95); }   // hedge posts down the walkway side
+  for (const x of [42.5, 57.5]) { prop('bush', x, 26.4); prop('bush2', x, 27.95); prop('bush2', x, 38.95); }                         // bushes along the street side
+  prop('tree_pink', 44.5, 27.6); prop('tree_oak', 55.5, 27.6);                                 // shade trees in the north lawns
+  prop('o_roses', 43.6, 25.95, false); prop('o_tulips', 45.4, 25.95, false); prop('o_tulips', 54.6, 25.95, false); prop('o_roses', 56.4, 25.95, false);
+  prop('o_flowerbed', 44.6, 38.6); prop('o_flowerbed', 55.4, 38.6);                           // flower beds in the south lawns
+  prop('o_topiary', 46.4, 37.95, false); prop('o_topiary', 53.6, 37.95, false);
+  // the plaza: lamps at its four corners, benches facing the fountain, planters at the walkway mouths
+  for (const [x, y] of [[47.3, 29.95], [52.7, 29.95], [47.3, 35.95], [52.7, 35.95]]) prop('o_lamp', x, y);
   for (const [x, y, s] of [[43.6, 32.6, 'o_bench'], [56.4, 32.6, 'o_stonebench']]) { prop(s, x, y, false); STATIONS.push({ id: `seatb${x}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' }); }
-  prop('o_flowerbed', 44, 25.4); prop('o_flowerbed', 56, 25.4); prop('o_lamp', 42.6, 30); prop('o_lamp', 57.4, 30); prop('o_lamp', 42.6, 36); prop('o_lamp', 57.4, 36);
-  prop('o_tulips', 45, 38.9); prop('o_tulips', 55, 38.9); prop('o_topiary', 43, 38.95); prop('o_roses', 42.9, 27.9); prop('o_roses', 57.1, 27.9); prop('o_drinkfount', 44.6, 35.9);
-  prop('o_noticeboard', 47, 25.6); prop('icecream', 53, 25.6);
-  STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47, y: 26.4, r: 1.4, area: 'town' });
+  prop('o_potflower', 42.4, 31.9, false); prop('o_potflower', 57.6, 31.9, false);
+  prop('o_lplanter', 47.4, 31.4); prop('o_lplanter', 52.6, 31.4);
+  prop('o_drinkfount', 55.0, 30.95); prop('o_bin_green', 42.6, 34.95);
+  prop('o_noticeboard', 47.9, 25.6);
+  STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47.9, y: 26.4, r: 1.4, area: 'town' });
   // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
   for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
@@ -282,7 +298,7 @@ scatter(HOUSING, ['gnome', 'o_potflower', 'flowerbox', 'o_birdstatue', 'o_roses'
 scatter(HOUSING, ['tuft'], 8, true);
 // manholes on the main roads, a news box and bollards by the square
 for (const [x, y] of [[50, 52], [50, 66], [30, 47], [70, 15], [25, 15], [50, 10]]) if (get(Math.floor(x), Math.floor(y - .5)) === '=') prop('manhole', x, y, false);
-prop('o_newsbox', 57.3, 38.9); prop('o_bollard', 47.6, 39.95); prop('o_bollard', 52.4, 39.95);
+prop('o_newsbox', 57.6, 35.9); prop('o_bollard', 47.6, 39.95); prop('o_bollard', 52.4, 39.95);
 // A-frame signs by the doors of open shops, produce on the market stall, a lantern at the fishing club
 for (const id of ['restaurant', 'fashion', 'toolshop', 'rider', 'kitchen']) { const b = BUILDINGS.find(x => x.id === id); if (b) prop('i_shopsign', b.x + b.w - .2, b.y + b.h + .05, false); }
 // neon OPEN signs hung beside the doors (lit only while the shop is open), and a cake on show outside the restaurant
@@ -957,6 +973,7 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   tracksuit: { name: 'ชุดวอร์มสปอร์ต', how: 'ซื้อที่ร้านแฟชั่น', price: 25000 },
   hoodie:    { name: 'ชุดฮู้ดดี้สตรีท', how: 'ซื้อที่ร้านแฟชั่น', price: 45000 },
   cowboy:    { name: 'ชุดคาวบอยนายอำเภอ', how: 'ซื้อที่ร้านแฟชั่น', price: 120000 },
+  tuxedo:    { name: 'ชุดทักซิโด้หูกระต่าย', how: 'ซื้อที่ร้านแฟชั่น', price: 180000 },
   devil:     { name: 'ชุดปีศาจน้อย', how: 'ซื้อที่ร้านแฟชั่น', price: 250000 },
   pilot:     { name: 'ชุดนักบินขับไล่', how: 'ซื้อที่ร้านแฟชั่น', price: 400000 },
   magician:  { name: 'ชุดสุภาพบุรุษนักมายากล', how: 'ซื้อที่ร้านแฟชั่น', price: 650000 },

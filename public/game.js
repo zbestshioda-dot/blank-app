@@ -75,7 +75,7 @@ function charLayer(frame, col, cat, lk) {
 }
 // women wearing an outfit that only exists as a men's sheet: her own head on the outfit's body ('head'), or her hair showing
 // under the outfit's hat ('hair'); hoods, masks and helmets that cover everything keep the outfit as drawn
-const FEM_HEAD = { office: 'head', merchant: 'head', thai: 'head', hoodie: 'head', pajama: 'head', tracksuit: 'head',
+const FEM_HEAD = { office: 'head', merchant: 'head', thai: 'head', tuxedo: 'head', hoodie: 'head', pajama: 'head', tracksuit: 'head',
   chef: 'hair', farmer: 'hair', fisher: 'hair', rider: 'hair', cowboy: 'hair', magician: 'hair', beggar: 'hair', pilot: 'hair', devil: 'hair' };
 const FEM_NECK = 40, FEM_HAT = 30;   // atlas rows: where her head ends / where her hair may show below a hat
 function femOutfitFrame(sheet, step, lk) {
@@ -94,7 +94,7 @@ function femOutfitFrame(sheet, step, lk) {
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
-  pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', admin: 'admin' };
+  pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
 function drawAura(px, py, H, t, front) {
@@ -1623,6 +1623,10 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-14c', d: '14 พ.ย. (รอบ 2)', items: [
+    '🤵 ชุดใหม่ <b>ชุดทักซิโด้หูกระต่าย</b> ซื้อได้ที่ร้านแฟชั่น ฿180,000',
+    '⛲ จัดจัตุรัสกลางเมืองใหม่: ทางเดินรูปกากบาทรอบน้ำพุ สนามหญ้า 4 มุมล้อมรั้วไม้ขาวและแนวพุ่มไม้ ต้นไม้ร่มรื่น แปลงดอกไม้ โคมไฟ 4 มุม ม้านั่งหันหาน้ำพุ',
+    '🍦 เอารถไอติมออกจากจัตุรัส' ] },
   { v: '2026-11-14b', d: '14 พ.ย.', items: [
     '👮 โต๊ะสถานีตำรวจมี <b>ดาบสมชาย</b> นั่งเวรประจำโต๊ะ',
     '🎓 มหาวิทยาลัยมี <b>ผอ.ประเสริฐ</b> ผู้อำนวยการยืนที่โต๊ะ',
