@@ -555,3 +555,7 @@ body.hasEvent #topBar{top:146px!important}
 #feed{display:flex;flex-direction:column}
 #feed #chatBox,#feed #cbOpen{order:1}
 #feed #toasts{order:2;margin-top:4px}
+/* thumb cluster: no talk/emoji buttons (tap a person to talk; staff via the big button) */
+#talkBtn,#emoBtn{display:none!important}
+#bagBtn{right:98px!important;bottom:6px!important;width:60px!important;height:60px!important}
+#restBtn{right:100px!important;bottom:74px!important;width:54px!important;height:54px!important}
