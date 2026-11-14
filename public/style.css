@@ -669,3 +669,15 @@ body.hasEvent #topBar{top:146px!important}
 #card.v2 .sInfo .l3{margin-top:2px}
 #card.v2 .sInfo .l3 #meMoney{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #card.v2 .sInfo .l3 #cOn{flex:none;font-size:10px}
+/* flatter status box: tight rows */
+#card.v2 .sInfo{padding-top:3px!important;padding-bottom:3px!important}
+#card.v2 .sInfo .bars{margin-top:1px!important;gap:0!important}
+#card.v2 .sInfo .bar{line-height:1;height:11px}
+#card.v2 .sInfo .bar label{font-size:9.5px;line-height:1}
+#card.v2 .sInfo .bar em{font-size:9px}
+#card.v2 .sInfo .bar s{height:5px;border-width:1px}
+#card.v2 .sInfo .l1{line-height:1.1}
+#card.v2 .sInfo #meName{font-size:13px!important}
+#card.v2 .sInfo .l3{margin-top:1px;line-height:1}
+#card.v2 .sInfo .money{font-size:13px!important;margin-top:0}
+#card.v2 .sInfo #jx label{font-size:8.5px}
