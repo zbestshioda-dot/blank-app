@@ -1132,6 +1132,14 @@ function act(a, m) {
       a.furniture = [...a.furniture, m.item]; markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${f.icon}${f.name} ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
     }
+    case 'furnshop.buy': {                  // the furniture shop: same items as the house menu, delivered to your own house
+      if (a.house < 0 || houses[a.house] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่หน้าบ้านแต่ละหลัง 🏡', '🛋️', false);
+      const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
+      if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, f.price)) return;
+      a.furniture = [...a.furniture, m.item]; joy(a, 5); markMe(a); wdAt = 0;
+      return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
+    }
     case 'hbed.sleep': {
       const i = s.idx, own = houses[i] === a && !tenants[i], rent = tenants[i] === a;
       if (!own && !rent) return toast(a, houses[i] === a ? 'บ้านนี้ปล่อยเช่าอยู่ คุณนอนไม่ได้' : 'นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า', '🔒', false);

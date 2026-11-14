@@ -1593,6 +1593,11 @@ function renderPanel(p) {
       return `<h2>🏡 สำนักงานอสังหาฯ</h2><div class="sub">${hoursTxt('estate')} · ซื้อ/เช่าได้ที่หน้าบ้านแต่ละหลัง · เจ้าของบ้านประกาศขายหรือปล่อยเช่าให้ผู้เล่นอื่นได้</div><div class="list">${rows}</div>`;
     }
     case 'door': return houseDoor(STN(st), st);
+    case 'furnshop': {
+      const own = me.house >= 0;
+      const rows = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price))).join('');
+      return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งไปวางที่บ้านของคุณทันที · ยิ่งบ้านสบาย นอนแล้วพลังงานฟื้นเร็วขึ้น${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}<div class="list">${rows}</div>`;
+    }
     case 'barber':
     case 'fashion': {
       const W = { hair: [], shirt: [], pants: [], ...(me.wardrobe || {}) }, lk = me.look || {};
@@ -1887,7 +1892,7 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
-fetch('assets/atlas.json').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp'; });
+fetch('assets/atlas.json?v=h1').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=h1'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;

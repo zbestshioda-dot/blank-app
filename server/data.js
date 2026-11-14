@@ -98,7 +98,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // north street: the civic street
   B('police', 'b_police2', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true, renov: true });
-  B('cinema', 'b_cinema', 27, 30, { label: 'โรงหนัง', icon: '🎬', deco: true, renov: true });
+  B('furnshop', 'b_furnshop', 27, 30, { label: 'ร้านเฟอร์นิเจอร์', icon: '🛋️', st: 'furnshop', outdoor: true, noSlot: true });   // furniture sold at the counter out front
   B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', outdoor: true, noSlot: true });   // hair dye at the counter outside
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true, renov: true });
   // south-west lane: services and trade (doors on row 45)
@@ -120,7 +120,8 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   });
   rect(52, 85, 40, 2, 'c'); rect(8, 85, 30, 2, 'c'); rect(37, 78, 2, 9, 'c'); rect(38, 78, 12, 2, 'c'); rect(60, 78, 2, 7, 'c');
   // empty lots kept for careers added later
-  for (const [x, y] of [[66, 12], [75, 12], [84, 12]]) { rect(x - 2, y - 3, 6, 3, 'm'); prop('signpost', x + .5, y + .2); }
+  for (const [x, y] of [[75, 12], [84, 12]]) { rect(x - 2, y - 3, 6, 3, 'm'); prop('signpost', x + .5, y + .2); }
+  B('gas', 'b_gas', 65, 13, { label: 'ปั๊มน้ำมัน', icon: '⛽', deco: true });   // scenery (no vehicles in the game)
 
   // town square: fountain, benches, flowers
   prop('fountain', 50, 33.6);
@@ -132,7 +133,6 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
   for (const [id, x, y, l] of [['crowd1', 46, 30.5, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
     STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
-  // a dark alley behind the cinema: where thieves find work
   prop('bin_grey', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
   for (let x = 6; x < 40; x += 9) prop(x % 2 ? 'lamp' : 'lamp2', x + .5, 34);
@@ -418,7 +418,7 @@ const dayAt = t => Math.floor((t + TIME_OFF + DAY_MS - MIDNIGHT_MS) / DAY_MS);
 // game hours that pass per real second at hour h
 const gameRate = h => (h >= CLOCK.dawn && h < CLOCK.dusk) ? (CLOCK.dusk - CLOCK.dawn) / (CLOCK.dayMin * 60) : (24 - (CLOCK.dusk - CLOCK.dawn)) / ((24 - CLOCK.dayMin) * 60);
 // opening hours [open, close) in game hours
-const HOURS = { fashion: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
