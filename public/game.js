@@ -64,6 +64,34 @@ function charFrame(frame, lk) {
   chCache.set(key, c); if (chCache.size > 400) chCache.delete(chCache.keys().next().value);
   return c;
 }
+// one recoloured layer (hair) of a frame on its own canvas
+function charLayer(frame, col, cat, lk) {
+  const { w, h, rows, per } = CH_ATLAS, r0 = rows[frame] ?? 0, bx = per ? Math.floor(r0 / per) * w * 4 : 0, row = per ? r0 % per : r0;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d');
+  t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
+  t.globalCompositeOperation = 'multiply'; t.fillStyle = lookColor(cat, lk[cat]); t.fillRect(0, 0, w, h);
+  t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
+  return c;
+}
+// women wearing an outfit that only exists as a men's sheet: her own head on the outfit's body ('head'), or her hair showing
+// under the outfit's hat ('hair'); hoods, masks and helmets that cover everything keep the outfit as drawn
+const FEM_HEAD = { office: 'head', merchant: 'head', thai: 'head', hoodie: 'head', pajama: 'head', tracksuit: 'head',
+  chef: 'hair', farmer: 'hair', fisher: 'hair', rider: 'hair', cowboy: 'hair', magician: 'hair', beggar: 'hair', pilot: 'hair', devil: 'hair' };
+const FEM_NECK = 40, FEM_HAT = 30;   // atlas rows: where her head ends / where her hair may show below a hat
+function femOutfitFrame(sheet, step, lk) {
+  const key = `F|${sheet}|${step}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
+  const { w, h } = CH_ATLAS, body = charFrame(sheet + ':' + step, lk), mode = FEM_HEAD[sheet];
+  c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  if (mode === 'head') {
+    g.drawImage(body, 0, FEM_NECK, w, h - FEM_NECK, 0, FEM_NECK, w, h - FEM_NECK);
+    g.drawImage(charFrame('f:' + step, lk), 0, 0, w, FEM_NECK, 0, 0, w, FEM_NECK);
+    g.drawImage(charLayer('f:' + step, 3, 'hair', lk), 0, FEM_NECK, w, h - FEM_NECK, 0, FEM_NECK, w, h - FEM_NECK);
+  } else {
+    g.drawImage(body, 0, 0);
+    g.drawImage(charLayer('f:' + step, 3, 'hair', lk), 0, FEM_HAT, w, h - FEM_HAT, 0, FEM_HAT, w, h - FEM_HAT);
+  }
+  chCache.set(key, c); return c;
+}
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', admin: 'admin' };
@@ -121,7 +149,9 @@ function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
-  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(outfit + WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
+  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;
+  const fr = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined
+    ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
