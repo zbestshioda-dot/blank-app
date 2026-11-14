@@ -67,13 +67,10 @@ function charFrame(frame, lk) {
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
-// the base character has 8-frame front/back walks (down0-7 / up0-7); job outfits keep their 4-step cycle
-const WALK8 = { front: [0, 1, 2, 3, 4, 5, 6, 7].map(i => 'down' + i), back: [0, 1, 2, 3, 4, 5, 6, 7].map(i => 'up' + i) };
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
   // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet = OUTFIT_SHEET[p.of], outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : '';
-  const w8 = !outfit && WALK8[view] && CH_ATLAS.rows.down7 !== undefined;
-  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(outfit + (w8 ? WALK8[view][step % 8] : WALK[view][(step >> 1) % 4]), lk), [ax, ay] = CH_ATLAS.feet;
+  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(outfit + WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false; g.drawImage(fr, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
   g.restore();
@@ -917,7 +914,7 @@ function drawPlayer(p, X, Y, t) {
   if (sitting || lying) dir = 'down';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
   p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) : 0);
-  const frame = moving ? Math.floor(p.walk / .7) % 8 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
+  const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
   const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
   let px = px0, py = py0;
