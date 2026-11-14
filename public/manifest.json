@@ -1,0 +1,10 @@
+{
+  "name": "เมืองชีวิตนี้เลือกได้",
+  "short_name": "Life Town",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#2b1d12",
+  "theme_color": "#5a3620",
+  "icons": [{ "src": "assets/ui/pin.png", "sizes": "136x132", "type": "image/png" }]
+}
