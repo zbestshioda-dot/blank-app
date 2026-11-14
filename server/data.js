@@ -490,15 +490,15 @@ const gameRate = h => (h >= CLOCK.dawn && h < CLOCK.dusk) ? (CLOCK.dusk - CLOCK.
 // opening hours [open, close) in game hours
 // ---------------------------------------------------------------- stock market (traded at the bank)
 // Prices are a deterministic random walk from a fixed start date (so restarts keep the same history): mean-reverting around a slowly
-// drifting fair value, with trend regimes and the odd news shock. One candle every 30 real seconds.
+// drifting fair value, with trend regimes and the odd news shock. One candle every 30 real seconds; vol = typical move per candle.
 const STOCKS = [
-  { id: 'TTECH', name: 'ไทยเทค', icon: '🏢', base: 120, vol: 0.016, desc: 'บริษัทไอทีที่พนักงานในเมืองทำงานอยู่' },
-  { id: 'LTB', name: 'ธนาคารไลฟ์ทาวน์', icon: '🏦', base: 85, vol: 0.008, desc: 'หุ้นปันผลมั่นคง ขึ้นลงช้า' },
-  { id: 'FARM', name: 'สหกรณ์การเกษตร', icon: '🌾', base: 42, vol: 0.013, desc: 'ราคาพุ่งช่วงภัยแล้ง', ev: { drought: 0.004, rain: -0.002 } },
-  { id: 'SEAFD', name: 'ประมงทองคำ', icon: '🐟', base: 28, vol: 0.015, desc: 'ธุรกิจปลาและอาหารทะเล' },
-  { id: 'RIDE', name: 'ส่งไวเดลิเวอรี่', icon: '🛵', base: 65, vol: 0.02, desc: 'ขึ้นแรงช่วงเทศกาลและคนหิว', ev: { festival: 0.004, hungry: 0.004 } },
-  { id: 'FUEL', name: 'พลังงานไทย', icon: '⛽', base: 150, vol: 0.011, desc: 'ปั๊มน้ำมันและพลังงาน' },
-  { id: 'MOON', name: 'มูนคอยน์', icon: '🚀', base: 12, vol: 0.045, desc: 'เสี่ยงสูงมาก ขึ้นลงทีละหลายสิบ%' },
+  { id: 'TTECH', name: 'ไทยเทค', icon: '🏢', base: 120, vol: 0.006, desc: 'บริษัทไอทีที่พนักงานในเมืองทำงานอยู่' },
+  { id: 'LTB', name: 'ธนาคารไลฟ์ทาวน์', icon: '🏦', base: 85, vol: 0.003, desc: 'หุ้นปันผลมั่นคง ขึ้นลงช้า' },
+  { id: 'FARM', name: 'สหกรณ์การเกษตร', icon: '🌾', base: 42, vol: 0.005, desc: 'ราคาพุ่งช่วงภัยแล้ง', ev: { drought: 0.004, rain: -0.002 } },
+  { id: 'SEAFD', name: 'ประมงทองคำ', icon: '🐟', base: 28, vol: 0.006, desc: 'ธุรกิจปลาและอาหารทะเล' },
+  { id: 'RIDE', name: 'ส่งไวเดลิเวอรี่', icon: '🛵', base: 65, vol: 0.008, desc: 'ขึ้นแรงช่วงเทศกาลและคนหิว', ev: { festival: 0.004, hungry: 0.004 } },
+  { id: 'FUEL', name: 'พลังงานไทย', icon: '⛽', base: 150, vol: 0.004, desc: 'ปั๊มน้ำมันและพลังงาน' },
+  { id: 'MOON', name: 'มูนคอยน์', icon: '🚀', base: 12, vol: 0.025, desc: 'เสี่ยงสูงมาก ขึ้นลงทีละหลายสิบ%' },
 ];
 const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeMin: 5, keep: 240 };
 // the 24-hour store: what it stocks and its shelf mark-up over the base price

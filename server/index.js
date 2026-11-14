@@ -429,7 +429,7 @@ function stockCandle(i, bias) {
     const trend = (sHash(Math.floor(i / 160), si * 13 + 3) - 0.5) * s.vol * 0.35;
     const o = Math.exp(s.lp); let hi = o, lo = o;
     for (let k = 0; k < 5; k++) {
-      s.lp += 0.004 * (fair - s.lp) + (trend + (bias?.[si] || 0)) / 5 + s.vol / 2.2 * sGauss(i * 5 + k, si * 101);
+      s.lp += 0.004 * (fair - s.lp) + (trend + (bias?.[si] || 0)) / 5 + s.vol / 2.236 * sGauss(i * 5 + k, si * 101);
       const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p);
     }
     if (sHash(i, si * 31 + 5) < 0.003) { s.lp += (sHash(i, si * 31 + 6) < 0.5 ? -1 : 1) * s.vol * (4 + 4 * sHash(i, si * 31 + 7)); const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p); }   // news

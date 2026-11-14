@@ -220,6 +220,7 @@ function handle(m) {
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
     case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
@@ -1279,7 +1280,12 @@ function refreshPanel(force) {
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch { } } }
   for (const id of ['chatMsgs', 'callMsgs']) { const cm = document.getElementById(id); if (cm) cm.scrollTop = cm.scrollHeight; }
 }
+function bindStocks(root) {
+  root.querySelectorAll('canvas[data-spark]').forEach(drawSpark);
+  root.querySelectorAll('canvas[data-chart]').forEach(c => { drawStockChart(c); const hv = e => { const r = c.getBoundingClientRect(); drawStockChart(c, e.clientX - r.left); }; c.onpointermove = hv; c.onpointerdown = hv; c.onpointerleave = () => drawStockChart(c); });
+}
 function bindPanel(root) {
+  bindStocks(root);
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     if (performance.now() - panelOpenT < 450) return;      // the tap that opened this panel must not also press a button in it
     FX.play('click');
@@ -1318,6 +1324,7 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  stock(m, root) { const q = m.qty || Math.floor(+root.querySelector('#skQty')?.value || 0); if (!(q > 0)) return toast('ใส่จำนวนหุ้น', '📈', false); send({ t: 'act', st: m.st, a: 'stock', op: m.op, id: m.id, qty: q }); },
   callMin() { closePanel(); toast('ย่อสายไว้แล้ว แตะแถบ 📞 ด้านบนเพื่อเปิด', '📞'); },
   list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
@@ -1428,6 +1435,68 @@ function achvPanel() {
   return `<h2>🏅 ความสำเร็จ</h2><div class="sub">ปลดล็อกแล้ว ${got}/${G.ach.length} · ทุกความสำเร็จได้เพชร 💎5–15 ตามความยาก และใช้เป็นฉายาบนหัวได้</div>
     ${todo.length ? `<div class="jobbox">🎁 รอรับรางวัล ${todo.length} รายการ รวม <b>💎${sum}</b>${B('รับทั้งหมด', { t: 'achclaim', id: 'all' }, 'primary big')}</div>` : ''}
     <div class="list">${rows}</div>`;
+}
+// ---- stock market (bank tab): price list with sparklines, a candlestick chart with moving averages and volume, holdings and trading
+const stockHist = {};
+const SK_COL = { up: '#26a69a', dn: '#ef5350' };
+function stockPanel(p, st) {
+  const sk = wd?.sk; if (!sk) return '<div class="sub">กำลังโหลดตลาด...</div>';
+  const sid = p.sid || sk.l[0][0], row = sk.l.find(x => x[0] === sid) || sk.l[0], meta = G.stocks.find(x => x.id === row[0]);
+  if (stockHist[row[0]]?.i !== sk.i && !p['req' + sk.i + row[0]]) { p['req' + sk.i + row[0]] = 1; send({ t: 'stockhist', id: row[0] }); }
+  const n = p.sn || 60, hold = (me.stocks || {})[row[0]], price = row[1];
+  const port = Object.entries(me.stocks || {}).reduce((t, [id, [q, avg]]) => { const pr = sk.l.find(x => x[0] === id)?.[1] || 0; t.v += q * pr; t.c += q * avg; return t; }, { v: 0, c: 0 });
+  const pct = v => `<b style="color:${v >= 0 ? SK_COL.up : SK_COL.dn}">${v >= 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(2)}%</b>`;
+  const list = sk.l.map(([id, c, ch, sp]) => { const m2 = G.stocks.find(x => x.id === id), mine = (me.stocks || {})[id];
+    return `<button class="skRow ${id === row[0] ? 'on' : ''}" data-m='${JSON.stringify({ fn: 'qtab', set: { sid: id } })}'><span class="skN">${m2.icon} <b>${id}</b><small>${esc(m2.name)}${mine ? ` · ถือ ${mine[0].toLocaleString()}` : ''}</small></span><canvas data-spark="${sp.join(',')}" width="70" height="26"></canvas><span class="skP">${c.toFixed(2)}<small>${pct(ch)}</small></span></button>`; }).join('');
+  const maxBuy = Math.max(0, Math.floor((me.money - G.stockFee[1]) / (price * (1 + G.stockFee[0]))));
+  const pl = hold ? (price - hold[1]) * hold[0] : 0;
+  const ranges = [[30, '15 นาที'], [60, '30 นาที'], [120, '1 ชม.'], [240, '2 ชม.']].map(([k, l]) => B(l, { fn: 'qtab', set: { sn: k } }, n === k ? 'primary' : '')).join('');
+  return `<div class="sub">เปิดตามเวลาธนาคาร · ราคาเปลี่ยนทุก 30 วินาที · ค่าธรรมเนียมซื้อขาย ${(G.stockFee[0] * 100).toFixed(2)}% (ขั้นต่ำ ${money(G.stockFee[1])}) · ขึ้นได้ก็ลงได้ ลงทุนแต่พอดี</div>
+    <div class="jobbox">💼 พอร์ตของคุณ มูลค่า <b>${money(Math.round(port.v))}</b>${port.c ? ` · ${port.v - port.c >= 0 ? 'กำไร' : 'ขาดทุน'} <b style="color:${port.v - port.c >= 0 ? SK_COL.up : SK_COL.dn}">${money(Math.round(Math.abs(port.v - port.c)))}</b> (${((port.v / port.c - 1) * 100).toFixed(1)}%)` : ' · ยังไม่มีหุ้น'}</div>
+    <div class="skList">${list}</div>
+    <div class="skHead"><div>${meta.icon} <b>${row[0]}</b> ${esc(meta.name)}<small>${esc(meta.desc)}</small></div><div class="skBig">${price.toFixed(2)}<small>${pct(row[2])} <i>24 ชม.เกม</i></small></div></div>
+    <div class="tabs skR">${ranges}</div>
+    <canvas class="skChart" data-chart="${row[0]}" data-n="${n}"></canvas>
+    <div class="grid2" style="margin-top:6px"><div class="item"><div class="nm">📦 ถืออยู่<small><b>${hold ? hold[0].toLocaleString() : 0}</b> หุ้น${hold ? ` · ทุนเฉลี่ย ${hold[1].toFixed(2)}` : ''}</small></div></div><div class="item"><div class="nm">${pl >= 0 ? '💹 กำไร' : '📉 ขาดทุน'}<small><b style="color:${pl >= 0 ? SK_COL.up : SK_COL.dn}">${money(Math.round(Math.abs(pl)))}</b>${hold ? ` (${((price / hold[1] - 1) * 100).toFixed(1)}%)` : ''}</small></div></div></div>
+    <div class="rowf" style="margin-top:8px"><input id="skQty" type="number" min="1" value="${Math.min(10, maxBuy) || 1}" inputmode="numeric"><span class="sub" style="margin:0">หุ้น · ซื้อได้สูงสุด ${maxBuy.toLocaleString()}</span></div>
+    <div class="grid2" style="margin-top:6px">${B('🟢 ซื้อ', { fn: 'stock', st, op: 'buy', id: row[0] }, 'good')}${B('🔴 ขาย', { fn: 'stock', st, op: 'sell', id: row[0] }, 'warn', !hold)}${B(`ซื้อเต็มเงิน (${maxBuy.toLocaleString()})`, { fn: 'stock', st, op: 'buy', id: row[0], qty: maxBuy }, '', !maxBuy)}${B('ขายหมด', { fn: 'stock', st, op: 'sell', id: row[0], qty: hold ? hold[0] : 0 }, '', !hold)}</div>`;
+}
+function drawSpark(c) {
+  const v = c.dataset.spark.split(',').map(Number), g = c.getContext('2d'), W = c.width, H = c.height, lo = Math.min(...v), hi = Math.max(...v), up = v[v.length - 1] >= v[0];
+  g.clearRect(0, 0, W, H); g.strokeStyle = up ? SK_COL.up : SK_COL.dn; g.lineWidth = 1.6; g.beginPath();
+  v.forEach((y, i) => { const px = i / (v.length - 1) * (W - 2) + 1, py = H - 2 - (y - lo) / ((hi - lo) || 1) * (H - 4); i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke();
+}
+function drawStockChart(c, hover) {
+  const h = stockHist[c.dataset.chart]; const dpr = window.devicePixelRatio || 1, W = c.clientWidth || 340, H = 230;
+  if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = '#141a22'; g.fillRect(0, 0, W, H);
+  if (!h) { g.fillStyle = '#8a96a8'; g.font = '13px sans-serif'; g.textAlign = 'center'; g.fillText('กำลังโหลดกราฟ...', W / 2, H / 2); return; }
+  const all = h.c, n = Math.min(+c.dataset.n || 60, all.length), cs = all.slice(-n), off = all.length - n;
+  const ma = k => all.map((_, i) => i < k - 1 ? null : all.slice(i - k + 1, i + 1).reduce((t, x) => t + x[3], 0) / k).slice(-n);
+  const R0 = 50, PH = H * .74, VH = H * .16, top = 8, cw = (W - R0 - 6) / n;
+  let lo = Math.min(...cs.map(x => x[2])), hi = Math.max(...cs.map(x => x[1])); const pad = (hi - lo) * .08 || hi * .01; lo -= pad; hi += pad;
+  const Y = p => top + (hi - p) / (hi - lo) * (PH - top), vmax = Math.max(...cs.map(x => x[4]));
+  g.font = '10px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
+  for (let k = 0; k <= 4; k++) { const p = lo + (hi - lo) * k / 4, y = Y(p); g.strokeStyle = 'rgba(255,255,255,.07)'; g.beginPath(); g.moveTo(4, y); g.lineTo(W - R0, y); g.stroke(); g.fillStyle = '#8a96a8'; g.fillText(p.toFixed(p < 20 ? 2 : 1), W - R0 + 4, y); }
+  cs.forEach(([o, hh, l, cl, v], i) => {
+    const x = 4 + i * cw + cw / 2, up = cl >= o, col = up ? SK_COL.up : SK_COL.dn;
+    g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(x, Y(hh)); g.lineTo(x, Y(l)); g.stroke();
+    const bw = Math.max(1, cw * .68), y1 = Y(Math.max(o, cl)), y2 = Y(Math.min(o, cl)); g.fillStyle = col; g.fillRect(x - bw / 2, y1, bw, Math.max(1, y2 - y1));
+    g.globalAlpha = .45; const vh = v / vmax * VH; g.fillRect(x - bw / 2, H - 14 - vh, bw, vh); g.globalAlpha = 1;
+  });
+  for (const [k, col] of [[10, '#ffd34d'], [30, '#6aa9ff']]) { const m = ma(k); g.strokeStyle = col; g.lineWidth = 1.3; g.beginPath(); let st = false; m.forEach((v, i) => { if (v == null) return; const x = 4 + i * cw + cw / 2; st ? g.lineTo(x, Y(v)) : g.moveTo(x, Y(v)); st = true; }); g.stroke(); }
+  const last = cs[cs.length - 1][3], ly = Y(last), upL = last >= cs[cs.length - 1][0];
+  g.setLineDash([4, 3]); g.strokeStyle = upL ? SK_COL.up : SK_COL.dn; g.beginPath(); g.moveTo(4, ly); g.lineTo(W - R0, ly); g.stroke(); g.setLineDash([]);
+  g.fillStyle = upL ? SK_COL.up : SK_COL.dn; g.fillRect(W - R0 + 1, ly - 8, R0 - 2, 16); g.fillStyle = '#fff'; g.fillText(last.toFixed(2), W - R0 + 4, ly);
+  g.fillStyle = '#8a96a8'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  for (let k = 1; k < 4; k++) { const i = Math.floor(n * k / 4), mins = (n - i) * (wd?.sk?.ms || 30000) / 60000; g.fillText(`-${mins >= 60 ? (mins / 60).toFixed(1) + 'ชม.' : Math.round(mins) + 'น.'}`, 4 + i * cw + cw / 2, H - 2); }
+  g.textAlign = 'left'; g.fillStyle = '#ffd34d'; g.fillText('MA10', 8, H * .74 + 12); g.fillStyle = '#6aa9ff'; g.fillText('MA30', 44, H * .74 + 12);
+  if (hover != null) {                          // crosshair + OHLC of the candle under the finger
+    const i = clamp(Math.floor((hover - 4) / cw), 0, n - 1), [o, hh, l, cl, v] = cs[i], x = 4 + i * cw + cw / 2;
+    g.strokeStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.moveTo(x, top); g.lineTo(x, H - 14); g.stroke();
+    g.fillStyle = 'rgba(20,26,34,.92)'; g.fillRect(6, 6, 200, 18); g.fillStyle = cl >= o ? SK_COL.up : SK_COL.dn; g.textBaseline = 'middle';
+    g.fillText(`เปิด ${o} สูง ${hh} ต่ำ ${l} ปิด ${cl}`, 10, 15);
+  }
 }
 function rewardsPanel() {
   const L = me.login; if (!L) return '';
@@ -1697,8 +1766,10 @@ function renderPanel(p) {
       return `<h2>🔑 รถของฉัน</h2><div class="sub">เลือกคันที่จะขี่ · ซื้อเพิ่มที่ 🚗 โชว์รูมรถ</div><div class="looks">${rows || '<div class="sub">ยังไม่มีรถ</div>'}</div>`;
     }
     case 'bank': {
-      const bk = G.shop.bank;
-      return `<h2>🏦 ธนาคาร</h2>${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (บนยอดไม่เกิน ${money(bk.cap)})</div>
+      const bk = G.shop.bank, btab = p.btab || 'acct';
+      const tabs = `<div class="tabs">${B('💰 บัญชี', { fn: 'qtab', set: { btab: 'acct' } }, btab === 'acct' ? 'primary' : '')}${B('📈 ตลาดหุ้น', { fn: 'qtab', set: { btab: 'stock' } }, btab === 'stock' ? 'primary' : '')}</div>`;
+      if (btab === 'stock') return `<h2>🏦 ธนาคาร · ตลาดหุ้น</h2>${tabs}${stockPanel(p, st)}`;
+      return `<h2>🏦 ธนาคาร</h2>${tabs}${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (บนยอดไม่เกิน ${money(bk.cap)})</div>
         <div class="grid2"><div class="item"><div class="nm">💵 เงินสด<small><b style="color:var(--acc);font-size:16px">${money(me.money)}</b></small></div></div><div class="item"><div class="nm">🏦 เงินฝาก<small><b style="color:var(--ok);font-size:16px">${money(me.bank)}</b></small></div></div></div>
         <div class="rowf" style="margin-top:10px"><input id="bankAmt" type="number" min="1" value="1000" inputmode="numeric"></div>
         <div class="grid2" style="margin-top:8px">${B('⬇️ ฝาก', { fn: 'bank', st, op: 'deposit' }, 'good')}${B('⬆️ ถอน', { fn: 'bank', st, op: 'withdraw' })}${B('ฝากทั้งหมด', { fn: 'bank', st, op: 'deposit', all: Math.floor(me.money) })}${B('ถอนทั้งหมด', { fn: 'bank', st, op: 'withdraw', all: me.bank })}</div>

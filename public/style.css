@@ -714,3 +714,14 @@ body.hasEvent #topBar{top:146px!important}
 #godBtn{right:19px;bottom:158px;width:50px;height:50px;background:linear-gradient(#ffd86a,#c98d1c)!important}
 #qList .qRow.rew span{color:#ffd770}
 #qList .qRow.rew i.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e04a35;margin-left:4px;vertical-align:middle}
+
+/* stock market */
+.skList{display:flex;flex-direction:column;gap:4px;margin:8px 0}
+.skRow{display:grid;grid-template-columns:1fr 70px 92px;align-items:center;gap:6px;padding:6px 8px;text-align:left;border-radius:10px}
+.skRow.on{outline:2px solid #ffc94d}
+.skRow .skN small{display:block;font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skRow .skP{text-align:right;font-weight:700}.skRow .skP small{display:block;font-size:10px}
+.skHead{display:flex;justify-content:space-between;align-items:flex-end;margin:6px 0 4px}.skHead small{display:block;font-size:11px;opacity:.75}
+.skBig{font-size:22px;font-weight:800;text-align:right}.skBig small{font-size:11px}.skBig i{font-style:normal;opacity:.6}
+.skR button{padding:4px 8px;font-size:12px}
+.skChart{width:100%;height:230px;display:block;border-radius:10px;touch-action:none}
