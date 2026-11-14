@@ -67,12 +67,19 @@ function charFrame(frame, lk) {
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
-function drawCharTo(g, p, fx, fy, k, view, step, faceLeft) {
+const SEAT_LEGS = .45;
+function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet = OUTFIT_SHEET[p.of], outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : '';
   const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(outfit + WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
-  g.imageSmoothingEnabled = false; g.drawImage(fr, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
+  g.imageSmoothingEnabled = false;
+  if (seated) {
+    // sitting, seen from the front: the body as is, the legs (hips to feet) folded to under half their height (knees towards you)
+    const hip = Math.round(ay - (ay - 4) * .34), legH = (CH_ATLAS.h - hip) * k * SEAT_LEGS, sh = CH_ATLAS.h - hip;
+    g.drawImage(fr, 0, 0, CH_ATLAS.w, hip, -ax * k, -(ay - hip) * k * SEAT_LEGS - hip * k, CH_ATLAS.w * k, hip * k);
+    g.drawImage(fr, 0, hip, CH_ATLAS.w, sh, -ax * k, -(ay - hip) * k * SEAT_LEGS, CH_ATLAS.w * k, legH);
+  } else g.drawImage(fr, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
   g.restore();
 }
 paintSw();
@@ -930,12 +937,9 @@ function drawPlayer(p, X, Y, t) {
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : .32), TS * .11, 0, 0, 7); ctx.fill();
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
-  else if (sitting) {   // seated: legs tucked away, body lowered a little
-    ctx.beginPath(); ctx.rect(px - H, py - H * 1.2, H * 2, H * 1.2 - H * .2); ctx.clip();
-    drawCharTo(ctx, p, px, py + H * .12, k, 'front', 0);
-  } else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
+  else if (sitting) drawCharTo(ctx, p, px, py, k, 'front', 0, false, true);   // seated: whole body, legs folded else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
   ctx.restore();
-  const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .12 : 0);
+  const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
   if (p.w && me?.career === 'police') { ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText('🚨', px - TS * .45, top + Math.sin(t / 120) * 3); }
