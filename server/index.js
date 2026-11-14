@@ -1828,7 +1828,7 @@ const randLook = () => ({ hair: pick(['brown', 'brown', 'black', 'black', ...HAI
 let npcRosterDirty = false;
 {
   const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 5; i++) {
     const [x, y] = pick(walkableIn('town'));
     npcs.push({ id: -(i + 1), folk: 1, name: D.NPC_NAMES[i % D.NPC_NAMES.length], area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
       g: i % 2 ? 'f' : 'm', look: randLook(), speed: rnd(1.1, 1.6), pickedAt: 0,
@@ -1838,7 +1838,7 @@ let npcRosterDirty = false;
 // people living in the housing estate stroll around it too
 {
   const hs = walkableIn('housing');
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 3; i++) {
     const [x, y] = pick(hs);
     npcs.push({ id: -(40 + i), folk: 1, name: D.NPC_NAMES[(i + 5) % D.NPC_NAMES.length], area: 'housing', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
       g: i % 2 ? 'm' : 'f', look: randLook(), speed: rnd(1.1, 1.5), pickedAt: 0, next: () => pick(hs).map(v => v + .5), stay: () => rnd(4, 14) });
@@ -1943,7 +1943,9 @@ function botArrive(n) {
   if (s.d === 'work' || s.d === 'fish') b.busy = { d: s.d, until: now() + s.stay * 1000 };
   return s.stay;
 }
+const BOTS_TALK = false;   // AI players keep quiet: no chat lines, no replies, no join/leave greetings in chat
 function botSay(n, text) {
+  if (!BOTS_TALK) return;
   const msg = { t: 'chat', id: n.id, name: n.name, c: n.c, text, ts: now() };
   for (const o of online.values()) if (areaId(o) === n.area && dist(o, n) <= 14) send(o, msg);
 }
@@ -1990,6 +1992,7 @@ function botTick(t) {
 }
 // a player said something near a bot (or named it in world chat): it answers after a moment, like a person typing
 function botHear(a, text, world) {
+  if (!BOTS_TALK) return;
   const cand = world ? bots().filter(n => text.includes(n.name)) : bots().filter(n => n.area === areaId(a) && dist(n, a) <= 8);
   const n = pick(cand); if (!n || n.bot.replyAt > now() || (!world && Math.random() < .35)) return;
   n.bot.replyAt = now() + 6000;
@@ -2086,7 +2089,7 @@ function npcTick(dt, ps) {
   }
   if (npcRosterDirty) { npcRosterDirty = false; sendRoster(); }
   // now and then a villager near someone says something (bubble over their head)
-  if (Math.random() < dt / 12) {
+  if (Math.random() < dt / 40) {
     const n = pick(npcs.filter(x => x.folk)), near = [...online.values()].filter(o => areaId(o) === n.area && dist(o, n) <= 14);
     if (near.length) { const msg = { t: 'chat', id: n.id, name: n.name, text: pick(D.NPC_LINES), ts: now(), npc: 1 }; near.forEach(o => send(o, msg)); }
   }
