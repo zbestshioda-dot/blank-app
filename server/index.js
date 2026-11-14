@@ -626,9 +626,7 @@ function docPickup(a) {
   if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำงาน... (ความสุขต่ำมาก)', '😞', false);
   if (!spend(a, 2)) return;
   if (o.day !== day) {                                 // first envelope of the day = clocking in
-    o.day = day; o.late = h > D.SHIFT.grace; o.pend = 0; o.hours = 0; o.n = 0;
-    if (o.late) { o.strikes++; toast(a, `มาสาย! (${hhmm(h)}) ค่าส่งเอกสารวันนี้ลด 30% · ถูกบันทึกมาสาย ${o.strikes} ครั้ง${o.strikes >= 2 ? ' ⚠️ ระวังถูกเลิกจ้าง' : ''}`, '⏰', false); if (fireCheck(a)) return; }
-    else { o.strikes = Math.max(0, o.strikes - 1); stat(a, 'ontime'); }
+    o.day = day; o.late = false; o.pend = 0; o.hours = 0; o.n = 0; o.strikes = 0; stat(a, 'ontime');   // no clock-in time: start whenever you like during work hours
   }
   const pool = DOC_DESTS.filter(s => s.id !== a.lastDoc), dest = pick(pool);
   const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), d = Math.hypot(dest.x - OFFICE_DOOR.x, dest.y - OFFICE_DOOR.y);
@@ -659,12 +657,7 @@ function officeTick(a, t, h, dt) {
     }
     toast(a, msg, '🏢');
   }
-  // online during the shift but never picked up an envelope -> absent
-  if (h >= 12 && h < D.SHIFT.end && o.day !== day && o.absent !== day && (now() - (a.loginAt || 0)) > 4 * 60000) {
-    o.absent = day; o.strikes++;
-    toast(a, `วันนี้คุณขาดงาน! (ต้องรับงานส่งเอกสารที่บริษัทก่อน 08:15) ถูกบันทึก ${o.strikes} ครั้ง`, '📋', false);
-    fireCheck(a);
-  }
+  // (no lateness or absence penalties for document runners)
 }
 // doctors: paid for every game hour spent inside the hospital during the shift (patients' fees come on top)
 function doctorTick(a, t, h, dt) {

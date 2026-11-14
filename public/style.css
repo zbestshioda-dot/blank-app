@@ -725,3 +725,17 @@ body.hasEvent #topBar{top:146px!important}
 .skBig{font-size:22px;font-weight:800;text-align:right}.skBig small{font-size:11px}.skBig i{font-style:normal;opacity:.6}
 .skR button{padding:4px 8px;font-size:12px}
 .skChart{width:100%;height:230px;display:block;border-radius:10px;touch-action:none}
+
+/* status card v3: see-through panel beside the portrait, the name in a badge under the portrait, money + diamonds on the top line */
+#card.v2 .sInfo{background:linear-gradient(90deg,rgba(20,14,8,.42),rgba(20,14,8,.12))!important;border:0!important;border-radius:0 14px 14px 0;padding:4px 8px 4px 16px!important;text-shadow:0 1px 2px #000,0 0 3px rgba(0,0,0,.8)}
+#card.v2 .pfp{margin-bottom:10px}
+#card.v2 .pfp #meName{position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);max-width:112px;padding:1px 8px;font-size:11px!important;line-height:1.35;font-weight:700!important;color:#fff3d6;background:linear-gradient(#3a2814,#20160b);border:1.5px solid #c9a45a;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:none;box-shadow:0 2px 4px rgba(0,0,0,.4)}
+#card.v2.admin .pfp #meName{background:linear-gradient(#3a2814,#20160b) padding-box;-webkit-background-clip:border-box;color:#ffd770!important;animation:none}
+#card.v2 .sInfo .l1{display:flex;align-items:center;gap:7px;line-height:1.15}
+#card.v2 .sInfo .l1 .money{font-size:15px!important;color:#ffd770;flex:none}
+#card.v2 .sInfo .l1 #meGems{font-size:12px;color:#aef0ff}
+#card.v2 .sInfo .l1 #cOn{margin-left:auto;font-size:10px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#card.v2 .sInfo .bar label,#card.v2 .sInfo .bar em{color:#fff3d6}
+#card.v2 .sInfo .bar s{background:rgba(10,6,2,.55);border-color:rgba(0,0,0,.7)}
+#docBack{position:absolute;left:8px;font-size:12px;padding:4px 12px;border-radius:14px;background:linear-gradient(#8fd3ff,#3f8fd6);color:#0d2236;font-weight:700;border:2px solid #1d4e7a;box-shadow:0 3px 0 #1d4e7a}
+#card.v2 #meCareer{display:none!important}

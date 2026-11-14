@@ -491,7 +491,7 @@ function openChatBox() { foldChat(false); setTimeout(() => $('#cbIn').focus(), 3
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // the status card folds down to a small strip (face, money, slim bars); folded by default on phones
-const placeLog = () => { const cd = $('#card'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); };
+const placeLog = () => { const cd = $('#card'), db = $('#docBack'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); };
 addEventListener('resize', () => placeLog());
 const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
 $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard(!$('#card').classList.contains('mini')); };
@@ -511,6 +511,14 @@ function paintNav() {
   b.classList.remove('hidden'); b.textContent = `✖ ยกเลิกนำทาง${guide.label ? ': ' + guide.label : ''}`;
   const cd = $('#card'); b.style.top = (cd.offsetTop + cd.offsetHeight + 4) + 'px';
 }
+// office runners: after an envelope is delivered, one tap walks you back to the office front desk for the next one
+function paintDocBack() {
+  const b = $('#docBack'), m = P.get(myId), h = hourNow(), r = m && areaOf(m.x, m.y);
+  const show = me?.career === 'office' && !me.docjob && me.office?.day === dayNow() && me.office?.closed !== dayNow() && h >= G.shift.start && h < G.shift.ot && r?.id !== 'r_office' && guide?.label !== STN('office')?.label;
+  const was = !b.classList.contains('hidden'); b.classList.toggle('hidden', !show); if (was !== show) placeLog(); if (!show) return;
+  const cd = $('#card'), nx = $('#navX'); b.style.top = (cd.offsetTop + cd.offsetHeight + 4 + (nx.classList.contains('hidden') ? 0 : nx.offsetHeight + 6)) + 'px';
+}
+$('#docBack').onclick = () => { FX.play('click'); setGuide('office', false, true); paintDocBack(); };
 $('#navX').onclick = () => { guide = null; FX.play('click'); paintNav(); placeLog(); toast('ยกเลิกการนำทางแล้ว', '📍'); };
 // fullscreen / landscape (Android Chrome & desktop; iOS only via "Add to Home Screen" + the manifest)
 async function screenMode(mode) {
@@ -784,7 +792,7 @@ let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meM
 let homeBtnT = 0;
 function frame(t) {
   requestAnimationFrame(frame);
-  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
+  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   const m = P.get(myId);
@@ -1560,10 +1568,10 @@ function renderPanel(p) {
       const o = me.office, today = dayNow();
       let status = '';
       if (me.career === 'office') {
-        const state = o && o.day === today ? (o.closed === today ? '✅ เลิกงานแล้ว' : `🟢 เข้างานแล้ว${o.late ? ' (สาย)' : ''} · ส่งไปแล้ว ${o.n || 0} งาน`) : '⚪ ยังไม่ลงเวลาเข้างาน (รับงานแรก = ลงเวลา)';
-        status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าส่งเอกสาร <b>~${money(Math.round(wage * .3))}–${money(Math.round(wage * .95))}</b>/งาน (ยิ่งไกลยิ่งได้มาก)<br>วันนี้: ${state}<br>มาสาย/ขาดงานสะสม: <b style="color:${(o?.strikes || 0) >= 2 ? 'var(--bad)' : 'inherit'}">${o?.strikes || 0}</b> ครั้ง (3 ครั้งขึ้นไปมีโอกาสถูกเลิกจ้าง)</div>
+        const state = o && o.day === today ? (o.closed === today ? '✅ เลิกงานแล้ว' : `🟢 ทำงานอยู่ · ส่งไปแล้ว ${o.n || 0} งาน`) : '⚪ ยังไม่ได้เริ่มงานวันนี้';
+        status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าส่งเอกสาร <b>~${money(Math.round(wage * .3))}–${money(Math.round(wage * .95))}</b>/งาน (ยิ่งไกลยิ่งได้มาก)<br>วันนี้: ${state}</div>
           ${me.docjob ? `<div class="jobbox ok">📄 กำลังส่งเอกสารไปที่ <b>${esc(STN(me.docjob.dest)?.label || '')}</b> · ค่าส่ง ~${money(me.docjob.pay)}${B('📍 นำทาง', { fn: 'guide', key: me.docjob.dest }, 'good')}</div>` : B('📄 รับงานส่งเอกสาร', { t: 'act', st, a: 'job' }, 'primary big')}
-          <div class="sub" style="margin-top:8px">📄 รับซองเอกสารที่นี่ เดินไปส่งให้ถึงหน้าอาคารปลายทาง ได้เงินทันที (ไกลได้มาก) แล้วกลับมารับงานต่อ · เข้างาน ${hhmm(G.shift.start)} (สายได้ถึง ${hhmm(G.shift.grace)}) · เลิก ${hhmm(G.shift.end)} · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าส่ง x${G.shift.otMul})</div>
+          <div class="sub" style="margin-top:8px">📄 รับซองเอกสารที่นี่ เดินไปส่งให้ถึงหน้าอาคารปลายทาง ได้เงินทันที (ไกลได้มาก) แล้วกลับมารับงานต่อ · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} เริ่มเมื่อไหร่ก็ได้ ไม่มีมาสาย · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าส่ง x${G.shift.otMul})</div>
           ${B('📦 ลาออก', { t: 'resign' }, 'warn')}`;
       }
       return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${me.career === 'office' ? '' : staffHint('office')}`;
