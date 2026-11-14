@@ -563,10 +563,11 @@ function findNear() {
 function onAction() {
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
   const t = performance.now();
-  if (near.type === 'door' && near.renov) return toast(`${near.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
+  const master = me.admin && me.god?.doors;
+  if (near.type === 'door' && near.renov && !master) return toast(`${near.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
   if (near.type === 'door' && near.house === undefined) {
     if (t < actCd) return; actCd = t + 1300;
-    if (!isOpen(near.bld)) { const o = G.hours[near.bld]; return toast(`${near.label} ปิดอยู่ (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
+    if (!isOpen(near.bld) && !master) { const o = G.hours[near.bld]; return toast(`${near.label} ปิดอยู่ (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
     return send({ t: 'enter', st: near.id });
   }
   if (near.type === 'exit') { if (t < actCd) return; actCd = t + 1300; return send({ t: 'exit' }); }
@@ -1021,6 +1022,8 @@ function bindPanel(root) {
     if (m.fn) return FN[m.fn](m, root);
     send(m);
   });
+  const gs = root.querySelector('#godSpd');
+  if (gs) { gs.oninput = () => { $('#godSpdV').textContent = (+gs.value).toFixed(1); }; gs.onchange = () => send({ t: 'god', op: 'speed', v: +gs.value }); }
   const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value, ch: chatTab }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
   root.querySelectorAll('[data-staff]').forEach(c => whenChars(() => {
@@ -1502,6 +1505,11 @@ function renderPanel(p) {
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ล้วง ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
+        <div class="setRow"><span><b>🏃 ความเร็ว x<span id="godSpdV">${(g.speed || 1).toFixed(1)}</span></b><small>เลื่อนปรับได้ 1–5 เท่า (กดค้างปุ่มวิ่งได้อีก)</small></span><input id="godSpd" type="range" min="1" max="5" step="0.5" value="${g.speed || 1}" style="width:130px"></div>
+        <div class="setRow"><span><b>✨ วาร์ป</b><small>เปิดแล้วกด 🗺️ แผนที่ แตะตรงไหนก็วาร์ปไปที่นั่น</small></span>${B(g.warp ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'warp' }, g.warp ? 'good' : '')}</div>
+        ${g.warp ? B('🗺️ เปิดแผนที่เพื่อวาร์ป', { fn: 'map' }, 'primary big') : ''}
+        <div class="setRow"><span><b>🚪 เข้าได้ทุกอาคาร</b><small>แม้ร้านปิด ปิดปรับปรุง หรือบ้านของคนอื่น · ไม่โดนไล่ออกตอนร้านปิด</small></span>${B(g.doors ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'doors' }, g.doors ? 'good' : '')}</div>
+        <div class="setRow"><span><b>👻 ล่องหน</b><small>คนอื่นมองไม่เห็นตัว ไม่ขึ้นในแผนที่/รายชื่อออนไลน์ (แชทใกล้ๆ ยังเห็นข้อความ)</small></span>${B(g.invis ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'invis' }, g.invis ? 'good' : '')}</div>
         <div class="grid2">${B('💯 สเตตัสเต็ม', { fn: 'god', op: 'fill' }, 'primary')}${B('💰 เงิน 999,999', { fn: 'god', op: 'money' }, 'primary')}</div>
         <div class="secT">🐞 รายงานบัคจากผู้เล่น</div><div class="grid2">${B('📥 โหลดรายงาน', { fn: 'god', op: 'bugs' })}${B('🗑️ ล้างทั้งหมด', { fn: 'god', op: 'bugclear' }, 'warn', !bugList?.length)}</div>${bl}`;
     }
@@ -2228,6 +2236,7 @@ function openMap(mapId, keepScroll) {
   if (!keepScroll && mapZoom > 1) { const q = outPos(m.x, m.y), [x, y] = L(q.x, q.y), box = $('#mapScroll'); box.scrollLeft = x - box.clientWidth / 2; box.scrollTop = y - box.clientHeight / 2; }
   c.onclick = e => {
     const rc = c.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
+    if (me.admin && me.god?.warp) { closeMap(); send({ t: 'god', op: 'warpto', x: +(A.x + x / k).toFixed(2), y: +(A.y + y / k).toFixed(2) }); return; }   // god mode: warp
     const hit = places.map(pl => [pl, Math.hypot(pl.x - x, pl.y - y)]).sort((a, b) => a[1] - b[1])[0];
     if (hit && hit[1] < r * 2.2) { closeMap(); setGuide(hit[0].key); }
   };

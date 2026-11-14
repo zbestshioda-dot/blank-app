@@ -142,14 +142,15 @@ function enterRoom(a, m) {
   const s = ST[m.st]; if (!s || s.type !== 'door') return;
   const room = ROOM[s.to]; if (!room) return;
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 1.2) return toast(a, 'เดินไปที่ประตูก่อน', '🚪', false);
-  if (s.renov) return toast(a, `${s.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
-  if (s.house === undefined && !buildingOpen(s.bld)) {
+  const master = isAdmin(a) && a.god?.doors;              // god mode: every door opens
+  if (s.renov && !master) return toast(a, `${s.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
+  if (s.house === undefined && !buildingOpen(s.bld) && !master) {
     const o = D.HOURS[s.bld];
     return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false);
   }
   if (s.house !== undefined) {
     const i = s.house, o = houses[i], tn = tenants[i];
-    if (o !== a && tn !== a) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
+    if (o !== a && tn !== a && !master) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
   }
   if (!cd(a, 'door', 1200, true)) return;
   teleport(a, room.spawn.x, room.spawn.y);
@@ -179,7 +180,9 @@ const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
 const comfort = a => houseOf(a) >= 0 ? (a.furniture || []).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0) : 0;
-const speedOf = a => dzProd(a, 'speed');           // vehicles were removed from the game
+const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
+const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
+const speedOf = a => dzProd(a, 'speed') * godSpeed(a);           // vehicles were removed from the game
 const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
 const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
 function accrue(a) {
@@ -1671,7 +1674,15 @@ function pubInfo(a) {
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
     of: outfitOf(a), th: a.thiefUntil > now() ? 1 : 0, afk: a.afk ? 1 : 0 };
 }
-function sendRoster() { broadcast({ t: 'roster', players: [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f })).concat(npcs.filter(npcVisible).map(npcInfo)) }); }
+function sendRoster() {
+  const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
+  const pub = JSON.stringify({ t: 'roster', players: all.filter(p => !p._h).concat(npc) });
+  for (const o of online.values()) {
+    if (o.ws.readyState !== 1) continue;
+    if (hidden(o)) o.ws.send(JSON.stringify({ t: 'roster', players: all.filter(p => !p._h || p.id === o.id).concat(npc) }));   // you still see yourself
+    else o.ws.send(pub);
+  }
+}
 function meView(a) {
   const isRider = a.career === 'rider';
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
@@ -1687,7 +1698,7 @@ function meView(a) {
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', outfits: a.outfits || [], wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     docShift: a.career === 'doctor' && a.doc ? { day: a.doc.day, hours: +(a.doc.hours || 0).toFixed(2) } : null,
-    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
+    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
@@ -1697,7 +1708,7 @@ function meView(a) {
 }
 function worldView() {
   const t = now();
-  const lb = [...accounts.values()].map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws, ti: titleOf(a) }))
+  const lb = [...accounts.values()].map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
     .sort((x, y) => y.w - x.w).slice(0, 10);
   return {
     t: 'wd', now: t, toff: D.TIME_OFF, on: online.size, mk: marketView(),
@@ -1779,7 +1790,7 @@ function login(ws, m) {
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
-  feed(`👋 ${a.name} เข้าเมือง`);
+  if (!hidden(a)) feed(`👋 ${a.name} เข้าเมือง`);
 }
 function fail(ws, msg) { ws.send(JSON.stringify({ t: 'loginfail', msg })); }
 
@@ -2000,6 +2011,15 @@ function godAct(a, m) {
     if (a.down && a.down.kind !== 'jail') revive(a, 100);
     toast(a, 'สเตตัสเต็มแล้ว', '💯');
   } else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
+  else if (m.op === 'speed') { a.god.speed = clamp(+m.v || 1, 1, 5); a.mvb = moveCap(a); }
+  else if (m.op === 'warp') { a.god.warp = !a.god.warp; toast(a, a.god.warp ? 'วาร์ป: เปิดแผนที่แล้วแตะจุดที่ต้องการ' : 'ปิดวาร์ป', '✨'); }
+  else if (m.op === 'warpto') {
+    const x = +m.x, y = +m.y; if (!a.god.warp || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const ar = D.areaAt(x, y); if (!ar || D.blocked(x, y)) return toast(a, 'วาร์ปไปตรงนั้นไม่ได้ (ติดสิ่งกีดขวาง)', '✨', false);
+    if (a.down) return; teleport(a, x, y); sendRoster(); return;
+  }
+  else if (m.op === 'doors') { a.god.doors = !a.god.doors; toast(a, a.god.doors ? 'God mode: เข้าได้ทุกอาคาร แม้ปิดแล้ว' : 'ปิด: เข้าได้ทุกอาคาร', '🚪'); }
+  else if (m.op === 'invis') { a.god.invis = !a.god.invis; toast(a, a.god.invis ? 'God mode: ล่องหน คนอื่นมองไม่เห็นคุณ' : 'ปิดล่องหน คนอื่นเห็นคุณแล้ว', '👻'); }
   else if (m.op === 'bugs') return send(a, { t: 'bugs', list: bugs.slice(-60).reverse() });
   else if (m.op === 'bugclear') { bugs = []; bugsDirty = true; dirty = true; return send(a, { t: 'bugs', list: [] }); }
   markMe(a); sendRoster();
@@ -2056,7 +2076,7 @@ function tick() {
   const crossed = (x) => lastHour < x && h >= x || (lastHour > h && (x > lastHour || x <= h));
   for (const [kind, [open, close]] of Object.entries(D.HOURS)) if (close < 24 && crossed(close)) {
     const room = D.ROOMS.find(r => r.rk === kind);
-    if (room) for (const a of online.values()) if (D.roomAt(a.x, a.y) === room) { teleport(a, room.outside.x, room.outside.y); toast(a, `${room.label}ปิดทำการแล้ว (${hhmm(close)}) เปิดอีกครั้ง ${hhmm(open)}`, '🔒'); }
+    if (room) for (const a of online.values()) if (D.roomAt(a.x, a.y) === room && !(isAdmin(a) && a.god?.doors)) { teleport(a, room.outside.x, room.outside.y); toast(a, `${room.label}ปิดทำการแล้ว (${hhmm(close)}) เปิดอีกครั้ง ${hhmm(open)}`, '🔒'); }
   }
   if (crossed(D.SHIFT.end)) feed('🏢 17:00 เลิกงานแล้ว ไฟในออฟฟิศปิด');
   if (crossed(D.SHIFT.start - 0.5)) for (const a of online.values()) if (a.career === 'office') toast(a, 'อีก 30 นาทีเข้างาน (08:00) ไปนั่งที่โต๊ะทำงานในบริษัทให้ทัน', '⏰');
@@ -2163,7 +2183,11 @@ function tick() {
   const ps = [];
   for (const a of online.values()) if (a.moved) { a.moved = false; ps.push([a.id, +a.x.toFixed(2), +a.y.toFixed(2), a.f]); }
   if (online.size) npcTick(dt, ps);
-  if (ps.length) broadcast({ t: 'ps', p: ps });
+  if (ps.length) {
+    const hid = new Set([...online.values()].filter(hidden).map(a => a.id));
+    if (!hid.size) broadcast({ t: 'ps', p: ps });
+    else { const pub = JSON.stringify({ t: 'ps', p: ps.filter(q => !hid.has(q[0])) }); for (const o of online.values()) if (o.ws.readyState === 1) o.ws.send(hid.has(o.id) ? JSON.stringify({ t: 'ps', p: ps.filter(q => !hid.has(q[0]) || q[0] === o.id) }) : pub); }
+  }
 
   if (t > wdAt) { wdAt = t + 1000; broadcast(worldView()); }
   if (t > saveAt) { saveAt = t + 15000; save(); }
