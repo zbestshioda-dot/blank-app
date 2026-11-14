@@ -234,8 +234,9 @@ const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1);
 const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
 const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
 function accrue(a) {
-  const t = now(), days = (t - (a.bankT || t)) / 86400e3; a.bankT = t;
+  const t = now(), days = Math.min(D.BANK.offlineDays, (t - (a.bankT || t)) / D.DAY_MS); a.bankT = t;
   if (a.bank > 0 && days > 0) a.bank += Math.min(a.bank, D.BANK.cap) * (Math.pow(1 + D.BANK.rate, days) - 1);
+  if (a.loan > 0 && days > 0) a.loan += a.loan * (Math.pow(1 + D.BANK.loanRate, days) - 1);
 }
 function quest(a, type, n = 1) {
   for (const e of Q.progress(a, type, n)) {
@@ -1006,8 +1007,8 @@ function act(a, m) {
       if (m.a === 'withdraw') { amt = Math.min(amt, Math.floor(a.bank)); if (amt <= 0) return toast(a, 'ไม่มีเงินในบัญชี', '💸', false); a.bank -= amt; a.money += amt; toast(a, `ถอนเงิน ${money(amt)}`, '🏦'); }
       if (m.a === 'borrow') {
         const room = Math.floor((D.BANK.loanMax - a.loan) / (1 + D.BANK.loanFee)); amt = Math.min(amt, room);
-        if (amt <= 0) return toast(a, `กู้ได้สูงสุด ${money(D.BANK.loanMax)} (รวมดอกเบี้ย) ใช้คืนก่อนนะ`, '🏦', false);
-        a.money += amt; a.loan += Math.ceil(amt * (1 + D.BANK.loanFee)); toast(a, `กู้เงิน ${money(amt)} (ต้องคืน ${money(amt * (1 + D.BANK.loanFee))})`, '🏦');
+        if (amt <= 0) return toast(a, `กู้ได้สูงสุด ${money(D.BANK.loanMax)} (รวมค่าธรรมเนียมและดอกเบี้ย) ใช้คืนก่อนนะ`, '🏦', false);
+        a.money += amt; a.loan += Math.ceil(amt * (1 + D.BANK.loanFee)); toast(a, `กู้เงิน ${money(amt)} (ยอดหนี้ ${money(amt * (1 + D.BANK.loanFee))} · ดอกเบี้ย ${D.BANK.loanRate * 100}% ต่อวันเกม ใช้คืนเร็วเสียน้อย)`, '🏦');
       }
       if (m.a === 'repay') { amt = Math.min(amt, Math.floor(a.money), Math.ceil(a.loan)); if (amt <= 0) return toast(a, a.loan > 0 ? 'เงินสดไม่พอ' : 'คุณไม่มีหนี้', 'ℹ️', false); a.money -= amt; a.loan -= amt; toast(a, `ชำระหนี้ ${money(amt)}${a.loan <= 0 ? ' — ปลดหนี้แล้ว! 🎉' : ''}`, '🏦'); }
       a.loan = Math.max(0, a.loan); return markMe(a);
@@ -2725,7 +2726,7 @@ function tick() {
   }
   for (const [id, r] of reqs) if (t > r.exp) { reqs.delete(id); toast(r.from, r.kind === 'call' ? `${r.to.name} ไม่รับสาย` : `${r.to.name} ไม่ตอบรับ`, '⌛', false); }
   // bank interest
-  if (slow && t % 30000 < 1000) for (const a of online.values()) if (a.bank > 0) { accrue(a); markMe(a); }
+  if (slow && t % 30000 < 1000) for (const a of online.values()) if (a.bank > 0 || a.loan > 0) { accrue(a); markMe(a); }
 
   // positions
   const ps = [];

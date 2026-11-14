@@ -1777,11 +1777,11 @@ function renderPanel(p) {
       const bk = G.shop.bank, btab = p.btab || 'acct';
       const tabs = `<div class="tabs">${B('💰 บัญชี', { fn: 'qtab', set: { btab: 'acct' } }, btab === 'acct' ? 'primary' : '')}${B('📈 ตลาดหุ้น', { fn: 'qtab', set: { btab: 'stock' } }, btab === 'stock' ? 'primary' : '')}</div>`;
       if (btab === 'stock') return `<h2>🏦 ธนาคาร · ตลาดหุ้น</h2>${tabs}${stockPanel(p, st)}`;
-      return `<h2>🏦 ธนาคาร</h2>${tabs}${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ย <b>${bk.rate * 100}% ต่อวัน</b> (บนยอดไม่เกิน ${money(bk.cap)})</div>
+      return `<h2>🏦 ธนาคาร</h2>${tabs}${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ยเงินฝาก <b>${+(bk.rate * 100).toFixed(2)}% ต่อวันเกม</b> (24 นาที · บนยอดไม่เกิน ${money(bk.cap)})</div>
         <div class="grid2"><div class="item"><div class="nm">💵 เงินสด<small><b style="color:var(--acc);font-size:16px">${money(me.money)}</b></small></div></div><div class="item"><div class="nm">🏦 เงินฝาก<small><b style="color:var(--ok);font-size:16px">${money(me.bank)}</b></small></div></div></div>
         <div class="rowf" style="margin-top:10px"><input id="bankAmt" type="number" min="1" value="1000" inputmode="numeric"></div>
         <div class="grid2" style="margin-top:8px">${B('⬇️ ฝาก', { fn: 'bank', st, op: 'deposit' }, 'good')}${B('⬆️ ถอน', { fn: 'bank', st, op: 'withdraw' })}${B('ฝากทั้งหมด', { fn: 'bank', st, op: 'deposit', all: Math.floor(me.money) })}${B('ถอนทั้งหมด', { fn: 'bank', st, op: 'withdraw', all: me.bank })}</div>
-        <div class="sub" style="margin-top:14px"><b>💳 กู้เงิน</b> · สูงสุด ${money(bk.loanMax)} ค่าธรรมเนียม ${bk.loanFee * 100}% · ระหว่างเป็นหนี้ ${bk.repayShare * 100}% ของรายได้ถูกหักใช้หนี้อัตโนมัติ</div>
+        <div class="sub" style="margin-top:14px"><b>💳 กู้เงิน</b> · สูงสุด ${money(bk.loanMax)} ค่าธรรมเนียม ${bk.loanFee * 100}% + ดอกเบี้ย ${bk.loanRate * 100}% ต่อวันเกมบนยอดหนี้ · ระหว่างเป็นหนี้ ${bk.repayShare * 100}% ของรายได้ถูกหักใช้หนี้อัตโนมัติ</div>
         <div class="item"><div class="nm">หนี้คงเหลือ<small><b style="color:${me.loan ? 'var(--bad)' : 'var(--ok)'};font-size:16px">${money(me.loan)}</b></small></div>${B('กู้', { fn: 'bank', st, op: 'borrow' })}${B('ใช้คืน', { fn: 'bank', st, op: 'repay' }, me.loan ? 'good' : '', !me.loan)}</div>`;
     }
     case 'pier': {
@@ -2671,12 +2671,12 @@ $('#mapScroll').addEventListener('wheel', e => { e.preventDefault(); const r = $
 }
 function openMap(mapId, keepScroll) {
   const m = P.get(myId);
-  mapId = mapId || mapOf(areaOf(m.x, m.y)?.id);
+  mapId = mapId || mapOf(areaOf(m.x, m.y)?.id); if (AREA[mapId]?.yard) mapId = 'housing';   // home yards are private: the big map shows the estate instead
   if (mapId !== mapCur && !keepScroll) mapZoom = Math.min(mapZoom, 5);
   mapCur = mapId;
   const A = AREA[mapId];
   $('#mapView').classList.remove('hidden');
-  $('#mapTabs').innerHTML = G.areas.filter(a => a.kind === 'map').map(a => `<button data-map="${a.id}" class="${a.id === mapId ? 'primary' : ''}">${a.name}</button>`).join('');
+  $('#mapTabs').innerHTML = G.areas.filter(a => a.kind === 'map' && !a.yard).map(a => `<button data-map="${a.id}" class="${a.id === mapId ? 'primary' : ''}">${a.name}</button>`).join('');
   $('#mapTabs').querySelectorAll('[data-map]').forEach(b => b.onclick = () => { mapZoom = 1; openMap(b.dataset.map); });
   // the legend sits beside the map on wide screens and in landscape, under it on portrait phones
   const c = $('#bigMap'), W = A.w, H = A.h, land = innerWidth > innerHeight, wide = innerWidth > 820 || land;
