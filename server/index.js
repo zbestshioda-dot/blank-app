@@ -2021,7 +2021,7 @@ function meView(a) {
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
-    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_REWARD,
+    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_GEMS,
   };
 }
 function worldView() {
@@ -2157,15 +2157,14 @@ function dailyLogin(a) {
   return { streak: a.loginStreak, reward, gems, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
 }
 // achievements: each one has a cash reward by rarity, collected from the achievements page
-const ACH_REWARD = [0, 300, 800, 2000, 5000, 12000], ACH_GEMS = [0, 2, 5, 10, 25, 50];   // 💎 diamonds by rarity
+const ACH_GEMS = [0, 5, 7, 10, 12, 15];   // achievements pay 💎 diamonds by rarity (no cash)
 function achClaim(a, id) {
   const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
   if (!todo.length) return toast(a, 'ไม่มีรางวัลให้รับ', '🏅', false);
-  let sum = 0;
   let gem = 0;
-  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) { sum += ACH_REWARD[ac.r || 1]; gem += ACH_GEMS[ac.r || 1]; } }
-  a.achGot = [...got, ...todo]; a.gems = (a.gems || 0) + gem; earn(a, sum); markMe(a); dirty = true;
-  toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ ${money(sum)} + 💎${gem}`, '🏅');
+  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) gem += ACH_GEMS[ac.r || 1]; }
+  a.achGot = [...got, ...todo]; a.gems = (a.gems || 0) + gem; markMe(a); dirty = true;
+  toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ 💎${gem}`, '💎');
 }
 
 function detach(a) {

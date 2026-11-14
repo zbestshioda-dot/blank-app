@@ -1364,11 +1364,11 @@ function achvPanel() {
   const pct = a => Math.min(1, (me.stats?.[a.stat] || 0) / a.n);
   const rows = G.ach.slice().sort((x, y) => st(x) - st(y) || (st(x) === 1 ? pct(y) - pct(x) : 0) || (x.r || 1) - (y.r || 1)).map(a => {
     const s2 = st(a), c = a.c ? G.careers[a.c] : null, pv = Math.min(a.n, me.stats?.[a.stat] || 0);
-    const btn = s2 === 0 ? B(`🎁 รับ ${money(achRew(a))}`, { t: 'achclaim', id: a.id }, 'primary') : s2 === 2 ? '<span class="tag">รับแล้ว ✓</span>' : `<span class="tag">${money(achRew(a))}</span>`;
+    const btn = s2 === 0 ? B(`🎁 รับ 💎${achRew(a)}`, { t: 'achclaim', id: a.id }, 'primary') : s2 === 2 ? '<span class="tag">รับแล้ว ✓</span>' : `<span class="tag">💎${achRew(a)}</span>`;
     return `<div class="item ${s2 === 2 ? 'done' : ''}"><div class="em">${s2 === 1 ? '🔒' : '🏅'}</div><div class="nm">${titleHtml(a.title, a.r)} <span class="rtag r${a.r || 1}">${RAR[a.r || 1]}</span>${c ? ` <span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${pv.toLocaleString()}/${a.n.toLocaleString()}</small><div class="wbar"><u style="width:${pct(a) * 100}%"></u></div></div>${btn}</div>`;
   }).join('');
-  return `<h2>🏅 ความสำเร็จ</h2><div class="sub">ปลดล็อกแล้ว ${got}/${G.ach.length} · ทุกความสำเร็จมีรางวัลเงินตามความหายาก และใช้เป็นฉายาบนหัวได้</div>
-    ${todo.length ? `<div class="jobbox">🎁 รอรับรางวัล ${todo.length} รายการ รวม <b>${money(sum)}</b>${B('รับทั้งหมด', { t: 'achclaim', id: 'all' }, 'primary big')}</div>` : ''}
+  return `<h2>🏅 ความสำเร็จ</h2><div class="sub">ปลดล็อกแล้ว ${got}/${G.ach.length} · ทุกความสำเร็จได้เพชร 💎5–15 ตามความยาก และใช้เป็นฉายาบนหัวได้</div>
+    ${todo.length ? `<div class="jobbox">🎁 รอรับรางวัล ${todo.length} รายการ รวม <b>💎${sum}</b>${B('รับทั้งหมด', { t: 'achclaim', id: 'all' }, 'primary big')}</div>` : ''}
     <div class="list">${rows}</div>`;
 }
 function rewardsPanel() {
@@ -1608,7 +1608,7 @@ function renderPanel(p) {
         const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
         return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
       return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่มหาวิทยาลัย'}</div>
-        <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${(me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) รับรางวัลความสำเร็จ และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
+        <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${(me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
     }
     case 'garage': {
       const rows = (me.vehicles || []).filter(k => G.shop.vehicles[k]).map(k => { const v = G.shop.vehicles[k], on = me.ride === k;
