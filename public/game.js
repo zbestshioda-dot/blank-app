@@ -220,6 +220,7 @@ function handle(m) {
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
     case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
     case 'tchat': tradeChat.push(m); if (tradeChat.length > 30) tradeChat.shift(); paintTradeChat(); if (!m.mine) FX.play('pop'); break;
@@ -1311,7 +1312,7 @@ const FN = {
   place: m => startPlace(m.k),
   photoDel: () => send({ t: 'pic', data: '' }),
   chatTab: m => { chatTab = m.tab; panel.sig = 'x' + m.tab; refreshPanel(true); setTimeout(() => $('#chatIn')?.focus(), 30); },
-  mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); $('#mailText').value = ''; },
+  mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); },   // the text stays until the server confirms (mailsent)
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
@@ -1843,7 +1844,7 @@ function renderPanel(p) {
       return `<h2>📬 กล่องจดหมาย</h2><div class="sub">ส่งถึงผู้เล่นคนไหนก็ได้ด้วยชื่อตัวละคร แม้เขาจะออฟไลน์ เก็บได้ 50 ฉบับล่าสุด</div>
         <div class="secT">✍️ เขียนจดหมาย</div>
         <input id="mailTo" maxlength="16" list="mailNames" placeholder="ชื่อผู้รับ" value="${esc(p.to || '')}"><datalist id="mailNames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
-        <textarea id="mailText" maxlength="500" placeholder="ข้อความ..."></textarea>${B('📨 ส่งจดหมาย', { fn: 'mailSend' }, 'primary big')}
+        <textarea id="mailText" maxlength="500" placeholder="ข้อความ..."></textarea>${B('📨 ส่งจดหมาย', { fn: 'mailSend' }, 'primary big')}${p.sent ? `<div class="jobbox ok">✅ ส่งข้อความแล้ว (ถึง ${esc(p.sent)})</div>` : ''}
         <div class="secT">📥 จดหมายของคุณ (${mailList.length})</div>${rows || '<div class="sub">ยังไม่มีจดหมาย</div>'}`;
     }
     case 'phone': return phonePanel(p);

@@ -2418,7 +2418,7 @@ function onMessage(ws, raw) {
       const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
       if (!text || !to) return toast(a, 'ใส่ชื่อผู้รับและข้อความ', '✉️', false);
       const bm = bots().find(x => x.name === to);
-      if (bm) { if (!cd(a, 'mail', 5000)) return; stat(a, 'mails'); if (Math.random() < .6) setTimeout(() => { if (!a.ws) return; a.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: bm.name, text: pick(['ได้รับจดหมายแล้วนะ ขอบคุณที่ทักมา 😊', 'สวัสดีครับ ไว้เจอกันในเมืองนะ', 'ขอบคุณจ้า ว่างๆ ไปตกปลาด้วยกัน']), t: now(), read: 0 }, ...(a.mail || [])].slice(0, 50); markMe(a); send(a, { t: 'mail', list: a.mail }); toast(a, `📬 จดหมายใหม่จาก ${bm.name}`, '📬'); }, rnd(20, 60) * 1000); return toast(a, `ส่งจดหมายถึง ${bm.name} แล้ว`, '📨'); }
+      if (bm) { if (!cd(a, 'mail', 5000)) return; stat(a, 'mails'); if (Math.random() < .6) setTimeout(() => { if (!a.ws) return; a.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: bm.name, text: pick(['ได้รับจดหมายแล้วนะ ขอบคุณที่ทักมา 😊', 'สวัสดีครับ ไว้เจอกันในเมืองนะ', 'ขอบคุณจ้า ว่างๆ ไปตกปลาด้วยกัน']), t: now(), read: 0 }, ...(a.mail || [])].slice(0, 50); markMe(a); send(a, { t: 'mail', list: a.mail }); toast(a, `📬 จดหมายใหม่จาก ${bm.name}`, '📬'); }, rnd(20, 60) * 1000); send(a, { t: 'mailsent', to: bm.name }); return toast(a, `ส่งข้อความถึง ${bm.name} แล้ว`, '✅'); }
       const o = [...accounts.values()].find(x => x.name === to);
       if (!o) return toast(a, `ไม่พบผู้เล่นชื่อ "${to}"`, '✉️', false);
       if (o === a) return toast(a, 'ส่งจดหมายถึงตัวเองไม่ได้', '✉️', false);
@@ -2426,7 +2426,8 @@ function onMessage(ws, raw) {
       o.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: a.name, text, t: now(), read: 0 }, ...(o.mail || [])].slice(0, 50);
       markMe(o); stat(a, 'mails'); dirty = true; send(o, { t: 'mail', list: o.mail });
       if (o.ws) toast(o, `📬 จดหมายใหม่จาก ${a.name}`, '📬');
-      return toast(a, `ส่งจดหมายถึง ${o.name} แล้ว`, '📨');
+      send(a, { t: 'mailsent', to: o.name });
+      return toast(a, `ส่งข้อความถึง ${o.name} แล้ว`, '✅');
     }
     case 'mailget': return send(a, { t: 'mail', list: a.mail || [] });
     case 'mailread': { let ch = false; for (const x of a.mail || []) if (!x.read) { x.read = 1; ch = true; } if (ch) markMe(a); return; }
