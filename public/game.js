@@ -2034,6 +2034,7 @@ function waterDepth(tx, ty) {
 function drawTile(ch, tx, ty, px, py, tm) {
   if (ch === 'B' || ch === 'T' || ch === 'o' && !roomGrid[ty * G.map.w + tx]) ch = under(tx, ty);
   if (ch === 'o') ch = 'i';
+  if (ch === 'g') ch = '.';
   const S = Math.ceil(TS) + 1;
   switch (ch) {
     case '.': { const v = hash(tx >> 1, ty >> 1); tex(v < .84 ? 'g_grass' : v < .92 ? 'g_grass_dots' : 'g_grass_flowers', tx, ty, px, py); return; }
