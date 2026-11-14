@@ -22,16 +22,15 @@
       <div class="pfp" data-open="profile" title="โปรไฟล์"><i id="lvRing"></i><img id="mePortrait" src="assets/ui/face_m.png" alt=""><span id="lvPct">★ 0%</span></div>
       <div class="sInfo">
         <div class="l1"><b id="meName"></b><span id="meCareer"></span></div>
-        <div class="l2"><span id="cWx">☀️</span><span id="cDate"></span><b id="cTime"></b></div>
+        <div class="bars">
+          <div class="bar" data-bar="energy" title="พลังงาน (แตะดูวิธีเพิ่ม)"><label>พลัง<em id="vE"></em></label><s><u id="bE"></u></s></div>
+          <div class="bar" data-bar="hunger" title="ความอิ่ม (แตะดูวิธีเพิ่ม)"><label>อิ่ม<em id="vH"></em></label><s><u id="bH"></u></s></div>
+          <div class="bar" data-bar="health" title="สุขภาพ (แตะดูวิธีเพิ่ม)"><label>เลือด<em id="vL"></em></label><s><u id="bL"></u></s></div>
+          <div class="bar" data-bar="happy" title="ความสุข (แตะดูวิธีเพิ่ม)"><label>สุข<em id="vJ"></em></label><s><u id="bJ"></u></s></div>
+          <div id="jx" class="hidden" title="ประสบการณ์อาชีพ: เลเวลสูงขึ้น ได้เงินจากงานมากขึ้น แต่ต้องใช้ EXP มากขึ้นและได้ EXP ต่อครั้งน้อยลง"><label><span id="jxL"></span><em id="jxV"></em></label><s><u id="jxU"></u></s></div>
+        </div>
         <div class="l3"><div class="money" id="meMoney"></div><span id="cOn" title="ผู้เล่นออนไลน์ตอนนี้"></span></div>
       </div>
-    </div>
-    <div class="bars">
-      <div class="bar" data-bar="energy" title="พลังงาน (แตะดูวิธีเพิ่ม)"><label>พลัง<em id="vE"></em></label><s><u id="bE"></u></s></div>
-      <div class="bar" data-bar="hunger" title="ความอิ่ม (แตะดูวิธีเพิ่ม)"><label>อิ่ม<em id="vH"></em></label><s><u id="bH"></u></s></div>
-      <div class="bar" data-bar="health" title="สุขภาพ (แตะดูวิธีเพิ่ม)"><label>เลือด<em id="vL"></em></label><s><u id="bL"></u></s></div>
-      <div class="bar" data-bar="happy" title="ความสุข (แตะดูวิธีเพิ่ม)"><label>สุข<em id="vJ"></em></label><s><u id="bJ"></u></s></div>
-      <div id="jx" class="hidden" title="ประสบการณ์อาชีพ: เลเวลสูงขึ้น ได้เงินจากงานมากขึ้น แต่ต้องใช้ EXP มากขึ้นและได้ EXP ต่อครั้งน้อยลง"><label><span id="jxL"></span><em id="jxV"></em></label><s><u id="jxU"></u></s></div>
     </div>
     <div id="statusBox"><div id="dzChips"></div></div>
     <div id="qBox">
@@ -43,6 +42,7 @@
   <div id="topRight">
     <div id="clock"></div>
     <div id="miniWrap"><canvas id="mini" width="120" height="88"></canvas><span id="miniName">🗺️ แผนที่</span></div>
+    <div id="mClock" class="l2"><span id="cWx">☀️</span><span id="cDate"></span><b id="cTime"></b></div>
   </div>
   <!-- the menu runs along the top of the screen -->
   <div id="topBar">
