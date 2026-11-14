@@ -284,7 +284,8 @@ const hasLic = (a, id) => (a.licenses || []).includes(id) && !licExpired(a, id);
 const fishLv = a => Math.min(D.FISHING.maxLv, 1 + Math.floor((a.xp?.fisher || 0) / D.FISHING.xpPerLv));
 
 const NPC_BUY = 0.3;                         // NPC shops buy at a fraction of what players pay each other
-const NPC_SELL = 2.5;                         // ...and sell at a big markup
+const NPC_SELL = 2.5;
+const FISH_RATE = 0.45;                       // the fish club pays this share of the market price (fishing sits just above begging on the pay ladder)                         // ...and sell at a big markup
 function marketPrice(id) {
   const it = D.ITEMS[id];
   let p = it.base * market[id].mult;
@@ -295,7 +296,7 @@ function marketPrice(id) {
 function npcBuyPrice(a, id, rate = NPC_BUY) {
   const it = D.ITEMS[id];
   let b = 1;
-  if (a.career === 'merchant' && it.kind === 'goods') rate = 0.7 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
+  if (a.career === 'merchant' && it.kind === 'goods') rate = 0.74 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
   else if (a.career === 'merchant') b += 0.05;
   if (a.career === 'chef' && it.kind === 'meal') rate = Math.max(rate, 0.65);                                      // restaurants buy chefs' dishes
   if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
@@ -405,7 +406,7 @@ const MENU = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].menu);
 const PICKUP = ST.restaurant;                      // the restaurant counter (inside)
 const RESTO_OUT = D.ROOMS.find(r => r.bld === 'restaurant').outside;
 function deliveryFee(x, y) {
-  const area = D.areaAt(x, y)?.id || 'town';
+  let area = D.areaAt(x, y)?.id || 'town'; if (area.startsWith('yard')) area = 'housing';   // a home yard is reached through the estate street
   const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
   const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' ? 25 : 0);
   return Math.round(D.RIDER.baseFee + d * D.RIDER.perTile);
@@ -432,7 +433,7 @@ function placeOrder(a, m) {
   ordersChanged();
 }
 function spawnNpcOrder() {
-  const spots = [...D.STATIONS.filter(s => s.type === 'door' && s.house !== undefined), ...D.STATIONS.filter(s => s.type === 'seat')];
+  const spots = [...D.STATIONS.filter(s => s.type === 'door' && s.house !== undefined && s.area === 'housing'), ...D.STATIONS.filter(s => s.type === 'seat' && (s.area === 'town' || s.area === 'housing'))];
   const s = pick(spots), id = pick(MENU);
   const fee = Math.round(deliveryFee(s.x, s.y) * (ev('hungry') ? 1.3 : 1));
   const o = { id: nextOrder++, cust: null, custName: pick(D.NPC_NAMES), item: id, price: 0, fee, tip: rint(0, 3) ? 0 : rint(10, D.RIDER.tipMax),
@@ -822,7 +823,7 @@ function act(a, m) {
       q = Math.min(q, have, 500);
       if (q <= 0) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
       if (!cd(a, 'sell', 300)) return;
-      const rate = s.type === 'market' ? NPC_BUY : s.type === 'fishclub' ? 0.55 : 0.5;   // the fish club and the farm buyer pay far better than the market's NPC
+      const rate = s.type === 'market' ? NPC_BUY : s.type === 'fishclub' ? FISH_RATE : 0.5;   // the fish club and the farm buyer pay far better than the market's NPC
       let total = 0;
       for (let i = 0; i < q; i++) { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); }
       addItem(a, id, -q);
@@ -2097,7 +2098,7 @@ function marketView() {
     b.p = Math.min(b.p, L.price); b.n += L.qty;
   }
   const out = {};
-  for (const k in D.ITEMS) out[k] = { npc: Math.round(npcBuyPrice({ career: '' }, k)), farm: Math.round(npcBuyPrice({ career: '' }, k, D.ITEMS[k].kind === 'fish' ? 0.55 : 0.5)), sell: npcSellPrice(k), ref: Math.round(marketPrice(k)), best: best[k] ? best[k].p : 0, n: best[k] ? best[k].n : 0 };
+  for (const k in D.ITEMS) out[k] = { npc: Math.round(npcBuyPrice({ career: '' }, k)), farm: Math.round(npcBuyPrice({ career: '' }, k, D.ITEMS[k].kind === 'fish' ? FISH_RATE : 0.5)), sell: npcSellPrice(k), ref: Math.round(marketPrice(k)), best: best[k] ? best[k].p : 0, n: best[k] ? best[k].n : 0 };
   return out;
 }
 

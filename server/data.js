@@ -492,7 +492,7 @@ const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null };
 // doctors are paid for every game hour they spend inside the hospital during their shift
-const DOCTOR = { start: 8, end: 20, wage: [60, 70, 82, 96, 112, 130, 152] };   // above office: needs a degree + licence
+const DOCTOR = { start: 8, end: 20, wage: [125, 140, 158, 178, 200, 225, 255] };   // above office: needs a degree + licence
 // calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
 const MONTH_DAYS = 5;
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -606,11 +606,13 @@ const POLICE_TEST = [
 // changing careers too often makes you wait longer (minutes); index = changes in the last 24 h
 const JOB_COOLDOWN_MIN = [0, 5];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
-const OFFICE_WAGE = [55, 65, 78, 92, 110, 130, 155];            // per game hour seated
-const RIDER = { baseFee: 25, perTile: 0.65, npcEvery: 55, tipMax: 30 };
+// pay ladder (Lv.1, per real minute of work): beggar ~12 < fishing ~20 < rider ~27 < merchant ~35 < office ~45 < police ~55 < doctor ~70
+// (a game hour of daytime lasts 1.75 real minutes, so ฿80 per game hour ≈ ฿45 a minute)
+const OFFICE_WAGE = [80, 92, 106, 122, 140, 160, 185];          // per game hour seated
+const RIDER = { baseFee: 18, perTile: 0.45, npcEvery: 55, tipMax: 30 };
 // running: faster, costs energy per tile; you stop running when energy gets low
 const RUN = { mul: 1.6, energyPerTile: 0.3, minEnergy: 5 };
-const POLICE = { patrolWage: 24, bounty: 250, jailSec: 75, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 4.3, begMax: 5000 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
+const POLICE = { patrolWage: 48, bounty: 300, jailSec: 75, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 4.3, begMax: 5000 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
 const EVENTS = [
