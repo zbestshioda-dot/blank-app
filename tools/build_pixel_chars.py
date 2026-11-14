@@ -23,10 +23,14 @@ SHEETS = {'base': ('tools/sheets/pixel_char.jpg', ('shirt', 'pants', 'hair')), '
           'fisher': ('tools/sheets/pixel_fisher.jpg', ()),
           'rider': ('tools/sheets/pixel_rider.jpg', ()),
           'beggar': ('tools/sheets/pixel_beggar.jpg', ()),
-          'thief': ('tools/sheets/pixel_thief.jpg', ())}
+          'thief': ('tools/sheets/pixel_thief.jpg', ()),
+          'fpolice': ('tools/sheets/pixel_police_f.jpg', ()),          # women's uniforms: used when p.g == 'f'
+          'fdoctor': ('tools/sheets/pixel_doctor_f.jpg', ('hair',))}
 # per-sheet frame overrides (some sheets put the poses in different cells)
 FRAME_FIX = {'f': {'down0': 0, 'down1': 14, 'down2': 13, 'up0': 19, 'up1': -19, 'left0': -5, 'left1': -7, 'left2': -6},   # female base: its side views face right
              'police': {'left2': 6}, 'fisher': {'down2': 13}, 'rider': {'down1': 10, 'down2': 15, 'left1': -7, 'left2': -17}, 'beggar': {'up0': 19, 'up1': 19},
+             'fpolice': {'down0': 0, 'down1': 6, 'down2': 11, 'up0': 19, 'up1': 4, 'left0': -17, 'left1': -7, 'left2': -12},   # side views face right
+             'fdoctor': {'down0': 0, 'down1': 6, 'down2': 11, 'up0': 19, 'up1': 4, 'left0': -17, 'left1': -7, 'left2': -12},
              'thief': {'down1': 10, 'down2': 15, 'up0': 4, 'up1': 9, 'left1': 6, 'left2': -7}}   # negative = use that cell mirrored
 TARGET_H = 96
 # which sheet frame (reading order, 0-19) is used for each direction / walk step; right = mirrored left

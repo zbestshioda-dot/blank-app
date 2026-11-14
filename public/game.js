@@ -42,7 +42,7 @@ function paintSw() {
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
-fetch('assets/pchar.json?v=f1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=f1'; });
+fetch('assets/pchar.json?v=f2').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=f2'; });
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
 // starter colours are known before login (the creator screen); everything else comes from the server
 const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
@@ -70,7 +70,8 @@ const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1',
 const SEAT_LEGS = .45;
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
-  const sheet = OUTFIT_SHEET[p.of], outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
+  const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
+    outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, fr = charFrame(outfit + WALK[view][step % 4], lk), [ax, ay] = CH_ATLAS.feet;
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
@@ -2744,6 +2745,6 @@ function mgEnd(key, score) {
 }
 FN.mgAgain = m => mgStart(m.key);
 FN.mgMenu = () => mgMenu();
-window.__lt = { send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel };   // read-only hooks for automated UI tests
+window.__lt = { send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel, drawCharTo };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();
