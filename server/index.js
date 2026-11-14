@@ -258,6 +258,12 @@ function msat(a, id) {
   const t = now(); a.msat = a.msat || {}; const e = a.msat[id] || (a.msat[id] = [1, t]);
   e[0] = Math.min(1, e[0] + (t - e[1]) / 1000 * 0.004); e[1] = t; return e;
 }
+// what the market's buyers pay this player per unit for their own trade's goods (merchant goods, chef dishes): shown in the sell tab
+function tradePrices(a) {
+  const kind = { merchant: 'goods', chef: 'meal' }[a.career]; if (!kind) return null;
+  const out = {}; for (const id in a.inv) if (a.inv[id] > 0 && D.ITEMS[id]?.kind === kind) out[id] = Math.round(npcBuyPrice(a, id, NPC_BUY) * msat(a, id)[0] * jobPay(a));
+  return out;
+}
 function spend(a, e) {
   if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) กินอาหารหรือนั่งพักก่อน`, '😴', false); return false; }
   a.energy -= e;
@@ -298,7 +304,11 @@ const fishLv = a => Math.min(D.FISHING.maxLv, 1 + Math.floor((a.xp?.fisher || 0)
 
 const NPC_BUY = 0.3;                         // NPC shops buy at a fraction of what players pay each other
 const NPC_SELL = 2.5;
-const FISH_RATE = 0.45;                       // the fish club pays this share of the market price (fishing sits just above begging on the pay ladder)                         // ...and sell at a big markup
+const FISH_RATE = 0.45;
+// chefs: a dish sells to the restaurants for what its ingredients cost at the kitchen counter + a cook's fee
+// (12 energy a dish, ~0.75 dishes a minute on natural energy => ~฿55/min at Lv.1, on par with police; cheaper ingredients bought from players are extra profit)
+const CHEF_MARGIN = 72;
+const CHEF_COST = Object.fromEntries(D.RECIPES.map(r => [r.id, Object.entries(r.in).reduce((s, [k, q]) => s + Math.ceil(D.ITEMS[k].base * 1.3) * q, 0)]));                       // the fish club pays this share of the market price (fishing sits just above begging on the pay ladder)                         // ...and sell at a big markup
 function marketPrice(id) {
   const it = D.ITEMS[id];
   let p = it.base * market[id].mult;
@@ -311,7 +321,7 @@ function npcBuyPrice(a, id, rate = NPC_BUY) {
   let b = 1;
   if (a.career === 'merchant' && it.kind === 'goods') rate = 0.74 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
   else if (a.career === 'merchant') b += 0.05;
-  if (a.career === 'chef' && it.kind === 'meal') rate = Math.max(rate, 0.65);                                      // restaurants buy chefs' dishes
+  if (a.career === 'chef' && it.kind === 'meal' && CHEF_COST[id]) return (CHEF_COST[id] + CHEF_MARGIN) * marketPrice(id) / it.base;   // restaurants pay chefs the ingredients (kitchen price) plus a fixed cook's fee, so every recipe pays about the same
   if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
   if (it.kind === 'fish') b += 0.01 * Math.min(8, fishLv(a) - 1);       // experienced anglers know the buyers
   return marketPrice(id) * rate * b;
@@ -839,7 +849,7 @@ function act(a, m) {
       if (!cd(a, 'sell', 300)) return;
       const rate = s.type === 'market' ? NPC_BUY : s.type === 'fishclub' ? FISH_RATE : 0.5;   // the fish club and the farm buyer pay far better than the market's NPC
       let total = 0;
-      const own = a.career === 'merchant' && it.kind === 'goods' ? msat(a, id) : null;   // a merchant's restock sales only press their own price, not everyone's
+      const own = a.career === 'merchant' && it.kind === 'goods' || a.career === 'chef' && it.kind === 'meal' ? msat(a, id) : null;   // a merchant's restock sales only press their own price, not everyone's
       for (let i = 0; i < q; i++) { if (own) { total += npcBuyPrice(a, id, rate) * own[0]; own[0] = Math.max(0.55, own[0] * 0.985); } else { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); } }
       addItem(a, id, -q);
       if ({ merchant: 'goods', farmer: 'crop', chef: 'meal' }[a.career] === it.kind) total *= jobPay(a);   // your own trade's goods sell better the higher your job level
@@ -2077,7 +2087,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,

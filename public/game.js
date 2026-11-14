@@ -1522,7 +1522,7 @@ function renderPanel(p) {
       } else if (tab === 'sell') {
         const inv = Object.entries(me.inv).filter(([id, q]) => q > 0 && match(id));
         body = inv.map(([id, q]) => {
-          const it = G.items[id], m2 = mk[id] || {}, sug = m2.n ? Math.max(1, m2.best - 1) : Math.round(m2.ref || it.base);
+          const it = G.items[id], m2 = { ...(mk[id] || {}), ...(me.npcp?.[id] ? { npc: me.npcp[id] } : {}) }, sug = m2.n ? Math.max(1, m2.best - 1) : Math.round(m2.ref || it.base);
           return itemRow(id, '', `มี ${q} · ราคาตลาด ~${money(m2.ref || it.base)} · ผู้เล่นขายถูกสุด ${m2.n ? money(m2.best) : '—'} · <span style="color:var(--bad)">NPC รับซื้อแค่ ${money(m2.npc || 0)}</span>`) +
             `<div class="rowf" style="margin:-2px 0 6px"><input id="lp_${id}" type="number" min="1" value="${sug}" style="width:90px"> <span class="sub" style="margin:0">฿/ชิ้น</span>${B('วาง 1', { fn: 'list', st, item: id, qty: 1 })}${B(`วางหมด ${q}`, { fn: 'list', st, item: id, qty: q }, 'good')}${B(`NPC ${money((m2.npc || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' })}</div>`;
         }).join('');
