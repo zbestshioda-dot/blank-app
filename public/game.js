@@ -229,7 +229,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '' });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '' });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -1444,7 +1444,7 @@ const QUEST_GIVER = {
   cook:     { f: 'chef_m',    name: 'เชฟหมี (ครัวใหญ่)', ask: 'ออเดอร์เข้ารัวๆ มาช่วยครัวหน่อย', thx: 'ฝีมือใช้ได้นี่ มาช่วยอีกนะ!' },
   treat:    { f: 'doctor_f',  name: 'หมอแพร (ผอ.โรงพยาบาล)', ask: 'คนไข้รอคิวเยอะ ช่วยดูแลด้วยนะคะ', thx: 'คนไข้หายดีแล้ว ขอบคุณค่ะคุณหมอ' },
   deliver:  { f: 'rider_m',   name: 'พี่ต่อ (หัวหน้าไรเดอร์)', ask: 'ออเดอร์ค้างเพียบ ช่วยวิ่งส่งหน่อย!', thx: 'ส่งไวทันใจ ลูกค้าชมใหญ่เลย!' },
-  trade:    { f: 'girl',      name: 'น้องมะปราง', ask: 'อยากลองแลกของกับคนอื่นจัง ช่วยหน่อยได้ไหม', thx: 'เย้! แลกของสนุกจังเลย' },
+  trade:    { f: 'mprang_shy', thxF: 'mprang_wave', name: 'น้องมะปราง', ask: 'อยากลองแลกของกับคนอื่นจัง ช่วยหน่อยได้ไหม', thx: 'เย้! แลกของสนุกจังเลย' },
   chat:     { f: 'student_m', name: 'น้องภูมิ (นักศึกษา · ร้านสะดวกซื้อ)', ask: 'มาเมืองนี้ใหม่ ยังไม่รู้จักใครเลย ช่วยทักคนแถวนี้ให้หน่อย', thx: 'ได้เพื่อนใหม่แล้ว ขอบคุณครับ!' },
   eat:      { f: 'grandma',   name: 'ยายบุญ (ร้านสะดวกซื้อสาขาหมู่บ้าน)', ask: 'ผอมลงนะหลาน กินข้าวกินปลาบ้างสิ', thx: 'อิ่มท้องแล้ว ยายก็สบายใจจ้ะ' },
   sit:      { f: 'teacher_f', name: 'คุณจิ๋ม (นายหน้าอสังหาฯ)', ask: 'ทำงานหนักแล้ว ไปนั่งพักที่จัตุรัสบ้างนะคะ', thx: 'พักผ่อนบ้าง ชีวิตจะได้สมดุลค่ะ' },
@@ -1453,14 +1453,14 @@ const QUEST_GIVER = {
   dailyall: { f: 'elder_m',   name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', ask: 'ช่วยเหลือชาวเมืองให้ครบทุกวัน เมืองเราจะน่าอยู่ขึ้น', thx: 'เมืองนี้โชคดีที่มีเธอ!' },
 };
 let FACES = null;
-fetch('assets/portraits.json?v=1').then(r => r.json()).then(j => { FACES = j; }).catch(() => { });
-const faceHtml = (type, px = 46) => { const g = QUEST_GIVER[type], i = FACES?.faces?.[g?.f]; if (i === undefined) return ''; const n = Object.keys(FACES.faces).length;
+fetch('assets/portraits.json?v=2').then(r => r.json()).then(j => { FACES = j; }).catch(() => { });
+const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], i = FACES?.faces?.[alt || g?.f]; if (i === undefined) return ''; const n = Object.keys(FACES.faces).length;
   return `<i class="qface" style="width:${px}px;height:${px}px;background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>`; };
 function questPop(type, title, line, reward) {
   const g = QUEST_GIVER[type]; if (!g || !FACES) return;
   document.querySelector('.questPop')?.remove();
   const d = document.createElement('div'); d.className = 'questPop';
-  d.innerHTML = `${faceHtml(type, 64)}<div><b>${esc(g.name)}</b><span>“${esc(line)}”</span><small>${esc(title)} · <b style="color:var(--acc)">+${money(reward)}</b></small></div>`;
+  d.innerHTML = `${faceHtml(type, 64, g.thxF)}<div><b>${esc(g.name)}</b><span>“${esc(line)}”</span><small>${esc(title)} · <b style="color:var(--acc)">+${money(reward)}</b></small></div>`;
   document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 3800); setTimeout(() => d.remove(), 4400);
 }
 // ------------------------------------------------------------------ dialog box (talking to people)
@@ -1517,6 +1517,8 @@ function dialogClose() { dlgQ = null; $('#dlg')?.classList.add('hidden'); }
 function dlgRender() {
   const d = $('#dlg'); if (!d || !dlgQ) return;
   const line = dlgQ.lines[dlgQ.i] || '', last = dlgQ.i >= dlgQ.lines.length - 1, done = dlgQ.shown >= line.length;
+  const fc = dlgQ.faces?.[dlgQ.i];   // a different expression for this line
+  if (fc && fc !== dlgQ.curFace) { dlgQ.curFace = fc; const old = d.querySelector('.dlgPic'); if (old) old.outerHTML = dlgFace(fc); }
   d.querySelector('.dlgText').textContent = line.slice(0, Math.floor(dlgQ.shown));
   d.querySelector('.dlgNext').style.visibility = done && !last ? 'visible' : 'hidden';
   const ch = d.querySelector('.dlgCh');
@@ -1553,10 +1555,27 @@ function talkTo(n, st) {
   const hi = (n.line ? n.line(me) : '').trim() || 'สวัสดี';
   dialog({ ...base, lines: [hi], choices });
 }
-// tapping a townsperson NPC: a short chat, with the profile one tap away
+// tapping a townsperson NPC: a short chat (with their portrait), the profile one tap away
+const FOLK_TALK = {
+  folk_m1: [['เพิ่งเลิกงานมาครับ วันนี้ส่งเอกสารไปสิบรอบ', 'ขาลากเลย ฮ่าๆ'], ['ถ้าอยากทำงานบริษัท ต้องเรียนจบปริญญาตรีก่อนนะครับ']],
+  folk_f1: [['กำลังจะไปธนาคารค่ะ', 'ได้ยินว่าหุ้นตัวหนึ่งขึ้นแรงมาก'], ['ร้านทำผมเปิดใหม่ข้างในแล้วนะคะ', 'ตกแต่งสวยมาก']],
+  folk_f2: [['ป้าขายข้าวแกงอยู่แถวตลาด', 'หิวก็แวะมานะลูก'], ['เดี๋ยวนี้เมืองเราคนเยอะขึ้นเยอะเลย', 'ดีใจจริงๆ']],
+  folk_m2: [['วันนี้แดดแรงจัง', 'เลยใส่หมวกออกมา'], ['ไปตกปลาริมหาดมา ได้ปลาทูสองตัว', 'คืนนี้ทอดกินพอดี']],
+  folk_m3: [['กำลังเก็บเงินซื้อบ้านในหมู่บ้านจัดสรรครับ', 'อีกนิดเดียว!'], ['เคยลองตกปลาที่ทะเลสาบไหม', 'ปลาน้ำจืดเยอะมาก']],
+  folk_f3: [['ป้าอยู่หมู่บ้านนี้มาสิบปีแล้ว', 'เพื่อนบ้านน่ารักทุกคน'], ['ปลูกผักในลานบ้านสนุกนะ', 'ลองดูสิ']],
+  folk_m4: [['สมัยตาหนุ่มๆ ที่นี่ยังเป็นทุ่งนาอยู่เลย', 'เดี๋ยวนี้มีร้านสะดวกซื้อแล้ว สะดวกจริงๆ'], ['ออกมาเดินเล่นทุกเย็น', 'หมอบอกว่าดีต่อสุขภาพ']],
+  folk_m5: [['เพิ่งเลิกเรียนครับ', 'การบ้านเยอะมากเลย 😩'], ['โตขึ้นผมอยากเป็นตำรวจ', 'ต้องเรียนให้จบ ม.6 ก่อน']],
+};
 function talkToTown(o) {
-  const t = TALK.town[(o.id * 7 + Math.floor(performance.now() / 60000)) % TALK.town.length];
-  dialog({ name: o.name, npc: o.id, lines: ['สวัสดีจ้า', ...t], choices: [{ label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, { label: '💬 คุยต่อ', fn: () => talkToTown({ ...o, id: o.id + 1 }) }, { label: '👋 ลาก่อน', fn: dialogClose }] });
+  const info = { label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, bye = { label: '👋 ลาก่อน', fn: dialogClose };
+  if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
+    const q = me.quests?.list.find(x => x.type === 'trade');
+    const lines = q && !q.done ? ['สวัสดีค่ะ! หนูชื่อมะปราง', 'อยากลองแลกของกับคนอื่นจัง... ช่วยหนูหน่อยได้ไหมคะ', 'ถ้าพี่แลกของสำเร็จ หนูจะดีใจมากเลย! ว้าว!', 'ไว้เจอกันใหม่นะคะ บ๊ายบาย!']
+      : ['สวัสดีค่ะ! หนูชื่อมะปราง', 'วันนี้หนูได้แลกสติกเกอร์กับพี่ข้างบ้านด้วย... เขินจัง', 'รู้ไหมคะ ที่ทะเลมีคนตกโลมาได้ด้วยนะ! ว้าว!', 'ไว้เจอกันใหม่นะคะ บ๊ายบาย!'];
+    return dialog({ name: o.name, face: 'mprang_happy', faces: ['mprang_happy', 'mprang_shy', 'mprang_wow', 'mprang_wave'], npc: o.id, lines, choices: [info, bye] });
+  }
+  const pool = FOLK_TALK[o.face] || TALK.town, t = pool[Math.floor(Math.random() * pool.length)];
+  dialog({ name: o.name, face: o.face || null, npc: o.id, lines: ['สวัสดีจ้า', ...t], choices: [info, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
 }
 // quest givers talk too (tap their portrait in the quest list)
 function talkQuest(type) {
@@ -1811,6 +1830,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15g', d: '15 พ.ย. (รอบ 7)', items: [
+    '👧 <b>น้องมะปราง</b> ออกมาเดินเล่นในเมืองแล้ว คุยด้วยแล้วจะเปลี่ยนสีหน้าไปตามเรื่อง (ยิ้ม เขิน ตกใจ โบกมือ)',
+    '🖼️ ชาวเมืองที่เดินเล่นทุกคนมีชื่อ หน้าตา และรูปวาดของตัวเอง: พี่โจ้ คุณเมย์ ป้าสมใจ พี่ดำ ต้นกล้า · ในหมู่บ้าน: ป้านวล ตาเฉย น้องเจมส์ · แต่ละคนมีเรื่องคุยของตัวเอง' ] },
   { v: '2026-11-15f', d: '15 พ.ย. (รอบ 6)', items: [
     '🖼️ <b>NPC ทุกคนที่คุยได้มีรูปวาดแล้ว</b> และหน้าตาในเกมตรงกับรูป: หมอแพร (ผอ.โรงพยาบาล) · พี่ข้าวหอม (สหกรณ์) · ลุงจุก (ศาลาประชาคม) · ยายบุญ (ร้านสะดวกซื้อสาขาหมู่บ้าน) · น้องภูมิ · น้องเก่ง · คุณจิ๋ม ฯลฯ',
     '🤫 ผู้เล่นในเมืองเงียบลง ไม่พิมพ์แชทรบกวนแล้ว',

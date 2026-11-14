@@ -1107,6 +1107,22 @@ const TREATMENTS = {
   salt:      { name: 'ผงเกลือแร่ + ยาฆ่าเชื้อ', icon: '🧂' },
   bandage:   { name: 'ทำแผล + เข้าเฝือก', icon: '🩹' },
 };
+// the townsfolk who stroll around: fixed people, each matching a painted portrait (public/assets/portraits, folk_*)
+const FOLK = {
+  town: [
+    { name: 'พี่โจ้ (พนักงานออฟฟิศ)', g: 'm', face: 'folk_m1', look: { hair: 'black', shirt: 'black', pants: 'gray' } },
+    { name: 'คุณเมย์', g: 'f', face: 'folk_f1', look: { hair: 'brown', shirt: 'black', pants: 'black' } },
+    { name: 'ป้าสมใจ', g: 'f', face: 'folk_f2', look: { hair: 'black', shirt: 'white', pants: 'gray' } },
+    { name: 'พี่ดำ', g: 'm', face: 'folk_m2', look: { hair: 'black', shirt: 'red', pants: 'gray' } },
+    { name: 'ต้นกล้า', g: 'm', face: 'folk_m3', look: { hair: 'brown', shirt: 'black', pants: 'gray' } },
+    { name: 'น้องมะปราง', g: 'f', face: 'mprang_happy', look: { hair: 'brown', shirt: 'pink', pants: 'gray' }, kid: 1 },
+  ],
+  housing: [
+    { name: 'ป้านวล', g: 'f', face: 'folk_f3', look: { hair: 'brown', shirt: 'yellow', pants: 'gray' } },
+    { name: 'ตาเฉย', g: 'm', face: 'folk_m4', look: { hair: 'silver', shirt: 'white', pants: 'gray' } },
+    { name: 'น้องเจมส์ (นักเรียน)', g: 'm', face: 'folk_m5', look: { hair: 'black', shirt: 'white', pants: 'black' } },
+  ],
+};
 const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้องเมย์', 'พี่ต้น', 'ยายจันทร์', 'ตาเหลือง', 'น้าแดง', 'พี่ฝน', 'น้องบอส', 'ป้าแจ๋ว', 'ลุงชัย', 'พี่นก'];
 
 // ================================================================= achievements -> titles shown over your head
@@ -1213,7 +1229,7 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
 
 module.exports = {
   RUN, CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
-  LOOKS, SHIRTS, NPC_LINES, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
+  LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, FISH_RARITY, RODS, ROD_ORDER, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,

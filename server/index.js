@@ -1828,21 +1828,21 @@ const randLook = () => ({ hair: pick(['brown', 'brown', 'black', 'black', ...HAI
 let npcRosterDirty = false;
 {
   const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
-  for (let i = 0; i < 5; i++) {
+  D.FOLK.town.forEach((p, i) => {
     const [x, y] = pick(walkableIn('town'));
-    npcs.push({ id: -(i + 1), folk: 1, name: D.NPC_NAMES[i % D.NPC_NAMES.length], area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
-      g: i % 2 ? 'f' : 'm', look: randLook(), speed: rnd(1.1, 1.6), pickedAt: 0,
+    npcs.push({ id: -(i + 1), folk: 1, name: p.name, face: p.face, area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+      g: p.g, look: { ...p.look }, speed: p.kid ? rnd(1.4, 1.8) : rnd(1.1, 1.6), pickedAt: 0,
       next: function () { return folkNext(this, spots); }, stay: () => rnd(4, 14) });
-  }
+  });
 }
 // people living in the housing estate stroll around it too
 {
   const hs = walkableIn('housing');
-  for (let i = 0; i < 3; i++) {
+  D.FOLK.housing.forEach((p, i) => {
     const [x, y] = pick(hs);
-    npcs.push({ id: -(40 + i), folk: 1, name: D.NPC_NAMES[(i + 5) % D.NPC_NAMES.length], area: 'housing', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
-      g: i % 2 ? 'm' : 'f', look: randLook(), speed: rnd(1.1, 1.5), pickedAt: 0, next: () => pick(hs).map(v => v + .5), stay: () => rnd(4, 14) });
-  }
+    npcs.push({ id: -(40 + i), folk: 1, name: p.name, face: p.face, area: 'housing', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+      g: p.g, look: { ...p.look }, speed: rnd(1.1, 1.5), pickedAt: 0, next: () => pick(hs).map(v => v + .5), stay: () => rnd(4, 14) });
+  });
 }
 // townsfolk go in and out of open shops through the front door, just like players
 const PUBLIC_DOORS = D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov && ROOM[s.to]);
@@ -2154,7 +2154,7 @@ function catchThief(a) {
   thiefCaught(th, a);
 }
 const npcVisible = n => !n.worker || n.on;
-const npcInfo = n => n.bot ? botPub(n) : n.thief ? { id: n.id, npc: 1, name: n.name, c: 'none', lv: 1, dz: [], pose: null, g: 'm', lk: n.look, x: n.x, y: n.y, f: n.f, title: '', of: 'thief', tf: 1 } : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, x: n.x, y: n.y, f: n.f, title: '',
+const npcInfo = n => n.bot ? botPub(n) : n.thief ? { id: n.id, npc: 1, name: n.name, c: 'none', lv: 1, dz: [], pose: null, g: 'm', lk: n.look, x: n.x, y: n.y, f: n.f, title: '', of: 'thief', tf: 1 } : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
 function stealNpc(a, id) {
   const n = npcs.find(x => x.id === id && (x.folk || x.bot));

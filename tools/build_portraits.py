@@ -12,7 +12,8 @@ from PIL import Image, ImageFilter
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 OUT = os.path.join(ROOT, 'public', 'assets', 'portraits')
 SHEETS = [('portraits_a.jpg', ['office_f', 'farmer_f', 'fisher_m', 'shop_f', 'chef_m', 'doctor_f', 'rider_m', 'police_f', 'beggar_m', 'thief_m', 'sad_f', None]),
-          ('portraits_b.jpg', ['elder_m', 'nurse_f', 'banker_f', 'barber_m', 'teacher_f', 'grocer_m', 'worker_m', 'market_f', 'grandma', 'student_m', 'girl', 'police_m'])]
+          ('portraits_b.jpg', ['elder_m', 'nurse_f', 'banker_f', 'barber_m', 'teacher_f', 'grocer_m', 'worker_m', 'market_f', 'grandma', 'student_m', 'girl', 'police_m']),
+          ('portraits_c.jpg', ['mprang_happy', 'mprang_shy', 'mprang_wow', 'mprang_wave', 'folk_m1', 'folk_f1', 'folk_f2', 'folk_m2', 'folk_f3', 'folk_m3', 'folk_m4', 'folk_m5'])]
 S = 128
 
 def main():
