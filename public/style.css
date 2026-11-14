@@ -607,3 +607,6 @@ body.hasEvent #topBar{top:146px!important}
 }
 #card.v2 .bar em{display:inline!important}
 @media (max-width:600px) and (orientation:portrait){#ticker{left:8px!important;right:8px!important;top:calc(2px + env(safe-area-inset-top))!important;z-index:9}}
+
+.prof .phCol{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none}
+.prof .phCol button{padding:4px 8px;font-size:12px;white-space:nowrap}
