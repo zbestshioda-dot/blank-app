@@ -554,7 +554,7 @@ const mapOf = id => { const a = AREA[id]; return a ? (a.kind === 'room' ? a.area
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.map.w || y >= G.map.h) ? ' ' : G.map.tiles[y][x];
 const solid = (x, y) => G.solid.includes(tileAt(Math.floor(x), Math.floor(y)));
 // the client checks with the full radius; the server allows a hair less, so rounding never causes a rejection
-const blockedAt = (x, y) => { const r = G.radius; return solid(x - r, y - r) || solid(x + r, y - r) || solid(x - r, y + r) || solid(x + r, y + r); };
+const blockedAt = (x, y) => { const r = G.radius; return solid(x - r, y - r) || solid(x + r, y - r) || solid(x - r, y + r) || solid(x + r, y + r) || roomWalls.some(b => x + r > b[0] && x - r < b[1] && y + r > b[2] && y - r < b[3]); };
 
 // ------------------------------------------------------------------ input
 const keys = {};
@@ -785,7 +785,7 @@ function frame(t) {
       const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, sp = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * dt;
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
-      const ar0 = rv?.fly ? areaOf(m.x, m.y) : null, free = (x, y) => ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
+      const ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && blockedAt(m.x, m.y), free = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
       const nx = r2(m.x + dx * sp); if (free(nx, m.y)) m.x = nx;
       const ny = r2(m.y + dy * sp); if (free(m.x, ny)) m.y = ny;
       m.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8; meMoving = Math.hypot(m.x - m.rx, m.y - m.ry) > 0.001;
@@ -1533,8 +1533,8 @@ function renderPanel(p) {
       if (me.house < 0) return '<h2>🛋️ จัดบ้าน</h2><div class="sub">ต้องมีบ้านของตัวเองก่อน</div>';
       const h = wd?.houses?.[me.house]; if (!h) return '';
       const own = [...new Set([...(me.furniture || []), ...(me.keep || [])])];
-      const rows = own.map(k => { const f = G.shop.furniture[k]; if (!f) return ''; const pos = furnPos(h, k);
-        return itemRowRaw(f.icon, f.name, pos ? `วางอยู่ชั้น ${pos[0]}` : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos ? B('📦', { t: 'hplace', k, store: 1 }) : ''}</div>`); }).join('');
+      const rows = own.map(k => { const f = G.shop.furniture[fbase(k)]; if (!f) return ''; const pos = furnPos(h, k), n = k.split('#')[1] || (f.multi ? 1 : 0);
+        return itemRowRaw(f.icon, f.name + (n ? ` #${n}` : ''), pos ? `วางอยู่ชั้น ${pos[0]}` : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos ? B('📦', { t: 'hplace', k, store: 1 }) : ''}${f.multi && !pos ? B('♻️', { t: 'hplace', k, del: 1 }) : ''}</div>`); }).join('');
       return `<h2>🛋️ จัดบ้าน</h2><div class="sub">เลือกชิ้นที่จะวาง แล้วแตะพื้นห้องในชั้นที่คุณยืนอยู่ · ของในคลังยังนับความสบาย ⭐ · ซื้อเพิ่มที่ 🛋️ ร้านเฟอร์นิเจอร์ในเมือง · บ้านมี ${1 + (h[8] || 0)}/${G.shop.floors} ชั้น (ต่อเติมที่บันได 🪜)</div>
         <div class="list">${rows || '<div class="sub">ยังไม่มีเฟอร์นิเจอร์ ซื้อได้ที่ร้านเฟอร์นิเจอร์ในเมือง</div>'}</div>`;
     }
@@ -1697,11 +1697,11 @@ function renderPanel(p) {
     }
     case 'door': return houseDoor(STN(st), st);
     case 'furnshop': {
-      const own = me.house >= 0, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง']];
+      const own = me.house >= 0, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง']];
       const tab = cats.some(c => c[0] === p.ftab) ? p.ftab : 'basic';
       const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => a[1].price - b[1].price);
-      const cards = list.map(([k, f]) => { const has = me.furniture.includes(k);
-        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price)}</div>`; }).join('');
+      const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
+        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price)}</div>`; }).join('');
       return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งเข้าคลังที่บ้าน จัดวางเองด้วยปุ่ม 🛋️ จัดบ้าน · ความสบายรวมสูงสุด ⭐30${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
@@ -1917,7 +1917,7 @@ function houseDoor(s, st) {
       ${(me.keep || []).length ? `<div class="sub" style="margin-top:8px"><b>🎁 ของพิเศษจากรางวัลเข้าเกม</b> ${me.keep.map(k => `${G.shop.furniture[k].icon} ${G.shop.furniture[k].name}`).join(' · ')} (ตั้งในบ้านอัตโนมัติ)</div>` : ''}
       <div style="margin-top:14px">${B('ขายบ้านคืนโครงการ (ได้คืน ~70%)', { t: 'act', st, a: 'sell' }, 'warn')}</div>`;
   }
-  let body = `<div class="sub">ความสบาย ⭐ ${cf} ${furn.length ? furn.map(k => G.shop.furniture[k].icon).join('') : ''}</div>`;
+  let body = `<div class="sub">ความสบาย ⭐ ${cf} ${furn.length ? furn.map(k => G.shop.furniture[fbase(k)]?.icon || '').join('') : ''}</div>`;
   if (iRent) body += `<div class="jobbox ok">🔑 คุณเช่าบ้านหลังนี้อยู่ เหลืออีก ${left} วัน</div>${enter}<div class="sub" style="margin-top:8px">ต่อสัญญา</div>${days(owner ? rentP : rent)}`;
   else if (tenant) body += `<div class="sub">มีผู้เช่าอยู่: ${esc(tenant)}</div>${enter}`;
   else {
@@ -2645,7 +2645,7 @@ function showDriveTest(m) {
 }
 
 // ------------------------------------------------------------------ areas, interiors
-let roomGrid = [], roomFurniture = [];
+let roomGrid = [], roomFurniture = [], roomWalls = [];   // roomWalls: footprints [x0, x1, y0, y1] of the walls and screens players put up in their homes
 const FURN_SPRITE = { rugr: 'f_rug_round', rugb: 'f_rug_blue', cactus: 'f_cactus', plant2: 'f_plant2', lamp: 'f_floorlamp', table: 'f_table_chairs', rtable: 'f_round_table', shelf: 'f_bookshelf', desk: 'f_laptop_desk', wardrobe2: 'f_wardrobe', mirror: 'f_mirror', armchair: 'f_armchair', bunk: 'f_bunk', coffee: 'f_coffee', winer: 'f_wine_rack',
   bookcase: 'f_bookshelf_wide', gclock: 'f_clock', teddy: 'i_teddy', flamp: 'f_floorlamp', vase: 'f_vase', plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
 // where each piece of bought furniture stands in the house (by kind, so a home always looks arranged)
@@ -2657,7 +2657,8 @@ function buildAreas() {
   buildMini(); layoutFurniture();
 }
 // where a piece stands: [floor, x, y] in room tiles; [0] = put away; unplaced old pieces keep their default spot on floor 1
-const furnSpr = k => FURN_SPRITE[k] || G?.shop?.furniture?.[k]?.spr;
+const fbase = k => String(k).split('#')[0];   // partition pieces are owned many times over: wdoor, wdoor#2 ...
+const furnSpr = k => FURN_SPRITE[k] || G?.shop?.furniture?.[fbase(k)]?.spr;
 const furnPos = (h, k) => { const p = h[7]?.[k]; if (p) return p[0] ? p : null; return FURN_POS[k] ? [1, FURN_POS[k][0], FURN_POS[k][1]] : null; };
 // ---- arranging your home: pick a piece, tap the floor to move it, then confirm
 let placing = null;
@@ -2666,7 +2667,7 @@ function startPlace(k) {
   if (!r || r.rk !== 'house' || r.house !== me.house) return toast('เข้าไปในบ้านของคุณก่อน แล้วค่อยจัดวาง', '🏠', false);
   closePanel();
   placing = { k, house: r.house, fl: r.floor || 1, x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
-  const f = G.shop.furniture[k];
+  const f = G.shop.furniture[fbase(k)];
   $('#placeBar').innerHTML = `<b>${f.icon} ${esc(f.name)}</b><small>แตะพื้นห้องเพื่อเลื่อน · ปุ่มลูกศรขยับละเอียด</small><div class="pb">${['⬅️', '⬆️', '⬇️', '➡️'].map((a, i) => `<button data-nud="${i}">${a}</button>`).join('')}<button id="plOk" class="primary">✓ วาง</button><button id="plStore">📦 เก็บ</button><button id="plX">✕</button></div>`;
   $('#placeBar').classList.remove('hidden');
   $('#placeBar').querySelectorAll('[data-nud]').forEach(b => b.onclick = () => { const d = [[-.25, 0], [0, -.25], [0, .25], [.25, 0]][+b.dataset.nud]; placing.x = clamp(placing.x + d[0], .7, 13.3); placing.y = clamp(placing.y + d[1], 1.2, 9.5); layoutFurniture(); });
@@ -2691,7 +2692,7 @@ function drawStairs(x, y, down, X, Y) {   // a little staircase drawn on the flo
   ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr',sans-serif`; ctx.textAlign = 'center'; ctx.fillText(down ? '⬇' : '⬆', px, py - n * sh - 4);
 }
 function layoutFurniture() {
-  roomFurniture = [];
+  roomFurniture = []; roomWalls = [];
   for (const r of G.areas) {
     if (r.kind !== 'room') continue;
     for (const f of r.furniture || []) roomFurniture.push(f);
@@ -2699,7 +2700,9 @@ function layoutFurniture() {
       const h = wd?.houses?.[r.house], fl = r.floor || 1; if (!h) continue;
       for (const k of h[2]) {
         if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
-        const pos = furnPos(h, k), sp = furnSpr(k); if (pos && pos[0] === fl && sp) roomFurniture.push([sp, r.x + pos[1], r.y + pos[2]]);
+        const pos = furnPos(h, k), sp = furnSpr(k); if (!(pos && pos[0] === fl && sp)) continue;
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2]]);
+        const a = atlas?.sprites?.[sp]; if (G.shop.furniture[fbase(k)]?.solid) { const hw = a ? a[2] / atlas.tile / 2 : 1.4; roomWalls.push([r.x + pos[1] - hw + .1, r.x + pos[1] + hw - .1, r.y + pos[2] - .45, r.y + pos[2]]); }
       }
       if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost']);
     }

@@ -187,9 +187,11 @@ function credit(o, amount) {          // pay someone who may be offline
 const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
-const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];   // bought furniture + login-reward pieces (kept even without a house)
+const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];
+const fbase = k => String(k).split('#')[0];   // partition pieces can be owned many times: wdoor, wdoor#2, wdoor#3 ...
+const FURN_MULTI_MAX = 40;   // bought furniture + login-reward pieces (kept even without a house)
 const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
-const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[k]?.comfort || 0), 0)) : 0;
+const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) : 0;
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
@@ -271,7 +273,7 @@ function worth(a) {
   for (const [k, q] of Object.entries(a.inv)) w += (D.ITEMS[k]?.base || 0) * q * 0.5;
   for (const L of a.listings || []) w += (D.ITEMS[L.item]?.base || 0) * L.qty * 0.5;
   for (const [, t] of Object.entries(a.tools || {})) for (let i = 0; i < t; i++) w += D.TOOL_PRICES[i] * 0.5;
-  if (a.house >= 0) { w += D.HOUSE_PRICES[a.house] * 0.7; for (const f of a.furniture || []) w += (D.FURNITURE[f]?.price || 0) * 0.5; }
+  if (a.house >= 0) { w += D.HOUSE_PRICES[a.house] * 0.7; for (const f of a.furniture || []) w += (D.FURNITURE[fbase(f)]?.price || 0) * 0.5; }
   for (const f of a.keep || []) w += (D.FURNITURE[f]?.price || 0) * 0.5;
   if (a.garden) w += D.GARDEN.lotPrice * 0.6;
   return w;
@@ -1115,7 +1117,7 @@ function act(a, m) {
     case 'house.sell': {
       if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
       if (tenants[s.house]) return toast(a, 'มีผู้เช่าอยู่ ขายไม่ได้จนกว่าจะหมดสัญญา', '🏠', false);
-      const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + D.FURNITURE[k].price * 0.4, 0));
+      const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0));
       houses[s.house] = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
       return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
     }
@@ -1137,9 +1139,14 @@ function act(a, m) {
     case 'furnshop.buy': {                  // the furniture shop: same items as the house menu, delivered to your own house
       if (a.house < 0 || houses[a.house] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่หน้าบ้านแต่ละหลัง 🏡', '🛋️', false);
       const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
-      if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
+      let key = m.item;
+      if (f.multi) {                        // walls, doors and screens: buy as many as you need
+        if (a.furniture.filter(k => fbase(k) === m.item).length >= FURN_MULTI_MAX) return toast(a, `มี${f.name}ครบ ${FURN_MULTI_MAX} ชิ้นแล้ว`, 'ℹ️', false);
+        for (let n = 2; a.furniture.includes(key); n++) key = `${m.item}#${n}`;
+      } else if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, f.price)) return;
-      a.furniture = [...a.furniture, m.item]; joy(a, 5); markMe(a); wdAt = 0;
+      a.furniture = [...a.furniture, key]; joy(a, f.multi ? 1 : 5); markMe(a); wdAt = 0;
+      if (f.multi) return toast(a, `ซื้อ ${f.icon}${f.name} แล้ว (มี ${a.furniture.filter(k => fbase(k) === m.item).length} ชิ้น) · วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
       return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)}) · จัดวางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
     }
     case 'dealer.buy': case 'dealer.sell': {   // the car showroom
@@ -2315,7 +2322,12 @@ function onMessage(ws, raw) {
       const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);
       const k = String(m.k || ''); if (!furnOf(a).includes(k)) return;
       a.fpos = { ...(a.fpos || {}) };
-      if (m.store) { a.fpos[k] = [0]; toast(a, `เก็บ${D.FURNITURE[k]?.name || ''}เข้าคลังแล้ว`, '📦'); }
+      const fd = D.FURNITURE[fbase(k)];
+      if (m.del) {                          // throw away a spare partition piece for half its price back
+        if (!fd?.multi || !a.furniture.includes(k)) return;
+        a.furniture = a.furniture.filter(x => x !== k); delete a.fpos[k]; credit(a, Math.round(fd.price / 2));
+        toast(a, `ขาย${fd.name}คืน ได้ ${money(Math.round(fd.price / 2))}`, '♻️');
+      } else if (m.store) { a.fpos[k] = [0]; toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
       else {
         const fl = Math.round(+m.fl) || 1, x = +m.x, y = +m.y;
         if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
