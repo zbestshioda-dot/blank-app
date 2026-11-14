@@ -147,15 +147,15 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('o_phonebooth', 57.3, 23.9); prop('o_bin_blue', 33.8, 29.95); prop('o_bin_green', 75, 33.95); prop('o_bin', 12.2, 33.95);
   // (no parked cars: real traffic drives the roads now)
   // parks, the lake and the beach
-  prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 84.5, 47.2, false);
+  prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 87.6, 47.2, false);
   prop('b_pavilion', 66, 44);
   // the east park: a rose arch over the path in, a fountain lawn, statues, lanterns by the pond, a playground and café tables by the fruit stall
-  prop('o_rosearch', 65, 39.95, false); prop('o_rosearch', 86.5, 40.95, false);
+  prop('o_rosearch', 65, 39.95, false); prop('o_rosearch', 85, 43.95, false);
   prop('o_fountain2', 59, 53.9); rect(58, 52, 3, 2, 'o'); prop('o_topiary', 56.4, 54); prop('o_topiary', 61.6, 54); prop('o_bench', 59, 56.9, false);
-  prop('o_birdstatue', 70, 48.9); prop('o_catstatue', 74.5, 45.4); prop('o_lantern', 72.4, 50.9); prop('o_lantern', 87.6, 50.9); prop('o_lantern', 75, 59.9);
-  prop('o_slide', 82, 64.9); rect(81, 64, 3, 1, 'o'); prop('o_hedgering', 88.5, 64.9); prop('o_stonebench', 78.6, 64.9, false);
+  prop('o_birdstatue', 70, 48.9); prop('o_catstatue', 76.4, 45.4); prop('o_lantern', 72.4, 50.9); prop('o_lantern', 87.6, 50.9); prop('o_lantern', 75, 59.9);
+  prop('o_slide', 76, 63.9); rect(75, 63, 3, 1, 'o'); prop('o_hedgering', 79.6, 63.9); prop('o_topiary', 79.6, 63.2, false); prop('o_stonebench', 72.4, 63.9, false); prop('o_lampball', 74, 62.4); prop('o_potflower', 70.8, 63.8);
   prop('o_parasol', 69, 41.3); prop('o_parasol2', 79, 41.3); prop('o_pergola', 89, 44.95, false); prop('o_woodtable', 89, 44.5);
-  prop('o_planter', 54, 40.9, false); prop('o_hedgecube', 62.6, 39.95); prop('o_hedgecube', 67.4, 39.95); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
+  prop('o_planter', 54, 40.9, false); prop('bench', 72, 47, false); prop('bench2', 86, 59.3, false); prop('pond', 64, 60.2);
   // the beach: umbrellas with loungers, palms, rocks at the waterline, a lifebuoy stand by the pier
   for (const [y, k] of [[20, 0], [27, 1], [35, 0], [44, 1], [55, 0], [67, 1], [74, 0], [83, 1]]) { prop(k ? 'parasol2' : 'parasol', 99.2, y); prop('deckchair', 98.3, y + 1.6); }
   for (const y of [16, 31, 49, 64, 79, 87]) prop(y % 2 ? 'palm_small' : 'palm', 98.2, y);
