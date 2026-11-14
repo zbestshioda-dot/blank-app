@@ -1756,14 +1756,18 @@ setInterval(() => { const t = now(); for (const [k, v] of loginFails) if (v.rese
 
 // daily login bonus: grows each consecutive day, capped at day 7 (kept small to fight inflation)
 const LOGIN_BONUS = [50, 80, 100, 120, 150, 200, 300];
+const LOGIN_CYCLE = 30, LOGIN_MILESTONE = 2000;   // day 30 of each cycle pays the milestone bonus
 function dailyLogin(a) {
   const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
   if (a.lastLogin === today) return null;
   a.loginStreak = a.lastLogin === yesterday ? (a.loginStreak || 0) + 1 : 1;
   a.lastLogin = today;
-  const reward = LOGIN_BONUS[Math.min(a.loginStreak, 7) - 1];
+  const streak = a.loginStreak, cycleDay = ((streak - 1) % LOGIN_CYCLE) + 1;
+  const milestone = cycleDay === LOGIN_CYCLE;               // every 30 days: big reward on top of the normal bonus
+  const reward = LOGIN_BONUS[Math.min(cycleDay, 7) - 1] + (milestone ? LOGIN_MILESTONE : 0);
   a.money += reward; a.earned += reward; dirty = true;
-  return { streak: a.loginStreak, reward, table: LOGIN_BONUS };
+  return { streak, reward, table: LOGIN_BONUS, cycleDay, cycle: LOGIN_CYCLE, milestone: LOGIN_MILESTONE,
+    daysToMilestone: LOGIN_CYCLE - cycleDay, nextReward: LOGIN_BONUS[Math.min(cycleDay + 1 > LOGIN_CYCLE ? 1 : cycleDay + 1, 7) - 1] };
 }
 
 function detach(a) {

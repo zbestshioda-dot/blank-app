@@ -1757,8 +1757,11 @@ function endTut() {
 }
 function showDaily(d) {
   const box = $('#daily');
+  const cd = d.cycleDay || Math.min(d.streak, 7), pct = Math.round(cd / (d.cycle || 30) * 100);
   box.innerHTML = `<div class="tutIcon">🎁</div><h2>โบนัสเข้าเกมวันที่ ${d.streak}</h2><p>เข้าเล่นทุกวันติดต่อกัน รางวัลจะเพิ่มขึ้นเรื่อยๆ</p>
-    <div class="days">${d.table.map((v, i) => `<div class="${i + 1 < Math.min(d.streak, 7) ? 'got' : i + 1 === Math.min(d.streak, 7) ? 'now' : ''}"><small>วัน ${i + 1}</small><b>฿${v.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="days">${d.table.map((v, i) => `<div class="${i + 1 < Math.min(cd, 7) ? 'got' : i + 1 === Math.min(cd, 7) ? 'now' : ''}"><small>วัน ${i + 1}</small><b>฿${v.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="cycleBar" title="ครบ ${d.cycle || 30} วันรับโบนัสใหญ่"><u style="width:${pct}%"></u></div>
+    <p class="sub">รอบนี้วันที่ ${cd}/${d.cycle || 30} · ${d.daysToMilestone ? `อีก ${d.daysToMilestone} วันได้โบนัสใหญ่ ฿${money(d.milestone || 0)}` : `🏆 วันนี้ได้โบนัสใหญ่ ฿${money(d.milestone || 0)}!`}</p>
     <div class="big-reward">+${money(d.reward)}</div><button class="primary big" id="dailyOk">รับเลย!</button>`;
   $('#dailyWrap').classList.remove('hidden');
   $('#dailyOk').onclick = () => { $('#dailyWrap').classList.add('hidden'); FX.play('coin', true); };

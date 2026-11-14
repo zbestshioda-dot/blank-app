@@ -383,3 +383,7 @@ textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid
 .bagGrid button.slot.sel{border-color:#5f7a2c;box-shadow:0 0 0 3px #c9e08b}
 .bagGrid button.slot b{position:absolute;right:3px;bottom:1px;font-size:11px;background:var(--woodDk);color:#fff8e6;border-radius:8px;padding:0 5px;line-height:1.5}
 .detailCard{margin-top:10px}
+
+/* ---------------- daily login cycle progress */
+.cycleBar{height:8px;border-radius:6px;background:#e7d3a6;border:1.5px solid #b38955;overflow:hidden;margin:8px auto;max-width:320px}
+.cycleBar u{display:block;height:100%;background:linear-gradient(#f2d25c,#d9a94a);border-radius:6px}
