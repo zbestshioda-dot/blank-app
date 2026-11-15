@@ -1068,3 +1068,8 @@ body.hasEvent #topBar{top:146px!important}
 @keyframes btnShine{0%,55%{left:-60%}100%{left:130%}}
 @media(max-width:860px){#startBtn{font-size:24px!important;padding:16px!important;letter-spacing:.5px}}
 @media(max-width:860px){#login.hasVid .promoPhone{background:transparent}#login.hasVid .promoPhone video{object-fit:contain;object-position:50% 0}}
+
+/* the day / weather / time badge sits on the map's top-left corner, so the menu column under the map keeps its room */
+#miniWrap #mClock{position:absolute;left:4px;top:4px;z-index:2;display:flex;align-items:center;gap:4px;white-space:nowrap;padding:1px 6px;transform:none;transform-origin:top left;box-shadow:0 2px 6px rgba(0,0,0,.45);border-radius:10px;font-size:11px;background:rgba(30,22,14,.9)}
+#miniWrap #mClock #cDate{display:none}#miniWrap #mClock #cTime{font-size:12px}#miniWrap #mClock #cWx{font-size:13px}
+#miniWrap #mClock span{position:static;text-shadow:none;font-weight:600}
