@@ -931,3 +931,23 @@ body.hasEvent #topBar{top:146px!important}
 /* pets */
 .petcard canvas{width:84px;height:84px;image-rendering:auto}.petcard.on{outline:2px solid var(--acc);border-radius:12px}.petcard .rtag{margin:2px 0 4px}
 #dogChip{position:absolute;left:50%;transform:translateX(-50%);top:88px;background:linear-gradient(#e9b24a,#c07d1e);color:#fff;border-color:#6d440a;font-weight:600;border-radius:20px;padding:6px 14px;white-space:nowrap}#dogChip.late{background:linear-gradient(#e0574a,#a3281e);animation:mgPulse 1s ease-in-out infinite}
+
+/* smaller bottom sheets and everything inside them (shops, lists, cards, tabs) */
+#panel .sheet,#tradeWin .sheet,#mg .sheet{zoom:.86;max-height:64vh;max-height:64dvh}
+#tradeWin .sheet{max-height:80vh;max-height:80dvh}
+#panel .sheet h2{font-size:16px;padding-bottom:7px}
+#panel .sheet .sub{font-size:11.5px;line-height:1.4}
+#panel .sheet .item,#tradeWin .sheet .item{padding:1px 4px}
+#panel .sheet .item .em{font-size:19px;width:26px}
+#panel .sheet .item button,#panel .sheet .look button{padding:3px 8px;font-size:12px}
+#panel .sheet .secT{font-size:13px}
+#panel .sheet .jobbox{font-size:12px;padding:3px 7px}
+#panel .sheet .setRow{padding:4px 8px;font-size:12.5px}
+#panel .sheet .tabs button{font-size:12px;padding:4px 5px}
+#panel .sheet .looks{grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:5px}
+#panel .sheet .look canvas{width:60px;height:80px}
+#panel .sheet .look.fcard canvas{width:80px;height:68px}
+#panel .sheet .petcard canvas{width:68px;height:68px}
+#panel .sheet .look small{font-size:10.5px;min-height:22px}
+#panel .sheet .grid2{gap:4px}
+@media(orientation:landscape) and (max-height:520px){#panel .sheet,#tradeWin .sheet,#mg .sheet{max-height:82vh;max-height:82dvh}}
