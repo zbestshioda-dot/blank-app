@@ -2005,6 +2005,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15l', d: '15 พ.ย. (รอบ 12)', items: [
+    '🐾 <b>ร้านสัตว์เลี้ยง 2 สาขา</b> (ถนนเหนือ · ถนนเหนือฝั่งตะวันตก) และ 🏋️ <b>ฟิตเนส</b> กับ 🥊 <b>โรงยิมมวย</b> เปิดตัวบนแผนที่แล้ว · ตอนนี้ปิดปรับปรุง รอเปิดเร็วๆ นี้' ] },
   { v: '2026-11-15k', d: '15 พ.ย. (รอบ 11)', items: [
     '🎬 <b>หน้าล็อกอินเป็นวิดีโอโปรโมท</b> เปิดเกมมาเจอวิดีโอเมืองขยับได้ทันที (กดปุ่ม 🔊 เพื่อเปิดเสียง) · บนมือถือเต็มจอ กด "เข้าเมืองเลย!" · ถ้าเคยเล่นแล้วกด "เล่นต่อ" ได้ทันที',
     '📦 กล่องล็อกอินเล็กลง ตัดข้อความที่ไม่จำเป็นออก เหลือแค่ช่อง ID/PIN กับปุ่มเข้าเมือง',
@@ -2690,7 +2692,7 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
-fetch('assets/atlas.json?v=v4').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v4'; });
+fetch('assets/atlas.json?v=v5').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v5'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;

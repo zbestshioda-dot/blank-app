@@ -341,6 +341,15 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   const way = c => '=,ckpswD'.includes(c);
   const nearWay = (x, y, r) => { for (let j = -r; j <= r; j++) for (let k = -r; k <= r; k++) if (way(get(x + k, y + j) || '.')) return true; return false; };
   const propNear = (x, y, r) => PROPS.some(p => Math.hypot(p.x - x, p.y - y) < r) || STATIONS.some(s => s.area === 'town' && Math.hypot(s.x - x, s.y - y) < r + .5);
+  // 0) new shops, all closed for renovation for now: two pet shops and two gyms (added here so nothing older moves)
+  for (const [id, spr, x, front, label, icon] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️'],
+    ['pet2', 'b_pet2', 12, 13, 'ร้านสัตว์เลี้ยง สาขา 2', '🐶'], ['gym2', 'b_gym2', 60, 45, 'โรงยิมมวย', '🥊']]) {
+    const b = B(id, spr, x, front, { label, icon, deco: true, renov: true });
+    for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
+    for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
+    // a paved doorstep from the door down to the street
+    const cx = Math.floor(b.x + b.w / 2); for (let y = b.y + b.h; y < front + 1; y++) for (const xx of [cx - 1, cx]) if ('.m'.includes(get(xx, y))) set(xx, y, 'c');
+  }
   // 1) back gardens: every shop or service whose back faces open grass gets a 3-row garden behind it: a white picket
   //    fence along the far edge, a hedge against the back wall, bushes in the corners and a flower bed in the middle
   for (const b of BUILDINGS) {
