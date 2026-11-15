@@ -2737,6 +2737,7 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));

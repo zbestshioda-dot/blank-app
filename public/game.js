@@ -2136,6 +2136,7 @@ function bindStocks(root) {
 }
 function bindPanel(root) {
   bindStocks(root);
+  { const ti = root.querySelector('#tipIn'); if (ti) ti.oninput = () => { if (panel) panel.tip = Math.max(0, Math.min(500, Math.floor(+ti.value) || 0)); }; }   // keep the tip through panel redraws
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     if (performance.now() - panelOpenT < 450) return;      // the tap that opened this panel must not also press a button in it
     FX.play('click');
@@ -2179,7 +2180,7 @@ const FN = {
   phMap() { closePanel(); mapZoom = 1; openMap(); },
   phClose() { closePanel(); },
   soilStore() { const h = wd?.houses?.[me.house]; if (!h) return; for (const k of me.furniture || []) if (G.shop.furniture[fbase(k)]?.tile && furnPos(h, k)) send({ t: 'hplace', k, store: 1 }); },
-  stock(m, root) { const q = m.qty || Math.floor(+root.querySelector('#skQty')?.value || 0); if (!(q > 0)) return toast('ใส่จำนวนหุ้น', '📈', false); send({ t: 'act', st: m.st, a: 'stock', op: m.op, id: m.id, qty: q }); },
+  stock(m, root) { const q = m.qty || Math.floor(+root.querySelector('#skQty')?.value || 0); if (!(q > 0)) return toast('ใส่จำนวนหุ้น', '📈', false); send(m.st ? { t: 'act', st: m.st, a: 'stock', op: m.op, id: m.id, qty: q } : { t: 'stock', op: m.op, id: m.id, qty: q }); },   // from the phone: no bank needed
   callMin() { closePanel(); toast('ย่อสายไว้แล้ว แตะแถบ 📞 ด้านบนเพื่อเปิด', '📞'); },
   list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
@@ -2195,7 +2196,7 @@ const FN = {
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
   addContact(m, root) { send({ t: 'contact_add', phone: m.phone || root.querySelector('#phIn').value }); },
   donate(m, root) { send({ t: 'donate', to: m.to, amt: +root.querySelector('#donIn').value || 0 }); },
-  order(m, root) { send({ t: 'order', item: m.item, tip: +(root.querySelector('#tipIn')?.value || 0) }); },
+  order(m, root) { send({ t: 'order', item: m.item, tip: panel?.tip ?? +(root.querySelector('#tipIn')?.value || 0) }); },
   open(m) { openPanel({ kind: m.kind, ...(m.set || {}) }); },
   qtalk(m) { talkQuest(m.type); },
   icuGo() { closePanel(); icuOpen(); },
@@ -2775,6 +2776,7 @@ const NEWS = [
   { v: '2026-11-16z4', d: '16 พ.ย. (รอบ 29)', items: [
     '📱 <b>เอาแถบเมนูออก</b> ทุกอย่างย้ายเข้าไปอยู่ในมือถือแล้ว (เพิ่มแอป งาน · อันดับ · วิธีเล่น · แจ้งบัค) · ปุ่มมือถือใหญ่ขึ้น แนวตั้งอยู่ใต้นาฬิกา แนวนอนอยู่ข้างมินิแมพ · มีจุดแดงเตือนเมื่อมีจดหมาย บิล หรือรางวัล',
     '💬 แนวนอน กล่องแชทกว้างเท่ากระดานเควสต์กับการ์ดสถานะ',
+    '🛵 แก้บั๊ก<b>ให้ทิปไรเดอร์ไม่ได้</b> (ช่องทิปเด้งกลับเป็น 0) · 📈 <b>ซื้อขายหุ้นผ่านมือถือได้แล้ว</b> ไม่ต้องไปธนาคาร',
     '👥 เดินใกล้เพื่อนที่เพิ่มกันแล้ว ขึ้นแค่ปุ่ม <b>ข้อมูล</b> · รายชื่อในมือถือ <b>ปักดาว ⭐ รายการโปรด</b> (ขึ้นบนสุด) และลบได้ (มีถามยืนยัน)'] },
   { v: '2026-11-16z3', d: '16 พ.ย. (รอบ 28)', items: ['🎵 เพลงในเกมไม่ขึ้นเป็นเครื่องเล่นเพลงบนแถบแจ้งเตือนมือถือแล้ว · เปิด YouTube/Spotify ฟังไปด้วยได้ เพลงไม่ตัดกัน (อยากฟังเพลงตัวเองอย่างเดียว ปิดเพลงในเกมที่ ⚙️ หรือแอปเพลงในมือถือ) · ออกจากเกมแล้วเสียงเกมหยุดเอง'] },
   { v: '2026-11-16z2', d: '16 พ.ย. (รอบ 27)', items: ['🐟 การ์ดโชว์ปลาที่ตกได้เล็กลง (เล็กสุดบนมือถือ) ไม่บังน้ำกับคนอื่นแล้ว'] },
@@ -3580,7 +3582,7 @@ function phonePanel(p) {
     const mine = (me.myOrders || []).map(o => itemRowRaw(G.items[o.item].icon, esc(G.items[o.item].name), o.state === 'open' ? '⏳ รอไรเดอร์รับออเดอร์' : o.state === 'taken' ? `🏃 ${esc(o.rider)} กำลังไปรับที่ร้าน` : `🛵 ${esc(o.rider)} กำลังมาส่ง`, o.state === 'open' ? B('ยกเลิก', { t: 'order_cancel', id: o.id }, 'warn') : '')).join('');
     body = `<div class="sub">${open ? 'ร้านอาหารเปิดอยู่' : '🔒 ร้านอาหารปิด (07:00–23:00)'} · ค่าส่งคิดตามระยะทาง · ไรเดอร์ผู้เล่นมาส่งถึงตัว (ถ้าไม่มีไรเดอร์ ร้านส่งเองแต่ช้า)</div>
       ${mine ? `<div class="sub"><b>ออเดอร์ของฉัน</b></div><div class="list">${mine}</div>` : ''}
-      <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" min="0" max="500" value="0" style="width:90px"> ฿</div><div class="list">${rows}</div>`;
+      <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" inputmode="numeric" min="0" max="500" value="${p.tip || 0}" style="width:90px"> ฿</div><div class="list">${rows}</div>`;
   } else if (tab === 'rider') body = riderJobs();
   else if (tab === 'bills') body = billsBox();
   else if (tab === 'fish') body = fishBook();
