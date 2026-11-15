@@ -629,7 +629,7 @@ function paintDown() {
 setInterval(() => { if (me?.down) paintDown(); }, 500);
 function paintEvent() {
   const e = $('#eventBar');
-  if (wd?.ev) { e.textContent = wd.ev.text; e.classList.remove('hidden'); } else e.classList.add('hidden');
+  if (wd?.ev) { if (e.dataset.t !== wd.ev.text) { e.dataset.t = wd.ev.text; e.innerHTML = `<span>${esc(wd.ev.text)}</span>`; } e.classList.remove('hidden'); } else { e.classList.add('hidden'); e.dataset.t = ''; }
   document.body.classList.toggle('hasEvent', !!wd?.ev);
 }
 // same clock as the server: days are slow, nights run twice as fast (server/data.js CLOCK)
@@ -2662,6 +2662,9 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16n', d: '16 พ.ย. (รอบ 14)', items: [
+    '📜 <b>ป้ายเหตุการณ์ (ฝนตกชุก ฯลฯ) เป็นแถบโปร่งใสวิ่งเหมือนประกาศเซิร์ฟเวอร์</b> ไม่บังหน้าจอแล้ว',
+    '📱 <b>แนวนอน:</b> เมนูกางออกเป็นแถวตามขอบบนจอ · <b>แนวตั้ง:</b> ป้ายเหตุการณ์ไปอยู่ชิดแถวเดียวกับเมนูด้านบน ไม่ทับมินิแมพ'] },
   { v: '2026-11-16m', d: '16 พ.ย. (รอบ 13)', items: ['🌤️ ย้ายป้ายสภาพอากาศและเวลากลับไปไว้ที่เดิม ใต้มินิแมพ'] },
   { v: '2026-11-16l', d: '16 พ.ย. (รอบ 12)', items: ['🛏️ ตอนหมดสติอยู่บนเตียงโรงพยาบาล ถ้ากดเดิน จะมีข้อความบอกว่าเดินไม่ได้และต้องรอเจ้าหน้าที่ (ไม่ใช่บัค)'] },
   { v: '2026-11-16k', d: '16 พ.ย. (รอบ 11)', items: ['🗺️ ย้ายป้ายวันเวลาและสภาพอากาศไปไว้มุมบนซ้ายของมินิแมพ ไม่ดันเมนูด้านขวาลงมาแล้ว'] },
