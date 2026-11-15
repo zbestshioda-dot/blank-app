@@ -1929,4 +1929,80 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
+// ---------------------------------------------------------------- login backdrop: a slow town scene behind the login card
+(() => {
+  const bg = document.getElementById('loginBg'), loginEl = document.getElementById('login');
+  if (!bg || !loginEl) return;
+  const g = bg.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const t0 = performance.now();
+  let W = 0, H = 0, T = 40;
+  const ok = () => typeof atlas !== 'undefined' && atlas && typeof atlasImg !== 'undefined' && atlasImg;
+  const spr = name => ok() && atlas.sprites[name] || null;
+  // draw one 96px ground cell as a 2x2 block of atlas tiles (same trick as the game's tex())
+  const ground = (name, x, y, size) => {
+    const s = spr(name); if (!s) return false;
+    const q = atlas.tile, h = size / 2;
+    for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) g.drawImage(atlasImg, s[0] + i * q, s[1] + k * q, q, q, x + i * h, y + k * h, h + 1, h + 1);
+    return true;
+  };
+  const sprite = (name, x, y, w) => {
+    const s = spr(name); if (!s) return;
+    const h = s[3] / s[2] * w;
+    g.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(x - w / 2), Math.round(y - h), Math.round(w), Math.round(h));
+  };
+  const fit = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    bg.width = Math.round(W * dpr); bg.height = Math.round(H * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.imageSmoothingEnabled = false;
+    T = Math.round(Math.max(34, Math.min(54, Math.min(W, H) / 9)));
+  };
+  const cars = [
+    { n: 'car_red', dir: 1, lane: .66, v: 46 }, { n: 'car_blue', dir: -1, lane: .72, v: 38 },
+    { n: 'car_yellow', dir: 1, lane: .78, v: 30 }, { n: 'bus', dir: -1, lane: .60, v: 26 }
+  ];
+  const leaves = Array.from({ length: 16 }, () => ({ x: Math.random(), y: Math.random(), s: .6 + Math.random() * .8, r: Math.random() * 6, c: Math.random() < .5 ? '#f4a7b9' : '#b87a4b' }));
+  const frame = now => {
+    if (loginEl.classList.contains('hidden')) return;              // logged in: stop drawing
+    const t = reduce ? 0 : (now - t0) / 1000, dt = 1 / 60;
+    g.clearRect(0, 0, W, H);
+    // grass everywhere, pavement and road band across the lower-middle
+    const cell = T * 2, scroll = (t * 14) % cell;
+    for (let y = -cell; y < H + cell; y += cell) for (let x = -cell - scroll; x < W + cell; x += cell) ground('g_grass', x, y, cell);
+    const roadY = Math.round(H * .62), roadH = T * 2.4;
+    for (let x = -cell - scroll; x < W + cell; x += cell) {
+      ground('g_sidewalk', x, roadY - T * 1.1, cell);
+      ground('g_sidewalk', x, roadY + roadH, cell);
+    }
+    g.fillStyle = '#41464e'; g.fillRect(0, roadY, W, roadH);
+    g.fillStyle = '#f2d25c';
+    for (let x = -T * 2 - (t * 40) % (T * 3); x < W; x += T * 3) g.fillRect(x, roadY + roadH / 2 - 2, T * 1.4, 4);
+    // trees drifting slowly on the grass above the road
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * T * 5 - t * 8) % (W + T * 6) + W + T * 6) % (W + T * 6) - T * 3;
+      sprite(i % 2 ? 'tree' : 'pine', x, roadY - T * 1.6, T * 2.6);
+    }
+    // cars driving along the road, looping
+    for (const c of cars) {
+      const span = W + T * 6, x = ((t * c.v * c.dir + (c.dir > 0 ? 0 : span)) % span + span) % span - T * 3;
+      sprite(c.n, x, roadY + roadH * c.lane, T * 2.2);
+    }
+    // falling petals and leaves
+    for (const f of leaves) {
+      f.y += dt * .05 * f.s; f.x += Math.sin(t + f.r) * .0008;
+      if (f.y > 1.05) { f.y = -.05; f.x = Math.random(); }
+      g.save(); g.translate(f.x * W, f.y * H); g.rotate(t * f.s + f.r);
+      g.fillStyle = f.c; g.globalAlpha = .75; g.fillRect(-3 * f.s, -2, 6 * f.s, 4); g.restore();
+    }
+    // soft vignette so the card stays readable
+    const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .25, W / 2, H / 2, Math.max(W, H) * .7);
+    vg.addColorStop(0, 'rgba(20,12,6,.15)'); vg.addColorStop(1, 'rgba(20,12,6,.6)');
+    g.globalAlpha = 1; g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    requestAnimationFrame(frame);
+  };
+  addEventListener('resize', fit);
+  fit(); requestAnimationFrame(frame);
+})();
+
 })();

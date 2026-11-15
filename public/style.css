@@ -387,3 +387,7 @@ textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid
 /* ---------------- daily login cycle progress */
 .cycleBar{height:8px;border-radius:6px;background:#e7d3a6;border:1.5px solid #b38955;overflow:hidden;margin:8px auto;max-width:320px}
 .cycleBar u{display:block;height:100%;background:linear-gradient(#f2d25c,#d9a94a);border-radius:6px}
+
+/* ---------------- animated town behind the login card */
+#loginBg{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#login>.box{position:relative;z-index:1}
