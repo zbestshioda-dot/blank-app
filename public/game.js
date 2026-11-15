@@ -167,13 +167,29 @@ function drawRide(p, v, px, py, k, view, dir) {
   drawVeh(p.veh, view, faceLeft, px, py);                                        // the bike in front hides the legs
 }
 const SEAT_LEGS = .45;
+// re-dye a sprite frame: the rider's green turned orange (the rival riders); cached per frame
+const DYE = new Map();
+function dyeFrame(fr, dye) {
+  let m = DYE.get(fr); if (m) return m;
+  const c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height; const g = c.getContext('2d'); g.drawImage(fr, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height), a = d.data;
+  for (let i = 0; i < a.length; i += 4) {
+    if (!a[i + 3]) continue;
+    const r = a[i], gg = a[i + 1], b = a[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+    if (gg !== mx || mx - mn < 45) continue;                 // only clearly green pixels
+    const v = mx / 255, sat = (mx - mn) / mx;
+    a[i] = Math.round(255 * v); a[i + 1] = Math.round(255 * v * (1 - sat * .55)); a[i + 2] = Math.round(255 * v * (1 - sat * .95));
+  }
+  g.putImageData(d, 0, 0); DYE.set(fr, c); return c;
+}
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;
-  const fr = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined
+  const fr0 = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined
     ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
+  const fr = p.dye ? dyeFrame(fr0, p.dye) : fr0;
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -340,6 +356,8 @@ function handle(m) {
     case 'mt': misLive = m; break;
     case 'ck': ckLive = { prog: m.prog, t: performance.now() }; break;
     case 'kfx': cookFx(m.kind); break;
+    case 'rb': rbResult(m); break;
+    case 'rbfx': FX.play('notice'); if (navigator.vibrate) navigator.vibrate([40, 40, 40]); break;
     case 'afx': if (m.kind === 'gavel') { FX.play('ding'); } else if (m.kind === 'bid') FX.play('pop'); else if (m.kind === 'win') { FX.play('coin', true); FX.play('levelup'); } else if (m.kind === 'lose') FX.play('fail'); else FX.play('notice'); if (panel?.kind === 'warehouse') refreshPanel(true); break;
     case 'mq': misAsk(m); break;
     case 'mfx': if (m.kind === 'pick') { FX.play('pop'); } else if (m.kind === 'catch') { FX.play('pet', ['squeak', 1]); FX.play('chime'); } else FX.play('ding'); if (navigator.vibrate) navigator.vibrate(25); break;
@@ -1048,6 +1066,7 @@ function draw(t) {
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   misEnts(ents, vis);
+  rivalEnts(ents, vis);
   if (me?.cook && myRoom?.rk === 'kitchen') ents.push([1e8, 7, { k: 'cook' }]);
   if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
@@ -1295,6 +1314,71 @@ function cookChip() {
   c.textContent = `${G.items[k.rid].icon} ${G.items[k.rid].name} · ${k.plated ? (k.hand === 'plate' ? 'เสิร์ฟที่เคาน์เตอร์!' : 'ยกจานไปเสิร์ฟ') : parts} · ⏱ ${left}s`;
   return true;
 }
+// ---- riders: the orange rival in town, and the battle screen (Pokemon style, turn by turn)
+let RIVAL = null;
+function rivalEnts(ents, vis) {
+  const r = me?.rival, P0 = P.get(myId);
+  if (!r || !P0 || areaOf(P0.x, P0.y)?.id !== 'town') { RIVAL = null; return; }
+  if (!RIVAL || RIVAL.name !== r.name) RIVAL = { id: 'rival', staff: 1, career: 'rider', c: 'rider', of: 'rider', dye: 'orange', g: 'm', lk: { hair: 'black' }, name: r.name, short: r.name, x: r.x, y: r.y, rx: r.x, ry: r.y, f: 6, dz: [] };
+  const t = performance.now(); RIVAL.f = (t / 900 | 0) % 2 ? 6 : 2;
+  if (vis(r.x, r.y, 3)) { ents.push([r.y + .3, 4, RIVAL]); ents.push([r.y + .31, 7, { k: 'mark', x: r.x, y: r.y }]); }
+}
+const RBM = [['dash', '🛵 บิดคันเร่ง', 'พลัง 22 · แม่น 95%'], ['cut', '📍 มุดทางลัด', 'พลัง 34 · แม่น 72%'], ['honk', '📣 บีบแตรข่ม', 'ลดพลังโจมตีศัตรู 3 เทิร์น'], ['smile', '😊 ยิ้มหวานให้ลูกค้า', 'ฟื้นแรงใจ 28% (พัก 2 เทิร์น)']];
+let RB = null;
+function rbOpen(st) {
+  RB = { st, busy: true, shown: { me: st.me.hp, foe: st.foe.hp } };
+  let w = $('#rbWin'); if (!w) { w = document.createElement('div'); w.id = 'rbWin'; document.body.appendChild(w); }
+  w.innerHTML = `<div class="rbField"><div class="rbFoeBox rbBox"><b>${esc(st.foe.name)}</b><span>Lv.${st.foe.lv}</span><div class="rbHp"><i id="rbFoeHp"></i></div></div>
+    <div class="rbFoeSpot"><canvas id="rbFoeCv" width="180" height="150"></canvas></div><div class="rbMeSpot"><canvas id="rbMeCv" width="200" height="170"></canvas></div>
+    <div class="rbMeBox rbBox"><b>${esc(st.me.name)}</b><span>Lv.${st.me.lv}</span><div class="rbHp"><i id="rbMeHp"></i></div><small id="rbMeNum"></small></div></div>
+    <div class="rbBottom"><div class="rbText" id="rbText"></div><div class="rbMenu hidden" id="rbMenu"></div></div>`;
+  w.classList.remove('hidden'); closePanel();
+  whenChars(() => {
+    const f = $('#rbFoeCv').getContext('2d'); f.clearRect(0, 0, 180, 150); drawCharTo(f, { of: 'rider', dye: 'orange', g: 'm', lk: { hair: 'black' } }, 90, 140, 130 / CH_ATLAS.h, 'front', 0);
+    const m = $('#rbMeCv').getContext('2d'); m.clearRect(0, 0, 200, 170); drawCharTo(m, { of: 'rider', g: me.gender, lk: me.look || {} }, 100, 165, 160 / CH_ATLAS.h, 'back', 0);
+  });
+  rbBars(); FX.play('notice');
+  rbSay([`${st.foe.name} ต้องการแย่งลูกค้า (${st.cust})!`, `ไปเลย ${st.me.name}!`], () => rbMenu());
+}
+function rbBars() {
+  if (!RB) return; const s = RB.st, sh = RB.shown;
+  const set = (id, hp, max) => { const e = $(id); if (!e) return; const f = Math.max(0, hp / max); e.style.width = f * 100 + '%'; e.style.background = f > .5 ? '#4cd964' : f > .2 ? '#ffcc00' : '#ff3b30'; };
+  set('#rbFoeHp', sh.foe, s.foe.max); set('#rbMeHp', sh.me, s.me.max); const n = $('#rbMeNum'); if (n) n.textContent = `${Math.round(sh.me)}/${s.me.max}`;
+}
+function rbSay(lines, done) {
+  const el = $('#rbText'); let i = 0;
+  const next = () => {
+    if (i >= lines.length) return done && done();
+    const L = lines[i++], txt = typeof L === 'string' ? L : L.text; el.textContent = '';
+    if (typeof L === 'object' && L.fx) L.fx();
+    let k = 0; const ty = setInterval(() => { el.textContent = txt.slice(0, ++k); if (k >= txt.length) { clearInterval(ty); setTimeout(next, 650); } }, 22);
+  };
+  next();
+}
+function rbMenu() {
+  if (!RB) return; RB.busy = false; const mn = $('#rbMenu'), m = RB.st.me;
+  $('#rbText').textContent = `${m.name} จะทำอะไร?`;
+  mn.innerHTML = RBM.map(([k, l, d]) => `<button data-rb="${k}" ${k === 'smile' && m.cd > 0 ? 'disabled' : ''}><b>${l}</b><small>${d}</small></button>`).join('') + `<button data-rb="drink" ${m.drinks ? '' : 'disabled'}><b>🧃 เครื่องดื่มชูกำลัง</b><small>ฟื้นแรงใจ 35 · เหลือ ${m.drinks}</small></button><button data-rb="run" class="warn"><b>🏳️ ยอมถอย</b><small>ปล่อยลูกค้าไป</small></button>`;
+  mn.classList.remove('hidden');
+  mn.querySelectorAll('[data-rb]').forEach(b => b.onclick = () => { if (RB.busy) return; RB.busy = true; mn.classList.add('hidden'); FX.play('click'); send({ t: 'rb', mv: b.dataset.rb }); });
+}
+function rbShake(who, kind) {
+  const c = $(who === 'me' ? '#rbMeCv' : '#rbFoeCv'); if (!c) return;
+  c.classList.remove('rbHit', 'rbHeal', 'rbAtk'); void c.offsetWidth; c.classList.add(kind);
+}
+function rbResult(m) {
+  if (m.start) return rbOpen(m.st);
+  if (!RB) return;
+  const lines = (m.ev || []).map(e => ({ text: e.text, fx: () => {
+    if (e.mv) { rbShake(e.who, 'rbAtk'); FX.play(e.mv === 'honk' || e.mv === 'shout' ? 'notice' : e.mv === 'smile' || e.mv === 'call' ? 'heal' : 'whoosh'); }
+    if (e.dmg) { RB.shown[e.tgt] = Math.max(0, RB.shown[e.tgt] - e.dmg); rbShake(e.tgt, 'rbHit'); FX.play(e.crit ? 'bite' : 'fail'); if (navigator.vibrate) navigator.vibrate(e.crit ? 80 : 40); rbBars(); }
+    if (e.heal) { RB.shown[e.tgt] += e.heal; rbShake(e.tgt, 'rbHeal'); rbBars(); }
+    if (e.miss) FX.play('click');
+    if (e.win) FX.play('levelup'); if (e.lose) FX.play('fail');
+  } }));
+  if (m.st) RB.st = { ...RB.st, ...m.st };
+  rbSay(lines, () => { if (m.end) setTimeout(() => { $('#rbWin')?.classList.add('hidden'); RB = null; }, 900); else rbMenu(); });
+}
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
@@ -1385,6 +1469,7 @@ function drawMisThing(e, X, Y, t) {
 }
 // where to go now: escort -> the destination once picked up; find/collect -> the hint ring's centre until you are close
 function misTarget() {
+  if (!me?.mis && me?.rival) return { x: me.rival.x, y: me.rival.y };
   const c = me?.mis?.cur; if (!c) return null;
   if (c.k === 'escort') return (misLive?.phase ?? c.phase) === 1 ? c.to : { x: misLive?.fx ?? c.fx, y: misLive?.fy ?? c.fy };
   if (c.k === 'chase') return { x: misLive?.cx ?? c.cx, y: misLive?.cy ?? c.cy };
@@ -1393,7 +1478,7 @@ function misTarget() {
   return { x: c.x, y: c.y };
 }
 function drawMisGuide(X, Y, t) {
-  const s = P.get(myId), tg = misTarget(); if (!s || !tg || areaOf(s.x, s.y)?.id !== (me.mis.cur.area || 'town')) return;
+  const s = P.get(myId), tg = misTarget(); if (!s || !tg || areaOf(s.x, s.y)?.id !== (me.mis?.cur?.area || 'town')) return;
   const dx = tg.x - s.rx, dy = tg.y - s.ry, d = Math.hypot(dx, dy); if (d < (tg.vague ? 7 : 3)) return;
   const a = Math.atan2(dy, dx), r = TS * 1.05, cx = s.rx * TS + X + Math.cos(a) * r, cy = s.ry * TS + Y + TS * .2 + Math.sin(a) * r * .6;
   ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
@@ -1405,6 +1490,7 @@ function drawMisGuide(X, Y, t) {
   ctx.strokeText(txt, lx, ly); ctx.fillText(txt, lx, ly);
 }
 function misMini(g, A, mapId) {
+  if (me?.rival && mapId === 'town') { const x = (me.rival.x - A.x) * 2, y = (me.rival.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 7.5, 0, 7); g.fill(); g.fillStyle = (performance.now() / 300 | 0) % 2 ? '#ff8a1a' : '#ffb85a'; g.beginPath(); g.arc(x, y, 5.5, 0, 7); g.fill(); }
   const c = me?.mis?.cur; if (!c || mapId !== 'town' || (c.area || 'town') !== 'town') return;
   const tg = misTarget(); if (!tg) return;
   const blink = (performance.now() / 350 | 0) % 2;
@@ -2369,6 +2455,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15y', d: '15 พ.ย. (รอบ 25)', items: [
+    '🧡 <b>ไรเดอร์: แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่ง (ชุดสีส้ม) จะโผล่มาในเมืองเป็นพักๆ เพื่อแย่งลูกค้าของคุณ ตามจุดสีส้มบนมินิแมพแล้ววิ่งไปขวาง หรือกด 🔎 ออกตามหาที่ศูนย์ไรเดอร์',
+    '⚔️ <b>สู้แบบโปเกม่อน</b> ผลัดกันเลือกท่า: 🛵 บิดคันเร่ง 📍 มุดทางลัด 📣 บีบแตรข่ม 😊 ยิ้มหวานให้ลูกค้า 🧃 เครื่องดื่มชูกำลัง · แรงใจใครหมดก่อนแพ้ ชนะได้ค่าส่ง+ทิปตามเลเวล · ขี่รถอยู่ตอนเจอได้เปรียบ'] },
   { v: '2026-11-15x', d: '15 พ.ย. (รอบ 24)', items: [
     '🔨 <b>พ่อค้า: โรงประมูล!</b> คลังสินค้าราคาส่งกลายเป็นโรงประมูล ล็อตสินค้าขึ้นเวทีทีละล็อต (ลังสินค้า ของสด ปลา อาหาร กล่องปริศนา) มีสภาพสินค้าและช่วงราคาจากผู้ประเมิน',
     '✉️ <b>ยื่นซองเดาราคาแข่งกับคู่แข่ง 3 คน</b> (เสี่ยเฮงใจถึง เจ๊หมวยเขี้ยว คุณหญิงมาลีรวยแต่ไม่รู้ราคา ฯลฯ) ใครเสนอสูงสุดชนะ แล้วเปิดมูลค่าจริง: <b>ซื้อต่ำกว่าราคาจริง = กำไร สูงกว่า = ขาดทุน</b> · อัปเกรดรถเข็นสินค้าให้ผู้ประเมินแม่นขึ้น'] },
@@ -2552,7 +2641,7 @@ function renderPanel(p) {
       const iWon = c.result[0]?.[2], verdict = iWon ? (c.net >= 0 ? `<div class="aucVerdict good">🎉 คุณชนะ! กำไร <b>${money(c.net)}</b></div>` : `<div class="aucVerdict bad">😵 ชนะแต่จ่ายแพงไป ขาดทุน <b>${money(-c.net)}</b></div>`) : `<div class="aucVerdict">${esc(c.win)} ได้ไป${c.my ? ' · คุณไม่ได้เสียเงิน' : ''}</div>`;
       return `${head}${lot}<div class="aucReal">💎 มูลค่าจริง <b>${money(c.real)}</b></div><div class="aucResList">${rows}</div>${verdict}${B('🔨 ล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
     }
-    case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${me.career === 'rider' ? riderJobs() : ''}`;
+    case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${me.career === 'rider' ? `<div class="jobbox">🧡 <b>แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่งจะโผล่มาแย่งลูกค้าเป็นพักๆ (จุดสีส้มบนมินิแมพ) วิ่งไปชนแล้วสู้กันแบบผลัดกันเลือกท่า ชนะได้ค่าส่ง+ทิป · ${me.rival ? `ตอนนี้ ${esc(me.rival.name)} อยู่ในเมือง!` : B('🔎 ออกตามหาไรเดอร์ส้ม', { t: 'rbseek' }, 'primary')}</div>` + riderJobs() : ''}`;
     case 'restaurant': {
       const rows = Object.entries(G.items).filter(([, it]) => it.menu).map(([id, it]) => itemRow(id, `<div class="col2">${B(`กินเลย ${money(it.base)}`, { t: 'act', st, a: 'eat', item: id }, 'good')}${B('🥡 ใส่กระเป๋า', { t: 'act', st, a: 'buy', item: id, qty: 1 })}</div>`, `${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('');
       const pick = me.career === 'rider' ? (() => { const n = (me.jobs || []).filter(j => j.mine && j.state === 'taken').length; return `<div class="jobbox">${B(n ? `🥡 รับอาหาร ${n} ออเดอร์` : 'ยังไม่มีออเดอร์ให้รับ', { t: 'act', st, a: 'pickup' }, 'primary big', !n)}</div>`; })() : '';

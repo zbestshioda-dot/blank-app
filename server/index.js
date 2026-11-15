@@ -1633,6 +1633,80 @@ function holdsHome(a) {
   if (a.rent && a.rent.until > now()) return a.rent.idx;
   return -1;
 }
+// ---- riders: "steal the customer" - an orange rival rider shows up in town; walk into them and it is a turn-based battle
+const RB_NAMES = ['บอย', 'แจ็ค', 'ต้อม', 'เบียร์', 'ก้อง', 'นัท', 'ปอนด์', 'ตี๋'];
+const RB_CUST = ['ป้าแดง', 'คุณนายใจดี', 'พี่ต้นออฟฟิศ', 'น้องข้าวหอม', 'ลุงจุก', 'คุณแพร'];
+const RB_MOVES = { dash: ['บิดคันเร่ง', 22, .95], cut: ['มุดทางลัด', 34, .72], honk: ['บีบแตรข่ม', 0, .9], smile: ['ยิ้มหวานให้ลูกค้า', 0, 1] };
+const RB_FOE = { block: ['ปาดหน้า', 24, .9], corner: ['เลี้ยวมุมแคบ', 32, .7], shout: ['ตะโกนข่ม', 0, .85], call: ['โทรหาลูกค้าก่อน', 0, 1] };
+function rbStats(L, bonus = 0) { return { lv: L, max: 60 + 8 * L, hp: 60 + 8 * L, atk: 10 + 2 * L + bonus, def: 8 + L + bonus * .5, spd: 10 + L + bonus, deb: 0, cd: 0 }; }
+function rivalSpawn(a, force) {
+  if (a.career !== 'rider' || a.rb || a.rival || areaId(a) !== 'town') return false;
+  const opts = reachFrom(a.x, a.y, 16, 45, 9); if (!opts.length) return false;
+  const c = pick(opts), L = Math.max(1, lvl(a) + rint(-1, 1));
+  a.rival = { x: c[0] + .5, y: c[1] + .5, until: now() + 180000, name: `ไรเดอร์ส้ม${pick(RB_NAMES)}`, lv: L, cust: pick(RB_CUST) };
+  markMe(a); send(a, { t: 'rbfx', kind: 'spawn' });
+  toast(a, `📣 ${a.rival.name} กำลังจะไปแย่งลูกค้า (${a.rival.cust}) ของคุณ! ตามไปขวางเลย (จุดสีส้มบนมินิแมพ)`, '🧡');
+  return true;
+}
+function rivalTick(a, t) {
+  if (a.career !== 'rider') { if (a.rival) { a.rival = null; markMe(a); } return; }
+  if (!a.rival && !a.rb && t > (a.rivalNext || (a.rivalNext = t + rnd(120, 240) * 1000))) { a.rivalNext = t + rnd(240, 420) * 1000; rivalSpawn(a); }
+  const r = a.rival; if (!r) return;
+  if (t > r.until) { a.rival = null; markMe(a); return toast(a, `${r.name} แย่งลูกค้าไปส่งแล้ว... ช้าไปนิด`, '🧡', false); }
+  if (areaId(a) === 'town' && Math.hypot(a.x - r.x, a.y - r.y) < 1.5) {          // caught up: battle!
+    const bike = a.ride && D.VEHICLES[a.ride] ? 3 : 0;
+    a.rb = { foe: { ...rbStats(r.lv), name: r.name }, me: { ...rbStats(lvl(a), bike), name: a.name, drinks: 2 }, cust: r.cust, turn: 0 };
+    a.rival = null; markMe(a); send(a, { t: 'rb', start: 1, st: rbView(a) });
+  }
+}
+const rbView = a => a.rb && { foe: a.rb.foe, me: a.rb.me, cust: a.rb.cust };
+function rbHit(att, dfn, pow, ev, who, mvName) {
+  const crit = Math.random() < 1 / 12, d = Math.max(1, Math.round(pow * (att.atk * (att.deb > 0 ? .75 : 1)) / dfn.def * rnd(.85, 1) * (crit ? 1.5 : 1)));
+  dfn.hp = Math.max(0, dfn.hp - d); ev.push({ who, text: crit ? 'ได้ผลดีเยี่ยม! (คริติคอล)' : `ได้ผล! ${dfn.name} เสียแรงใจ ${d}`, dmg: d, tgt: who === 'me' ? 'foe' : 'me', crit });
+}
+function rbAct(a, m) {
+  const b = a.rb; if (!b) return;
+  const me = b.me, foe = b.foe, ev = [];
+  if (m.mv === 'run') { a.rb = null; joy(a, -2); markMe(a); return send(a, { t: 'rb', end: 'run', ev: [{ who: 'me', text: `${me.name} ยอมถอย... ${foe.name} แย่งลูกค้าไปได้` }] }); }
+  const myTurn = () => {
+    if (m.mv === 'drink') {
+      if (me.drinks <= 0) { ev.push({ who: 'me', text: 'เครื่องดื่มชูกำลังหมดแล้ว!' }); return; }
+      me.drinks--; const h = Math.min(me.max - me.hp, 35); me.hp += h; ev.push({ who: 'me', text: `${me.name} ดื่มเครื่องดื่มชูกำลัง! แรงใจ +${h}`, heal: h, tgt: 'me' }); return;
+    }
+    const mv = RB_MOVES[m.mv]; if (!mv) return;
+    ev.push({ who: 'me', text: `${me.name} ใช้ ${mv[0]}!`, mv: m.mv });
+    if (m.mv === 'smile') {
+      if (me.cd > 0) { ev.push({ who: 'me', text: 'ยิ้มบ่อยไปลูกค้าเริ่มเขิน... ไม่ได้ผล' }); return; }
+      const h = Math.min(me.max - me.hp, Math.round(me.max * .28)); me.hp += h; me.cd = 2; ev.push({ who: 'me', text: `ลูกค้าประทับใจ! แรงใจ +${h}`, heal: h, tgt: 'me' }); return;
+    }
+    if (Math.random() > mv[2]) { ev.push({ who: 'me', text: 'แต่พลาด!', miss: 1 }); return; }
+    if (m.mv === 'honk') { foe.deb = 3; ev.push({ who: 'me', text: `${foe.name} ตกใจ! พลังโจมตีลดลง`, tgt: 'foe', debuff: 1 }); return; }
+    rbHit(me, foe, mv[1], ev, 'me');
+  };
+  const foeTurn = () => {
+    let k = 'block'; const r = Math.random();
+    if (foe.hp < foe.max * .35 && foe.cd <= 0) k = 'call'; else if (me.deb <= 0 && r < .22) k = 'shout'; else k = r < .62 ? 'block' : 'corner';
+    const mv = RB_FOE[k]; ev.push({ who: 'foe', text: `${foe.name} ใช้ ${mv[0]}!`, mv: k });
+    if (k === 'call') { const h = Math.min(foe.max - foe.hp, Math.round(foe.max * .3)); foe.hp += h; foe.cd = 3; ev.push({ who: 'foe', text: `ลูกค้าใจอ่อน! ${foe.name} แรงใจ +${h}`, heal: h, tgt: 'foe' }); return; }
+    if (Math.random() > mv[2]) { ev.push({ who: 'foe', text: 'แต่พลาด!', miss: 1 }); return; }
+    if (k === 'shout') { me.deb = 3; ev.push({ who: 'foe', text: `${me.name} เสียขวัญ! พลังโจมตีลดลง`, tgt: 'me', debuff: 1 }); return; }
+    rbHit(foe, me, mv[1], ev, 'foe');
+  };
+  const first = me.spd > foe.spd || me.spd === foe.spd && Math.random() < .5;
+  for (const f of first ? [myTurn, foeTurn] : [foeTurn, myTurn]) { f(); if (me.hp <= 0 || foe.hp <= 0) break; }
+  for (const x of [me, foe]) { if (x.deb > 0) x.deb--; if (x.cd > 0) x.cd--; }
+  b.turn++;
+  if (foe.hp <= 0 || me.hp <= 0) {
+    const won = foe.hp <= 0; a.rb = null;
+    if (won) {
+      const pay = Math.round((120 + 40 * lvl(a)) * jobPay(a) * (1 + (BOOST[tier(a, 'rider')] || 0)));
+      earn(a, pay); addXp(a, 1); stat(a, 'rbwin'); joy(a, 6);
+      ev.push({ who: 'me', text: `${foe.name} หมดแรงใจ! ${b.cust} เลือกคุณ · ได้ค่าส่ง+ทิป ${money(pay)}`, win: 1 });
+    } else { a.energy = Math.max(0, a.energy - 5); joy(a, -3); ev.push({ who: 'foe', text: `${me.name} หมดแรงใจ... ${foe.name} แย่งลูกค้าไปได้`, lose: 1 }); }
+    markMe(a); return send(a, { t: 'rb', end: won ? 'win' : 'lose', ev, st: { foe, me } });
+  }
+  send(a, { t: 'rb', ev, st: rbView(a) });
+}
 // ---- the auction house (merchants): a lot comes up, you and three rival bidders each hand in one sealed bid (a guess of
 // what it is worth); the highest bid wins and pays it. The house buys the lot back from the winner at its true value,
 // so bidding under the true value is profit and bidding over it is a loss. An appraiser gives a rough range.
@@ -2580,7 +2654,8 @@ function meView(a) {
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
-    mis: misView(a), misNext: a.misNext || 0, auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
+    mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
+    auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
     cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
     dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
     icu: null, icuNext: a.icuNext || 0,
@@ -2874,6 +2949,8 @@ function onMessage(ws, raw) {
     case 'bug': return bugReport(a, m);
     case 'god': return godAct(a, m);
     case 'mission': return misAct(a, m);
+    case 'rb': return rbAct(a, m);
+    case 'rbseek': { if (a.career !== 'rider') return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
     case 'reset': return resetChar(a, m);
     case 'resign': return resign(a);
     case 'paybills': return payBills(a);
@@ -3084,6 +3161,7 @@ function tick() {
     if (a.mis) misTick(a, t, dt);
     if (a.cook) cookTick(a, t, dt);
     if (a.auc) aucTick(a, t);
+    if (a.career === 'rider' || a.rival) rivalTick(a, t);
     if (godLock(a)) {   // god mode: locked stats
       a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
       if ((a.dz || []).length) { a.dz = []; sendRoster(); }

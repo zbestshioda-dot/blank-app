@@ -963,3 +963,23 @@ body.hasEvent #topBar{top:146px!important}
 .aucRes{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.5);border-radius:10px;padding:5px 9px;font-size:13px}.aucRes span{margin-left:auto;font-weight:700}
 .aucRes.win{background:#ffe8a8}.aucRes.me{outline:2px solid var(--acc)}.aucRes i{font-style:normal;font-size:11px;padding:1px 6px;border-radius:8px;color:#fff}.aucRes i.up{background:#2e9e3a}.aucRes i.dn{background:#c0392b}
 .aucVerdict{text-align:center;font-size:16px;margin:10px 0;padding:8px;border-radius:10px;background:rgba(255,255,255,.5)}.aucVerdict.good{background:#dff3c8;color:#2a6b12}.aucVerdict.bad{background:#f8d6d0;color:#8a1f12}
+
+/* rider battle (Pokemon style) */
+#rbWin{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;background:linear-gradient(#bfe6ff 0%,#e8f6ff 45%,#9ed38a 45%,#79b86a 100%);font-family:var(--ui)}
+#rbWin.hidden{display:none}
+.rbField{position:relative;flex:1;min-height:0}
+.rbBox{position:absolute;background:#fffbe8;border:3px solid #3e2414;border-radius:12px 4px 12px 4px;padding:6px 10px;min-width:190px;box-shadow:0 4px 0 rgba(0,0,0,.25);color:#2a1a0e}
+.rbBox b{font-size:15px}.rbBox span{float:right;font-size:13px;font-weight:700}.rbBox small{display:block;text-align:right;font-weight:700}
+.rbHp{height:9px;background:#555;border-radius:5px;margin-top:5px;overflow:hidden;border:2px solid #333}.rbHp i{display:block;height:100%;width:100%;background:#4cd964;transition:width .6s ease,background .6s}
+.rbFoeBox{left:4%;top:6%}.rbMeBox{right:4%;bottom:8%}
+.rbFoeSpot{position:absolute;right:8%;top:8%;width:180px;height:150px}.rbFoeSpot::after,.rbMeSpot::after{content:'';position:absolute;left:10%;right:10%;bottom:-6px;height:26px;border-radius:50%;background:rgba(60,110,50,.55);z-index:-1}
+.rbMeSpot{position:absolute;left:6%;bottom:2%;width:200px;height:170px}
+.rbFoeSpot canvas,.rbMeSpot canvas{width:100%;height:100%;image-rendering:pixelated}
+.rbBottom{background:#fffbe8;border-top:4px solid #3e2414;padding:10px 12px calc(10px + env(safe-area-inset-bottom));color:#2a1a0e}
+.rbText{min-height:44px;font-size:16px;font-weight:600}
+.rbMenu{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}.rbMenu.hidden{display:none}
+.rbMenu button{text-align:left;padding:7px 10px}.rbMenu button small{display:block;font-size:11px;opacity:.75;font-weight:400}
+.rbHit{animation:rbHit .45s}.rbHeal{animation:rbHeal .6s}.rbAtk{animation:rbAtk .35s}
+@keyframes rbHit{0%,100%{transform:none;opacity:1}20%{transform:translateX(-8px);opacity:.3}40%{transform:translateX(8px);opacity:1}60%{transform:translateX(-5px);opacity:.3}80%{transform:translateX(4px)}}
+@keyframes rbHeal{50%{filter:brightness(1.6) drop-shadow(0 0 8px #8f8)}}
+@keyframes rbAtk{50%{transform:translate(12px,-10px) scale(1.05)}}
