@@ -340,6 +340,7 @@ function handle(m) {
     case 'mt': misLive = m; break;
     case 'ck': ckLive = { prog: m.prog, t: performance.now() }; break;
     case 'kfx': cookFx(m.kind); break;
+    case 'afx': if (m.kind === 'gavel') { FX.play('ding'); } else if (m.kind === 'bid') FX.play('pop'); else if (m.kind === 'win') { FX.play('coin', true); FX.play('levelup'); } else if (m.kind === 'lose') FX.play('fail'); else FX.play('notice'); if (panel?.kind === 'warehouse') refreshPanel(true); break;
     case 'mq': misAsk(m); break;
     case 'mfx': if (m.kind === 'pick') { FX.play('pop'); } else if (m.kind === 'catch') { FX.play('pet', ['squeak', 1]); FX.play('chime'); } else FX.play('ding'); if (navigator.vibrate) navigator.vibrate(25); break;
     case 'req': showReq(m); break;
@@ -1307,6 +1308,7 @@ function misBox() {
   return `<div class="jobbox">${m.icon} <b>${esc(m.title)}</b> · เหลือเวลา <b class="miscd"></b><br><small>${esc(m.story)}</small><ul class="misSteps">${steps}</ul>${B('ยกเลิกภารกิจ', { t: 'mission', op: 'quit' })}</div>`;
 }
 function paintMisChip() {
+  document.querySelectorAll('.auccd').forEach(el => { const l = Math.max(0, Math.ceil((+el.dataset.t - Date.now() - clockOff) / 1000)); el.textContent = l ? `${l} วินาที` : 'ปิดรับซอง!'; });
   const c = $('#misChip'), m = me?.mis;
   if (!m) { if (!cookChip()) c.classList.add('hidden'); return; }
   const left = Math.max(0, Math.ceil((m.until - Date.now() - clockOff) / 1000)), tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -1570,7 +1572,7 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', g: 'f', lk: { hair: 'brown', shirt: 'white' }, hi: 'สวัสดีค่ะ สนใจร่วมงานกับไทยเทคไหมคะ?', yes: 'ทำงานให้ตรงเวลานะคะ เข้างาน 8 โมง!' },
   farmer:   { name: 'พี่ข้าวหอม (ประธานสหกรณ์)', short: 'พี่ข้าวหอม', g: 'f', lk: { hair: 'brown', shirt: 'red' }, hi: 'มาทำไร่ด้วยกันไหม ได้กินผักสดทุกวันเลยนะ', yes: 'ดูแลแปลงดีๆ นะ' },
   fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: 'มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: 'ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
-  merchant: { name: 'เฮียชัย (เจ้าของคลังสินค้า)', short: 'เฮียชัย', lk: { hair: 'brown' }, hi: 'ของถูกเอาไปขายแพง กำไรงามนะ สนใจไหม?', yes: 'ซื้อถูกขายแพง จำไว้!' },
+  merchant: { name: 'เฮียชัย (เจ้าของโรงประมูล)', short: 'เฮียชัย', lk: { hair: 'brown' }, hi: 'มาประมูลของกันไหม ล็อตใหม่ขึ้นเวทีตลอด', yes: 'ซื้อถูกขายแพง จำไว้!' },
   chef:     { name: 'เชฟหมี (หัวหน้าครัว)', short: 'เชฟหมี', lk: { hair: 'black' }, hi: 'อยากเป็นเชฟต้องมีใบรับรองนะ แล้วมาปรุงด้วยกัน', yes: 'วัตถุดิบดี อาหารก็อร่อย!' },
   doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะคะ', yes: 'อยู่ในโรงพยาบาลช่วงเวรได้เงินเดือนทุกชั่วโมงนะคะ' },
   rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', lk: { hair: 'black' }, hi: 'มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน', yes: 'ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
@@ -1819,6 +1821,7 @@ function bindPanel(root) {
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
+  aucBid(m) { const v = +($('#aucAmt')?.value || 0); send({ t: 'act', st: m.st, a: 'bid', amt: v }); },
   openPets() { openPanel({ kind: 'pets' }); },
   titles: () => { panel.titles = !panel.titles; refreshPanel(true); if (panel.titles) setTimeout(() => { const t = document.querySelector('#panelBody .secT'); t && t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); },
   photo: () => pickPhoto(),
@@ -2009,7 +2012,7 @@ const TALK = {
   staff_fishing: [['ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', 'ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', 'ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วย'], ['สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['มีสมุดภาพปลาที่สมาคมด้วยนะ', 'ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย']],
   staff_chef: [['อาหารดีเริ่มที่วัตถุดิบดี', 'ปลาสดจากชาวประมง ผักจากชาวไร่ ทำอะไรก็อร่อย'], ['อยากเป็นเชฟต้องมีใบรับรองเชฟก่อนนะ', 'ซื้อได้ที่มหาวิทยาลัย'], ['ต้มยำหม้อนี้ใส่พริกไปสามกำมือ', 'ใครกินไม่ไหวไม่ใช่ความผิดฉันนะ 🌶️']],
   staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่มหาวิทยาลัย'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
-  staff_merchant: [['ซื้อของจากคลังราคาส่ง', 'แล้วไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง ง่ายๆ'], ['ของแต่ละอย่างมีสต็อกจำกัดนะ', 'มาเช้าได้ของเยอะกว่า'], ['เฮียค้าขายมาสามสิบปี', 'เคล็ดลับคือ ยิ้มเข้าไว้ ลูกค้ามาเอง 😄']],
+  staff_merchant: [['ที่นี่เป็นโรงประมูลแล้ว ล็อตขึ้นเวทีทีละล็อต', 'ยื่นซองเดาราคาแข่งกับเสี่ยเฮง เจ๊หมวย พวกนั้น'], ['ซื้อได้ต่ำกว่ามูลค่าจริงก็กำไร', 'แต่ถ้าใจร้อนเสนอสูงเกินก็ขาดทุนนะ'], ['ฟังผู้ประเมินไว้บ้าง', 'แต่สภาพของก็สำคัญ ของมีตำหนิราคาตกเยอะ']],
   staff_police: [['เห็นใครล้วงกระเป๋า โทร 191 ได้ทันที', 'สายตรวจจะรีบไปจับ'], ['อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', 'ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['เมืองนี้สงบสุขได้ เพราะทุกคนช่วยกันดูแล']],
   staff_doctor: [['ป่วยแล้วอย่าฝืน มาโรงพยาบาลนะ', 'บอกอาการให้ชัดๆ หมอจะได้รักษาถูก'], ['กินให้ครบ นอนให้พอ', 'ภูมิคุ้มกันจะดีขึ้นเอง']],
   staff_farmer: [['ไร่ชานเมืองปิดปรับปรุงอยู่นะ', 'อีกไม่นานคงได้กลับไปปลูกผักกันอีก'], ['ทุเรียนปลูกนานหน่อย แต่ราคาดีมาก', 'ข้าวโตเร็ว ขายได้ทุกวัน']],
@@ -2366,6 +2369,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15x', d: '15 พ.ย. (รอบ 24)', items: [
+    '🔨 <b>พ่อค้า: โรงประมูล!</b> คลังสินค้าราคาส่งกลายเป็นโรงประมูล ล็อตสินค้าขึ้นเวทีทีละล็อต (ลังสินค้า ของสด ปลา อาหาร กล่องปริศนา) มีสภาพสินค้าและช่วงราคาจากผู้ประเมิน',
+    '✉️ <b>ยื่นซองเดาราคาแข่งกับคู่แข่ง 3 คน</b> (เสี่ยเฮงใจถึง เจ๊หมวยเขี้ยว คุณหญิงมาลีรวยแต่ไม่รู้ราคา ฯลฯ) ใครเสนอสูงสุดชนะ แล้วเปิดมูลค่าจริง: <b>ซื้อต่ำกว่าราคาจริง = กำไร สูงกว่า = ขาดทุน</b> · อัปเกรดรถเข็นสินค้าให้ผู้ประเมินแม่นขึ้น'] },
   { v: '2026-11-15w', d: '15 พ.ย. (รอบ 23)', items: [
     '🔥 <b>เชฟ: Cooking Battle!</b> รับออเดอร์ที่เคาน์เตอร์ครัวใหญ่ แล้ววิ่งทำจริงในครัว: 🧺 หยิบวัตถุดิบ → 🔪 <b>สับ</b>ที่เขียง / 🍳 <b>ผัด</b>ที่กระทะ (ยืนทำจนเสร็จ) → 🍲 <b>ต้ม</b> / 🔥 <b>ย่าง</b> (สุกเองแต่ต้องยกให้ทัน ไม่งั้นเละ/ไหม้) → 🍽️ <b>รวมจาน</b> → 🛎️ ยกไปเสิร์ฟให้ทันเวลา · เสิร์ฟเร็วได้ทิปและมีโอกาสได้เพิ่มอีกจาน',
     '🚑 <b>หมอ ICU ไม่ใช่มินิเกมแล้ว</b> เคสฉุกเฉิน 8 แบบ เดินไปหยิบเครื่องมือ/ยาในโรงพยาบาลจริง แล้วยืนรักษาคนไข้ที่เตียง ICU ให้ทันเวลา',
@@ -2532,10 +2538,19 @@ function renderPanel(p) {
       return `<h2>🏪 ร้านสะดวกซื้อ 24 ชม.</h2><div class="sub">เปิดตลอด 24 ชั่วโมง ของมีเสมอ ไม่ต้องรอใครวางขาย · ราคาสูงกว่าตลาดนิดหน่อย</div><div class="list">${rows}</div>`;
     }
     case 'warehouse': {
-      const rows = Object.entries(G.items).filter(([, it]) => it.wholesale).map(([id, it]) =>
-        itemRow(id, `<div>${B('ซื้อ 1', { t: 'act', st, a: 'buy', item: id, qty: 1 })}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 })}${B('x10', { t: 'act', st, a: 'buy', item: id, qty: 10 })}</div>`,
-          `ราคาส่ง ${money(it.wholesale)} · ราคาตลาด ~${money(it.base)} · สต็อกของคุณ ${me.wstock?.[id] ?? '-'}/${it.stock}`)).join('');
-      return `<h2>📦 คลังสินค้าราคาส่ง</h2><div class="sub">${hoursTxt('warehouse')} · พ่อค้าแต่ละคนมีโควตาสต็อกของตัวเอง เติมใหม่เรื่อยๆ ไม่ต้องแย่งกับใคร · ซื้อแต่ละครั้งเสีย ⚡4 · เอาไปวางขายที่ตลาดกลาง</div>${staffHint('merchant')}${me.career === 'merchant' ? `<div class="list">${rows}</div>` : ''}`;
+      const c = me.auc, head = `<h2>🔨 โรงประมูล</h2><div class="sub">${hoursTxt('warehouse')} · ล็อตละ 20 วินาที ยื่นซองประมูลได้ครั้งเดียว (แก้ราคาได้ก่อนหมดเวลา) แข่งกับคู่แข่ง 3 คน · ใครเสนอสูงสุดชนะและจ่ายตามที่เสนอ · ได้ของมาแล้วโรงประมูลรับซื้อคืนในราคาจริงทันที: <b>ต่ำกว่าราคาจริง = กำไร</b> สูงกว่า = ขาดทุน</div>`;
+      if (me.career !== 'merchant') return `${head}<div class="jobbox">เฉพาะ<b>พ่อค้า</b> · สมัครได้ที่นี่</div>`;
+      const lot = c ? `<div class="aucLot"><div class="aucIco">${c.icon}</div><div><b>${esc(c.name)}</b><div class="aucItems">${Object.entries(c.items).map(([id, q]) => `<span>${G.items[id].icon} ${esc(G.items[id].name)} ×${q}</span>`).join('')}</div><small>สภาพ: <b>${c.cond}</b> · 🧐 ผู้ประเมินว่าราวๆ <b>${money(c.lo)} – ${money(c.hi)}</b></small></div></div>` : '';
+      if (!c || c.stage === 'done' && !c.result) return `${head}<div class="jobbox">ยังไม่มีล็อตบนเวที</div>${B('🔨 เปิดล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
+      if (c.stage === 'bid') {
+        const bots = c.bots.map(b => `<div class="aucBot">${b.sent ? '✉️' : '🤔'} <b>${esc(b.name)}</b> <small>${esc(b.style)} · ${b.sent ? 'ยื่นซองแล้ว' : 'กำลังคิด...'}</small></div>`).join('');
+        return `${head}${lot}<div class="aucTimer">⏱ เหลือเวลา <b class="auccd" data-t="${c.until}"></b></div><div class="aucBots">${bots}<div class="aucBot me">${c.my ? '✉️' : '✍️'} <b>คุณ</b> <small>${c.my ? `ยื่นแล้ว ${money(c.my)} (แก้ได้)` : 'ยังไม่ได้ยื่น'}</small></div></div>
+          <div class="rowf" style="margin-top:8px"><input id="aucAmt" type="number" min="10" step="10" inputmode="numeric" placeholder="ราคาที่จะเสนอ (บาท)" value="${c.my || ''}">${B(c.my ? '✉️ แก้ซอง' : '✉️ ยื่นซอง', { fn: 'aucBid', st }, 'primary')}</div>
+          <div class="sub">เงินสดที่มี ${money(me.money)} · ไม่ยื่นก็ได้ ถ้าคิดว่าแพงเกินไป</div>`;
+      }
+      const rows = c.result.map(([n, b, mine], i) => `<div class="aucRes ${i === 0 ? 'win' : ''} ${mine ? 'me' : ''}">${i === 0 ? '🏆' : `${i + 1}.`} <b>${esc(mine ? 'คุณ' : n)}</b><span>${money(b)}</span>${b <= c.real ? '<i class="up">ต่ำกว่าจริง</i>' : '<i class="dn">เกินราคาจริง</i>'}</div>`).join('');
+      const iWon = c.result[0]?.[2], verdict = iWon ? (c.net >= 0 ? `<div class="aucVerdict good">🎉 คุณชนะ! กำไร <b>${money(c.net)}</b></div>` : `<div class="aucVerdict bad">😵 ชนะแต่จ่ายแพงไป ขาดทุน <b>${money(-c.net)}</b></div>`) : `<div class="aucVerdict">${esc(c.win)} ได้ไป${c.my ? ' · คุณไม่ได้เสียเงิน' : ''}</div>`;
+      return `${head}${lot}<div class="aucReal">💎 มูลค่าจริง <b>${money(c.real)}</b></div><div class="aucResList">${rows}</div>${verdict}${B('🔨 ล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
     }
     case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${me.career === 'rider' ? riderJobs() : ''}`;
     case 'restaurant': {

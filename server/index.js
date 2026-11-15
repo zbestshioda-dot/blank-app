@@ -771,7 +771,7 @@ function apply(a, career) {
   const tips = {
     office: 'เข้างาน 08:00 (สายได้ไม่เกิน 08:15) นั่งที่โต๊ะทำงานว่างตัวไหนก็ได้ ได้ค่าแรงตามชั่วโมงที่นั่ง เลิก 17:00',
     farmer: 'ซื้อสวนของตัวเองได้ที่ป้ายหน้าแปลงในไร่ แล้วเริ่มปลูกได้เลย',
-    merchant: 'ซื้อของจากคลังสินค้าราคาส่ง แล้ววางขายที่ตลาดกลาง',
+    merchant: 'ประมูลสินค้าที่โรงประมูล เดาราคาแข่งกับคู่แข่ง ซื้อได้ต่ำกว่ามูลค่าจริง = กำไร',
     chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
     doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (กู้ชีพ ผ่าตัด ห้ามเลือด ฯลฯ ลงมือทำในห้องจริง) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
@@ -962,6 +962,8 @@ function act(a, m) {
       return toast(a, `ขาย ${it.icon}${it.name} x${q} ให้ NPC ได้ ${money(got)} (วางขายให้ผู้เล่นที่ตลาดกลางได้ราคาดีกว่ามาก)`, '💰');
     }
     // ---------------- merchant
+    case 'warehouse.auction': return aucStart(a);
+    case 'warehouse.bid': return aucBid(a, m);
     case 'warehouse.buy': {
       if (!need(a, 'merchant')) return;
       const id = m.item, it = D.ITEMS[id];
@@ -1625,11 +1627,52 @@ function ate(a, id) {
     a.craving = null; a.craveNext = now() + rnd(5, 10) * 60000;
   }
 }
-const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'crowd.pick', 'sdesk.sit']);
+const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'warehouse.auction', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'crowd.pick', 'sdesk.sit']);
 function holdsHome(a) {
   if (a.house >= 0 && !tenants[a.house]) return a.house;
   if (a.rent && a.rent.until > now()) return a.rent.idx;
   return -1;
+}
+// ---- the auction house (merchants): a lot comes up, you and three rival bidders each hand in one sealed bid (a guess of
+// what it is worth); the highest bid wins and pays it. The house buys the lot back from the winner at its true value,
+// so bidding under the true value is profit and bidding over it is a loss. An appraiser gives a rough range.
+const AUC_BOTS = [['เสี่ยเฮง', 'ใจถึง', .82, 1.08], ['เจ๊หมวย', 'เขี้ยว', .62, .92], ['ลุงชาญ', 'ระวังตัว', .55, .88], ['คุณหญิงมาลี', 'รวยแต่ไม่รู้ราคา', .6, 1.2], ['เฮียหมง', 'นักเก็ง', .7, 1.02], ['พี่บอย', 'มือใหม่', .45, 1.15]];
+const AUC_LOTS = [['ลังสินค้าจากโกดังปิดกิจการ', '📦', 'goods'], ['ของสดล็อตใหญ่จากสหกรณ์', '🧺', 'crop'], ['ปลาจากเรือประมงเช้านี้', '🐟', 'fish'], ['อาหารเหลือจากงานเลี้ยง', '🍱', 'meal'], ['กล่องปริศนาของสะสม', '🎁', 'mix']];
+const AUC_COND = [['ดีมาก', 1.15], ['ดี', 1], ['พอใช้', .85], ['มีตำหนิ', .65]];
+function aucStart(a) {
+  if (!need(a, 'merchant')) return;
+  if (a.auc && a.auc.stage === 'bid') return;
+  if ((a.aucNext || 0) > now()) return toast(a, 'ล็อตถัดไปกำลังขึ้นเวที รอแป๊บ', '⏳', false);
+  if (!spend(a, 4)) return;
+  const [name, icon, kind] = pick(AUC_LOTS), pool = Object.entries(D.ITEMS).filter(([, it]) => it.base >= 6 && (kind === 'mix' ? true : it.kind === kind));
+  const n = kind === 'mix' ? rint(2, 4) : rint(1, 3), items = {};
+  for (let i = 0; i < n; i++) { const [id, it] = pick(pool); items[id] = (items[id] || 0) + Math.max(1, Math.round(rnd(1, 12) * Math.min(1, 300 / it.base))); }
+  const [cond, cm] = pick(AUC_COND), mk = id => market[id]?.mult || 1;
+  const real = Math.max(50, Math.round(Object.entries(items).reduce((s0, [id, q]) => s0 + D.ITEMS[id].base * q * mk(id), 0) * cm / 10) * 10);
+  const err = [.3, .22, .15, .09][tier(a, 'merchant')], c0 = real * rnd(1 - err * .6, 1 + err * .6);
+  const t = now(), bots = [...AUC_BOTS].sort(() => Math.random() - .5).slice(0, 3).map(([bn, style, lo, hi]) => ({ name: bn, style, bid: Math.round(real * rnd(lo, hi) / 10) * 10, at: t + rint(3000, 17000) }));
+  a.auc = { stage: 'bid', name, icon, items, cond, real, lo: Math.round(c0 * (1 - err) / 10) * 10, hi: Math.round(c0 * (1 + err) / 10) * 10, t0: t, until: t + 20000, bots, my: 0 };
+  markMe(a); send(a, { t: 'afx', kind: 'gavel' });
+}
+function aucBid(a, m) {
+  const c = a.auc; if (!c || c.stage !== 'bid' || now() > c.until) return;
+  const v = Math.round(+m.amt || 0); if (!(v > 0)) return toast(a, 'ใส่ราคาที่จะประมูลก่อน', 'ℹ️', false);
+  if (v > a.money) return toast(a, `เงินสดไม่พอ (มี ${money(a.money)})`, '💸', false);
+  c.my = v; markMe(a); send(a, { t: 'afx', kind: 'bid' });
+}
+function aucTick(a, t) {
+  const c = a.auc; if (c.stage !== 'bid') return;
+  for (const b of c.bots) if (!b.sent && t >= b.at) { b.sent = true; markMe(a); }
+  if (t < c.until) return;
+  const all = [...c.bots.map(b => ({ name: b.name, bid: b.bid, at: b.at })), ...(c.my ? [{ name: a.name, bid: c.my, at: 0, me: 1 }] : [])].sort((x, y) => y.bid - x.bid || x.at - y.at);
+  const win = all[0]; c.stage = 'done'; c.result = all.map(x => [x.name, x.bid, x.me ? 1 : 0]); c.win = win.name;
+  a.aucNext = t + 2500;
+  if (win.me) {
+    const net = c.real - win.bid; a.money -= win.bid; earn(a, c.real); addXp(a, .6); quest(a, 'buy', 1); stat(a, 'wholesale', Object.values(c.items).reduce((x, y) => x + y, 0));
+    if (net > 0) joy(a, 3); c.net = net;
+    toast(a, net >= 0 ? `🔨 ชนะประมูล! จ่าย ${money(win.bid)} ของจริงมีค่า ${money(c.real)} กำไร ${money(net)}` : `🔨 ชนะประมูล... แต่จ่าย ${money(win.bid)} ของมีค่าแค่ ${money(c.real)} ขาดทุน ${money(-net)}`, net >= 0 ? '💰' : '📉', net >= 0);
+  } else toast(a, `🔨 ${win.name} ชนะไปที่ ${money(win.bid)} (มูลค่าจริง ${money(c.real)})`, '🔨', false);
+  send(a, { t: 'afx', kind: win.me ? (c.net >= 0 ? 'win' : 'lose') : 'other' }); markMe(a);
 }
 // ---- the cooking battle: carry each ingredient around the kitchen (pantry -> board / pan / pot / grill -> plate -> serve)
 const OP_AT = { chop: 'board', fry: 'pan', boil: 'pot', grill: 'grill' };
@@ -2537,7 +2580,8 @@ function meView(a) {
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
-    mis: misView(a), misNext: a.misNext || 0, cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
+    mis: misView(a), misNext: a.misNext || 0, auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
+    cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
     dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
@@ -3039,6 +3083,7 @@ function tick() {
     const indoors = !!D.roomAt(a.x, a.y);
     if (a.mis) misTick(a, t, dt);
     if (a.cook) cookTick(a, t, dt);
+    if (a.auc) aucTick(a, t);
     if (godLock(a)) {   // god mode: locked stats
       a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
       if ((a.dz || []).length) { a.dz = []; sendRoster(); }

@@ -104,7 +104,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', late: 2 });   // walk-in salon
   B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true, renov: true });
   // south-west lane: services and trade (doors on row 45)
-  B('warehouse', 'b_factory', 5, 45, { label: 'คลังสินค้าราคาส่ง', icon: '📦', st: 'warehouse' });
+  B('warehouse', 'b_factory', 5, 45, { label: 'โรงประมูล (คลังสินค้า)', icon: '🔨', st: 'warehouse' });
   B('restaurant', 'b_cafe2', 20, 30, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' });
   B('kitchen', 'b_kitchen', 13, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_rider2', 20, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
@@ -863,7 +863,7 @@ const CAREERS = {
   none:     { name: 'ว่างงาน', icon: '🙂', where: null, desc: 'ยังไม่มีงานทำ ไปสมัครงานตามอาคารต่างๆ' },
   office:   { name: 'พนักงานบริษัท', icon: '👔', where: 'office', need: ['degree'], desc: 'เข้างาน 08:00–17:00 (โอทีต่อได้ถึง 21:00 ค่าส่ง x1.25) รับซองเอกสารที่บริษัทไปส่งตามอาคารทั่วเมือง ได้เงินทุกครั้งที่ส่งถึง ยิ่งไกลยิ่งได้มาก มาสายโดนหักเงินและอาจถูกเลิกจ้าง' },
   farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
-  merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
+  merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ประมูลสินค้าที่โรงประมูล (คลังสินค้าเดิม) แข่งกับคู่แข่ง เดาราคาให้แม่น ชนะต่ำกว่ามูลค่าจริง = กำไร สูงกว่า = ขาดทุน · ของในกระเป๋ายังวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
@@ -946,7 +946,7 @@ const TOOL_PRICES = [4000, 15000, 50000];
 const TOOLS = {
   office:   { name: 'ชุดสูทหรู', icon: '👔', fx: ['ค่าแรง +10%', 'ค่าแรง +20%', 'ค่าแรง +30%'] },
   farmer:   { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
-  merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
+  merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ผู้ประเมินแม่นขึ้น (±22%)', 'ผู้ประเมินแม่นขึ้น (±15%)', 'ผู้ประเมินแม่นขึ้น (±9%)'] },
   chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
   police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['ค่าตอบแทน +15%', 'ค่าตอบแทน +30%', 'ค่าตอบแทน +50%'] },
@@ -1233,7 +1233,7 @@ const ACHIEVEMENTS = [
   { id: 'fis1', r: 1, c: null, stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
   { id: 'fis2', r: 4, c: null, stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
   { id: 'fis3', r: 5, c: null, stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
-  { id: 'mer1', r: 1, c: 'merchant', stat: 'wholesale', n: 50, title: 'พ่อค้าหน้าใหม่', desc: 'ซื้อสินค้าจากคลัง 50 ชิ้น' },
+  { id: 'mer1', r: 1, c: 'merchant', stat: 'wholesale', n: 50, title: 'พ่อค้าหน้าใหม่', desc: 'ประมูลชนะได้สินค้ารวม 50 ชิ้น' },
   { id: 'mer2', r: 3, c: 'merchant', stat: 'psold', n: 100, title: 'เจ้าสัว', desc: 'ขายของให้ผู้เล่นอื่น 100 ชิ้น' },
   { id: 'che1', r: 2, c: 'chef', stat: 'cooked', n: 20, title: 'แม่ครัวหัวป่าก์', desc: 'ปรุงอาหาร 20 จาน' },
   { id: 'che2', r: 4, c: 'chef', stat: 'cooked', n: 100, title: 'เชฟกระทะเหล็ก', desc: 'ปรุงอาหาร 100 จาน' },

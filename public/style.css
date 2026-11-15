@@ -953,3 +953,13 @@ body.hasEvent #topBar{top:146px!important}
 @media(orientation:landscape) and (max-height:520px){#panel .sheet,#tradeWin .sheet,#mg .sheet{max-height:82vh;max-height:82dvh}}
 #misChip{position:absolute;left:50%;transform:translateX(-50%);top:88px;background:linear-gradient(#5aa0e0,#2a6fb0);color:#fff;border-color:#163e66;font-weight:600;border-radius:20px;padding:6px 14px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}#misChip.late{background:linear-gradient(#e0574a,#a3281e);animation:mgPulse 1s ease-in-out infinite}body:has(#dogChip:not(.hidden)) #misChip{top:130px}
 .misSteps{margin:6px 0 2px;padding-left:4px;list-style:none}.misSteps li{font-size:12.5px;margin:2px 0}.misSteps li.done{color:var(--mut);text-decoration:line-through}.misSteps li.cur{font-weight:600}
+
+/* auction house */
+.aucLot{display:flex;gap:10px;align-items:center;background:var(--paper3);border:2px solid var(--line);border-radius:12px;padding:8px 10px;margin:6px 0}
+.aucIco{font-size:38px}.aucItems{display:flex;flex-wrap:wrap;gap:4px 10px;margin:3px 0;font-size:13px}
+.aucTimer{text-align:center;font-size:15px;margin:6px 0}.aucBots{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.aucBot{background:rgba(255,255,255,.5);border-radius:10px;padding:5px 8px;font-size:13px}.aucBot small{display:block;color:var(--mut)}.aucBot.me{background:#fff3c4}
+.aucReal{text-align:center;font-size:17px;margin:8px 0}.aucResList{display:flex;flex-direction:column;gap:4px}
+.aucRes{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.5);border-radius:10px;padding:5px 9px;font-size:13px}.aucRes span{margin-left:auto;font-weight:700}
+.aucRes.win{background:#ffe8a8}.aucRes.me{outline:2px solid var(--acc)}.aucRes i{font-style:normal;font-size:11px;padding:1px 6px;border-radius:8px;color:#fff}.aucRes i.up{background:#2e9e3a}.aucRes i.dn{background:#c0392b}
+.aucVerdict{text-align:center;font-size:16px;margin:10px 0;padding:8px;border-radius:10px;background:rgba(255,255,255,.5)}.aucVerdict.good{background:#dff3c8;color:#2a6b12}.aucVerdict.bad{background:#f8d6d0;color:#8a1f12}
