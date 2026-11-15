@@ -108,10 +108,12 @@ const titleRar = a => isAdmin(a) ? 6 : D.ACHIEVEMENTS.find(x => x.id === a.title
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
 const dzProd = (a, key) => (a.dz || []).reduce((m, d) => m * (DZ[d]?.[key] || 1), 1);
+const newbie = a => now() - (a.created || now()) < 3 * 3600e3 || (a.earned || 0) < 3000;
 function infect(a, id, chance = 1) {
   if (godLock(a)) return false;
   if (Math.random() > chance || !DZ[id] || (a.dz || []).includes(id) || (a.dz || []).length >= 3 || a.down) return false;
   if ((a.immune?.[id] || 0) > now()) return false;
+  if (newbie(a)) return false;                       // new players (first 3 hours) do not catch anything yet
   a.dz = [...(a.dz || []), id];
   const d = DZ[id];
   toast(a, `คุณป่วยเป็น${d.name}! อาการ: ${d.sym.slice(0, 2).join(', ')} · ${d.self}`, d.icon, false);
@@ -628,7 +630,7 @@ function knockOut(a) {
     const here = D.areaAt(a.x, a.y);
     if (here && here.kind === 'map') { const ev = { t: 'amb', id: a.id, x: +a.x.toFixed(2), y: +a.y.toFixed(2), area: here.id }; for (const o of online.values()) if (o !== a && areaId(o) === here.id) send(o, ev); }
     const docsOn = [...online.values()].some(o => o.career === 'doctor' && o !== a && !o.down);
-    a.down = { kind: 'hosp', t: now(), until: now() + (docsOn ? 120000 : 60000) };
+    a.down = { kind: 'hosp', t: now(), until: now() + (docsOn ? 60000 : 25000), free: newbie(a) || a.money < 500 };
     let i = beds.findIndex(b => !b);
     if (i < 0) i = beds.findIndex(b => b && b.npc);
     if (i >= 0) { beds[i] = a; a.bed = i; const s = ST['bed' + i]; place(a, s.x, s.y, true); }
@@ -3251,8 +3253,10 @@ function tick() {
         if (a.health >= 15) revive(a, 15);
       } else if (a.down.kind === 'hosp') {
         if (t > (a.down.until || a.down.t + 60000)) {
-          const fee = Math.min(1200, Math.round(a.money * 0.25)); a.money -= fee;
-          revive(a, 30); toast(a, `เจ้าหน้าที่โรงพยาบาลช่วยให้คุณฟื้น เสียค่ารักษา ${money(fee)} (ยังต้องรักษาโรคที่เป็นอยู่)`, '🏥', false);
+          // the staff patch you up properly: illnesses treated, a decent amount of health back; free for new / broke players
+          const fee = a.down.free ? 0 : Math.min(600, Math.round(a.money * 0.1)); a.money -= fee;
+          a.dz = []; a.immune = a.immune || {}; for (const k of Object.keys(DZ)) a.immune[k] = now() + 10 * 60000;
+          revive(a, 70); sendRoster(); toast(a, `🏥 ฟื้นแล้ว! เจ้าหน้าที่รักษาโรคให้หายหมด (กันป่วยซ้ำ 10 นาที) · ${fee ? `ค่ารักษา ${money(fee)}` : 'รักษาฟรี 💚'}`, '🏥');
         }
       }
     }
