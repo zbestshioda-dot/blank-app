@@ -347,6 +347,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '', pt: p.pt || '' });
+        if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -1188,7 +1189,7 @@ function draw(t) {
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
   }
-  drawBobber(X, Y, t); drawMisGuide(X, Y, t);
+  drawOtherCasts(X, Y, t); drawBobber(X, Y, t); drawMisGuide(X, Y, t);
   drawSirens(X, Y);
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
@@ -2759,7 +2760,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
-  { v: '2026-11-16y', d: '16 พ.ย. (รอบ 25)', items: ['🥚 เพิ่มอีสเตอร์เอ้กแล้ว'] },
+  { v: '2026-11-16y', d: '16 พ.ย. (รอบ 25)', items: ['🥚 เพิ่มอีสเตอร์เอ้กแล้ว', '🎣 เห็นคนอื่นตกปลาแล้ว (คันเบ็ด สายเบ็ด ทุ่นลอย ทุ่นจมตอนปลากิน สายตึงตอนเย่อปลา) ไม่ใช่ยืนเฉยๆ'] },
   { v: '2026-11-16x', d: '16 พ.ย. (รอบ 24)', items: [
     '🚶 <b>เดินลื่นขึ้น</b> เดินเฉียดต้นไม้ เสาไฟ กระถางดอกไม้ หรือมุมตึก ตัวละครจะไถลอ้อมไปเอง ไม่ติดค้าง · นิ้วที่สองแตะจอไม่ทำให้จอยหลุดแล้ว',
     '💬 ปุ่ม <b>คุย</b> คุยกับคนที่ยืนใกล้ที่สุด (ผู้เล่นหรือชาวเมือง) ไม่เด้งไปหาผู้กองเอกหรือพนักงานเคาน์เตอร์ทุกครั้งแล้ว',
@@ -4528,6 +4529,30 @@ function findWater(x, y) {
     if (far && n > bn) { bn = n; best = far; }
   }
   return best;
+}
+// other players fishing: their rod, the line and the float (it dips on a bite, the line goes taut in a fight)
+function drawOtherCasts(X, Y, t) {
+  const here = areaOf(P.get(myId)?.x || 0, P.get(myId)?.y || 0)?.id;
+  for (const s of P.values()) {
+    if (s.id === myId || !s.fc || !s.fcB || areaOf(s.x, s.y)?.id !== here) continue;
+    const b = s.fcB, px = s.rx * TS + X, py = s.ry * TS + Y + TS * .32;
+    if (px < -TS * 4 || px > VW + TS * 4 || py < -TS * 4 || py > VH + TS * 4) continue;
+    const ddx = b.x - s.rx, ddy = b.y - s.ry, dl = Math.hypot(ddx, ddy) || 1, ux = ddx / dl, uy = ddy / dl, side = ux >= -.05 ? 1 : -1;
+    const hx = px + side * TS * .18, hy = py - TS * .78, fight = s.fc === 3, bend = TS * (fight ? .4 : s.fc === 2 ? .25 : .08);
+    const tx0 = hx + ux * TS * .75 + side * TS * .45, ty0 = hy + uy * TS * .45 - TS * .85, tx = tx0 + ux * bend * .5, ty = ty0 + bend;
+    const cx0 = (hx + tx0) / 2 - side * bend * .15, cy0 = (hy + ty0) / 2 - bend * .25;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#4a2e16'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(cx0, cy0, tx, ty); ctx.stroke();
+    ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(cx0, cy0, tx, ty); ctx.stroke();
+    const fl = Math.min(1, (performance.now() - (s.fcT || 0)) / 380);
+    let ex = (s.rx + ddx * fl) * TS + X, ey = (s.ry + ddy * fl) * TS + Y - Math.sin(fl * Math.PI) * TS * 1.2 + Math.sin(t / 420 + s.id) * 1.5;
+    if (s.fc === 2) { ex += Math.sin(t / 35) * 3; ey += TS * .1; }
+    if (fight) { ex += Math.sin(t / 160) * TS * .35; ey += Math.cos(t / 210) * TS * .2; if (Math.random() < .06) FX.ring((ex - X) / TS, (ey - Y) / TS, '#fff', 360, .5); }
+    ctx.strokeStyle = fight ? '#ffd34d' : 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo((tx + ex) / 2, Math.max(ty, ey) + (fight ? 0 : TS * .4), ex, ey); ctx.stroke();
+    if (!fight) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey - TS * .04, TS * .07, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#e8402f'; ctx.beginPath(); ctx.arc(ex, ey - TS * .04, TS * .07, 0, Math.PI); ctx.fill(); }
+    else { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.ellipse(ex, ey, TS * .22, TS * .08, 0, 0, 7); ctx.fill(); }
+  }
 }
 function drawBobber(X, Y, t) {
   if (!bobber || !me?.cast) return;

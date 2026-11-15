@@ -2466,8 +2466,10 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '' };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
 }
+// others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
+const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
 function sendRoster() {
   const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
   const pub = JSON.stringify({ t: 'roster', players: all.filter(p => !p._h).concat(npc) });
@@ -3005,6 +3007,7 @@ function resetChar(a, m) {
 let lastTick = now(), wdAt = 0, saveAt = 0, slowAt = 0, marketAt = 0, lastHour = hourNow();
 function tick() {
   stockTick();
+  { let ch = false; for (const a of online.values()) { const v = castPub(a); if (v !== (a._fc || 0)) { a._fc = v; ch = true; } } if (ch) sendRoster(); }
   const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;
   const h = hourNow();
 
