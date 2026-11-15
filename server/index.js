@@ -760,8 +760,7 @@ function apply(a, career) {
   const c = D.CAREERS[career]; if (!c || career === 'none') return;
   if (a.career === career) return toast(a, `คุณเป็น${c.name}อยู่แล้ว`, 'ℹ️', false);
   for (const l of c.need || []) if (!hasLic(a, l)) return toast(a, licExpired(a, l) ? `${D.LICENSES[l].name}หมดอายุแล้ว ต่ออายุที่มหาวิทยาลัยก่อน` : `ต้องมี${D.LICENSES[l].name}ก่อน (ที่มหาวิทยาลัย)`, '🎓', false);
-  if (career === 'beggar') return toast(a, 'อาชีพขอทานสมัครไม่ได้ · คนที่เงินหมดตัว (เงินสด+เงินฝากไม่ถึง ฿100 และไม่มีงาน) จะกลายเป็นขอทานเอง', '🚫', false);
-  if (career === 'beggar' && a.money + (a.bank || 0) > D.POLICE.begMax) return toast(a, `มีเงินเกิน ${money(D.POLICE.begMax)} (รวมเงินฝาก) เป็นขอทานไม่ได้แล้ว`, '🥣', false);
+  if (career === 'beggar' && a.money + (a.bank || 0) > 2000) return toast(a, `มีเงินเกิน ${money(2000)} (รวมเงินฝาก) เป็นขอทานไม่ได้แล้ว`, '🥣', false);
   const wait = jobCooldown(a);
   if (wait > 0) return toast(a, `เพิ่งเปลี่ยนงานไป ต้องรออีก ${Math.ceil(wait / 60000)} นาทีถึงจะสมัครงานใหม่ได้`, '⏳', false);
   if (a.career === 'office') { a.xp.office = 0; a.office = null; }
@@ -3191,9 +3190,8 @@ function tick() {
     if (a.pose === 'rest' || a.pose === 'bed') { a.awake = Math.max(0, (a.awake || 0) - 4 * dt); if (a.awake === 0 && (a.dz || []).some(d => d === 'insomnia' || d === 'exhaust') && a.pose === 'rest') sleepWell(a); }
     else a.awake = (a.awake || 0) + dt;
     if (slow) moodTick(a, t, indoors);
-    if (slow && !isAdmin(a)) {               // beggars: out of poverty past ฿2,000; the broke and jobless end up begging
+    if (slow && !isAdmin(a)) {               // beggars: out of poverty past ฿2,000
       if (a.career === 'beggar' && a.money + (a.bank || 0) > 2000) { a.career = 'none'; a.pose === 'beg' && standUp(a); markMe(a); sendRoster(); toast(a, '🎉 มีเงินเกิน ฿2,000 แล้ว! พ้นจากการเป็นขอทาน ไปสมัครงานใหม่ได้เลย', '🎉'); feed(`🎉 ${a.name} พ้นจากการเป็นขอทานแล้ว!`); }
-      else if (a.career === 'none' && a.money + (a.bank || 0) < 100 && !a.loan && t - (a.created || 0) > 600000) { a.career = 'beggar'; markMe(a); sendRoster(); toast(a, '🥣 เงินหมดตัว... กลายเป็นขอทาน · ไปวิ่งเก็บขยะที่ถังขยะหรือนั่งขอทาน (🥣) จนมีเงินเกิน ฿2,000 ก็จะพ้นได้', '🥣', false); }
     }
     if (slow && !a.down) {
       // ---- ways to get sick (often enough that doctors have work)
