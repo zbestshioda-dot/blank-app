@@ -951,3 +951,5 @@ body.hasEvent #topBar{top:146px!important}
 #panel .sheet .look small{font-size:10.5px;min-height:22px}
 #panel .sheet .grid2{gap:4px}
 @media(orientation:landscape) and (max-height:520px){#panel .sheet,#tradeWin .sheet,#mg .sheet{max-height:82vh;max-height:82dvh}}
+#misChip{position:absolute;left:50%;transform:translateX(-50%);top:88px;background:linear-gradient(#5aa0e0,#2a6fb0);color:#fff;border-color:#163e66;font-weight:600;border-radius:20px;padding:6px 14px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}#misChip.late{background:linear-gradient(#e0574a,#a3281e);animation:mgPulse 1s ease-in-out infinite}body:has(#dogChip:not(.hidden)) #misChip{top:130px}
+.misSteps{margin:6px 0 2px;padding-left:4px;list-style:none}.misSteps li{font-size:12.5px;margin:2px 0}.misSteps li.done{color:var(--mut);text-decoration:line-through}.misSteps li.cur{font-weight:600}

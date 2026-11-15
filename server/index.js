@@ -1646,6 +1646,163 @@ function holdsHome(a) {
   if (a.rent && a.rent.until > now()) return a.rent.idx;
   return -1;
 }
+// ---- job missions (server/missions.js): a short story per career played out in town, step by step
+const MIS = require('./missions');
+// reachable town tiles from (x, y): [x, y, steps] with min..max steps of walking and at least minE straight-line distance
+function reachFrom(x0, y0, min, max, minE = 0) {
+  const A = D.AREAS.find(r => r.id === 'town'), sx = Math.floor(x0), sy = Math.floor(y0), out = [];
+  const dist = new Map([[sy * 4096 + sx, 0]]), q = [[sx, sy]];
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i], d = dist.get(y * 4096 + x);
+    if (d >= min && d <= max && Math.hypot(x - sx, y - sy) >= minE && D.TILES[y][x] !== 'D' && !D.roomAt(x + .5, y + .5)) out.push([x, y, d]);
+    if (d >= max) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = ny * 4096 + nx;
+      if (nx <= A.x || ny <= A.y || nx >= A.x + A.w - 1 || ny >= A.y + A.h - 1 || dist.has(k) || D.blocked(nx + .5, ny + .5)) continue;
+      dist.set(k, d + 1); q.push([nx, ny]);
+    }
+  }
+  return out;
+}
+const misLook = who => {
+  const [kind, name] = who.includes(':') ? who.split(':') : ['m', who], h = [...name].reduce((s, c) => s * 31 + c.charCodeAt(0) >>> 0, 7);
+  const hair = kind === 'o' ? 'silver' : ['brown', 'black', 'blonde', 'red', 'brown'][h % 5], shirt = D.SHIRTS[h % D.SHIRTS.length];
+  return { name, g: kind === 'f' || (kind === 'o' && h % 2) || (kind === 'k' && h % 2) ? 'f' : 'm', lk: { hair, shirt, pants: ['gray', 'blue', 'black', 'brown'][(h >> 3) % 4] }, kid: kind === 'k' };
+};
+function misPlace(where, prev) {
+  if (where === 'here') return { x: prev.x, y: prev.y, d: 0 };
+  if (where === 'far' || where === 'near') {
+    const opts = where === 'far' ? reachFrom(prev.x, prev.y, 30, 90, 16) : reachFrom(prev.x, prev.y, 6, 18, 4);
+    const c = opts.length ? pick(opts) : [Math.floor(prev.x), Math.floor(prev.y), 0];
+    return { x: c[0] + .5, y: c[1] + .5, d: c[2] };
+  }
+  const st = ST[MIS.PLACES[where] || where]; if (!st) return { x: prev.x, y: prev.y, d: 0 };
+  let x = st.x, y = st.y;
+  if (D.blocked(x, y)) { const n = standNear('town', x, y + .6); if (n) [x, y] = n; }
+  return { x, y, d: Math.round(Math.hypot(x - prev.x, y - prev.y) * 1.4), label: st.label };
+}
+function misBuild(a, car, force) {
+  const list = MIS.M[car]; if (!list) return null;
+  a.misRecent = (a.misRecent || []).filter(i => i < list.length);
+  let idx; do idx = rint(0, list.length - 1); while (a.misRecent.includes(idx) && a.misRecent.length < list.length - 1);
+  if (force != null && list[force]) idx = force;                    // (admins can pick one, for testing)
+  a.misRecent = [...a.misRecent, idx].slice(-6);
+  const [title, icon, story, raw] = list[idx];
+  const out = D.roomAt(a.x, a.y)?.outside; let prev = out ? { x: out.x, y: out.y } : { x: a.x, y: a.y };
+  let est = 40; const steps = [];
+  for (const r of raw) {
+    const k = r[0], pl = misPlace(r[1], prev), st = { k, x: pl.x, y: pl.y };
+    est += (pl.d || Math.hypot(pl.x - prev.x, pl.y - prev.y) * 1.4) / SPEED * 2.3;
+    if (k === 'go') st.label = r[2];
+    else if (k === 'find') { st.icon = r[2]; st.label = r[3]; st.hc = [Math.round(pl.x + rnd(-5, 5)), Math.round(pl.y + rnd(-5, 5)), 10]; est += 25; }
+    else if (k === 'collect') {
+      st.icon = r[3]; st.label = r[4]; const pool = reachFrom(pl.x, pl.y, 0, 10), items = [];
+      for (let i = 0; i < 40 && items.length < r[2] && pool.length; i++) { const c = pick(pool); if (items.every(([x, y]) => Math.hypot(x - c[0] - .5, y - c[1] - .5) >= 2)) items.push([c[0] + .5, c[1] + .5, 0]); }
+      st.items = items; st.hc = [Math.round(pl.x), Math.round(pl.y), 9]; est += items.length * 6;
+    }
+    else if (k === 'deliver') { st.who = misLook(r[2]); st.label = r[3]; }
+    else if (k === 'work') { st.sec = r[2]; st.icon = r[3]; st.label = r[4]; st.prog = 0; est += r[2] * 1.3; }
+    else if (k === 'chase') { st.animal = r[2]; st.label = r[3]; st.cx = pl.x; st.cy = pl.y; st.flee = 0; est += 40; }
+    else if (k === 'escort') {
+      st.who = misLook(r[3]); st.label = r[4]; const to = misPlace(r[2], pl); st.to = { x: to.x, y: to.y }; st.fx = pl.x; st.fy = pl.y; st.phase = 0;
+      est += (to.d || Math.hypot(to.x - pl.x, to.y - pl.y) * 1.4) / 2.4 * 2 + 10; prev = to; steps.push(st); continue;
+    }
+    else if (k === 'talk') { st.who = misLook(r[2]); st.q = r[3]; st.ans = r[4]; st.right = r[5]; st.label = `คุยกับ${st.who.name}`; est += 20; }
+    steps.push(st); prev = { x: st.x, y: st.y };
+  }
+  const limit = Math.round(clamp(est, 120, 720) * 1000), t = now();
+  return { car, idx, title, icon, story, steps, i: 0, t0: t, limit, until: t + limit, trail: [], mtAt: 0 };
+}
+function misView(a) {
+  const m = a.mis; if (!m) return null;
+  const c = m.steps[m.i];
+  const cur = c && { k: c.k, x: c.x, y: c.y, label: c.label, icon: c.icon, who: c.who, items: c.items, sec: c.sec, prog: c.prog, hc: c.hc, animal: c.animal, to: c.to, phase: c.phase, fx: c.fx, fy: c.fy, cx: c.cx, cy: c.cy };
+  return { title: m.title, icon: m.icon, story: m.story, i: m.i, until: m.until, t0: m.t0, steps: m.steps.map((s, j) => ({ k: s.k, label: s.label, done: j < m.i })), cur };
+}
+function misNext(a) {
+  const m = a.mis; m.i++;
+  if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
+  const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
+  const pay = Math.round((110 + 80 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
+  a.mis = null; a.misNext = t + 30000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
+  toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🏅');
+}
+const FX0 = (a, kind) => send(a, { t: 'mfx', kind });
+function misTick(a, t, dt) {
+  const m = a.mis, c = m.steps[m.i];
+  if (t > m.until) { a.mis = null; a.misNext = t + 60000; joy(a, -3); markMe(a); return toast(a, `⏰ หมดเวลา! ภารกิจ "${m.title}" ล้มเหลว`, '😢', false); }
+  if (!c || areaId(a) !== 'town') return;
+  const d = Math.hypot(a.x - c.x, a.y - c.y);
+  const last = m.trail[m.trail.length - 1]; if (!last || Math.hypot(a.x - last[0], a.y - last[1]) > .35) { m.trail.push([a.x, a.y]); if (m.trail.length > 80) m.trail.shift(); }
+  let live = false;
+  switch (c.k) {
+    case 'go': case 'deliver': if (d < 1.6) misNext(a); return;
+    case 'find': if (d < 1.4) misNext(a); return;
+    case 'talk':
+      if (d < 1.8 && !c.asked && t > (c.askAt || 0)) { c.asked = true; send(a, { t: 'mq', who: c.who, q: c.q, ans: c.ans }); }
+      if (d > 4) c.asked = false;
+      return;
+    case 'collect': {
+      let got = false;
+      for (const it of c.items) if (!it[2] && Math.hypot(a.x - it[0], a.y - it[1]) < 1.2) { it[2] = 1; got = true; }
+      if (got) { FX0(a, 'pick'); if (c.items.every(it => it[2])) misNext(a); else markMe(a); }
+      return;
+    }
+    case 'work':
+      if (d < 1.9 && !a.down) { c.prog = Math.min(c.sec, c.prog + dt); live = true; if (c.prog >= c.sec) return misNext(a); }
+      break;
+    case 'chase': {
+      const pd = Math.hypot(a.x - c.cx, a.y - c.cy);
+      if (pd < 1.05) { FX0(a, 'catch'); return misNext(a); }
+      let tx = 0, ty = 0, sp;
+      if (pd < 6) { c.flee += dt; sp = c.flee > 9 ? 1.7 : 2.5; tx = (c.cx - a.x) / pd; ty = (c.cy - a.y) / pd; }
+      else { sp = .55; if (!c.wd || t > c.wdT) { const an = rnd(0, 6.28); c.wd = [Math.cos(an), Math.sin(an)]; c.wdT = t + rnd(1500, 3500); } [tx, ty] = c.wd; }
+      let best = null, bs = -1e9;
+      for (let k = 0; k < 12; k++) {                     // pick the free direction closest to "away"
+        const an = Math.atan2(ty, tx) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * .45 + rnd(-.15, .15), nx = c.cx + Math.cos(an) * sp * dt, ny = c.cy + Math.sin(an) * sp * dt;
+        if (D.blocked(nx, ny) || D.areaAt(nx, ny)?.id !== 'town') continue;
+        const sc = -Math.abs(k) * .3 + (pd < 6 ? Math.hypot(nx - a.x, ny - a.y) * 3 : 0);
+        if (sc > bs) { bs = sc; best = [nx, ny]; }
+      }
+      if (best) { c.cx = best[0]; c.cy = best[1]; } else if (c.wd) c.wdT = 0;
+      live = true; break;
+    }
+    case 'escort': {
+      if (c.phase === 0) { if (Math.hypot(a.x - c.fx, a.y - c.fy) < 1.6) { c.phase = 1; m.trail = [[a.x, a.y]]; markMe(a); } live = true; break; }
+      const fd = Math.hypot(a.x - c.fx, a.y - c.fy); c.wait = fd > 9;
+      if (fd > 1.4 && !c.wait) {                         // follow your footsteps (never through walls)
+        while (m.trail.length > 1 && Math.hypot(m.trail[0][0] - c.fx, m.trail[0][1] - c.fy) < .3) m.trail.shift();
+        const tgt = m.trail[0] || [a.x, a.y];
+        const dx = tgt[0] - c.fx, dy = tgt[1] - c.fy, l = Math.hypot(dx, dy) || 1, st = Math.min(l, 2.5 * dt);
+        c.fx += dx / l * st; c.fy += dy / l * st;
+      }
+      if (Math.hypot(c.fx - c.to.x, c.fy - c.to.y) < 2.2) return misNext(a);
+      live = true; break;
+    }
+  }
+  if (live && t > m.mtAt) { m.mtAt = t + 200; send(a, { t: 'mt', k: c.k, prog: c.prog, cx: c.cx, cy: c.cy, fx: c.fx, fy: c.fy, wait: c.wait ? 1 : 0, phase: c.phase }); }
+}
+function misAct(a, m) {
+  if (m.op === 'start') {
+    if (!a.career || a.career === 'none' || !MIS.M[a.career]) return toast(a, 'ต้องมีอาชีพก่อน ถึงจะรับภารกิจได้', 'ℹ️', false);
+    if (a.mis) return toast(a, 'คุณมีภารกิจค้างอยู่แล้ว', 'ℹ️', false);
+    if ((a.misNext || 0) > now() && !(isAdmin(a) && a.god?.nocd)) return toast(a, `ยังไม่มีงานใหม่ รออีก ${Math.ceil((a.misNext - now()) / 1000)} วินาที`, '⏳', false);
+    const out = D.roomAt(a.x, a.y)?.outside, where = out ? D.areaAt(out.x, out.y)?.id : areaId(a);
+    if (where !== 'town') return toast(a, 'ภารกิจอาชีพทำในตัวเมือง กลับเข้าเมืองก่อนนะ', '🏙️', false);
+    if (a.down) return;
+    if (!spend(a, 5)) return;
+    a.mis = misBuild(a, a.career, isAdmin(a) && m.idx != null ? +m.idx : null); markMe(a);
+    return toast(a, `${a.mis.icon} ภารกิจใหม่: ${a.mis.title} — ${a.mis.story} (เวลา ${Math.round(a.mis.limit / 6000) / 10} นาที)`, '📋');
+  }
+  if (!a.mis) return;
+  if (m.op === 'quit') { a.mis = null; a.misNext = now() + 30000; markMe(a); return toast(a, 'ยกเลิกภารกิจแล้ว', 'ℹ️', false); }
+  if (m.op === 'answer') {
+    const c = a.mis.steps[a.mis.i]; if (!c || c.k !== 'talk' || !c.asked) return;
+    if (+m.i === c.right) { toast(a, `✅ ${c.who.name}: ขอบคุณมาก เข้าใจแล้ว!`, '💬'); return misNext(a); }
+    a.mis.until -= 20000; c.asked = false; c.askAt = now() + 2500; markMe(a);
+    return toast(a, `❌ ${c.who.name} ดูไม่ค่อยพอใจคำตอบนี้... (เสียเวลา 20 วิ) ลองคุยใหม่อีกครั้ง`, '💬', false);
+  }
+}
 // ---- lost-dog cases (police): a dog hides somewhere reachable in town; find it (walk up to it) before the time limit
 function dogSpot(a) {
   const A = D.AREAS.find(r => r.id === 'town'), sx = Math.floor(a.x), sy = Math.floor(a.y);
@@ -2313,6 +2470,7 @@ function meView(a) {
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
+    mis: misView(a), misNext: a.misNext || 0,
     dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
     icu: a.icu ? { kind: a.icu.kind, who: a.icu.who, cpr: a.icu.cpr, zones: a.icu.zones, speeds: a.icu.speeds } : null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
@@ -2603,6 +2761,7 @@ function onMessage(ws, raw) {
     }
     case 'bug': return bugReport(a, m);
     case 'god': return godAct(a, m);
+    case 'mission': return misAct(a, m);
     case 'reset': return resetChar(a, m);
     case 'resign': return resign(a);
     case 'paybills': return payBills(a);
@@ -2810,6 +2969,7 @@ function tick() {
   const flu = ev('flu');
   for (const a of online.values()) {
     const indoors = !!D.roomAt(a.x, a.y);
+    if (a.mis) misTick(a, t, dt);
     if (godLock(a)) {   // god mode: locked stats
       a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
       if ((a.dz || []).length) { a.dz = []; sendRoster(); }

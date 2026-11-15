@@ -337,6 +337,9 @@ function handle(m) {
     }
     case 'bite': fishBiteT = performance.now(); FX.play('bite'); if (navigator.vibrate) navigator.vibrate([60, 40, 90]); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 1.1); FX.burst(bobber.x, bobber.y, '#dff4ff', 10); } break;
     case 'hooked': fightStart(m.fight); break;
+    case 'mt': misLive = m; break;
+    case 'mq': misAsk(m); break;
+    case 'mfx': if (m.kind === 'pick') { FX.play('pop'); } else if (m.kind === 'catch') { FX.play('pet', ['squeak', 1]); FX.play('chime'); } else FX.play('ding'); if (navigator.vibrate) navigator.vibrate(25); break;
     case 'req': showReq(m); break;
     case 'ring': showRing(m); break;
     case 'call': {
@@ -1038,6 +1041,7 @@ function draw(t) {
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);   // helicopters fly over the roofs
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
+  misEnts(ents, vis);
   if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
@@ -1057,6 +1061,7 @@ function draw(t) {
     }
     else if (k === 5) drawCar(e, X, Y);
     else if (k === 6) drawPet(e, X, Y, t);
+    else if (k === 7) drawMisThing(e, X, Y, t);
     else drawPlayer(e, X, Y, t);
   }
   if (A?.yard) drawYardLocks(A, X, Y, t);
@@ -1073,7 +1078,7 @@ function draw(t) {
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
   }
-  drawBobber(X, Y, t);
+  drawBobber(X, Y, t); drawMisGuide(X, Y, t);
   drawSirens(X, Y);
   FX.draw(ctx, X, Y, TS);
   drawGuide(X, Y, t);
@@ -1205,6 +1210,119 @@ function shopPets(room) {
 }
 const PET_VOICE = { shiba: 'dog', golden: 'bigdog', corgi: 'dog', pug: 'dog', husky: 'bigdog', dalmatian: 'bigdog', poodle: 'dog', pom: 'dog', chihuahua: 'dog', tabby: 'cat', blackcat: 'cat', whitecat: 'cat', siamese: 'cat', calico: 'cat', britcat: 'cat', oddeye: 'cat',
   chick: 'bird', duck: 'duck', penguin: 'duck', rabbit: 'squeak', lop: 'squeak', hamster: 'squeak', guinea: 'squeak', hedgehog: 'squeak', squirrel: 'squeak', fox: 'dog', redpanda: 'squeak', panda: 'low', capybara: 'low', turtle: 'low', dragon: 'roar', unicorn: 'magic' };
+// ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
+// the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
+let misLive = null, MISNPC = null;
+const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
+function misBox() {
+  const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
+  if (me.career === 'none') return '';
+  if (!m) return `<div class="jobbox">📋 <b>ภารกิจอาชีพ</b> · สุ่มงานจริงในเมือง 20 แบบของ${esc(G.careers[me.career]?.name || '')} (เดินส่งของ ตามหา เก็บของ ไล่จับ พาคนไป คุยแก้ปัญหา) ค่าตอบแทนตามเวลาที่ใช้ ทำเร็วได้โบนัส · หมดเวลา = ล้มเหลว${cd > 0 ? `<br><small>งานใหม่เข้าในอีก ${cd} วินาที</small>` : ''}<br>${B('📋 รับภารกิจ (⚡5)', { t: 'mission', op: 'start' }, 'primary', cd > 0)}</div>`;
+  const steps = m.steps.map((s, j) => `<li class="${s.done ? 'done' : j === m.i ? 'cur' : ''}">${s.done ? '✅' : j === m.i ? '👉' : '▫️'} ${MIS_K[s.k] || ''} ${esc(s.label)}</li>`).join('');
+  return `<div class="jobbox">${m.icon} <b>${esc(m.title)}</b> · เหลือเวลา <b class="miscd"></b><br><small>${esc(m.story)}</small><ul class="misSteps">${steps}</ul>${B('ยกเลิกภารกิจ', { t: 'mission', op: 'quit' })}</div>`;
+}
+function paintMisChip() {
+  const c = $('#misChip'), m = me?.mis;
+  if (!m) return c.classList.add('hidden');
+  const left = Math.max(0, Math.ceil((m.until - Date.now() - clockOff) / 1000)), tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  const cur = m.cur; let extra = '';
+  if (cur?.k === 'collect') extra = ` (${cur.items.filter(i => i[2]).length}/${cur.items.length})`;
+  if (cur?.k === 'work') extra = ` ${Math.floor(((misLive?.k === 'work' ? misLive.prog : cur.prog) || 0) / cur.sec * 100)}%`;
+  if (cur?.k === 'escort' && misLive?.wait) extra = ' · รอด้วย!';
+  c.classList.remove('hidden'); c.classList.toggle('late', left < 30);
+  c.textContent = `${m.icon} ${cur ? (MIS_K[cur.k] || '') + ' ' + cur.label : m.title}${extra} · ${tm}`;
+  document.querySelectorAll('.miscd').forEach(el => { el.textContent = tm; });
+}
+setInterval(paintMisChip, 400);
+$('#misChip').onclick = () => openPanel({ kind: 'career' });
+function misAsk(m) {
+  MISNPC = misPerson(m.who, 0, 0);
+  dialog({ name: m.who.name, npc: 'misnpc', lines: [m.q], choices: m.ans.map((a, i) => ({ label: a, fn: () => { dialogClose(); send({ t: 'mission', op: 'answer', i }); } })) });
+}
+function misPerson(w, x, y) { return { id: 'misnpc', staff: 1, career: '', c: '', of: '', g: w.g, lk: w.lk, name: w.name, short: w.name, x, y, rx: x, ry: y, f: 6, dz: [], kid: w.kid }; }
+const misAnim = {};
+function misEnts(ents, vis) {
+  const m = me?.mis, c = m?.cur, P0 = P.get(myId);
+  if (!c || !P0 || areaOf(P0.x, P0.y)?.id !== 'town') { MISNPC = null; return; }
+  const near = (x, y, r) => Math.hypot(P0.rx - x, P0.ry - y) < r;
+  if (c.k === 'deliver' || c.k === 'talk' || (c.k === 'escort')) {
+    let x = c.x, y = c.y;
+    if (c.k === 'escort') { const L = misLive?.k === 'escort' ? misLive : c; x = L.fx ?? c.fx; y = L.fy ?? c.fy; }
+    if (!MISNPC || MISNPC.name !== c.who.name) MISNPC = misPerson(c.who, x, y);
+    MISNPC.x = x; MISNPC.y = y; MISNPC.rx += (x - MISNPC.rx) * .2; MISNPC.ry += (y - MISNPC.ry) * .2;
+    if (Math.hypot(x - MISNPC.rx, y - MISNPC.ry) > 3) { MISNPC.rx = x; MISNPC.ry = y; }
+    const dx = x - (MISNPC.px ?? x), dy = y - (MISNPC.py ?? y); if (Math.hypot(dx, dy) > .01) MISNPC.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8; MISNPC.px = x; MISNPC.py = y;
+    if (vis(MISNPC.rx, MISNPC.ry, 3)) ents.push([MISNPC.ry + .3, 4, MISNPC]);
+    if (vis(MISNPC.rx, MISNPC.ry, 3)) ents.push([MISNPC.ry + .31, 7, { k: 'mark', x: MISNPC.rx, y: MISNPC.ry, wait: c.k === 'escort' && misLive?.wait, ph: c.phase }]);
+  } else MISNPC = null;
+  if (c.k === 'find' && near(c.x, c.y, 9)) ents.push([c.y + .2, 7, { k: 'item', x: c.x, y: c.y, icon: c.icon, glow: 1 }]);
+  if (c.k === 'collect') for (const it of c.items) if (!it[2] && near(it[0], it[1], 11)) ents.push([it[1] + .2, 7, { k: 'item', x: it[0], y: it[1], icon: c.icon }]);
+  if (c.k === 'work') ents.push([-1e8, 7, { k: 'spot', x: c.x, y: c.y, icon: c.icon }]);
+  if (c.k === 'go') ents.push([c.y + .2, 7, { k: 'beacon', x: c.x, y: c.y }]);
+  if (c.k === 'chase') {
+    const L = misLive?.k === 'chase' ? misLive : c, key = m.t0 + ':' + m.i;
+    let q = misAnim[key]; if (!q) { for (const k in misAnim) delete misAnim[k]; q = misAnim[key] = { id: c.animal, x: L.cx, y: L.cy, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 380, idleAt: 0, shop: 1 }; }
+    const dx = L.cx - q.x, dy = L.cy - q.y, d = Math.hypot(dx, dy);
+    q.x += dx * .25; q.y += dy * .25; q.moving = d > .02;
+    if (q.moving) { q.phase += d * 2.2; if (Math.abs(dx) > Math.abs(dy)) { q.view = 'side'; q.flip = dx < 0; } else q.view = dy < 0 ? 'up' : 'down'; } else if (performance.now() > q.idleAt) { q.idleAt = performance.now() + 1500 + Math.random() * 2000; petPlay(q, false); }
+    if (vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]);
+  }
+}
+function drawMisThing(e, X, Y, t) {
+  const px = e.x * TS + X, py = e.y * TS + Y;
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (e.k === 'item') {
+    const b = Math.sin(t / 300 + e.x) * 3;
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + TS * .3, TS * .22, TS * .07, 0, 0, 7); ctx.fill();
+    if (e.glow) { ctx.fillStyle = `rgba(255,236,140,${.25 + .15 * Math.sin(t / 200)})`; ctx.beginPath(); ctx.arc(px, py, TS * .45, 0, 7); ctx.fill(); }
+    ctx.font = `${Math.round(TS * .5)}px serif`; ctx.fillText(e.icon, px, py + b);
+  } else if (e.k === 'spot') {
+    const p = (misLive?.k === 'work' ? misLive.prog : me.mis?.cur?.prog) || 0, sec = me.mis?.cur?.sec || 1;
+    ctx.strokeStyle = 'rgba(255,214,90,.9)'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]); ctx.lineDashOffset = -t / 60;
+    ctx.beginPath(); ctx.ellipse(px, py + TS * .25, TS * 1.5, TS * .6, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,214,90,.15)'; ctx.fill();
+    ctx.font = `${Math.round(TS * .5)}px serif`; ctx.fillText(e.icon, px, py - TS * .3 + Math.sin(t / 250) * 3);
+    if (p > 0) { ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(px, py - TS * 1.1, TS * .3, 0, 7); ctx.stroke(); ctx.strokeStyle = '#7fe08a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py - TS * 1.1, TS * .3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, p / sec)); ctx.stroke(); }
+  } else if (e.k === 'beacon') {
+    const g = ctx.createLinearGradient(0, py - TS * 3, 0, py); g.addColorStop(0, 'rgba(255,220,90,0)'); g.addColorStop(1, 'rgba(255,220,90,.45)');
+    ctx.fillStyle = g; ctx.fillRect(px - TS * .35, py - TS * 3, TS * .7, TS * 3);
+    ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(px, py, TS * .7 + Math.sin(t / 250) * 3, TS * .28, 0, 0, 7); ctx.stroke();
+  } else if (e.k === 'mark') {
+    ctx.font = `800 ${Math.round(TS * .5)}px sans-serif`; ctx.fillStyle = e.wait ? '#ff6b5a' : '#ffd34d'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
+    const s = e.wait ? '⏳' : e.ph === 1 ? '' : '!', y = py - TS * 2.05 + Math.sin(t / 220) * 3;
+    if (s) { ctx.strokeText(s, px, y); ctx.fillText(s, px, y); }
+    if (e.wait) { ctx.font = `600 ${Math.round(TS * .26)}px 'Mitr',sans-serif`; ctx.fillStyle = '#fff'; ctx.strokeText('รอด้วย!', px, y - TS * .45); ctx.fillText('รอด้วย!', px, y - TS * .45); }
+  }
+  ctx.restore();
+}
+// where to go now: escort -> the destination once picked up; find/collect -> the hint ring's centre until you are close
+function misTarget() {
+  const c = me?.mis?.cur; if (!c) return null;
+  if (c.k === 'escort') return (misLive?.phase ?? c.phase) === 1 ? c.to : { x: misLive?.fx ?? c.fx, y: misLive?.fy ?? c.fy };
+  if (c.k === 'chase') return { x: misLive?.cx ?? c.cx, y: misLive?.cy ?? c.cy };
+  if (c.k === 'collect') { const it = c.items.find(i => !i[2]); return it ? { x: it[0], y: it[1], vague: 1 } : null; }
+  if (c.k === 'find') return { x: c.hc[0], y: c.hc[1], vague: 1 };
+  return { x: c.x, y: c.y };
+}
+function drawMisGuide(X, Y, t) {
+  const s = P.get(myId), tg = misTarget(); if (!s || !tg || areaOf(s.x, s.y)?.id !== 'town') return;
+  const dx = tg.x - s.rx, dy = tg.y - s.ry, d = Math.hypot(dx, dy); if (d < (tg.vague ? 7 : 3)) return;
+  const a = Math.atan2(dy, dx), r = TS * 1.05, cx = s.rx * TS + X + Math.cos(a) * r, cy = s.ry * TS + Y + TS * .2 + Math.sin(a) * r * .6;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+  ctx.fillStyle = tg.vague ? 'rgba(255,190,60,.9)' : 'rgba(90,170,255,.95)'; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(TS * .3, 0); ctx.lineTo(-TS * .12, -TS * .18); ctx.lineTo(-TS * .04, 0); ctx.lineTo(-TS * .12, TS * .18); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  ctx.font = `700 ${Math.round(TS * .24)}px 'Mitr',sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.fillStyle = '#fff';
+  const lx = s.rx * TS + X + Math.cos(a) * r * 1.55, ly = s.ry * TS + Y + TS * .2 + Math.sin(a) * r * .95; const txt = `${Math.round(d)} ม.`;
+  ctx.strokeText(txt, lx, ly); ctx.fillText(txt, lx, ly);
+}
+function misMini(g, A, mapId) {
+  const c = me?.mis?.cur; if (!c || mapId !== 'town') return;
+  const tg = misTarget(); if (!tg) return;
+  const blink = (performance.now() / 350 | 0) % 2;
+  if (c.hc && (c.k === 'find' || c.k === 'collect')) { g.strokeStyle = blink ? '#5ab0ff' : '#2a7fd0'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((c.hc[0] - A.x) * 2, (c.hc[1] - A.y) * 2, c.hc[2] * 2, 0, 7); g.stroke(); g.setLineDash([]); }
+  else { const x = (tg.x - A.x) * 2, y = (tg.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); g.fillStyle = blink ? '#2a7fd0' : '#5ab0ff'; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); }
+}
 // the police case's lost dog: sits out in town (only the officer on the case sees it), looks around, hops, barks when you are close
 let lostQ = null;
 function lostDog() {
@@ -1544,6 +1662,7 @@ function drawMini() {
     g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2);
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
+  misMini(g, A, mapId);
   if (me?.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc; g.strokeStyle = (performance.now() / 400 | 0) % 2 ? '#ffd23a' : '#ff9f1a'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((hx - A.x) * 2, (hy - A.y) * 2, hr * 2, 0, 7); g.stroke(); g.setLineDash([]); g.font = '16px serif'; g.textAlign = 'center'; g.fillText('🐕', (hx - A.x) * 2, (hy - A.y) * 2 + 6); }
   { const q = PETST.get(myId); if (q && mapOf(areaOf(q.x, q.y)?.id) === mapId) { const mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 4.5, 0, 7); g.fill(); g.fillStyle = '#ff7eb0'; g.beginPath(); g.arc(mx, my, 3, 0, 7); g.fill(); } }   // your pet: a pink dot
   { // you: drawn last, bigger, with a pulsing ring so you can always find yourself
@@ -1841,7 +1960,7 @@ function dialog(opts) {
   d.querySelector('.dlgX').onclick = () => dialogClose();
   d.classList.remove('hidden');
   const c = d.querySelector('[data-dlg]');
-  if (c) whenChars(() => { const n = STAFF.find(x => x.id === c.dataset.dlg) || P.get(+c.dataset.dlg); if (!n) return; const g = c.getContext('2d'); g.clearRect(0, 0, 84, 84); drawCharTo(g, n, 42, 150, 150 / CH_ATLAS.h, 'front', 0); });
+  if (c) whenChars(() => { const n = STAFF.find(x => x.id === c.dataset.dlg) || (c.dataset.dlg === 'misnpc' ? MISNPC : null) || P.get(+c.dataset.dlg); if (!n) return; const g = c.getContext('2d'); g.clearRect(0, 0, 84, 84); drawCharTo(g, n, 42, 150, 150 / CH_ATLAS.h, 'front', 0); });
   dlgRender();
 }
 function dialogClose() { dlgQ = null; $('#dlg')?.classList.add('hidden'); }
@@ -2161,6 +2280,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15v', d: '15 พ.ย. (รอบ 22)', items: [
+    '📋 <b>ภารกิจอาชีพ! ทุกอาชีพมีงาน 20 แบบ สุ่มมาให้ทำ</b> เล่นกันจริงๆ ในเมือง ไม่ใช่มินิเกม: เดินไปส่งเอกสาร ตามหาของหาย เก็บของที่กระจาย ส่งของถึงมือคน ยืนทำงานจนเสร็จ ไล่จับสัตว์ที่หนี พาคนแก่/คนเจ็บเดินไปส่ง และคุยตอบคำถามให้ถูก',
+    '🧭 รับภารกิจที่เมนู 💼 งาน (⚡5) มีลูกศรชี้ทางพร้อมระยะ จุดบนมินิแมพ ป้ายบอกขั้นตอนและเวลาที่เหลือ · ค่าตอบแทนตามเวลาที่ใช้ ทำเสร็จก่อนครึ่งเวลาโบนัส +25% · หมดเวลา = ล้มเหลว · ตอบคำถามผิดเสียเวลา 20 วิ'] },
   { v: '2026-11-15u', d: '15 พ.ย. (รอบ 21)', items: [
     '🎣 <b>ตกปลาแบบใหม่ สมจริง ไม่มีแถบมินิเกมแล้ว</b> ยืนริมน้ำแล้วกด<b>ปุ่มใหญ่</b>เหวี่ยงเบ็ดได้เลย ทุ่นลอยอยู่ในน้ำจริง',
     '🫧 ทุ่นไหวเบาๆ = ปลาแค่แตะเหยื่อ (ตวัดตอนนี้ปลาตกใจหนี) · <b>ทุ่นจมเมื่อไหร่ กดตวัดทันที</b>',
@@ -2466,7 +2588,7 @@ function renderPanel(p) {
         return itemRowRaw(c.icon, `${c.name}${me.career === id ? ' <span class="tag">ปัจจุบัน</span>' : ''}`, `สมัคร: คุยกับ <b>${esc(stf?.short || 'เจ้าหน้าที่')}</b> ที่${where?.label || '-'}${miss.length ? ` · <span style="color:var(--bad)">ต้องมี ${miss.join(', ')}</span>` : ''}<br>${c.desc}`, B('🚶 เดินไปสมัคร', { fn: 'guide', key: stf ? stf.st : c.where }, 'good'));
       }).join('');
       const starter = `<div class="jobbox">💡 <b>เพิ่งเริ่มเล่น ยังไม่มีเงิน?</b> ไปซื้อเบ็ด ${money(G.fishing.rod)} กับน้าเล็กที่สมาคมประมง แล้ว<b>ตกปลาขาย</b> ทำได้ทุกคนทุกเวลาไม่ต้องสมัครงาน ${me.rod ? '' : B('🎣 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good')}</div>`;
-      return `<h2>💼 งานของฉัน</h2>
+      return `<h2>💼 งานของฉัน</h2>${misBox()}
         <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(+me.jx.cur).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
         ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
