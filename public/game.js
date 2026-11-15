@@ -2,6 +2,7 @@
 (() => {
 const $ = s => document.querySelector(s);
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
+const job = c => me?.career === c || !!me?.admin;   // admins can do every job's work
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // ---- pixel icons: emoji anywhere in the page (panels, buttons, toasts, the HUD) are swapped for the game's own pixel-art
 // icons (public/assets/icons.webp). Text drawn on the canvas keeps its emoji.
@@ -612,12 +613,12 @@ function paintHud() {
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
   const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.add('hidden'); if (!$('#mg').classList.contains('hidden')) mgClose();   // (mini-games were removed)
   $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
-  $('#begBtn').classList.toggle('hidden', me.career !== 'beggar');
+  $('#begBtn').classList.toggle('hidden', !job('beggar'));
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
   $('#begBtn').innerHTML = me.pose === 'beg' ? '<span>🧍</span><small>ลุก</small>' : '<span>🥣</span><small>ขอทาน</small>';
 
   paintNav();
-  $('#phoneBtn').classList.toggle('has', me.career === 'rider' && (me.jobs || []).some(j => j.state === 'open'));
+  $('#phoneBtn').classList.toggle('has', job('rider') && (me.jobs || []).some(j => j.state === 'open'));
   const dn = $('#downView');
   if (me.down) {
     dn.classList.remove('hidden');
@@ -955,7 +956,7 @@ function onAction() {
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
-  if (near.type === 'trash' && me.career === 'beggar') { if (t < actCd) return; actCd = t + 1500; return doAct(near.id, 'run'); }
+  if (near.type === 'trash' && job('beggar')) { if (t < actCd) return; actCd = t + 1500; return doAct(near.id, 'run'); }
   if (near.type === 'trash') return toast('ถังขยะ · ขอทานวิ่งเก็บขยะเริ่มจากตรงนี้', '🗑️', false);
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
@@ -1539,9 +1540,9 @@ let misLive = null, MISNPC = null;
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
-  if (me.career === 'none') return '';
+  if (me.career === 'none' && !me.admin) return '';
   if (m?.kind === 'icu' && panel?.kind === 'career') return '<div class="jobbox">🚨 กำลังทำเคสฉุกเฉินที่ ICU</div>';
-  if (!m) return `<div class="jobbox">📋 <b>ภารกิจอาชีพ</b> · สุ่มงานจริงในเมือง 20 แบบของ${esc(G.careers[me.career]?.name || '')} (เดินส่งของ ตามหา เก็บของ ไล่จับ พาคนไป คุยแก้ปัญหา) ค่าตอบแทนตามเวลาที่ใช้ ทำเร็วได้โบนัส · หมดเวลา = ล้มเหลว${cd > 0 ? `<br><small>งานใหม่เข้าในอีก ${cd} วินาที</small>` : ''}<br>${B('📋 รับภารกิจ (⚡5)', { t: 'mission', op: 'start' }, 'primary', cd > 0)}</div>`;
+  if (!m) return `<div class="jobbox">📋 <b>ภารกิจอาชีพ</b> · สุ่มงานจริงในเมือง 20 แบบของ${esc(G.careers[me.career]?.name || '')} (เดินส่งของ ตามหา เก็บของ ไล่จับ พาคนไป คุยแก้ปัญหา) ค่าตอบแทนตามเวลาที่ใช้ ทำเร็วได้โบนัส · หมดเวลา = ล้มเหลว${cd > 0 ? `<br><small>งานใหม่เข้าในอีก ${cd} วินาที</small>` : ''}<br>${me.admin ? `<div class="grid2">${['office', 'farmer', 'merchant', 'chef', 'doctor', 'police', 'beggar', 'rider'].map(c => B(`${G.careers[c].icon} ${G.careers[c].name}`, { t: 'mission', op: 'start', car: c }, c === me.career ? 'primary' : 'good')).join('')}</div><small>👑 แอดมินเลือกภารกิจของอาชีพไหนก็ได้</small>` : B('📋 รับภารกิจ (⚡5)', { t: 'mission', op: 'start' }, 'primary', cd > 0)}</div>`;
   const steps = m.steps.map((s, j) => `<li class="${s.done ? 'done' : j === m.i ? 'cur' : ''}">${s.done ? '✅' : j === m.i ? '👉' : '▫️'} ${MIS_K[s.k] || ''} ${esc(s.label)}</li>`).join('');
   return `<div class="jobbox">${m.icon} <b>${esc(m.title)}</b> · เหลือเวลา <b class="miscd"></b><br><small>${esc(m.story)}</small><ul class="misSteps">${steps}</ul>${B('ยกเลิกภารกิจ', { t: 'mission', op: 'quit' })}</div>`;
 }
@@ -2629,10 +2630,13 @@ function applyBox(career, st) {
     ${me.career !== 'none' ? `<div class="sub">ตอนนี้คุณเป็น${G.careers[me.career].name} สมัครงานนี้ = ลาออกจากงานเดิม</div>` : ''}
     ${B(`✍️ สมัครงาน${c.name}`, { t: 'act', st, a: 'apply', career }, 'primary big', miss.length > 0 || me.jobWait > 0)}</div>`;
 }
-const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
+const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16c', d: '16 พ.ย. (รอบ 3)', items: [
+    '🪪 รูปในหน้า<b>ข้อมูลผู้เล่น</b>เป็นวงกลมแบบเดียวกับแถบสถานะ (ทั้งของเราและของคนอื่น)',
+    '👑 <b>แอดมินทำงานได้ทุกอาชีพ</b> โดยไม่ต้องเปลี่ยนงาน (ประมูล ทำอาหาร ICU เคสหมาหาย วิ่งเก็บขยะ แย่งลูกค้า จับโจร รักษาคนไข้ ภารกิจของทุกอาชีพ ฯลฯ)'] },
   { v: '2026-11-16b', d: '16 พ.ย. (รอบ 2)', items: [
     '🖼️ <b>กรอบรูปโปรไฟล์ 36 แบบ!</b> กดรูปโปรไฟล์ → 🖼️ กรอบรูป · กรอบโลหะและอัญมณี (ไม้ เงิน ทอง แพลทินัม แหวนเพชร ทับทิม มรกต ไพลิน …) และกรอบน่ารัก (ซากุระ ทานตะวัน แมว กระต่าย น้องหมา ลูกกวาด …) ซื้อแล้วใส่ได้เลย ทุกคนเห็นในโปรไฟล์',
     '✨ <b>กรอบพิเศษ 12 แบบ เรืองแสงเคลื่อนไหว</b> แต่ละแบบสีและจังหวะต่างกัน (มงกุฎราชา ปีกเทวดา ปีศาจ เปลวเพลิง น้ำแข็ง สายฟ้า กาแล็กซี สายรุ้ง นีออน ลายไทย ดอกบัว สายน้ำ) · ตอนนี้ล็อกไว้ก่อน เร็วๆ นี้!'] },
@@ -2753,7 +2757,7 @@ function renderPanel(p) {
     case 'news': return newsHtml();
     case 'icu': {
       const wait = Math.max(0, Math.ceil(((me.icuNext || 0) - Date.now() - clockOff) / 1000));
-      if (me.career !== 'doctor') return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เฉพาะแพทย์เท่านั้น · หมอรับเคสฉุกเฉินที่นี่ แล้วลงมือรักษาจริงในห้อง</div>`;
+      if (!job('doctor')) return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เฉพาะแพทย์เท่านั้น · หมอรับเคสฉุกเฉินที่นี่ แล้วลงมือรักษาจริงในห้อง</div>`;
       const pay = G.icu.pay[Math.min(me.lv, G.icu.pay.length) - 1] * 2.2;
       const cur = me.mis?.kind === 'icu';
       return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เคสฉุกเฉินสุ่ม 8 แบบ (หัวใจหยุดเต้น ผ่าตัดไส้ติ่ง หอบหืด กระดูกหัก เสียเลือดมาก แพ้รุนแรง ไข้เลือดออก แผลลึก) · เดินไปหยิบยา/อุปกรณ์ในห้อง แล้วยืนรักษาคนไข้ที่เตียง ICU จนเสร็จภายในเวลา · ~${money(pay)} ต่อเคส ทำเร็ว +25% · ⚡${G.icu.energy}</div>
@@ -2763,14 +2767,14 @@ function renderPanel(p) {
       const l = Math.min(me.career === 'office' ? me.lv : 1, G.titles.length), wage = G.wages[l - 1];
       const o = me.office, today = dayNow();
       let status = '';
-      if (me.career === 'office') {
+      if (job('office')) {
         const state = o && o.day === today ? (o.closed === today ? '✅ เลิกงานแล้ว' : `🟢 ทำงานอยู่ · ส่งไปแล้ว ${o.n || 0} งาน`) : '⚪ ยังไม่ได้เริ่มงานวันนี้';
         status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าส่งเอกสาร <b>~${money(Math.round(wage * .3))}–${money(Math.round(wage * .95))}</b>/งาน (ยิ่งไกลยิ่งได้มาก)<br>วันนี้: ${state}</div>
           ${me.docjob ? `<div class="jobbox ok">📄 กำลังส่งเอกสารไปที่ <b>${esc(STN(me.docjob.dest)?.label || '')}</b> · ค่าส่ง ~${money(me.docjob.pay)}${B('📍 นำทาง', { fn: 'guide', key: me.docjob.dest }, 'good')}</div>` : B('📄 รับงานส่งเอกสาร', { t: 'act', st, a: 'job' }, 'primary big')}
           <div class="sub" style="margin-top:8px">📄 รับซองเอกสารที่นี่ เดินไปส่งให้ถึงหน้าอาคารปลายทาง ได้เงินทันที (ไกลได้มาก) แล้วกลับมารับงานต่อ · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} เริ่มเมื่อไหร่ก็ได้ ไม่มีมาสาย · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าส่ง x${G.shift.otMul})</div>
           ${B('📦 ลาออก', { t: 'resign' }, 'warn')}`;
       }
-      return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${me.career === 'office' ? '' : staffHint('office')}`;
+      return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${job('office') ? '' : staffHint('office')}`;
     }
     case 'sdesk': {
       const L = me.enrolled && G.licenses[me.enrolled];
@@ -2816,7 +2820,7 @@ function renderPanel(p) {
     }
     case 'warehouse': {
       const c = me.auc, head = `<h2>🔨 โรงประมูล</h2><div class="sub">${hoursTxt('warehouse')} · ล็อตละ 20 วินาที ยื่นซองประมูลได้ครั้งเดียว (แก้ราคาได้ก่อนหมดเวลา) แข่งกับคู่แข่ง 3 คน · ใครเสนอสูงสุดชนะและจ่ายตามที่เสนอ · ได้ของมาแล้วโรงประมูลรับซื้อคืนในราคาจริงทันที: <b>ต่ำกว่าราคาจริง = กำไร</b> สูงกว่า = ขาดทุน</div>`;
-      if (me.career !== 'merchant') return `${head}<div class="jobbox">เฉพาะ<b>พ่อค้า</b> · สมัครได้ที่นี่</div>`;
+      if (!job('merchant')) return `${head}<div class="jobbox">เฉพาะ<b>พ่อค้า</b> · สมัครได้ที่นี่</div>`;
       const lot = c ? `<div class="aucLot"><div class="aucIco">${c.icon}</div><div><b>${esc(c.name)}</b><div class="aucItems">${Object.entries(c.items).map(([id, q]) => `<span>${G.items[id].icon} ${esc(G.items[id].name)} ×${q}</span>`).join('')}</div><small>สภาพ: <b>${c.cond}</b> · 🧐 ผู้ประเมินว่าราวๆ <b>${money(c.lo)} – ${money(c.hi)}</b></small></div></div>` : '';
       if (!c || c.stage === 'done' && !c.result) return `${head}<div class="jobbox">ยังไม่มีล็อตบนเวที</div>${B('🔨 เปิดล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
       if (c.stage === 'bid') {
@@ -2829,10 +2833,10 @@ function renderPanel(p) {
       const iWon = c.result[0]?.[2], verdict = iWon ? (c.net >= 0 ? `<div class="aucVerdict good">🎉 คุณชนะ! กำไร <b>${money(c.net)}</b></div>` : `<div class="aucVerdict bad">😵 ชนะแต่จ่ายแพงไป ขาดทุน <b>${money(-c.net)}</b></div>`) : `<div class="aucVerdict">${esc(c.win)} ได้ไป${c.my ? ' · คุณไม่ได้เสียเงิน' : ''}</div>`;
       return `${head}${lot}<div class="aucReal">💎 มูลค่าจริง <b>${money(c.real)}</b></div><div class="aucResList">${rows}</div>${verdict}${B('🔨 ล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
     }
-    case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${me.career === 'rider' ? `<div class="jobbox">🧡 <b>แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่งจะโผล่มาแย่งลูกค้าเป็นพักๆ (จุดสีส้มบนมินิแมพ) วิ่งไปชนแล้วสู้กันแบบผลัดกันเลือกท่า ชนะได้ค่าส่ง+ทิป · ${me.rival ? `ตอนนี้ ${esc(me.rival.name)} อยู่ในเมือง!` : B('🔎 ออกตามหาไรเดอร์ส้ม', { t: 'rbseek' }, 'primary')}</div>` + riderJobs() : ''}`;
+    case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${job('rider') ? `<div class="jobbox">🧡 <b>แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่งจะโผล่มาแย่งลูกค้าเป็นพักๆ (จุดสีส้มบนมินิแมพ) วิ่งไปชนแล้วสู้กันแบบผลัดกันเลือกท่า ชนะได้ค่าส่ง+ทิป · ${me.rival ? `ตอนนี้ ${esc(me.rival.name)} อยู่ในเมือง!` : B('🔎 ออกตามหาไรเดอร์ส้ม', { t: 'rbseek' }, 'primary')}</div>` + riderJobs() : ''}`;
     case 'restaurant': {
       const rows = Object.entries(G.items).filter(([, it]) => it.menu).map(([id, it]) => itemRow(id, `<div class="col2">${B(`กินเลย ${money(it.base)}`, { t: 'act', st, a: 'eat', item: id }, 'good')}${B('🥡 ใส่กระเป๋า', { t: 'act', st, a: 'buy', item: id, qty: 1 })}</div>`, `${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('');
-      const pick = me.career === 'rider' ? (() => { const n = (me.jobs || []).filter(j => j.mine && j.state === 'taken').length; return `<div class="jobbox">${B(n ? `🥡 รับอาหาร ${n} ออเดอร์` : 'ยังไม่มีออเดอร์ให้รับ', { t: 'act', st, a: 'pickup' }, 'primary big', !n)}</div>`; })() : '';
+      const pick = job('rider') ? (() => { const n = (me.jobs || []).filter(j => j.mine && j.state === 'taken').length; return `<div class="jobbox">${B(n ? `🥡 รับอาหาร ${n} ออเดอร์` : 'ยังไม่มีออเดอร์ให้รับ', { t: 'act', st, a: 'pickup' }, 'primary big', !n)}</div>`; })() : '';
       return `<h2>🍜 ร้านอาหาร</h2><div class="sub">${hoursTxt('restaurant')} · <b>ซื้อตุนใส่กระเป๋า</b>ไว้กินทีหลังได้ (กดใช้ในกระเป๋า 🎒) · สั่งให้มาส่งได้ผ่านแอพในมือถือ 📱 · ของราคาถูกอาจทำให้🤢อาหารเป็นพิษ</div>${pick}<div class="list">${rows}</div>`;
     }
     case 'kitchen': {
@@ -2842,21 +2846,21 @@ function renderPanel(p) {
         return itemRow(r.id, B(me.cook ? 'กำลังทำ...' : '🔥 รับออเดอร์ ⚡12', { t: 'act', st, a: 'cook', rid: r.id }, ok && !me.cook ? 'good' : '', !ok || !!me.cook), `${ing} · ${cookSteps(r)} · ขาย ~${money(out.base)}`);
       }).join('');
       const ings = [...new Set(G.recipes.flatMap(r => Object.keys(r.in)))].map(i => { const it = G.items[i], c = Math.ceil(it.base * 1.3); return itemRow(i, `<div class="col2">${B(`ซื้อ ${money(c)}`, { t: 'act', st, a: 'buy', item: i, qty: 1 }, '', me.money < c)}${B('x5', { t: 'act', st, a: 'buy', item: i, qty: 5 }, '', me.money < c * 5)}</div>`, `มีในกระเป๋า ${me.inv[i] || 0}`); }).join('');
-      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ปรุงอาหารขายได้แพงกว่าวัตถุดิบหลายเท่า · ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง (ถูกกว่า) หรือซื้อที่ครัวนี้ (แพงกว่า 30%)</div>${staffHint('chef')}${me.career === 'chef' ? `<h3>🍳 เมนู</h3><div class="list">${rows}</div><h3>🛒 วัตถุดิบ</h3><div class="list">${ings}</div>` : ''}`;
+      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ปรุงอาหารขายได้แพงกว่าวัตถุดิบหลายเท่า · ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง (ถูกกว่า) หรือซื้อที่ครัวนี้ (แพงกว่า 30%)</div>${staffHint('chef')}${job('chef') ? `<h3>🍳 เมนู</h3><div class="list">${rows}</div><h3>🛒 วัตถุดิบ</h3><div class="list">${ings}</div>` : ''}`;
     }
     case 'hospital': {
       const dz = me.dz || [], price = dz.length ? 1500 + 500 * (dz.length - 1) : 800, waiting = (wd?.beds || []).filter(Boolean).length;
       const mine = dz.map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, `${G.diseases[d].sym.join(' · ')}<br>${G.diseases[d].self}`, '')).join('');
-      const shift = me.career === 'doctor' ? `<div class="jobbox ok">🚨 หมอไม่ต้องเข้าเวรแล้ว · ไปที่ <b>ICU</b> (มุมขวาล่างของโรงพยาบาล) รับเคสฉุกเฉิน แล้วลงมือรักษาในห้องจริง ได้ค่ารักษาทุกเคส</div>${B('📍 ไป ICU', { fn: 'guide', key: 'icu' }, 'good')}` : '';
+      const shift = job('doctor') ? `<div class="jobbox ok">🚨 หมอไม่ต้องเข้าเวรแล้ว · ไปที่ <b>ICU</b> (มุมขวาล่างของโรงพยาบาล) รับเคสฉุกเฉิน แล้วลงมือรักษาในห้องจริง ได้ค่ารักษาทุกเคส</div>${B('📍 ไป ICU', { fn: 'guide', key: 'icu' }, 'good')}` : '';
       return `<h2>🏥 โรงพยาบาล</h2><div class="sub">เปิด 24 ชม. · สุขภาพ ${Math.floor(me.health)}/100 · <b>ถูกกว่า:</b> นอนที่ <b>เตียงคนไข้</b> รอหมอรักษา (~฿300) · ตอนนี้มีคนไข้ ${waiting} เตียง</div>${shift}
         ${mine ? `<div class="list">${mine}</div>` : '<div class="sub">✅ ตอนนี้คุณไม่ได้ป่วย</div>'}
         <h3>💊 ร้านขายยา</h3><div class="sub">ซื้อยาให้ตรงกับอาการ แล้วกดใช้ในกระเป๋า 🎒 (ถูกกว่าให้พยาบาลรักษา)</div><div class="list">${Object.entries(G.items).filter(([, it]) => it.pharmacy).map(([id, it]) => itemRow(id, B(`ซื้อ ${money(it.base)}`, { t: 'act', st, a: 'medbuy', item: id }, it.cures?.some(d => dz.includes(d)) ? 'good pulse' : '', me.money < it.base), `${it.cures ? `รักษา <b>${it.cures.map(d => G.diseases[d].icon + G.diseases[d].name).join(', ')}</b>${it.cures.some(d => dz.includes(d)) ? ' ✅ ตรงอาการคุณ' : ''} · ` : ''}${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('')}</div>
         ${B(`💉 ให้พยาบาล NPC รักษาทันที ${money(price)}${dz.length ? ' (หายทุกโรค)' : ' (❤️ +40)'}`, { t: 'act', st, a: 'heal' }, 'big')}
-        ${me.career === 'doctor' ? '<div class="sub">🩺 เดินไปที่เตียงที่มีคนไข้ (ทั้งผู้เล่นและชาวเมือง) แล้ววินิจฉัยจากอาการ</div>' : staffHint('doctor')}`;
+        ${job('doctor') ? '<div class="sub">🩺 เดินไปที่เตียงที่มีคนไข้ (ทั้งผู้เล่นและชาวเมือง) แล้ววินิจฉัยจากอาการ</div>' : staffHint('doctor')}`;
     }
     case 'bed': {
       const s = STN(st), b = wd?.beds?.[s.idx];
-      if (me.career === 'doctor' && b && b[1] !== myId) {
+      if (job('doctor') && b && b[1] !== myId) {
         const [name, , sym, hp, n, npc, dn] = b;
         if (dn) return `<h2>🚨 ${esc(name)} หมดสติ!</h2><div class="sub">ต้องช่วยให้ฟื้นก่อน แล้วค่อยวินิจฉัยโรค</div>${B('💓 ปั๊มหัวใจ / ช่วยให้ฟื้น (⚡8)', { t: 'act', st, a: 'revive' }, 'primary big pulse')}`;
         const opts = n ? Object.entries(G.treatments).map(([k, tr]) => B(`${tr.icon} ${tr.name}`, { t: 'act', st, a: 'treat', tx: k }, 'good')).join('') : B('🩺 ตรวจร่างกาย + ให้ยาบำรุง', { t: 'act', st, a: 'treat', tx: 'checkup' }, 'good');
@@ -3111,9 +3115,9 @@ function renderPanel(p) {
           return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`}`;
     }
-    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? dogBox(st) + policeReports() : ''}`;
+    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) + policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · สมัครเป็นขอทานได้ที่นี่ (เงินสด+ฝากไม่เกิน ฿2,000) · หาเงินโดย<b>วิ่งเก็บขยะ</b>ที่ถังขยะ หรือนั่งขอทาน (ปุ่ม 🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ</div>${staffHint('beggar')}`;
-    case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน · ใครก็ล้วงกระเป๋าได้ (ทุก 1 นาที) ตอนล้วงจะใส่ชุดโจรทันที คนเห็นแจ้งตำรวจได้ และสายตรวจจะวิ่งไล่จับ · ถ้าพลาดอาจถูกจับคาหนังคาเขา</div>${me.career === 'police' ? '<div class="sub">👮 ตำรวจล้วงกระเป๋าไม่ได้</div>' : B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big')}`;
+    case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน · ใครก็ล้วงกระเป๋าได้ (ทุก 1 นาที) ตอนล้วงจะใส่ชุดโจรทันที คนเห็นแจ้งตำรวจได้ และสายตรวจจะวิ่งไล่จับ · ถ้าพลาดอาจถูกจับคาหนังคาเขา</div>${job('police') ? '<div class="sub">👮 ตำรวจล้วงกระเป๋าไม่ได้</div>' : B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big')}`;
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;
     case 'quests': {
@@ -3217,10 +3221,10 @@ function renderPanel(p) {
         <div class="grid2" style="margin-bottom:6px">${B('✉️ ส่งจดหมาย', { fn: 'open', kind: 'mail', set: { to: o.name } })}</div>
         <div class="sub">${far ? '⚠️ อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน' : 'อยู่ใกล้พอที่จะติดต่อกันได้'}</div>
         <div class="grid2">${B('🤝 แลกเปลี่ยน', { fn: 'tradeReq', to: o.id }, 'primary', far)}${B(known ? '📇 มีเบอร์แล้ว' : '📱 ขอเบอร์', { t: 'req', kind: 'phone', to: o.id }, 'good', far || known)}</div>
-        ${me.career === 'doctor' ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
+        ${job('doctor') ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
         ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}
         ${o.th ? `<div class="jobbox">🕶️ ${esc(o.name)} ใส่ชุดโจร! ${B('📞 แจ้งตำรวจ 191', { t: 'report', thief: o.id }, 'warn')}</div>` : ''}
-        ${me.career === 'police' ? (o.w ? B('👮 จับกุม! (มีการแจ้งความ)', { t: 'arrest', to: o.id }, 'warn big pulse', d > 2) : '<div class="sub">👮 ไม่มีการแจ้งความเกี่ยวกับคนนี้</div>') : `<div style="margin-top:8px">${stealBtn}</div>`}`;
+        ${job('police') ? (o.w ? B('👮 จับกุม! (มีการแจ้งความ)', { t: 'arrest', to: o.id }, 'warn big pulse', d > 2) : '<div class="sub">👮 ไม่มีการแจ้งความเกี่ยวกับคนนี้</div>') : `<div style="margin-top:8px">${stealBtn}</div>`}`;
     }
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => b.on - a.on);
@@ -3353,7 +3357,7 @@ function riderJobs() {
 }
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'contacts');
-  const tabs = `<div class="tabs">${[['contacts', '📇 รายชื่อ'], ['call', call ? '📞 กำลังคุย' : '📞 โทร'], ['food', '🍔 อาหาร'], ['bills', (me.bills || []).length ? '🧾 บิล ❗' : '🧾 บิล'], ...(me.career === 'rider' ? [['rider', '🛵 ไรเดอร์']] : []), ...(me.career === 'police' ? [['police', '🚨 แจ้งเหตุ']] : [])].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;
+  const tabs = `<div class="tabs">${[['contacts', '📇 รายชื่อ'], ['call', call ? '📞 กำลังคุย' : '📞 โทร'], ['food', '🍔 อาหาร'], ['bills', (me.bills || []).length ? '🧾 บิล ❗' : '🧾 บิล'], ...(job('rider') ? [['rider', '🛵 ไรเดอร์']] : []), ...(job('police') ? [['police', '🚨 แจ้งเหตุ']] : [])].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;
   let body = '';
   if (tab === 'contacts') {
     const onl = new Set((me.friends || []).filter(f => f.on).map(f => f.p));
@@ -3949,7 +3953,7 @@ function openMap(mapId, keepScroll) {
   }
   for (const s of G.stations) {
     if (s.area !== A.id || !/^(pier|gate|coop|farmbuy|estate|fishclub|lot|square)$/.test(s.type)) continue;
-    if (s.type === 'lot' && !(me.garden?.lot === s.lot) && !(!wd?.lots?.[s.lot] && me.career === 'farmer')) continue;
+    if (s.type === 'lot' && !(me.garden?.lot === s.lot) && !(!wd?.lots?.[s.lot] && job('farmer'))) continue;
     const [x, y] = L(s.x, s.y);
     places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.renov ? '🚧 ปิดปรับปรุงชั่วคราว' : s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
   }
@@ -3981,7 +3985,7 @@ function openMap(mapId, keepScroll) {
   });
   if (me.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc, [x, y] = L(hx, hy); g.strokeStyle = '#ffb300'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.arc(x, y, hr * k, 0, 7); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,200,0,.12)'; g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐕', x, y); }
   // police only: where reported thieves were seen
-  if (me.career === 'police') for (const rp of me.reports || []) if (mapOf(rp.area) === mapId) {
+  if (job('police')) for (const rp of me.reports || []) if (mapOf(rp.area) === mapId) {
     const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp, [x, y] = L(q.x, q.y);
     g.strokeStyle = '#ff3b3b'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, r * 1.6, 0, 7); g.stroke();
     g.font = `${Math.round(r * 1.6)}px serif`; g.fillText('🚨', x, y);

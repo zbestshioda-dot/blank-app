@@ -1032,3 +1032,7 @@ body.hasEvent #topBar{top:146px!important}
 .frmCard .fprev img{position:absolute;inset:0;margin:auto;width:30px;height:30px;border-radius:50%;object-fit:cover}
 .frmCard button{padding:3px 6px;font-size:11px}.frmCard.lock{opacity:.85}
 .pfp.hasFrame #meName,.pfp.hasFrame #lvPct{z-index:4}
+
+/* profile photo: round, like the status card */
+.prof .ph{border-radius:50%!important;border:3px solid #6b4a1e!important;background:#e9d4ad;box-shadow:0 0 0 2px #c9a45a,0 3px 6px rgba(0,0,0,.3)}
+.prof .phWrap .ph{display:block}

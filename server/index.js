@@ -317,6 +317,7 @@ function cd(a, key, ms, quiet) {
 }
 function addItem(a, id, n) { a.inv[id] = (a.inv[id] || 0) + n; if (a.inv[id] <= 0) delete a.inv[id]; }
 function need(a, career) {
+  if (isAdmin(a)) return true;                       // admins can do every job's work
   if (a.career !== career) {
     const c = D.CAREERS[career], w = c.where && ST[c.where];
     toast(a, `ต้องเป็น${c.name}ก่อน — ไปสมัครงานที่ ${w ? w.label : '-'}`, '🚫', false); return false;
@@ -527,7 +528,7 @@ function orderView(o) {
   return { id: o.id, item: o.item, state: o.state, fee: o.fee, tip: o.tip, cust: o.custName, npc: !!o.npc, rider: o.riderName || '', t: o.t,
     dest: o.npc ? { x: o.npc.x, y: o.npc.y } : null, area: o.npc ? o.npc.area : null };
 }
-function ordersChanged() { for (const a of online.values()) if (a.career === 'rider' || [...orders.values()].some(o => o.cust === a)) markMe(a); }
+function ordersChanged() { for (const a of online.values()) if (a.career === 'rider' || isAdmin(a) || [...orders.values()].some(o => o.cust === a)) markMe(a); }
 function placeOrder(a, m) {
   const id = m.item, it = D.ITEMS[id];
   if (!it || !it.menu) return;
@@ -874,7 +875,7 @@ function act(a, m) {
     }
     // ---------------- office
     case 'trash.run': case 'trash.dig': {   // beggars: an endless run through the street picking up rubbish (played on the client)
-      if (a.career !== 'beggar') return toast(a, 'วิ่งเก็บขยะได้เฉพาะขอทาน', '🗑️', false);
+      if (a.career !== 'beggar' && !isAdmin(a)) return toast(a, 'วิ่งเก็บขยะได้เฉพาะขอทาน', '🗑️', false);
       if (a.run0 && now() - a.run0 < 180000) return;
       if (now() < (a.runNext || 0)) return toast(a, `เหนื่อยอยู่ พักอีก ${Math.ceil((a.runNext - now()) / 1000)} วินาทีค่อยวิ่งใหม่`, '😮‍💨', false);
       if (!spend(a, 6)) return;
@@ -1485,7 +1486,7 @@ function request(a, m) {
   if (m.kind === 'trade') {
     if (a.trade || o.trade) return toast(a, 'ฝ่ายใดฝ่ายหนึ่งกำลังแลกเปลี่ยนอยู่', '⚠️', false);
   } else if (m.kind === 'heal') {
-    if (a.career !== 'doctor') return toast(a, 'ต้องเป็นแพทย์เท่านั้น', '🚫', false);
+    if (a.career !== 'doctor' && !isAdmin(a)) return toast(a, 'ต้องเป็นแพทย์เท่านั้น', '🚫', false);
     if (o.health >= 95) return toast(a, `${o.name} สุขภาพดีอยู่แล้ว`, 'ℹ️', false);
   } else if (m.kind === 'phone') {
     if ((a.contacts || []).some(c => c.p === o.phone)) return toast(a, `มีเบอร์ ${o.name} อยู่แล้ว`, '📇', false);
@@ -1635,7 +1636,7 @@ const RB_MOVES = { dash: ['บิดคันเร่ง', 22, .95], cut: ['ม
 const RB_FOE = { block: ['ปาดหน้า', 24, .9], corner: ['เลี้ยวมุมแคบ', 32, .7], shout: ['ตะโกนข่ม', 0, .85], call: ['โทรหาลูกค้าก่อน', 0, 1] };
 function rbStats(L, bonus = 0) { return { lv: L, max: 60 + 8 * L, hp: 60 + 8 * L, atk: 10 + 2 * L + bonus, def: 8 + L + bonus * .5, spd: 10 + L + bonus, deb: 0, cd: 0 }; }
 function rivalSpawn(a, force) {
-  if (a.career !== 'rider' || a.rb || a.rival || areaId(a) !== 'town') return false;
+  if (a.career !== 'rider' && !isAdmin(a) || a.rb || a.rival || areaId(a) !== 'town') return false;
   const opts = reachFrom(a.x, a.y, 16, 45, 9); if (!opts.length) return false;
   const c = pick(opts), L = Math.max(1, lvl(a) + rint(-1, 1));
   a.rival = { x: c[0] + .5, y: c[1] + .5, until: now() + 180000, name: `ไรเดอร์ส้ม${pick(RB_NAMES)}`, lv: L, cust: pick(RB_CUST) };
@@ -1644,8 +1645,8 @@ function rivalSpawn(a, force) {
   return true;
 }
 function rivalTick(a, t) {
-  if (a.career !== 'rider') { if (a.rival) { a.rival = null; markMe(a); } return; }
-  if (!a.rival && !a.rb && t > (a.rivalNext || (a.rivalNext = t + rnd(120, 240) * 1000))) { a.rivalNext = t + rnd(240, 420) * 1000; rivalSpawn(a); }
+  if (a.career !== 'rider' && !isAdmin(a)) { if (a.rival) { a.rival = null; markMe(a); } return; }
+  if (a.career === 'rider' && !a.rival && !a.rb && t > (a.rivalNext || (a.rivalNext = t + rnd(120, 240) * 1000))) { a.rivalNext = t + rnd(240, 420) * 1000; rivalSpawn(a); }
   const r = a.rival; if (!r) return;
   if (t > r.until) { a.rival = null; markMe(a); return toast(a, `${r.name} แย่งลูกค้าไปส่งแล้ว... ช้าไปนิด`, '🧡', false); }
   if (areaId(a) === 'town' && Math.hypot(a.x - r.x, a.y - r.y) < 1.5) {          // caught up: battle!
@@ -1963,14 +1964,15 @@ function misTick(a, t, dt) {
 }
 function misAct(a, m) {
   if (m.op === 'start') {
-    if (!a.career || a.career === 'none' || !MIS.M[a.career]) return toast(a, 'ต้องมีอาชีพก่อน ถึงจะรับภารกิจได้', 'ℹ️', false);
+    const car = isAdmin(a) && MIS.M[m.car] ? m.car : a.career;
+    if (!car || car === 'none' || !MIS.M[car]) return toast(a, 'ต้องมีอาชีพก่อน ถึงจะรับภารกิจได้', 'ℹ️', false);
     if (a.mis) return toast(a, 'คุณมีภารกิจค้างอยู่แล้ว', 'ℹ️', false);
     if ((a.misNext || 0) > now() && !(isAdmin(a) && a.god?.nocd)) return toast(a, `ยังไม่มีงานใหม่ รออีก ${Math.ceil((a.misNext - now()) / 1000)} วินาที`, '⏳', false);
     const out = D.roomAt(a.x, a.y)?.outside, where = out ? D.areaAt(out.x, out.y)?.id : areaId(a);
     if (where !== 'town') return toast(a, 'ภารกิจอาชีพทำในตัวเมือง กลับเข้าเมืองก่อนนะ', '🏙️', false);
     if (a.down) return;
     if (!spend(a, 5)) return;
-    a.mis = misBuild(a, a.career, isAdmin(a) && m.idx != null ? +m.idx : null); markMe(a);
+    a.mis = misBuild(a, car, isAdmin(a) && m.idx != null ? +m.idx : null); markMe(a);
     return toast(a, `${a.mis.icon} ภารกิจใหม่: ${a.mis.title} — ${a.mis.story} (เวลา ${Math.round(a.mis.limit / 6000) / 10} นาที)`, '📋');
   }
   if (!a.mis) return;
@@ -2060,7 +2062,7 @@ function moodTick(a, t, indoors) {
   // monthly water & electricity bills
   billUp(a);
   // begging: passers-by drop coins now and then
-  if (a.pose === 'beg' && a.career === 'beggar' && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
+  if (a.pose === 'beg' && (a.career === 'beggar' || isAdmin(a)) && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
     const c = Math.round(rint(4, 14) * jobPay(a)); earn(a, c); if (Math.random() < .5) addXp(a, .5); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
   }
   if (a.dogq) dogTick(a, t);
@@ -2191,7 +2193,7 @@ function report(a, m) {
   toast(a, `📞 191 รับแจ้งแล้ว ${cops ? `ตำรวจออนไลน์ ${cops} นาย และ` : ''}สายตรวจ NPC กำลังตามตัว ${c.thiefName}`, '🚓');
 }
 function arrest(a, m) {
-  if (a.down || a.career !== 'police') return;
+  if (a.down || a.career !== 'police' && !isAdmin(a)) return;
   if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำอะไร...', '😞', false);
   const o = nearPlayer(a, m.to, 2);
   if (!o) return toast(a, 'ต้องเข้าไปใกล้ผู้ต้องสงสัยก่อน', '👮', false);
@@ -2637,7 +2639,7 @@ function jobView(a) {
   const j = jobXp(a.xp[c] || 0); return { L: j.L, cur: +j.cur.toFixed(2), need: j.need, gain: Math.round(xpGain(j.L) * 100), pay: Math.round((jobPay(a) - 1) * 100), max: j.L >= JOB_MAX ? 1 : 0 };
 }
 function meView(a) {
-  const isRider = a.career === 'rider';
+  const isRider = a.career === 'rider' || isAdmin(a);
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
   const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
   return {
@@ -2657,7 +2659,7 @@ function meView(a) {
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
-    reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
+    reports: a.career === 'police' || isAdmin(a) ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_GEMS,
@@ -2945,7 +2947,7 @@ function onMessage(ws, raw) {
     case 'bug': return bugReport(a, m);
     case 'god': return godAct(a, m);
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
-      if (!a.run0 || a.career !== 'beggar') return;
+      if (!a.run0 || a.career !== 'beggar' && !isAdmin(a)) return;
       const sec = (now() - a.run0) / 1000; a.run0 = 0; a.runNext = now() + 15000;
       const n = k => clamp(Math.floor(+m[k] || 0), 0, 999), cups = n('cups'), cans = n('cans'), bottles = n('bottles'), coins = n('coins'), dist = clamp(Math.floor(+m.dist || 0), 0, Math.round(sec * 40));
       if (cups + cans + bottles + coins > sec * 1.8 + 3 || coins > sec * .3 + 2) { markMe(a); return toast(a, 'ผลการวิ่งผิดปกติ ไม่ได้รับเงิน', '⚠️', false); }
@@ -2967,7 +2969,7 @@ function onMessage(ws, raw) {
     }
     case 'mission': return misAct(a, m);
     case 'rb': return rbAct(a, m);
-    case 'rbseek': { if (a.career !== 'rider') return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
+    case 'rbseek': { if (a.career !== 'rider' && !isAdmin(a)) return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
     case 'reset': return resetChar(a, m);
     case 'resign': return resign(a);
     case 'paybills': return payBills(a);
