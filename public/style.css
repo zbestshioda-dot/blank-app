@@ -430,8 +430,8 @@ body.hasEvent #topBar{top:186px!important}
   body.hasEvent #topBar{top:40px!important}
   #menu .tile,#menuToggle,#phoneBtn{width:30px;height:30px;padding:2px;border-radius:7px}.tile b.q{font-size:15px}
   #menu,#topBar{gap:3px}
-  #topRight{right:44px!important}
-  #thumbs{right:calc(44px + env(safe-area-inset-right))!important}
+  #topRight{right:6px!important}
+  #thumbs{right:calc(6px + env(safe-area-inset-right))!important}
 }
 
 /* ---------------- UI kit skin (wood/parchment pieces from assets/ui/k_*) */
