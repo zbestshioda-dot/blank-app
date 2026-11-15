@@ -241,12 +241,31 @@ paintSw();
 if (creds) { $('#inName').value = creds.name; $('#inPin').value = creds.pin; }
 // share the game with friends (login screen + settings)
 async function shareGame() {
-  const url = location.origin + location.pathname, text = 'มาเล่น "เมืองชีวิตนี้เลือกได้" ด้วยกัน! เกมใช้ชีวิตออนไลน์ หางาน หาเงิน ซื้อบ้าน ตกปลา เล่นบนมือถือได้เลย';
+  const url = 'https://is.gd/lifetown', text = 'มาเล่น "เมืองชีวิตนี้เลือกได้" ด้วยกัน! เกมใช้ชีวิตออนไลน์ หางาน หาเงิน ซื้อบ้าน ตกปลา เล่นบนมือถือได้เลย';
   try { if (navigator.share) { await navigator.share({ title: 'เมืองชีวิตนี้เลือกได้', text, url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(`${text}\n${url}`); toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย!', '📋'); }
   catch { prompt('คัดลอกลิงก์นี้ส่งให้เพื่อน:', url); }
 }
 document.querySelectorAll('.shareBtn').forEach(b => b.onclick = shareGame);
+// install as an app (phone home screen / computer): the browser's own prompt when it offers one, otherwise how-to steps
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+addEventListener('appinstalled', () => { installEvt = null; document.querySelectorAll('.instBtn').forEach(b => b.classList.add('hidden')); });
+if (matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone) document.querySelectorAll('.instBtn').forEach(b => b.classList.add('hidden'));
+try { if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { }); } catch { }
+function howTo(html) {
+  document.querySelector('.howTo')?.remove();
+  const d = document.createElement('div'); d.className = 'howTo'; d.innerHTML = `<div class="howCard">${html}<button type="button" class="primary">เข้าใจแล้ว</button></div>`;
+  d.onclick = e => { if (e.target === d || e.target.tagName === 'BUTTON') d.remove(); }; document.body.appendChild(d);
+}
+document.querySelectorAll('.instBtn').forEach(b => b.onclick = async () => {
+  if (installEvt) { const e = installEvt; installEvt = null; try { await e.prompt(); await e.userChoice; } catch { } return; }
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (b.dataset.inst === 'm') howTo(ios
+    ? '<h3>📱 ติดตั้งบน iPhone / iPad</h3><ol><li>เปิดเกมใน <b>Safari</b></li><li>แตะปุ่ม <b>แชร์</b> (สี่เหลี่ยมมีลูกศรขึ้น) ด้านล่าง</li><li>เลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b> แล้วกด <b>เพิ่ม</b></li></ol><small>จะมีไอคอนเกมบนหน้าจอ เปิดแล้วเต็มจอเหมือนแอป</small>'
+    : '<h3>📱 ติดตั้งบนมือถือ Android</h3><ol><li>เปิดเกมใน <b>Chrome</b></li><li>แตะเมนู <b>⋮</b> มุมขวาบน</li><li>เลือก <b>"ติดตั้งแอป"</b> หรือ <b>"เพิ่มลงในหน้าจอหลัก"</b></li></ol><small>จะมีไอคอนเกมบนหน้าจอ เปิดแล้วเต็มจอเหมือนแอป</small>');
+  else howTo('<h3>💻 ติดตั้งในคอม</h3><ol><li>เปิดเกมใน <b>Chrome</b> หรือ <b>Edge</b></li><li>กดไอคอน <b>ติดตั้ง ⊕</b> ทางขวาของช่องที่อยู่เว็บ<br><small>(หรือเมนู ⋮ → บันทึกและแชร์ → ติดตั้งหน้าเป็นแอป)</small></li><li>กด <b>ติดตั้ง</b></li></ol><small>จะมีไอคอนเกมบนเดสก์ท็อปและเมนูเริ่ม เปิดเป็นหน้าต่างแยก</small>');
+});
 const nameErr = v => /[^\x20-\x7e]/.test(v) ? 'ชื่อตัวละครใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น' : /\s/.test(v) ? 'ชื่อห้ามมีเว้นวรรค' : '';
 $('#inName').addEventListener('input', e => { $('#loginErr').textContent = nameErr(e.target.value) ? nameErr(e.target.value).replace('ชื่อตัวละคร', 'ID') + ' (บัญชีเก่าที่เป็นภาษาไทยยังเข้าได้)' : ''; });
 $('#createBack').onclick = () => { $('#createBox').classList.add('hidden'); $('#loginForm').classList.remove('hidden'); };
@@ -2773,6 +2792,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16z5', d: '16 พ.ย. (รอบ 30)', items: ['📲 หน้าล็อกอินมีปุ่ม <b>ติดตั้งบนมือถือ</b> · <b>แชร์ลิงก์</b> (is.gd/lifetown) · <b>ติดตั้งในคอม</b> ติดตั้งแล้วมีไอคอนเกม เปิดเต็มจอเหมือนแอป', '💖 มือถือมีแอป <b>สนับสนุน</b> · ผู้จัดทำ นาย วราวุฒิ สีเสือ'] },
   { v: '2026-11-16z4', d: '16 พ.ย. (รอบ 29)', items: [
     '📱 <b>เอาแถบเมนูออก</b> ทุกอย่างย้ายเข้าไปอยู่ในมือถือแล้ว (เพิ่มแอป งาน · อันดับ · วิธีเล่น · แจ้งบัค) · ปุ่มมือถือใหญ่ขึ้น แนวตั้งอยู่ใต้นาฬิกา แนวนอนอยู่ข้างมินิแมพ · มีจุดแดงเตือนเมื่อมีจดหมาย บิล หรือรางวัล',
     '💬 แนวนอน กล่องแชทกว้างเท่ากระดานเควสต์กับการ์ดสถานะ',
@@ -3551,8 +3571,8 @@ const PH_APPS = [
 // the rest of the old menu, as plain apps on the last row
 const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
-  ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
-const PH_TITLE = { contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
+  ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'], ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
+const PH_TITLE = { support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
   const dt = me?.date, clock = hhmm(hourNow());
@@ -3586,6 +3606,9 @@ function phonePanel(p) {
   } else if (tab === 'rider') body = riderJobs();
   else if (tab === 'bills') body = billsBox();
   else if (tab === 'fish') body = fishBook();
+  else if (tab === 'support') body = `<div class="phSup"><div class="big">💖</div><b>สนับสนุนเมืองชีวิตนี้เลือกได้</b><small>ขอบคุณที่เล่นด้วยกันนะครับ ทุกการสนับสนุนช่วยให้เซิร์ฟเวอร์เปิดต่อและมีอัปเดตใหม่ๆ</small>
+    <div class="qrBox"><img src="assets/ui/support_qr.png?v=1" alt="QR สนับสนุน" onerror="this.parentNode.classList.add('none')"><span>QR สนับสนุนเร็วๆ นี้</span></div>
+    <div class="by">ผู้จัดทำ<br><b>นาย วราวุฒิ สีเสือ</b></div></div>`;
   else if (tab === 'wx') { const ev = wd?.ev, h = hourNow(); body = `<div class="phWx"><div class="big">${ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️'}</div><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small><div class="jobbox">${ev ? esc(ev.text) : 'วันนี้อากาศปกติ ไม่มีเหตุการณ์พิเศษ'}</div></div>`; }
   else if (tab === 'music') body = `<div class="phWx"><div class="big">🎵</div><b>${(h => h >= 6 && h < 19 ? 'เพลงกลางวัน' : 'เพลงกลางคืน')(hourNow())}</b><small>เพลงเปลี่ยนเองตามเวลาในเกม</small></div><div class="grid2">${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🔇 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'primary' : '')}${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'primary' : '')}</div>`;
   const sub = tab === 'contacts' || tab === 'call' ? `<div class="tabs">${B('📇 รายชื่อ', { fn: 'qtab', set: { tab: 'contacts' } }, tab === 'contacts' ? 'primary' : '')}${B(call ? '📞 กำลังคุย' : '📞 สาย', { fn: 'qtab', set: { tab: 'call' } }, tab === 'call' ? 'primary' : '')}</div>`

@@ -1,10 +1,17 @@
 {
   "name": "เมืองชีวิตนี้เลือกได้",
   "short_name": "Life Town",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
   "background_color": "#2b1d12",
   "theme_color": "#5a3620",
-  "icons": [{ "src": "assets/ui/pin.png", "sizes": "136x132", "type": "image/png" }]
+  "description": "เกมใช้ชีวิตออนไลน์ หางาน หาเงิน ซื้อบ้าน ตกปลา เล่นกับเพื่อนในเมืองเดียวกัน",
+  "icons": [
+    { "src": "assets/ui/icon192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/ui/icon512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
 }
