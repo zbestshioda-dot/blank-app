@@ -106,14 +106,22 @@
 <div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div><div class="tchat"><b>💬 คุยต่อรอง</b><div class="log" id="tchatLog"></div><form id="tchatForm" class="rowf"><input id="tchatIn" maxlength="120" placeholder="พิมพ์คุยกับอีกฝ่าย..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form></div></div></div>
 
 <div id="login">
+  <canvas id="petals"></canvas>
+  <div id="loginHero">
+    <span class="heroKicker">LIFE TOWN</span>
+    <h1>เมืองชีวิตนี้เลือกได้</h1>
+    <p class="heroTag">เลือกอาชีพ ตกปลา ทำสวน สร้างบ้าน<br>ในเมืองเดียวกับผู้เล่นตัวจริง</p>
+    <div class="heroChips"><span>🎣 ตกปลา 79 ชนิด</span><span>🩺 หมอ ICU</span><span>🌾 ทำสวน</span><span>🏠 ซื้อบ้าน</span><span>🛵 ไรเดอร์</span><span>📈 ตลาดหุ้น</span></div>
+    <div class="heroCast" id="heroCast"></div>
+    <div class="heroOnline" id="heroOnline"></div>
+  </div>
   <form id="loginForm" class="box" autocomplete="off">
-    <div class="logo"><img src="assets/ui/pin.png" alt=""><h1>เมืองชีวิตนี้เลือกได้<small>LIFE TOWN</small></h1></div>
-    <p class="sub">ใช้ชีวิตในเมืองเดียวกับผู้เล่นคนอื่น หางานทำ หาเงิน ซื้อบ้าน ทำสวน และช่วยเหลือกัน</p>
+    <div class="logo"><img src="assets/ui/pin.png" alt=""><h1>เข้าเมือง<small>LIFE TOWN</small></h1></div>
     <label>ID <small>(ใช้ล็อกอิน · ภาษาอังกฤษและตัวเลขเท่านั้น)</small><input id="inName" maxlength="16" placeholder="เช่น somchai99" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
     <label>รหัส PIN 4-8 หลัก<input id="inPin" inputmode="numeric" pattern="\d{4,8}" maxlength="8" placeholder="••••" type="password" required></label>
     <div id="loginErr"></div>
     <button class="primary" type="submit">เข้าเมือง</button>
-    <div class="sub">ยังไม่มีบัญชี? ตั้ง ID และ PIN ใหม่ได้เลย แล้วจะได้ตั้งชื่อและสร้างตัวละครครั้งเดียว</div>
+    <div class="sub">✨ ยังไม่มีบัญชี? ตั้ง ID และ PIN ใหม่แล้วกด <b>เข้าเมือง</b> ได้เลย จะได้สร้างตัวละครต่อ ฟรี ไม่ต้องสมัคร</div>
     <div class="cbt">📢 เซิฟนี้เป็น CBT เมื่อเกมสมบูรณ์ข้อมูลจะถูกรีเซ็ต</div>
     <button type="button" class="shareBtn">📤 ชวนเพื่อนมาเล่น</button>
   </form>

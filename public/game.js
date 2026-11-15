@@ -1453,7 +1453,35 @@ const QUEST_GIVER = {
   dailyall: { f: 'elder_m',   name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', ask: 'ช่วยเหลือชาวเมืองให้ครบทุกวัน เมืองเราจะน่าอยู่ขึ้น', thx: 'เมืองนี้โชคดีที่มีเธอ!' },
 };
 let FACES = null;
-fetch('assets/portraits.json?v=2').then(r => r.json()).then(j => { FACES = j; }).catch(() => { });
+// ---- login screen: townsfolk to meet, falling petals, live online count
+function buildCast() {
+  const box = document.getElementById('heroCast'); if (!box || !FACES) return;
+  const cast = [['office_f', 'นภา'], ['fisher_m', 'น้าเล็ก'], ['doctor_f', 'หมอแพร'], ['chef_m', 'เชฟหมี'], ['mprang_happy', 'มะปราง'], ['rider_m', 'พี่ต่อ'], ['farmer_f', 'ข้าวหอม'], ['police_f', 'ดาบสมศรี']], n = Object.keys(FACES.faces).length, px = innerWidth <= 860 ? 42 : 58;
+  box.innerHTML = cast.map(([f, nm]) => { const i = FACES.faces[f]; return i === undefined ? '' : `<div class="cm"><i class="qface" style="background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>${nm}</div>`; }).join('');
+}
+(function loginFx() {
+  const cv = document.getElementById('petals'), login = document.getElementById('login'); if (!cv || !login) return;
+  const g = cv.getContext('2d'); let W = 0, H = 0, ps = [];
+  const fit = () => { W = cv.width = innerWidth; H = cv.height = innerHeight; ps = Array.from({ length: Math.round(Math.min(46, W / 28)) }, () => mk(true)); };
+  const mk = init => ({ x: Math.random() * W, y: init ? Math.random() * H : -20, r: 4 + Math.random() * 7, vy: 22 + Math.random() * 34, vx: -8 + Math.random() * 22, ph: Math.random() * 7, rot: Math.random() * 7, vr: -1.5 + Math.random() * 3, hue: Math.random() < .75 ? '#ffc0d3' : '#ffe6a8' });
+  let last = performance.now();
+  function tick(t) {
+    if (login.classList.contains('hidden') || !login.isConnected || getComputedStyle(login).display === 'none') return;
+    requestAnimationFrame(tick);
+    const dt = Math.min(.05, (t - last) / 1000); last = t; g.clearRect(0, 0, W, H);
+    for (const p of ps) {
+      p.y += p.vy * dt; p.x += (p.vx + Math.sin(t / 900 + p.ph) * 16) * dt; p.rot += p.vr * dt;
+      if (p.y > H + 20 || p.x > W + 30) Object.assign(p, mk(false), { x: Math.random() * W });
+      g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.scale(1, .55 + Math.abs(Math.sin(t / 700 + p.ph)) * .45); g.globalAlpha = .85; g.fillStyle = p.hue;
+      g.beginPath(); g.moveTo(0, -p.r); g.bezierCurveTo(p.r, -p.r * .6, p.r * .9, p.r * .7, 0, p.r); g.bezierCurveTo(-p.r * .9, p.r * .7, -p.r, -p.r * .6, 0, -p.r); g.fill(); g.restore();
+    }
+  }
+  if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  fit(); addEventListener('resize', fit); requestAnimationFrame(tick);
+  const online = () => fetch('/api/status').then(r => r.json()).then(j => { const e = document.getElementById('heroOnline'); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; }).catch(() => { });
+  online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
+})();
+fetch('assets/portraits.json?v=2').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
 const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], i = FACES?.faces?.[alt || g?.f]; if (i === undefined) return ''; const n = Object.keys(FACES.faces).length;
   return `<i class="qface" style="width:${px}px;height:${px}px;background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>`; };
 function questPop(type, title, line, reward) {
@@ -1907,6 +1935,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15i', d: '15 พ.ย. (รอบ 9)', items: [
+    '🌸 <b>หน้าล็อกอินใหม่</b> ชื่อเกมตัวใหญ่ ฉากเมืองขยับช้าๆ กลีบซากุระปลิวลง โชว์ชาวเมืองที่จะได้เจอ บอกว่าทำอะไรได้บ้าง และบอกจำนวนคนที่ออนไลน์ตอนนี้' ] },
   { v: '2026-11-15h', d: '15 พ.ย. (รอบ 8)', items: [
     '🩺 <b>หมอไม่ต้องเข้าเวรแล้ว</b> ได้เงินจาก<b>เคสฉุกเฉินที่ ICU</b> แทน (มุมขวาล่างของโรงพยาบาล)',
     '💓 เคสสุ่ม: <b>ปั๊มหัวใจ</b> กดตอนวงแหวนหดมาแตะหัวใจให้ตรงจังหวะ 20 ครั้ง · 🔪 <b>ผ่าตัด</b> หยุดมีดให้อยู่ในแถบเขียว 5 ขั้น เร็วขึ้นเรื่อยๆ',
