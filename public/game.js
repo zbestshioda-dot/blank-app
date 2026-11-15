@@ -1463,7 +1463,7 @@ function buildMini() {
     // buildings as clean blocks in the same colours as the big map (shops/services, scenery, homes)
     for (const b of G.map.buildings) {
       if (b.x < a.x || b.x >= a.x + a.w || b.y < a.y || b.y >= a.y + a.h) continue;
-      g.fillStyle = b.deco ? '#b9a48f' : b.house !== undefined ? '#d98f6a' : '#4d5b7a';
+      g.fillStyle = b.renov ? '#d9a21f' : b.deco ? '#b9a48f' : b.house !== undefined ? '#d98f6a' : '#4d5b7a';   // amber = closed for renovation
       g.fillRect((b.x - a.x) * 2, (b.y - a.y) * 2, b.w * 2, b.h * 2);
       g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect((b.x - a.x) * 2, (b.y - a.y + b.h) * 2 - 1, b.w * 2, 1);
     }
@@ -1483,6 +1483,7 @@ function drawMini() {
     g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2);
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
+  { const q = PETST.get(myId); if (q && mapOf(areaOf(q.x, q.y)?.id) === mapId) { const mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 4.5, 0, 7); g.fill(); g.fillStyle = '#ff7eb0'; g.beginPath(); g.arc(mx, my, 3, 0, 7); g.fill(); } }   // your pet: a pink dot
   { // you: drawn last, bigger, with a pulsing ring so you can always find yourself
     const q = outPos(m.rx, m.ry), mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2, k = (performance.now() % 1200) / 1200;
     g.strokeStyle = `rgba(255,230,60,${1 - k})`; g.lineWidth = 4; g.beginPath(); g.arc(mx, my, 9 + k * 16, 0, 7); g.stroke();
@@ -2096,6 +2097,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15n', d: '15 พ.ย. (รอบ 14)', items: [
+    '🗺️ <b>มินิแมพ/แผนที่ใหญ่อัปเดต</b> อาคารที่ปิดปรับปรุง (ร้านสัตว์เลี้ยง ฟิตเนส โรงยิม ห้องสมุด ร้านดอกไม้ สถานีดับเพลิง) เป็นสี <b>เหลืองอำพัน</b> เห็นชัดว่าเข้าไม่ได้ และสัตว์เลี้ยงของคุณเป็น <b>จุดสีชมพู</b> บนมินิแมพ'] },
   { v: '2026-11-15m', d: '15 พ.ย. (รอบ 13)', items: [
     '🐾 <b>สัตว์เลี้ยง 32 ชนิด!</b> หมา แมว กระต่าย แฮมสเตอร์ เม่น กระรอก ลูกเป็ด จิ้งจอก แพนด้า เพนกวิน คาปิบาร่า ไปจนถึง 🐲 มังกรน้อย และ 🦄 ยูนิคอร์น แบ่งความหายากทั่วไป–มหากาพย์',
     '🎒 รับเลี้ยงได้ที่ <b>กระเป๋า → 🐾 เปิดสัตว์เลี้ยง</b> (ร้านสัตว์เลี้ยงยังปิดปรับปรุง) เรียกออกมาเดินตามได้ทุกที่ เข้าตึก/วาร์ปก็ตามมา และผู้เล่นคนอื่นก็เห็นสัตว์ของคุณ',
@@ -3339,7 +3342,7 @@ function openMap(mapId, keepScroll) {
   for (const b of G.map.buildings) {
     if (b.x < A.x || b.x >= A.x + A.w) continue;
     const [bx, by] = L(b.x, b.y), mineHouse = b.house !== undefined && (me.house === b.house || me.rent?.idx === b.house);
-    g.fillStyle = b.deco ? '#b9a48f' : b.house !== undefined ? (mineHouse ? '#f2b636' : '#d98f6a') : isOpen(b.id) ? '#4d5b7a' : '#7a4a4a';
+    g.fillStyle = b.renov ? '#d9a21f' : b.deco ? '#b9a48f' : b.house !== undefined ? (mineHouse ? '#f2b636' : '#d98f6a') : isOpen(b.id) ? '#4d5b7a' : '#7a4a4a';
     g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
     g.beginPath(); g.roundRect(bx + 1, by + 1, b.w * k - 2, b.h * k - 2, Math.min(6, k)); g.fill(); g.stroke();
     if (b.deco || !b.st) { if (b.label) { g.font = `${Math.max(9, k * .8)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(b.icon, bx + b.w * k / 2, by + b.h * k / 2); } continue; }
