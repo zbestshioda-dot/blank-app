@@ -3614,6 +3614,7 @@ function phonePanel(p) {
   else if (tab === 'fish') body = fishBook();
   else if (tab === 'support') body = `<div class="phSup"><div class="big">💖</div><b>สนับสนุนเมืองชีวิตนี้เลือกได้</b><small>ขอบคุณที่เล่นด้วยกันนะครับ ทุกการสนับสนุนช่วยให้เซิร์ฟเวอร์เปิดต่อและมีอัปเดตใหม่ๆ</small>
     <div class="qrBox"><img src="assets/ui/support_qr.png?v=1" alt="QR สนับสนุน" onerror="this.parentNode.classList.add('none')"><span>QR สนับสนุนเร็วๆ นี้</span></div>
+    <a class="qrSave" href="assets/ui/support_qr.png?v=1" download="lifetown-support-qr.png">📥 บันทึกรูป QR</a><small class="qrHint">หรือกดค้างที่รูปแล้วเลือก "บันทึกรูปภาพ"</small>
     <div class="by">ผู้จัดทำ<br><b>นาย วราวุฒิ สีเสือ</b></div></div>`;
   else if (tab === 'wx') { const ev = wd?.ev, h = hourNow(); body = `<div class="phWx"><div class="big">${ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️'}</div><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small><div class="jobbox">${ev ? esc(ev.text) : 'วันนี้อากาศปกติ ไม่มีเหตุการณ์พิเศษ'}</div></div>`; }
   else if (tab === 'music') body = `<div class="phWx"><div class="big">🎵</div><b>${(h => h >= 6 && h < 19 ? 'เพลงกลางวัน' : 'เพลงกลางคืน')(hourNow())}</b><small>เพลงเปลี่ยนเองตามเวลาในเกม</small></div><div class="grid2">${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🔇 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'primary' : '')}${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'primary' : '')}</div>`;

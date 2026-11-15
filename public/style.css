@@ -1184,3 +1184,6 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border
 .qrBox img{display:block;width:100%;image-rendering:pixelated}.qrBox span{display:none}
 .qrBox.none img{display:none}.qrBox.none span{display:block;padding:24px 4px;color:#9a7a5a;font-size:11px}
 .phSup .by{font-size:10.5px;color:#7a5a3a}.phSup .by b{font-size:13px;color:#3a2410}
+.qrBox img{image-rendering:auto;-webkit-touch-callout:default;user-select:auto}
+.qrSave{display:block;margin:0 auto 3px;width:78%;padding:6px 0;border-radius:10px;background:linear-gradient(#ffe36b,#f0a52a);border:2px solid #5c3a1e;box-shadow:0 2px 0 #5c3a1e;color:#3a2410;font-weight:700;font-size:12px;text-decoration:none}
+.qrHint{display:block;font-size:9.5px;color:#9a7a5a;margin-bottom:8px}

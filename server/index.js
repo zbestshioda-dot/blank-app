@@ -44,7 +44,7 @@ for (const [k, it] of Object.entries(D.ITEMS)) {
 let event = null;                           // { id, text, until }
 let nextEventAt = Date.now() + (process.env.EVENT_NOW ? 2000 : 120_000);   // EVENT_NOW=1 starts an event right away (testing)
 const chatLog = [];                         // town-wide announcements only
-let announceText = '';                      // the admin's notice in the red ticker at the top ('' = the default CBT notice); chat "all <text>"
+let announceText = '📢 จะอัปเดตอีกครั้งในวันศุกร์ · แมพใหม่ สวนสนุกที่จะเพิ่มพลังใจ ยะฮู้! ❤️';                      // the admin's notice in the red ticker at the top ('' = the default CBT notice); chat "all <text>"
 const reqs = new Map();                     // pending requests (trade / heal / call)
 let nextId = 1, dirty = false;
 
@@ -390,7 +390,7 @@ const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'ene
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -456,7 +456,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap, ann: announceText }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -2720,7 +2720,7 @@ function onMessage(ws, raw) {
       const text = cleanText(m.text, 120); if (!text) return;
       if (isAdmin(a) && /^all(\s|$)/i.test(text)) {   // admin: "all <text>" replaces the ticker notice for everyone, "all" alone restores the CBT notice
         announceText = text.slice(3).trim();
-        broadcast({ t: 'announce', text: announceText });
+        broadcast({ t: 'announce', text: announceText }); bugsDirty = true; dirty = true;   // kept across restarts
         return toast(a, announceText ? 'ตั้งประกาศแถบด้านบนให้ทุกคนแล้ว' : 'กลับไปใช้ประกาศ CBT เดิมแล้ว', '📢');
       }
       if (m.ch === 'world') {                 // town-wide chat: everyone reads it in the chat box, no bubble over the head
