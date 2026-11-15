@@ -25,19 +25,41 @@ try { creds = JSON.parse(localStorage.getItem('lt_creds') || 'null'); } catch { 
 let avatar = clamp(creds?.avatar ?? 0, 0, 3), gender = creds?.gender || 'm';
 const SHIRT_IDS = ['white', 'blue', 'green', 'red'];
 const sw = $('#swatches');
+// character creator: a big live preview (walking in place, tap ◀ ▶ to turn), gender toggle, round shirt colours
+let prevView = 'front';
 function paintSw() {
   sw.innerHTML = '';
   const row = document.createElement('div'); row.className = 'genders';
-  for (const [g, l] of [['m', '👦 ชาย'], ['f', '👧 หญิง']]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.className = g === gender ? 'primary' : ''; b.onclick = () => { gender = g; paintSw(); }; row.appendChild(b); }
+  for (const [g, l] of [['m', '👦 ชาย'], ['f', '👧 หญิง']]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.className = g === gender ? 'on' : ''; b.onclick = () => { gender = g; paintSw(); }; row.appendChild(b); }
   sw.appendChild(row);
+  const lab = document.createElement('div'); lab.className = 'lbl'; lab.textContent = 'สีเสื้อตัวแรก'; sw.appendChild(lab);
   const shirts = document.createElement('div'); shirts.className = 'shirts';
   SHIRT_IDS.forEach((id, i) => {
-    const c = document.createElement('canvas'); c.width = 84; c.height = 120; c.className = i === avatar ? 'on' : '';
-    c.onclick = () => { avatar = i; paintSw(); }; shirts.appendChild(c);
-    whenChars(() => { const g = c.getContext('2d'); drawCharTo(g, { g: gender, lk: { hair: 'brown', shirt: id, pants: 'gray' } }, 42, 112, 100 / CH_ATLAS.h, 'front', 0); });
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'dot' + (i === avatar ? ' on' : ''); b.style.background = STARTER_COLORS.shirt[id]; b.title = id;
+    b.onclick = () => { avatar = i; paintSw(); }; shirts.appendChild(b);
   });
   sw.appendChild(shirts);
 }
+(function previewLoop() {
+  const cv = document.getElementById('cbPrev'); if (!cv) return; const g = cv.getContext('2d'); let spin = 0;
+  const views = ['front', 'side', 'back', 'side'];
+  document.getElementById('rotL').onclick = () => { spin = (spin + 3) % 4; prevView = views[spin]; };
+  document.getElementById('rotR').onclick = () => { spin = (spin + 1) % 4; prevView = views[spin]; };
+  cv.onclick = () => { spin = (spin + 1) % 4; prevView = views[spin]; };
+  function draw(t) {
+    requestAnimationFrame(draw);
+    const box = document.getElementById('createBox'); if (!box || box.classList.contains('hidden') || !chImg) return;
+    const W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
+    // stage: soft light, round pedestal, sparkles
+    const gr = g.createRadialGradient(W / 2, H * .55, 10, W / 2, H * .55, W * .62); gr.addColorStop(0, 'rgba(255,236,170,.75)'); gr.addColorStop(1, 'rgba(255,236,170,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(W / 2, H - 22, 62, 14, 0, 0, 7); g.fill();
+    g.fillStyle = '#e9c98a'; g.beginPath(); g.ellipse(W / 2, H - 26, 58, 12, 0, 0, 7); g.fill(); g.strokeStyle = '#a9742f'; g.lineWidth = 3; g.stroke();
+    for (let i = 0; i < 6; i++) { const a = t / 1400 + i * 1.05, x = W / 2 + Math.cos(a) * (70 + i * 3), y = H * .5 + Math.sin(a * 1.3) * 70, o = (Math.sin(t / 300 + i * 2) + 1) / 2; g.globalAlpha = o * .9; g.fillStyle = '#fff3b0'; g.fillRect(x - 2, y - 6, 4, 12); g.fillRect(x - 6, y - 2, 12, 4); } g.globalAlpha = 1;
+    const step = Math.floor(t / 150) % 4, bob = Math.abs(Math.sin(t / 150 * Math.PI / 2)) * 2;
+    drawCharTo(g, { g: gender, lk: { hair: 'brown', shirt: SHIRT_IDS[avatar], pants: 'gray' } }, W / 2, H - 28 - bob, 215 / CH_ATLAS.h, prevView, step);
+  }
+  requestAnimationFrame(draw);
+})();
 // ---- pixel character (public/assets/pchar.webp, built by tools/build_pixel_chars.py)
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
@@ -178,15 +200,31 @@ $('#createBack').onclick = () => { $('#createBox').classList.add('hidden'); $('#
 $('#createOk').onclick = () => {
   const cname = $('#inCname').value.trim();
   if (cname.length < 2) { $('#createErr').textContent = 'ตั้งชื่อตัวละครก่อน (2-16 ตัว)'; return; }
-  $('#createErr').textContent = ''; creds = { ...creds, create: 1, cname, gender, shirt: SHIRT_IDS[avatar] }; wantLogin = true; connect();
+  $('#createErr').textContent = ''; creds = { ...creds, create: 1, cname, gender, shirt: SHIRT_IDS[avatar] }; loginBusy(true); wantLogin = true; connect();
 };
+let busyT = 0;
+function loginBusy(on) {
+  const b = $('#loginGo'), c = $('#createOk'); clearTimeout(busyT);
+  b.disabled = c.disabled = !!on; b.classList.toggle('busy', !!on);
+  b.firstElementChild.textContent = on ? '⏳ กำลังเข้าเมือง...' : '🚪 เข้าเมือง';
+  if (on) busyT = setTimeout(() => loginBusy(false), 9000);
+}
+function loginShake() { const f = $('#createBox').classList.contains('hidden') ? $('#loginForm') : $('#createBox'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
 $('#loginForm').onsubmit = e => {
   e.preventDefault();
   // the server has the final say: new characters must use English/digits, old Thai-named characters still log in
   creds = { name: $('#inName').value.trim(), pin: $('#inPin').value };
   $('#loginErr').textContent = '';
-  wantLogin = true; connect();
+  loginBusy(true); wantLogin = true; connect();
 };
+$('#pinEye').onclick = () => { const i = $('#inPin'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#pinEye').textContent = show ? '🙈' : '👁'; };
+{ // one tip at a time under the button
+  const tips = ['🎣 ตกปลาได้ทุกที่ที่มีน้ำ ปลาทองคำราคา ฿5,000', '🩺 หมอรับเคส ICU: ปั๊มหัวใจ ผ่าตัด ให้ตรงจังหวะ', '🏠 ซื้อบ้านในหมู่บ้านจัดสรร ปลูกผักในลานบ้านของตัวเอง', '🛵 เป็นไรเดอร์ ส่งอาหารให้ผู้เล่นตัวจริง', '📈 เล่นหุ้นที่ธนาคาร ซื้อถูก ขายแพง', '🤝 แลกของ คุยโทรศัพท์ กับเพื่อนในเมืองได้', '👮 เป็นตำรวจ จับโจรล้วงกระเป๋า ได้ค่าหัว'];
+  let k = Math.floor(Math.random() * tips.length); const el = $('#loginTip');
+  const show = () => { el.classList.remove('in'); setTimeout(() => { el.textContent = '💡 ' + tips[k++ % tips.length]; el.classList.add('in'); }, 250); };
+  show(); setInterval(() => { if (!$('#login').classList.contains('hidden')) show(); }, 5000);
+}
+if (!$('#inName').value) setTimeout(() => $('#inName').focus(), 300);
 
 // ------------------------------------------------------------------ network
 function connect() {
@@ -206,10 +244,10 @@ const doAct = (st, a, extra = {}) => send({ t: 'act', st, a, ...extra });
 
 function handle(m) {
   switch (m.t) {
-    case 'loginfail': $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
+    case 'loginfail': loginBusy(false); loginShake(); $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
     case 'newchar':     // new ID: pick gender + first shirt once
-      wantLogin = false; $('#loginForm').classList.add('hidden'); $('#createBox').classList.remove('hidden');
-      $('#createName').textContent = 'ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
+      loginBusy(false); wantLogin = false; $('#loginForm').classList.add('hidden'); $('#createBox').classList.remove('hidden');
+      $('#createName').textContent = 'ยินดีต้อนรับ ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
@@ -1935,6 +1973,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15j', d: '15 พ.ย. (รอบ 10)', items: [
+    '🔑 <b>ฟอร์มล็อกอินใหม่</b> ช่องกรอกมีไอคอน กดดู/ซ่อน PIN ได้ ปุ่มเข้าเมืองขึ้นสถานะกำลังเข้า ใส่ผิดการ์ดสั่นเตือน มีขั้นตอน 1-2-3 และเคล็ดลับหมุนเวียน',
+    '🧍 <b>หน้าสร้างตัวละครใหม่</b> ตัวละครตัวใหญ่เดินอยู่บนแท่น กดลูกศรหมุนดูได้รอบตัว เลือกเพศและสีเสื้อแล้วเห็นผลทันที' ] },
   { v: '2026-11-15i', d: '15 พ.ย. (รอบ 9)', items: [
     '🌸 <b>หน้าล็อกอินใหม่</b> ชื่อเกมตัวใหญ่ ฉากเมืองขยับช้าๆ กลีบซากุระปลิวลง โชว์ชาวเมืองที่จะได้เจอ บอกว่าทำอะไรได้บ้าง และบอกจำนวนคนที่ออนไลน์ตอนนี้' ] },
   { v: '2026-11-15h', d: '15 พ.ย. (รอบ 8)', items: [

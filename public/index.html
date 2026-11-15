@@ -116,22 +116,24 @@
     <div class="heroOnline" id="heroOnline"></div>
   </div>
   <form id="loginForm" class="box" autocomplete="off">
-    <div class="logo"><img src="assets/ui/pin.png" alt=""><h1>เข้าเมือง<small>LIFE TOWN</small></h1></div>
-    <label>ID <small>(ใช้ล็อกอิน · ภาษาอังกฤษและตัวเลขเท่านั้น)</small><input id="inName" maxlength="16" placeholder="เช่น somchai99" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
-    <label>รหัส PIN 4-8 หลัก<input id="inPin" inputmode="numeric" pattern="\d{4,8}" maxlength="8" placeholder="••••" type="password" required></label>
+    <div class="lfHead"><img src="assets/ui/pin.png" alt=""><div><h2>เข้าเมือง</h2><small>เล่นฟรี ไม่ต้องโหลดแอป เปิดบนมือถือหรือคอมได้เลย</small></div></div>
+    <div class="lfSteps"><span><b>1</b> ตั้ง ID + PIN</span><i>›</i><span><b>2</b> สร้างตัวละคร</span><i>›</i><span><b>3</b> เริ่มใช้ชีวิต</span></div>
+    <label class="fld"><i>👤</i><input id="inName" maxlength="16" placeholder="ID ของคุณ เช่น somchai99" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
+    <small class="hint">ID ใช้ภาษาอังกฤษและตัวเลขเท่านั้น</small>
+    <label class="fld"><i>🔑</i><input id="inPin" inputmode="numeric" pattern="\d{4,8}" maxlength="8" placeholder="PIN 4-8 หลัก" type="password" required><button type="button" id="pinEye" title="แสดง/ซ่อน PIN">👁</button></label>
     <div id="loginErr"></div>
-    <button class="primary" type="submit">เข้าเมือง</button>
-    <div class="sub">✨ ยังไม่มีบัญชี? ตั้ง ID และ PIN ใหม่แล้วกด <b>เข้าเมือง</b> ได้เลย จะได้สร้างตัวละครต่อ ฟรี ไม่ต้องสมัคร</div>
-    <div class="cbt">📢 เซิฟนี้เป็น CBT เมื่อเกมสมบูรณ์ข้อมูลจะถูกรีเซ็ต</div>
-    <button type="button" class="shareBtn">📤 ชวนเพื่อนมาเล่น</button>
+    <button class="primary" type="submit" id="loginGo"><span>🚪 เข้าเมือง</span></button>
+    <div class="lfTip" id="loginTip"></div>
+    <div class="lfFoot"><span class="cbt">📢 เซิฟนี้เป็น CBT ข้อมูลจะถูกรีเซ็ตเมื่อเกมสมบูรณ์</span><button type="button" class="shareBtn">📤 ชวนเพื่อน</button></div>
   </form>
   <div id="createBox" class="box hidden">
-    <div class="logo"><img src="assets/ui/pin.png" alt=""><h1>สร้างตัวละคร<small id="createName"></small></h1></div>
-    <p class="sub">เลือกได้ครั้งเดียวตอนสร้างตัวละคร · ผมเริ่มต้นเหมือนกันทุกคน (ย้อมผมที่ร้านทำผม เปลี่ยนเสื้อผ้าที่ร้านแฟชั่นในเมือง)</p>
-    <label>ชื่อตัวละคร <small>(ไทย/อังกฤษ/ตัวเลข 2-16 ตัว · ชื่อที่คนอื่นเห็นบนหัว)</small><input id="inCname" maxlength="16" placeholder="เช่น สมชาย" autocomplete="off"></label>
-    <div class="lbl">เพศและเสื้อตัวแรก</div><div id="swatches"></div>
+    <div class="lfHead"><img src="assets/ui/pin.png" alt=""><div><h2>สร้างตัวละคร</h2><small id="createName"></small></div></div>
+    <div class="cbStage"><button type="button" class="rot" id="rotL" title="หมุน">◀</button><canvas id="cbPrev" width="200" height="250"></canvas><button type="button" class="rot" id="rotR" title="หมุน">▶</button></div>
+    <label class="fld"><i>✏️</i><input id="inCname" maxlength="16" placeholder="ตั้งชื่อตัวละคร (ไทย/อังกฤษ 2-16 ตัว)" autocomplete="off"></label>
+    <div id="swatches"></div>
+    <small class="hint">ย้อมผมที่ร้านทำผม เปลี่ยนชุดที่ร้านแฟชั่นได้ทีหลัง</small>
     <div id="createErr" style="color:var(--bad);min-height:16px;font-size:13px"></div>
-    <div class="rowf"><button type="button" id="createBack" style="flex:1">← กลับ</button><button type="button" class="primary" id="createOk" style="flex:2">✨ สร้างตัวละครและเข้าเมือง</button></div>
+    <div class="rowf"><button type="button" id="createBack" style="flex:1">← กลับ</button><button type="button" class="primary" id="createOk" style="flex:2">✨ เข้าเมือง!</button></div>
   </div>
 </div>
 <script src="fx.js"></script>
