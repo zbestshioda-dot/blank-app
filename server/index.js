@@ -384,10 +384,10 @@ const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'ene
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg'];
-let nextListing = 1;
+let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) bugs = meta.bugs || [];
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -453,7 +453,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -827,9 +827,10 @@ function legendRoll(a, c) {
 }
 // the mayor walks around disguised as one of the AI townsfolk; whoever spots them (talks to them up close) wins today's prize
 let mayorBot = null, mayorDayK = '';
+const mayorPool = () => npcs.filter(n => n.area === 'town' && (n.folk || n.bot));   // townsfolk walking around town
 function mayorNow() {
   const d = dayKey();
-  if (d !== mayorDayK || !bots().some(n => n.id === mayorBot)) { mayorDayK = d; const bs = bots(); mayorBot = bs.length ? pick(bs).id : null; }
+  if (d !== mayorDayK || !mayorPool().some(n => n.id === mayorBot)) { mayorDayK = d; const bs = mayorPool(); mayorBot = bs.length ? pick(bs).id : null; }
   return mayorBot;
 }
 function eggMayor(a, bn) {
@@ -839,7 +840,7 @@ function eggMayor(a, bn) {
   e.md = d; a.gems = (a.gems || 0) + D.EGG.mayorGems; stat(a, 'mayorfound'); joy(a, 8); markMe(a);
   feed(`🕵️ ${a.name} จับได้ว่านายกฯ ปลอมตัวเป็น "${bn.name}" มาเดินเล่นในเมือง!`);
   send(a, { t: 'egg', k: 'mayor', name: bn.name, gems: D.EGG.mayorGems });
-  const bs = bots().filter(n => n.id !== bn.id); if (bs.length) mayorBot = pick(bs).id;   // the mayor slips away into someone else
+  const bs = mayorPool().filter(n => n.id !== bn.id); if (bs.length) mayorBot = pick(bs).id;   // the mayor slips away into someone else
 }
 function act(a, m) {
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
@@ -1579,6 +1580,7 @@ function phoneAct(a, m) {
     a.contacts = [...(a.contacts || []), { p: num, n: o.name }]; markMe(a);
     return toast(a, `บันทึกเบอร์ ${o.name} แล้ว`, '📇');
   }
+  if (m.t === 'contact_pin') { const c = (a.contacts || []).find(c => c.p === String(m.phone)); if (c) { c.fav = !c.fav; markMe(a); } return; }
   if (m.t === 'contact_del') { a.contacts = (a.contacts || []).filter(c => c.p !== String(m.phone)); return markMe(a); }
   if (m.t === 'call') {
     if (a.down) return toast(a, 'คุณหมดสติอยู่ โทรไม่ได้', '📵', false);
@@ -2335,9 +2337,9 @@ function botJoin(quiet) {
   npcs.push(n); npcRosterDirty = true;
   if (!quiet) feed(`👋 ${name} เข้าเมือง`);
 }
-function botLeave(n) {
+function botLeave(n, quiet) {
   const i = npcs.indexOf(n); if (i < 0) return;
-  npcs.splice(i, 1); npcRosterDirty = true; feed(`🚪 ${n.name} ออกจากเมือง`);
+  npcs.splice(i, 1); npcRosterDirty = true; if (!quiet) feed(`🚪 ${n.name} ออกจากเมือง`);
 }
 // every so often someone logs off or a new one arrives, keeping 3–6 around; bots level up and chat
 let botLastT = now();
@@ -2359,8 +2361,9 @@ function botTick(t) {
   }
   if (t > botEventAt) {
     botEventAt = t + rnd(150, 420) * 1000;
-    const k = bots().length, want = rint(3, 6);
-    if (k < want) botJoin(); else if (k > want) botLeave(pick(bots().filter(n => !n.inside)) || pick(bots()));
+    // the AI townsfolk are being retired: one slips away now and then (never right next to a player, no message), none come back
+    const away = bots().filter(n => !n.inside && ![...online.values()].some(o => areaId(o) === n.area && dist(o, n) < 16));
+    if (away.length) { botLeave(pick(away), true); botCap = bots().length; bugsDirty = true; dirty = true; }
   }
 }
 // a player said something near a bot (or named it in world chat): it answers after a moment, like a person typing
@@ -2378,7 +2381,6 @@ function botHear(a, text, world) {
 }
 const botPub = n => ({ id: n.id, name: n.name, av: 0, c: n.c, lv: n.bot.lv, dz: [], pose: null, title: n.bot.title?.title || '', tr: n.bot.title?.r || 0, pic: 0, w: 0, sad: 0, g: n.g, lk: n.look, adm: 0,
   of: D.CAREERS[n.c]?.where ? n.c : '', th: 0, afk: 0, x: n.x, y: n.y, f: n.f });
-for (let i = rint(3, 6); i > 0; i--) botJoin(true);
 
 // worker NPCs: where they walk and what they do there (only while no player has that job)
 const ST_XY = id => { const s = ST[id]; return s ? [s.x, s.y] : null; };
@@ -2503,7 +2505,7 @@ function meView(a) {
     cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
     dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
     icu: null, icuNext: a.icuNext || 0,
-    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
+    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
@@ -2735,6 +2737,7 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
     case 'minigame': {                      // (mini-games were removed from the game)
@@ -2881,7 +2884,7 @@ function onMessage(ws, raw) {
     case 'title': { if (!m.id || (a.ach || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
     case 'order': return placeOrder(a, m);
     case 'order_take': case 'order_drop': case 'order_deliver': case 'order_cancel': return riderAct(a, m);
-    case 'contact_add': case 'contact_del': case 'call': case 'call_msg': case 'call_end': return phoneAct(a, m);
+    case 'contact_add': case 'contact_del': case 'contact_pin': case 'call': case 'call_msg': case 'call_end': return phoneAct(a, m);
     case 'req': return request(a, m);
     case 'req_ans': return answerReq(a, m);
     case 'trade_offer': return tradeOffer(a, m);
@@ -3216,6 +3219,7 @@ process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
 async function main() {
   await store.init();
   await load();
+  for (let i = Math.min(botCap, rint(3, 6)); i > 0; i--) botJoin(true);   // only as many as are still left
   setInterval(tick, TICK);
   server.listen(PORT, () => console.log(`Life Town running on http://localhost:${PORT}`));
 }

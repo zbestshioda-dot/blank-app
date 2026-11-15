@@ -1152,3 +1152,18 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border
 .catchPop canvas{width:96px;height:64px}
 .catchPop b{font-size:14px}.catchPop .rtag{font-size:10px}.catchPop small{font-size:10.5px;margin-top:2px}
 @media (max-width:520px){.catchPop{padding:4px 11px 6px}.catchPop canvas{width:76px;height:50px}.catchPop b{font-size:13px}}
+
+/* no more menu: the phone button stands alone (a bit bigger) — portrait: where the menu toggle was; landscape: left of the minimap */
+#phoneBtn{width:46px!important;height:46px!important;padding:4px!important;border-radius:11px!important}
+#phoneBtn img{width:100%;height:100%;object-fit:contain}
+@media (orientation:landscape){
+  #topBar,body.hasEvent #topBar{left:auto!important;right:calc(var(--miniW,128px) + 14px + env(safe-area-inset-right))!important;top:calc(8px + env(safe-area-inset-top))!important;bottom:auto!important;width:auto!important;justify-content:flex-end!important}
+  /* chat lines up with the quest board and the status card */
+  #feed{width:calc(var(--cardW,250px) - 8px - env(safe-area-inset-left))!important}
+}
+@media (orientation:landscape){.cbHead button{padding:3px 5px}#cbOn{padding-left:3px;font-size:10px}}
+.phClock{margin:2% 0 3%}.phClock b{font-size:calc(var(--w) * .13)}.phClock small{font-size:11px}
+.phApps{flex:1;overflow-y:auto;align-content:start;gap:6px 2px;padding-bottom:16px;scrollbar-width:none}.phApps::-webkit-scrollbar{display:none}
+.phApp.em i{display:flex;align-items:center;justify-content:center;border-radius:22%;border:2px solid rgba(60,30,10,.75);box-shadow:inset 0 2px 0 rgba(255,255,255,.45);font-size:calc(var(--w) * .085);box-sizing:border-box}
+#cbOn i{font-style:normal}
+@media (orientation:landscape){#cbOn i{display:none}}

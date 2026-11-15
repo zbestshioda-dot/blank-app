@@ -544,7 +544,7 @@ const CAREER_ICON = c => G?.careers[c]?.icon || '';
 function paintCardClock(h) {
   const dt = me?.date; if (dt) $('#cDate').textContent = `${dt.day} ${G.months[dt.month]}`;
   $('#cTime').textContent = hhmm(h);
-  if (wd) $('#cbOn').textContent = `${wd.on} ออนไลน์`;
+  if (wd) { const t = `${wd.on}<i> ออนไลน์</i>`; if ($('#cbOn').innerHTML !== t) $('#cbOn').innerHTML = t; }
   $('#cWx').textContent = wd?.ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️';
 }
 // today's quests listed in the card: tap one and you walk there by yourself
@@ -590,11 +590,11 @@ function paintHud() {
   if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
   else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
   $('#statusBox').classList.toggle('hidden', !chips.length);
-  paintPortrait(); $('#mailBtn').classList.toggle('has', (me.mailN || 0) > 0);
+  paintPortrait(); $('#phoneBtn').classList.toggle('has', (me.mailN || 0) > 0 || (me.bills || []).length > 0 || achTodo().length > 0);
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
   $('#meMoney').textContent = Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
-  const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); $('#qBtn').classList.toggle('has', d < 3); }
+  const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
@@ -687,7 +687,7 @@ function openChatBox() { foldChat(false); setTimeout(() => $('#cbIn').focus(), 3
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // the status card folds down to a small strip (face, money, slim bars); folded by default on phones
-const placeLog = () => { const cd = $('#card'), db = $('#docBack'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); };
+const placeLog = () => { const cd = $('#card'), db = $('#docBack'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); const tr = $('#topRight'); if (tr) document.body.style.setProperty('--miniW', tr.offsetWidth + 'px'); };
 addEventListener('resize', () => placeLog());
 const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
 $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard(!$('#card').classList.contains('mini')); };
@@ -729,9 +729,6 @@ async function screenMode(mode) {
 }
 document.addEventListener('fullscreenchange', () => { if (panel?.kind === 'settings') refreshPanel(true); setTimeout(resize, 200); });
 // side menu can be folded away (remembered on this device)
-const setMenu = open => { $('#menu').classList.toggle('hidden', !open); $('#menuToggle').classList.toggle('closed', !open); $('#menuToggle').title = open ? 'ซ่อนเมนู' : 'เปิดเมนู'; try { localStorage.setItem('lt_menu', open ? '1' : '0'); } catch { } };
-$('#menuToggle').onclick = () => { FX.play('click'); setMenu($('#menu').classList.contains('hidden')); };
-{ let m = '1'; try { m = localStorage.getItem('lt_menu') ?? '1'; } catch { } setMenu(m !== '0'); }
 $('#mapX').onclick = closeMap;
 $('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapView') closeMap(); });
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
@@ -1939,11 +1936,11 @@ function nearBtns(t) {
     if (d < bd) { bd = d; best = p; }
   }
   if (!best) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); nbFor = null; return; }
-  const friend = (me.contacts || []).some(c => c.n === best.name);
+  const friend = (me.friends || []).some(f => f.n === best.name) || (me.contacts || []).some(c => c.n === best.name);
   const sig = best.id + '|' + friend;
   if (sig !== nbSig) {
     nbSig = sig;
-    el.innerHTML = `<button data-nb="info">👤 ข้อมูล</button><button data-nb="add" class="${friend ? 'done' : 'add'}" ${friend ? 'disabled' : ''}>${friend ? '✓ เพื่อนกันแล้ว' : '➕ เพิ่มเพื่อน'}</button>`;
+    el.innerHTML = friend ? '<button data-nb="info">👤 ข้อมูล</button>' : `<button data-nb="info">👤 ข้อมูล</button><button data-nb="add" class="${friend ? 'done' : 'add'}" ${friend ? 'disabled' : ''}>${friend ? '✓ เพื่อนกันแล้ว' : '➕ เพิ่มเพื่อน'}</button>`;
   }
   nbFor = best.id;
   el.style.fontSize = Math.round(TS * .27) + 'px';   // same text size as the name tag
@@ -2178,6 +2175,7 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  delContact(m) { popup(`ลบ <b>${esc(m.n)}</b> ออกจากรายชื่อ?`, [['🗑️ ลบ', 'warn', () => send({ t: 'contact_del', phone: m.phone })], ['ยกเลิก', '', () => { }]], 10000); },
   phMap() { closePanel(); mapZoom = 1; openMap(); },
   phClose() { closePanel(); },
   soilStore() { const h = wd?.houses?.[me.house]; if (!h) return; for (const k of me.furniture || []) if (G.shop.furniture[fbase(k)]?.tile && furnPos(h, k)) send({ t: 'hplace', k, store: 1 }); },
@@ -2478,6 +2476,7 @@ function eggFx(m) {
   }
 }
 function talkToTown(o) {
+  send({ t: 'npctalk', id: o.id });
   const info = { label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, bye = { label: '👋 ลาก่อน', fn: dialogClose };
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
     const q = me.quests?.list.find(x => x.type === 'trade');
@@ -2773,6 +2772,10 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16z4', d: '16 พ.ย. (รอบ 29)', items: [
+    '📱 <b>เอาแถบเมนูออก</b> ทุกอย่างย้ายเข้าไปอยู่ในมือถือแล้ว (เพิ่มแอป งาน · อันดับ · วิธีเล่น · แจ้งบัค) · ปุ่มมือถือใหญ่ขึ้น แนวตั้งอยู่ใต้นาฬิกา แนวนอนอยู่ข้างมินิแมพ · มีจุดแดงเตือนเมื่อมีจดหมาย บิล หรือรางวัล',
+    '💬 แนวนอน กล่องแชทกว้างเท่ากระดานเควสต์กับการ์ดสถานะ',
+    '👥 เดินใกล้เพื่อนที่เพิ่มกันแล้ว ขึ้นแค่ปุ่ม <b>ข้อมูล</b> · รายชื่อในมือถือ <b>ปักดาว ⭐ รายการโปรด</b> (ขึ้นบนสุด) และลบได้ (มีถามยืนยัน)'] },
   { v: '2026-11-16z3', d: '16 พ.ย. (รอบ 28)', items: ['🎵 เพลงในเกมไม่ขึ้นเป็นเครื่องเล่นเพลงบนแถบแจ้งเตือนมือถือแล้ว · เปิด YouTube/Spotify ฟังไปด้วยได้ เพลงไม่ตัดกัน (อยากฟังเพลงตัวเองอย่างเดียว ปิดเพลงในเกมที่ ⚙️ หรือแอปเพลงในมือถือ) · ออกจากเกมแล้วเสียงเกมหยุดเอง'] },
   { v: '2026-11-16z2', d: '16 พ.ย. (รอบ 27)', items: ['🐟 การ์ดโชว์ปลาที่ตกได้เล็กลง (เล็กสุดบนมือถือ) ไม่บังน้ำกับคนอื่นแล้ว'] },
   { v: '2026-11-16z', d: '16 พ.ย. (รอบ 26)', items: ['📱 <b>มือถือโฉมใหม่</b> เปิดมาเป็นหน้าจอโทรศัพท์จริงๆ มีวอลเปเปอร์เมือง นาฬิกา และแอป 16 อัน (โทร แชท จดหมาย เดลิเวอรี หุ้น บิล แผนที่ เพื่อน โปรไฟล์ ตั้งค่า เควสต์ รางวัล สัตว์เลี้ยง สมุดปลา อากาศ เพลง) · แตะแถบล่างหรือปุ่ม ‹ เพื่อกลับหน้าหลัก'] },
@@ -3416,8 +3419,8 @@ function renderPanel(p) {
         ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}`;
     }
     case 'friends': {
-      const fr = (me.friends || []).slice().sort((a, b) => b.on - a.on);
-      const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', esc(f.n), f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call) : '')).join('');
+      const fr = (me.friends || []).slice().sort((a, b) => (b.fav || 0) - (a.fav || 0) || b.on - a.on);
+      const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', `${f.fav ? '⭐ ' : ''}${esc(f.n)}`, f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call) : '')).join('');
       const others = [...P.values()].filter(x => !x.npc && x.id !== myId && !fr.some(f => f.n === x.name));
       const orow = others.map(x => itemRowRaw(x.afk ? '🌙' : '🟢', `${x.adm ? '👑 ' : ''}${esc(x.name)} <span class="tag">${CAREER_ICON(x.c)} ${G.careers[x.c]?.name || ''}</span>`, `${AREA[areaOf(x.x, x.y)?.id]?.name || areaOf(x.x, x.y)?.label || ''}${x.afk ? ' · ไม่อยู่หน้าจอ' : ''}`, '')).join('');
       const onN = fr.filter(f => f.on).length;
@@ -3543,20 +3546,26 @@ const PH_APPS = [
   ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }], ['แผนที่', { fn: 'phMap' }], ['เพื่อน', { fn: 'open', kind: 'friends' }],
   ['โปรไฟล์', { fn: 'open', kind: 'profile' }], ['ตั้งค่า', { fn: 'open', kind: 'settings' }], ['เควสต์', { fn: 'open', kind: 'quests' }], ['รางวัล', { fn: 'open', kind: 'achv' }],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }], ['อากาศ', { fn: 'qtab', set: { tab: 'wx' } }], ['เพลง', { fn: 'qtab', set: { tab: 'music' } }]];
+// the rest of the old menu, as plain apps on the last row
+const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+  ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
+  ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 const PH_TITLE = { contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
   const dt = me?.date, clock = hhmm(hourNow());
   const status = `<div class="phStat"><b>${clock}</b><span>📶 🔋</span></div>`;
   if (tab === 'home') {
-    const badge = i => (i === 0 && call) || (i === 5 && (me.bills || []).length) || (i === 11 && achTodo().length) ? '<em></em>' : '';
-    const apps = PH_APPS.map(([l, m], i) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(i)}<small>${l}</small></button>`).join('');
+    const badge = i => (i === 0 && call) || (i === 2 && (me.mailN || 0) > 0) || (i === 5 && (me.bills || []).length) || (i === 11 && achTodo().length) ? '<em></em>' : '';
+    const apps = PH_APPS.map(([l, m], i) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(i)}<small>${l}</small></button>`).join('')
+      + PH_MORE.filter(a => !a[3] || me.admin).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
     return `<div class="phone"><div class="phScr home">${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
   if (tab === 'contacts') {
     const onl = new Set((me.friends || []).filter(f => f.on).map(f => f.p));
-    const rows = (me.contacts || []).map(c => itemRowRaw(onl.has(c.p) ? '🟢' : '⚪', esc(c.n), c.p, `<div class="rowf">${B('📞', { t: 'call', phone: c.p }, 'good', !!call)}${B('🗑️', { t: 'contact_del', phone: c.p })}</div>`)).join('');
+    const fav = new Set((me.friends || []).filter(f => f.fav).map(f => f.p)), list = (me.contacts || []).slice().sort((x, y) => fav.has(y.p) - fav.has(x.p) || onl.has(y.p) - onl.has(x.p));
+    const rows = list.map(c => itemRowRaw(onl.has(c.p) ? '🟢' : '⚪', `${fav.has(c.p) ? '⭐ ' : ''}${esc(c.n)}`, c.p, `<div class="rowf">${B(fav.has(c.p) ? '★' : '☆', { t: 'contact_pin', phone: c.p }, fav.has(c.p) ? 'primary' : '')}${B('📞', { t: 'call', phone: c.p }, 'good', !!call)}${B('🗑️', { fn: 'delContact', phone: c.p, n: c.n })}</div>`)).join('');
     body = `<div class="jobbox">📱 เบอร์ของคุณ: <b style="font-size:18px;letter-spacing:2px">${me.phone}</b><div class="sub">บอกเบอร์นี้ให้เพื่อน แล้วเพื่อนจะบันทึกและโทรหาคุณได้</div></div>
       <div class="rowf" style="margin:10px 0"><input id="phIn" inputmode="numeric" maxlength="6" placeholder="เบอร์เพื่อน 6 หลัก">${B('บันทึก', { fn: 'addContact' }, 'good')}</div>
       <div class="list">${rows || '<div class="sub">ยังไม่มีรายชื่อ</div>'}</div>`;
