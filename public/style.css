@@ -1147,3 +1147,8 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border
 .phBody .grid2{grid-template-columns:1fr}
 .phBody .fbookGrid{grid-template-columns:repeat(3,1fr)}
 .phWx{text-align:center;padding:8px 0}.phWx .big{font-size:52px;line-height:1.1}.phWx b{display:block;font-size:20px}.phWx small{display:block;color:#7a5a3a;margin-bottom:8px}
+/* catch card: smaller, so it doesn't cover the water and the players (phones especially) */
+.catchPop{padding:6px 14px 8px;border-width:3px;border-radius:14px;top:27%}
+.catchPop canvas{width:96px;height:64px}
+.catchPop b{font-size:14px}.catchPop .rtag{font-size:10px}.catchPop small{font-size:10.5px;margin-top:2px}
+@media (max-width:520px){.catchPop{padding:4px 11px 6px}.catchPop canvas{width:76px;height:50px}.catchPop b{font-size:13px}}
