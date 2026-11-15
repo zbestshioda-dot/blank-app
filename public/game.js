@@ -952,6 +952,7 @@ function onAction() {
     return send({ t: 'enter', st: near.id });
   }
   if (near.type === 'exit') { if (t < actCd) return; actCd = t + 1300; return send({ t: 'exit' }); }
+  if (near.type === 'gate' && near.renov && !master && job('farmer') && near.id === 'gate_farm') return dialog({ name: 'ป้าสายใจ (ฝากงานที่ประตูไร่)', face: 'farmer_f', lines: ['ไร่ปิดปรับปรุงอยู่จ้ะ แต่งานในเมืองยังมีเยอะ', 'อยากรับภารกิจไหมหลาน?'], choices: [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: 'farmer', st: 'gate_farm' }); }, cls: 'good' }, { label: '👋 ลาก่อน', fn: dialogClose }] });
   if (near.type === 'gate' && near.renov && !master) return toast('ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
@@ -1538,12 +1539,17 @@ function rbResult(m) {
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
+const MIS_CAREERS = ['office', 'farmer', 'merchant', 'chef', 'doctor', 'police', 'beggar', 'rider'];
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
   if (me.career === 'none' && !me.admin) return '';
   if (m?.kind === 'icu' && panel?.kind === 'career') return '<div class="jobbox">🚨 กำลังทำเคสฉุกเฉินที่ ICU</div>';
-  if (!m) return `<div class="jobbox">📋 <b>ภารกิจอาชีพ</b> · สุ่มงานจริงในเมือง 20 แบบของ${esc(G.careers[me.career]?.name || '')} (เดินส่งของ ตามหา เก็บของ ไล่จับ พาคนไป คุยแก้ปัญหา) ค่าตอบแทนตามเวลาที่ใช้ ทำเร็วได้โบนัส · หมดเวลา = ล้มเหลว${cd > 0 ? `<br><small>งานใหม่เข้าในอีก ${cd} วินาที</small>` : ''}<br>${me.admin ? `<div class="grid2">${['office', 'farmer', 'merchant', 'chef', 'doctor', 'police', 'beggar', 'rider'].map(c => B(`${G.careers[c].icon} ${G.careers[c].name}`, { t: 'mission', op: 'start', car: c }, c === me.career ? 'primary' : 'good')).join('')}</div><small>👑 แอดมินเลือกภารกิจของอาชีพไหนก็ได้</small>` : B('📋 รับภารกิจ (⚡5)', { t: 'mission', op: 'start' }, 'primary', cd > 0)}</div>`;
+  if (!m) {
+    const giver = STAFF.find(x => x.career === me.career && !x.keeper), at = giver && STN(giver.st);
+    const where = me.career === 'farmer' ? 'ไร่ชานเมืองปิดปรับปรุงอยู่ เกษตรกรรับภารกิจที่หน้าประตูไร่ (ฝั่งตะวันตกของเมือง)' : giver ? `คุยกับ <b>${esc(giver.short)}</b> ที่${esc(AREA[at?.area]?.label || AREA[at?.area]?.name || at?.label || '')}` : '';
+    return `<div class="jobbox">📋 <b>ภารกิจอาชีพ</b> · งานจริงในเมือง 20 แบบสุ่มของ${esc(G.careers[me.career]?.name || '')} · <b>รับภารกิจได้ที่ NPC ของอาชีพ</b>${where ? `: ${where}` : ''}${cd > 0 ? `<br><small>งานใหม่เข้าในอีก ${cd} วินาที</small>` : ''}${me.admin ? `<div class="grid2">${['office', 'farmer', 'merchant', 'chef', 'doctor', 'police', 'beggar', 'rider'].map(c => B(`${G.careers[c].icon} ${G.careers[c].name}`, { t: 'mission', op: 'start', car: c }, c === me.career ? 'primary' : 'good')).join('')}</div><small>👑 แอดมินเลือกภารกิจของอาชีพไหนก็ได้ จากที่ไหนก็ได้</small>` : ''}</div>`;
+  }
   const steps = m.steps.map((s, j) => `<li class="${s.done ? 'done' : j === m.i ? 'cur' : ''}">${s.done ? '✅' : j === m.i ? '👉' : '▫️'} ${MIS_K[s.k] || ''} ${esc(s.label)}</li>`).join('');
   return `<div class="jobbox">${m.icon} <b>${esc(m.title)}</b> · เหลือเวลา <b class="miscd"></b><br><small>${esc(m.story)}</small><ul class="misSteps">${steps}</ul>${B('ยกเลิกภารกิจ', { t: 'mission', op: 'quit' })}</div>`;
 }
@@ -2332,7 +2338,9 @@ function talkTo(n, st) {
   const act = n.keeper ? '🛒 ดูร้าน / ใช้บริการ' : n.career === 'fishing' ? '🎣 ดูเบ็ด' : me.career === n.career ? '📋 ดูงาน' : '📝 สมัครงาน';
   const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
   const base = { name: n.name, face: NPC_FACE[n.id], npc: n.id };
-  const choices = [{ label: act, fn: openIt, cls: 'primary' }, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
+  const misOk = !n.keeper && MIS_CAREERS.includes(n.career) && job(n.career);
+  const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' }] : [];
+  const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   const hi = (n.line ? n.line(me) : '').trim() || 'สวัสดี';
   dialog({ ...base, lines: [hi], choices });
 }
@@ -2635,6 +2643,8 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16f', d: '16 พ.ย. (รอบ 6)', items: [
+    '📋 <b>ภารกิจอาชีพย้ายไปอยู่ที่ NPC ของแต่ละอาชีพ</b> เช่น ภารกิจตำรวจคุยกับจ่าที่สถานีตำรวจ ภารกิจหมอคุยกับหมอที่โรงพยาบาล ภารกิจไรเดอร์ที่ศูนย์ไรเดอร์ ฯลฯ แล้วเลือก "📋 รับภารกิจ" · เกษตรกรรับที่ประตูไร่ (ไร่ยังปิดปรับปรุง)'] },
   { v: '2026-11-16e', d: '16 พ.ย. (รอบ 5)', items: [
     '🎣 <b>ตกปลา: บอกจังหวะกลางจอแล้ว</b> รอปลา · ตวัด! · กดค้างกรอสาย · ปล่อยสาย! (สายจะขาด) · ยกตอนปลาโผล่ พร้อมคำแนะนำสั้นๆ และสีกระพริบตามสถานการณ์',
     '🎣 ปุ่มใหญ่ตอนอยู่ริมน้ำเปลี่ยนเป็น<b>รูปคันเบ็ดใหม่</b> สีตามเบ็ดที่ถือ (ไม้ไผ่ ไฟเบอร์ คาร์บอน โปร ทอง มังกร) คันโค้งตามแรงปลา สายเปลี่ยนสีตามความตึง และเห็นทุ่น/ปลาที่ปลายสาย'] },

@@ -1966,6 +1966,10 @@ function misAct(a, m) {
     const car = isAdmin(a) && MIS.M[m.car] ? m.car : a.career;
     if (!car || car === 'none' || !MIS.M[car]) return toast(a, 'ต้องมีอาชีพก่อน ถึงจะรับภารกิจได้', 'ℹ️', false);
     if (a.mis) return toast(a, 'คุณมีภารกิจค้างอยู่แล้ว', 'ℹ️', false);
+    if (!isAdmin(a)) {                                    // missions are handed out by the job's NPC (farmers: at the farm gate while the farm is closed)
+      const st = ST[m.st], ok = st && (st.id === 'staff_' + car || car === 'farmer' && st.id === 'gate_farm') && areaId(a) === st.area && Math.hypot(a.x - st.x, a.y - st.y) < (st.r || 1.5) + 2.5;
+      if (!ok) return toast(a, 'รับภารกิจได้ที่ NPC ของอาชีพคุณ', '📋', false);
+    }
     if ((a.misNext || 0) > now() && !(isAdmin(a) && a.god?.nocd)) return toast(a, `ยังไม่มีงานใหม่ รออีก ${Math.ceil((a.misNext - now()) / 1000)} วินาที`, '⏳', false);
     const out = D.roomAt(a.x, a.y)?.outside, where = out ? D.areaAt(out.x, out.y)?.id : areaId(a);
     if (where !== 'town') return toast(a, 'ภารกิจอาชีพทำในตัวเมือง กลับเข้าเมืองก่อนนะ', '🏙️', false);
