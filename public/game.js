@@ -994,7 +994,7 @@ function onAction() {
 }
 
 // ------------------------------------------------------------------ main loop
-let stuckT = 0, unstickAt = 0;
+let stuckT = 0, unstickAt = 0, downHintAt = 0;
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
 function frame(t) {
@@ -1012,7 +1012,10 @@ function frame(t) {
     if (!dx && !dy && autoPath && !me.down) { const st = autoStep(m, dt); if (st) [dx, dy] = st; }
     const ox0 = m.x, oy0 = m.y;
     if (holdAfterTp) { if (!dx && !dy && !joy) holdAfterTp = false; else { dx = 0; dy = 0; } }
-    if (me.down) { dx = 0; dy = 0; }
+    if (me.down) {
+      if ((dx || dy) && performance.now() > downHintAt) { downHintAt = performance.now() + 4000; toast(me.down.kind === 'jail' ? 'ติดคุกอยู่ เดินไม่ได้ รอพ้นโทษ' : me.down.kind === 'hosp' ? 'คุณหมดสติอยู่บนเตียง เดินไม่ได้ · รอเจ้าหน้าที่รักษาให้ฟื้น (ดูเวลาด้านล่าง)' : 'หิวจนหมดแรง เดินไม่ได้ · กินอะไรสักอย่างเพื่อฟื้น', '🛏️', false); }
+      dx = 0; dy = 0;
+    }
     const l = Math.hypot(dx, dy); meMoving = false;
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
@@ -2659,6 +2662,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16l', d: '16 พ.ย. (รอบ 12)', items: ['🛏️ ตอนหมดสติอยู่บนเตียงโรงพยาบาล ถ้ากดเดิน จะมีข้อความบอกว่าเดินไม่ได้และต้องรอเจ้าหน้าที่ (ไม่ใช่บัค)'] },
   { v: '2026-11-16k', d: '16 พ.ย. (รอบ 11)', items: ['🗺️ ย้ายป้ายวันเวลาและสภาพอากาศไปไว้มุมบนซ้ายของมินิแมพ ไม่ดันเมนูด้านขวาลงมาแล้ว'] },
   { v: '2026-11-16j', d: '16 พ.ย. (รอบ 10)', items: [
     '💚 <b>ผู้เล่นใหม่ไม่ป่วยแล้ว</b> 3 ชั่วโมงแรก (หรือจนกว่าจะหาเงินได้ ฿3,000) จะไม่ติดโรคใดๆ',
