@@ -11,7 +11,7 @@ function pxIconize(root) {
   if (!PXI.re || !root) return;
   const doNode = t => {
     const v = t.nodeValue; if (!v || !PXI.re.test(v)) return; PXI.re.lastIndex = 0;
-    const p = t.parentElement; if (!p || p.closest('input,textarea,select,option,script,style,canvas,.noicon,[contenteditable]')) return;
+    const p = t.parentElement; if (!p || p.closest('input,textarea,select,option,script,style,canvas,.noicon,[contenteditable],#actBtn,#fishCue')) return;
     const frag = document.createDocumentFragment(); let last = 0;
     v.replace(PXI.re, (m, off) => {
       const i = PXI.map[m.replace(/️/g, '')]; if (i === undefined) return m;
@@ -463,7 +463,7 @@ document.querySelectorAll('#chatBox [data-ct]').forEach(b => b.onclick = () => {
   $('#cbIn').placeholder = cbTab === 'world' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
   paintChatBox();
 });
-$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (i.value.trim()) send({ t: 'chat', text: i.value, ch: cbTab === 'world' ? 'world' : 'near' }); i.value = ''; i.blur(); };
+$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (!i.value.trim()) return; const ch = cbTab === 'world' ? 'world' : 'near'; if (!worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; i.blur(); };
 foldChat(cbFolded);
 function logLine(html, cls, bubbleOnly) {
   const l = $('#log'); const d = document.createElement('div');
@@ -1060,7 +1060,7 @@ function frame(t) {
     if (near.type === 'pier') actRod(); else actIco(ico);
     $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
       : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
-      : near.type === 'pier' ? (me.cast ? fishCue()[1] : '🎣 เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
+      : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); $('#actLabel').textContent = 'ใช้งาน'; }
   paintFishCue();
@@ -2070,7 +2070,7 @@ function bindPanel(root) {
   });
   const gs = root.querySelector('#godSpd');
   if (gs) { gs.oninput = () => { $('#godSpdV').textContent = (+gs.value).toFixed(1); }; gs.onchange = () => send({ t: 'god', op: 'speed', v: +gs.value }); }
-  const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (i.value.trim()) send({ t: 'chat', text: i.value, ch: chatTab }); i.value = ''; };
+  const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (!i.value.trim()) return; if (!worldOk(chatTab)) return; send({ t: 'chat', text: i.value, ch: chatTab }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
   root.querySelectorAll('[data-staff]').forEach(c => whenChars(() => {
     const n = STAFF.find(x => x.id === c.dataset.staff) || STAFF.find(x => x.career === c.dataset.staff); if (!n) return;
@@ -2444,7 +2444,14 @@ const rarTag = id => { const r = G.items[id]?.rar; return r ? `<span class="rtag
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(it.name)}${rarTag(id)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
-let chatTab = 'near';
+let chatTab = 'near', worldAt = 0;
+// world chat: one line every 3 seconds. Too soon -> say so and keep what was typed, so nothing is lost
+function worldOk(ch) {
+  if (ch !== 'world') return true;
+  const left = Math.ceil((worldAt + 3000 - Date.now()) / 1000);
+  if (left > 0) { toast(`แชทโลกส่งได้ทุก 3 วินาที · รออีก ${left} วินาที แล้วกดส่งใหม่ได้เลย (ข้อความยังอยู่ในช่องพิมพ์)`, '💬', false); return false; }
+  worldAt = Date.now(); return true;
+}
 const chatHtml = () => chatLog.filter(m => m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
 // ---- profile photo, titles by rarity, mail
 let myPic = '', mailList = [], tradeChat = [];
@@ -2663,6 +2670,10 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16r', d: '16 พ.ย. (รอบ 18)', items: [
+    '🎣 ปุ่มเบ็ดตกปลาวาดคันเบ็ดใหม่ให้ชัดขึ้น (ด้ามจับ รอก และสายเบ็ดอยู่ในกรอบปุ่ม)',
+    '🧑‍🤝‍🧑 เอาโจรขโมยที่เดินเกาะคนบนถนนออกจากเมืองแล้ว',
+    '💬 แชทโลก: ถ้าพิมพ์ถี่เกินไป (ส่งได้ทุก 3 วินาที) จะบอกเวลาที่ต้องรอ และข้อความยังค้างในช่องพิมพ์ให้ส่งใหม่ได้'] },
   { v: '2026-11-16q', d: '16 พ.ย. (รอบ 17)', items: ['📜 แนวตั้ง: ป้ายเหตุการณ์ขยับขึ้นมาเหนือตัวละคร'] },
   { v: '2026-11-16p', d: '16 พ.ย. (รอบ 16)', items: ['📜 แนวตั้ง: ป้ายเหตุการณ์ย้ายมาอยู่กลางจอ ยาวเต็มความกว้าง และตัวหนังสือจัดกึ่งกลาง (ถ้าข้อความยาวจะยังวิ่งวนอยู่)'] },
   { v: '2026-11-16o', d: '16 พ.ย. (รอบ 15)', items: ['📱 แนวนอน: ปุ่มกระเป๋า พัก วิ่ง ขอทาน และปุ่มใช้งาน เลื่อนไปชิดขวาจอแล้ว (เมนูย้ายขึ้นไปด้านบนแล้ว จึงมีที่ว่างพอ)'] },
@@ -4356,12 +4367,15 @@ function actRod() {
   const c = me.cast, st = !c ? 'idle' : c.state === 'wait' ? 'wait' : c.state === 'bite' ? 'bite' : FG?.mode === 'land' ? 'land' : 'fight';
   const ten = st === 'fight' ? Math.round((FG?.ten || 0) * 4) : st === 'bite' ? 2 : 0, rod = me.rodEq || 'bamboo', key = `rod:${rod}:${st}:${ten}:${reelHold ? 1 : 0}`;
   if (key === actIconKey) return;
-  const [c1, c2] = ROD_COL[rod] || ROD_COL.bamboo, bend = [2, 6, 11, 16, 21][ten];
-  const tipX = 40 - bend * .35, tipY = 8 + bend * .9, lineCol = ten >= 3 ? '#ff4a3a' : ten >= 2 ? '#ffd34d' : '#ffffff';
-  const end = st === 'idle' ? '' : st === 'wait' ? `<line x1="${tipX}" y1="${tipY}" x2="${tipX + 2}" y2="40" stroke="${lineCol}" stroke-width="1.2"/><circle cx="${tipX + 2}" cy="40" r="3" fill="#fff"/><path d="M${tipX - 1} 40a3 3 0 0 1 6 0z" fill="#e0453a"/>`
-    : st === 'bite' ? `<line x1="${tipX}" y1="${tipY}" x2="${tipX + 2}" y2="42" stroke="${lineCol}" stroke-width="1.4"/><text x="${tipX + 4}" y="38" font-size="12" font-weight="900" fill="#ffd34d" stroke="#000" stroke-width=".8">!</text>`
-    : `<line x1="${tipX}" y1="${tipY}" x2="${tipX + 3}" y2="40" stroke="${lineCol}" stroke-width="1.6"/><path d="M${tipX - 4} 41q5-5 10 0q-5 5-10 0z" fill="#9fb3c2" stroke="#26323a" stroke-width=".8"/><path d="M${tipX + 6} 41l3-3v6z" fill="#9fb3c2"/>`;
-  actIco(key, `<svg class="rodIco ${st}" viewBox="0 0 48 48" width="1em" height="1em"><path d="M6 44 Q${26 - bend * .4} ${30 - bend * .2} ${tipX} ${tipY}" fill="none" stroke="#2a1a0e" stroke-width="5" stroke-linecap="round"/><path d="M6 44 Q${26 - bend * .4} ${30 - bend * .2} ${tipX} ${tipY}" fill="none" stroke="${c1}" stroke-width="2.6" stroke-linecap="round"/><path d="M5 45 L13 37" stroke="#7a4a22" stroke-width="5" stroke-linecap="round"/><circle cx="14" cy="38" r="4" fill="#c8ccd2" stroke="#2a1a0e" stroke-width="1.4"/><circle cx="14" cy="38" r="1.4" fill="${c2}"/>${end}</svg>`);
+  const [c1, c2] = ROD_COL[rod] || ROD_COL.bamboo;
+  // a clean rod: grip bottom-left, the rod arcs up to the tip; the tip bends down a little with the pull
+  const bend = [0, 2, 4, 6, 8][ten], tip = [38, 9 + bend * .4], grip = [9, 39], ctrl = [24, 16 - bend * .3];
+  const lineCol = ten >= 3 ? '#ff5a4a' : ten >= 2 ? '#ffd34d' : '#ffffff';
+  const hook = st === 'idle' ? '' : st === 'wait' ? `<line x1="${tip[0]}" y1="${tip[1]}" x2="36" y2="42" stroke="${lineCol}" stroke-width="1"/><circle cx="36" cy="42" r="3.2" fill="#fff" stroke="#3e2414" stroke-width=".8"/><path d="M33.2 42a2.8 2.8 0 0 1 5.6 0z" fill="#e0453a"/>`
+    : st === 'bite' ? `<line x1="${tip[0]}" y1="${tip[1]}" x2="36" y2="41" stroke="${lineCol}" stroke-width="1.2"/><circle cx="36" cy="43" r="3" fill="#fff" stroke="#3e2414" stroke-width=".8"/><text x="41" y="16" font-size="13" font-weight="900" fill="#ffd34d" stroke="#3e2414" stroke-width="1">!</text>`
+    : `<line x1="${tip[0]}" y1="${tip[1]}" x2="34" y2="40" stroke="${lineCol}" stroke-width="1.4"/><path d="M29 42q5-4 10 0q-5 4-10 0z" fill="#9fb3c2" stroke="#26323a" stroke-width=".8"/>`;
+  const rodPath = `M${grip[0]} ${grip[1]} Q${ctrl[0]} ${ctrl[1]} ${tip[0]} ${tip[1]}`;
+  actIco(key, `<svg class="rodIco ${st}" viewBox="0 0 48 48" width="44" height="44"><path d="${rodPath}" fill="none" stroke="#3e2414" stroke-width="4.2" stroke-linecap="round"/><path d="${rodPath}" fill="none" stroke="${c1}" stroke-width="2.2" stroke-linecap="round"/><path d="M${grip[0]} ${grip[1]} L${grip[0] + 6} ${grip[1] - 6}" stroke="#7a4a22" stroke-width="4.2" stroke-linecap="round"/><circle cx="16" cy="30" r="3.6" fill="#c8ccd2" stroke="#3e2414" stroke-width="1.2"/><circle cx="16" cy="30" r="1.3" fill="${c2}"/>${hook}</svg>`);
 }
 // the big cue on screen while fishing (strike now / hold to reel / let it run / lift it out)
 function paintFishCue() {
@@ -4375,7 +4389,7 @@ function paintFishCue() {
 }
 // the big button's icon + label while fishing
 function fishCue() {
-  const c = me?.cast; if (!c) return ['🎣', '🎣 เหวี่ยงเบ็ด'];
+  const c = me?.cast; if (!c) return ['🎣', 'เหวี่ยงเบ็ด'];
   if (c.state === 'wait') return ['⏳', 'รอปลากินเบ็ด...'];
   if (c.state === 'bite') return ['‼️', 'ตวัด!'];
   if (!FG) return ['🎣', 'กำลังสู้กับปลา'];

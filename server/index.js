@@ -2553,8 +2553,10 @@ function thiefCaught(th, by) {
   else feed(`👮 ${by.name} จับโจรขโมยได้${loot ? ` คืนเงินให้ ${v.name}` : ''}`);
   thiefGone(th);
 }
+const THIEF_NPC = false;                   // the roaming pickpocket NPC is off (players can still pick pockets themselves)
 function thiefTick() {
   const t = now(), th = npcs.find(n => n.thief);
+  if (!THIEF_NPC) { if (th) thiefGone(th); return; }
   if (!th) {
     if (t < thiefAt) return;
     thiefAt = t + rnd(150, 330) * 1000;
