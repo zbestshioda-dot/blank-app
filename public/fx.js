@@ -15,7 +15,7 @@ window.FX = (() => {
     ac = new AC();
     master = ac.createGain(); master.gain.value = 0.9; master.connect(ac.destination);
     sfxBus = ac.createGain(); sfxBus.gain.value = st.sfx ? 0.55 : 0; sfxBus.connect(master);
-    musicBus = ac.createGain(); musicBus.gain.value = st.music ? 0.16 : 0; musicBus.connect(master);
+    musicBus = ac.createGain(); musicBus.gain.value = st.music ? 1 : 0; musicBus.connect(master);
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     startMusic();
@@ -83,30 +83,69 @@ window.FX = (() => {
   function play(name, arg) { if (!st.sfx) return; ensure(); try { SFX[name] && SFX[name](arg); } catch { } }
 
   // ------------------------------------------------------------------ background music
-  // gentle generative tune: a 4-chord pad loop with random pentatonic plucks
-  let musicTimer = null, beat = 0, nextAt = 0;
+  // Two composed loops (tools/music/compose.py): "Sunny Town" by day, "Starry Night" by night,
+  // crossfaded when the in-game clock changes. Falls back to the old generative tune if a file
+  // cannot be loaded or decoded.
+  const TRACKS = { day: { url: 'assets/music/day.mp3', frames: 3681391 }, night: { url: 'assets/music/night.mp3', frames: 4838400 } };
+  const MUSIC_VOL = 0.42, bufs = {}, loading = {};
+  let cur = null, want = 'day', synthOnly = false;
+  function load(k) {
+    if (!loading[k]) {
+      loading[k] = fetch(TRACKS[k].url).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(a => new Promise((res, rej) => ac.decodeAudioData(a, res, rej)))
+        .then(b => { bufs[k] = b; if (want === k) playTrack(k); return b; })
+        .catch(() => { if (!cur) { synthOnly = true; startSynth(); } });
+    }
+    return loading[k];
+  }
+  function playTrack(k) {
+    if (!ac || (cur && cur.k === k)) return;
+    const b = bufs[k]; if (!b) { load(k); return; }
+    const t = ac.currentTime, src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = b; src.loop = true;
+    // if the decoder kept the mp3 encoder delay/padding, loop only the real song so the seam is exact
+    const exact = Math.round(TRACKS[k].frames * b.sampleRate / 44100), extra = b.length - exact;
+    let off = 0;
+    if (extra > 8) { off = Math.min(extra, Math.round(1105 * b.sampleRate / 44100)) / b.sampleRate; src.loopStart = off; src.loopEnd = off + exact / b.sampleRate; }
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(MUSIC_VOL, t + 2.5);
+    src.connect(g); g.connect(musicBus); src.start(t, off);
+    if (cur) { const o = cur; o.g.gain.cancelScheduledValues(t); o.g.gain.setValueAtTime(o.g.gain.value, t); o.g.gain.linearRampToValueAtTime(0, t + 3); o.src.stop(t + 3.1); }
+    cur = { k, src, g };
+  }
+  function scene(k) {
+    if (k === want || !TRACKS[k]) return;
+    want = k;
+    if (ac && !synthOnly) playTrack(k);
+  }
+  function startMusic() { if (!synthOnly) playTrack(want); }
+
+  // generative fallback: a 4-chord pad loop with random pentatonic plucks
+  let musicTimer = null, beat = 0, nextAt = 0, synthBus = null;
   const CHORDS = [[261.6, 329.6, 392], [220, 261.6, 329.6], [174.6, 220, 261.6], [196, 246.9, 293.7]];
   const PENTA = [523.3, 587.3, 659.3, 784, 880, 1046.5];
-  function startMusic() {
+  function startSynth() {
     if (musicTimer || !ac) return;
+    synthBus = ac.createGain(); synthBus.gain.value = 0.16; synthBus.connect(musicBus);
     nextAt = ac.currentTime + 0.1;
     musicTimer = setInterval(() => {
       if (!st.music || ac.state !== 'running') { nextAt = ac.currentTime + 0.1; return; }
       while (nextAt < ac.currentTime + 0.6) {
         const at = nextAt - ac.currentTime, chord = CHORDS[Math.floor(beat / 8) % CHORDS.length];
-        if (beat % 8 === 0) chord.forEach(f => tone(f / 2, 4.2, { type: 'sine', vol: 0.35, at, attack: 0.6, dest: musicBus }));
-        if (beat % 2 === 0) tone(chord[0] / 4, 0.5, { type: 'triangle', vol: 0.25, at, dest: musicBus });
-        if (Math.random() < 0.45) tone(PENTA[Math.floor(Math.random() * PENTA.length)], 0.6, { type: 'triangle', vol: 0.18, at, attack: 0.01, dest: musicBus });
+        if (beat % 8 === 0) chord.forEach(f => tone(f / 2, 4.2, { type: 'sine', vol: 0.35, at, attack: 0.6, dest: synthBus }));
+        if (beat % 2 === 0) tone(chord[0] / 4, 0.5, { type: 'triangle', vol: 0.25, at, dest: synthBus });
+        if (Math.random() < 0.45) tone(PENTA[Math.floor(Math.random() * PENTA.length)], 0.6, { type: 'triangle', vol: 0.18, at, attack: 0.01, dest: synthBus });
         nextAt += 0.5; beat++;
       }
     }, 200);
   }
+  // pause all sound while the tab / app is in the background
+  document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend(); else ac.resume(); });
   function setOpt(k, v) {
     st[k] = v; save(); ensure();
     if (!ac) return;
     const t = ac.currentTime;
     if (k === 'sfx') sfxBus.gain.setTargetAtTime(v ? 0.55 : 0, t, 0.05);
-    if (k === 'music') musicBus.gain.setTargetAtTime(v ? 0.16 : 0, t, 0.3);
+    if (k === 'music') musicBus.gain.setTargetAtTime(v ? 1 : 0, t, 0.3);
   }
 
   // ------------------------------------------------------------------ visual effects (world coordinates in tiles)
@@ -145,5 +184,5 @@ window.FX = (() => {
     }
   }
 
-  return { play, float, burst, ring, dust, draw, opts: st, setOpt, ensure };
+  return { play, float, burst, ring, dust, draw, opts: st, setOpt, ensure, scene };
 })();

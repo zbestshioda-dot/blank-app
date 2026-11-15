@@ -603,6 +603,7 @@ function draw(t) {
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(G.map.tiles[ty][tx], tx, ty, tx * TS + X, ty * TS + Y, tm);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
+  FX.scene(night > 0.3 ? 'night' : 'day');
   for (const s of G.stations) {
     if (!inside(s.x, s.y)) continue;
     const px = s.x * TS + X, py = s.y * TS + Y;

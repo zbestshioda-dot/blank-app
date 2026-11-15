@@ -2096,7 +2096,7 @@ function tick() {
 }
 
 // ------------------------------------------------------------------ http
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp3': 'audio/mpeg' };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
