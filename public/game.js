@@ -2643,6 +2643,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16g', d: '16 พ.ย. (รอบ 7)', items: ['🗺️ เอาหมุดสีม่วง (NPC อาชีพ) ออกจากแผนที่ใหญ่แล้ว แผนที่ดูโล่งขึ้น'] },
   { v: '2026-11-16f', d: '16 พ.ย. (รอบ 6)', items: [
     '📋 <b>ภารกิจอาชีพย้ายไปอยู่ที่ NPC ของแต่ละอาชีพ</b> เช่น ภารกิจตำรวจคุยกับจ่าที่สถานีตำรวจ ภารกิจหมอคุยกับหมอที่โรงพยาบาล ภารกิจไรเดอร์ที่ศูนย์ไรเดอร์ ฯลฯ แล้วเลือก "📋 รับภารกิจ" · เกษตรกรรับที่ประตูไร่ (ไร่ยังปิดปรับปรุง)'] },
   { v: '2026-11-16e', d: '16 พ.ย. (รอบ 5)', items: [
@@ -3974,16 +3975,7 @@ function openMap(mapId, keepScroll) {
     places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.renov ? '🚧 ปิดปรับปรุงชั่วคราว' : s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
   }
   if (mapId === 'town') { const [x, y] = L(50, 32); places.push({ key: 'seatb43.6', icon: '⛲', label: 'จัตุรัสกลางเมือง', sub: 'นั่งเล่น พูดคุย', x, y, kind: 'spot' }); }
-  // job staff (where you apply / change jobs) are their own markers, kept apart from the places
-  const staffPl = [];
-  for (const n of STAFF) {
-    if (n.keeper) continue;
-    const s = STN(n.st); if (!s) continue;
-    const room = AREA[s.area]?.kind === 'room' ? AREA[s.area] : null, q = room ? room.doorPt : s;
-    if (mapOf(s.area) !== mapId) continue;
-    const [x, y] = L(q.x + (room ? 1.4 : 0), q.y + (room ? -1.2 : 0)), c = G.careers[n.career];
-    staffPl.push({ key: n.st, icon: '👤', label: n.short, sub: n.career === 'fishing' ? '🎣 ซื้อเบ็ด (ตกปลาได้ทุกคน)' : `${c?.icon || ''} สมัคร/เปลี่ยนเป็น${c?.name || ''}${room ? ` · ใน${room.label}` : ''}`, x, y, kind: 'staff', hl: me.career === n.career, ci: n.career === 'fishing' ? '🎣' : c?.icon || '👤' });
-  }
+  const staffPl = [];   // (job staff pins were taken off the map)
   // place markers: the place's own symbol on a light badge (no numbered black dots); job staff are person pins with their career's symbol
   const r = clamp(k * .95, 8, 13);
   places.forEach(pl => {
