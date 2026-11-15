@@ -226,6 +226,31 @@ $('#pinEye').onclick = () => { const i = $('#inPin'), show = i.type === 'passwor
 }
 if (!$('#inName').value) setTimeout(() => $('#inName').focus(), 300);
 
+// ---- login promo video: plays muted behind the login (full screen on phones, in a phone frame beside the form on desktop)
+const promo = (() => {
+  const login = $('#login'), v = $('#promoV'), snd = $('#promoSnd'), form = $('#loginForm'); if (!v) return { stop() { } };
+  const lite = (navigator.connection && navigator.connection.saveData) || matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let wantSound = false; try { wantSound = localStorage.getItem('lt_snd') === '1'; } catch { }
+  const off = () => login.classList.remove('hasVid');
+  const label = () => { snd.textContent = v.muted ? '🔇' : '🔊'; };
+  if (lite) { v.removeAttribute('autoplay'); login.classList.add('posterOnly'); }
+  else {
+    v.src = 'assets/ui/login_promo.mp4'; v.addEventListener('error', off); v.play().catch(() => { });
+    v.addEventListener('playing', () => login.classList.add('vidOn'), { once: true });
+  }
+  snd.onclick = e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => { }); try { localStorage.setItem('lt_snd', v.muted ? '0' : '1'); } catch { } label(); };
+  // browsers only allow sound after a tap: if the player liked sound last time, turn it on at their first tap
+  if (wantSound) login.addEventListener('pointerdown', () => { v.muted = false; v.play().catch(() => { }); label(); }, { once: true });
+  label();
+  // phone: the form is a bottom dock, closed to a single big button until tapped (a saved account just plays on)
+  const saved = !!(creds && creds.name && creds.pin), start = $('#startBtn');
+  const open = () => { form.classList.add('open'); setTimeout(() => $(saved && $('#inName').value ? '#inPin' : '#inName').focus(), 120); };
+  if (saved) { start.textContent = `▶ เล่นต่อ · ${creds.name}`; }
+  start.onclick = () => { if (saved && !form.classList.contains('open')) { loginBusy(true); creds = { name: creds.name, pin: creds.pin }; wantLogin = true; connect(); } else open(); };
+  $('#otherAcct').onclick = () => { $('#inName').value = ''; $('#inPin').value = ''; open(); };
+  $('#promoPhone').onclick = () => { if (matchMedia('(max-width:860px)').matches) return; $('#inName').focus(); };   // desktop: the "enter the city" button in the video focuses the form
+  return { open, stop() { v.pause(); v.removeAttribute('src'); v.load(); } };
+})();
 // ------------------------------------------------------------------ network
 function connect() {
   if (ws && ws.readyState <= 1) { if (ws.readyState === 1) sendLogin(); return; }
@@ -244,7 +269,7 @@ const doAct = (st, a, extra = {}) => send({ t: 'act', st, a, ...extra });
 
 function handle(m) {
   switch (m.t) {
-    case 'loginfail': loginBusy(false); loginShake(); $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
+    case 'loginfail': loginBusy(false); loginShake(); promo.open(); $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
     case 'newchar':     // new ID: pick gender + first shirt once
       loginBusy(false); wantLogin = false; $('#loginForm').classList.add('hidden'); $('#createBox').classList.remove('hidden');
       $('#createName').textContent = 'ยินดีต้อนรับ ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
@@ -252,7 +277,7 @@ function handle(m) {
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
       G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
-      creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds));
+      creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop();
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
@@ -1516,7 +1541,7 @@ function buildCast() {
   }
   if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
   fit(); addEventListener('resize', fit); requestAnimationFrame(tick);
-  const online = () => fetch('/api/status').then(r => r.json()).then(j => { const e = document.getElementById('heroOnline'); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; }).catch(() => { });
+  const online = () => fetch('/api/status').then(r => r.json()).then(j => { for (const id of ['heroOnline', 'promoOnline']) { const e = document.getElementById(id); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; } }).catch(() => { });
   online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
 })();
 fetch('assets/portraits.json?v=2').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
@@ -1973,6 +1998,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15k', d: '15 พ.ย. (รอบ 11)', items: [
+    '🎬 <b>หน้าล็อกอินเป็นวิดีโอโปรโมท</b> เปิดเกมมาเจอวิดีโอเมืองขยับได้ทันที (กดปุ่ม 🔊 เพื่อเปิดเสียง) · บนมือถือเต็มจอ กด "เข้าเมืองเลย!" · ถ้าเคยเล่นแล้วกด "เล่นต่อ" ได้ทันที' ] },
   { v: '2026-11-15j', d: '15 พ.ย. (รอบ 10)', items: [
     '🔑 <b>ฟอร์มล็อกอินใหม่</b> ช่องกรอกมีไอคอน กดดู/ซ่อน PIN ได้ ปุ่มเข้าเมืองขึ้นสถานะกำลังเข้า ใส่ผิดการ์ดสั่นเตือน มีขั้นตอน 1-2-3 และเคล็ดลับหมุนเวียน',
     '🧍 <b>หน้าสร้างตัวละครใหม่</b> ตัวละครตัวใหญ่เดินอยู่บนแท่น กดลูกศรหมุนดูได้รอบตัว เลือกเพศและสีเสื้อแล้วเห็นผลทันที' ] },

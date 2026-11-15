@@ -105,7 +105,10 @@
 <div id="dailyWrap" class="hidden"><div class="tutCard" id="daily"></div></div>
 <div id="tradeWin" class="hidden"><div class="sheet"><div id="tradeBody"></div><div class="tchat"><b>💬 คุยต่อรอง</b><div class="log" id="tchatLog"></div><form id="tchatForm" class="rowf"><input id="tchatIn" maxlength="120" placeholder="พิมพ์คุยกับอีกฝ่าย..." autocomplete="off"><button class="primary" type="submit">ส่ง</button></form></div></div></div>
 
-<div id="login">
+<div id="login" class="hasVid">
+  <div id="promo"><div class="promoPhone" id="promoPhone"><video id="promoV" muted loop playsinline autoplay preload="auto" poster="assets/ui/login_promo_poster.webp"></video>
+    <div id="promoOnline" class="promoOnline"></div>
+    <button type="button" id="promoSnd" title="เปิด/ปิดเสียง">🔇</button></div></div>
   <canvas id="petals"></canvas>
   <div id="loginHero">
     <span class="heroKicker">LIFE TOWN</span>
@@ -116,6 +119,7 @@
     <div class="heroOnline" id="heroOnline"></div>
   </div>
   <form id="loginForm" class="box" autocomplete="off">
+    <button type="button" class="primary" id="startBtn">▶ เข้าเมืองเลย!</button><button type="button" id="otherAcct" class="linkBtn">ใช้บัญชีอื่น</button>
     <div class="lfHead"><img src="assets/ui/pin.png" alt=""><div><h2>เข้าเมือง</h2><small>เล่นฟรี ไม่ต้องโหลดแอป เปิดบนมือถือหรือคอมได้เลย</small></div></div>
     <div class="lfSteps"><span><b>1</b> ตั้ง ID + PIN</span><i>›</i><span><b>2</b> สร้างตัวละคร</span><i>›</i><span><b>3</b> เริ่มใช้ชีวิต</span></div>
     <label class="fld"><i>👤</i><input id="inName" maxlength="16" placeholder="ID ของคุณ เช่น somchai99" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
