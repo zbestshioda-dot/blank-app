@@ -996,3 +996,39 @@ body.hasEvent #topBar{top:146px!important}
 /* pixel icons that replace emoji in the UI */
 :root{--pxs:1.2em}
 .pxi{display:inline-block;width:var(--pxs);height:var(--pxs);vertical-align:-.22em;background:url(assets/icons.webp?v=1) no-repeat;background-size:calc(var(--pxcols,16) * var(--pxs)) calc(var(--pxrows,12) * var(--pxs));font-style:normal;flex:none}
+
+/* profile frames over the profile photo; the special ones glow (each its own colours and motion) */
+.pfx{position:absolute;left:50%;top:50%;width:var(--fs);height:var(--fs);background:url(assets/frames.webp?v=1) no-repeat;background-size:calc(6 * var(--fs)) calc(6 * var(--fs));pointer-events:none;z-index:3}
+.pfx.sp::before,.pfx.sp::after{content:'';position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.pfx.sp::before{z-index:-1;background:conic-gradient(from 0deg,transparent 0 10%,var(--c1) 18%,transparent 30% 55%,var(--c2) 65%,transparent 78%);-webkit-mask:radial-gradient(circle,transparent 30%,#000 34% 46%,transparent 52%);mask:radial-gradient(circle,transparent 30%,#000 34% 46%,transparent 52%);filter:blur(3px);opacity:.9;animation:gSpin var(--sp,3s) linear infinite}
+.pfx.sp{animation:var(--an) var(--du,2s) ease-in-out infinite}
+@keyframes gSpin{to{transform:rotate(360deg)}}
+@keyframes gPulse{0%,100%{filter:drop-shadow(0 0 2px var(--c1)) drop-shadow(0 0 3px var(--c2))}50%{filter:drop-shadow(0 0 7px var(--c1)) drop-shadow(0 0 14px var(--c2))}}
+@keyframes gFlick{0%,100%{filter:drop-shadow(0 0 4px var(--c1)) drop-shadow(0 0 9px var(--c2))}20%{filter:drop-shadow(0 0 8px var(--c1)) drop-shadow(0 0 16px var(--c2))}35%{filter:drop-shadow(0 0 3px var(--c1))}60%{filter:drop-shadow(0 0 10px var(--c1)) drop-shadow(0 0 4px var(--c2))}80%{filter:drop-shadow(0 0 5px var(--c2))}}
+@keyframes gZap{0%,9%,13%,52%,56%,100%{filter:drop-shadow(0 0 3px var(--c1))}10%,12%,53%,55%{filter:drop-shadow(0 0 12px var(--c1)) drop-shadow(0 0 22px var(--c2)) brightness(1.5)}}
+@keyframes gRainbow{0%{filter:drop-shadow(0 0 6px #ff4d4d) drop-shadow(0 0 10px #ffb84d)}25%{filter:drop-shadow(0 0 6px #fff04d) drop-shadow(0 0 10px #6dff6d)}50%{filter:drop-shadow(0 0 6px #4dd2ff) drop-shadow(0 0 10px #6d6dff)}75%{filter:drop-shadow(0 0 6px #d24dff) drop-shadow(0 0 10px #ff4dd2)}100%{filter:drop-shadow(0 0 6px #ff4d4d) drop-shadow(0 0 10px #ffb84d)}}
+@keyframes gNeon{0%,100%{filter:drop-shadow(0 0 5px var(--c1)) drop-shadow(0 0 12px var(--c1))}50%{filter:drop-shadow(0 0 5px var(--c2)) drop-shadow(0 0 12px var(--c2))}}
+@keyframes gShine{0%,100%{filter:drop-shadow(0 0 3px var(--c1)) brightness(1)}50%{filter:drop-shadow(0 0 9px var(--c2)) brightness(1.25)}}
+@keyframes gWave{0%{transform:scale(.55);opacity:.9}100%{transform:scale(1.15);opacity:0}}
+.pfx.g24{--c1:#ffd34d;--c2:#fff3a0;--an:gPulse;--du:2.2s;--sp:2.6s}
+.pfx.g25{--c1:#ffffff;--c2:#fff2b8;--an:gPulse;--du:3s;--sp:5s}
+.pfx.g26{--c1:#ff2a2a;--c2:#5a0010;--an:gFlick;--du:1.6s;--sp:4s}
+.pfx.g27{--c1:#ff7a00;--c2:#ffd000;--an:gFlick;--du:.9s;--sp:1.6s}
+.pfx.g28{--c1:#9be7ff;--c2:#ffffff;--an:gShine;--du:2.6s;--sp:3.5s}
+.pfx.g29{--c1:#fff06a;--c2:#5ab4ff;--an:gZap;--du:1.8s;--sp:1.1s}
+.pfx.g30{--c1:#b15cff;--c2:#4a7bff;--an:gPulse;--du:3.2s;--sp:6s}
+.pfx.g31{--c1:#ff6bd5;--c2:#6bf5ff;--an:gRainbow;--du:4s;--sp:2.4s}
+.pfx.g32{--c1:#ff4fd8;--c2:#3ff0ff;--an:gNeon;--du:1.4s;--sp:1.8s}
+.pfx.g33{--c1:#ffcc33;--c2:#e0302a;--an:gPulse;--du:2.4s;--sp:3s}
+.pfx.g34{--c1:#ff8fc8;--c2:#ffe0f0;--an:gPulse;--du:2.8s;--sp:4.5s}
+.pfx.g35{--c1:#3fb6ff;--c2:#aef0ff;--an:gShine;--du:2s;--sp:3s}
+.pfx.g35::after,.pfx.g25::after{z-index:-1;border:2px solid var(--c2);animation:gWave 2.2s ease-out infinite}
+.pfx.g31::before{background:conic-gradient(#ff4d4d,#ffb84d,#fff04d,#6dff6d,#4dd2ff,#6d6dff,#d24dff,#ff4d4d)}
+.pfp.hasFrame #lvRing{opacity:0}
+.phWrap{position:relative;display:inline-block;flex:none}
+.frmGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:6px}
+.frmCard{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--paper3);border:2px solid var(--line);border-radius:10px;padding:6px 3px;text-align:center;font-size:11px}
+.frmCard.on{border-color:var(--acc);background:#ffe8a8}.frmCard .fprev{position:relative;width:64px;height:64px}
+.frmCard .fprev img{position:absolute;inset:0;margin:auto;width:30px;height:30px;border-radius:50%;object-fit:cover}
+.frmCard button{padding:3px 6px;font-size:11px}.frmCard.lock{opacity:.85}
+.pfp.hasFrame #meName,.pfp.hasFrame #lvPct{z-index:4}

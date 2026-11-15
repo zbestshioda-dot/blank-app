@@ -343,7 +343,7 @@ function handle(m) {
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       else setTimeout(() => me && checkNews(), 900);
       break;
-    case 'me': { const prev = me; me = m; $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
+    case 'me': { const prev = me; me = m; if (!prev || prev.frame !== m.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
     case 'wd': { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
     case 'roster': {
       const ids = new Set();
@@ -2420,7 +2420,31 @@ const chatHtml = () => chatLog.filter(m => m.sys || (chatTab === 'world' ? m.w :
 let myPic = '', mailList = [], tradeChat = [];
 const infoCache = new Map();
 const facePng = () => `assets/ui/face_${me?.gender === 'f' ? 'f' : 'm'}.png`;
-function paintPortrait() { const im = $('#mePortrait'); const src = myPic || facePng(); if (im.getAttribute('src') !== src) im.src = src; }
+function paintPortrait() {
+  const im = $('#mePortrait'); const src = myPic || facePng(); if (im.getAttribute('src') !== src) im.src = src;
+  const box = im.parentElement, f = me?.frame ?? -1; let el = box.querySelector('.pfx');
+  box.classList.toggle('hasFrame', f >= 0);
+  if (f < 0) { el?.remove(); return; }
+  const sz = Math.round(im.getBoundingClientRect().width * 1.62) || 100, html = frameHtml(f, sz);
+  if (!el || el.dataset.k !== f + ':' + sz) { el?.remove(); box.insertAdjacentHTML('beforeend', html); }
+}
+// a profile frame drawn over a photo of size ~ sz/1.6 centred in the same box (the frame's hole sits on the centre)
+let FRAMES_AT = null;
+fetch('assets/frames.json?v=1').then(r => r.json()).then(j => { FRAMES_AT = j; if (me) paintPortrait(); }).catch(() => { });
+function frameHtml(id, sz) {
+  if (!FRAMES_AT || id < 0) return '';
+  const [hx, hy] = FRAMES_AT.holes[id] || [.5, .5], c = FRAMES_AT.cols, sp = id >= 24;
+  return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
+}
+function frameRows() {
+  const own = me.frames || [], cur = me.frame ?? -1, pic = myPic || facePng();
+  const card = f => { const has = own.includes(f.id), on = cur === f.id;
+    const btn = f.locked ? (me.admin ? B(on ? 'ใส่อยู่ ✓' : '👑 ลองใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? 'primary' : '') : '<small>🔒 เร็วๆ นี้</small>')
+      : has ? B(on ? 'ถอด' : 'ใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? '' : 'good') : B(money(f.price), { t: 'frame', op: 'buy', id: f.id }, 'good', me.money < f.price);
+    return `<div class="frmCard ${on ? 'on' : ''} ${f.locked ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
+  const sec = (t, list) => `<div class="secT">${t}</div><div class="frmGrid">${list.map(card).join('')}</div>`;
+  return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · ล็อกไว้ก่อน)', G.frameDefs.slice(24));
+}
 const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ'];
 const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d'];
 const titleHtml = (t, r) => t ? `<span class="ttl rar${r || 1}">«${esc(t)}»</span>` : '';
@@ -2609,6 +2633,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16b', d: '16 พ.ย. (รอบ 2)', items: [
+    '🖼️ <b>กรอบรูปโปรไฟล์ 36 แบบ!</b> กดรูปโปรไฟล์ → 🖼️ กรอบรูป · กรอบโลหะและอัญมณี (ไม้ เงิน ทอง แพลทินัม แหวนเพชร ทับทิม มรกต ไพลิน …) และกรอบน่ารัก (ซากุระ ทานตะวัน แมว กระต่าย น้องหมา ลูกกวาด …) ซื้อแล้วใส่ได้เลย ทุกคนเห็นในโปรไฟล์',
+    '✨ <b>กรอบพิเศษ 12 แบบ เรืองแสงเคลื่อนไหว</b> แต่ละแบบสีและจังหวะต่างกัน (มงกุฎราชา ปีกเทวดา ปีศาจ เปลวเพลิง น้ำแข็ง สายฟ้า กาแล็กซี สายรุ้ง นีออน ลายไทย ดอกบัว สายน้ำ) · ตอนนี้ล็อกไว้ก่อน เร็วๆ นี้!'] },
   { v: '2026-11-16a', d: '16 พ.ย.', items: [
     '🎨 <b>ไอคอนพิกเซลชุดใหม่ทั้งเกม!</b> ไอคอนในเมนู ปุ่ม แจ้งเตือน หน้าร้าน กระเป๋า เควสต์ อิโมจิ ฯลฯ เปลี่ยนเป็นภาพพิกเซลอาร์ตเข้ากับตัวเกม (185 ไอคอน)'] },
   { v: '2026-11-15za', d: '15 พ.ย. (รอบ 27)', items: [
@@ -3119,12 +3146,13 @@ function renderPanel(p) {
     case 'profile': {
       const ti = G.ach.find(x => x.id === me.title), got = (me.ach || []).length;
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
-        <div class="prof"><div class="phCol"><img class="ph" src="${myPic || facePng()}" alt="">${B(p.titles ? '▲ ซ่อนฉายา' : '🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
+        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B(p.titles ? '▲ ซ่อนฉายา' : '🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B(p.frames ? '▲ ซ่อนกรอบ' : '🖼️ กรอบรูป', { fn: 'qtab', set: { frames: !p.frames } })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
         <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div></div>
         ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
           return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
           <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
+        ${p.frames ? frameRows() : ''}
         ${p.titles ? `<div class="secT">🏅 เปลี่ยนฉายา · สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
         <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="list">${achRows()}</div>` : ''}`;
     }
@@ -3181,7 +3209,7 @@ function renderPanel(p) {
       const fee = `<input id="feeIn" type="number" value="200" min="0" max="1000" style="width:90px">`;
       const known = (me.contacts || []).some(c => c.n === o.name);
       const inf = infoCache.get(o.id);
-      const prof = `<div class="prof"><img class="ph" src="${inf?.pic || `assets/ui/face_${o.g === 'f' ? 'f' : 'm'}.png`}" alt=""><div class="pi">
+      const prof = `<div class="prof"><span class="phWrap"><img class="ph" src="${inf?.pic || `assets/ui/face_${o.g === 'f' ? 'f' : 'm'}.png`}" alt="">${frameHtml(inf?.fr ?? -1, 124)}</span><div class="pi">
         <div>${CAREER_ICON(o.c)} ${G.careers[o.c]?.name || 'ว่างงาน'} · Lv.${o.lv || 1}</div><div>${titleHtml(o.title, o.tr)}</div>
         ${inf ? `<small>💰 ${money(inf.worth)} · 🎣 Lv.${inf.fishLv} · อยู่ในเมือง ${inf.days} วัน${inf.home ? ` · 🏠 บ้าน #${inf.home}` : ''}${inf.degree ? ' · 🎓' : ''}${inf.phone ? ` · 📱 ${inf.phone}` : ''}</small>` : '<small>กำลังโหลด...</small>'}</div></div>
         ${inf?.ach?.length ? `<div class="tchips">${inf.ach.slice(0, 12).map(([t, r]) => `<span class="rar${r}">🏅 ${esc(t)}</span>`).join('')}</div>` : ''}`;

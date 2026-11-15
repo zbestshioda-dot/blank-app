@@ -803,6 +803,15 @@ const RODS = {
   dragon: { name: 'เบ็ดมังกรทะเลลึก', icon: '🐉', price: 250000, zone: 0.44, luck: 3.2, junk: 0.12, desc: 'เบ็ดในตำนาน ปลามหากาพย์-ตำนานกินเบ็ดบ่อยที่สุด' },
 };
 const ROD_ORDER = Object.keys(RODS);
+// profile frames (public/assets/frames.webp, in this order): 12 metal & gem rings, 12 cute ones, 12 special ones (locked for now)
+const FRAMES = [
+  ['กรอบไม้', 300], ['กรอบไม้หมุด', 600], ['กรอบเงิน', 1500], ['กรอบทอง', 3000], ['กรอบแพลทินัม', 5000], ['แหวนเพชร', 12000],
+  ['แหวนทับทิม', 6000], ['แหวนมรกต', 6000], ['แหวนไพลิน', 6000], ['แหวนอเมทิสต์', 7000], ['สร้อยไข่มุก', 8000], ['ออบซิเดียน', 9000],
+  ['ซากุระ', 2000], ['ทานตะวัน', 2000], ['เถาวัลย์ดอกไม้', 2500], ['ปุยเมฆ', 2500], ['ออร่าชมพู', 3000], ['ราตรีดาว', 3500],
+  ['หัวใจ', 2500], ['แมวเหมียว', 3000], ['กระต่ายโบว์', 3000], ['น้องหมา', 3000], ['ลูกกวาด', 3500], ['ป่าเห็ด', 3500],
+  ['มงกุฎราชา', 0, 1], ['ปีกเทวดา', 0, 1], ['ปีศาจ', 0, 1], ['เปลวเพลิง', 0, 1], ['คริสตัลน้ำแข็ง', 0, 1], ['สายฟ้า', 0, 1],
+  ['กาแล็กซี', 0, 1], ['สายรุ้ง', 0, 1], ['นีออน', 0, 1], ['ลายไทย', 0, 1], ['ดอกบัว', 0, 1], ['สายน้ำ', 0, 1],
+].map(([name, price, special], id) => ({ id, name, price, special: !!special, locked: !!special }));
 // pets: bought in the pet panel (the pet shops are closed for renovation), one follows you around. rar 1-5 like fish
 const PETS = {
   chick:    { name: 'ลูกเจี๊ยบ', icon: '🐤', price: 500, rar: 1, desc: 'ตัวจิ๋วเจี๊ยบๆ กระโดดตุ๊บๆ' },
@@ -1301,6 +1310,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, COOK, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };
