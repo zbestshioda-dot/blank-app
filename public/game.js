@@ -805,7 +805,7 @@ cv.addEventListener('pointerdown', e => {
   lastPtrMouse = e.pointerType === 'mouse';
   cv.setPointerCapture(e.pointerId);
   down = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
-  if (e.pointerType === 'touch' || e.pointerType === 'pen') joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
+  if ((e.pointerType === 'touch' || e.pointerType === 'pen') && !joy) joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
   else if (e.button === 0) mouseHold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
 });
 cv.addEventListener('pointermove', e => {
@@ -925,9 +925,11 @@ function nearestPerson(r = 3) {
 function talk() {
   if (!G || !me) return;
   FX.play('click');
-  const p = nearestPerson();
-  if (p) return openPanel({ kind: 'player', pid: p.id });
-  if (near && STAFF_AT[near.id]) return onAction();
+  // whoever is closest wins: a player or townsperson standing next to you comes before the staff behind the desk
+  const p = nearestPerson(3.5), m = P.get(myId), sf = near && STAFF_AT[near.id];
+  const pd = p ? Math.hypot(p.x - m.x, p.y - m.y) : 1e9, sd = sf ? Math.hypot(sf.x - m.x, sf.y - m.y) : 1e9;
+  if (p && pd <= sd + .4) return p.npc && !p.bot ? talkToTown(p) : openPanel({ kind: 'player', pid: p.id });
+  if (sf) return onAction();
   toast('ไม่มีใครอยู่ใกล้ๆ เดินเข้าไปใกล้คนที่อยากคุยก่อน', '💬', false);
 }
 
@@ -1013,6 +1015,7 @@ function frame(t) {
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
+  if (RUN && !RUN.over && !document.getElementById('runWin')?.classList.contains('hidden')) return;   // the trash run covers the screen: don't draw the town under it (phones lagged)
   const m = P.get(myId);
   if (m) {
     let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
@@ -1036,8 +1039,15 @@ function frame(t) {
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
       const ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && blockedAt(m.x, m.y), free = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
+      const bx = m.x, by = m.y;
       const nx = r2(m.x + dx * sp); if (free(nx, m.y)) m.x = nx;
       const ny = r2(m.y + dy * sp); if (free(m.x, ny)) m.y = ny;
+      // corner assist: brushing the edge of a tree, pole or pot slides you around it instead of stopping dead
+      if (m.x === bx && m.y === by && !ar0) {
+        const slide = (ax, ay, px, py) => { if (!ax && !ay) return false; for (let o = .06; o <= .52; o += .04) for (const sg of [1, -1]) { const qx = bx + px * o * sg, qy = by + py * o * sg; if (free(qx, qy) && free(r2(qx + ax * sp), r2(qy + ay * sp))) { const k = Math.min(sp, o); m.x = r2(bx + px * k * sg); m.y = r2(by + py * k * sg); if (!free(m.x, m.y)) { m.x = bx; m.y = by; continue; } return true; } } return false; };
+        if (Math.abs(dx) >= Math.abs(dy)) slide(Math.sign(dx), 0, 0, 1) || slide(0, Math.sign(dy), 1, 0);
+        else slide(0, Math.sign(dy), 1, 0) || slide(Math.sign(dx), 0, 0, 1);
+      }
       m.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8; meMoving = Math.hypot(m.x - m.rx, m.y - m.ry) > 0.001;
       stepAcc += Math.hypot(m.x - m.rx, m.y - m.ry);
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
@@ -1401,6 +1411,12 @@ function runStart(seed) {
   const cv = $('#runCv');
   let p0 = null;
   cv.onpointerdown = e => { p0 = { x: e.clientX, y: e.clientY }; };
+  // a swipe counts as soon as the finger has travelled far enough, not when it lifts
+  cv.onpointermove = e => {
+    if (!p0 || !RUN || RUN.crashed) return; const dx = e.clientX - p0.x, dy = e.clientY - p0.y;
+    if (Math.abs(dx) > 26 && Math.abs(dx) > Math.abs(dy)) { p0 = null; runMove(dx > 0 ? 1 : -1); }
+    else if (dy < -26 && -dy > Math.abs(dx)) { p0 = null; runJump(); }
+  };
   cv.onpointerup = e => {
     if (!p0 || !RUN || RUN.crashed) return; const dx = e.clientX - p0.x, dy = e.clientY - p0.y; p0 = null;
     if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) runMove(dx > 0 ? 1 : -1);
@@ -2716,6 +2732,10 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16x', d: '16 พ.ย. (รอบ 24)', items: [
+    '🚶 <b>เดินลื่นขึ้น</b> เดินเฉียดต้นไม้ เสาไฟ กระถางดอกไม้ หรือมุมตึก ตัวละครจะไถลอ้อมไปเอง ไม่ติดค้าง · นิ้วที่สองแตะจอไม่ทำให้จอยหลุดแล้ว',
+    '💬 ปุ่ม <b>คุย</b> คุยกับคนที่ยืนใกล้ที่สุด (ผู้เล่นหรือชาวเมือง) ไม่เด้งไปหาผู้กองเอกหรือพนักงานเคาน์เตอร์ทุกครั้งแล้ว',
+    '🗑️ <b>วิ่งเก็บขยะไม่แลค</b> ไม่วาดเมืองซ้อนข้างหลังตอนวิ่ง · ปัดเปลี่ยนเลน/กระโดดติดทันทีไม่ต้องรอยกนิ้ว'] },
   { v: '2026-11-16w', d: '16 พ.ย. (รอบ 23)', items: ['💬 ตัวเลขผู้เล่นที่ออนไลน์ย้ายจากการ์ดสถานะไปอยู่ท้ายแถบแท็บในกล่องแชท แตะเพื่อดูรายชื่อคนที่ออนไลน์'] },
   { v: '2026-11-16v', d: '16 พ.ย. (รอบ 22)', items: [
     '👥 เดินเข้าใกล้ผู้เล่นคนอื่น จะมีปุ่ม <b>ข้อมูล</b> และ <b>เพิ่มเพื่อน</b> ขึ้นเหนือชื่อเขา',
