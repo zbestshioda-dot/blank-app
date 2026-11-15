@@ -23,6 +23,9 @@ window.FX = (() => {
   }
   // browsers only allow audio after a user gesture
   ['pointerdown', 'keydown', 'touchstart'].forEach(e => addEventListener(e, ensure, { passive: true }));
+  // game audio mixes with other apps (YouTube, Spotify) instead of taking over, and stops while the game is in the background
+  try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch { }
+  document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend().catch(() => { }); else ac.resume().catch(() => { }); });
 
   function tone(freq, dur, o = {}) {
     if (!ac) return;
@@ -162,5 +165,5 @@ window.FX = (() => {
     }
   }
 
-  return { play, float, burst, ring, dust, draw, opts: st, setOpt, ensure };
+  return { play, float, burst, ring, dust, draw, opts: st, setOpt, ensure, ctx: () => ac };
 })();

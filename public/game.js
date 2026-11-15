@@ -636,22 +636,33 @@ const hourOfPhase = m => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 
 const hourNow = () => FORCE_PHASE !== null ? +FORCE_PHASE * 24 : hourOfPhase(((((Date.now() + clockOff + (wd?.toff || 0)) % G.dayMs) + G.dayMs) % G.dayMs) / 60000);
 // ---- background music: a day track and a night track (assets/music), cross-faded as the in-game clock turns
 window.BGM_EXT = true;
-const BGM = { day: null, night: null, vol: .42 };
+// played through Web Audio (not an <audio> element): phones then don't treat the game as a media player, so the music
+// doesn't show up in the notification shade or stop YouTube/Spotify; it mixes in and goes quiet when the game is hidden
+const BGM = { vol: .42, buf: {}, src: {}, gain: {}, loading: {} };
+function bgmLoad(k, ac) {
+  if (BGM.loading[k]) return; BGM.loading[k] = 1;
+  fetch(`assets/music/${k}.mp3?v=1`).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
+    const n = d.length, mono = ac.createBuffer(1, n, d.sampleRate), o = mono.getChannelData(0), L = d.getChannelData(0), R = d.numberOfChannels > 1 ? d.getChannelData(1) : L;
+    for (let i = 0; i < n; i++) o[i] = (L[i] + R[i]) * .5;   // mono: half the memory on phones
+    BGM.buf[k] = mono; BGM.loading[k] = 0;
+  }).catch(() => { setTimeout(() => { BGM.loading[k] = 0; }, 15000); });
+}
 function bgmTick() {
-  if (!G || !me) return;
+  const ac = FX.ctx(); if (!G || !me || !ac || ac.state !== 'running') return;   // audio starts after the first tap
   const h = hourNow(), want = FX.opts.music ? (h >= 6 && h < 18.5 ? 'day' : 'night') : null;
   for (const k of ['day', 'night']) {
-    let a = BGM[k];
-    if (!a && k === want) { a = BGM[k] = new Audio(`assets/music/${k}.mp3?v=1`); a.loop = true; a.volume = 0; a.preload = 'auto'; }
-    if (!a) continue;
     const target = k === want ? BGM.vol : 0;
-    a.volume = Math.max(0, Math.min(1, a.volume + (target - a.volume) * .06));
-    if (target > 0 && a.paused) a.play().catch(() => { });
-    if (target === 0 && a.volume < .01 && !a.paused) a.pause();
+    if (target > 0 && !BGM.src[k]) {
+      if (!BGM.buf[k]) { bgmLoad(k, ac); continue; }
+      const g = ac.createGain(), s = ac.createBufferSource(); g.gain.value = 0; g.connect(ac.destination); s.buffer = BGM.buf[k]; s.loop = true; s.connect(g); s.start();
+      BGM.src[k] = s; BGM.gain[k] = g;
+    }
+    const g = BGM.gain[k]; if (!g) continue;
+    g.gain.value = Math.max(0, g.gain.value + (target - g.gain.value) * .06);
+    if (target === 0 && g.gain.value < .01) { try { BGM.src[k].stop(); } catch { } BGM.src[k].disconnect(); g.disconnect(); BGM.src[k] = BGM.gain[k] = null; BGM.buf[k] = null; }   // faded out: let the buffer go
   }
 }
 setInterval(bgmTick, 100);
-addEventListener('pointerdown', () => { for (const k of ['day', 'night']) { const a = BGM[k]; if (a && a.paused && a.volume > 0) a.play().catch(() => { }); } });   // after a tap the browser lets it play
 const dayNow = () => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 }, mid = (c.dayMin + (24 - c.dusk) * (24 - c.dayMin) / (24 - (c.dusk - c.dawn))) * 60000; return Math.floor((Date.now() + clockOff + (wd?.toff || 0) + G.dayMs - mid) / G.dayMs); };
 const isInside = rid => { const m = P.get(myId); return !!m && roomOf(m.x, m.y)?.id === rid; };
 const FORCE_PHASE = new URLSearchParams(location.search).get('phase');   // ?phase=0.95 previews a time of day
@@ -2762,6 +2773,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16z3', d: '16 พ.ย. (รอบ 28)', items: ['🎵 เพลงในเกมไม่ขึ้นเป็นเครื่องเล่นเพลงบนแถบแจ้งเตือนมือถือแล้ว · เปิด YouTube/Spotify ฟังไปด้วยได้ เพลงไม่ตัดกัน (อยากฟังเพลงตัวเองอย่างเดียว ปิดเพลงในเกมที่ ⚙️ หรือแอปเพลงในมือถือ) · ออกจากเกมแล้วเสียงเกมหยุดเอง'] },
   { v: '2026-11-16z2', d: '16 พ.ย. (รอบ 27)', items: ['🐟 การ์ดโชว์ปลาที่ตกได้เล็กลง (เล็กสุดบนมือถือ) ไม่บังน้ำกับคนอื่นแล้ว'] },
   { v: '2026-11-16z', d: '16 พ.ย. (รอบ 26)', items: ['📱 <b>มือถือโฉมใหม่</b> เปิดมาเป็นหน้าจอโทรศัพท์จริงๆ มีวอลเปเปอร์เมือง นาฬิกา และแอป 16 อัน (โทร แชท จดหมาย เดลิเวอรี หุ้น บิล แผนที่ เพื่อน โปรไฟล์ ตั้งค่า เควสต์ รางวัล สัตว์เลี้ยง สมุดปลา อากาศ เพลง) · แตะแถบล่างหรือปุ่ม ‹ เพื่อกลับหน้าหลัก'] },
   { v: '2026-11-16y', d: '16 พ.ย. (รอบ 25)', items: ['🥚 เพิ่มอีสเตอร์เอ้กแล้ว', '🎣 เห็นคนอื่นตกปลาแล้ว (คันเบ็ด สายเบ็ด ทุ่นลอย ทุ่นจมตอนปลากิน สายตึงตอนเย่อปลา) ไม่ใช่ยืนเฉยๆ'] },
