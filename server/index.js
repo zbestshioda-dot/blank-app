@@ -383,7 +383,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg'];
 let nextListing = 1;
 async function load() {
   const rows = await store.loadAll();
@@ -815,6 +815,32 @@ function waterSpot(a) {
   const pool = D.waterPool(a.x, a.y); if (!pool) return null;
   return { id: 'water', type: 'pier', pool, label: 'ตกปลา', icon: '🎣', x: a.x, y: a.y, r: 3, area: areaId(a) };
 }
+// ------------------------------------------------------------------ easter eggs
+const dayKey = () => new Date(now() + 7 * 3600e3).toISOString().slice(0, 10);   // Thai calendar day
+const eggOf = a => { a.egg = a.egg || {}; a.egg.s = a.egg.s || []; return a.egg; };
+// the legendary fish: the east corner of the lake, around midnight in game, once a day per player
+function legendRoll(a, c) {
+  const L = D.EGG.legend, h = c.ch ?? hourNow();   // the hour you cast at
+  if (c.pool !== 'lake' || Math.hypot(c.x - L.x, c.y - L.y) > L.r || !(h >= 23.75 || h < 1.25)) return null;
+  if (eggOf(a).ld === dayKey() || Math.random() >= L.odds) return null;
+  return 'mayorkoi';
+}
+// the mayor walks around disguised as one of the AI townsfolk; whoever spots them (talks to them up close) wins today's prize
+let mayorBot = null, mayorDayK = '';
+function mayorNow() {
+  const d = dayKey();
+  if (d !== mayorDayK || !bots().some(n => n.id === mayorBot)) { mayorDayK = d; const bs = bots(); mayorBot = bs.length ? pick(bs).id : null; }
+  return mayorBot;
+}
+function eggMayor(a, bn) {
+  if (bn.id !== mayorNow() || bn.area !== areaId(a) || dist(a, bn) > 4) return;
+  const e = eggOf(a), d = dayKey();
+  if (e.md === d) return send(a, { t: 'egg', k: 'mayor', name: bn.name, again: 1 });
+  e.md = d; a.gems = (a.gems || 0) + D.EGG.mayorGems; stat(a, 'mayorfound'); joy(a, 8); markMe(a);
+  feed(`🕵️ ${a.name} จับได้ว่านายกฯ ปลอมตัวเป็น "${bn.name}" มาเดินเล่นในเมือง!`);
+  send(a, { t: 'egg', k: 'mayor', name: bn.name, gems: D.EGG.mayorGems });
+  const bs = bots().filter(n => n.id !== bn.id); if (bs.length) mayorBot = pick(bs).id;   // the mayor slips away into someone else
+}
 function act(a, m) {
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
   if (!s && m.st === 'water') { if (a.cast) { a.cast = null; markMe(a); } return toast(a, 'ต้องยืนติดริมน้ำก่อนถึงจะตกปลาได้', '🎣', false); }
@@ -1197,19 +1223,39 @@ function act(a, m) {
       a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4);
       return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่มใหญ่เพื่อเหวี่ยงเบ็ด`, '🎣');
     }
+    case 'wish.toss': {                    // the wishing fountain: a ฿10 coin, a fortune, and once a day maybe ฿1,000 back
+      const E = D.EGG, e = eggOf(a), d = dayKey(); if (e.d !== d) { e.d = d; e.wn = 0; e.ww = 0; }
+      if (!cd(a, 'wish', 1200, true)) return;
+      if (e.wn >= E.wishDay) return toast(a, `วันนี้โยนเหรียญครบ ${E.wishDay} ครั้งแล้ว น้ำพุขอพักก่อน พรุ่งนี้มาใหม่นะ`, '⛲', false);
+      if (!pay(a, E.wishCost)) return;
+      e.wn++; const win = !e.ww && Math.random() < 1 / E.wishOdds, f = pick(D.FORTUNES);
+      if (win) { e.ww = 1; a.money += E.wishWin; a.earned += E.wishWin; stat(a, 'wishwin'); joy(a, 8); feed(`⛲✨ ${a.name} โยนเหรียญที่น้ำพุแล้วได้ ${money(E.wishWin)}!`); }
+      markMe(a); send(a, { t: 'egg', k: 'wish', win: win ? E.wishWin : 0, f });
+      return;
+    }
+    case 'secret.read': {                  // one of the five little signs in the corners of town
+      const E = D.EGG, e = eggOf(a);
+      if (e.s.includes(s.n)) return toast(a, `🪧 "คุณเจอที่ลับแล้ว!" · ป้ายนี้คุณเจอไปแล้ว (${e.s.length}/5)`, '🪧', false);
+      e.s.push(s.n); a.gems = (a.gems || 0) + E.secretGems; stat(a, 'secrets', e.s.length, true); joy(a, 6);
+      let frame = false;
+      if (e.s.length >= 5) { a.frames = a.frames || []; if (!a.frames.includes(E.secretFrame)) { a.frames.push(E.secretFrame); frame = true; } }
+      feed(e.s.length >= 5 ? `🗺️ ${a.name} เจอที่ลับครบทั้ง 5 จุดในเมือง!` : `🪧 ${a.name} เจอที่ลับในเมือง! (${e.s.length}/5)`);
+      markMe(a); send(a, { t: 'egg', k: 'secret', n: e.s.length, gems: E.secretGems, frame: frame ? D.FRAMES[E.secretFrame].name : '' });
+      return;
+    }
     case 'pier.cast': {                    // cast from the water's edge (the big button); the float lands a couple of tiles out
       if (!rodOf(a)) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (เริ่ม ${money(D.RODS.bamboo.price)})`, '🎣', false);
       if (a.cast) return;
       if (!spend(a, 8)) return;
       const bite = now() + rnd(3500, 9500) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
-      a.cast = { state: 'wait', bite, win: Math.round(1500 + r.zone * 2500 + 25 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
+      a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round(1500 + r.zone * 2500 + 25 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
       return;
     }
     case 'pier.reel': case 'pier.hook': {   // strike: too early (only a nibble) scares the fish, inside the bite window hooks it and the fight starts
       const c = a.cast; if (!c) return;
       if (c.state === 'wait') { c.bite = Math.max(c.bite, now() + 1500); markMe(a); return toast(a, 'ยังไม่ใช่! ทุ่นแค่ไหว รอให้ทุ่นจมก่อนค่อยตวัด', '⏳', false); }
       if (c.state !== 'bite') return;
-      const id = rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
+      const id = legendRoll(a, c) || rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
       const pow = id ? clamp(.18 + .1 * rar + (it.base >= 1500 ? .05 : 0), .15, .75) : .1;
       c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((0.8 + rar * 0.8) * 1000);
       c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(750 + r.zone * 1000), seed: rint(1, 1e9), min: c.min };
@@ -2019,7 +2065,9 @@ function giveCatch(a, id) {
   if (rar >= 4) stat(a, 'epicfish');
   a.fishdex = a.fishdex || {}; const first = !a.fishdex[id]; a.fishdex[id] = (a.fishdex[id] || 0) + 1;
   stat(a, 'fishdex', Object.keys(a.fishdex).filter(k => D.ITEMS[k]?.rar).length, true);
-  if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
+  if (it.legend) { eggOf(a).ld = dayKey(); stat(a, 'legendfish'); feed(`🎉 ${a.name} พบปลาในตำนาน! ${it.icon} ${it.name}`); send(a, { t: 'egg', k: 'legend' }); }
+  else if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
+
   send(a, { t: 'catch', item: id, first });
   return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
 }
@@ -2593,7 +2641,7 @@ function dailyLogin(a) {
   return { streak: a.loginStreak, reward, gems, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
 }
 // achievements: each one has a cash reward by rarity, collected from the achievements page
-const ACH_GEMS = [0, 5, 7, 10, 12, 15];   // achievements pay 💎 diamonds by rarity (no cash)
+const ACH_GEMS = [0, 5, 7, 10, 12, 15, 15, 20];   // achievements pay 💎 diamonds by rarity (no cash)
 function achClaim(a, id) {
   const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
   if (!todo.length) return toast(a, 'ไม่มีรางวัลให้รับ', '🏅', false);
@@ -2849,6 +2897,7 @@ function onMessage(ws, raw) {
     }
     case 'info': {                          // someone's profile: tap a player
       const bn = botById(+m.id);
+      if (bn) eggMayor(a, bn);
       if (bn) { const b = bn.bot; return send(a, { t: 'info', id: bn.id, name: bn.name, pic: '', c: bn.c, lv: b.lv, title: b.title?.title || '', tr: b.title?.r || 0, adm: 0, ach: b.title ? [[b.title.title, b.title.r]] : [], worth: b.worth, days: b.days, fishLv: b.fishLv, home: 0, degree: 0, phone: '' }); }
       const o = playerById(m.id); if (!o || o.npc) return;
       const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(Boolean).sort((x, y) => y.r - x.r);

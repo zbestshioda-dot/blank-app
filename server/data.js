@@ -190,6 +190,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
+  STATIONS.push({ id: 'wish', type: 'wish', label: 'โยนเหรียญ ฿10', icon: '⛲', x: 50, y: 34.7, r: 1.4, area: 'town' });
+  // five little signs in corners nobody walks to
+  [[67, 25.3], [1.6, 38.5], [1.6, 87.6], [92.5, 1.6], [98, 88]].forEach(([x, y], n) => { prop('signpost', x, y - .15, false); STATIONS.push({ id: 'secret' + n, type: 'secret', n, label: 'ป้ายเล็กๆ', icon: '🪧', x, y: y + .1, r: .9, area: 'town' }); });
   STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง · ร้านขายปลา', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'pier_l1', type: 'fishspot', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 21, y: 62.2, r: 1.8, area: 'town' });
   STATIONS.push({ id: 'pier_l2', type: 'fishspot', pool: 'lake', label: 'ท่าตกปลา (ทะเลสาบ)', icon: '🎣', x: 32, y: 62.2, r: 1.8, area: 'town' });
@@ -676,6 +679,7 @@ const ITEMS = {
   hammerhead:{ name: 'ฉลามหัวค้อน', icon: '🦈', kind: 'fish', base: 1100, rar: 4 },
   shark:     { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200, rar: 4 },
   goldenfish:{ name: 'ปลาทองคำ', icon: '✨', kind: 'fish', base: 5000, rar: 5 },
+  mayorkoi:  { name: 'ปลาทองยักษ์นายกฯ', icon: '🐡', kind: 'fish', base: 15000, rar: 5, legend: 1 },
   // second sheet: freshwater (lake/river) and sea fish, plus a few sea creatures
   bluegill:  { name: 'ปลาบลูกิล', icon: '🐟', kind: 'fish', base: 35, rar: 1, w: 'f' },
   perch:     { name: 'ปลาเพิร์ช', icon: '🐟', kind: 'fish', base: 45, rar: 1, w: 'f' },
@@ -1227,6 +1231,11 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   magician:  { name: 'ชุดสุภาพบุรุษนักมายากล', how: 'ซื้อที่ร้านแฟชั่น', price: 650000 },
   thai:      { name: 'ชุดไทยทองคำ', how: 'ซื้อที่ร้านแฟชั่น', price: 1000000 } };
 const ACHIEVEMENTS = [
+  { id: 'egg_legend', r: 7, c: null, stat: 'legendfish', n: 1, title: 'ผู้พิชิตตำนาน', desc: 'ตกปลาในตำนานได้', secret: 1 },
+  { id: 'egg_explore', r: 4, c: null, stat: 'secrets', n: 1, title: 'นักสำรวจ', desc: 'เจอที่ลับในเมือง', secret: 1 },
+  { id: 'egg_explore5', r: 5, c: null, stat: 'secrets', n: 5, title: 'นักสำรวจตัวจริง', desc: 'เจอที่ลับครบทั้ง 5 จุด', secret: 1 },
+  { id: 'egg_mayor', r: 4, c: null, stat: 'mayorfound', n: 1, title: 'ตาเหยี่ยว', desc: 'จับได้ว่านายกฯ ปลอมตัวมาเดินเล่น', secret: 1 },
+  { id: 'egg_wish', r: 3, c: null, stat: 'wishwin', n: 1, title: 'ดวงเฮง', desc: 'โยนเหรียญที่น้ำพุแล้วได้เงินก้อน', secret: 1 },
   { id: 'off1', r: 1, c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
   { id: 'off2', r: 2, c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
   { id: 'off3', r: 3, c: 'office', stat: 'promo', n: 4, title: 'ผู้จัดการไฟแรง', desc: 'ได้เลื่อนตำแหน่ง 4 ครั้ง' },
@@ -1293,7 +1302,16 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
   }
 }
 
-module.exports = {
+// easter eggs: the wishing fountain, the disguised mayor, the legendary fish and the secret signs
+const EGG = { wishCost: 10, wishWin: 1000, wishOdds: 50, wishDay: 30, legend: { x: 38.6, y: 62.4, r: 2.8, odds: .25 }, secretGems: 5, secretFrame: 30, mayorGems: 3 };
+const FORTUNES = [
+  'วันนี้ปลาหายากจะกินเบ็ดคุณ', 'จะมีคนแปลกหน้าทักคุณก่อน แล้วกลายเป็นเพื่อนสนิท', 'เงินจะไหลมาเทมา... แต่ก็จะไหลออกเหมือนกัน', 'อย่าเพิ่งขายหุ้นวันนี้ รออีกนิด',
+  'ของที่คุณตามหาอยู่ใกล้กว่าที่คิด', 'วันนี้เหมาะกับการกินของอร่อยๆ สักมื้อ', 'มีคนแอบชื่นชมคุณอยู่นะ', 'ดวงการงานรุ่งเรือง เจ้านายจะยิ้มให้',
+  'ระวังเดินชนเสาไฟ', 'ลองเดินไปมุมที่ไม่เคยไป อาจเจออะไรดีๆ', 'คืนนี้ดาวสวย ฟ้าเปิด', 'สัตว์เลี้ยงของคุณรักคุณมากกว่าที่คิด',
+  'โชคดีจะมาตอนที่คุณไม่ทันตั้งตัว', 'วันนี้เหมาะกับการโทรหาเพื่อนเก่า', 'น้ำพุบอกว่า... ขอเหรียญอีกสักเหรียญ', 'ดวงความรักสดใส ยิ้มเยอะๆ นะ',
+  'เที่ยงคืนเป็นเวลาของสิ่งแปลกประหลาด', 'คนที่เดินผ่านคุณไปเมื่อกี้ อาจไม่ใช่คนธรรมดา', 'อดทนอีกนิด สิ่งที่รอจะมาถึง', 'วันนี้ใครให้อะไร รับไว้ด้วยรอยยิ้ม',
+];
+module.exports = { EGG, FORTUNES,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

@@ -367,6 +367,7 @@ function handle(m) {
     }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
     case 'catch': catchPop(m.item, m.first); break;
+    case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
@@ -992,6 +993,7 @@ function onAction() {
     if (me.cast.state === 'fight') return fightPress();
     return strike();
   }
+  if (near.type === 'wish' || near.type === 'secret') { if (t < actCd) return; actCd = t + 900; return doAct(near.id, near.type === 'wish' ? 'toss' : 'read'); }
   if (panel?.st === near.id) { closePanel(); return; }
   if (dlgQ) { dlgTap(); return; }
   if (STAFF_AT[near.id]) return talkTo(STAFF_AT[near.id], near.id);
@@ -1179,7 +1181,7 @@ function draw(t) {
     const px = s.x * TS + X, py = s.y * TS + Y;
     if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
     const isNear = near && near.id === s.id;
-    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash)$/.test(s.type) && !isNear) continue;
+    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret)$/.test(s.type) && !isNear) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
@@ -1961,7 +1963,8 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.title) {
     ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58);
     // title colour = rarity; legendary titles (and the mayor's) shimmer
-    if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
+    if (p.tr === 7 && !p.adm) { const w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), h0 = (t / 12) % 360; for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(h0 + k * 60) % 360},95%,66%)`); ctx.fillStyle = g; }
+    else if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
     else ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d';
     ctx.fillText(`«${p.title}»`, px, top - TS * .58);
   }
@@ -2361,7 +2364,10 @@ const TALK = {
   keep_cstore4: [['ยายเปิดร้านนี้มาตั้งแต่หมู่บ้านเพิ่งสร้าง', 'เห็นเด็กๆ โตกันมาทุกคนเลย'], ['ผอมลงนะหลาน กินข้าวกินปลาบ้างสิ', 'ข้าวกล่องในตู้อร่อยนะ ยายชิมแล้ว']],
   keep_furnshop: [['ซื้อเฟอร์นิเจอร์แล้วส่งถึงบ้านเลยครับ', 'จัดวางเองได้ด้วยปุ่ม 🛋️ จัดบ้าน'], ['บ้านสบาย นอนหลับสบาย ความสุขก็เพิ่มขึ้นครับ'], ['ผมใส่ฮู้ดทั้งวันเพราะในร้านแอร์เย็นมากครับ 🥶']],
   cstore: [['เปิดยี่สิบสี่ชั่วโมงทุกวันค่ะ', 'น้ำ ขนม ข้าวกล่อง ยา มีครบ'], ['ดึกๆ หิวก็แวะมาได้นะคะ'], ['รับถุงไหมคะ... อ๋อ ไม่รับ ช่วยโลกด้วย ดีมากค่ะ 🌱']],
-  town: [['วันนี้อากาศดีจังเลย', 'เหมาะกับการไปนั่งเล่นที่จัตุรัส'], ['ได้ยินว่ามีคนตกปลาทองคำได้ด้วยนะ', 'ฉันลองมาทั้งเดือนยังไม่เคยเห็นเลย'], ['ค่าไฟเดือนนี้แพงจัง', 'คงต้องเปิดแอร์น้อยลงหน่อย'], [ 'ช่วงนี้มีข่าวบ่อย'], ['เคยไปทะเลฝั่งตะวันออกหรือยัง', 'ตอนเย็นสวยมากเลย'], ['หมอที่โรงพยาบาลเก่งมาก', 'รักษาไข้หวัดหายในวันเดียว']],
+  town: [['ได้ยินว่าเที่ยงคืนที่มุมทะเลสาบฝั่งตะวันออก มีอะไรแปลกๆ ว่ายวนอยู่', 'ใครจะไปรู้... อาจเป็นแค่ข่าวลือก็ได้'],
+    ['ลือกันว่านายกฯ ชอบปลอมตัวเป็นคนธรรมดามาเดินเล่นในเมือง', 'ถ้าเห็นใครท่าทางแปลกๆ ลองเดินไปทักใกล้ๆ ดูสิ'],
+    ['เคยลองโยนเหรียญที่น้ำพุกลางเมืองไหม', 'เขาว่าน้ำพุทำนายดวงได้ บางทีก็คืนเงินให้ด้วยนะ'],
+    ['มีคนบอกว่าเจอป้ายเล็กๆ ซ่อนอยู่ตามมุมเมืองที่ไม่ค่อยมีใครเดินไป', 'หลังตึกใหญ่ ริมขอบเมือง... ใครจะไปรู้มีกี่ป้าย'], ['วันนี้อากาศดีจังเลย', 'เหมาะกับการไปนั่งเล่นที่จัตุรัส'], ['ได้ยินว่ามีคนตกปลาทองคำได้ด้วยนะ', 'ฉันลองมาทั้งเดือนยังไม่เคยเห็นเลย'], ['ค่าไฟเดือนนี้แพงจัง', 'คงต้องเปิดแอร์น้อยลงหน่อย'], [ 'ช่วงนี้มีข่าวบ่อย'], ['เคยไปทะเลฝั่งตะวันออกหรือยัง', 'ตอนเย็นสวยมากเลย'], ['หมอที่โรงพยาบาลเก่งมาก', 'รักษาไข้หวัดหายในวันเดียว']],
 };
 let dlgQ = null;
 function dlgFace(face, npc) {
@@ -2437,6 +2443,26 @@ const FOLK_TALK = {
   folk_m4: [['สมัยตาหนุ่มๆ ที่นี่ยังเป็นทุ่งนาอยู่เลย', 'เดี๋ยวนี้มีร้านสะดวกซื้อแล้ว สะดวกจริงๆ'], ['ออกมาเดินเล่นทุกเย็น', 'หมอบอกว่าดีต่อสุขภาพ']],
   folk_m5: [['เพิ่งเลิกเรียนครับ', 'การบ้านเยอะมากเลย 😩'], ['โตขึ้นผมอยากเป็นตำรวจ', 'ต้องเรียนให้จบ ม.6 ก่อน']],
 };
+// easter eggs: coin in the fountain, a secret sign, the disguised mayor, the legendary fish
+function eggFx(m) {
+  document.querySelectorAll('#reqs .req.egg').forEach(e => e.remove());
+  const pop = (...a) => popup(...a).classList.add('egg');
+  const s = P.get(myId), x = s?.x || 50, y = s?.y || 35;
+  if (m.k === 'wish') {
+    FX.play('coin'); FX.float(50, 33.2, '🪙', '#ffd34d', .5); FX.ring(50, 33.6, '#bfe8ff', 700, 1.2);
+    if (m.win) { FX.play('coin', true); FX.play('levelup'); for (let i = 0; i < 4; i++) setTimeout(() => { FX.burst(50 + (Math.random() - .5) * 2, 33 + (Math.random() - .5), '#ffd34d', 26); FX.ring(50, 33.6, '#ffe58a', 1000, 2.4); }, i * 220); }
+    pop(`⛲ <b>คำทำนายจากน้ำพุ</b><br>"${esc(m.f)}"${m.win ? `<br><br>✨ <b>น้ำพุคืนโชคให้คุณ ${money(m.win)}!</b>` : ''}`, [['🙏 สาธุ', 'good', () => { }]], m.win ? 12000 : 6000);
+  } else if (m.k === 'secret') {
+    FX.play('chime'); FX.burst(x, y - .6, '#9be7ff', 22); FX.ring(x, y, '#ffffff', 900, 1.6);
+    pop(`🪧 <b>"คุณเจอที่ลับแล้ว!"</b><br>ได้ 💎${m.gems} · เจอแล้ว ${m.n}/5 จุด${m.frame ? `<br><br>🖼️ <b>เจอครบทุกจุด! ได้กรอบพิเศษ "${esc(m.frame)}"</b> ใส่ได้ที่โปรไฟล์ → กรอบรูป` : ''}`, [['เยี่ยม!', 'good', () => { }]], 10000);
+  } else if (m.k === 'mayor') {
+    closePanel(); FX.play(m.again ? 'pop' : 'levelup');
+    if (!m.again) { FX.burst(x, y - .6, '#ffd34d', 30); FX.ring(x, y, '#ffd34d', 1000, 2); }
+    dialog({ name: `${m.name} (นายกฯ ปลอมตัว)`, face: null, lines: m.again ? ['ชู่ว์... วันนี้คุณจับผมได้แล้วนะ', 'พรุ่งนี้ผมจะปลอมตัวให้เนียนกว่านี้!'] : ['เอ๊ะ! จำผมได้ด้วยเหรอเนี่ย', 'ผมนายกฯ เอง แอบปลอมตัวมาดูชีวิตชาวเมือง', `เก่งมาก! รับ 💎${m.gems} ไปเลย แล้วอย่าบอกใครว่าผมปลอมตัวเป็นใครนะ... อ้าว ประกาศไปแล้ว`], choices: [{ label: '😆 แล้วเจอกันใหม่', fn: dialogClose }] });
+  } else if (m.k === 'legend') {
+    FX.play('levelup'); for (let i = 0; i < 6; i++) setTimeout(() => { FX.burst(x + (Math.random() - .5) * 2, y - .8, `hsl(${i * 60},95%,65%)`, 26); FX.ring(x, y, `hsl(${i * 60 + 30},95%,70%)`, 1100, 2.6); }, i * 200);
+  }
+}
 function talkToTown(o) {
   const info = { label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, bye = { label: '👋 ลาก่อน', fn: dialogClose };
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
@@ -2538,14 +2564,14 @@ function frameHtml(id, sz) {
 function frameRows() {
   const own = me.frames || [], cur = me.frame ?? -1, pic = myPic || facePng();
   const card = f => { const has = own.includes(f.id), on = cur === f.id;
-    const btn = f.locked ? (me.admin ? B(on ? 'ใส่อยู่ ✓' : '👑 ลองใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? 'primary' : '') : '<small>🔒 เร็วๆ นี้</small>')
+    const btn = f.locked && !has ? (me.admin ? B(on ? 'ใส่อยู่ ✓' : '👑 ลองใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? 'primary' : '') : '<small>🔒 เร็วๆ นี้</small>')
       : has ? B(on ? 'ถอด' : 'ใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? '' : 'good') : B(money(f.price), { t: 'frame', op: 'buy', id: f.id }, 'good', me.money < f.price);
-    return `<div class="frmCard ${on ? 'on' : ''} ${f.locked ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
+    return `<div class="frmCard ${on ? 'on' : ''} ${f.locked && !has ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
   const sec = (t, list) => `<div class="secT">${t}</div><div class="frmGrid">${list.map(card).join('')}</div>`;
   return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · ล็อกไว้ก่อน)', G.frameDefs.slice(24));
 }
-const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ'];
-const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d'];
+const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ', 'ในตำนาน'];
+const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d', '#ff6bd6'];
 const titleHtml = (t, r) => t ? `<span class="ttl rar${r || 1}">«${esc(t)}»</span>` : '';
 // shrink a photo from the album to a small square JPEG before it is sent (kept under ~20 KB)
 function pickPhoto() {
@@ -2607,6 +2633,7 @@ function achvPanel() {
   const pct = a => Math.min(1, (me.stats?.[a.stat] || 0) / a.n);
   const rows = G.ach.slice().sort((x, y) => st(x) - st(y) || (st(x) === 1 ? pct(y) - pct(x) : 0) || (x.r || 1) - (y.r || 1)).map(a => {
     const s2 = st(a), c = a.c ? G.careers[a.c] : null, pv = Math.min(a.n, me.stats?.[a.stat] || 0);
+    if (a.secret && s2 === 1) return `<div class="item"><div class="em">❔</div><div class="nm"><b>??? ความสำเร็จลับ</b><small>ยังเป็นความลับ... ลองสังเกตสิ่งรอบตัว ฟังชาวเมืองคุยกัน</small></div><span class="tag">💎?</span></div>`;
     const btn = s2 === 0 ? B(`🎁 รับ 💎${achRew(a)}`, { t: 'achclaim', id: a.id }, 'primary') : s2 === 2 ? '<span class="tag">รับแล้ว ✓</span>' : `<span class="tag">💎${achRew(a)}</span>`;
     return `<div class="item ${s2 === 2 ? 'done' : ''}"><div class="em">${s2 === 1 ? '🔒' : '🏅'}</div><div class="nm">${titleHtml(a.title, a.r)} <span class="rtag r${a.r || 1}">${RAR[a.r || 1]}</span>${c ? ` <span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${pv.toLocaleString()}/${a.n.toLocaleString()}</small><div class="wbar"><u style="width:${pct(a) * 100}%"></u></div></div>${btn}</div>`;
   }).join('');
@@ -2732,6 +2759,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16y', d: '16 พ.ย. (รอบ 25)', items: ['🥚 เพิ่มอีสเตอร์เอ้กแล้ว'] },
   { v: '2026-11-16x', d: '16 พ.ย. (รอบ 24)', items: [
     '🚶 <b>เดินลื่นขึ้น</b> เดินเฉียดต้นไม้ เสาไฟ กระถางดอกไม้ หรือมุมตึก ตัวละครจะไถลอ้อมไปเอง ไม่ติดค้าง · นิ้วที่สองแตะจอไม่ทำให้จอยหลุดแล้ว',
     '💬 ปุ่ม <b>คุย</b> คุยกับคนที่ยืนใกล้ที่สุด (ผู้เล่นหรือชาวเมือง) ไม่เด้งไปหาผู้กองเอกหรือพนักงานเคาน์เตอร์ทุกครั้งแล้ว',
