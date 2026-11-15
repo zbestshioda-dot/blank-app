@@ -629,7 +629,8 @@ function paintDown() {
 setInterval(() => { if (me?.down) paintDown(); }, 500);
 function paintEvent() {
   const e = $('#eventBar');
-  if (wd?.ev) { if (e.dataset.t !== wd.ev.text) { e.dataset.t = wd.ev.text; e.innerHTML = `<span>${esc(wd.ev.text)}</span>`; } e.classList.remove('hidden'); } else { e.classList.add('hidden'); e.dataset.t = ''; }
+  if (wd?.ev) { if (e.dataset.t !== wd.ev.text) { e.dataset.t = wd.ev.text; e.innerHTML = `<span>${esc(wd.ev.text)}</span>`; }
+    requestAnimationFrame(() => { const sp = e.firstElementChild; if (sp) e.classList.toggle('still', sp.offsetWidth <= e.clientWidth - 16); }); e.classList.remove('hidden'); } else { e.classList.add('hidden'); e.dataset.t = ''; }
   document.body.classList.toggle('hasEvent', !!wd?.ev);
 }
 // same clock as the server: days are slow, nights run twice as fast (server/data.js CLOCK)
@@ -2662,6 +2663,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16p', d: '16 พ.ย. (รอบ 16)', items: ['📜 แนวตั้ง: ป้ายเหตุการณ์ย้ายมาอยู่กลางจอ ยาวเต็มความกว้าง และตัวหนังสือจัดกึ่งกลาง (ถ้าข้อความยาวจะยังวิ่งวนอยู่)'] },
   { v: '2026-11-16o', d: '16 พ.ย. (รอบ 15)', items: ['📱 แนวนอน: ปุ่มกระเป๋า พัก วิ่ง ขอทาน และปุ่มใช้งาน เลื่อนไปชิดขวาจอแล้ว (เมนูย้ายขึ้นไปด้านบนแล้ว จึงมีที่ว่างพอ)'] },
   { v: '2026-11-16n', d: '16 พ.ย. (รอบ 14)', items: [
     '📜 <b>ป้ายเหตุการณ์ (ฝนตกชุก ฯลฯ) เป็นแถบโปร่งใสวิ่งเหมือนประกาศเซิร์ฟเวอร์</b> ไม่บังหน้าจอแล้ว',
