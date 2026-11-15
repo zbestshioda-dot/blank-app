@@ -2794,6 +2794,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16z6', d: '16 พ.ย. (รอบ 31)', items: ['📱 จัดแอปในมือถือใหม่ เอาโปรไฟล์ แผนที่ อากาศ ออก (โปรไฟล์ดูได้จากการแตะรูปตัวเอง แผนที่แตะมินิแมพ) · 💼 หน้างานของฉันไม่แสดงภารกิจอาชีพแล้ว รับภารกิจได้ที่ NPC ของแต่ละอาชีพเหมือนเดิม'] },
   { v: '2026-11-16z5', d: '16 พ.ย. (รอบ 30)', items: ['📲 หน้าล็อกอินมีปุ่ม <b>ติดตั้งบนมือถือ</b> · <b>แชร์ลิงก์</b> (is.gd/lifetown) · <b>ติดตั้งในคอม</b> ติดตั้งแล้วมีไอคอนเกม เปิดเต็มจอเหมือนแอป', '💖 มือถือมีแอป <b>สนับสนุน</b> · ผู้จัดทำ นาย วราวุฒิ สีเสือ'] },
   { v: '2026-11-16z4', d: '16 พ.ย. (รอบ 29)', items: [
     '📱 <b>เอาแถบเมนูออก</b> ทุกอย่างย้ายเข้าไปอยู่ในมือถือแล้ว (เพิ่มแอป งาน · อันดับ · วิธีเล่น · แจ้งบัค) · ปุ่มมือถือใหญ่ขึ้น แนวตั้งอยู่ใต้นาฬิกา แนวนอนอยู่ข้างมินิแมพ · มีจุดแดงเตือนเมื่อมีจดหมาย บิล หรือรางวัล',
@@ -3189,7 +3190,7 @@ function renderPanel(p) {
         return itemRowRaw(c.icon, `${c.name}${me.career === id ? ' <span class="tag">ปัจจุบัน</span>' : ''}`, `สมัคร: คุยกับ <b>${esc(stf?.short || 'เจ้าหน้าที่')}</b> ที่${where?.label || '-'}${miss.length ? ` · <span style="color:var(--bad)">ต้องมี ${miss.join(', ')}</span>` : ''}<br>${c.desc}`, B('🚶 เดินไปสมัคร', { fn: 'guide', key: stf ? stf.st : c.where }, 'good'));
       }).join('');
       const starter = `<div class="jobbox">💡 <b>เพิ่งเริ่มเล่น ยังไม่มีเงิน?</b> ไปซื้อเบ็ด ${money(G.fishing.rod)} กับน้าเล็กที่สมาคมประมง แล้ว<b>ตกปลาขาย</b> ทำได้ทุกคนทุกเวลาไม่ต้องสมัครงาน ${me.rod ? '' : B('🎣 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good')}</div>`;
-      return `<h2>💼 งานของฉัน</h2>${misBox()}
+      return `<h2>💼 งานของฉัน</h2>
         <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(+me.jx.cur).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
         ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
@@ -3569,11 +3570,12 @@ function riderJobs() {
   }).join('')}</div>`;
 }
 // 📱 the phone: a pixel handset with a home screen of apps; each app opens on the screen, or the matching menu
+// [label, action, picture in the 4x4 app sheet, badge key]
 const PH_APPS = [
-  ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }], ['แชท', { fn: 'open', kind: 'chat' }], ['จดหมาย', { fn: 'open', kind: 'mail' }], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }],
-  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }], ['แผนที่', { fn: 'phMap' }], ['เพื่อน', { fn: 'open', kind: 'friends' }],
-  ['โปรไฟล์', { fn: 'open', kind: 'profile' }], ['ตั้งค่า', { fn: 'open', kind: 'settings' }], ['เควสต์', { fn: 'open', kind: 'quests' }], ['รางวัล', { fn: 'open', kind: 'achv' }],
-  ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }], ['อากาศ', { fn: 'qtab', set: { tab: 'wx' } }], ['เพลง', { fn: 'qtab', set: { tab: 'music' } }]];
+  ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['แชท', { fn: 'open', kind: 'chat' }, 1], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
+  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], ['เพื่อน', { fn: 'open', kind: 'friends' }, 7],
+  ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
+  ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13], ['เพลง', { fn: 'qtab', set: { tab: 'music' } }, 15]];
 // the rest of the old menu, as plain apps on the last row
 const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
@@ -3584,8 +3586,8 @@ function phonePanel(p) {
   const dt = me?.date, clock = hhmm(hourNow());
   const status = `<div class="phStat"><b>${clock}</b><span>📶 🔋</span></div>`;
   if (tab === 'home') {
-    const badge = i => (i === 0 && call) || (i === 2 && (me.mailN || 0) > 0) || (i === 5 && (me.bills || []).length) || (i === 11 && achTodo().length) ? '<em></em>' : '';
-    const apps = PH_APPS.map(([l, m], i) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(i)}<small>${l}</small></button>`).join('')
+    const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
+    const apps = PH_APPS.map(([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`).join('')
       + PH_MORE.filter(a => !a[3] || me.admin).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
     return `<div class="phone"><div class="phScr home">${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
