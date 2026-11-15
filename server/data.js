@@ -156,9 +156,6 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('o_drinkfount', 57.4, 30.95); prop('o_bin_green', 42.6, 34.95);
   prop('o_noticeboard', 47.9, 25.6);
   STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47.9, y: 26.4, r: 1.4, area: 'town' });
-  // crowds (pickpockets work here); beggars sit anywhere, busy places pay best
-  for (const [id, x, y, l] of [['crowd1', 50, 30.6, 'จัตุรัส'], ['crowd2', 66.5, 30.5, 'หน้าตลาด']])
-    STATIONS.push({ id, type: 'crowd', label: `ฝูงชน (${l})`, icon: '👥', x, y, r: 1.4, area: 'town' });
   prop('o_bin', 41.4, 12.2);   // the barber shop stands where a barrel and a crate used to be
   // street furniture
   for (let x = 6; x < 40; x += 9) prop('o_lamp', x + .5, 34.95, 'grass');   // street lamps stand on the verge behind the sidewalk, clear of the road and the footpath
@@ -875,7 +872,7 @@ const CAREERS = {
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ประมูลสินค้าที่โรงประมูล (คลังสินค้าเดิม) แข่งกับคู่แข่ง เดาราคาให้แม่น ชนะต่ำกว่ามูลค่าจริง = กำไร สูงกว่า = ขาดทุน · ของในกระเป๋ายังวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
-  police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
+  police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง' },
   beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'สมัครได้ถ้ามีเงิน (สด+ฝาก) ไม่เกิน ฿2,000 · วิ่งเก็บขยะที่ถังขยะ (หลบสิ่งกีดขวางไปเรื่อยๆ จนกว่าจะชน) หรือนั่งขอทาน (🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
@@ -896,11 +893,9 @@ const DRIVING_TEST = [
   { q: 'ดื่มแอลกอฮอล์แล้วควรทำอย่างไร', a: ['ขับช้าๆ', 'ไม่ขับรถ', 'เปิดไฟฉุกเฉินแล้วขับ'], ok: 1 },
 ];
 const POLICE_TEST = [
-  { q: 'เจอคนถูกล้วงกระเป๋า ตำรวจควรทำอะไรก่อน', a: ['ไล่จับโจรทันที', 'ถามรายละเอียดและตำแหน่งที่เห็นล่าสุด', 'กลับสถานี'], ok: 1 },
   { q: 'หมายเลขแจ้งเหตุด่วนเหตุร้ายคือ', a: ['191', '1669', '199'], ok: 0 },
   { q: 'จับกุมผู้ต้องสงสัยได้เมื่อใด', a: ['เมื่อหน้าตาน่าสงสัย', 'เมื่อมีพยานหรือหลักฐานการกระทำผิด', 'ทุกเมื่อที่อยากจับ'], ok: 1 },
   { q: 'ตำรวจควรวางตัวกับประชาชนอย่างไร', a: ['สุภาพและช่วยเหลือ', 'ข่มขู่ให้กลัว', 'ไม่สนใจ'], ok: 0 },
-  { q: 'ของกลางที่ยึดคืนได้จากโจร ควรทำอย่างไร', a: ['เก็บไว้เอง', 'แบ่งกับเพื่อน', 'คืนให้ผู้เสียหาย'], ok: 2 },
 ];
 // changing careers too often makes you wait longer (minutes); index = changes in the last 24 h
 const JOB_COOLDOWN_MIN = [0, 5];
@@ -959,7 +954,6 @@ const TOOLS = {
   chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
   police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['ค่าตอบแทน +15%', 'ค่าตอบแทน +30%', 'ค่าตอบแทน +50%'] },
-  thief:    { name: 'ถุงมือล้วงกระเป๋า', icon: '🧤', fx: ['ล้วงสำเร็จง่ายขึ้น', 'ล้วงสำเร็จง่ายขึ้นมาก', 'ล้วงแทบไม่พลาด'] },
   beggar:   { name: 'ป้ายกระดาษซึ้งๆ', icon: '🪧', fx: ['คนให้เงินบ่อยขึ้น 15%', 'คนให้เงินบ่อยขึ้น 30%', 'คนให้เงินบ่อยขึ้น 50%'] },
   rider:    { name: 'กล่องเก็บความร้อน', icon: '📦', fx: ['ค่าส่ง +10%', 'ค่าส่ง +20%', 'ค่าส่ง +35%'] },
 };
@@ -1217,7 +1211,7 @@ const LOOKS = {
            black: { name: 'กางเกงดำ', price: 500, color: '#3d3d47' }, green: { name: 'กางเกงเขียวขี้ม้า', price: 500, color: '#6f8e4c' } },
 };
 const SHIRTS = ['white', 'blue', 'green', 'red'];       // starter choices
-const NPC_LINES = ['วันนี้อากาศดีจังเลย', 'ตลาดวันนี้คนเยอะมาก', 'หิวจัง ไปกินก๋วยเตี๋ยวดีกว่า', 'ระวังโจรล้วงกระเป๋านะ', 'ได้ยินว่าที่ทะเลมีฉลามด้วย',
+const NPC_LINES = ['วันนี้อากาศดีจังเลย', 'ตลาดวันนี้คนเยอะมาก', 'หิวจัง ไปกินก๋วยเตี๋ยวดีกว่า', 'ได้ยินว่าที่ทะเลมีฉลามด้วย',
   'ค่าไฟเดือนนี้แพงจัง', 'ไปนั่งเล่นที่จัตุรัสกัน', 'หมอที่โรงพยาบาลเก่งมาก', 'อยากได้บ้านในหมู่บ้านจัดสรรจัง', 'ข้าวโพดปีนี้หวานมาก', 'สวัสดีจ้า', 'วันนี้ทำงานเหนื่อยมาก'];
 
 // outfits you can wear instead of your job's clothes (rewards)
@@ -1251,10 +1245,6 @@ const ACHIEVEMENTS = [
   { id: 'doc3', r: 3, c: 'doctor', stat: 'revived', n: 3, title: 'ผู้กู้ชีพ', desc: 'ช่วยชีวิตผู้เล่นที่หมดสติ 3 ครั้ง' },
   { id: 'rid1', r: 1, c: 'rider', stat: 'delivered', n: 10, title: 'ไรเดอร์สายฟ้า', desc: 'ส่งอาหารสำเร็จ 10 ออเดอร์' },
   { id: 'rid2', r: 3, c: 'rider', stat: 'delivered', n: 60, title: 'ขาซิ่งประจำเมือง', desc: 'ส่งอาหารสำเร็จ 60 ออเดอร์' },
-  { id: 'pol1', r: 2, c: 'police', stat: 'arrests', n: 3, title: 'มือปราบ', desc: 'จับโจรได้ 3 ครั้ง' },
-  { id: 'pol2', r: 4, c: 'police', stat: 'arrests', n: 20, title: 'ผู้พิทักษ์เมือง', desc: 'จับโจรได้ 20 ครั้ง' },
-  { id: 'thi1', r: 2, c: null, stat: 'stolen', n: 10, title: 'มือไว', desc: 'ล้วงกระเป๋าสำเร็จ 10 ครั้ง' },
-  { id: 'thi2', r: 4, c: null, stat: 'stolen', n: 50, title: 'จอมโจรเงา', desc: 'ล้วงกระเป๋าสำเร็จ 50 ครั้ง' },
   { id: 'beg1', r: 1, c: 'beggar', stat: 'alms', n: 20, title: 'ผู้ยากไร้', desc: 'ได้รับเงินบริจาค 20 ครั้ง' },
   { id: 'gen5', r: 1, c: null, stat: 'donated', n: 5, title: 'ใจบุญ', desc: 'บริจาคให้ขอทาน 5 ครั้ง' },
   { id: 'gen6', r: 2, c: null, stat: 'cravings', n: 10, title: 'นักชิม', desc: 'กินของที่อยากกินได้ทันเวลา 10 ครั้ง' },
@@ -1271,8 +1261,6 @@ const ACHIEVEMENTS = [
   { id: 'che3', r: 5, c: 'chef', stat: 'cooked', n: 500, title: 'ยอดเชฟแห่งเมือง', desc: 'ปรุงอาหาร 500 จาน' },
   { id: 'doc4', r: 5, c: 'doctor', stat: 'treated', n: 200, title: 'แพทย์ในตำนาน', desc: 'รักษาคนไข้หาย 200 คน' },
   { id: 'rid3', r: 5, c: 'rider', stat: 'delivered', n: 300, title: 'ตำนานไรเดอร์', desc: 'ส่งอาหารสำเร็จ 300 ออเดอร์' },
-  { id: 'pol3', r: 5, c: 'police', stat: 'arrests', n: 100, title: 'ผู้บัญชาการ', desc: 'จับโจรได้ 100 ครั้ง' },
-  { id: 'thi3', r: 5, c: null, stat: 'stolen', n: 200, title: 'ราชันย์โจร', desc: 'ล้วงกระเป๋าสำเร็จ 200 ครั้ง' },
   { id: 'beg2', r: 3, c: 'beggar', stat: 'alms', n: 200, title: 'ขอทานพันล้าน', desc: 'ได้รับเงินบริจาค 200 ครั้ง' },
   { id: 'gen7', r: 5, c: null, stat: 'worth', n: 1000000, title: 'มหาเศรษฐี', desc: 'มีทรัพย์สินรวม ฿1,000,000' },
   { id: 'gen8', r: 3, c: null, stat: 'trades', n: 50, title: 'นักค้าขายตัวยง', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 50 ครั้ง' },

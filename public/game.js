@@ -220,7 +220,7 @@ function dyeFrame(fr, dye) {
   g.putImageData(d, 0, 0); DYE.set(fr, c); return c;
 }
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
-  // outfits (job clothes, the thief outfit, reward outfits) are whole sheets; only the hair colour is applied on top
+  // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;
@@ -272,7 +272,7 @@ $('#loginForm').onsubmit = e => {
 };
 $('#pinEye').onclick = () => { const i = $('#inPin'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#pinEye').textContent = show ? '🙈' : '👁'; };
 { // one tip at a time under the button
-  const tips = ['🎣 ตกปลาได้ทุกที่ที่มีน้ำ ปลาทองคำราคา ฿5,000', '🩺 หมอรับเคส ICU: ปั๊มหัวใจ ผ่าตัด ให้ตรงจังหวะ', '🏠 ซื้อบ้านในหมู่บ้านจัดสรร ปลูกผักในลานบ้านของตัวเอง', '🛵 เป็นไรเดอร์ ส่งอาหารให้ผู้เล่นตัวจริง', '📈 เล่นหุ้นที่ธนาคาร ซื้อถูก ขายแพง', '🤝 แลกของ คุยโทรศัพท์ กับเพื่อนในเมืองได้', '👮 เป็นตำรวจ จับโจรล้วงกระเป๋า ได้ค่าหัว'];
+  const tips = ['🎣 ตกปลาได้ทุกที่ที่มีน้ำ ปลาทองคำราคา ฿5,000', '🩺 หมอรับเคส ICU: ปั๊มหัวใจ ผ่าตัด ให้ตรงจังหวะ', '🏠 ซื้อบ้านในหมู่บ้านจัดสรร ปลูกผักในลานบ้านของตัวเอง', '🛵 เป็นไรเดอร์ ส่งอาหารให้ผู้เล่นตัวจริง', '📈 เล่นหุ้นที่ธนาคาร ซื้อถูก ขายแพง', '🤝 แลกของ คุยโทรศัพท์ กับเพื่อนในเมืองได้'];
   let k = Math.floor(Math.random() * tips.length); const el = $('#loginTip');
   const show = () => { el.classList.remove('in'); setTimeout(() => { el.textContent = '💡 ' + tips[k++ % tips.length]; el.classList.add('in'); }, 250); };
   show(); setInterval(() => { if (!$('#login').classList.contains('hidden')) show(); }, 5000);
@@ -415,12 +415,6 @@ function handle(m) {
     case 'bugs': bugList = m.list; if (panel?.kind === 'god') refreshPanel(true); break;
     case 'reset': try { localStorage.removeItem('lt_tut2'); } catch { } guide = null; setTimeout(() => showTut(0), 600); break;
     case 'crave': FX.play('ding'); break;
-    case 'witness':
-      popup(`👀 คุณเห็น <b>${esc(m.thief)}</b> ล้วงกระเป๋า <b>${esc(m.victim)}</b>!`, [['📞 แจ้งตำรวจ 191', 'warn', () => send({ t: 'report', crime: m.crime })], ['ปล่อยไป', '', () => {}]], 25000);
-      FX.play('notice'); break;
-    case 'robbed':
-      popup(m.thief ? `😠 <b>${esc(m.thief)}</b> พยายามล้วงกระเป๋าคุณ!` : `😱 มีคนล้วงกระเป๋าคุณไป <b>${money(m.amt)}</b>`, [['📞 แจ้งตำรวจ 191', 'warn', () => send({ t: 'report', crime: m.crime })], ['ช่างมัน', '', () => {}]], 25000);
-      FX.play('fail'); if (navigator.vibrate) navigator.vibrate(300); break;
     case 'ach': FX.play('levelup'); { const s = P.get(myId); if (s) { FX.burst(s.x, s.y, '#ffd34d', 24); FX.ring(s.x, s.y, '#ffd34d', 900, 1.6); } } break;
     case 'daily': if (tutPending) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
     case 'quest': {
@@ -847,7 +841,7 @@ function onTap(sx, sy) {
     if (p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
     const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
   }
-  if (hit) { FX.play('click'); if (hit.npc && !hit.tf && !hit.bot) return talkToTown(hit); return openPanel({ kind: 'player', pid: hit.id }); }
+  if (hit) { FX.play('click'); if (hit.npc && !hit.bot) return talkToTown(hit); return openPanel({ kind: 'player', pid: hit.id }); }
 }
 // ---- tap-to-walk: breadth-first path over free tiles of the current area, followed by the movement loop
 let autoPath = null, autoNav = false, autoT = 0;
@@ -1821,7 +1815,6 @@ function drawPlayer(p, X, Y, t) {
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
-  if (p.w && me?.career === 'police') { ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText('🚨', px - TS * .45, top + Math.sin(t / 120) * 3); }
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
   const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? '💫' : mine && me?.craving ? '💡' : pose === 'seat' ? '❤️' : null;
   if (emote) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
@@ -1872,7 +1865,7 @@ const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FA
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: -1.9, dy: 0.7, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
   { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', dx: .6, dy: -1.15, lk: { hair: 'silver', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมครับ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ครับ'] },
   { st: 'furnshop', name: 'น้องเก่ง (ร้านเฟอร์นิเจอร์)', short: 'น้องเก่ง', icon: '🛋️', dx: .6, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['โซฟาตัวนี้นั่งสบายมากครับ', 'จัดบ้านสวย อยู่แล้วมีความสุขนะ', 'ซื้อแล้วส่งถึงบ้านเลยครับ'] },
-  { st: 'police', name: 'ดาบหญิงสมศรี (เวรประจำโต๊ะ)', short: 'ดาบสมศรี', icon: '👮', g: 'f', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'brown' }, hi: ['มีอะไรให้ช่วยคะ', 'เห็นโจรล้วงกระเป๋า โทร 191 ได้เลยค่ะ', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะคะ'] },
+  { st: 'police', name: 'ดาบหญิงสมศรี (เวรประจำโต๊ะ)', short: 'ดาบสมศรี', icon: '👮', g: 'f', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'brown' }, hi: ['มีอะไรให้ช่วยคะ', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะคะ'] },
   { st: 'school', name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', short: 'ผอ.ประเสริฐ', icon: '🎓', dx: .5, dy: -1.1, of: 'office', lk: { hair: 'silver' }, hi: ['ตั้งใจเรียนนะ อนาคตอยู่ในมือเธอ', 'นั่งโต๊ะเรียนครบชั่วโมงได้ 1 คาบ', 'ยินดีต้อนรับสู่มหาวิทยาลัย'] },
   { st: 'cstore', name: 'น้องฝน (พนักงานร้าน)', short: 'น้องฝน', icon: '🏪', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'white' }, hi: ['สวัสดีค่ะ ยินดีต้อนรับค่ะ', 'รับขนมจีบซาลาเปาเพิ่มไหมคะ', 'สะสมแต้มไหมคะ'] },
   { st: 'cstore2', name: 'น้องภูมิ (พนักงานร้าน · นักศึกษา)', short: 'น้องภูมิ', icon: '🏪', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'brown' }, hi: ['สวัสดีครับ ยินดีต้อนรับครับ', 'รับถุงไหมครับ', 'ทำงานพิเศษหลังเลิกเรียนครับ'] },
@@ -1888,7 +1881,7 @@ function staffGreet(n) {
   n.greetT = t; if (n.his) n.cur = n.his[Math.floor(Math.random() * n.his.length)]; n.bubble = n.line(me).trim(); n.bt = t + 5000;
 }
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
-  const icon = p.keeper ? p.icon : p.tf ? '🕶️' : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
+  const icon = p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
@@ -1974,7 +1967,6 @@ function drawPlayerPixel(p, X, Y, t) {
   const mine = p.id === myId, top = (lying ? py0 - 10 * u : py - 23 * u - bob);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 + TS * .05); }
-  if (p.w && me?.career === 'police') { ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText('🚨', px - 7 * u, top + Math.sin(t / 120) * 3); }
   const badge = pose === 'veg' ? '🥬' : pose === 'hosp' ? '🚑' : pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px + 7 * u, top + Math.sin(t / 300) * 3); }
   sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
@@ -2027,7 +2019,6 @@ function drawMini() {
     g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 9, 0, 7); g.fill();
     g.fillStyle = '#ff2a10'; g.beginPath(); g.arc(mx, my, 6.5, 0, 7); g.fill();
   }
-  if (me?.career === 'police') for (const rp of me.reports || []) { const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp; if (mapOf(rp.area) !== mapId) continue; g.fillStyle = (performance.now() / 300 | 0) % 2 ? '#ff2b2b' : '#fff'; g.fillRect((q.x - A.x) * 2 - 4, (q.y - A.y) * 2 - 4, 8, 8); }
   $('#miniName').textContent = `🗺️ ${A.name}`;
 }
 
@@ -2132,7 +2123,6 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
-  stealP(m) { send({ t: 'steal', to: m.to }); },
 };
 let bugList = null;
 // quest givers: every quest comes from a townsperson with a painted portrait (public/assets/portraits.*)
@@ -2281,16 +2271,16 @@ const TALK = {
   staff_chef: [['อาหารดีเริ่มที่วัตถุดิบดี', 'ปลาสดจากชาวประมง ผักจากชาวไร่ ทำอะไรก็อร่อย'], ['อยากเป็นเชฟต้องมีใบรับรองเชฟก่อนนะ', 'ซื้อได้ที่มหาวิทยาลัย'], ['ต้มยำหม้อนี้ใส่พริกไปสามกำมือ', 'ใครกินไม่ไหวไม่ใช่ความผิดฉันนะ 🌶️']],
   staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่มหาวิทยาลัย'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
   staff_merchant: [['ที่นี่เป็นโรงประมูลแล้ว ล็อตขึ้นเวทีทีละล็อต', 'ยื่นซองเดาราคาแข่งกับเสี่ยเฮง เจ๊หมวย พวกนั้น'], ['ซื้อได้ต่ำกว่ามูลค่าจริงก็กำไร', 'แต่ถ้าใจร้อนเสนอสูงเกินก็ขาดทุนนะ'], ['ฟังผู้ประเมินไว้บ้าง', 'แต่สภาพของก็สำคัญ ของมีตำหนิราคาตกเยอะ']],
-  staff_police: [['เห็นใครล้วงกระเป๋า โทร 191 ได้ทันที', 'สายตรวจจะรีบไปจับ'], ['อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', 'ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['เมืองนี้สงบสุขได้ เพราะทุกคนช่วยกันดูแล']],
+  staff_police: [['ตามหาหมาที่หายไปได้ที่นี่ ค่าตอบแทนดี', 'รับเคสได้ตลอด 24 ชม.'], ['อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', 'ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['เมืองนี้สงบสุขได้ เพราะทุกคนช่วยกันดูแล']],
   staff_doctor: [['ป่วยแล้วอย่าฝืน มาโรงพยาบาลนะ', 'บอกอาการให้ชัดๆ หมอจะได้รักษาถูก'], ['กินให้ครบ นอนให้พอ', 'ภูมิคุ้มกันจะดีขึ้นเอง']],
   staff_farmer: [['ไร่ชานเมืองปิดปรับปรุงอยู่นะ', 'อีกไม่นานคงได้กลับไปปลูกผักกันอีก'], ['ทุเรียนปลูกนานหน่อย แต่ราคาดีมาก', 'ข้าวโตเร็ว ขายได้ทุกวัน']],
   staff_beggar: [['ลุงไม่มีอะไรเลย มีแต่ใจ', 'แต่คนในเมืองนี้ใจดีนะ'], ['นั่งตรงที่คนพลุกพล่าน', 'ได้เศษเงินบ่อยกว่า']],
   keep_market: [['ตลาดเปิดยี่สิบสี่ชั่วโมงจ้า', 'ซื้อจากผู้เล่นถูกกว่าร้าน NPC นะ ลองดูก่อน'], ['วางขายของได้นะ ตั้งราคาเองเลย', 'แต่อย่าตั้งแพงเกิน เดี๋ยวไม่มีคนซื้อ'], ['ทุเรียนวันนี้หอมมาก', 'เจ๊แอบกินไปลูกนึงแล้ว 🤫']],
-  keep_bank: [['ฝากเงินได้ดอกเบี้ยทุกวันเกมนะคะ', 'เก็บไว้กับตัวเยอะๆ ระวังโดนล้วงกระเป๋านะคะ'], ['ที่นี่มีตลาดหุ้นด้วยนะคะ', 'ซื้อตอนถูก ขายตอนแพง... พูดง่ายทำยากค่ะ 😅'], ['กู้เงินได้ แต่ระหว่างเป็นหนี้ รายได้ส่วนหนึ่งจะถูกหักไปใช้หนี้นะคะ']],
+  keep_bank: [['ฝากเงินได้ดอกเบี้ยทุกวันเกมนะคะ'], ['ที่นี่มีตลาดหุ้นด้วยนะคะ', 'ซื้อตอนถูก ขายตอนแพง... พูดง่ายทำยากค่ะ 😅'], ['กู้เงินได้ แต่ระหว่างเป็นหนี้ รายได้ส่วนหนึ่งจะถูกหักไปใช้หนี้นะคะ']],
   keep_restaurant: [['หิวไหมจ๊ะ วันนี้มีกะเพราไข่ดาว', 'ซื้อตุนใส่กระเป๋าไว้กินทีหลังก็ได้นะ'], ['ถ้าตัวละครอยากกินอะไร', 'รีบมากินนะ ความสุขเพิ่มเยอะเลย']],
   keep_toolshop: [['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดอุปกรณ์อาชีพได้ที่นี่ เงินเข้าเพิ่มขึ้นแน่นอน'], ['ร้านนี้ไม่ขายเบ็ดแล้วนะ', 'ไปซื้อกับน้าเล็กที่สมาคมประมง']],
   keep_school: [['การศึกษาคือการลงทุนที่คุ้มที่สุด', 'เรียนจบ ม.6 ก่อน แล้วค่อยต่อปริญญาตรี'], ['นั่งโต๊ะเรียนครบหนึ่งชั่วโมงในเกม ได้หนึ่งคาบ', 'อย่าโดดเรียนล่ะ ครูเห็นนะ 👀'], ['สอบใบขับขี่ สอบนายสิบ ก็ที่นี่']],
-  keep_police: [['มีอะไรให้ช่วยไหมคะ', 'ของหาย โดนขโมย มาแจ้งได้เลย'], ['ช่วงค่ำระวังโจรด้วยนะคะ', 'อย่าพกเงินสดเยอะ ฝากธนาคารไว้ปลอดภัยกว่า']],
+  keep_police: [['มีอะไรให้ช่วยไหมคะ', 'ของหาย โดนขโมย มาแจ้งได้เลย'], [ 'อย่าพกเงินสดเยอะ ฝากธนาคารไว้ปลอดภัยกว่า']],
   keep_barber: [['ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน', 'มาย้อมสีใหม่ ให้ตัวเองดูโดดเด่นสิครับ'], ['สีที่เคยทำไปแล้ว เปลี่ยนกลับได้ฟรีนะ'], ['ทำผมใหม่แล้วความสุขเพิ่มด้วยนะ', 'วิทยาศาสตร์ยืนยัน... มั้งครับ 😆']],
   keep_estate: [['บ้านในหมู่บ้านจัดสรร ซื้อหรือเช่าก็ได้ค่ะ', 'มีลานบ้านไว้ทำสวนด้วยนะคะ'], ['ปล่อยเช่าบ้าน มีรายได้ทุกเดือนค่ะ'], ['ทำงานหนักแล้วอย่าลืมพักนะคะ', 'ไปนั่งเล่นที่จัตุรัสบ้าง ชีวิตจะได้สมดุล']],
   keep_cstore2: [['ผมเรียนอยู่มหาวิทยาลัยครับ ทำงานพิเศษตอนเย็น', 'มาเมืองนี้ใหม่ๆ ยังไม่ค่อยรู้จักใครเลย'], ['ดึกๆ หิวก็แวะมาได้นะครับ', 'ข้าวกล่องอุ่นไมโครเวฟให้ด้วย']],
@@ -2299,7 +2289,7 @@ const TALK = {
   keep_cstore4: [['ยายเปิดร้านนี้มาตั้งแต่หมู่บ้านเพิ่งสร้าง', 'เห็นเด็กๆ โตกันมาทุกคนเลย'], ['ผอมลงนะหลาน กินข้าวกินปลาบ้างสิ', 'ข้าวกล่องในตู้อร่อยนะ ยายชิมแล้ว']],
   keep_furnshop: [['ซื้อเฟอร์นิเจอร์แล้วส่งถึงบ้านเลยครับ', 'จัดวางเองได้ด้วยปุ่ม 🛋️ จัดบ้าน'], ['บ้านสบาย นอนหลับสบาย ความสุขก็เพิ่มขึ้นครับ'], ['ผมใส่ฮู้ดทั้งวันเพราะในร้านแอร์เย็นมากครับ 🥶']],
   cstore: [['เปิดยี่สิบสี่ชั่วโมงทุกวันค่ะ', 'น้ำ ขนม ข้าวกล่อง ยา มีครบ'], ['ดึกๆ หิวก็แวะมาได้นะคะ'], ['รับถุงไหมคะ... อ๋อ ไม่รับ ช่วยโลกด้วย ดีมากค่ะ 🌱']],
-  town: [['วันนี้อากาศดีจังเลย', 'เหมาะกับการไปนั่งเล่นที่จัตุรัส'], ['ได้ยินว่ามีคนตกปลาทองคำได้ด้วยนะ', 'ฉันลองมาทั้งเดือนยังไม่เคยเห็นเลย'], ['ค่าไฟเดือนนี้แพงจัง', 'คงต้องเปิดแอร์น้อยลงหน่อย'], ['ระวังโจรล้วงกระเป๋านะ', 'ช่วงนี้มีข่าวบ่อย'], ['เคยไปทะเลฝั่งตะวันออกหรือยัง', 'ตอนเย็นสวยมากเลย'], ['หมอที่โรงพยาบาลเก่งมาก', 'รักษาไข้หวัดหายในวันเดียว']],
+  town: [['วันนี้อากาศดีจังเลย', 'เหมาะกับการไปนั่งเล่นที่จัตุรัส'], ['ได้ยินว่ามีคนตกปลาทองคำได้ด้วยนะ', 'ฉันลองมาทั้งเดือนยังไม่เคยเห็นเลย'], ['ค่าไฟเดือนนี้แพงจัง', 'คงต้องเปิดแอร์น้อยลงหน่อย'], [ 'ช่วงนี้มีข่าวบ่อย'], ['เคยไปทะเลฝั่งตะวันออกหรือยัง', 'ตอนเย็นสวยมากเลย'], ['หมอที่โรงพยาบาลเก่งมาก', 'รักษาไข้หวัดหายในวันเดียว']],
 };
 let dlgQ = null;
 function dlgFace(face, npc) {
@@ -2670,9 +2660,11 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16s', d: '16 พ.ย. (รอบ 19)', items: [
+    '📢 ประกาศภัยแล้งขยับขึ้นไปอยู่สูงขึ้นในจอแนวตั้ง',
+    '🚫 เอา<b>อาชีพโจร</b> (ล้วงกระเป๋า ชุดโจร สายตรวจจับโจร 191 ค่าหัว) และ<b>จุดฝูงชน</b>ออกจากเมืองทั้งหมดแล้ว · ตำรวจรับเคสตามหาหมาที่หายไปเหมือนเดิม'] },
   { v: '2026-11-16r', d: '16 พ.ย. (รอบ 18)', items: [
     '🎣 ปุ่มเบ็ดตกปลาวาดคันเบ็ดใหม่ให้ชัดขึ้น (ด้ามจับ รอก และสายเบ็ดอยู่ในกรอบปุ่ม)',
-    '🧑‍🤝‍🧑 เอาโจรขโมยที่เดินเกาะคนบนถนนออกจากเมืองแล้ว',
     '💬 แชทโลก: ถ้าพิมพ์ถี่เกินไป (ส่งได้ทุก 3 วินาที) จะบอกเวลาที่ต้องรอ และข้อความยังค้างในช่องพิมพ์ให้ส่งใหม่ได้'] },
   { v: '2026-11-16q', d: '16 พ.ย. (รอบ 17)', items: ['📜 แนวตั้ง: ป้ายเหตุการณ์ขยับขึ้นมาเหนือตัวละคร'] },
   { v: '2026-11-16p', d: '16 พ.ย. (รอบ 16)', items: ['📜 แนวตั้ง: ป้ายเหตุการณ์ย้ายมาอยู่กลางจอ ยาวเต็มความกว้าง และตัวหนังสือจัดกึ่งกลาง (ถ้าข้อความยาวจะยังวิ่งวนอยู่)'] },
@@ -2699,8 +2691,7 @@ const NEWS = [
   { v: '2026-11-16d', d: '16 พ.ย. (รอบ 4)', items: [
     '🐞 <b>แก้บัค: วิ่งเก็บขยะขึ้น "ผลการวิ่งผิดปกติ" ไม่ได้เงิน</b> ยิ่งวิ่งนานยิ่งเจอบ่อย (ระบบนับว่าเก็บของเร็วเกินไป ทั้งที่ยิ่งวิ่งเร็วของก็มาถี่ขึ้นจริง) · ตอนนี้ตรวจจากระยะทางแทน และถ้าผิดปกติจริงจะบอกเหตุผลชัดๆ · ได้สูงสุด ฿400 ต่อรอบ บอกไว้ในหน้าสรุปแล้ว ขอบคุณที่แจ้งบัคค่ะ 🙏'] },
   { v: '2026-11-16c', d: '16 พ.ย. (รอบ 3)', items: [
-    '🪪 รูปในหน้า<b>ข้อมูลผู้เล่น</b>เป็นวงกลมแบบเดียวกับแถบสถานะ (ทั้งของเราและของคนอื่น)',
-    '👑 <b>แอดมินทำงานได้ทุกอาชีพ</b> โดยไม่ต้องเปลี่ยนงาน (ประมูล ทำอาหาร ICU เคสหมาหาย วิ่งเก็บขยะ แย่งลูกค้า จับโจร รักษาคนไข้ ภารกิจของทุกอาชีพ ฯลฯ)'] },
+    '🪪 รูปในหน้า<b>ข้อมูลผู้เล่น</b>เป็นวงกลมแบบเดียวกับแถบสถานะ (ทั้งของเราและของคนอื่น)'] },
   { v: '2026-11-16b', d: '16 พ.ย. (รอบ 2)', items: [
     '🖼️ <b>กรอบรูปโปรไฟล์ 36 แบบ!</b> กดรูปโปรไฟล์ → 🖼️ กรอบรูป · กรอบโลหะและอัญมณี (ไม้ เงิน ทอง แพลทินัม แหวนเพชร ทับทิม มรกต ไพลิน …) และกรอบน่ารัก (ซากุระ ทานตะวัน แมว กระต่าย น้องหมา ลูกกวาด …) ซื้อแล้วใส่ได้เลย ทุกคนเห็นในโปรไฟล์',
     '✨ <b>กรอบพิเศษ 12 แบบ เรืองแสงเคลื่อนไหว</b> แต่ละแบบสีและจังหวะต่างกัน (มงกุฎราชา ปีกเทวดา ปีศาจ เปลวเพลิง น้ำแข็ง สายฟ้า กาแล็กซี สายรุ้ง นีออน ลายไทย ดอกบัว สายน้ำ) · ตอนนี้ล็อกไว้ก่อน เร็วๆ นี้!'] },
@@ -3048,7 +3039,7 @@ function renderPanel(p) {
     case 'toolshop': {
       const order = [me.career, ...Object.keys(G.shop.tools).filter(c => c !== me.career)].filter(c => G.shop.tools[c]);
       const rows = order.map(c => {
-        const d = G.shop.tools[c], t = (me.tools || {})[c] || 0, cc = G.careers[c] || { fisher: { icon: '🎣', name: 'ตกปลา (ทุกคน)' }, thief: { icon: '🕶️', name: 'ล้วงกระเป๋า (ทุกคน)' } }[c] || { icon: '', name: c };
+        const d = G.shop.tools[c], t = (me.tools || {})[c] || 0, cc = G.careers[c] || { fisher: { icon: '🎣', name: 'ตกปลา (ทุกคน)' } }[c] || { icon: '', name: c };
         const sub = t >= 3 ? `สูงสุดแล้ว · ${d.fx[2]}` : `ถัดไป: ${d.fx[t]}${t ? ` · ตอนนี้: ${d.fx[t - 1]}` : ''}`;
         return itemRowRaw(d.icon, `${d.name} <span class="tag">${cc.icon} ${cc.name}</span> <span style="color:var(--acc)">${'★'.repeat(t)}${'☆'.repeat(3 - t)}</span>`, sub,
           t >= 3 ? '<span class="tag">MAX</span>' : B(money(G.shop.toolPrices[t]), { t: 'act', st, a: 'buy', career: c }, c === me.career ? 'good' : ''));
@@ -3179,9 +3170,8 @@ function renderPanel(p) {
           return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`}`;
     }
-    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) + policeReports() : ''}`;
+    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) + policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · สมัครเป็นขอทานได้ที่นี่ (เงินสด+ฝากไม่เกิน ฿2,000) · หาเงินโดย<b>วิ่งเก็บขยะ</b>ที่ถังขยะ หรือนั่งขอทาน (ปุ่ม 🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ</div>${staffHint('beggar')}`;
-    case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน · ใครก็ล้วงกระเป๋าได้ (ทุก 1 นาที) ตอนล้วงจะใส่ชุดโจรทันที คนเห็นแจ้งตำรวจได้ และสายตรวจจะวิ่งไล่จับ · ถ้าพลาดอาจถูกจับคาหนังคาเขา</div>${job('police') ? '<div class="sub">👮 ตำรวจล้วงกระเป๋าไม่ได้</div>' : B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big')}`;
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;
     case 'quests': {
@@ -3260,16 +3250,13 @@ function renderPanel(p) {
         😌 <b>พัก</b>: นั่งพักได้ทุกที่ พลังงานฟื้นเร็ว 3 เท่า และเลือดค่อยๆ ฟื้น (ถ้าไม่หิว)<br>
         ❤️ <b>สุขภาพ</b>: หิวนานเลือดลด · ป่วยต้องหาหมอ · แตะแถบสถานะเพื่อดูวิธีเพิ่ม<br>
         🍱 <b>ตุนอาหาร</b>: ซื้อใส่กระเป๋าที่ร้านอาหาร แล้วกด "ใช้" ในกระเป๋าตอนหิว<br>
-        🕶️ <b>ล้วงกระเป๋า</b>: ใครก็ทำได้ (ยกเว้นตำรวจ) จะใส่ชุดโจรทันที คนเห็นแจ้ง 191 ได้ สายตรวจ NPC จะวิ่งไล่จับ<br>
         👥 <b>เพื่อน</b>: คุยกับคนอื่นแล้ว "📱 ขอเบอร์" (ปฏิเสธ 2 ครั้ง ต้องรอ 10 นาที) · ดูเพื่อนที่ออนไลน์ที่เมนู 👥<br>
         💤 ไม่ได้แตะจอ 2 นาที จะขึ้นว่า "ไม่อยู่"</div>
         <div class="grid2" style="margin-top:8px">${B('📖 ดูบทช่วยสอน', { fn: 'tut' })}${B('🗺️ เปิดแผนที่', { fn: 'map' })}</div>`;
     case 'player': {
       const o = P.get(p.pid); if (!o) return '';
-      const m = P.get(myId), d = Math.hypot(o.x - m.x, o.y - m.y), far = d > 5.5, canSteal = me.career !== 'police';
-      const stealBtn = canSteal ? B('🕶️ ล้วงกระเป๋า (ต้องประชิดตัว · ใส่ชุดโจร)', { fn: 'stealP', to: o.id }, 'warn', d > 1.8) : '';
+      const m = P.get(myId), d = Math.hypot(o.x - m.x, o.y - m.y), far = d > 5.5;
       if (o.npc) {
-        if (o.tf) return `<h2>🕶️ โจรขโมย <span class="tag">NPC</span></h2><div class="sub">โจรล้วงกระเป๋าที่ป้วนเปี้ยนในเมือง! วิ่งเข้าไปใกล้ๆ แล้วจับ ได้เงินที่ถูกขโมยคืนและรางวัลนำจับ</div>${B('👊 จับโจร!', { t: 'catchthief' }, 'warn big pulse', d > 1.8)}${d > 1.8 ? '<div class="sub">⚠️ ต้องเข้าไปใกล้กว่านี้ (กดค้างปุ่มใหญ่เพื่อวิ่ง)</div>' : ''}`;
         if (o.wk && o.desc) return `<h2>${esc(o.name)} <span class="tag">NPC</span></h2><div class="sub">${esc(o.desc)}</div>`;
         if (o.wk) return `<h2>${CAREER_ICON(o.c)} ${esc(o.name)} <span class="tag">NPC</span></h2><div class="sub">ทำงาน${G.careers[o.c]?.name || ''}แทน เพราะตอนนี้ไม่มีผู้เล่นทำงานนี้ออนไลน์${o.c === 'police' ? ' · สายตรวจจะวิ่งไล่จับคนที่ถูกแจ้งความ' : ''}</div>`;
         return `<h2>🏘️ ${esc(o.name)} <span class="tag">ชาวเมือง</span></h2><div class="sub">ชาวบ้านที่เดินไปมาในเมือง ทักทายกันได้ในแชท</div>${stealBtn}`;
@@ -3286,9 +3273,7 @@ function renderPanel(p) {
         <div class="sub">${far ? '⚠️ อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน' : 'อยู่ใกล้พอที่จะติดต่อกันได้'}</div>
         <div class="grid2">${B('🤝 แลกเปลี่ยน', { fn: 'tradeReq', to: o.id }, 'primary', far)}${B(known ? '📇 มีเบอร์แล้ว' : '📱 ขอเบอร์', { t: 'req', kind: 'phone', to: o.id }, 'good', far || known)}</div>
         ${job('doctor') ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
-        ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}
-        ${o.th ? `<div class="jobbox">🕶️ ${esc(o.name)} ใส่ชุดโจร! ${B('📞 แจ้งตำรวจ 191', { t: 'report', thief: o.id }, 'warn')}</div>` : ''}
-        ${job('police') ? (o.w ? B('👮 จับกุม! (มีการแจ้งความ)', { t: 'arrest', to: o.id }, 'warn big pulse', d > 2) : '<div class="sub">👮 ไม่มีการแจ้งความเกี่ยวกับคนนี้</div>') : `<div style="margin-top:8px">${stealBtn}</div>`}`;
+        ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}`;
     }
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => b.on - a.on);
@@ -3398,13 +3383,6 @@ function dogBox(st) {
   if (c) return `<div class="jobbox">🐕 <b>เคสหมาหาย: น้อง${esc(c.name)}</b> (${G.pets[c.dog]?.name || ''}) · เจ้าของ ${esc(c.owner)}<br>📍 มีคนเห็นแถว <b>${esc(c.hint)}</b> · เหลือเวลา <b class="dogcd"></b><br><small>เดินไปให้ใกล้ตัวมันเพื่อพบ · ฟังเสียงเห่า และดูวงสีเหลืองบนแผนที่ · เจอเร็วได้โบนัส</small>${B('ยกเลิกเคส', { t: 'act', st, a: 'dogquit' })}</div>`;
   return `<div class="jobbox">🐕 <b>เคสหมาหาย</b> · ค่าตอบแทนตามเวลาที่ใช้ตามหา (ตามไกลได้มาก) · เวลาจำกัด ถ้าไม่เจอทันถือว่าล้มเหลว${cd > 0 ? `<br><small>เคสใหม่เข้าในอีก ${cd} วินาที</small>` : ''}${B('📋 รับเคสหมาหาย (⚡5)', { t: 'act', st, a: 'dog' }, 'primary', cd > 0)}</div>`;
 }
-function policeReports() {
-  const r = me.reports || [];
-  if (!r.length) return '<div class="sub" style="margin-top:10px">ยังไม่มีการแจ้งเหตุ · เมื่อมีคนโทร 191 ตำแหน่งโจรจะขึ้นที่นี่และบนแผนที่ (เฉพาะตำรวจ)</div>';
-  return `<div class="list">${r.map(c => itemRowRaw('🚨', `${esc(c.thief)} ล้วงกระเป๋า${c.victim ? ` ${esc(c.victim)}` : ''}`, `${c.amt ? `เงินที่หายไป ${money(c.amt)} · ` : ''}แจ้งเมื่อ ${Math.max(0, Math.round((Date.now() + clockOff - c.t) / 1000))} วิที่แล้ว · ${AREA[c.area]?.name || ''}`,
-    `<div class="col2">${B('📍 จุดที่เห็น', { fn: 'guidePt', x: c.x, y: c.y, area: c.area, label: `จุดที่เห็น ${c.thief}` }, 'good')}${P.get(c.tid) ? B('🎯 ตามตัว', { fn: 'guide', key: 'p' + c.tid }, 'warn') : ''}</div>`)).join('')}</div>
-    <div class="sub">เข้าใกล้โจรแล้วแตะที่ตัวเพื่อจับกุม (โจรที่มีการแจ้งความจะมี 🚨 บนหัว)</div>`;
-}
 function riderJobs() {
   const jobs = me.jobs || [];
   if (!jobs.length) return '<div class="sub" style="margin-top:10px">ยังไม่มีออเดอร์ รอสักครู่... (ออเดอร์ใหม่จะแจ้งเตือน 🔔)</div>';
@@ -3443,7 +3421,6 @@ function phonePanel(p) {
       <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" min="0" max="500" value="0" style="width:90px"> ฿</div><div class="list">${rows}</div>`;
   } else if (tab === 'rider') body = riderJobs();
   else if (tab === 'bills') body = billsBox();
-  else if (tab === 'police') body = policeReports();
   return `<h2>📱 มือถือ</h2>${tabs}${body}`;
 }
 
@@ -4039,12 +4016,6 @@ function openMap(mapId, keepScroll) {
     g.font = `${Math.round(r * 1.15)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
   });
   if (me.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc, [x, y] = L(hx, hy); g.strokeStyle = '#ffb300'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.arc(x, y, hr * k, 0, 7); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,200,0,.12)'; g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐕', x, y); }
-  // police only: where reported thieves were seen
-  if (job('police')) for (const rp of me.reports || []) if (mapOf(rp.area) === mapId) {
-    const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp, [x, y] = L(q.x, q.y);
-    g.strokeStyle = '#ff3b3b'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, r * 1.6, 0, 7); g.stroke();
-    g.font = `${Math.round(r * 1.6)}px serif`; g.fillText('🚨', x, y);
-  }
   // online players as coloured dots with their names; you are the big white dot with a ring
   let onHere = 0;
   for (const p of P.values()) {

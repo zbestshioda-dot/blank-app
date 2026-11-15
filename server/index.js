@@ -405,7 +405,7 @@ function hydrate(r) {
     furniture: [], bank: 0, bankT: now(), loan: 0, dz: [], awake: 0, listings: [], contacts: [], stats: {}, ach: [], title: '', jobChanges: [],
     enrolled: false, classes: 0, office: null, garden: null, rent: null, houseSale: 0, houseRent: 0, down: null,
     gender: 'm', look: null, wardrobe: null, god: null, rod: 0, hideJob: false, outfit: '', outfits: [], pets: [], pet: '', frames: [], frame: -1, licExp: {}, phoneAsk: {}, school: null,
-    happy: 80, bills: [], billMonth: null, usage: { sleep: 0 }, utilOff: false, wanted: 0, crimes: [], craving: null,
+    happy: 80, bills: [], billMonth: null, usage: { sleep: 0 }, utilOff: false, craving: null,
   }, r, { ws: null, id: null, f: 0, bed: -1, chair: -1, pose: null, seat: null, immune: {}, cd: {}, cast: null, trade: null, call: null, lastPosT: now(), moved: false, meDirty: false, desk: -1, afk: false, emo: null, thiefUntil: 0 });
   if ((a.v || 1) < 2) {                            // migrate saves from the old single-map town
     if (!D.CAREERS[a.career]) a.career = 'none';
@@ -778,7 +778,7 @@ function apply(a, career) {
     chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
     doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (กู้ชีพ ผ่าตัด ห้ามเลือด ฯลฯ ลงมือทำในห้องจริง) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
-    police: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 แล้วตามจับโจรได้ค่าหัว',
+    police: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
   };
   toast(a, `ยินดีด้วย! ได้งานเป็น ${c.icon} ${c.name} · ${tips[career]}`, c.icon);
@@ -818,7 +818,7 @@ function act(a, m) {
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
   if (!s && m.st === 'water') { if (a.cast) { a.cast = null; markMe(a); } return toast(a, 'ต้องยืนติดริมน้ำก่อนถึงจะตกปลาได้', '🎣', false); }
   if (!s) return;
-  if (a.down) return toast(a, a.down.kind === 'jail' ? 'คุณติดคุกอยู่ ทำอะไรไม่ได้' : 'คุณหมดสติอยู่ ทำอะไรไม่ได้', a.down.kind === 'jail' ? '⛓️' : '💤', false);
+  if (a.down) return toast(a, 'คุณหมดสติอยู่ ทำอะไรไม่ได้', '💤', false);
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
   const h = hourNow();
   if (!D.isOpen(s.type, h)) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
@@ -838,25 +838,6 @@ function act(a, m) {
       for (const o of online.values()) if (o !== a && o.seat === s.id) return toast(a, 'ที่นั่งนี้มีคนนั่งแล้ว', '🪑', false);
       standUp(a); a.pose = 'seat'; a.seat = s.id; place(a, s.x, s.y); quest(a, 'sit'); sendRoster(); joy(a, 3);
       return toast(a, 'นั่งพักที่โต๊ะ พลังงานฟื้นเร็วขึ้น คุยกับคนรอบๆ ได้ (เดินเพื่อลุก)', '🪑');
-    }
-    // ---------------- beggars and pickpockets
-    case 'crowd.pick': {
-      if (a.career === 'police') return toast(a, 'ตำรวจล้วงกระเป๋าไม่ได้!', '👮', false);
-      if (!cd(a, 'crowd', 60000) || !spend(a, 8)) return;
-      thiefMode(a);
-      if (Math.random() < 0.6 + 0.08 * tier(a, 'thief')) {
-        const amt = rint(20, 80); earn(a, amt); stat(a, 'stolen');
-        if (Math.random() < 0.25) { const c = newCrime(a, '', amt); makeWanted(c, 'ชาวบ้านโทรแจ้ง'); return toast(a, `ล้วงได้ ${money(amt)} แต่มีชาวบ้านเห็นแล้วโทรแจ้งตำรวจ! รีบหลบไป`, '🚨', false); }
-        return toast(a, `ล้วงกระเป๋าคนในฝูงชนได้ ${money(amt)}`, '🕶️');
-      }
-      if (Math.random() < 0.3) {
-        const fine = Math.min(Math.floor(a.money), 100); a.money -= fine;
-        standUp(a); a.thiefUntil = 0; a.wanted = 0; a.down = { kind: 'jail', t: now(), until: now() + 30000 };
-        const r = ROOM.r_police; place(a, r.x + 10.5, r.y + 7.8, true); joy(a, -15); markMe(a); sendRoster();
-        feed(`👮 ${a.name} ถูกชาวบ้านจับได้คาหนังคาเขาขณะล้วงกระเป๋า`);
-        return toast(a, `ถูกจับได้คาหนังคาเขา! ปรับ ${money(fine)} และติดคุก 30 วินาที`, '⛓️', false);
-      }
-      return toast(a, 'ล้วงพลาด! คนรู้ตัวทัน รีบเดินหนีไป', '😰', false);
     }
     case 'bank.bills': return payBills(a);
     case 'fashion.buy': case 'barber.buy': {
@@ -2077,8 +2058,7 @@ function moodTick(a, t, indoors) {
 function begSpot(a) {
   const area = areaId(a); if (area !== 'town' && area !== 'housing' && area !== 'farm') return 0.3;
   let m = area === 'town' ? 0.7 : 0.45;
-  if (D.STATIONS.some(s => s.type === 'crowd' && s.area === area && Math.hypot(s.x - a.x, s.y - a.y) < 4)) m = 1.2;
-  else if (D.STATIONS.some(s => (s.type === 'door' && s.house === undefined || s.type === 'crowd') && s.area === area && Math.hypot(s.x - a.x, s.y - a.y) < 6)) m = 1;
+  if (D.STATIONS.some(s => s.type === 'door' && s.house === undefined && s.area === area && Math.hypot(s.x - a.x, s.y - a.y) < 6)) m = 1;
   const h = hourNow(); if (h >= 22 || h < 6) m *= 0.4;
   return m;
 }
@@ -2129,105 +2109,6 @@ function donate(a, m) {
   toast(a, `บริจาค ${money(amt)} ให้ ${o.name} อิ่มบุญ มีความสุข +${j}`, '🙏'); toast(o, `${a.name} บริจาคให้คุณ ${money(amt)}`, '🙏');
   if (amt >= 500) feed(`🙏 ${a.name} ใจบุญ บริจาคให้ขอทาน ${money(amt)}`);
 }
-const crimes = new Map();               // id -> crime
-let crimeSeq = 1;
-function newCrime(thief, victim, amt) {
-  const c = { id: crimeSeq++, thief, thiefName: thief.name, victim, amt, t: now(), x: thief.x, y: thief.y, area: areaId(thief), reported: 0 };
-  crimes.set(c.id, c); thief.crimes = [...(thief.crimes || []).filter(x => now() - x.t < 10 * 60000), { id: c.id, amt, victim, t: c.t }];
-  return c;
-}
-function makeWanted(c, by) {
-  if (!c || c.reported) { if (c) c.thief.wanted = now() + D.POLICE.wantedMin * 60000; return; }
-  c.reported = now(); c.x = c.thief.x; c.y = c.thief.y; c.area = areaId(c.thief);
-  c.thief.wanted = now() + D.POLICE.wantedMin * 60000; c.thief.sd = true; sendRoster();
-  for (const p of online.values()) if (p.career === 'police') { toast(p, `🚨 แจ้งเหตุ 191: ${c.thiefName} ล้วงกระเป๋า${c.victim ? ` ${c.victim}` : ''} (${by}) ดูตำแหน่งบนแผนที่ตำรวจ`, '🚨'); markMe(p); }
-}
-// pickpocketing is a side activity anyone (but the police) can try; you pull on the thief outfit while doing it
-function thiefMode(a) {
-  const was = a.thiefUntil > now();
-  a.thiefUntil = now() + D.POLICE.outfitMin * 60000;
-  if (!was) sendRoster();
-}
-function steal(a, m) {
-  if (a.down) return;
-  if (a.career === 'police') return toast(a, 'ตำรวจล้วงกระเป๋าไม่ได้!', '👮', false);
-  if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำอะไร...', '😞', false);
-  if (+m.to < 0) return stealNpc(a, +m.to);
-  const o = nearPlayer(a, m.to, 1.8);
-  if (!o) return toast(a, 'ต้องเข้าไปใกล้ๆ เป้าหมาย (ประชิดตัว)', '🕶️', false);
-  if (godLock(o)) return toast(a, `${o.name} ระวังตัวแจ ล้วงไม่ได้`, '👑', false);
-  if (o.down) return toast(a, 'เป้าหมายไม่อยู่ในสภาพที่จะล้วงได้', '🕶️', false);
-  if (!cd(a, 'steal', 45000) || !spend(a, 8)) return;
-  thiefMode(a);
-  let chance = 0.55 + 0.1 * tier(a, 'thief') + (o.pose ? 0.2 : 0) - (o.career === 'police' ? 0.35 : 0);
-  const ok = Math.random() < chance;
-  let c = null;
-  if (ok) {
-    const amt = Math.min(600, Math.floor(o.money * rnd(0.05, 0.14)));
-    if (amt < 10) return toast(a, `กระเป๋า${o.name}ว่างเปล่า ไม่มีอะไรให้ล้วง`, '🕶️', false);
-    o.money -= amt; earn(a, amt); stat(a, 'stolen'); markMe(o); joy(o, -15);
-    c = newCrime(a, o.name, amt);
-    toast(a, `ล้วงกระเป๋า ${o.name} สำเร็จ ได้ ${money(amt)} รีบหนีไปก่อนมีคนแจ้งตำรวจ!`, '🕶️');
-    send(o, { t: 'robbed', amt, crime: c.id, thief: null });
-    toast(o, `กระเป๋าเบาลง! มีคนล้วงเงินคุณไป ${money(amt)}`, '😱', false);
-  } else {
-    c = newCrime(a, o.name, 0);
-    toast(a, `${o.name} รู้ตัว! ล้วงไม่สำเร็จ รีบหนี!`, '😰', false);
-    send(o, { t: 'robbed', amt: 0, crime: c.id, thief: a.name });
-  }
-  // anyone close enough sees it; police who see it can arrest right away
-  for (const w of online.values()) {
-    if (w === a || areaId(w) !== areaId(a) || dist(w, a) > 7) continue;
-    if (w.career === 'police') { makeWanted(c, `ตำรวจ ${w.name} เห็นเหตุการณ์`); toast(w, `คุณเห็น ${a.name} ล้วงกระเป๋า ${o.name}! แตะที่ตัวโจรเพื่อจับกุม`, '👮'); }
-    else if (w !== o) send(w, { t: 'witness', crime: c.id, thief: a.name, victim: o.name });
-  }
-}
-function report(a, m) {
-  // reporting someone you saw in the thief outfit (from their profile): their latest crime
-  if (m.thief != null && m.crime == null) {
-    const th = online.get(+m.thief);
-    const last = th && [...crimes.values()].filter(c => c.thief === th && now() - c.t < 10 * 60000).sort((x, y) => y.t - x.t)[0];
-    if (!last) return toast(a, th && th.thiefUntil > now() ? `ยังไม่มีหลักฐานว่า ${th.name} ล้วงกระเป๋าใคร` : 'ไม่มีเหตุให้แจ้ง', '📵', false);
-    m = { crime: last.id };
-  }
-  const c = crimes.get(+m.crime);
-  if (!c || now() - c.t > 10 * 60000) return toast(a, 'เหตุการณ์นี้นานเกินไปแล้ว', '📵', false);
-  if (!cd(a, 'report', 5000, true)) return;
-  const cops = [...online.values()].filter(p => p.career === 'police').length;
-  makeWanted(c, `${a.name} โทรแจ้ง`);
-  toast(a, `📞 191 รับแจ้งแล้ว ${cops ? `ตำรวจออนไลน์ ${cops} นาย และ` : ''}สายตรวจ NPC กำลังตามตัว ${c.thiefName}`, '🚓');
-}
-function arrest(a, m) {
-  if (a.down || a.career !== 'police' && !isAdmin(a)) return;
-  if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำอะไร...', '😞', false);
-  const o = nearPlayer(a, m.to, 2);
-  if (!o) return toast(a, 'ต้องเข้าไปใกล้ผู้ต้องสงสัยก่อน', '👮', false);
-  if (godLock(o)) return toast(a, `${o.name} มีภูมิคุ้มกัน`, '👑', false);
-  if (!(o.wanted > now())) return toast(a, `ไม่มีหลักฐานหรือการแจ้งความเกี่ยวกับ ${o.name} จับไม่ได้`, '👮', false);
-  if (!cd(a, 'arrest', 3000)) return;
-  const back = jail(o, `ตำรวจ${a.name}`);
-  const got = earn(a, D.POLICE.bounty * (1 + BOOST[tier(a, 'police')]) * jobPay(a) + Math.max(0, back) * 0.3); stat(a, 'arrests'); addXp(a, 2); joy(a, 6);
-  return toast(a, `จับกุม ${o.name} สำเร็จ! ได้ค่าหัว ${money(got)}`, '👮');
-}
-// fine the thief, give the loot back to the victims and lock them up; returns what is left of the fine
-function jail(o, by) {
-  const recent = (o.crimes || []).filter(c => now() - c.t < 10 * 60000);
-  const stolen = recent.reduce((s, c) => s + c.amt, 0);
-  const fine = Math.min(Math.floor(o.money), stolen + D.POLICE.fineBase);
-  o.money -= fine;
-  // give the loot back to the victims
-  let back = fine;
-  for (const c of recent) { const v = byName(c.victim); const r = Math.min(back, c.amt); if (v && r > 0) { credit(v, r); back -= r; if (v.ws) toast(v, `${by}จับ${o.name}ได้ คืนเงินที่ถูกล้วง ${money(r)}`, '👮'); } }
-  for (const c of recent) crimes.delete(c.id);
-  o.crimes = []; o.wanted = 0; o.thiefUntil = 0;
-  standUp(o); o.cast = null; if (o.trade) tradeClose(o.trade, `${o.name} ถูกจับ`);
-  o.down = { kind: 'jail', t: now(), until: now() + D.POLICE.jailSec * 1000 };
-  const r = ROOM.r_police; place(o, r.x + 10.5, r.y + 7.8, true); joy(o, -20); markMe(o); sendRoster();
-  toast(o, `ถูก${by}จับกุม! ปรับ ${money(fine)} และติดคุก ${Math.round(D.POLICE.jailSec / 60 * 10) / 10} นาที`, '⛓️', false);
-  feed(`👮 ${by} จับกุม ${o.name} ข้อหาล้วงกระเป๋า`);
-  return back;
-}
-
 // ------------------------------------------------------------------ looks
 function wear(a, m) {
   const cat = m.cat; if (!D.LOOKS[cat]) return;
@@ -2270,7 +2151,7 @@ const HAIRS = Object.keys(D.LOOKS.hair), SH = Object.keys(D.LOOKS.shirt), PA = O
 const randLook = () => ({ hair: pick(['brown', 'brown', 'black', 'black', ...HAIRS]), shirt: pick(SH), pants: pick(PA) });
 let npcRosterDirty = false;
 {
-  const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|crowd|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
+  const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
   D.FOLK.town.forEach((p, i) => {
     const [x, y] = pick(walkableIn('town'));
     npcs.push({ id: -(i + 1), folk: 1, name: p.name, face: p.face, area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
@@ -2326,7 +2207,7 @@ const BOT_SAY = {
   any: ['มีใครว่างบ้าง', 'วันนี้เงินเข้าดีมาก 555', 'เหนื่อยจัง', 'ใครรู้ที่ตกปลาดีๆ บ้าง', 'หิวแล้วอะ', 'เดินหลงอีกแล้ว 😅', 'สวัสดีทุกคน', 'เมืองนี้น่าอยู่ดี', 'ใกล้จะเลเวลอัปแล้ว!', 'ใครอยู่แถวนี้บ้าง'],
   none: ['หางานอยู่ มีงานไหนดีบ้าง', 'ว่างงานอะ ไปสมัครงานก่อนดีกว่า'],
   rider: ['ส่งของรอบที่สิบแล้ว 🛵', 'ทิปวันนี้ดีมาก'], farmer: ['ผักโตไวมากวันนี้', 'เดี๋ยวไปรดน้ำผักก่อน'], merchant: ['ของราคาส่งขึ้นอีกแล้ว', 'ใครอยากซื้อของบ้าง ราคาดี'],
-  chef: ['ทำต้มยำขายดีมาก', 'วัตถุดิบหมดอีกแล้ว'], doctor: ['ใครป่วยมาหาหมอได้นะ', 'เวรวันนี้ยาวมาก'], police: ['ระวังโจรนะทุกคน', 'ลาดตระเวนอยู่ 👮'],
+  chef: ['ทำต้มยำขายดีมาก', 'วัตถุดิบหมดอีกแล้ว'], doctor: ['ใครป่วยมาหาหมอได้นะ', 'เวรวันนี้ยาวมาก'], police: [ 'ลาดตระเวนอยู่ 👮'],
   office: ['ประชุมอีกแล้ว', 'เงินเดือนออกพอดี'], beggar: ['ขอเศษเงินหน่อยครับ 🙏', 'วันนี้ได้นิดเดียวเอง'],
 };
 const BOT_REPLY = [
@@ -2491,27 +2372,12 @@ function npcDoctor(n) {
   toast(pt, `${n.name} รักษา${DZ[d].name}ให้แล้ว ค่ารักษา ${money(fee)} (หมอผู้เล่นถูกกว่า)`, '🩺');
   if (!(pt.dz || []).length) standUp(pt);
 }
-// the patrol: chases the nearest reported thief in town and arrests on contact
-function copTick(n) {
-  const t = now();
-  const wanted = [...online.values()].filter(a => a.wanted > t && !a.down && areaId(a) === n.area && !npcs.some(o => o !== n && o.chase === a));
-  const tgt = wanted.sort((x, y) => dist(x, n) - dist(y, n))[0];
-  if (!tgt) { if (n.chase) { n.chase = null; n.speed = n.worker.speed; n.path = []; } return; }
-  if (n.chase !== tgt) { n.chase = tgt; n.repath = 0; n.wait = 0; n.say = '🚨 หยุดนะ! ตำรวจ!'; toast(tgt, `🚓 ${n.name} กำลังวิ่งไล่จับคุณ! หนีเข้าตึกหรือออกนอกเมือง`, '🚨', false); }
-  n.speed = D.POLICE.npcSpeed * (0.97 + 0.03 * Math.sin(t / 900));
-  if (dist(tgt, n) < 0.9) {
-    if (godLock(tgt)) return;
-    jail(tgt, n.name); n.chase = null; n.speed = n.worker.speed; n.path = []; n.wait = 3; return;
-  }
-  if (t > (n.repath || 0)) { n.repath = t + 500; n.path = routeTo(n, [tgt.x, tgt.y], n.area) || []; n.wait = 0; }
-}
 function npcTick(dt, ps) {
   for (const n of npcs) {
     if (n.worker) {
       const on = workerOn(n);
       if (on !== n.on) { n.on = on; npcRosterDirty = true; if (!on) { n.chase = null; n.pose = null; } }
       if (!on) continue;
-      if (n.worker.cop) copTick(n);
       if (n.worker.job && !n.path.length) n.worker.job(n);
     }
     if (n.wait > 0) { n.wait -= dt; if (n.say && Math.random() < dt / 20) n.say = null; continue; }
@@ -2536,90 +2402,12 @@ function npcTick(dt, ps) {
     const n = pick(npcs.filter(x => x.folk)), near = [...online.values()].filter(o => areaId(o) === n.area && dist(o, n) <= 14);
     if (near.length) { const msg = { t: 'chat', id: n.id, name: n.name, text: pick(D.NPC_LINES), ts: now(), npc: 1 }; near.forEach(o => send(o, msg)); }
   }
-  for (const n of npcs) if (n.say && n.chase) {
-    const near = [...online.values()].filter(o => areaId(o) === n.area && dist(o, n) <= 14);
-    const msg = { t: 'chat', id: n.id, name: n.name, text: n.say, ts: now(), npc: 1 }; near.forEach(o => send(o, msg)); n.say = null;
-  }
-}
-// ------------------------------------------------------------------ the pickpocket NPC
-// Every few minutes a thief sneaks up on someone in town, lifts some cash and runs for it. Catch it (tap it, get close)
-// to get the money back plus a reward; a patrolling NPC cop that bumps into it catches it too. Otherwise it gets away.
-let thiefAt = now() + 120000;
-function thiefGone(th, msg) { const i = npcs.indexOf(th); if (i >= 0) npcs.splice(i, 1); npcRosterDirty = true; if (msg && th.thief.v?.ws) toast(th.thief.v, msg, '🕶️', false); }
-function thiefCaught(th, by) {
-  const T = th.thief, v = T.v, loot = T.loot || 0;
-  if (loot && v) { credit(v, loot); if (v.ws) toast(v, `${by.name} จับโจรได้! ได้เงินคืน ${money(loot)}`, '👮'); }
-  if (by.ws) { const rw = loot ? 150 + Math.round(loot * .2) : 60; earn(by, rw); joy(by, 8); stat(by, 'thiefCaught'); toast(by, `👊 จับโจรได้! รางวัลนำจับ ${money(rw)}${loot && by !== v ? ` · คืนเงิน ${money(loot)} ให้ ${v.name}` : ''}`, '👮'); feed(`👮 ${by.name} จับโจรขโมยได้กลางเมือง!`); }
-  else feed(`👮 ${by.name} จับโจรขโมยได้${loot ? ` คืนเงินให้ ${v.name}` : ''}`);
-  thiefGone(th);
-}
-const THIEF_NPC = false;                   // the roaming pickpocket NPC is off (players can still pick pockets themselves)
-function thiefTick() {
-  const t = now(), th = npcs.find(n => n.thief);
-  if (!THIEF_NPC) { if (th) thiefGone(th); return; }
-  if (!th) {
-    if (t < thiefAt) return;
-    thiefAt = t + rnd(150, 330) * 1000;
-    const v = pick([...online.values()].filter(a => areaId(a) === 'town' && !a.down && a.money >= 80 && !hidden(a) && !godLock(a) && t - (a.robbedAt || 0) > 10 * 60000));
-    if (!v) return;
-    const far = walkableIn('town').filter(([x, y]) => { const d = Math.hypot(x + .5 - v.x, y + .5 - v.y); return d > 9 && d < 14; });
-    if (!far.length) return;
-    const [x, y] = pick(far);
-    npcs.push({ id: -900, thief: { v, state: 'stalk', until: t + 70000, loot: 0 }, name: 'โจรขโมย', area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: 0,
-      look: { hair: 'black', shirt: 'black', pants: 'black' }, speed: 2.6, next: () => null, stay: () => 0 });
-    npcRosterDirty = true; return;
-  }
-  const T = th.thief, v = T.v;
-  for (const c of npcs) if (c.worker?.cop && c.on !== false && c.area === 'town' && dist(c, th) < 1.3 && T.state === 'flee') return thiefCaught(th, c);
-  if (t > T.until) return thiefGone(th, T.loot ? `โจรหนีไปได้ เงิน ${money(T.loot)} หายไปแล้ว 😢 (คราวหน้ารีบวิ่งตามจับ!)` : null);
-  if (T.state === 'stalk') {
-    if (!v.ws || v.down || areaId(v) !== 'town' || hidden(v)) { T.state = 'flee'; T.goal = null; return; }
-    if (dist(v, th) < 1.0) {
-      const amt = Math.min(400, Math.max(20, Math.round(v.money * rnd(.05, .12))));
-      v.money -= amt; v.robbedAt = t; markMe(v); T.loot = amt; T.state = 'flee'; T.goal = null; T.until = t + 45000; th.speed = 3.6;
-      toast(v, `👜 โจรล้วงกระเป๋าคุณไป ${money(amt)}! วิ่งตามไปแตะจับ (กดค้างปุ่มใหญ่ = วิ่ง)`, '🕶️', false);
-      const msg = { t: 'chat', id: th.id, name: th.name, text: pick(['หึหึ ขอยืมหน่อยนะ', 'เงินมาแล้ว! 💨', 'จับได้ก็จับไป!']), ts: t, npc: 1 };
-      for (const o of online.values()) if (areaId(o) === 'town' && dist(o, th) <= 14) send(o, msg);
-      return;
-    }
-    if (t > (T.repath || 0)) { T.repath = t + 450; th.path = routeTo(th, [v.x, v.y], 'town') || []; th.wait = 0; }
-    return;
-  }
-  // fleeing: run to a spot far from everyone, then vanish
-  if (!T.goal) {
-    const cand = walkableIn('town').filter(([x, y]) => Math.hypot(x - th.x, y - th.y) > 22);
-    T.goal = pick(cand.length ? cand : walkableIn('town')).map(q => q + .5);
-    th.path = routeTo(th, T.goal, 'town') || []; th.wait = 0;
-  }
-  if (!th.path.length) thiefGone(th, T.loot ? `โจรหนีไปได้ เงิน ${money(T.loot)} หายไปแล้ว 😢` : null);
-}
-function catchThief(a) {
-  const th = npcs.find(n => n.thief); if (!th) return toast(a, 'โจรหนีไปแล้ว', '🕶️', false);
-  if (areaId(a) !== 'town' || dist(a, th) > 1.8) return toast(a, 'ต้องเข้าไปใกล้ๆ อีก (วิ่งตามไป!)', '🏃', false);
-  thiefCaught(th, a);
 }
 const npcVisible = n => !n.worker || n.on;
-const npcInfo = n => n.bot ? botPub(n) : n.thief ? { id: n.id, npc: 1, name: n.name, c: 'none', lv: 1, dz: [], pose: null, g: 'm', lk: n.look, x: n.x, y: n.y, f: n.f, title: '', of: 'thief', tf: 1 } : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
+const npcInfo = n => n.bot ? botPub(n) : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
-function stealNpc(a, id) {
-  const n = npcs.find(x => x.id === id && (x.folk || x.bot));
-  if (!n || areaId(a) !== 'town' || Math.hypot(a.x - n.x, a.y - n.y) > 1.8) return toast(a, 'ต้องเข้าไปใกล้ๆ เป้าหมาย (ประชิดตัว)', '🕶️', false);
-  if (now() - n.pickedAt < 5 * 60000) return toast(a, `${n.name} ระวังตัวแจ ล้วงไม่ได้ (เพิ่งโดนล้วงไป)`, '🕶️', false);
-  if (!cd(a, 'steal', 45000) || !spend(a, 8)) return;
-  n.pickedAt = now(); thiefMode(a);
-  if (Math.random() < 0.6 + 0.08 * tier(a, 'thief')) {
-    const amt = rint(15, 60); earn(a, amt); stat(a, 'stolen');
-    if (Math.random() < 0.3) { const c = newCrime(a, n.name, amt); makeWanted(c, `${n.name} ร้องโวยวาย`); return toast(a, `ล้วงได้ ${money(amt)} แต่${n.name}รู้ตัวแล้วโทรแจ้งตำรวจ!`, '🚨', false); }
-    return toast(a, `ล้วงกระเป๋า${n.name}ได้ ${money(amt)}`, '🕶️');
-  }
-  const c = newCrime(a, n.name, 0); makeWanted(c, `${n.name} จับได้ว่าถูกล้วง`);
-  return toast(a, `${n.name} จับได้! ร้องเรียกตำรวจแล้ว รีบหนี!`, '😰', false);
-}
-
-// ------------------------------------------------------------------ public views
-// what you are wearing: the thief outfit while pickpocketing, else a reward outfit you picked, else your job's clothes (unless hidden)
+// what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
 function outfitOf(a) {
-  if (a.thiefUntil > now()) return 'thief';
   if (a.god?.cloak && isAdmin(a)) return 'admin';           // admin-only cloak + aura (god mode)
   if (a.outfit && (a.outfits || []).includes(a.outfit)) return a.outfit;
   if (!a.hideJob && D.CAREERS[a.career]?.where) return a.career;
@@ -2628,8 +2416,8 @@ function outfitOf(a) {
 function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || []).includes(f.id) || f.locked && isAdmin(a)) ? f.id : -1; }
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
-    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, w: a.wanted > now() ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), th: a.thiefUntil > now() ? 1 : 0, afk: a.afk ? 1 : 0, veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '' };
+    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
+    of: outfitOf(a), afk: a.afk ? 1 : 0, veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '' };
 }
 function sendRoster() {
   const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
@@ -2666,7 +2454,6 @@ function meView(a) {
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
-    reports: a.career === 'police' || isAdmin(a) ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_GEMS,
@@ -2738,7 +2525,6 @@ function login(ws, m) {
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   if (D.areaAt(a.x, a.y)?.id === 'farm' && !isAdmin(a)) { const g = D.GATES.town_from_farm; a.x = g.x; a.y = g.y; }   // the farm is closed for renovation: back to the town gate
-  if (a.down && a.down.kind === 'jail') { const r = ROOM.r_police; a.x = r.x + 10.5; a.y = r.y + 7.8; }
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
   online.set(a.id, a);
@@ -2888,7 +2674,7 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
-    case 'catchthief': return catchThief(a);
+
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
     case 'minigame': {                      // (mini-games were removed from the game)
       return;
@@ -2990,7 +2776,7 @@ function onMessage(ws, raw) {
     case 'resign': return resign(a);
     case 'paybills': return payBills(a);
     case 'donate': return donate(a, m);
-    case 'steal': return steal(a, m);
+
     case 'ride': {                           // get on / off one of your vehicles
       const k = String(m.v || '');
       if (!k || a.ride === k && !m.on) { if (D.VEHICLES[a.ride]?.fly && D.blocked(a.x, a.y)) return toast(a, 'หาที่โล่งลงจอดก่อน 🚁', '🚁', false); a.ride = ''; }
@@ -3029,8 +2815,8 @@ function onMessage(ws, raw) {
       }
       markMe(a); wdAt = 0; return;
     }
-    case 'report': return report(a, m);
-    case 'arrest': return arrest(a, m);
+
+
     case 'title': { if (!m.id || (a.ach || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
     case 'order': return placeOrder(a, m);
     case 'order_take': case 'order_drop': case 'order_deliver': case 'order_cancel': return riderAct(a, m);
@@ -3113,7 +2899,7 @@ function godAct(a, m) {
   else if (m.op === 'fill') {
     a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
     for (const d of [...(a.dz || [])]) cure(a, d);
-    if (a.down && a.down.kind !== 'jail') revive(a, 100);
+    if (a.down) revive(a, 100);
     toast(a, 'สเตตัสเต็มแล้ว', '💯');
   } else if (m.op === 'cloak') { a.god.cloak = !a.god.cloak; markMe(a); sendRoster(); toast(a, a.god.cloak ? 'สวมชุดคลุมแอดมิน + ออร่า' : 'ถอดชุดคลุมแอดมิน', '🌑'); }
   else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
@@ -3148,7 +2934,7 @@ function resetChar(a, m) {
   const fresh = hydrate(keep);
   for (const k of SAVE_KEYS) a[k] = fresh[k];
   byPhone.set(a.phone, a);
-  a.cd = {}; a.thiefUntil = 0; a.wanted = 0; a.crimes = []; a.office = null; a.doc = null;
+  a.cd = {}; a.office = null; a.doc = null;
   Q.ensure(a);
   place(a, D.SPAWN.x, D.SPAWN.y, true); markMe(a); sendRoster(); wdAt = 0; dirty = true; a.sd = true;
   send(a, { t: 'reset' });
@@ -3201,7 +2987,7 @@ function tick() {
       a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
       if ((a.dz || []).length) { a.dz = []; sendRoster(); }
       if (a.down) { a.down = null; sendRoster(); }
-      a.craving = null; a.utilOff = false; a.wanted = 0;
+      a.craving = null; a.utilOff = false;
     }
     // ---- energy, hunger, health
     const restMul = a.pose === 'rest' ? 3 : a.pose === 'seat' ? 2 : a.pose === 'bed' ? 2 : 1;
@@ -3235,7 +3021,6 @@ function tick() {
       if ((a.dz || []).some(d => d === 'cold' || d === 'flu')) for (const o of online.values()) if (o !== a && areaId(o) === areaId(a) && dist(o, a) < 2.5) infect(o, a.dz.includes('flu') ? 'flu' : 'cold', 0.01);
       if (a.career === 'office') officeTick(a, t, h, 1);
       if (a.desk >= 0) studyTick(a, h, 1);
-      if (a.thiefUntil && a.thiefUntil < t) { a.thiefUntil = 0; sendRoster(); }
       if (a.call?.payer) callBill(a);
       // (leaving begging is handled with the ฿2,000 rule above)
       if ((a.licenses || []).includes('driving') && a.licExp?.driving) {
@@ -3246,11 +3031,8 @@ function tick() {
     }
     // ---- knocked out
     if (!a.down && a.health <= 0) knockOut(a);
-    if (a.down && a.down.kind === 'jail' && a.health <= 0) a.health = 1;
     else if (a.down) {
-      if (a.down.kind === 'jail') {
-        if (t > a.down.until) { a.down = null; a.thiefUntil = 0; const r = ROOM.r_police; place(a, r.outside.x, r.outside.y, true); markMe(a); sendRoster(); toast(a, 'พ้นโทษแล้ว! อย่ากลับไปทำผิดอีกนะ', '🔓'); }
-      } else if (a.down.kind === 'veg') {
+      if (a.down.kind === 'veg') {
         a.health = Math.min(100, a.health + 0.12 * dt);
         if (a.health >= 15) revive(a, 15);
       } else if (a.down.kind === 'hosp') {
@@ -3274,7 +3056,6 @@ function tick() {
   if (slow) {
     // garden: tell owners their crops are ready
     for (const o of lots) if (o && o.garden && o.ws) o.garden.crops.forEach(c => { if (c && !c[2] && c[1] <= t) { c[2] = true; toast(o, `${D.ITEMS[c[0]].name}ในสวนของคุณโตแล้ว! ไปเก็บเกี่ยวได้`, '🌾'); } });
-    for (const [id, c] of crimes) if (t - c.t > 15 * 60000) crimes.delete(id);
     // rentals expire
     tenants.forEach((a, i) => { if (a && a.rent && a.rent.until < t) { tenants[i] = null; a.rent = null; a.sd = true; if (a.ws) { toast(a, 'สัญญาเช่าบ้านหมดแล้ว ต่อสัญญาได้ที่หน้าบ้าน', '🔑', false); markMe(a); } wdAt = 0; } });
     // NPC patients
@@ -3300,7 +3081,7 @@ function tick() {
   // positions
   const ps = [];
   for (const a of online.values()) if (a.moved) { a.moved = false; ps.push([a.id, +a.x.toFixed(2), +a.y.toFixed(2), a.f]); }
-  if (online.size) { botTick(t); thiefTick(); npcTick(dt, ps); }
+    if (online.size) { botTick(t); npcTick(dt, ps); }
   if (ps.length) {
     const hid = new Set([...online.values()].filter(hidden).map(a => a.id));
     if (!hid.size) broadcast({ t: 'ps', p: ps });
