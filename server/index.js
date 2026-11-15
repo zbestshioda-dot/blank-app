@@ -2948,6 +2948,13 @@ function onMessage(ws, raw) {
       markMe(a); return sendRoster();
     }
     case 'bug': return bugReport(a, m);
+    case 'unstick': {                         // the client could not walk for a while: drop anything that pins the player, resync the position
+      if (!cd(a, 'unstick', 3000, true)) return;
+      if (a.cast) a.cast = null; if (a.pose && a.pose !== 'jail' && !a.down) standUp(a);
+      if (D.blocked(a.x, a.y)) { const n = standNear(areaId(a), a.x, a.y); if (n) { a.x = n[0]; a.y = n[1]; } }
+      console.log(`[unstick] ${a.name} at ${a.x.toFixed(1)},${a.y.toFixed(1)} ${cleanText(m.why || '', 160)}`);
+      place(a, a.x, a.y); markMe(a); return;
+    }
     case 'god': return godAct(a, m);
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
       if (!a.run0 || a.career !== 'beggar' && !isAdmin(a)) return;
@@ -3085,7 +3092,7 @@ function bugReport(a, m) {
   const text = cleanText(m.text, 600); if (text.length < 5) return toast(a, 'เขียนรายละเอียดอีกนิด (อย่างน้อย 5 ตัวอักษร)', '🐞', false);
   if (!cd(a, 'bug', 60000)) return;
   const area = D.areaAt(a.x, a.y);
-  bugs.push({ t: now(), by: a.name, login: a.login, text, where: `${area?.name || area?.label || '?'} (${a.x.toFixed(1)}, ${a.y.toFixed(1)})`, ua: cleanText(m.ua, 160), build: BUILD });
+  bugs.push({ t: now(), by: a.name, login: a.login, text, where: `${area?.name || area?.label || '?'} (${a.x.toFixed(1)}, ${a.y.toFixed(1)})`, ua: cleanText(m.ua, 160), st: cleanText(m.st, 300), build: BUILD });
   if (bugs.length > 300) bugs = bugs.slice(-300);
   bugsDirty = true; dirty = true;
   console.log(`[bug] ${a.name}: ${text}`);

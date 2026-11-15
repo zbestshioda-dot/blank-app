@@ -994,6 +994,7 @@ function onAction() {
 }
 
 // ------------------------------------------------------------------ main loop
+let stuckT = 0, unstickAt = 0;
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
 function frame(t) {
@@ -1027,6 +1028,10 @@ function frame(t) {
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
     if (autoPath) autoPath.stuck = Math.hypot(m.x - ox0, m.y - oy0) < .004 ? autoPath.stuck + dt : 0;
+    // watchdog: trying to walk but not moving for a while (and not against a wall) -> clear whatever holds us and ask the server to resync
+    { const tryMove = (dx || dy) && !me.down, moved = Math.hypot(m.x - ox0, m.y - oy0) > .002, wall = tryMove && blockedAt(m.x + Math.sign(dx) * .35, m.y + Math.sign(dy) * .35);
+      stuckT = tryMove && !moved && !wall ? stuckT + dt : 0;
+      if (stuckT > 1.2 && performance.now() > unstickAt) { unstickAt = performance.now() + 4000; stuckT = 0; holdAfterTp = false; reelHold = false; if (!me.cast) FG = null; send({ t: 'unstick', x: m.x, y: m.y, why: JSON.stringify({ cast: me.cast?.state || 0, FG: !!FG, joy: !!joy, pose: me.pose || 0, down: me.down?.kind || 0 }) }); } }
     // walking into a gate's yellow circle takes you through it, no button needed
     if ((dx || dy) && near?.type === 'gate' && Math.hypot(near.x - m.x, near.y - m.y) < near.r * .75 && performance.now() > actCd) { actCd = performance.now() + 2000; autoPath = null; doAct(near.id, 'go'); }
     // walking down onto the door mat takes you outside, no button needed
@@ -2115,7 +2120,7 @@ const FN = {
   share() { shareGame(); },
   look(m) { send({ t: 'look', ...m.set }); },
   reel() { strike(); },
-  bug(m, root) { const v = root.querySelector('#bugIn').value.trim(); if (v.length < 5) return toast('เขียนรายละเอียดอีกนิด', '🐞', false); send({ t: 'bug', text: v, ua: navigator.userAgent.slice(0, 160) + ` ${innerWidth}x${innerHeight}` }); root.querySelector('#bugIn').value = ''; },
+  bug(m, root) { const v = root.querySelector('#bugIn').value.trim(); if (v.length < 5) return toast('เขียนรายละเอียดอีกนิด', '🐞', false); send({ t: 'bug', text: v, ua: navigator.userAgent.slice(0, 160) + ` ${innerWidth}x${innerHeight}`, st: JSON.stringify({ cast: me.cast?.state || 0, FG: !!FG, joy: !!joy, hat: holdAfterTp, pose: me.pose || 0, down: me.down?.kind || 0, panel: panel?.kind || 0, dlg: !!dlgQ, run: !!RUN, rb: !!RB, mis: me.mis?.title || 0, cook: !!me.cook }).slice(0, 300) }); root.querySelector('#bugIn').value = ''; },
   reset(m, root) {
     const pin = root.querySelector('#resetPin').value, ok = root.querySelector('#resetOk').value.trim();
     if (ok !== 'รีเซ็ต') return toast('พิมพ์คำว่า "รีเซ็ต" ในช่องยืนยันก่อน', '⚠️', false);
@@ -2654,6 +2659,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16i', d: '16 พ.ย. (รอบ 9)', items: ['🐞 แก้บัค: ตกปลาเสร็จแล้วบางครั้งเดินไม่ได้ · ถ้าตัวละครค้างเดินไม่ไป เกมจะปลดล็อกและซิงก์ตำแหน่งกับเซิร์ฟเวอร์ให้เองใน 1–2 วินาที · ขอบคุณที่แจ้งบัคค่ะ 🙏'] },
   { v: '2026-11-16h', d: '16 พ.ย. (รอบ 8)', items: [
     '🎬 <b>หน้าล็อกอินใหม่</b> วิดีโอโปรโมทตัวใหม่ (ฉากจริงในเกม) กรอบเรืองแสงสีรุ้งบนคอม ปุ่มเข้าเมืองมีแสงวิ่ง แตะ 🔊 เพื่อฟังเพลง',
     '🎵 <b>เพลงประกอบใหม่</b> กลางวันกับกลางคืนมีเพลงคนละเพลง เปลี่ยนนุ่มๆ ตามเวลาในเกม (ปิด/เปิดได้ที่ ⚙️ ตั้งค่า → เพลง)'] },
@@ -3273,7 +3279,7 @@ function renderPanel(p) {
     case 'god': {
       if (!me.admin) return '';
       const g = me.god || {};
-      const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}</small></div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
+      const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small></div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ล้วง ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
@@ -4382,7 +4388,7 @@ function onMeDiff(a, b) {
   if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }
   if (b.hunger - a.hunger >= 8) FX.float(x, y + .4, `+${Math.round(b.hunger - a.hunger)}🍗`, '#8fe3a6', .34);
   if (!a.cast && b.cast) { bobber = findWater(s.x, s.y); castT = performance.now(); FX.play('whoosh'); if (bobber) setTimeout(() => { FX.play('splash'); FX.ring(bobber.x, bobber.y, '#fff', 800, 1); }, 380); }
-  if (!b.cast) { bobber = null; FG = null; reelHold = false; }
+  if (!b.cast) { bobber = null; FG = null; reelHold = false; if (a.cast) holdAfterTp = false; }
   if (!a.down && b.down) { FX.play('fail'); closePanel(); }
   if (a.down && !b.down) FX.play('heal');
 }
