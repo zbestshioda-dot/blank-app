@@ -1086,3 +1086,7 @@ body.hasEvent #topBar{top:146px!important}
 }
 
 #eventBar.still span{animation:none}#eventBar.still{text-align:center!important}
+/* fishing cue: small, above the player (not over the water) */
+#fishCue{top:31%!important;bottom:auto!important;min-width:0!important;padding:3px 12px 4px!important;border-width:2px!important;border-radius:12px!important;max-width:min(300px,86vw)}
+#fishCue b{font-size:15px!important}#fishCue small{font-size:10.5px!important;margin-top:0!important}
+#fishCue.fc-wait b{font-size:14px!important}
