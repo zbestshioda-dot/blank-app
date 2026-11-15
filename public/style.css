@@ -887,3 +887,22 @@ body.hasEvent #topBar{top:146px!important}
   #login.hasVid #createBox{margin:auto;max-height:96vh;overflow:auto}
   #login.hasVid:has(#createBox:not(.hidden)) .promoPhone::after{height:100%;background:rgba(12,7,3,.7)}
 }
+
+/* ---- login box, compact ---- */
+#loginForm{gap:6px!important;padding:0 2px!important}
+#loginForm.box{width:min(330px,100%)!important}
+#login.hasVid #loginForm{width:min(330px,100%)!important}
+#loginForm .lfHead img{width:30px}#loginForm .lfHead h2{font-size:20px}#loginForm .lfHead small{font-size:11px}
+#loginForm .lfSteps,#loginForm .lfTip,#loginForm .hint{display:none}
+#loginForm .fld>i{font-size:17px;padding:0 2px 0 10px}
+#loginForm .fld input{font-size:15px;padding:9px 8px!important}
+#loginForm .fld button{font-size:16px;padding:4px 10px}
+#loginGo{font-size:17px!important;padding:10px!important}
+#loginErr{min-height:0!important;font-size:12px}#loginErr:empty{display:none}
+#loginForm .lfFoot{gap:6px}#loginForm .lfFoot .cbt{font-size:10px!important;padding:4px 6px!important}#loginForm .lfFoot .shareBtn{font-size:12px;padding:5px 8px}
+@media(max-width:860px){
+  #login.hasVid #loginForm{padding:10px 14px calc(10px + env(safe-area-inset-bottom))!important;width:100%!important;border-radius:20px 20px 0 0}
+  #login.hasVid #loginForm:not(.open){padding:8px 14px calc(8px + env(safe-area-inset-bottom))!important}
+  #startBtn{font-size:19px;padding:11px}
+  #login.hasVid #loginForm.open .lfHead{display:none}
+}
