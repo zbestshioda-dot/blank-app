@@ -3,6 +3,42 @@
 const $ = s => document.querySelector(s);
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// ---- pixel icons: emoji anywhere in the page (panels, buttons, toasts, the HUD) are swapped for the game's own pixel-art
+// icons (public/assets/icons.webp). Text drawn on the canvas keeps its emoji.
+const PXI = { map: null, re: null, cols: 16, rows: 12 };
+function pxIconize(root) {
+  if (!PXI.re || !root) return;
+  const doNode = t => {
+    const v = t.nodeValue; if (!v || !PXI.re.test(v)) return; PXI.re.lastIndex = 0;
+    const p = t.parentElement; if (!p || p.closest('input,textarea,select,option,script,style,canvas,.noicon,[contenteditable]')) return;
+    const frag = document.createDocumentFragment(); let last = 0;
+    v.replace(PXI.re, (m, off) => {
+      const i = PXI.map[m.replace(/️/g, '')]; if (i === undefined) return m;
+      if (off > last) frag.appendChild(document.createTextNode(v.slice(last, off)));
+      const e = document.createElement('span'); e.className = 'pxi'; e.setAttribute('aria-label', m); e.title = '';
+      e.style.backgroundPosition = `calc(-${i % PXI.cols} * var(--pxs)) calc(-${Math.floor(i / PXI.cols)} * var(--pxs))`;
+      frag.appendChild(e); last = off + m.length; return m;
+    });
+    if (last === 0) return;
+    if (last < v.length) frag.appendChild(document.createTextNode(v.slice(last)));
+    t.replaceWith(frag);
+  };
+  if (root.nodeType === 3) return doNode(root);
+  if (root.nodeType !== 1) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), list = [];
+  for (let n = w.nextNode(); n; n = w.nextNode()) list.push(n);
+  list.forEach(doNode);
+}
+fetch('assets/icons.json?v=1').then(r => r.json()).then(j => {
+  PXI.map = {}; for (const [k, v] of Object.entries(j.map)) PXI.map[k.replace(/️/g, '')] = v;
+  PXI.cols = j.cols; PXI.rows = j.rows;
+  document.documentElement.style.setProperty('--pxrows', j.rows); document.documentElement.style.setProperty('--pxcols', j.cols);
+  const keys = Object.keys(PXI.map).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  PXI.re = new RegExp(`(?<!\\u200D)(?:${keys.join('|')})\\uFE0F?(?!\\u200D|[\\u{1F3FB}-\\u{1F3FF}])`, 'gu');
+  pxIconize(document.body);
+  new MutationObserver(recs => { for (const r of recs) { if (r.type === 'characterData') pxIconize(r.target); else r.addedNodes.forEach(n => pxIconize(n)); } })
+    .observe(document.body, { childList: true, subtree: true, characterData: true });
+}).catch(() => { });
 const money = n => '฿' + Math.round(n).toLocaleString('en-US');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const hhmm = h => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
@@ -2573,6 +2609,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16a', d: '16 พ.ย.', items: [
+    '🎨 <b>ไอคอนพิกเซลชุดใหม่ทั้งเกม!</b> ไอคอนในเมนู ปุ่ม แจ้งเตือน หน้าร้าน กระเป๋า เควสต์ อิโมจิ ฯลฯ เปลี่ยนเป็นภาพพิกเซลอาร์ตเข้ากับตัวเกม (185 ไอคอน)'] },
   { v: '2026-11-15za', d: '15 พ.ย. (รอบ 27)', items: [
     '🥣 <b>เปิดสมัครขอทานได้เหมือนเดิม</b> สมัครที่ศาลาประชาคม (เงินสด+เงินฝากไม่เกิน ฿2,000) · ไม่มีการกลายเป็นขอทานอัตโนมัติแล้ว · มีเงินเกิน ฿2,000 ยังพ้นจากขอทานเหมือนเดิม'] },
   { v: '2026-11-15z', d: '15 พ.ย. (รอบ 26)', items: [
