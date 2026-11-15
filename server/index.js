@@ -760,6 +760,7 @@ function apply(a, career) {
   const c = D.CAREERS[career]; if (!c || career === 'none') return;
   if (a.career === career) return toast(a, `คุณเป็น${c.name}อยู่แล้ว`, 'ℹ️', false);
   for (const l of c.need || []) if (!hasLic(a, l)) return toast(a, licExpired(a, l) ? `${D.LICENSES[l].name}หมดอายุแล้ว ต่ออายุที่มหาวิทยาลัยก่อน` : `ต้องมี${D.LICENSES[l].name}ก่อน (ที่มหาวิทยาลัย)`, '🎓', false);
+  if (career === 'beggar') return toast(a, 'อาชีพขอทานสมัครไม่ได้ · คนที่เงินหมดตัว (เงินสด+เงินฝากไม่ถึง ฿100 และไม่มีงาน) จะกลายเป็นขอทานเอง', '🚫', false);
   if (career === 'beggar' && a.money + (a.bank || 0) > D.POLICE.begMax) return toast(a, `มีเงินเกิน ${money(D.POLICE.begMax)} (รวมเงินฝาก) เป็นขอทานไม่ได้แล้ว`, '🥣', false);
   const wait = jobCooldown(a);
   if (wait > 0) return toast(a, `เพิ่งเปลี่ยนงานไป ต้องรออีก ${Math.ceil(wait / 60000)} นาทีถึงจะสมัครงานใหม่ได้`, '⏳', false);
@@ -873,17 +874,12 @@ function act(a, m) {
       return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย! (ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า หรือที่ร้านนี้)`, '👗');
     }
     // ---------------- office
-    case 'trash.dig': {                     // beggars rummage through bins: some coins, leftover food, or something nasty
-      if (a.career !== 'beggar') return toast(a, 'คุ้ยถังขยะได้เฉพาะขอทาน', '🗑️', false);
-      a.trashCd = a.trashCd || {};
-      if (now() < (a.trashCd[s.id] || 0)) return toast(a, `ถังนี้เพิ่งคุ้ยไป รออีก ${Math.ceil((a.trashCd[s.id] - now()) / 1000)} วิ ลองถังอื่น`, '🗑️', false);
-      if (!spend(a, 3)) return;
-      a.trashCd[s.id] = now() + 90000; stat(a, 'trash');
-      const r = Math.random();
-      if (r < .45) { const c = rint(5, 25); earn(a, c); return toast(a, `คุ้ยเจอเหรียญตกอยู่ ${money(c)} 🪙`, '🗑️'); }
-      if (r < .7) { const it = pick(['noodle', 'somtam', 'kaprao', 'fried_rice']); addItem(a, it, 1); markMe(a); return toast(a, `เจอ${D.ITEMS[it].icon}${D.ITEMS[it].name}ที่ยังกินได้ เก็บใส่กระเป๋าแล้ว`, '🗑️'); }
-      if (r < .8) { infect(a, 'poison', .5); joy(a, -3); return toast(a, 'เจอแต่ของเน่า เหม็นมาก! 🤢 (ระวังท้องเสีย)', '🗑️', false); }
-      return toast(a, 'ไม่เจออะไรเลย มีแต่ถุงพลาสติก', '🗑️', false);
+    case 'trash.run': case 'trash.dig': {   // beggars: an endless run through the street picking up rubbish (played on the client)
+      if (a.career !== 'beggar') return toast(a, 'วิ่งเก็บขยะได้เฉพาะขอทาน', '🗑️', false);
+      if (a.run0 && now() - a.run0 < 180000) return;
+      if (now() < (a.runNext || 0)) return toast(a, `เหนื่อยอยู่ พักอีก ${Math.ceil((a.runNext - now()) / 1000)} วินาทีค่อยวิ่งใหม่`, '😮‍💨', false);
+      if (!spend(a, 6)) return;
+      a.run0 = now(); markMe(a); return send(a, { t: 'trashrun', seed: rint(1, 1e9) });
     }
     case 'chair.sit': {                       // the desks are just furniture now: office work is running documents
       return toast(a, 'งานบริษัทตอนนี้คือส่งเอกสาร 📄 รับงานได้ที่ฝ่ายบุคคล (เคาน์เตอร์หน้าออฟฟิศ)', '📄', false);
@@ -2948,6 +2944,16 @@ function onMessage(ws, raw) {
     }
     case 'bug': return bugReport(a, m);
     case 'god': return godAct(a, m);
+    case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
+      if (!a.run0 || a.career !== 'beggar') return;
+      const sec = (now() - a.run0) / 1000; a.run0 = 0; a.runNext = now() + 15000;
+      const n = k => clamp(Math.floor(+m[k] || 0), 0, 999), cups = n('cups'), cans = n('cans'), bottles = n('bottles'), coins = n('coins'), dist = clamp(Math.floor(+m.dist || 0), 0, Math.round(sec * 40));
+      if (cups + cans + bottles + coins > sec * 1.8 + 3 || coins > sec * .3 + 2) { markMe(a); return toast(a, 'ผลการวิ่งผิดปกติ ไม่ได้รับเงิน', '⚠️', false); }
+      const pay = Math.min(400, Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + (BOOST[tier(a, 'beggar')] || 0))));
+      if (pay > 0) earn(a, pay); addXp(a, Math.min(2, (cups + cans + bottles) / 25)); stat(a, 'trash', cups + cans + bottles); joy(a, 3); markMe(a);
+      if (dist > (a.stats?.runBest || 0)) stat(a, 'runBest', dist, true);
+      return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}`, '♻️');
+    }
     case 'mission': return misAct(a, m);
     case 'rb': return rbAct(a, m);
     case 'rbseek': { if (a.career !== 'rider') return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
@@ -3185,6 +3191,10 @@ function tick() {
     if (a.pose === 'rest' || a.pose === 'bed') { a.awake = Math.max(0, (a.awake || 0) - 4 * dt); if (a.awake === 0 && (a.dz || []).some(d => d === 'insomnia' || d === 'exhaust') && a.pose === 'rest') sleepWell(a); }
     else a.awake = (a.awake || 0) + dt;
     if (slow) moodTick(a, t, indoors);
+    if (slow && !isAdmin(a)) {               // beggars: out of poverty past ฿2,000; the broke and jobless end up begging
+      if (a.career === 'beggar' && a.money + (a.bank || 0) > 2000) { a.career = 'none'; a.pose === 'beg' && standUp(a); markMe(a); sendRoster(); toast(a, '🎉 มีเงินเกิน ฿2,000 แล้ว! พ้นจากการเป็นขอทาน ไปสมัครงานใหม่ได้เลย', '🎉'); feed(`🎉 ${a.name} พ้นจากการเป็นขอทานแล้ว!`); }
+      else if (a.career === 'none' && a.money + (a.bank || 0) < 100 && !a.loan && t - (a.created || 0) > 600000) { a.career = 'beggar'; markMe(a); sendRoster(); toast(a, '🥣 เงินหมดตัว... กลายเป็นขอทาน · ไปวิ่งเก็บขยะที่ถังขยะหรือนั่งขอทาน (🥣) จนมีเงินเกิน ฿2,000 ก็จะพ้นได้', '🥣', false); }
+    }
     if (slow && !a.down) {
       // ---- ways to get sick (often enough that doctors have work)
       if (a.awake > 40 * 60) infect(a, 'insomnia', 0.02);
@@ -3199,7 +3209,7 @@ function tick() {
       if (a.desk >= 0) studyTick(a, h, 1);
       if (a.thiefUntil && a.thiefUntil < t) { a.thiefUntil = 0; sendRoster(); }
       if (a.call?.payer) callBill(a);
-      if (a.career === 'beggar' && a.money + (a.bank || 0) > D.POLICE.begMax) { if (a.pose === 'beg') standUp(a); a.career = 'none'; markMe(a); sendRoster(); toast(a, `มีเงินเกิน ${money(D.POLICE.begMax)} แล้ว เลิกเป็นขอทาน กลายเป็นคนว่างงาน (ลองหางานอื่นดู!)`, '🥣', false); }
+      // (leaving begging is handled with the ฿2,000 rule above)
       if ((a.licenses || []).includes('driving') && a.licExp?.driving) {
         const left = a.licExp.driving - t;
         if (left < 0 && !a.licWarned2) { a.licWarned2 = true; toast(a, 'ใบขับขี่หมดอายุแล้ว! ต่ออายุได้ที่มหาวิทยาลัย (ไรเดอร์รับออเดอร์ไม่ได้จนกว่าจะต่อ)', '🪪', false); }

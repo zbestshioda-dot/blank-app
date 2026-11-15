@@ -357,6 +357,7 @@ function handle(m) {
     case 'ck': ckLive = { prog: m.prog, t: performance.now() }; break;
     case 'kfx': cookFx(m.kind); break;
     case 'rb': rbResult(m); break;
+    case 'trashrun': runStart(m.seed); break;
     case 'rbfx': FX.play('notice'); if (navigator.vibrate) navigator.vibrate([40, 40, 40]); break;
     case 'afx': if (m.kind === 'gavel') { FX.play('ding'); } else if (m.kind === 'bid') FX.play('pop'); else if (m.kind === 'win') { FX.play('coin', true); FX.play('levelup'); } else if (m.kind === 'lose') FX.play('fail'); else FX.play('notice'); if (panel?.kind === 'warehouse') refreshPanel(true); break;
     case 'mq': misAsk(m); break;
@@ -918,8 +919,8 @@ function onAction() {
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
-  if (near.type === 'trash' && me.career === 'beggar') return doAct(near.id, 'dig');
-  if (near.type === 'trash') return toast('ถังขยะ · ขอทานคุ้ยหาของได้', '🗑️', false);
+  if (near.type === 'trash' && me.career === 'beggar') { if (t < actCd) return; actCd = t + 1500; return doAct(near.id, 'run'); }
+  if (near.type === 'trash') return toast('ถังขยะ · ขอทานวิ่งเก็บขยะเริ่มจากตรงนี้', '🗑️', false);
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
   if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type)) { if (t < actCd) return; actCd = t + 250; return doAct(near.id, 'use'); }   // cooking battle stations
@@ -1314,6 +1315,123 @@ function cookChip() {
   c.textContent = `${G.items[k.rid].icon} ${G.items[k.rid].name} · ${k.plated ? (k.hand === 'plate' ? 'เสิร์ฟที่เคาน์เตอร์!' : 'ยกจานไปเสิร์ฟ') : parts} · ⏱ ${left}s`;
   return true;
 }
+// ---- beggars: the trash run. A street seen from behind the runner (Pepsiman style): three lanes, rubbish and coins to pick
+// up, cones / boxes / dogs to jump over, cars and bins to dodge. Faster and faster until you crash.
+let RUN = null;
+const RUN_ITEMS = { cup: ['🥤', 2], can: ['🥫', 3], bottle: ['🍾', 3], coin: ['🪙', 8] };
+const RUN_OBS = { cone: ['🚧', 0], box: ['📦', 0], dog: ['🐕', 0], car: ['🚗', 1], bin: ['🗑️', 1], cart: ['🛒', 0] };
+function runStart(seed) {
+  closePanel();
+  let w = $('#runWin'); if (!w) { w = document.createElement('div'); w.id = 'runWin'; w.innerHTML = '<canvas id="runCv"></canvas><div class="runHud" id="runHud"></div><button class="x" id="runX" title="เลิกวิ่ง"></button><div class="runEnd hidden" id="runEnd"></div><div class="runHelp" id="runHelp">ปัด/แตะซ้าย-ขวา = เปลี่ยนเลน · ปัดขึ้น/แตะกลาง = กระโดด<br>⌨️ ← → เปลี่ยนเลน · ↑ หรือ Space กระโดด</div>'; document.body.appendChild(w); }
+  w.classList.remove('hidden'); $('#runEnd').classList.add('hidden'); $('#runHelp').classList.remove('hidden');
+  const r = (n => () => (n = (n * 16807) % 2147483647) / 2147483647)(seed || 1);
+  RUN = { r, t: 0, v: 11, dist: 0, lane: 0, lx: 0, jt: -9, objs: [], nextZ: 22, got: { cups: 0, cans: 0, bottles: 0, coins: 0 }, crashed: 0, over: false, shake: 0, step: 0, last: performance.now(), pops: [] };
+  $('#runX').onclick = () => runCrash(true);
+  const cv = $('#runCv');
+  let p0 = null;
+  cv.onpointerdown = e => { p0 = { x: e.clientX, y: e.clientY }; };
+  cv.onpointerup = e => {
+    if (!p0 || !RUN || RUN.crashed) return; const dx = e.clientX - p0.x, dy = e.clientY - p0.y; p0 = null;
+    if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) runMove(dx > 0 ? 1 : -1);
+    else if (dy < -30) runJump();
+    else { const x = e.clientX / innerWidth; if (x < .33) runMove(-1); else if (x > .67) runMove(1); else runJump(); }
+  };
+  setTimeout(() => $('#runHelp')?.classList.add('hidden'), 3500);
+  FX.play('whoosh'); requestAnimationFrame(runFrame);
+}
+const runMove = d => { if (!RUN || RUN.crashed) return; const n = Math.max(-1, Math.min(1, RUN.lane + d)); if (n !== RUN.lane) { RUN.lane = n; FX.play('click'); } };
+const runJump = () => { if (!RUN || RUN.crashed) return; if (RUN.t - RUN.jt > .62) { RUN.jt = RUN.t; FX.play('pop'); } };
+addEventListener('keydown', e => {
+  if (!RUN || $('#runWin')?.classList.contains('hidden')) return;
+  const k = e.key; e.stopImmediatePropagation(); e.preventDefault();
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') runMove(-1); else if (k === 'ArrowRight' || k === 'd' || k === 'D') runMove(1);
+  else if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ') runJump(); else if (k === 'Escape') runCrash(true);
+}, true);
+function runSpawn() {
+  const R = RUN, r = R.r, z = R.nextZ, lanes = [-1, 0, 1].sort(() => r() - .5);
+  const pat = r();
+  if (pat < .35) {                                           // one obstacle, a line of rubbish in another lane
+    const ok = Object.keys(RUN_OBS); R.objs.push({ z, lane: lanes[0], o: ok[Math.floor(r() * ok.length)] });
+    const it = r() < .12 ? 'coin' : ['cup', 'can', 'bottle'][Math.floor(r() * 3)]; for (let i = 0; i < 4; i++) R.objs.push({ z: z + i * 2.2, lane: lanes[1], i: it });
+  } else if (pat < .6) {                                     // two blockers, one gap with rubbish in it
+    R.objs.push({ z, lane: lanes[0], o: r() < .5 ? 'car' : 'bin' }, { z, lane: lanes[1], o: r() < .5 ? 'cone' : 'box' });
+    R.objs.push({ z: z - 1.5, lane: lanes[2], i: 'can' }, { z: z + 1.5, lane: lanes[2], i: 'cup' });
+  } else if (pat < .8) {                                     // a low obstacle with rubbish arcing over it: jump through it
+    R.objs.push({ z, lane: lanes[0], o: ['cone', 'box', 'dog', 'cart'][Math.floor(r() * 4)] });
+    for (let i = -2; i <= 2; i++) R.objs.push({ z: z + i * 1.4, lane: lanes[0], i: i === 0 && r() < .5 ? 'coin' : 'bottle', h: 1.3 * (1 - (i / 2.6) ** 2) });
+  } else {                                                   // a zig-zag of rubbish
+    let L = lanes[0]; for (let i = 0; i < 6; i++) { R.objs.push({ z: z + i * 2.4, lane: L, i: i === 5 && r() < .4 ? 'coin' : 'cup' }); if (r() < .4) L = Math.max(-1, Math.min(1, L + (r() < .5 ? -1 : 1))); }
+    R.objs.push({ z: z + 8, lane: lanes[1], o: r() < .5 ? 'car' : 'dog' });
+  }
+  R.nextZ = z + 13 + r() * 9 - Math.min(5, R.t / 25);
+}
+function runCrash(quit) {
+  const R = RUN; if (!R || R.crashed) return;
+  R.crashed = performance.now(); R.shake = 1; FX.play(quit ? 'click' : 'fail'); if (!quit && navigator.vibrate) navigator.vibrate([80, 40, 120]);
+  const g = R.got, val = g.cups * 2 + g.cans * 3 + g.bottles * 3 + g.coins * 8 + Math.floor(R.dist / 100) * 2;
+  setTimeout(() => {
+    const e = $('#runEnd'); e.classList.remove('hidden');
+    e.innerHTML = `<h2>${quit ? '🛑 เลิกวิ่ง' : '💥 ชนแล้ว!'}</h2><div class="runSum"><div>🏃 ระยะทาง <b>${Math.floor(R.dist)} ม.</b></div><div>🥤 แก้ว ${g.cups} · 🥫 กระป๋อง ${g.cans} · 🍾 ขวด ${g.bottles} · 🪙 เหรียญ ${g.coins}</div><div class="runVal">ขายของเก่าได้ประมาณ <b>${money(val)}</b></div></div><button class="primary big" id="runOk">♻️ เอาไปขาย</button>`;
+    $('#runOk').onclick = () => { send({ t: 'trashrun.end', ...g, dist: Math.floor(R.dist) }); $('#runWin').classList.add('hidden'); RUN = null; };
+  }, quit ? 100 : 1100);
+}
+function runFrame(now) {
+  const R = RUN; if (!R) return;
+  const cv = $('#runCv'); if (!cv) return;
+  const W = innerWidth, H = innerHeight, dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const dt = Math.min(.05, (now - R.last) / 1000); R.last = now;
+  if (!R.crashed) {
+    R.t += dt; R.v = Math.min(30, 11 + R.t * .32); const dz = R.v * dt; R.dist += dz; R.step += dz;
+    for (const o of R.objs) o.z -= dz;
+    R.nextZ -= dz; while (R.nextZ < 70) runSpawn();
+    if (R.step > 3.1) { R.step = 0; if (R.r() < .5) FX.play('step', ','); }
+  }
+  // object z = how far ahead of the runner it is (it shrinks as you run)
+  R.lx += (R.lane - R.lx) * Math.min(1, dt * 14);
+  const jh = (() => { const u = (R.t - R.jt) / .62; return u >= 0 && u < 1 ? Math.sin(u * Math.PI) * 1.6 : 0; })();
+  // collisions
+  if (!R.crashed) for (const o of R.objs) {
+    if (o.done || o.z > .9 || o.z < -.6 || Math.abs(o.lane - R.lx) > .45) continue;
+    if (o.i) { if (Math.abs(jh - (o.h || 0)) < 1.1) { o.done = 1; const k = { cup: 'cups', can: 'cans', bottle: 'bottles', coin: 'coins' }[o.i]; R.got[k]++; FX.play(o.i === 'coin' ? 'coin' : 'pop'); R.pops.push({ t: now, txt: `+${RUN_ITEMS[o.i][1]}` }); } }
+    else if (RUN_OBS[o.o][1] || jh < .55) { o.done = 1; runCrash(false); break; }
+  }
+  R.objs = R.objs.filter(o => o.z > -3 && !(o.done && o.i));
+  // ---- draw
+  const sh = R.shake > 0 ? (R.shake *= .9, (Math.random() - .5) * 14 * R.shake) : 0;
+  g.save(); g.translate(sh, 0);
+  const y0 = H * .32, D = 5.2, by = H * 1.0, cx = W / 2, lw = Math.min(W * .26, 230);
+  const S = z => D / (Math.max(-D * .8, z) + D), Y = z => y0 + (by - y0) * S(z), X = (l, z) => cx + l * lw * S(z);
+  const sky = g.createLinearGradient(0, 0, 0, y0); sky.addColorStop(0, '#7ec8ff'); sky.addColorStop(1, '#d9f0ff'); g.fillStyle = sky; g.fillRect(-20, 0, W + 40, y0 + 1);
+  g.fillStyle = '#9aa7b6'; for (let i = 0; i < 14; i++) { const bw = W / 10, bh = 30 + ((i * 53) % 70); g.fillRect(i * bw - 10, y0 - bh, bw * .8, bh); }
+  g.fillStyle = '#c9d2db'; for (let i = 0; i < 14; i++) { const bw = W / 10; for (let k = 0; k < 4; k++) g.fillRect(i * bw + 4 + k * bw * .18, y0 - 20 - ((i * 53) % 70) * .6, bw * .1, 6); }
+  g.fillStyle = '#7dbb5b'; g.fillRect(-20, y0, W + 40, by - y0);
+  const quad = (l1, l2, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(X(l1, 80), Y(80)); g.lineTo(X(l2, 80), Y(80)); g.lineTo(X(l2, -2), Y(-2)); g.lineTo(X(l1, -2), Y(-2)); g.fill(); };
+  quad(-2.3, 2.3, '#d8cfbf'); quad(-1.55, 1.55, '#4b4f57');
+  g.fillStyle = '#e9d36a'; const off = R.dist % 6;
+  for (let k = 0; k < 14; k++) { const z1 = k * 6 - off, z2 = z1 + 2.5; if (z2 < -1) continue; for (const l of [-.5, .5]) { g.beginPath(); g.moveTo(X(l - .02, z1), Y(z1)); g.lineTo(X(l + .02, z1), Y(z1)); g.lineTo(X(l + .02, z2), Y(z2)); g.lineTo(X(l - .02, z2), Y(z2)); g.fill(); } }
+  for (let k = 0; k < 10; k++) { const z = k * 9 - (R.dist % 9); if (z < -1) continue; const s = S(z); g.font = `${Math.round(70 * s)}px serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(k % 2 ? '🌳' : '💡', X(-2.6, z), Y(z)); g.fillText(k % 2 ? '💡' : '🌳', X(2.6, z), Y(z)); }
+  // objects far to near
+  for (const o of [...R.objs].sort((a, b) => b.z - a.z)) {
+    if (o.z > 62 || o.done) continue;
+    const s = S(o.z), x = X(o.lane, o.z), y = Y(o.z), size = (o.i ? .42 : RUN_OBS[o.o][1] ? .95 : .62) * lw * s;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, size * .45, size * .12, 0, 0, 7); g.fill();
+    g.font = `${Math.round(size)}px serif`; g.textAlign = 'center'; g.textBaseline = 'bottom';
+    const bob = o.i ? Math.sin(now / 200 + o.z) * 4 * s : 0;
+    g.fillText(o.i ? RUN_ITEMS[o.i][0] : RUN_OBS[o.o][0], x, y - (o.h || 0) * .55 * lw * s - bob);
+  }
+  // the runner, from behind
+  const px = X(R.lx, 0), py = Y(0) - 8, k = Math.min(H * .25, lw * 1.25) / CH_ATLAS.h;
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(px, py, 46 * (1 - jh * .2), 12, 0, 0, 7); g.fill();
+  if (chImg) drawCharTo(g, { of: 'beggar', g: me.gender, lk: me.look || {} }, px, py - jh * 70, k, 'back', R.crashed ? 0 : Math.floor(R.dist / 1.4) % 4);
+  if (R.crashed) { g.font = '64px serif'; g.textAlign = 'center'; g.fillText('💫', px, py - CH_ATLAS.h * k - 10); }
+  for (const p of R.pops) { const u = (now - p.t) / 700; if (u > 1) continue; g.globalAlpha = 1 - u; g.font = `800 24px 'Mitr',sans-serif`; g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeText(p.txt, px + 50, py - 200 - u * 50); g.fillText(p.txt, px + 50, py - 200 - u * 50); g.globalAlpha = 1; }
+  R.pops = R.pops.filter(p => now - p.t < 700);
+  g.restore();
+  const G0 = R.got; $('#runHud').innerHTML = `🏃 <b>${Math.floor(R.dist)}</b> ม. · 🥤${G0.cups} 🥫${G0.cans} 🍾${G0.bottles} 🪙${G0.coins} · ⚡ ${Math.round(R.v * 3.6)} กม./ชม.`;
+  if (!(R.crashed && now - R.crashed > 3000)) requestAnimationFrame(runFrame);
+}
 // ---- riders: the orange rival in town, and the battle screen (Pokemon style, turn by turn)
 let RIVAL = null;
 function rivalEnts(ents, vis) {
@@ -1663,7 +1781,7 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะคะ', yes: 'อยู่ในโรงพยาบาลช่วงเวรได้เงินเดือนทุกชั่วโมงนะคะ' },
   rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', lk: { hair: 'black' }, hi: 'มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน', yes: 'ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
   police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: 'เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ', yes: 'ถ้ามีแจ้งเหตุ 191 รีบไปนะ' },
-  beggar:   { name: 'ลุงจุก (ศาลาประชาคม)', short: 'ลุงจุก', lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: 'ไม่มีงานทำก็มานั่งขอทานกับลุงได้นะ นั่งตรงไหนก็ได้', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะ' },
+  beggar:   { name: 'ลุงจุก (ศาลาประชาคม)', short: 'ลุงจุก', lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: 'ขอทานสมัครไม่ได้นะ คนหมดตัวถึงจะมาเป็น · ไปวิ่งเก็บขยะที่ถังขยะ หรือนั่งขอทาน เก็บให้เกิน 2,000 บาทก็พ้นแล้ว', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะ' },
 };
 let STAFF = [], STAFF_AT = {};
 function buildStaff() {
@@ -2455,6 +2573,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15z', d: '15 พ.ย. (รอบ 26)', items: [
+    '🏃 <b>ขอทาน: วิ่งเก็บขยะ!</b> (แบบ Pepsiman) ไปที่ถังขยะแล้วกดปุ่มใหญ่ วิ่งไปตามถนน 3 เลน เก็บแก้ว 🥤 กระป๋อง 🥫 ขวด 🍾 เหรียญ 🪙 · กระโดดข้ามกรวย กล่อง หมา รถเข็น · หลบรถกับถังขยะ · ยิ่งวิ่งยิ่งเร็ว จนกว่าจะชน แล้วเอาของไปขาย',
+    '🚫 เอาการเดินคุ้ยขยะออกแล้ว · <b>สมัครเป็นขอทานไม่ได้แล้ว</b> คนที่เงินหมดตัวและไม่มีงาน (เงินสด+เงินฝากไม่ถึง ฿100) จะกลายเป็นขอทานเอง · <b>มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ</b>'] },
   { v: '2026-11-15y', d: '15 พ.ย. (รอบ 25)', items: [
     '🧡 <b>ไรเดอร์: แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่ง (ชุดสีส้ม) จะโผล่มาในเมืองเป็นพักๆ เพื่อแย่งลูกค้าของคุณ ตามจุดสีส้มบนมินิแมพแล้ววิ่งไปขวาง หรือกด 🔎 ออกตามหาที่ศูนย์ไรเดอร์',
     '⚔️ <b>สู้แบบโปเกม่อน</b> ผลัดกันเลือกท่า: 🛵 บิดคันเร่ง 📍 มุดทางลัด 📣 บีบแตรข่ม 😊 ยิ้มหวานให้ลูกค้า 🧃 เครื่องดื่มชูกำลัง · แรงใจใครหมดก่อนแพ้ ชนะได้ค่าส่ง+ทิปตามเลเวล · ขี่รถอยู่ตอนเจอได้เปรียบ'] },
@@ -2924,7 +3045,7 @@ function renderPanel(p) {
         }).join('')}</div>`}`;
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? dogBox(st) + policeReports() : ''}`;
-    case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ขอทานนั่งได้ทุกที่ (ปุ่ม 🥣) ที่คนพลุกพล่านอย่างหน้าร้าน/จัตุรัสได้เงินบ่อยกว่า</div>${staffHint('beggar')}`;
+    case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ขอทานสมัครไม่ได้ (คนหมดตัวและไม่มีงานจะกลายเป็นขอทานเอง) · หาเงินโดย<b>วิ่งเก็บขยะ</b>ที่ถังขยะ หรือนั่งขอทาน (ปุ่ม 🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ</div>${staffHint('beggar')}`;
     case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน · ใครก็ล้วงกระเป๋าได้ (ทุก 1 นาที) ตอนล้วงจะใส่ชุดโจรทันที คนเห็นแจ้งตำรวจได้ และสายตรวจจะวิ่งไล่จับ · ถ้าพลาดอาจถูกจับคาหนังคาเขา</div>${me.career === 'police' ? '<div class="sub">👮 ตำรวจล้วงกระเป๋าไม่ได้</div>' : B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big')}`;
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;

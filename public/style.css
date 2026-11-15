@@ -983,3 +983,12 @@ body.hasEvent #topBar{top:146px!important}
 @keyframes rbHit{0%,100%{transform:none;opacity:1}20%{transform:translateX(-8px);opacity:.3}40%{transform:translateX(8px);opacity:1}60%{transform:translateX(-5px);opacity:.3}80%{transform:translateX(4px)}}
 @keyframes rbHeal{50%{filter:brightness(1.6) drop-shadow(0 0 8px #8f8)}}
 @keyframes rbAtk{50%{transform:translate(12px,-10px) scale(1.05)}}
+
+/* the beggar's trash run */
+#runWin{position:fixed;inset:0;z-index:45;background:#000;touch-action:none;user-select:none;-webkit-user-select:none}
+#runWin.hidden{display:none}#runCv{position:absolute;inset:0;width:100%;height:100%}
+.runHud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,8,.7);color:#fff;padding:6px 14px;border-radius:20px;font-family:var(--ui);font-size:15px;white-space:nowrap}
+#runX{position:absolute;right:10px;top:max(8px,env(safe-area-inset-top))}
+.runHelp{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);background:rgba(20,14,8,.75);color:#fff;padding:10px 16px;border-radius:14px;font-family:var(--ui);text-align:center;font-size:14px}.runHelp.hidden{display:none}
+.runEnd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,90vw);background:#fffbe8;border:4px solid #3e2414;border-radius:16px;padding:14px;text-align:center;color:#2a1a0e;font-family:var(--ui)}.runEnd.hidden{display:none}
+.runSum div{margin:6px 0}.runVal{font-size:18px}
