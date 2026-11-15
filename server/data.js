@@ -479,6 +479,9 @@ for (const b of [0, 1, 2].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === 
       room.furniture.push(['f_bed_hosp', rx + dx, ry + dy - .2]);
       STATIONS.push({ id: 'bed' + i, type: 'bed', idx: i, room: room.id, label: 'เตียงคนไข้', icon: '🛏️', x: rx + dx, y: ry + dy, r: 1.2 });
     });
+    // ICU: emergency cases for doctors (CPR or surgery mini-games)
+    room.furniture.push(['f_bed_hosp', rx + 12.5, ry + 9.3], ['x_monitor', rx + 10.9, ry + 9.5]);
+    STATIONS.push({ id: 'icu', type: 'icu', room: room.id, label: 'ICU · เคสฉุกเฉิน', icon: '🚨', x: rx + 12.5, y: ry + 9.6, r: 1.3 });
   }
   STATIONS.push(s);
   if (kind === 'school') {
@@ -595,7 +598,11 @@ const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
-const DOCTOR = { start: 8, end: 20, wage: [125, 140, 158, 178, 200, 225, 255] };   // above office: needs a degree + licence
+const DOCTOR = { start: 8, end: 20, wage: [125, 140, 158, 178, 200, 225, 255] };   // (old shift pay, kept for reference)
+// ICU cases: pay per case by level, x (0.6 + 0.6 * score); a new case is ready this long after the last one
+const ICU = { pay: [80, 90, 100, 115, 130, 150, 175], next: 30000, energy: 6,
+  cpr: { n: 20, bpm: [100, 110, 120] }, surgery: { steps: 5 },
+  patients: ['คุณสมชาย (หัวใจหยุดเต้น)', 'ป้าบุญมี (หมดสติกลางตลาด)', 'น้องปิ่น (อุบัติเหตุจักรยาน)', 'ลุงเหม (ไส้ติ่งแตก)', 'พี่ก้อง (ถูกรถชน)', 'คุณยายทองคำ (หัวใจวาย)', 'หนุ่มนักวิ่ง (ล้มหมดสติ)', 'ช่างไฟ (ไฟดูด)'] };   // above office: needs a degree + licence
 // calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
 const MONTH_DAYS = 5;
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -796,7 +803,7 @@ const CAREERS = {
   farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
-  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'อยู่ในโรงพยาบาลช่วงเวลางาน 08:00–20:00 ได้เงินเดือนตามชั่วโมง + ค่ารักษาคนไข้บนเตียง (ต้องวินิจฉัยจากอาการให้ถูก)' },
+  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: ปั๊มหัวใจให้ตรงจังหวะ หรือผ่าตัดให้แม่น ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ลาดตระเวนได้เบี้ยเลี้ยง รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
   beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'นั่งขอทานได้ทุกที่ (ปุ่ม 🥣) ได้เศษเงินจากคนผ่านไปมา ที่คนพลุกพล่านได้บ่อยกว่า ผู้เล่นที่บริจาคให้จะมีความสุขเพิ่ม' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
@@ -1228,7 +1235,7 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
 }
 
 module.exports = {
-  RUN, CLOCK, gameRate, DOCTOR, FISHING, OUTFITS,
+  RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,

@@ -773,7 +773,7 @@ function apply(a, career) {
     farmer: 'ซื้อสวนของตัวเองได้ที่ป้ายหน้าแปลงในไร่ แล้วเริ่มปลูกได้เลย',
     merchant: 'ซื้อของจากคลังสินค้าราคาส่ง แล้ววางขายที่ตลาดกลาง',
     chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
-    doctor: `อยู่ในโรงพยาบาลช่วง ${hhmm(D.DOCTOR.start)}–${hhmm(D.DOCTOR.end)} ได้เงินเดือนทุกชั่วโมง + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา`,
+    doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (ปั๊มหัวใจ/ผ่าตัด) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
     police: 'ลาดตระเวนนอกอาคารได้เบี้ยเลี้ยง รับแจ้งเหตุ 191 แล้วตามจับโจรได้ค่าหัว',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
@@ -1159,6 +1159,45 @@ function act(a, m) {
       return toast(a, `วินิจฉัยถูกต้อง! รักษา${DZ[target].name}หาย ได้ ${money(got)}`, '💉');
     }
     // ---------------- fishing (anyone with a rod)
+    // ---------------- ICU: emergency cases (doctors). A random case: CPR (press on the beat) or surgery (stop the marker in the zone)
+    case 'icu.start': {
+      if (!need(a, 'doctor')) return;
+      if (a.icu) return;
+      if ((a.icuNext || 0) > now()) return toast(a, `เคสถัดไปยังไม่เข้า รออีก ${Math.ceil((a.icuNext - now()) / 1000)} วินาที`, '⏳', false);
+      if (!spend(a, D.ICU.energy)) return;
+      const kind = Math.random() < .5 ? 'cpr' : 'surgery', l = lvl(a, 'doctor');
+      a.icu = { kind, who: pick(D.ICU.patients), t0: now() };
+      if (kind === 'cpr') a.icu.cpr = { n: D.ICU.cpr.n, bpm: pick(D.ICU.cpr.bpm) };
+      else {
+        a.icu.zones = []; a.icu.speeds = [];
+        for (let i = 0; i < D.ICU.surgery.steps; i++) { const w = Math.max(.09, .2 - i * .02 + .006 * l), z0 = rnd(.08, .92 - w); a.icu.zones.push([+z0.toFixed(3), +(z0 + w).toFixed(3)]); a.icu.speeds.push(+rnd(.8 + i * .12, 1.05 + i * .15).toFixed(2)); }
+      }
+      markMe(a); return;
+    }
+    case 'icu.done': {
+      const c = a.icu; if (!c) return;
+      let score = 0;
+      if (c.kind === 'cpr') {   // m.off: for every beat, how far the press was from it (ms), null = missed
+        const iv = 60000 / c.cpr.bpm; if (now() - c.t0 < iv * c.cpr.n * .9) return;
+        const off = (Array.isArray(m.off) ? m.off : []).slice(0, c.cpr.n);
+        for (const o of off) { const d = Math.abs(+o); if (o === null || !Number.isFinite(d)) continue; score += d <= 70 ? 1 : d <= 140 ? .6 : d <= 220 ? .25 : 0; }
+        score /= c.cpr.n;
+      } else {                  // m.pos: where the marker was stopped at each step (0-1)
+        if (now() - c.t0 < c.zones.length * 700) return;
+        const pos = (Array.isArray(m.pos) ? m.pos : []).slice(0, c.zones.length);
+        pos.forEach((p, i) => { const [z0, z1] = c.zones[i]; p = +p; if (p >= z0 && p <= z1) score += 1; else if (p >= z0 - .04 && p <= z1 + .04) score += .4; });
+        score /= c.zones.length;
+      }
+      a.icu = null; a.icuNext = now() + D.ICU.next;
+      const l = Math.min(lvl(a, 'doctor'), D.ICU.pay.length), ok = score >= .5;
+      if (!ok) { markMe(a); joy(a, -3); return toast(a, `${c.kind === 'cpr' ? 'ปั๊มหัวใจไม่ตรงจังหวะ' : 'ผ่าตัดพลาด'} ${c.who} ถูกส่งต่อโรงพยาบาลใหญ่... (ความแม่นยำ ${Math.round(score * 100)}%) ลองใหม่เคสหน้า`, '💔', false); }
+      const pay = Math.round(D.ICU.pay[l - 1] * (.6 + .6 * score) * (1 + BOOST[tier(a, 'doctor')]) * jobPay(a) * wellbeing(a));
+      earn(a, pay); addXp(a, .5); quest(a, 'treat'); stat(a, 'treated'); joy(a, 3);
+      const grade = score >= .95 ? 'สมบูรณ์แบบ! 🌟' : score >= .8 ? 'ยอดเยี่ยม!' : 'ผ่าน';
+      if (score >= .95) feed(`🚑 หมอ${a.name} ช่วยชีวิต ${c.who} ได้อย่างสมบูรณ์แบบ!`);
+      return toast(a, `${c.kind === 'cpr' ? '💓 หัวใจกลับมาเต้นแล้ว!' : '🩹 ผ่าตัดสำเร็จ!'} ${c.who} ปลอดภัย · ${grade} (${Math.round(score * 100)}%) · ได้ ${money(pay)}`, '🚑');
+    }
+    case 'icu.quit': { if (a.icu) { a.icu = null; a.icuNext = now() + D.ICU.next / 2; markMe(a); toast(a, 'ส่งต่อเคสให้หมอคนอื่นแล้ว', '🚑', false); } return; }
     case 'fishclub.info': return;
     case 'fishclub.rod': case 'staff.rod': {                 // buy a rod (it goes into the bag and into your hand)
       const id = D.RODS[m.rod] ? m.rod : 'bamboo', r = D.RODS[id];
@@ -1588,7 +1627,7 @@ function ate(a, id) {
     a.craving = null; a.craveNext = now() + rnd(5, 10) * 60000;
   }
 }
-const WORK = new Set(['chair.sit', 'warehouse.buy', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'crowd.pick', 'sdesk.sit']);
+const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'crowd.pick', 'sdesk.sit']);
 function holdsHome(a) {
   if (a.house >= 0 && !tenants[a.house]) return a.house;
   if (a.rent && a.rent.until > now()) return a.rent.idx;
@@ -2213,7 +2252,7 @@ function meView(a) {
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
-    docShift: a.career === 'doctor' && a.doc ? { day: a.doc.day, hours: +(a.doc.hours || 0).toFixed(2) } : null,
+    icu: a.icu ? { kind: a.icu.kind, who: a.icu.who, cpr: a.icu.cpr, zones: a.icu.zones, speeds: a.icu.speeds } : null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
@@ -2298,7 +2337,7 @@ function login(ws, m) {
     t: 'init', id: a.id,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -2738,7 +2777,6 @@ function tick() {
       // contagion: standing next to someone with a cold or the flu
       if ((a.dz || []).some(d => d === 'cold' || d === 'flu')) for (const o of online.values()) if (o !== a && areaId(o) === areaId(a) && dist(o, a) < 2.5) infect(o, a.dz.includes('flu') ? 'flu' : 'cold', 0.01);
       if (a.career === 'office') officeTick(a, t, h, 1);
-      if (a.career === 'doctor') doctorTick(a, t, h, 1);
       if (a.desk >= 0) studyTick(a, h, 1);
       if (a.thiefUntil && a.thiefUntil < t) { a.thiefUntil = 0; sendRoster(); }
       if (a.call?.payer) callBill(a);

@@ -778,3 +778,11 @@ body.hasEvent #topBar{top:146px!important}
 .dlgX{position:absolute;top:-12px;right:-12px;width:30px;height:30px;border-radius:50%;padding:0;font-size:14px}
 .item .em[data-m]{cursor:pointer}
 @media(max-width:600px){#dlg{bottom:calc(150px + env(safe-area-inset-bottom))}.dlgPix{width:64px;height:64px}.dlgText{font-size:14.5px}}
+/* ICU mini-games */
+#icuG{position:fixed;inset:0;z-index:70;background:rgba(5,12,18,.72);display:flex;align-items:center;justify-content:center;padding:12px}
+#icuG.hidden{display:none}
+.icuBox{width:min(600px,100%);background:var(--paper3);border:4px solid var(--wood);border-radius:18px;padding:12px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+.icuHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.icuHead b{font-size:18px}.icuHead small{color:var(--mut)}
+#icuC{display:block;width:100%;height:auto;border-radius:12px;touch-action:none}
+.icuMsg{text-align:center;margin:8px 0;font-weight:600}
+.icuBtns{display:flex;gap:8px}.icuBtns .big{flex:1;font-size:22px;padding:16px}

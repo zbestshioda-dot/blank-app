@@ -452,7 +452,6 @@ function paintHud() {
   if (me.happy < 20) chips.push(`<span class="chip bad" data-dz="_sad">${ic('i_sad')} ซึมเศร้า</span>`);
   if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">${ic('i_bulb')} อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
   if (me.desk >= 0 && me.enrolled) chips.push(`<span class="chip study" data-dz="_study">📖 เรียนอยู่ ${Math.round((me.study || 0) * 100)}%</span>`);
-  if (me.docShift && isInside('r_hospital') && hourNow() >= G.doctor.start && hourNow() < G.doctor.end) chips.push(`<span class="chip duty" data-dz="_duty">🩺 เข้าเวร ${me.docShift.hours.toFixed(1)} ชม.</span>`);
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
   if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
   else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
@@ -834,7 +833,7 @@ function onAction() {
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
 function frame(t) {
-  requestAnimationFrame(frame); dlgTick();
+  requestAnimationFrame(frame); dlgTick(); icuDraw(); if (me?.icu && !icuG && !icuClosedT) icuOpen(); if (!me?.icu) icuClosedT = 0;
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
@@ -1421,6 +1420,7 @@ const FN = {
   order(m, root) { send({ t: 'order', item: m.item, tip: +(root.querySelector('#tipIn')?.value || 0) }); },
   open(m) { openPanel({ kind: m.kind, ...(m.set || {}) }); },
   qtalk(m) { talkQuest(m.type); },
+  icuGo() { closePanel(); icuOpen(); },
   share() { shareGame(); },
   look(m) { send({ t: 'look', ...m.set }); },
   reel() { reel(); },
@@ -1462,6 +1462,83 @@ function questPop(type, title, line, reward) {
   const d = document.createElement('div'); d.className = 'questPop';
   d.innerHTML = `${faceHtml(type, 64, g.thxF)}<div><b>${esc(g.name)}</b><span>“${esc(line)}”</span><small>${esc(title)} · <b style="color:var(--acc)">+${money(reward)}</b></small></div>`;
   document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 3800); setTimeout(() => d.remove(), 4400);
+}
+// ------------------------------------------------------------------ ICU mini-games
+// CPR: a ring closes in on the heart on every beat; press when it touches (20 beats). Surgery: a scalpel sweeps the
+// incision bar; stop it inside the green zone, 5 steps, each faster with a narrower zone. Results go to the server.
+let icuG = null, icuClosedT = 0;
+function icuOpen() {
+  const c = me?.icu; if (!c || icuG) return;
+  closePanel(); dialogClose();
+  let d = $('#icuG'); if (!d) { d = document.createElement('div'); d.id = 'icuG'; document.body.appendChild(d); }
+  const cpr = c.kind === 'cpr';
+  d.innerHTML = `<div class="icuBox"><div class="icuHead"><b>${cpr ? '💓 ปั๊มหัวใจ (CPR)' : '🔪 ผ่าตัดฉุกเฉิน'}</b><small>ผู้ป่วย: ${esc(c.who)}</small></div>
+    <canvas id="icuC" width="560" height="300"></canvas><div class="icuMsg" id="icuMsg">${cpr ? 'กดปุ่มตอนวงแหวนหดมาแตะหัวใจ' : 'กดหยุดมีดตอนอยู่ในแถบเขียว'}</div>
+    <div class="icuBtns"><button class="primary big" id="icuHit">${cpr ? '💓 ปั๊ม!' : '🔪 กรีด!'}</button><button id="icuQuit">ส่งต่อเคส</button></div></div>`;
+  d.classList.remove('hidden');
+  icuG = { kind: c.kind, c, t0: performance.now() + 1800, taps: [], pos: [], step: 0, steps: c.zones?.length || 0, fb: [], done: false };
+  if (cpr) { icuG.iv = 60000 / c.cpr.bpm; icuG.n = c.cpr.n; }
+  const hit = () => icuHit(); $('#icuHit').onpointerdown = e => { e.preventDefault(); hit(); };
+  $('#icuQuit').onclick = () => { doAct('icu', 'quit'); icuClosedT = 1; icuClose(); };
+  d.onpointerdown = e => { if (e.target.id === 'icuC') { e.preventDefault(); hit(); } };
+}
+function icuClose() { icuG = null; $('#icuG')?.classList.add('hidden'); }
+function icuHit() {
+  const g = icuG; if (!g || g.done) return;
+  const t = performance.now(); if (t < g.t0 - 300) return;
+  if (g.kind === 'cpr') {
+    g.taps.push(t); const k = Math.round((t - g.t0) / g.iv), off = t - (g.t0 + k * g.iv), d = Math.abs(off);
+    g.fb.push({ t, txt: d <= 70 ? 'เป๊ะ!' : d <= 140 ? 'ดี' : d <= 220 ? 'เกือบ' : 'พลาด', col: d <= 70 ? '#2ecc71' : d <= 140 ? '#f1c40f' : '#e67e22' });
+    FX.play(d <= 140 ? 'click' : 'fail');
+  } else {
+    const p = icuPos(t), z = g.c.zones[g.step], ok = p >= z[0] && p <= z[1];
+    g.pos.push(+p.toFixed(3)); g.fb.push({ t, txt: ok ? 'แม่นยำ!' : 'คลาดเคลื่อน', col: ok ? '#2ecc71' : '#e74c3c' }); FX.play(ok ? 'splash' : 'fail');
+    g.step++; g.stepT = t + 500;
+    if (g.step >= g.steps) icuFinish();
+  }
+}
+const icuPos = t => { const g = icuG; if (!g || g.step >= g.steps) return 0; const st = Math.max(g.t0, g.stepT || 0), ph = ((t - st) / 1000 * g.c.speeds[g.step] * .9) % 2; return ph < 1 ? ph : 2 - ph; };
+function icuFinish() {
+  const g = icuG; if (!g || g.done) return; g.done = true;
+  let payload;
+  if (g.kind === 'cpr') {   // for every beat the closest press (ms off), each press counted once
+    const used = new Set(), off = [];
+    for (let k = 0; k < g.n; k++) { const bt = g.t0 + k * g.iv; let best = null, bi = -1; g.taps.forEach((tp, i) => { if (used.has(i)) return; const d = tp - bt; if (Math.abs(d) <= g.iv / 2 && (best === null || Math.abs(d) < Math.abs(best))) { best = d; bi = i; } }); if (bi >= 0) used.add(bi); off.push(best === null ? null : Math.round(best)); }
+    payload = { off };
+  } else payload = { pos: g.pos };
+  $('#icuMsg').textContent = 'กำลังประเมินผล...';
+  icuClosedT = 1; setTimeout(() => { doAct('icu', 'done', payload); icuClose(); }, 700);
+}
+function icuDraw() {
+  const g = icuG; if (!g) return; const c = document.getElementById('icuC'); if (!c) return;
+  const x = c.getContext('2d'), W = c.width, H = c.height, t = performance.now(); x.clearRect(0, 0, W, H);
+  x.fillStyle = '#0d1b24'; x.fillRect(0, 0, W, H);
+  // monitor grid
+  x.strokeStyle = 'rgba(80,200,160,.12)'; x.lineWidth = 1; for (let i = 0; i < W; i += 28) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); } for (let j = 0; j < H; j += 28) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  if (t < g.t0) { x.fillStyle = '#fff'; x.font = '800 64px sans-serif'; x.fillText(Math.ceil((g.t0 - t) / 600), W / 2, H / 2); return; }
+  if (g.kind === 'cpr') {
+    const k = (t - g.t0) / g.iv, beat = Math.round(k), ph = k - Math.floor(k), cx = W / 2, cy = H / 2 + 10;
+    if (k > g.n - .5 && !g.done) return icuFinish();
+    // ECG line
+    x.strokeStyle = '#3ef0a0'; x.lineWidth = 2.5; x.beginPath();
+    for (let i = 0; i < W; i += 3) { const u = ((t / 1000) * 1.8 - i / W * 3) % 1, y = u > .02 && u < .06 ? -40 : u > .06 && u < .09 ? 30 : 0; i ? x.lineTo(i, 52 + y * .6) : x.moveTo(i, 52); } x.stroke();
+    // heart + closing ring
+    const pulse = 1 + Math.max(0, .18 - Math.abs(ph < .5 ? ph : ph - 1) * .9);
+    x.font = `${Math.round(86 * pulse)}px serif`; x.fillText('❤️', cx, cy);
+    const rr = 46 + (1 - ph) * 90; x.strokeStyle = 'rgba(255,255,255,.85)'; x.lineWidth = 5; x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.stroke();
+    x.strokeStyle = 'rgba(62,240,160,.6)'; x.lineWidth = 3; x.beginPath(); x.arc(cx, cy, 46, 0, 7); x.stroke();
+    x.fillStyle = '#9fe'; x.font = '700 18px sans-serif'; x.fillText(`ครั้งที่ ${Math.min(g.n, beat + 1)}/${g.n} · ${g.c.cpr.bpm} ครั้ง/นาที`, cx, H - 22);
+  } else {
+    const p = icuPos(t), z = g.c.zones[Math.min(g.step, g.steps - 1)], bx = 40, bw = W - 80, by = H / 2 - 22, bh = 44;
+    x.fillStyle = '#f2d4c4'; x.beginPath(); x.roundRect(bx, by, bw, bh, 12); x.fill();   // skin
+    x.setLineDash([8, 7]); x.strokeStyle = '#7a3b3b'; x.lineWidth = 2; x.beginPath(); x.moveTo(bx + 10, by + bh / 2); x.lineTo(bx + bw - 10, by + bh / 2); x.stroke(); x.setLineDash([]);
+    x.fillStyle = 'rgba(46,204,113,.55)'; x.fillRect(bx + z[0] * bw, by - 6, (z[1] - z[0]) * bw, bh + 12);
+    g.pos.forEach((q, i) => { x.fillStyle = '#c0392b'; x.fillRect(bx + q * bw - 2, by + 6, 4, bh - 12); });
+    if (t > (g.stepT || 0) && g.step < g.steps) { const mx = bx + p * bw; x.font = '34px serif'; x.fillText('🔪', mx, by - 18); x.fillStyle = '#fff'; x.fillRect(mx - 2, by - 4, 4, bh + 8); }
+    x.fillStyle = '#9fe'; x.font = '700 18px sans-serif'; x.fillText(`ขั้นที่ ${Math.min(g.step + 1, g.steps)}/${g.steps}`, W / 2, H - 26);
+  }
+  const f = g.fb[g.fb.length - 1]; if (f && t - f.t < 600) { x.globalAlpha = 1 - (t - f.t) / 600; x.fillStyle = f.col; x.font = '800 30px sans-serif'; x.fillText(f.txt, W / 2, 100 - (t - f.t) / 20); x.globalAlpha = 1; }
 }
 // ------------------------------------------------------------------ dialog box (talking to people)
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
@@ -1830,6 +1907,10 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15h', d: '15 พ.ย. (รอบ 8)', items: [
+    '🩺 <b>หมอไม่ต้องเข้าเวรแล้ว</b> ได้เงินจาก<b>เคสฉุกเฉินที่ ICU</b> แทน (มุมขวาล่างของโรงพยาบาล)',
+    '💓 เคสสุ่ม: <b>ปั๊มหัวใจ</b> กดตอนวงแหวนหดมาแตะหัวใจให้ตรงจังหวะ 20 ครั้ง · 🔪 <b>ผ่าตัด</b> หยุดมีดให้อยู่ในแถบเขียว 5 ขั้น เร็วขึ้นเรื่อยๆ',
+    '💰 ยิ่งแม่นยิ่งได้มาก · ได้เกิน 95% ประกาศให้ทั้งเมืองรู้ · เคสใหม่เข้าทุก 30 วินาที' ] },
   { v: '2026-11-15g', d: '15 พ.ย. (รอบ 7)', items: [
     '👧 <b>น้องมะปราง</b> ออกมาเดินเล่นในเมืองแล้ว คุยด้วยแล้วจะเปลี่ยนสีหน้าไปตามเรื่อง (ยิ้ม เขิน ตกใจ โบกมือ)',
     '🖼️ ชาวเมืองที่เดินเล่นทุกคนมีชื่อ หน้าตา และรูปวาดของตัวเอง: พี่โจ้ คุณเมย์ ป้าสมใจ พี่ดำ ต้นกล้า · ในหมู่บ้าน: ป้านวล ตาเฉย น้องเจมส์ · แต่ละคนมีเรื่องคุยของตัวเอง' ] },
@@ -1885,6 +1966,13 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'news': return newsHtml();
+    case 'icu': {
+      const wait = Math.max(0, Math.ceil(((me.icuNext || 0) - Date.now()) / 1000));
+      if (me.career !== 'doctor') return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เฉพาะแพทย์เท่านั้น · หมอรับเคสฉุกเฉินที่นี่: ปั๊มหัวใจให้ตรงจังหวะ หรือผ่าตัดให้แม่น</div>`;
+      const pay = G.icu.pay[Math.min(me.lv, G.icu.pay.length) - 1];
+      return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เคสสุ่ม: <b>💓 ปั๊มหัวใจ</b> (กดให้ตรงจังหวะหัวใจ ${G.icu.cpr.n} ครั้ง) หรือ <b>🔪 ผ่าตัด</b> (หยุดมีดให้อยู่ในแถบเขียว ${G.icu.surgery.steps} ขั้น) · ค่ารักษา ~${money(pay * .9)}–${money(pay * 1.2)} ต่อเคส ยิ่งแม่นยิ่งได้มาก · ⚡${G.icu.energy}</div>
+        ${me.icu ? B('▶️ กลับไปทำเคสที่ค้างอยู่', { fn: 'icuGo' }, 'primary big') : wait ? `<div class="jobbox">⏳ เคสถัดไปจะเข้ามาในอีก <b>${wait}</b> วินาที</div>` : B('🚑 รับเคสฉุกเฉิน', { t: 'act', st, a: 'start' }, 'primary big')}`;
+    }
     case 'office': {
       const l = Math.min(me.career === 'office' ? me.lv : 1, G.titles.length), wage = G.wages[l - 1];
       const o = me.office, today = dayNow();
@@ -1964,7 +2052,7 @@ function renderPanel(p) {
     case 'hospital': {
       const dz = me.dz || [], price = dz.length ? 1500 + 500 * (dz.length - 1) : 800, waiting = (wd?.beds || []).filter(Boolean).length;
       const mine = dz.map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, `${G.diseases[d].sym.join(' · ')}<br>${G.diseases[d].self}`, '')).join('');
-      const shift = me.career === 'doctor' ? `<div class="jobbox ok">🩺 เวรหมอ ${hhmm(G.doctor.start)}–${hhmm(G.doctor.end)} · อยู่ในโรงพยาบาลช่วงนี้ได้เงินเดือน <b>${money(G.doctor.wage[Math.min(me.lv, G.doctor.wage.length) - 1])}</b>/ชม. · วันนี้ ${(me.docShift?.hours || 0).toFixed(1)} ชม.</div>` : '';
+      const shift = me.career === 'doctor' ? `<div class="jobbox ok">🚨 หมอไม่ต้องเข้าเวรแล้ว · ไปที่ <b>ICU</b> (มุมขวาล่างของโรงพยาบาล) รับเคสฉุกเฉิน: ปั๊มหัวใจหรือผ่าตัด ได้ค่ารักษาทุกเคส</div>${B('📍 ไป ICU', { fn: 'guide', key: 'icu' }, 'good')}` : '';
       return `<h2>🏥 โรงพยาบาล</h2><div class="sub">เปิด 24 ชม. · สุขภาพ ${Math.floor(me.health)}/100 · <b>ถูกกว่า:</b> นอนที่ <b>เตียงคนไข้</b> รอหมอรักษา (~฿300) · ตอนนี้มีคนไข้ ${waiting} เตียง</div>${shift}
         ${mine ? `<div class="list">${mine}</div>` : '<div class="sub">✅ ตอนนี้คุณไม่ได้ป่วย</div>'}
         <h3>💊 ร้านขายยา</h3><div class="sub">ซื้อยาให้ตรงกับอาการ แล้วกดใช้ในกระเป๋า 🎒 (ถูกกว่าให้พยาบาลรักษา)</div><div class="list">${Object.entries(G.items).filter(([, it]) => it.pharmacy).map(([id, it]) => itemRow(id, B(`ซื้อ ${money(it.base)}`, { t: 'act', st, a: 'medbuy', item: id }, it.cures?.some(d => dz.includes(d)) ? 'good pulse' : '', me.money < it.base), `${it.cures ? `รักษา <b>${it.cures.map(d => G.diseases[d].icon + G.diseases[d].name).join(', ')}</b>${it.cures.some(d => dz.includes(d)) ? ' ✅ ตรงอาการคุณ' : ''} · ` : ''}${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('')}</div>
