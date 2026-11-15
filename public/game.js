@@ -1408,7 +1408,7 @@ function runCrash(quit) {
   const g = R.got, val = g.cups * 2 + g.cans * 3 + g.bottles * 3 + g.coins * 8 + Math.floor(R.dist / 100) * 2;
   setTimeout(() => {
     const e = $('#runEnd'); e.classList.remove('hidden');
-    e.innerHTML = `<h2>${quit ? '🛑 เลิกวิ่ง' : '💥 ชนแล้ว!'}</h2><div class="runSum"><div>🏃 ระยะทาง <b>${Math.floor(R.dist)} ม.</b></div><div>🥤 แก้ว ${g.cups} · 🥫 กระป๋อง ${g.cans} · 🍾 ขวด ${g.bottles} · 🪙 เหรียญ ${g.coins}</div><div class="runVal">ขายของเก่าได้ประมาณ <b>${money(val)}</b></div></div><button class="primary big" id="runOk">♻️ เอาไปขาย</button>`;
+    e.innerHTML = `<h2>${quit ? '🛑 เลิกวิ่ง' : '💥 ชนแล้ว!'}</h2><div class="runSum"><div>🏃 ระยะทาง <b>${Math.floor(R.dist)} ม.</b></div><div>🥤 แก้ว ${g.cups} · 🥫 กระป๋อง ${g.cans} · 🍾 ขวด ${g.bottles} · 🪙 เหรียญ ${g.coins}</div><div class="runVal">ขายของเก่าได้ประมาณ <b>${money(Math.min(400, val))}</b>${val > 400 ? '<br><small>(ได้สูงสุด ฿400 ต่อรอบ)</small>' : ''}</div></div><button class="primary big" id="runOk">♻️ เอาไปขาย</button>`;
     $('#runOk').onclick = () => { send({ t: 'trashrun.end', ...g, dist: Math.floor(R.dist) }); $('#runWin').classList.add('hidden'); RUN = null; };
   }, quit ? 100 : 1100);
 }
@@ -2634,6 +2634,8 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16d', d: '16 พ.ย. (รอบ 4)', items: [
+    '🐞 <b>แก้บัค: วิ่งเก็บขยะขึ้น "ผลการวิ่งผิดปกติ" ไม่ได้เงิน</b> ยิ่งวิ่งนานยิ่งเจอบ่อย (ระบบนับว่าเก็บของเร็วเกินไป ทั้งที่ยิ่งวิ่งเร็วของก็มาถี่ขึ้นจริง) · ตอนนี้ตรวจจากระยะทางแทน และถ้าผิดปกติจริงจะบอกเหตุผลชัดๆ · ได้สูงสุด ฿400 ต่อรอบ บอกไว้ในหน้าสรุปแล้ว ขอบคุณที่แจ้งบัคค่ะ 🙏'] },
   { v: '2026-11-16c', d: '16 พ.ย. (รอบ 3)', items: [
     '🪪 รูปในหน้า<b>ข้อมูลผู้เล่น</b>เป็นวงกลมแบบเดียวกับแถบสถานะ (ทั้งของเราและของคนอื่น)',
     '👑 <b>แอดมินทำงานได้ทุกอาชีพ</b> โดยไม่ต้องเปลี่ยนงาน (ประมูล ทำอาหาร ICU เคสหมาหาย วิ่งเก็บขยะ แย่งลูกค้า จับโจร รักษาคนไข้ ภารกิจของทุกอาชีพ ฯลฯ)'] },

@@ -876,7 +876,6 @@ function act(a, m) {
     // ---------------- office
     case 'trash.run': case 'trash.dig': {   // beggars: an endless run through the street picking up rubbish (played on the client)
       if (a.career !== 'beggar' && !isAdmin(a)) return toast(a, 'วิ่งเก็บขยะได้เฉพาะขอทาน', '🗑️', false);
-      if (a.run0 && now() - a.run0 < 180000) return;
       if (now() < (a.runNext || 0)) return toast(a, `เหนื่อยอยู่ พักอีก ${Math.ceil((a.runNext - now()) / 1000)} วินาทีค่อยวิ่งใหม่`, '😮‍💨', false);
       if (!spend(a, 6)) return;
       a.run0 = now(); markMe(a); return send(a, { t: 'trashrun', seed: rint(1, 1e9) });
@@ -2949,12 +2948,14 @@ function onMessage(ws, raw) {
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
       if (!a.run0 || a.career !== 'beggar' && !isAdmin(a)) return;
       const sec = (now() - a.run0) / 1000; a.run0 = 0; a.runNext = now() + 15000;
-      const n = k => clamp(Math.floor(+m[k] || 0), 0, 999), cups = n('cups'), cans = n('cans'), bottles = n('bottles'), coins = n('coins'), dist = clamp(Math.floor(+m.dist || 0), 0, Math.round(sec * 40));
-      if (cups + cans + bottles + coins > sec * 1.8 + 3 || coins > sec * .3 + 2) { markMe(a); return toast(a, 'ผลการวิ่งผิดปกติ ไม่ได้รับเงิน', '⚠️', false); }
-      const pay = Math.min(400, Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + (BOOST[tier(a, 'beggar')] || 0))));
+      // plausibility, from how the run is built: at most 30 m/s, at most ~6 pieces of rubbish per 8 m row, one coin per row
+      const n = k => clamp(Math.floor(+m[k] || 0), 0, 9999), cups = n('cups'), cans = n('cans'), bottles = n('bottles'), coins = n('coins'), dist = n('dist'), items = cups + cans + bottles + coins;
+      const why = dist > sec * 31 + 40 ? `ระยะทาง ${dist} ม. เกินกว่าที่วิ่งได้ใน ${Math.round(sec)} วินาที` : items > dist * .8 + 8 ? `เก็บของ ${items} ชิ้น มากเกินกว่าที่มีบนถนน ${dist} ม.` : coins > dist / 8 + 2 ? `เหรียญ ${coins} เหรียญ มากเกินกว่าที่มีบนถนน ${dist} ม.` : '';
+      if (why) { markMe(a); return toast(a, `⚠️ ผลการวิ่งผิดปกติ ไม่ได้รับเงิน: ${why} (ถ้าเล่นปกติแล้วเจอแบบนี้ กด 🐞 แจ้งบัคได้เลย)`, '⚠️', false); }
+      const raw = Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + (BOOST[tier(a, 'beggar')] || 0))), pay = Math.min(400, raw);
       if (pay > 0) earn(a, pay); addXp(a, Math.min(2, (cups + cans + bottles) / 25)); stat(a, 'trash', cups + cans + bottles); joy(a, 3); markMe(a);
       if (dist > (a.stats?.runBest || 0)) stat(a, 'runBest', dist, true);
-      return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}`, '♻️');
+      return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}${raw > pay ? ` (เต็มเพดาน ฿400 ต่อรอบ จากที่คิดได้ ${money(raw)})` : ''}`, '♻️');
     }
     case 'frame': {                         // profile frames: buy one, wear it (or take it off with -1)
       const f = D.FRAMES[+m.id];
