@@ -338,6 +338,8 @@ function handle(m) {
     case 'bite': fishBiteT = performance.now(); FX.play('bite'); if (navigator.vibrate) navigator.vibrate([60, 40, 90]); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 1.1); FX.burst(bobber.x, bobber.y, '#dff4ff', 10); } break;
     case 'hooked': fightStart(m.fight); break;
     case 'mt': misLive = m; break;
+    case 'ck': ckLive = { prog: m.prog, t: performance.now() }; break;
+    case 'kfx': cookFx(m.kind); break;
     case 'mq': misAsk(m); break;
     case 'mfx': if (m.kind === 'pick') { FX.play('pop'); } else if (m.kind === 'catch') { FX.play('pet', ['squeak', 1]); FX.play('chime'); } else FX.play('ding'); if (navigator.vibrate) navigator.vibrate(25); break;
     case 'req': showReq(m); break;
@@ -552,7 +554,7 @@ function paintHud() {
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
-  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.toggle('hidden', !atDesk); if (!atDesk && !$('#mg').classList.contains('hidden')) mgClose();
+  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.add('hidden'); if (!$('#mg').classList.contains('hidden')) mgClose();   // (mini-games were removed)
   $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
   $('#begBtn').classList.toggle('hidden', me.career !== 'beggar');
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
@@ -901,6 +903,8 @@ function onAction() {
   if (near.type === 'trash') return toast('ถังขยะ · ขอทานคุ้ยหาของได้', '🗑️', false);
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
+  if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type)) { if (t < actCd) return; actCd = t + 250; return doAct(near.id, 'use'); }   // cooking battle stations
+  if (near.type === 'kitchen' && me.cook?.hand === 'plate') return doAct(near.id, 'serve');
   if (near.type === 'pier') {                                         // fishing is all on the big button: cast, strike, (hold to reel), lift
     if (!me.cast) { if (t < actCd) return; actCd = t + 900; return doAct(near.id, 'cast'); }
     if (me.cast.state === 'fight') return fightPress();
@@ -924,7 +928,7 @@ function onAction() {
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
 function frame(t) {
-  requestAnimationFrame(frame); dlgTick(); icuDraw(); if (me?.icu && !icuG && !icuClosedT) icuOpen(); if (!me?.icu) icuClosedT = 0;
+  requestAnimationFrame(frame); dlgTick();
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
@@ -975,9 +979,10 @@ function frame(t) {
     const stf = STAFF_AT[near.id];
     if (stf) { $('#actIcon').textContent = '💬'; staffGreet(stf); }
     if (near.type === 'pier' && me.cast) $('#actIcon').textContent = fishCue()[0];
+    if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) $('#actIcon').textContent = cookCue(near)[0];
     $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
       : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
-      : near.type === 'pier' ? (me.cast ? fishCue()[1] : '🎣 เหวี่ยงเบ็ด') : near.label;
+      : near.type === 'pier' ? (me.cast ? fishCue()[1] : '🎣 เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); $('#actIcon').textContent = '👆'; $('#actLabel').textContent = 'ใช้งาน'; }
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
@@ -1042,6 +1047,7 @@ function draw(t) {
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   misEnts(ents, vis);
+  if (me?.cook && myRoom?.rk === 'kitchen') ents.push([1e8, 7, { k: 'cook' }]);
   if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
@@ -1210,6 +1216,84 @@ function shopPets(room) {
 }
 const PET_VOICE = { shiba: 'dog', golden: 'bigdog', corgi: 'dog', pug: 'dog', husky: 'bigdog', dalmatian: 'bigdog', poodle: 'dog', pom: 'dog', chihuahua: 'dog', tabby: 'cat', blackcat: 'cat', whitecat: 'cat', siamese: 'cat', calico: 'cat', britcat: 'cat', oddeye: 'cat',
   chick: 'bird', duck: 'duck', penguin: 'duck', rabbit: 'squeak', lop: 'squeak', hamster: 'squeak', guinea: 'squeak', hedgehog: 'squeak', squirrel: 'squeak', fox: 'dog', redpanda: 'squeak', panda: 'low', capybara: 'low', turtle: 'low', dragon: 'roar', unicorn: 'magic' };
+// ---- cooking battle: what each station holds, the timers, what is in your hands, and the big button's hint
+let ckLive = null;
+const OPN = { chop: ['🔪', 'สับ'], fry: ['🍳', 'ผัด'], boil: ['🍲', 'ต้ม'], grill: ['🔥', 'ย่าง'] };
+const AT_ST = { board: 'k_board', pan: 'k_pan', pot: 'k_pot', grill: 'k_grill', plate: 'k_plate', pantry: 'k_pantry' };
+const cookSteps = r => Object.keys(r.in).map(i => `${G.items[i].icon}${(r.ops?.[i] || []).map(o => OPN[o][0]).join('')}`).join(' + ') + ' → 🍽️';
+function cookState(cp) {                      // 0..1 progress, and whether it is ready / ruined
+  const c = me.cook; if (!c) return {};
+  const op = cp.ops[cp.k], now0 = Date.now() + clockOff;
+  if (cp.at === 'pot' || cp.at === 'grill') { const el = (now0 - cp.t) / 1000, need = G.cook[op], win = G.cook.window[op]; return { p: Math.min(1, el / need), ready: el >= need && el < need + win, burnt: cp.burnt || el >= need + win, warn: el >= need ? (el - need) / win : 0 }; }
+  if (cp.at === 'board' || cp.at === 'pan') { const i = c.comps.indexOf(cp), pr = ckLive?.prog?.[i] ?? cp.prog; return { p: cp.ready ? 1 : Math.min(1, pr / G.cook[op]), ready: cp.ready }; }
+  return {};
+}
+function drawCook(X, Y, t) {
+  const c = me.cook; if (!c) return;
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const by = {};
+  c.comps.forEach(cp => { if (AT_ST[cp.at] && cp.at !== 'pantry') (by[cp.at] = by[cp.at] || []).push(cp); });
+  for (const [at, list] of Object.entries(by)) {
+    const st = STN(AT_ST[at]); if (!st) continue;
+    list.forEach((cp, j) => {
+      const px = (st.x + (j - (list.length - 1) / 2) * .7) * TS + X, py = (st.y - 1.25) * TS + Y, s0 = cookState(cp);
+      if (at === 'plate') { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(G.items[cp.ing].icon, px, py + TS * .35); return; }
+      const col = s0.burnt ? '#5a3a2a' : s0.ready ? ((t / 200 | 0) % 2 ? '#7fe08a' : '#c9ffd0') : s0.warn ? '#ff8a3a' : '#ffd34d';
+      ctx.fillStyle = 'rgba(20,16,12,.75)'; ctx.beginPath(); ctx.arc(px, py, TS * .36, 0, 7); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, TS * .36, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (s0.burnt ? 1 : s0.p || 0)); ctx.stroke();
+      ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(s0.burnt ? '💀' : G.items[cp.ing].icon, px, py + 1);
+      if ((at === 'pot' || at === 'grill') && !s0.burnt && Math.random() < .05) FX.burst(st.x, st.y - 1, at === 'pot' ? '#ffffff' : '#777777', 2);
+      if (s0.burnt && Math.random() < .08) FX.burst(st.x, st.y - 1.2, '#444', 3);
+      if (s0.ready && !s0.burnt) { ctx.font = `700 ${Math.round(TS * .24)}px 'Mitr',sans-serif`; ctx.fillStyle = s0.warn > .5 ? '#ff6a4a' : '#7fe08a'; ctx.fillText(s0.warn > .5 ? 'รีบยก!' : 'พร้อม!', px, py - TS * .55); }
+    });
+  }
+  const P0 = P.get(myId);                     // what you carry: above your head
+  if (P0) {
+    const hx = P0.rx * TS + X, hy = P0.ry * TS + Y - TS * 1.85, held = typeof c.hand === 'number' && c.hand >= 0 ? c.comps[c.hand] : null;
+    if (held || c.hand === 'plate') {
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(hx, hy, TS * .42, TS * .3, 0, 0, 7); ctx.fill();
+      ctx.font = `${Math.round(TS * .36)}px serif`; ctx.fillText(c.hand === 'plate' ? G.items[c.rid].icon : G.items[held.ing].icon, hx, hy + 1);
+      if (held) { const nx = held.ops[held.k]; ctx.font = `${Math.round(TS * .22)}px serif`; ctx.fillText(nx ? OPN[nx][0] : '🍽️', hx + TS * .36, hy - TS * .2); }
+    }
+  }
+  ctx.restore();
+}
+// the big button's label at a kitchen station
+function cookCue(st) {
+  const c = me.cook; if (!c) return ['🍳', st.label];
+  const held = typeof c.hand === 'number' && c.hand >= 0 ? c.comps[c.hand] : null, where = st.type.slice(1), nx = held?.ops[held.k];
+  const AT = { board: 'chop', pan: 'fry', pot: 'boil', grill: 'grill' };
+  if (st.type === 'kitchen') return c.hand === 'plate' ? ['🛎️', 'เสิร์ฟ!'] : ['📋', 'ดูออเดอร์'];
+  if (where === 'pantry') return held ? ['↩️', 'วางคืน'] : c.comps.some(x => x.at === 'pantry') ? ['🧺', 'หยิบวัตถุดิบ'] : ['🧺', 'หยิบครบแล้ว'];
+  if (where === 'plate') return held ? (held.k >= held.ops.length ? ['🍽️', 'วางจัดจาน'] : ['⚠️', 'ยังไม่พร้อม']) : c.plated ? ['🍽️', 'ยกจาน'] : ['🍽️', 'โต๊ะจัดจาน'];
+  if (held) return AT[where] === nx ? [OPN[nx][0], `วางเพื่อ${OPN[nx][1]}`] : ['⚠️', nx ? `ต้อง${OPN[nx][1]}ที่อื่น` : 'ไปจัดจาน'];
+  const here = c.comps.filter(x => x.at === where); if (!here.length) return [st.icon, st.label];
+  const r = here.map(cookState); if (r.some(x => x.burnt)) return ['🗑️', 'ทิ้งของเสีย'];
+  if (r.some(x => x.ready)) return ['🫴', 'ยกขึ้น'];
+  return where === 'board' || where === 'pan' ? [OPN[AT[where]][0], `กำลัง${OPN[AT[where]][1]}... ยืนอยู่`] : ['⏳', 'รอสุก...'];
+}
+let cookSnd = 0;
+function cookFx(kind) {
+  if (kind === 'pick' || kind === 'drop') FX.play('pop');
+  else if (kind === 'ready') { FX.play('ding'); if (navigator.vibrate) navigator.vibrate(30); }
+  else if (kind === 'burnt' || kind === 'fail') FX.play('fail');
+  else if (kind === 'serve' || kind === 'plated') FX.play('chime');
+  else if (kind === 'pot') FX.play('splash'); else if (kind === 'grill' || kind === 'pan') FX.play('sizzle'); else if (kind === 'board') FX.play('munch');
+}
+// sounds while you work: chopping knocks at the board, sizzling at the pan
+setInterval(() => {
+  const c = me?.cook, P0 = P.get(myId); if (!c || !P0 || roomOf(P0.x, P0.y)?.rk !== 'kitchen') return;
+  for (const cp of c.comps) if ((cp.at === 'board' || cp.at === 'pan') && !cp.ready) { const st = STN(AT_ST[cp.at]); if (st && Math.hypot(P0.x - st.x, P0.y - st.y) < 1.5) { if (cp.at === 'board') FX.play('chop'); else if (++cookSnd % 4 === 0) FX.play('sizzle'); } }
+}, 260);
+// the order ticket: dish, time left, each ingredient's path
+function cookChip() {
+  const c = $('#misChip'); const k = me?.cook; if (!k || me?.mis) return false;
+  const left = Math.max(0, Math.ceil((k.until - Date.now() - clockOff) / 1000));
+  const parts = k.comps.map(cp => `${G.items[cp.ing].icon}${cp.at === 'plate' ? '✅' : cp.ops.slice(cp.k).map(o => OPN[o][0]).join('') || '🍽️'}`).join(' ');
+  c.classList.remove('hidden'); c.classList.toggle('late', left < 20);
+  c.textContent = `${G.items[k.rid].icon} ${G.items[k.rid].name} · ${k.plated ? (k.hand === 'plate' ? 'เสิร์ฟที่เคาน์เตอร์!' : 'ยกจานไปเสิร์ฟ') : parts} · ⏱ ${left}s`;
+  return true;
+}
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
@@ -1217,13 +1301,14 @@ const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
   if (me.career === 'none') return '';
+  if (m?.kind === 'icu' && panel?.kind === 'career') return '<div class="jobbox">🚨 กำลังทำเคสฉุกเฉินที่ ICU</div>';
   if (!m) return `<div class="jobbox">📋 <b>ภารกิจอาชีพ</b> · สุ่มงานจริงในเมือง 20 แบบของ${esc(G.careers[me.career]?.name || '')} (เดินส่งของ ตามหา เก็บของ ไล่จับ พาคนไป คุยแก้ปัญหา) ค่าตอบแทนตามเวลาที่ใช้ ทำเร็วได้โบนัส · หมดเวลา = ล้มเหลว${cd > 0 ? `<br><small>งานใหม่เข้าในอีก ${cd} วินาที</small>` : ''}<br>${B('📋 รับภารกิจ (⚡5)', { t: 'mission', op: 'start' }, 'primary', cd > 0)}</div>`;
   const steps = m.steps.map((s, j) => `<li class="${s.done ? 'done' : j === m.i ? 'cur' : ''}">${s.done ? '✅' : j === m.i ? '👉' : '▫️'} ${MIS_K[s.k] || ''} ${esc(s.label)}</li>`).join('');
   return `<div class="jobbox">${m.icon} <b>${esc(m.title)}</b> · เหลือเวลา <b class="miscd"></b><br><small>${esc(m.story)}</small><ul class="misSteps">${steps}</ul>${B('ยกเลิกภารกิจ', { t: 'mission', op: 'quit' })}</div>`;
 }
 function paintMisChip() {
   const c = $('#misChip'), m = me?.mis;
-  if (!m) return c.classList.add('hidden');
+  if (!m) { if (!cookChip()) c.classList.add('hidden'); return; }
   const left = Math.max(0, Math.ceil((m.until - Date.now() - clockOff) / 1000)), tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   const cur = m.cur; let extra = '';
   if (cur?.k === 'collect') extra = ` (${cur.items.filter(i => i[2]).length}/${cur.items.length})`;
@@ -1233,8 +1318,8 @@ function paintMisChip() {
   c.textContent = `${m.icon} ${cur ? (MIS_K[cur.k] || '') + ' ' + cur.label : m.title}${extra} · ${tm}`;
   document.querySelectorAll('.miscd').forEach(el => { el.textContent = tm; });
 }
-setInterval(paintMisChip, 400);
-$('#misChip').onclick = () => openPanel({ kind: 'career' });
+setInterval(paintMisChip, 250);
+$('#misChip').onclick = () => { if (me?.cook && !me.mis) return toast('ทำทีละขั้น: 🧺 หยิบวัตถุดิบ → 🔪 สับ / 🍳 ผัด (ยืนทำ) → 🍲 ต้ม / 🔥 ย่าง (สุกเองแต่อย่าปล่อยนาน!) → 🍽️ วางจัดจาน → 🛎️ ยกไปเสิร์ฟที่เคาน์เตอร์ด้านบน', '🍳'); openPanel({ kind: me?.mis?.kind === 'icu' ? 'icu' : 'career', st: me?.mis?.kind === 'icu' ? 'icu' : undefined }); };
 function misAsk(m) {
   MISNPC = misPerson(m.who, 0, 0);
   dialog({ name: m.who.name, npc: 'misnpc', lines: [m.q], choices: m.ans.map((a, i) => ({ label: a, fn: () => { dialogClose(); send({ t: 'mission', op: 'answer', i }); } })) });
@@ -1243,7 +1328,7 @@ function misPerson(w, x, y) { return { id: 'misnpc', staff: 1, career: '', c: ''
 const misAnim = {};
 function misEnts(ents, vis) {
   const m = me?.mis, c = m?.cur, P0 = P.get(myId);
-  if (!c || !P0 || areaOf(P0.x, P0.y)?.id !== 'town') { MISNPC = null; return; }
+  if (!c || !P0 || areaOf(P0.x, P0.y)?.id !== (c.area || 'town')) { MISNPC = null; return; }
   const near = (x, y, r) => Math.hypot(P0.rx - x, P0.ry - y) < r;
   if (c.k === 'deliver' || c.k === 'talk' || (c.k === 'escort')) {
     let x = c.x, y = c.y;
@@ -1287,6 +1372,7 @@ function drawMisThing(e, X, Y, t) {
     const g = ctx.createLinearGradient(0, py - TS * 3, 0, py); g.addColorStop(0, 'rgba(255,220,90,0)'); g.addColorStop(1, 'rgba(255,220,90,.45)');
     ctx.fillStyle = g; ctx.fillRect(px - TS * .35, py - TS * 3, TS * .7, TS * 3);
     ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(px, py, TS * .7 + Math.sin(t / 250) * 3, TS * .28, 0, 0, 7); ctx.stroke();
+  } else if (e.k === 'cook') { ctx.restore(); return drawCook(X, Y, t);
   } else if (e.k === 'mark') {
     ctx.font = `800 ${Math.round(TS * .5)}px sans-serif`; ctx.fillStyle = e.wait ? '#ff6b5a' : '#ffd34d'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
     const s = e.wait ? '⏳' : e.ph === 1 ? '' : '!', y = py - TS * 2.05 + Math.sin(t / 220) * 3;
@@ -1305,7 +1391,7 @@ function misTarget() {
   return { x: c.x, y: c.y };
 }
 function drawMisGuide(X, Y, t) {
-  const s = P.get(myId), tg = misTarget(); if (!s || !tg || areaOf(s.x, s.y)?.id !== 'town') return;
+  const s = P.get(myId), tg = misTarget(); if (!s || !tg || areaOf(s.x, s.y)?.id !== (me.mis.cur.area || 'town')) return;
   const dx = tg.x - s.rx, dy = tg.y - s.ry, d = Math.hypot(dx, dy); if (d < (tg.vague ? 7 : 3)) return;
   const a = Math.atan2(dy, dx), r = TS * 1.05, cx = s.rx * TS + X + Math.cos(a) * r, cy = s.ry * TS + Y + TS * .2 + Math.sin(a) * r * .6;
   ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
@@ -1317,7 +1403,7 @@ function drawMisGuide(X, Y, t) {
   ctx.strokeText(txt, lx, ly); ctx.fillText(txt, lx, ly);
 }
 function misMini(g, A, mapId) {
-  const c = me?.mis?.cur; if (!c || mapId !== 'town') return;
+  const c = me?.mis?.cur; if (!c || mapId !== 'town' || (c.area || 'town') !== 'town') return;
   const tg = misTarget(); if (!tg) return;
   const blink = (performance.now() / 350 | 0) % 2;
   if (c.hc && (c.k === 'find' || c.k === 'collect')) { g.strokeStyle = blink ? '#5ab0ff' : '#2a7fd0'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((c.hc[0] - A.x) * 2, (c.hc[1] - A.y) * 2, c.hc[2] * 2, 0, 7); g.stroke(); g.setLineDash([]); }
@@ -2280,6 +2366,10 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15w', d: '15 พ.ย. (รอบ 23)', items: [
+    '🔥 <b>เชฟ: Cooking Battle!</b> รับออเดอร์ที่เคาน์เตอร์ครัวใหญ่ แล้ววิ่งทำจริงในครัว: 🧺 หยิบวัตถุดิบ → 🔪 <b>สับ</b>ที่เขียง / 🍳 <b>ผัด</b>ที่กระทะ (ยืนทำจนเสร็จ) → 🍲 <b>ต้ม</b> / 🔥 <b>ย่าง</b> (สุกเองแต่ต้องยกให้ทัน ไม่งั้นเละ/ไหม้) → 🍽️ <b>รวมจาน</b> → 🛎️ ยกไปเสิร์ฟให้ทันเวลา · เสิร์ฟเร็วได้ทิปและมีโอกาสได้เพิ่มอีกจาน',
+    '🚑 <b>หมอ ICU ไม่ใช่มินิเกมแล้ว</b> เคสฉุกเฉิน 8 แบบ เดินไปหยิบเครื่องมือ/ยาในโรงพยาบาลจริง แล้วยืนรักษาคนไข้ที่เตียง ICU ให้ทันเวลา',
+    '🧹 <b>เอามินิเกมออกทั้งหมด</b> (มินิเกมฆ่าเวลาในออฟฟิศ/ตอนนั่งเรียน, แถบจังหวะ ICU)'] },
   { v: '2026-11-15v', d: '15 พ.ย. (รอบ 22)', items: [
     '📋 <b>ภารกิจอาชีพ! ทุกอาชีพมีงาน 20 แบบ สุ่มมาให้ทำ</b> เล่นกันจริงๆ ในเมือง ไม่ใช่มินิเกม: เดินไปส่งเอกสาร ตามหาของหาย เก็บของที่กระจาย ส่งของถึงมือคน ยืนทำงานจนเสร็จ ไล่จับสัตว์ที่หนี พาคนแก่/คนเจ็บเดินไปส่ง และคุยตอบคำถามให้ถูก',
     '🧭 รับภารกิจที่เมนู 💼 งาน (⚡5) มีลูกศรชี้ทางพร้อมระยะ จุดบนมินิแมพ ป้ายบอกขั้นตอนและเวลาที่เหลือ · ค่าตอบแทนตามเวลาที่ใช้ ทำเสร็จก่อนครึ่งเวลาโบนัส +25% · หมดเวลา = ล้มเหลว · ตอบคำถามผิดเสียเวลา 20 วิ'] },
@@ -2379,11 +2469,12 @@ function renderPanel(p) {
   switch (k) {
     case 'news': return newsHtml();
     case 'icu': {
-      const wait = Math.max(0, Math.ceil(((me.icuNext || 0) - Date.now()) / 1000));
-      if (me.career !== 'doctor') return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เฉพาะแพทย์เท่านั้น · หมอรับเคสฉุกเฉินที่นี่: ปั๊มหัวใจให้ตรงจังหวะ หรือผ่าตัดให้แม่น</div>`;
-      const pay = G.icu.pay[Math.min(me.lv, G.icu.pay.length) - 1];
-      return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เคสสุ่ม: <b>💓 ปั๊มหัวใจ</b> (กดให้ตรงจังหวะหัวใจ ${G.icu.cpr.n} ครั้ง) หรือ <b>🔪 ผ่าตัด</b> (หยุดมีดให้อยู่ในแถบเขียว ${G.icu.surgery.steps} ขั้น) · ค่ารักษา ~${money(pay * .9)}–${money(pay * 1.2)} ต่อเคส ยิ่งแม่นยิ่งได้มาก · ⚡${G.icu.energy}</div>
-        ${me.icu ? B('▶️ กลับไปทำเคสที่ค้างอยู่', { fn: 'icuGo' }, 'primary big') : wait ? `<div class="jobbox">⏳ เคสถัดไปจะเข้ามาในอีก <b>${wait}</b> วินาที</div>` : B('🚑 รับเคสฉุกเฉิน', { t: 'act', st, a: 'start' }, 'primary big')}`;
+      const wait = Math.max(0, Math.ceil(((me.icuNext || 0) - Date.now() - clockOff) / 1000));
+      if (me.career !== 'doctor') return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เฉพาะแพทย์เท่านั้น · หมอรับเคสฉุกเฉินที่นี่ แล้วลงมือรักษาจริงในห้อง</div>`;
+      const pay = G.icu.pay[Math.min(me.lv, G.icu.pay.length) - 1] * 2.2;
+      const cur = me.mis?.kind === 'icu';
+      return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เคสฉุกเฉินสุ่ม 8 แบบ (หัวใจหยุดเต้น ผ่าตัดไส้ติ่ง หอบหืด กระดูกหัก เสียเลือดมาก แพ้รุนแรง ไข้เลือดออก แผลลึก) · เดินไปหยิบยา/อุปกรณ์ในห้อง แล้วยืนรักษาคนไข้ที่เตียง ICU จนเสร็จภายในเวลา · ~${money(pay)} ต่อเคส ทำเร็ว +25% · ⚡${G.icu.energy}</div>
+        ${cur ? misBox() : me.mis ? '<div class="jobbox">มีภารกิจอื่นค้างอยู่ ทำให้เสร็จก่อน</div>' : wait ? `<div class="jobbox">⏳ เคสถัดไปจะเข้ามาในอีก <b>${wait}</b> วินาที</div>` : B('🚑 รับเคสฉุกเฉิน', { t: 'act', st, a: 'start' }, 'primary big')}`;
     }
     case 'office': {
       const l = Math.min(me.career === 'office' ? me.lv : 1, G.titles.length), wage = G.wages[l - 1];
@@ -2456,7 +2547,7 @@ function renderPanel(p) {
       const rows = G.recipes.map(r => {
         const out = G.items[r.id]; const ok = Object.entries(r.in).every(([i, q]) => (me.inv[i] || 0) >= q);
         const ing = Object.entries(r.in).map(([i, q]) => `${G.items[i].icon}${q} (มี ${me.inv[i] || 0})`).join(' + ');
-        return itemRow(r.id, B('ปรุง ⚡12', { t: 'act', st, a: 'cook', rid: r.id }, ok ? 'good' : '', !ok), `${ing} · ขาย ~${money(out.base)} · ${eatText(out.eat)}`);
+        return itemRow(r.id, B(me.cook ? 'กำลังทำ...' : '🔥 รับออเดอร์ ⚡12', { t: 'act', st, a: 'cook', rid: r.id }, ok && !me.cook ? 'good' : '', !ok || !!me.cook), `${ing} · ${cookSteps(r)} · ขาย ~${money(out.base)}`);
       }).join('');
       const ings = [...new Set(G.recipes.flatMap(r => Object.keys(r.in)))].map(i => { const it = G.items[i], c = Math.ceil(it.base * 1.3); return itemRow(i, `<div class="col2">${B(`ซื้อ ${money(c)}`, { t: 'act', st, a: 'buy', item: i, qty: 1 }, '', me.money < c)}${B('x5', { t: 'act', st, a: 'buy', item: i, qty: 5 }, '', me.money < c * 5)}</div>`, `มีในกระเป๋า ${me.inv[i] || 0}`); }).join('');
       return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ปรุงอาหารขายได้แพงกว่าวัตถุดิบหลายเท่า · ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง (ถูกกว่า) หรือซื้อที่ครัวนี้ (แพงกว่า 30%)</div>${staffHint('chef')}${me.career === 'chef' ? `<h3>🍳 เมนู</h3><div class="list">${rows}</div><h3>🛒 วัตถุดิบ</h3><div class="list">${ings}</div>` : ''}`;
@@ -2464,7 +2555,7 @@ function renderPanel(p) {
     case 'hospital': {
       const dz = me.dz || [], price = dz.length ? 1500 + 500 * (dz.length - 1) : 800, waiting = (wd?.beds || []).filter(Boolean).length;
       const mine = dz.map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, `${G.diseases[d].sym.join(' · ')}<br>${G.diseases[d].self}`, '')).join('');
-      const shift = me.career === 'doctor' ? `<div class="jobbox ok">🚨 หมอไม่ต้องเข้าเวรแล้ว · ไปที่ <b>ICU</b> (มุมขวาล่างของโรงพยาบาล) รับเคสฉุกเฉิน: ปั๊มหัวใจหรือผ่าตัด ได้ค่ารักษาทุกเคส</div>${B('📍 ไป ICU', { fn: 'guide', key: 'icu' }, 'good')}` : '';
+      const shift = me.career === 'doctor' ? `<div class="jobbox ok">🚨 หมอไม่ต้องเข้าเวรแล้ว · ไปที่ <b>ICU</b> (มุมขวาล่างของโรงพยาบาล) รับเคสฉุกเฉิน แล้วลงมือรักษาในห้องจริง ได้ค่ารักษาทุกเคส</div>${B('📍 ไป ICU', { fn: 'guide', key: 'icu' }, 'good')}` : '';
       return `<h2>🏥 โรงพยาบาล</h2><div class="sub">เปิด 24 ชม. · สุขภาพ ${Math.floor(me.health)}/100 · <b>ถูกกว่า:</b> นอนที่ <b>เตียงคนไข้</b> รอหมอรักษา (~฿300) · ตอนนี้มีคนไข้ ${waiting} เตียง</div>${shift}
         ${mine ? `<div class="list">${mine}</div>` : '<div class="sub">✅ ตอนนี้คุณไม่ได้ป่วย</div>'}
         <h3>💊 ร้านขายยา</h3><div class="sub">ซื้อยาให้ตรงกับอาการ แล้วกดใช้ในกระเป๋า 🎒 (ถูกกว่าให้พยาบาลรักษา)</div><div class="list">${Object.entries(G.items).filter(([, it]) => it.pharmacy).map(([id, it]) => itemRow(id, B(`ซื้อ ${money(it.base)}`, { t: 'act', st, a: 'medbuy', item: id }, it.cures?.some(d => dz.includes(d)) ? 'good pulse' : '', me.money < it.base), `${it.cures ? `รักษา <b>${it.cures.map(d => G.diseases[d].icon + G.diseases[d].name).join(', ')}</b>${it.cures.some(d => dz.includes(d)) ? ' ✅ ตรงอาการคุณ' : ''} · ` : ''}${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('')}</div>

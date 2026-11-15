@@ -402,7 +402,7 @@ const LAYOUT = {
   dealer: [['x_cardesk', 7, 2.4], ['w_sports_s', 3.2, 5.6], ['w_suv_s', 10.8, 5.6], ['w_cruiser_s', 2.6, 8.7], ['w_sport_s', 11.4, 8.7], ['x_plant', 1.5, 2.7], ['x_keys', 9.6, 1.1, false], ['x_tirerack2', 12.0, 2.7], ['x_tools', 11.4, 8.7], ['x_aboard2', 9.0, 8.8, false], ['x_wclock', 4.6, 1.0, false]],
   toolshop: [['x_toolbox', 2.2, 2.6], ['x_mshelf', 4.3, 2.7], ['x_cashdesk', 7, 2.5], ['x_workbench', 9.6, 2.6], ['f_shelf_c', 11.9, 2.8], ['x_storage', 2.4, 6.4], ['x_seeds', 4.8, 6.0, false], ['x_barrow', 10.8, 6.4], ['x_bucket2', 1.8, 8.7], ['x_jack', 4.0, 8.6], ['x_ghose', 10.4, 8.7], ['x_ladder2', 12.5, 8.7], ['i_lantern', 5, 1.15, false], ['i_clock', 9.4, 1.0, false]],
   restaurant: [['x_plant', 1.6, 2.8], ['x_coffeebar', 3.9, 2.5], ['x_counter', 7, 2.4], ['x_cakecase', 9.9, 2.5], ['x_drinkfridge', 12.1, 2.7], ['x_wclock', 5.4, 0.95, false], ['i_hanging', 12.6, 1.25, false], ['x_cafeset', 3.4, 5.7], ['x_cafeset', 10.6, 5.7], ['x_cafeset', 3.4, 8.6], ['x_cafeset', 10.6, 8.6], ['x_menu', 5.4, 9.15, false], ['x_bell', 7.9, 1.75, false]],
-  kitchen: [['x_hood', 4.6, 1.45, false], ['x_oven', 2.4, 2.6], ['x_souppot', 4.6, 2.6], ['x_prep', 7.2, 2.5], ['x_sink', 10.3, 2.5], ['x_breadrack', 2.0, 6.4], ['f_bench', 10.5, 6.6], ['x_tray', 10.5, 5.75, false], ['x_freezer', 2.6, 8.7], ['i_rice_sack', 4.4, 8.6], ['x_ice', 10.0, 8.8], ['f_fridge', 12.3, 8.7], ['x_ext', 12.6, 5.0], ['i_clock', 7.4, 1.0, false], ['x_dishrack', 12.0, 1.95, false]],
+  kitchen: [['f_stove', 6.0, 6.3], ['x_hood', 4.6, 1.45, false], ['x_oven', 2.4, 2.6], ['x_souppot', 4.6, 2.6], ['x_prep', 7.2, 2.5], ['x_sink', 10.3, 2.5], ['x_breadrack', 2.0, 6.4], ['f_bench', 10.5, 6.6], ['x_tray', 10.5, 5.75, false], ['x_freezer', 2.6, 8.7], ['i_rice_sack', 4.4, 8.6], ['x_ice', 10.0, 8.8], ['f_fridge', 12.3, 8.7], ['x_ext', 12.6, 5.0], ['i_clock', 7.4, 1.0, false], ['x_dishrack', 12.0, 1.95, false]],
   hospital: [['f_reception2', 3.5, 2.5], ['x_medcab', 1.6, 2.7], ['f_window', 6.4, 1.1], ['f_firstaid', 9.2, 1.1, false], ['x_medfridge', 5.6, 2.8], ['x_waitseats', 2.6, 6.2], ['x_waitseats', 2.6, 8.4], ['x_plant', 5.2, 10.7], ['x_wheelchair2', 14.0, 10.6], ['x_iv', 15.0, 6.6], ['x_monitor', 9.75, 3.0], ['x_monitor', 12.25, 3.0], ['x_stretcher', 5.4, 6.8], ['x_xray', 15.0, 3.2], ['x_clock', 4.0, 1.0, false], ['i_bin_blue', 1.6, 10.6, false], ['x_magrack', 1.6, 4.6]],
   school: [['x_board', 7, 1.75, false], ['x_tdesk', 7, 2.6], ['f_books', 1.8, 2.6], ['f_bookshelf_wide', 3.8, 2.6], ['x_globe', 10.0, 2.6], ['x_cubby', 12.0, 2.7], ['x_locker', 1.6, 5.4], ['x_locker', 1.6, 7.6], ['x_clock', 11.0, 1.0, false], ['i_calendar', 4.8, 1.05, false], ['x_plant', 12.6, 8.8], ['i_backpack', 7, 8.6, false]],
   police: [['x_pdesk', 7, 2.4], ['x_lockers', 2.2, 2.6], ['f_filing_grey', 4.2, 2.6], ['x_radio', 9.4, 2.7], ['f_corkboard', 10.4, 1.15, false], ['x_cuffs', 5.4, 1.15, false], ['x_alarm', 12.4, 1.2, false], ['x_pcdesk2', 3.0, 5.6], ['f_bunk', 11.5, 7.4], ['f_bunk2', 9.5, 7.4], ['x_metaldoor', 12.2, 4.6], ['x_cones', 2.2, 8.8], ['x_barricade', 4.4, 8.8], ['f_plant', 12.6, 8.7], ['x_wclock', 7, 0.95, false]],
@@ -487,6 +487,11 @@ for (const b of [0, 1, 2].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === 
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
   // the rider hub's waiting bench seats two side by side
   if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
+  if (kind === 'kitchen') {             // cooking battle: work stations around the kitchen (the counter at the top is where dishes are served)
+    for (const [id, type, label, icon, dx, dy] of [['k_pantry', 'kpantry', 'ตู้วัตถุดิบ', '🧺', 12.3, 7.3], ['k_grill', 'kgrill', 'เตาย่าง', '🔥', 2.4, 3.6], ['k_pot', 'kpot', 'หม้อต้ม', '🍲', 4.6, 3.6],
+      ['k_board', 'kboard', 'เขียงสับ', '🔪', 10.3, 3.6], ['k_pan', 'kpan', 'กระทะผัด', '🍳', 6.0, 7.2], ['k_plate', 'kplate', 'โต๊ะจัดจาน', '🍽️', 10.5, 7.6]])
+      STATIONS.push({ id, type, label, icon, room: room.id, x: rx + dx, y: ry + dy, r: 1.1 });
+  }
   if (kind === 'hospital') {
     s.x = rx + 3.5;
     [[8.5, 3.6], [11, 3.6], [13.5, 3.6], [8.5, 7.4], [11, 7.4], [13.5, 7.4]].forEach(([dx, dy], i) => {
@@ -759,13 +764,16 @@ const CROPS = {
   chili:  { seed: 50,  grow: 480, min: 4, max: 5 },
   durian: { seed: 200, grow: 900, min: 3, max: 4 },
 };
+// ops: what each ingredient goes through in the cooking battle before it goes on the plate (chop / fry need you standing
+// at the board or the pan; boil / grill cook by themselves and must be taken off in time or they are ruined)
 const RECIPES = [
-  { id: 'fried_rice',   in: { rice: 2 } },
-  { id: 'corn_soup',    in: { corn: 2, rice: 1 } },
-  { id: 'grilled_fish', in: { catfish: 1, chili: 1 } },
-  { id: 'tomyum',       in: { tilapia: 1, chili: 1, corn: 1 } },
-  { id: 'durian_sweet', in: { durian: 1, rice: 1 } },
+  { id: 'fried_rice',   in: { rice: 2 }, ops: { rice: ['fry'] } },
+  { id: 'corn_soup',    in: { corn: 2, rice: 1 }, ops: { corn: ['chop', 'boil'], rice: ['boil'] } },
+  { id: 'grilled_fish', in: { catfish: 1, chili: 1 }, ops: { catfish: ['chop', 'grill'], chili: ['chop'] } },
+  { id: 'tomyum',       in: { tilapia: 1, chili: 1, corn: 1 }, ops: { tilapia: ['chop', 'boil'], chili: ['chop'], corn: ['chop', 'boil'] } },
+  { id: 'durian_sweet', in: { durian: 1, rice: 1 }, ops: { durian: ['chop'], rice: ['boil'] } },
 ];
+const COOK = { chop: 4, fry: 5, boil: 7, grill: 6, window: { boil: 9, grill: 6 }, grillMax: 2 };
 // fishing pools: [id, weight]. null = junk
 // what bites where. The first sheet's fish keep their hand-set weights; the second sheet's join every water of their kind
 // ('f' fresh: river + lake, 's' sea) with a weight by rarity. The nothing-bites weight is then set so a cast is worth about
@@ -857,7 +865,7 @@ const CAREERS = {
   farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
-  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: ปั๊มหัวใจให้ตรงจังหวะ หรือผ่าตัดให้แม่น ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
+  doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
   beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'นั่งขอทานได้ทุกที่ (ปุ่ม 🥣) ได้เศษเงินจากคนผ่านไปมา ที่คนพลุกพล่านได้บ่อยกว่า ผู้เล่นที่บริจาคให้จะมีความสุขเพิ่ม' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
@@ -1293,6 +1301,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, COOK, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

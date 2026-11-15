@@ -773,7 +773,7 @@ function apply(a, career) {
     farmer: 'ซื้อสวนของตัวเองได้ที่ป้ายหน้าแปลงในไร่ แล้วเริ่มปลูกได้เลย',
     merchant: 'ซื้อของจากคลังสินค้าราคาส่ง แล้ววางขายที่ตลาดกลาง',
     chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
-    doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (ปั๊มหัวใจ/ผ่าตัด) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
+    doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (กู้ชีพ ผ่าตัด ห้ามเลือด ฯลฯ ลงมือทำในห้องจริง) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
     police: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 แล้วตามจับโจรได้ค่าหัว',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
@@ -1003,17 +1003,30 @@ function act(a, m) {
       ordersChanged();
       return toast(a, `รับอาหาร ${mine.length} ออเดอร์แล้ว! ไปส่งให้ลูกค้า (ดูทางในแอพ)`, '🥡');
     }
-    case 'kitchen.cook': {
+    case 'kitchen.cook': {                  // start a cooking battle: the ingredients come out of your bag onto the counter
       if (!need(a, 'chef')) return;
+      if (a.cook) return toast(a, 'กำลังทำออเดอร์อยู่ ทำให้เสร็จก่อนนะ', '🍳', false);
       const r = D.RECIPES.find(x => x.id === m.rid); if (!r) return;
       for (const [k, q] of Object.entries(r.in)) if ((a.inv[k] || 0) < q) return toast(a, 'วัตถุดิบไม่พอ', '🥬', false);
       if (!cd(a, 'cook', 1500) || !spend(a, 12)) return;
       for (const [k, q] of Object.entries(r.in)) addItem(a, k, -q);
-      const extra = Math.random() < 0.2 * tier(a, 'chef') ? 1 : 0;
-      addItem(a, r.id, 1 + extra); addXp(a); markMe(a); quest(a, 'cook'); stat(a, 'cooked', 1 + extra);
-      if (Math.random() < 0.02) infect(a, 'injury');
-      return toast(a, `ปรุง ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} สำเร็จ${extra ? ' — ฝีมือดี ได้เพิ่มอีก 1 จาน!' : ''}`, '🍳');
+      const comps = Object.keys(r.in).map(ing => ({ ing, ops: r.ops[ing] || [], k: 0, at: 'pantry', t: 0, prog: 0, ready: false, burnt: false }));
+      const sec = 20 + comps.reduce((s0, c) => s0 + 9 + c.ops.reduce((x, o) => x + D.COOK[o] + 7, 0), 0);
+      const limit = Math.round(sec * 1.35 * 1000), t = now();
+      a.cook = { rid: r.id, comps, hand: -1, plated: false, t0: t, limit, until: t + limit, ckAt: 0 };
+      markMe(a); return toast(a, `🔥 ออเดอร์เข้า! ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} ภายใน ${Math.round(limit / 1000)} วินาที — เริ่มที่ 🧺 ตู้วัตถุดิบ`, '🍳');
     }
+    case 'kitchen.serve': {
+      const c = a.cook; if (!c || c.hand !== 'plate') return toast(a, 'ยังไม่มีจานพร้อมเสิร์ฟ', 'ℹ️', false);
+      a.cook = null;
+      const it = D.ITEMS[c.rid], left = Math.max(0, (c.until - now()) / c.limit), extra = Math.random() < 0.2 * tier(a, 'chef') + (left > .4 ? .25 : 0) ? 1 : 0;
+      const tip = Math.round(it.base * .35 * left * jobPay(a));
+      addItem(a, c.rid, 1 + extra); addXp(a); quest(a, 'cook'); stat(a, 'cooked', 1 + extra); if (tip > 0) earn(a, tip); markMe(a);
+      if (Math.random() < 0.02) infect(a, 'injury');
+      send(a, { t: 'kfx', kind: 'serve' });
+      return toast(a, `🛎️ เสิร์ฟ ${it.icon}${it.name} สำเร็จ! เหลือเวลา ${Math.round(left * 100)}%${extra ? ' · ทำไว ได้เพิ่มอีก 1 จาน!' : ''}${tip ? ` · ทิป ${money(tip)}` : ''}`, '🍳');
+    }
+    case 'kpantry.use': case 'kboard.use': case 'kpan.use': case 'kpot.use': case 'kgrill.use': case 'kplate.use': return cookUse(a, s);
     case 'kitchen.buy': {
       if (!need(a, 'chef')) return;
       const id = m.item, it = D.ITEMS[id];
@@ -1176,44 +1189,16 @@ function act(a, m) {
       markMe(a); return toast(a, `🐕 ${a.dogq.owner}แจ้งว่า "น้อง${a.dogq.name}" หายไป! ตามหาให้เจอภายใน ${Math.round(limit / 60000 * 10) / 10} นาที`, '🐕');
     }
     case 'police.dogquit': { if (a.dogq) { a.dogq = null; a.dogNext = now() + D.DOGQ.next; markMe(a); toast(a, 'ยกเลิกเคสหมาหายแล้ว', 'ℹ️', false); } return; }
-    case 'icu.start': {
+    case 'icu.start': {                     // an emergency case, played out in the hospital: fetch what is needed, work on the patient
       if (!need(a, 'doctor')) return;
-      if (a.icu) return;
-      if ((a.icuNext || 0) > now()) return toast(a, `เคสถัดไปยังไม่เข้า รออีก ${Math.ceil((a.icuNext - now()) / 1000)} วินาที`, '⏳', false);
+      if (a.mis) return toast(a, 'คุณมีเคส/ภารกิจค้างอยู่แล้ว', 'ℹ️', false);
+      if ((a.icuNext || 0) > now() && !(isAdmin(a) && a.god?.nocd)) return toast(a, `เคสถัดไปยังไม่เข้า รออีก ${Math.ceil((a.icuNext - now()) / 1000)} วินาที`, '⏳', false);
       if (!spend(a, D.ICU.energy)) return;
-      const kind = Math.random() < .5 ? 'cpr' : 'surgery', l = lvl(a, 'doctor');
-      a.icu = { kind, who: pick(D.ICU.patients), t0: now() };
-      if (kind === 'cpr') a.icu.cpr = { n: D.ICU.cpr.n, bpm: pick(D.ICU.cpr.bpm) };
-      else {
-        a.icu.zones = []; a.icu.speeds = [];
-        for (let i = 0; i < D.ICU.surgery.steps; i++) { const w = Math.max(.09, .2 - i * .02 + .006 * l), z0 = rnd(.08, .92 - w); a.icu.zones.push([+z0.toFixed(3), +(z0 + w).toFixed(3)]); a.icu.speeds.push(+rnd(.8 + i * .12, 1.05 + i * .15).toFixed(2)); }
-      }
-      markMe(a); return;
+      const l = lvl(a, 'doctor'), base = D.ICU.pay[Math.min(l, D.ICU.pay.length) - 1];
+      a.mis = icuCase(a, pick(ICU_CASES), base * 2.2); markMe(a);
+      return toast(a, `🚨 ${a.mis.title} — ${a.mis.story}`, '🚑');
     }
-    case 'icu.done': {
-      const c = a.icu; if (!c) return;
-      let score = 0;
-      if (c.kind === 'cpr') {   // m.off: for every beat, how far the press was from it (ms), null = missed
-        const iv = 60000 / c.cpr.bpm; if (now() - c.t0 < iv * c.cpr.n * .9) return;
-        const off = (Array.isArray(m.off) ? m.off : []).slice(0, c.cpr.n);
-        for (const o of off) { const d = Math.abs(+o); if (o === null || !Number.isFinite(d)) continue; score += d <= 70 ? 1 : d <= 140 ? .6 : d <= 220 ? .25 : 0; }
-        score /= c.cpr.n;
-      } else {                  // m.pos: where the marker was stopped at each step (0-1)
-        if (now() - c.t0 < c.zones.length * 700) return;
-        const pos = (Array.isArray(m.pos) ? m.pos : []).slice(0, c.zones.length);
-        pos.forEach((p, i) => { const [z0, z1] = c.zones[i]; p = +p; if (p >= z0 && p <= z1) score += 1; else if (p >= z0 - .04 && p <= z1 + .04) score += .4; });
-        score /= c.zones.length;
-      }
-      a.icu = null; a.icuNext = now() + D.ICU.next;
-      const l = Math.min(lvl(a, 'doctor'), D.ICU.pay.length), ok = score >= .5;
-      if (!ok) { markMe(a); joy(a, -3); return toast(a, `${c.kind === 'cpr' ? 'ปั๊มหัวใจไม่ตรงจังหวะ' : 'ผ่าตัดพลาด'} ${c.who} ถูกส่งต่อโรงพยาบาลใหญ่... (ความแม่นยำ ${Math.round(score * 100)}%) ลองใหม่เคสหน้า`, '💔', false); }
-      const pay = Math.round(D.ICU.pay[l - 1] * (.6 + .6 * score) * (1 + BOOST[tier(a, 'doctor')]) * jobPay(a) * wellbeing(a));
-      earn(a, pay); addXp(a, .5); quest(a, 'treat'); stat(a, 'treated'); joy(a, 3);
-      const grade = score >= .95 ? 'สมบูรณ์แบบ! 🌟' : score >= .8 ? 'ยอดเยี่ยม!' : 'ผ่าน';
-      if (score >= .95) feed(`🚑 หมอ${a.name} ช่วยชีวิต ${c.who} ได้อย่างสมบูรณ์แบบ!`);
-      return toast(a, `${c.kind === 'cpr' ? '💓 หัวใจกลับมาเต้นแล้ว!' : '🩹 ผ่าตัดสำเร็จ!'} ${c.who} ปลอดภัย · ${grade} (${Math.round(score * 100)}%) · ได้ ${money(pay)}`, '🚑');
-    }
-    case 'icu.quit': { if (a.icu) { a.icu = null; a.icuNext = now() + D.ICU.next / 2; markMe(a); toast(a, 'ส่งต่อเคสให้หมอคนอื่นแล้ว', '🚑', false); } return; }
+    case 'icu.quit': { if (a.mis?.kind === 'icu') { a.mis = null; a.icuNext = now() + D.ICU.next / 2; markMe(a); toast(a, 'ส่งต่อเคสให้หมอคนอื่นแล้ว', '🚑', false); } return; }
     case 'fishclub.info': return;
     case 'petshop.buy': {                                  // adopt a pet at a pet shop (kept forever) and bring it out
       m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;
@@ -1646,6 +1631,70 @@ function holdsHome(a) {
   if (a.rent && a.rent.until > now()) return a.rent.idx;
   return -1;
 }
+// ---- the cooking battle: carry each ingredient around the kitchen (pantry -> board / pan / pot / grill -> plate -> serve)
+const OP_AT = { chop: 'board', fry: 'pan', boil: 'pot', grill: 'grill' };
+const AT_NAME = { board: 'เขียง', pan: 'กระทะ', pot: 'หม้อ', grill: 'เตาย่าง' };
+function cookUse(a, s) {
+  const c = a.cook; if (!c) return toast(a, 'ยังไม่มีออเดอร์ · รับออเดอร์ที่เคาน์เตอร์ครัว (ปรุงอาหาร)', '🍳', false);
+  const where = s.type.slice(1), held = typeof c.hand === 'number' && c.hand >= 0 ? c.comps[c.hand] : null, I = id => D.ITEMS[id];
+  const nextOp = cp => cp.ops[cp.k];
+  if (where === 'pantry') {
+    if (held && held.k === 0 && !held.ready) { held.at = 'pantry'; c.hand = -1; markMe(a); return; }       // put it back
+    if (held || c.hand === 'plate') return toast(a, 'มือเต็มแล้ว วางของในมือก่อน', '✋', false);
+    const i = c.comps.findIndex(cp => cp.at === 'pantry'); if (i < 0) return toast(a, 'หยิบวัตถุดิบครบแล้ว', 'ℹ️', false);
+    c.hand = i; c.comps[i].at = 'hand'; markMe(a); return send(a, { t: 'kfx', kind: 'pick' });
+  }
+  if (where === 'plate') {
+    if (held) {
+      if (held.k < held.ops.length) return toast(a, `${I(held.ing).name}ยังไม่พร้อม ต้อง${{ chop: 'สับ', fry: 'ผัด', boil: 'ต้ม', grill: 'ย่าง' }[nextOp(held)]}ก่อน`, '⚠️', false);
+      held.at = 'plate'; c.hand = -1;
+      if (c.comps.every(cp => cp.at === 'plate')) { c.plated = true; send(a, { t: 'kfx', kind: 'plated' }); toast(a, `จัดจาน ${I(c.rid).icon}${I(c.rid).name} เสร็จ! ยกไปเสิร์ฟที่เคาน์เตอร์ด้านบน`, '🍽️'); }
+      else send(a, { t: 'kfx', kind: 'drop' });
+      markMe(a); return;
+    }
+    if (c.plated && c.hand === -1) { c.hand = 'plate'; markMe(a); return send(a, { t: 'kfx', kind: 'pick' }); }
+    return toast(a, c.plated ? 'มือเต็มแล้ว' : 'เอาวัตถุดิบที่ทำเสร็จแล้วมาวางจัดจาน', 'ℹ️', false);
+  }
+  // board / pan / pot / grill
+  const here = c.comps.map((cp, i) => [cp, i]).filter(([cp]) => cp.at === where);
+  if (held) {
+    if (OP_AT[nextOp(held)] !== where) return toast(a, held.k >= held.ops.length ? `${I(held.ing).name}พร้อมแล้ว เอาไปวางที่ 🍽️ โต๊ะจัดจาน` : `${I(held.ing).name}ต้องไปที่${AT_NAME[OP_AT[nextOp(held)]]}`, '⚠️', false);
+    if ((where === 'board' || where === 'pan') && here.length) return toast(a, `${AT_NAME[where]}ไม่ว่าง`, '✋', false);
+    if (where === 'grill' && here.length >= D.COOK.grillMax) return toast(a, 'เตาย่างเต็มแล้ว', '✋', false);
+    held.at = where; held.t = now(); held.prog = 0; held.ready = false; held.burnt = false; c.hand = -1; markMe(a);
+    return send(a, { t: 'kfx', kind: where });
+  }
+  if (c.hand === 'plate') return toast(a, 'ถือจานอยู่ เอาไปเสิร์ฟที่เคาน์เตอร์', '🍽️', false);
+  if (!here.length) return toast(a, `${AT_NAME[where]}ว่างอยู่`, 'ℹ️', false);
+  const [cp, i] = here.find(([x]) => x.ready || x.burnt) || here[0];
+  if (cp.burnt) {                                       // ruined: throw it out and start that ingredient again (if you still have one)
+    if ((a.inv[cp.ing] || 0) < 1) { a.cook = null; markMe(a); send(a, { t: 'kfx', kind: 'fail' }); return toast(a, `💀 ${I(cp.ing).name}${where === 'grill' ? 'ไหม้' : 'เละ'} และไม่มีวัตถุดิบสำรอง ออเดอร์ล้มเหลว!`, '🍳', false); }
+    addItem(a, cp.ing, -1); Object.assign(cp, { k: 0, at: 'pantry', t: 0, prog: 0, ready: false, burnt: false }); markMe(a);
+    return toast(a, `🗑️ ทิ้ง${I(cp.ing).name}ที่${where === 'grill' ? 'ไหม้' : 'เละ'} ใช้วัตถุดิบสำรองจากกระเป๋าเริ่มใหม่ (หยิบที่ตู้วัตถุดิบ)`, '🍳', false);
+  }
+  if (!cp.ready) return toast(a, where === 'board' || where === 'pan' ? `ยืนอยู่ตรงนี้เพื่อ${where === 'board' ? 'สับ' : 'ผัด'}ให้เสร็จก่อน` : `${I(cp.ing).name}ยังไม่สุก รออีกนิด`, '⏳', false);
+  cp.k++; cp.ready = false; cp.at = 'hand'; c.hand = i; markMe(a); return send(a, { t: 'kfx', kind: 'pick' });
+}
+function cookTick(a, t, dt) {
+  const c = a.cook;
+  if (t > c.until) { a.cook = null; markMe(a); send(a, { t: 'kfx', kind: 'fail' }); return toast(a, `⏰ หมดเวลา! ลูกค้ารอ${D.ITEMS[c.rid].name}ไม่ไหว ออเดอร์ล้มเหลว`, '😢', false); }
+  const room = D.roomAt(a.x, a.y); if (room?.rk !== 'kitchen') return;
+  let live = false, changed = false;
+  for (const cp of c.comps) {
+    const op = cp.ops[cp.k];
+    if ((cp.at === 'board' || cp.at === 'pan') && !cp.ready) {        // chopping / stir-frying: only while you stand there
+      const st = ST[cp.at === 'board' ? 'k_board' : 'k_pan'];
+      if (Math.hypot(a.x - st.x, a.y - st.y) < 1.5) { cp.prog += dt; live = true; if (cp.prog >= D.COOK[op]) { cp.ready = true; changed = true; send(a, { t: 'kfx', kind: 'ready' }); } }
+    }
+    if ((cp.at === 'pot' || cp.at === 'grill') && !cp.burnt) {          // boiling / grilling: on their own, but don't forget them
+      const el = (t - cp.t) / 1000;
+      if (!cp.ready && el >= D.COOK[op]) { cp.ready = true; changed = true; send(a, { t: 'kfx', kind: 'ready' }); }
+      if (el >= D.COOK[op] + D.COOK.window[op]) { cp.burnt = true; cp.ready = false; changed = true; send(a, { t: 'kfx', kind: 'burnt' }); toast(a, `🔥 ${D.ITEMS[cp.ing].name}${cp.at === 'grill' ? 'ไหม้' : 'เละ'}แล้ว! รีบเอาไปทิ้งแล้วทำใหม่`, '💀', false); }
+    }
+  }
+  if (changed) markMe(a);
+  if (live && t > c.ckAt) { c.ckAt = t + 200; send(a, { t: 'ck', prog: c.comps.map(cp => +cp.prog.toFixed(2)) }); }
+}
 // ---- job missions (server/missions.js): a short story per career played out in town, step by step
 const MIS = require('./missions');
 // reachable town tiles from (x, y): [x, y, steps] with min..max steps of walking and at least minE straight-line distance
@@ -1713,25 +1762,43 @@ function misBuild(a, car, force) {
   const limit = Math.round(clamp(est, 120, 720) * 1000), t = now();
   return { car, idx, title, icon, story, steps, i: 0, t0: t, limit, until: t + limit, trail: [], mtAt: 0 };
 }
+// ICU cases: steps at spots in the hospital (x, y relative to the hospital room); 'bed' = the ICU bed
+const ICU_CASES = [
+  ['หัวใจหยุดเต้น!', '💓', 'คนไข้หมดสติ ชีพจรหาย ต้องกู้ชีพด่วน', [['go', 'cab', 'หยิบเครื่องกระตุกหัวใจ (AED) ที่ตู้ยา'], ['work', 'bed', 12, '💓', 'ปั๊มหัวใจและช็อกไฟฟ้าจนชีพจรกลับมา'], ['go', 'fridge', 'หยิบยาอะดรีนาลีนจากตู้เย็นยา'], ['work', 'bed', 5, '💉', 'ฉีดยาและเฝ้าดูสัญญาณชีพ']]],
+  ['ไส้ติ่งแตก', '🔪', 'คนไข้ปวดท้องขวาล่างรุนแรง ต้องผ่าตัดทันที', [['go', 'cab', 'เตรียมชุดเครื่องมือผ่าตัด'], ['work', 'fridge', 4, '🧼', 'ล้างมือ ใส่ถุงมือและชุดผ่าตัด'], ['work', 'bed', 14, '🔪', 'ผ่าตัดไส้ติ่ง'], ['work', 'bed', 6, '🧵', 'เย็บแผล'], ['go', 'desk', 'ส่งรายงานผ่าตัดให้พยาบาล']]],
+  ['หอบหืดกำเริบ', '🫁', 'เด็กหายใจไม่ออก ริมฝีปากเริ่มเขียว', [['go', 'fridge', 'หยิบยาพ่นขยายหลอดลม'], ['go', 'iv', 'เข็นถังออกซิเจนมา'], ['work', 'bed', 9, '🫁', 'ให้ออกซิเจนและพ่นยา']]],
+  ['กระดูกขาหัก', '🦴', 'คนงานตกนั่งร้าน ขาผิดรูป', [['work', 'xray', 6, '🩻', 'เอกซเรย์ดูแนวกระดูก'], ['go', 'cab', 'หยิบเฝือกและผ้าพัน'], ['work', 'bed', 10, '🦴', 'จัดกระดูกและใส่เฝือก']]],
+  ['เสียเลือดมาก', '🩸', 'อุบัติเหตุรถชน เลือดออกไม่หยุด', [['work', 'bed', 6, '🩹', 'กดห้ามเลือด'], ['go', 'fridge', 'หยิบถุงเลือดกรุ๊ปโอ'], ['go', 'iv', 'เตรียมเสาน้ำเกลือ'], ['work', 'bed', 8, '💉', 'ให้เลือดและน้ำเกลือ']]],
+  ['แพ้อาหารรุนแรง', '⚠️', 'คนไข้กินกุ้งแล้วหน้าบวม หายใจลำบาก', [['go', 'fridge', 'หยิบยาฉีดแก้แพ้'], ['work', 'bed', 5, '💉', 'ฉีดยาแก้แพ้'], ['work', 'monitor', 6, '📈', 'เฝ้าดูชีพจรและความดัน']]],
+  ['ไข้เลือดออกช็อก', '🦟', 'เด็กไข้สูงหลายวัน ความดันตก', [['work', 'desk', 4, '📋', 'อ่านประวัติและผลเลือด'], ['go', 'iv', 'เตรียมน้ำเกลือ'], ['work', 'bed', 10, '💧', 'ให้สารน้ำทางหลอดเลือด'], ['work', 'monitor', 5, '📈', 'เช็กความดันจนคงที่']]],
+  ['ถูกของมีคมบาด', '🩹', 'แผลลึกที่แขน ต้องเย็บด่วน', [['go', 'cab', 'หยิบชุดเย็บแผล'], ['work', 'bed', 5, '🧴', 'ล้างแผลและฉีดยาชา'], ['work', 'bed', 8, '🧵', 'เย็บแผล']]],
+];
+function icuCase(a, def, pay) {
+  const R = D.AREAS.find(r => r.id === 'r_hospital'), P = { cab: [1.6, 3.9], fridge: [5.6, 3.8], xray: [14.2, 4.6], iv: [13.6, 6.6], desk: [3.5, 3.6], monitor: [12.25, 4.0] };
+  const at = w => { if (w === 'bed') return [ST.icu.x, ST.icu.y - .6]; const [x, y] = P[w]; const n = D.blocked(R.x + x, R.y + y) ? standNear('r_hospital', R.x + x, R.y + y) : [R.x + x, R.y + y]; return n; };
+  const [title, icon, story, raw] = def, steps = raw.map(r => { const [x, y] = at(r[1]); return r[0] === 'go' ? { k: 'go', x, y, label: r[2], area: 'r_hospital' } : { k: 'work', x, y, sec: r[2], icon: r[3], label: r[4], prog: 0, area: 'r_hospital' }; });
+  const limit = Math.round((25 + steps.reduce((s0, st) => s0 + (st.sec || 0) + 6, 0)) * 1.45 * 1000), t = now();
+  return { kind: 'icu', car: 'doctor', idx: -1, title, icon, story: `${pick(D.ICU.patients)} · ${story}`, steps, i: 0, t0: t, limit, until: t + limit, trail: [], mtAt: 0, payFixed: Math.round(pay) };
+}
 function misView(a) {
   const m = a.mis; if (!m) return null;
   const c = m.steps[m.i];
-  const cur = c && { k: c.k, x: c.x, y: c.y, label: c.label, icon: c.icon, who: c.who, items: c.items, sec: c.sec, prog: c.prog, hc: c.hc, animal: c.animal, to: c.to, phase: c.phase, fx: c.fx, fy: c.fy, cx: c.cx, cy: c.cy };
-  return { title: m.title, icon: m.icon, story: m.story, i: m.i, until: m.until, t0: m.t0, steps: m.steps.map((s, j) => ({ k: s.k, label: s.label, done: j < m.i })), cur };
+  const cur = c && { area: c.area || 'town', k: c.k, x: c.x, y: c.y, label: c.label, icon: c.icon, who: c.who, items: c.items, sec: c.sec, prog: c.prog, hc: c.hc, animal: c.animal, to: c.to, phase: c.phase, fx: c.fx, fy: c.fy, cx: c.cx, cy: c.cy };
+  return { kind: m.kind || '', title: m.title, icon: m.icon, story: m.story, i: m.i, until: m.until, t0: m.t0, steps: m.steps.map((s, j) => ({ k: s.k, label: s.label, done: j < m.i })), cur };
 }
 function misNext(a) {
   const m = a.mis; m.i++;
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
-  const pay = Math.round((110 + 80 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
-  a.mis = null; a.misNext = t + 30000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
+  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((110 + 80 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
+  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else a.misNext = t + 30000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🏅');
 }
 const FX0 = (a, kind) => send(a, { t: 'mfx', kind });
 function misTick(a, t, dt) {
   const m = a.mis, c = m.steps[m.i];
-  if (t > m.until) { a.mis = null; a.misNext = t + 60000; joy(a, -3); markMe(a); return toast(a, `⏰ หมดเวลา! ภารกิจ "${m.title}" ล้มเหลว`, '😢', false); }
-  if (!c || areaId(a) !== 'town') return;
+  if (t > m.until) { a.mis = null; if (m.kind === 'icu') a.icuNext = t + D.ICU.next; else a.misNext = t + 60000; joy(a, -3); markMe(a); return toast(a, `⏰ หมดเวลา! ภารกิจ "${m.title}" ล้มเหลว`, '😢', false); }
+  if (!c || areaId(a) !== (c.area || 'town')) return;
   const d = Math.hypot(a.x - c.x, a.y - c.y);
   const last = m.trail[m.trail.length - 1]; if (!last || Math.hypot(a.x - last[0], a.y - last[1]) > .35) { m.trail.push([a.x, a.y]); if (m.trail.length > 80) m.trail.shift(); }
   let live = false;
@@ -1795,7 +1862,7 @@ function misAct(a, m) {
     return toast(a, `${a.mis.icon} ภารกิจใหม่: ${a.mis.title} — ${a.mis.story} (เวลา ${Math.round(a.mis.limit / 6000) / 10} นาที)`, '📋');
   }
   if (!a.mis) return;
-  if (m.op === 'quit') { a.mis = null; a.misNext = now() + 30000; markMe(a); return toast(a, 'ยกเลิกภารกิจแล้ว', 'ℹ️', false); }
+  if (m.op === 'quit') { if (a.mis.kind === 'icu') a.icuNext = now() + D.ICU.next / 2; else a.misNext = now() + 30000; a.mis = null; markMe(a); return toast(a, 'ยกเลิกภารกิจแล้ว', 'ℹ️', false); }
   if (m.op === 'answer') {
     const c = a.mis.steps[a.mis.i]; if (!c || c.k !== 'talk' || !c.asked) return;
     if (+m.i === c.right) { toast(a, `✅ ${c.who.name}: ขอบคุณมาก เข้าใจแล้ว!`, '💬'); return misNext(a); }
@@ -2470,9 +2537,9 @@ function meView(a) {
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
-    mis: misView(a), misNext: a.misNext || 0,
+    mis: misView(a), misNext: a.misNext || 0, cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
     dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
-    icu: a.icu ? { kind: a.icu.kind, who: a.icu.who, cpr: a.icu.cpr, zones: a.icu.zones, speeds: a.icu.speeds } : null, icuNext: a.icuNext || 0,
+    icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     reports: a.career === 'police' ? [...crimes.values()].filter(c => c.reported && now() - c.reported < D.POLICE.wantedMin * 60000).map(c => ({ id: c.id, thief: c.thiefName, victim: c.victim, amt: c.amt, x: c.x, y: c.y, area: c.area, t: c.reported, tid: c.thief.id || 0 })) : [],
@@ -2556,7 +2623,7 @@ function login(ws, m) {
   send(a, {
     t: 'init', id: a.id,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
-    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, careers: D.CAREERS, licenses: D.LICENSES,
+    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
@@ -2699,7 +2766,8 @@ function onMessage(ws, raw) {
     case 'act': return act(a, m);
     case 'catchthief': return catchThief(a);
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
-    case 'minigame': {                      // office mini-games: a small bonus for a good score while seated at your desk (capped per day)
+    case 'minigame': {                      // (mini-games were removed from the game)
+      return;
       const max = { math: 40, mail: 45, memo: 30 }[m.game]; if (!max) return;
       if (a.desk >= 0) {                    // students: just something to break the boredom (a little happiness, no money)
         if (!cd(a, 'minigame', 15000, true)) return;
@@ -2970,6 +3038,7 @@ function tick() {
   for (const a of online.values()) {
     const indoors = !!D.roomAt(a.x, a.y);
     if (a.mis) misTick(a, t, dt);
+    if (a.cook) cookTick(a, t, dt);
     if (godLock(a)) {   // god mode: locked stats
       a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
       if ((a.dz || []).length) { a.dz = []; sendRoster(); }
