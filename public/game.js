@@ -2660,6 +2660,9 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16t', d: '16 พ.ย. (รอบ 20)', items: [
+    '🎣 <b>ตกปลาง่ายขึ้นมาก</b> ตวัดได้นานขึ้นเกือบเท่าตัวหลังทุ่นจม · ตวัดเร็วไปไม่เสียปลาแล้ว แค่รอทุ่นจมใหม่ · เย่อสบายขึ้น (สายขาดยากขึ้น ปลาหนียากขึ้น กรอสายเร็วขึ้น สู้สั้นลง) · ยกปลาได้ช่วงกว้างขึ้นและพลาดได้ 5 ครั้ง',
+    '🚫 เอาข้อความและปุ่มเรื่อง<b>ล้วงกระเป๋า</b>ที่หลงเหลือออกหมดแล้ว'] },
   { v: '2026-11-16s', d: '16 พ.ย. (รอบ 19)', items: [
     '📢 ประกาศภัยแล้งขยับขึ้นไปอยู่สูงขึ้นในจอแนวตั้ง',
     '🚫 เอา<b>อาชีพโจร</b> (ล้วงกระเป๋า ชุดโจร สายตรวจจับโจร 191 ค่าหัว) และ<b>จุดฝูงชน</b>ออกจากเมืองทั้งหมดแล้ว · ตำรวจรับเคสตามหาหมาที่หายไปเหมือนเดิม'] },
@@ -3034,7 +3037,7 @@ function renderPanel(p) {
         <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(+me.jx.cur).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
         ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
-        ${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา และ 🕶️ ล้วงกระเป๋า ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;
+        ${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;
     }
     case 'toolshop': {
       const order = [me.career, ...Object.keys(G.shop.tools).filter(c => c !== me.career)].filter(c => G.shop.tools[c]);
@@ -3259,7 +3262,7 @@ function renderPanel(p) {
       if (o.npc) {
         if (o.wk && o.desc) return `<h2>${esc(o.name)} <span class="tag">NPC</span></h2><div class="sub">${esc(o.desc)}</div>`;
         if (o.wk) return `<h2>${CAREER_ICON(o.c)} ${esc(o.name)} <span class="tag">NPC</span></h2><div class="sub">ทำงาน${G.careers[o.c]?.name || ''}แทน เพราะตอนนี้ไม่มีผู้เล่นทำงานนี้ออนไลน์${o.c === 'police' ? ' · สายตรวจจะวิ่งไล่จับคนที่ถูกแจ้งความ' : ''}</div>`;
-        return `<h2>🏘️ ${esc(o.name)} <span class="tag">ชาวเมือง</span></h2><div class="sub">ชาวบ้านที่เดินไปมาในเมือง ทักทายกันได้ในแชท</div>${stealBtn}`;
+        return `<h2>🏘️ ${esc(o.name)} <span class="tag">ชาวเมือง</span></h2><div class="sub">ชาวบ้านที่เดินไปมาในเมือง ทักทายกันได้ในแชท</div>`;
       }
       const fee = `<input id="feeIn" type="number" value="200" min="0" max="1000" style="width:90px">`;
       const known = (me.contacts || []).some(c => c.n === o.name);
@@ -3293,7 +3296,7 @@ function renderPanel(p) {
       const g = me.god || {};
       const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small></div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
-        <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ล้วง ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
+        <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏃 ความเร็ว x<span id="godSpdV">${(g.speed || 1).toFixed(1)}</span></b><small>เลื่อนปรับได้ 1–5 เท่า (กดค้างปุ่มวิ่งได้อีก)</small></span><input id="godSpd" type="range" min="1" max="5" step="0.5" value="${g.speed || 1}" style="width:130px"></div>
         <div class="setRow"><span><b>✨ วาร์ป</b><small>เปิดแล้วกด 🗺️ แผนที่ แตะตรงไหนก็วาร์ปไปที่นั่น</small></span>${B(g.warp ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'warp' }, g.warp ? 'good' : '')}</div>
@@ -4280,7 +4283,7 @@ function fightPress() {
   const now0 = performance.now();
   if (now0 >= FG.surf && now0 <= FG.surfEnd) return fightEnd(true);
   FG.miss++; FG.ten = Math.min(.95, FG.ten + .25); FX.play('splash'); if (fishAt()) FX.ring(fishAt().x, fishAt().y, '#fff', 400, .7);
-  if (FG.miss >= 3) fightEnd(false, 'miss');
+  if (FG.miss >= 6) fightEnd(false, 'miss');
 }
 function stepFight(dt) {
   if (!FG) return;
@@ -4295,11 +4298,11 @@ function stepFight(dt) {
     }
     if (FG.run) {
       const st = FG.str0;
-      if (hold) { FG.ten += 1.15 * st / FG.str * dt * 1.7; FG.dist -= .02 * dt; FG.sta -= .16 * st * dt; }
-      else { FG.ten += (st * .35 - .55) * dt; FG.dist += .11 * st * dt; FG.sta -= .07 * st * dt; }
+      if (hold) { FG.ten += .7 * st / FG.str * dt * 1.7; FG.dist -= .02 * dt; FG.sta -= .16 * st * dt; }
+      else { FG.ten += (st * .25 - .6) * dt; FG.dist += .07 * st * dt; FG.sta -= .07 * st * dt; }
       if (Math.random() < dt * 6) { const f = fishAt(); if (f) FX.burst(f.x, f.y, '#e8f7ff', 2); }
     } else {
-      if (hold) { FG.dist -= (.14 + .12 * (1 - FG.pow)) * (.55 + .45 * (1 - FG.sta)) * dt * (1 + (FG.str - 1) * .5); FG.ten += (.45 - FG.ten) * 2.2 * dt; }
+      if (hold) { FG.dist -= (.24 + .16 * (1 - FG.pow)) * (.55 + .45 * (1 - FG.sta)) * dt * (1 + (FG.str - 1) * .5); FG.ten += (.45 - FG.ten) * 2.2 * dt; }
       else { FG.ten -= .55 * dt; FG.sta = Math.min(1, FG.sta + .025 * dt); }
     }
     FG.ten = Math.max(0, FG.ten); FG.sta = Math.max(0, FG.sta);
@@ -4307,15 +4310,15 @@ function stepFight(dt) {
     if (hold && now0 - FG.lastTick > (FG.run ? 140 : 85)) { FG.lastTick = now0; FX.play('reel', FG.ten); }
     if (FG.ten > .78 && Math.random() < dt * 4) FX.play('creak', FG.ten);
     if (FG.ten >= 1) return fightEnd(false, 'snap');
-    if (FG.dist >= 1.5) return fightEnd(false, 'run');
-    if (FG.slack > 2.8) return fightEnd(false, 'slack');
+    if (FG.dist >= 2.2) return fightEnd(false, 'run');
+    if (FG.slack > 5) return fightEnd(false, 'slack');
     if (FG.dist <= .12) {
       if (el < (FG.min || 0) + 400) FG.dist = .13;              // (the server wants a little fight first)
       else { FG.mode = 'land'; FG.dist = .1; FG.surf = now0 + 500 + r() * 600; FG.surfEnd = FG.surf + FG.land; FG.landT = now0; }
     }
   } else {                                                   // at the bank: it thrashes and breaks the surface now and then
     FG.ten = .55 + Math.sin(now0 / 90) * .12;
-    if (now0 > FG.surfEnd) { FG.surf = now0 + 650 + r() * 750; FG.surfEnd = FG.surf + FG.land; }
+    if (now0 > FG.surfEnd) { FG.surf = now0 + 450 + r() * 450; FG.surfEnd = FG.surf + FG.land; }
     if (now0 >= FG.surf && !FG.splashed) { FG.splashed = true; FX.play('splash'); const f = fishAt(); if (f) { FX.ring(f.x, f.y, '#fff', 450, .9); FX.burst(f.x, f.y - .2, '#e8f7ff', 8); } }
     if (now0 > FG.surfEnd) FG.splashed = false;
     if (now0 - FG.landT > 7000) { FG.mode = 'fight'; FG.dist = .45; FG.run = true; FG.pt = now0 + 1200; FG.str0 = FG.pow; FG.miss = 0; }   // it dives again

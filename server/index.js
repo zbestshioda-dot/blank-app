@@ -1201,17 +1201,17 @@ function act(a, m) {
       if (a.cast) return;
       if (!spend(a, 8)) return;
       const bite = now() + rnd(3500, 9500) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
-      a.cast = { state: 'wait', bite, win: Math.round(650 + r.zone * 2000 + 15 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
+      a.cast = { state: 'wait', bite, win: Math.round(1500 + r.zone * 2500 + 25 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
       return;
     }
     case 'pier.reel': case 'pier.hook': {   // strike: too early (only a nibble) scares the fish, inside the bite window hooks it and the fight starts
       const c = a.cast; if (!c) return;
-      if (c.state === 'wait') { a.cast = null; markMe(a); return toast(a, 'ตวัดเร็วไป ทุ่นแค่ไหวเพราะปลาแตะเหยื่อ ปลาตกใจหนีไปแล้ว', '💨', false); }
+      if (c.state === 'wait') { c.bite = Math.max(c.bite, now() + 1500); markMe(a); return toast(a, 'ยังไม่ใช่! ทุ่นแค่ไหว รอให้ทุ่นจมก่อนค่อยตวัด', '⏳', false); }
       if (c.state !== 'bite') return;
       const id = rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
-      const pow = id ? clamp(.22 + .16 * rar + (it.base >= 1500 ? .08 : 0), .2, 1) : .12;
-      c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((1.5 + rar * 1.6) * 1000);
-      c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(300 + r.zone * 650), seed: rint(1, 1e9), min: c.min };
+      const pow = id ? clamp(.18 + .1 * rar + (it.base >= 1500 ? .05 : 0), .15, .75) : .1;
+      c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((0.8 + rar * 0.8) * 1000);
+      c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(750 + r.zone * 1000), seed: rint(1, 1e9), min: c.min };
       markMe(a); return send(a, { t: 'hooked', fight: c.fight });
     }
     case 'pier.land': {                     // the fish was played out and lifted at the right moment
@@ -1605,7 +1605,7 @@ function ate(a, id) {
     a.craving = null; a.craveNext = now() + rnd(5, 10) * 60000;
   }
 }
-const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'warehouse.auction', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'crowd.pick', 'sdesk.sit']);
+const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'warehouse.auction', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'sdesk.sit']);
 function holdsHome(a) {
   if (a.house >= 0 && !tenants[a.house]) return a.house;
   if (a.rent && a.rent.until > now()) return a.rent.idx;
