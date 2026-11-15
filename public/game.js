@@ -299,7 +299,7 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '' });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '', pt: p.pt || '' });
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
@@ -753,6 +753,10 @@ function onTap(sx, sy) {
   const c = camera(), wx = (sx + c.x) / TS, wy = (sy + c.y) / TS, m = P.get(myId); if (!m) return;
   if (placing) return placeTap(wx, wy);
   const here = areaOf(m.x, m.y)?.id;
+  for (const [oid, q] of PETST) {                              // petting a pet (yours or someone's) makes it hop happily
+    if (areaOf(q.x, q.y)?.id !== here || Math.hypot(q.x - wx, (q.y - .35) - wy) > .6) continue;
+    return petPlay(q, true);
+  }
   let hit = null, hd = .8;
   for (const p of P.values()) {
     if (p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
@@ -944,6 +948,7 @@ function frame(t) {
     if (sendT > 0.066 && sig !== lastSent) { sendT = 0; lastSent = sig; send({ t: 'p', x: +m.x.toFixed(2), y: +m.y.toFixed(2), f: m.f, fx: fixId }); }
   }
   for (const p of P.values()) if (p.id !== myId) { const k = Math.min(1, dt * 12); p.rx += (p.x - p.rx) * k; p.ry += (p.y - p.ry) * k; }
+  stepPets(dt);
 
   near = findNear();
   const ab = $('#actBtn');
@@ -1018,6 +1023,7 @@ function draw(t) {
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);   // helicopters fly over the roofs
+  for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
   for (const a of ambs) if (a.area === A?.id) { if (!a.body.gone) ents.push([a.body.ry + .3, 4, a.body]); ents.push([a.y + halfY(a), 5, a]); }
@@ -1035,6 +1041,7 @@ function draw(t) {
       else { spr(e[0], e[1], e[2], X, Y); if (e[4]) drawYardCrop(e, X, Y, t); }
     }
     else if (k === 5) drawCar(e, X, Y);
+    else if (k === 6) drawPet(e, X, Y, t);
     else drawPlayer(e, X, Y, t);
   }
   if (A?.yard) drawYardLocks(A, X, Y, t);
@@ -1162,6 +1169,88 @@ function drawPlot(s, px, py, t) {
   }
   if (left <= 0) { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText('✨', px + TS * .75, py - TS * .8 + Math.sin(t / 200) * 3); }
   else { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x0 + b, y0 + W - b - 4, W - 2 * b, 4); ctx.fillStyle = '#9be15d'; ctx.fillRect(x0 + b, y0 + W - b - 4, (W - 2 * b) * prog, 4); }   // growth bar
+}
+// ---- pets: a pet follows its owner along the owner's own trail (so it never walks through walls), hops while it trots,
+// hops by itself now and then, and hops + sends hearts when you tap it
+const PETST = new Map();
+const petDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function petPlay(q, love) {
+  q.hop = performance.now(); q.big = love ? 1.7 : 1; q.hopDur = love ? 520 : 420;
+  if (love) { FX.play('pop'); FX.float(q.x, q.y - .9, '❤', '#ff6b9a', .55); FX.burst(q.x, q.y - .5, '#ff9ec0', 8); if (navigator.vibrate) navigator.vibrate(12); }
+}
+function stepPets(dt) {
+  const now0 = performance.now();
+  for (const p of P.values()) {
+    if (!p.pt) { PETST.delete(p.id); continue; }
+    let q = PETST.get(p.id);
+    const head = [p.rx, p.ry], area = areaOf(p.x, p.y)?.id;
+    if (!q || q.id !== p.pt) {                                      // just called out: pops up next to the owner with a big hop
+      q = { id: p.pt, x: p.rx - .7, y: p.ry + .1, trail: [head], area, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 420, idleAt: now0 + 2500 };
+      PETST.set(p.id, q); petPlay(q, false); q.big = 1.5; if (vis0(q)) { FX.burst(q.x, q.y - .4, '#ffe27a', 10); FX.play('pop'); }
+    }
+    const last = q.trail[q.trail.length - 1];
+    if (area !== q.area || petDist(head, last) > 3) { q.area = area; q.trail = [head]; q.x = p.rx - .6; q.y = p.ry + .1; }   // door / teleport: it comes along
+    else if (petDist(head, last) > .1) q.trail.push(head);
+    let tot = 0;                                                     // keep ~3 tiles of trail
+    for (let i = q.trail.length - 1; i > 0; i--) { tot += petDist(q.trail[i], q.trail[i - 1]); if (tot > 3) { q.trail.splice(0, i - 1); break; } }
+    const D = 1.0; let tgt = null, acc = 0;
+    for (let i = q.trail.length - 1; i > 0 && !tgt; i--) {
+      const a = q.trail[i], b = q.trail[i - 1], l = petDist(a, b);
+      if (acc + l >= D) { const f = (D - acc) / (l || 1); tgt = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
+      acc += l;
+    }
+    if (!tgt) {                                                      // standing still next to you: stay, but never right on top of you
+      const d = petDist([q.x, q.y], head);
+      tgt = d < .6 ? [head[0] + (q.x - head[0]) / (d || 1) * .85 + (d ? 0 : .8), head[1] + (q.y - head[1]) / (d || 1) * .85] : [q.x, q.y];
+    }
+    const dx = tgt[0] - q.x, dy = tgt[1] - q.y, d = Math.hypot(dx, dy);
+    let step = 0;
+    if (d > .05) { const sp = Math.min(d * 6.5 + .6, 8.5); step = Math.min(d, sp * dt); q.x += dx / d * step; q.y += dy / d * step; }
+    q.moving = step / Math.max(dt, .001) > .8;
+    if (q.moving) {
+      q.phase += step * 2.4; q.idleAt = now0 + 2500 + Math.random() * 3500;
+      if (Math.abs(dx) > Math.abs(dy) * 1.1) { q.view = 'side'; q.flip = dx < 0; } else q.view = dy < 0 ? 'up' : 'down';
+    } else {
+      q.phase = 0;
+      if (now0 > q.idleAt) { q.idleAt = now0 + 2500 + Math.random() * 4500; petPlay(q, false); q.big = .7 + Math.random() * .5; if (Math.random() < .25) FX.float(q.x, q.y - .9, '♪', '#ffd9ea', .4); }
+      if (now0 - (q.movedAt || 0) > 700) q.view = 'down';
+    }
+    if (q.moving) q.movedAt = now0;
+    q.owner = p.id;
+  }
+  for (const id of [...PETST.keys()]) if (!P.has(id)) PETST.delete(id);
+}
+const vis0 = q => areaOf(q.x, q.y)?.id === areaOf(P.get(myId)?.x, P.get(myId)?.y)?.id;
+function drawPet(q, X, Y, t) {
+  if (!PET_AT || !petImg) return;
+  const meta = PET_AT.pets[q.id]; if (!meta) return;
+  const C = PET_AT.cell, now0 = performance.now();
+  const size = TS * 1.08 * meta.sz;
+  let h = 0, sx = 1, sy = 1;
+  const u = (now0 - q.hop) / q.hopDur;
+  if (u >= 0 && u < 1) {                                       // a hop: stretch going up, squash on landing
+    h = Math.sin(u * Math.PI) * TS * .55 * q.big;
+    sy = u > .8 ? 1 - .14 * Math.sin((u - .8) / .2 * Math.PI) : 1 + .08 * Math.sin(u * Math.PI); sx = 2 - sy;
+  }
+  else if (q.moving) { const b = Math.abs(Math.sin(q.phase * Math.PI)); h = b * TS * .2; sy = 1 - .08 * Math.max(0, .25 - b) * 4; sx = 2 - sy; }
+  else { const br = Math.sin(now0 / 420 + q.x * 3); sy = 1 + br * .02; sx = 2 - sy; }                // breathing
+  const px = Math.round(q.x * TS + X), py = Math.round(q.y * TS + Y + TS * .32);
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; const shr = 1 - Math.min(.45, h / (TS * .9));
+  ctx.beginPath(); ctx.ellipse(px, py, TS * .3 * meta.sz * shr + TS * .06, TS * .1 * shr, 0, 0, 7); ctx.fill();
+  const group = q.view === 'up' ? 1 : q.view === 'side' ? 2 : 0, nf = meta.n[group];
+  const fr = q.moving ? Math.floor(q.phase * 1.5) % Math.max(1, nf) : 0;   // idle = frame 0
+  const sw = size * sx, sh = size * sy;
+  ctx.save(); ctx.translate(px, py - h);
+  if (q.view === 'side' && q.flip) ctx.scale(-1, 1);
+  ctx.drawImage(petImg, (group * 4 + fr) * C, meta.row * C, C, C, -sw / 2, -sh + size * .03, sw, sh);
+  ctx.restore();
+}
+// a pet's face for the shop / bag lists
+function drawPetIcon(c, id) {
+  const meta = PET_AT.pets[id]; if (!meta) return; const g = c.getContext('2d'), C = PET_AT.cell;
+  g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = true;
+  const k = Math.min(c.width, c.height) * (.62 + meta.sz * .38) / C;
+  g.drawImage(petImg, 0, meta.row * C, C, C, (c.width - C * k) / 2, c.height - C * k + 2, C * k, C * k);
 }
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
 function drawPlayer(p, X, Y, t) {
@@ -1454,6 +1543,7 @@ function bindPanel(root) {
     drawCharTo(g, { g: me.gender, lk }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
   bindSpr(root);
+  root.querySelectorAll('[data-pet]').forEach(c => { const draw = () => { if (!PET_AT || !petImg) return setTimeout(draw, 300); drawPetIcon(c, c.dataset.pet); }; draw(); });
   root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
@@ -1461,6 +1551,7 @@ function bindPanel(root) {
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
+  openPets() { openPanel({ kind: 'pets' }); },
   titles: () => { panel.titles = !panel.titles; refreshPanel(true); if (panel.titles) setTimeout(() => { const t = document.querySelector('#panelBody .secT'); t && t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); },
   photo: () => pickPhoto(),
   place: m => startPlace(m.k),
@@ -2005,6 +2096,10 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15m', d: '15 พ.ย. (รอบ 13)', items: [
+    '🐾 <b>สัตว์เลี้ยง 32 ชนิด!</b> หมา แมว กระต่าย แฮมสเตอร์ เม่น กระรอก ลูกเป็ด จิ้งจอก แพนด้า เพนกวิน คาปิบาร่า ไปจนถึง 🐲 มังกรน้อย และ 🦄 ยูนิคอร์น แบ่งความหายากทั่วไป–มหากาพย์',
+    '🎒 รับเลี้ยงได้ที่ <b>กระเป๋า → 🐾 เปิดสัตว์เลี้ยง</b> (ร้านสัตว์เลี้ยงยังปิดปรับปรุง) เรียกออกมาเดินตามได้ทุกที่ เข้าตึก/วาร์ปก็ตามมา และผู้เล่นคนอื่นก็เห็นสัตว์ของคุณ',
+    '🦘 <b>กระโดดน่ารัก</b> วิ่งตามแล้วเด้งดึ๋งๆ มีหายใจเบาๆ กระโดดเล่นเองเป็นพักๆ และ <b>แตะที่ตัวมัน</b>เพื่อให้กระโดดดีใจพร้อมหัวใจ ❤'] },
   { v: '2026-11-15l', d: '15 พ.ย. (รอบ 12)', items: [
     '🐾 <b>ร้านสัตว์เลี้ยง 2 สาขา</b> (ถนนเหนือ · ถนนเหนือฝั่งตะวันตก) และ 🏋️ <b>ฟิตเนส</b> กับ 🥊 <b>โรงยิมมวย</b> เปิดตัวบนแผนที่แล้ว · ตอนนี้ปิดปรับปรุง รอเปิดเร็วๆ นี้' ] },
   { v: '2026-11-15k', d: '15 พ.ย. (รอบ 11)', items: [
@@ -2250,6 +2345,16 @@ function renderPanel(p) {
       }).join('');
       return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่/ต่ออายุได้ที่นี่</div><div class="list">${degRow}${rows}</div>`;
     }
+    case 'pets': {
+      const have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => G.pets[a].price - G.pets[b].price);
+      const card = id => { const pt = G.pets[id], own = have.includes(id), on = me.pet === id;
+        const btn = own ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : B(money(pt.price), { t: 'pet.buy', id }, 'good', me.money < pt.price);
+        return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
+      const mine = ids.filter(id => have.includes(id)), shop = ids.filter(id => !have.includes(id));
+      return `<h2>🐾 สัตว์เลี้ยง</h2><div class="sub">${me.pet ? `ตอนนี้ ${G.pets[me.pet].icon} <b>${esc(G.pets[me.pet].name)}</b> เดินตามคุณอยู่ · แตะที่ตัวมันเพื่อเล่นด้วย` : 'เรียกสัตว์เลี้ยงออกมาเดินตามคุณได้ (ร้านสัตว์เลี้ยงปิดปรับปรุง · รับเลี้ยงที่นี่ไปก่อน)'} · เลี้ยงได้ทีละ 1 ตัว</div>
+        ${mine.length ? `<div class="secT">💖 สัตว์เลี้ยงของฉัน (${mine.length})</div><div class="looks">${mine.map(card).join('')}</div>` : ''}
+        <div class="secT">🏪 รับเลี้ยง (${shop.length})</div><div class="looks">${shop.map(card).join('')}</div>`;
+    }
     case 'bag': {
       const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
@@ -2260,6 +2365,7 @@ function renderPanel(p) {
       const job = me.career !== 'none' && G.careers[me.career]?.where;
       const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(G.outfitDefs[id]?.name || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
       return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>
+        <div class="secT">🐾 สัตว์เลี้ยง</div><div class="setRow"><span><b>${me.pet && G.pets[me.pet] ? G.pets[me.pet].icon + ' ' + esc(G.pets[me.pet].name) : 'ยังไม่ได้เรียกสัตว์เลี้ยง'}</b><small>มี ${(me.pets || []).length}/${Object.keys(G.pets).length} ตัว · เรียกออกมาเดินตาม กระโดดน่ารัก</small></span>${B('🐾 เปิดสัตว์เลี้ยง', { fn: 'openPets' })}</div>
         <div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>
         <div class="secT">👕 ชุด</div>
         <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
@@ -2692,6 +2798,8 @@ function sign(text, x, y, o = {}) {
 }
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
+let PET_AT = null, petImg = null;
+fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=1'; }).catch(() => { });
 fetch('assets/atlas.json?v=v5').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v5'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;

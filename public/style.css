@@ -927,3 +927,6 @@ body.hasEvent #topBar{top:146px!important}
 .pitems i{font-style:normal;font-size:13px;font-size:3.9cqw;font-weight:600;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.35);border-radius:999px;padding:3px 11px;transition:all .25s;opacity:.7}
 .pitems i.on{background:linear-gradient(#ffe08a,#f2b636);color:#4a2605;border-color:#fff;opacity:1;transform:scale(1.12);text-shadow:none}
 .pcta{left:13%;width:72%;top:72%;height:10%;padding-left:0;border-radius:16px;background:linear-gradient(#ffe08a,#f2b636);border:3px solid #9a6420;box-shadow:0 4px 0 #7a4a14,0 8px 14px rgba(0,0,0,.4);animation:glow 2.2s ease-in-out infinite}
+
+/* pets */
+.petcard canvas{width:84px;height:84px;image-rendering:auto}.petcard.on{outline:2px solid var(--acc);border-radius:12px}.petcard .rtag{margin:2px 0 4px}

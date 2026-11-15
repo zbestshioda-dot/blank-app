@@ -785,6 +785,41 @@ const RODS = {
   dragon: { name: 'เบ็ดมังกรทะเลลึก', icon: '🐉', price: 250000, zone: 0.44, luck: 3.2, junk: 0.12, desc: 'เบ็ดในตำนาน ปลามหากาพย์-ตำนานกินเบ็ดบ่อยที่สุด' },
 };
 const ROD_ORDER = Object.keys(RODS);
+// pets: bought in the pet panel (the pet shops are closed for renovation), one follows you around. rar 1-5 like fish
+const PETS = {
+  chick:    { name: 'ลูกเจี๊ยบ', icon: '🐤', price: 500, rar: 1, desc: 'ตัวจิ๋วเจี๊ยบๆ กระโดดตุ๊บๆ' },
+  duck:     { name: 'ลูกเป็ด', icon: '🦆', price: 600, rar: 1, desc: 'เดินส่ายก้นกุ๊กกิ๊ก' },
+  hamster:  { name: 'แฮมสเตอร์', icon: '🐹', price: 800, rar: 1, desc: 'แก้มป่องน่าฟัด' },
+  guinea:   { name: 'หนูตะเภา', icon: '🐹', price: 1000, rar: 1, desc: 'ตัวกลมๆ นุ่มนิ่ม' },
+  tabby:    { name: 'แมวส้ม', icon: '🐱', price: 1200, rar: 1, desc: 'แมวส้มหน้าตายิ้มแย้ม' },
+  blackcat: { name: 'แมวดำ', icon: '🐈‍⬛', price: 1500, rar: 1, desc: 'ตาสีทอง นำโชค' },
+  shiba:    { name: 'ชิบะ', icon: '🐕', price: 1500, rar: 1, desc: 'ซนแต่ซื่อสัตย์' },
+  rabbit:   { name: 'กระต่ายขาว', icon: '🐰', price: 1500, rar: 1, desc: 'กระโดดเก่งที่สุด' },
+  lop:      { name: 'กระต่ายหูตก', icon: '🐰', price: 1800, rar: 1, desc: 'หูยาวตกลงมาน่ารัก' },
+  pug:      { name: 'ปั๊ก', icon: '🐶', price: 1800, rar: 1, desc: 'หน้ายู่ ตัวกลม' },
+  whitecat: { name: 'แมวขาว', icon: '🐈', price: 1800, rar: 1, desc: 'ขนขาวฟู ตาสองสี' },
+  golden:   { name: 'โกลเดนรีทรีฟเวอร์', icon: '🦮', price: 2000, rar: 2, desc: 'เพื่อนซี้ใจดี' },
+  calico:   { name: 'แมวสามสี', icon: '🐱', price: 2000, rar: 2, desc: 'ขนสามสีมงคล' },
+  hedgehog: { name: 'เม่นน้อย', icon: '🦔', price: 2000, rar: 2, desc: 'หนามนุ่มๆ ไม่เจ็บ' },
+  siamese:  { name: 'แมววิเชียรมาศ', icon: '🐱', price: 2200, rar: 2, desc: 'ตาสีฟ้าสวยสง่า' },
+  britcat:  { name: 'แมวบริติช', icon: '🐱', price: 2200, rar: 2, desc: 'หน้ากลมแก้มป่อง' },
+  squirrel: { name: 'กระรอก', icon: '🐿️', price: 2200, rar: 2, desc: 'หางฟูเป็นเกลียว' },
+  corgi:    { name: 'คอร์กี้', icon: '🐕', price: 2500, rar: 2, desc: 'ก้นกลมวิ่งแล้วส่าย' },
+  chihuahua:{ name: 'ชิวาวา', icon: '🐕', price: 2500, rar: 2, desc: 'ตัวเล็ก หูใหญ่ ใจกล้า' },
+  oddeye:   { name: 'แมวตาสองสี', icon: '🐈', price: 2800, rar: 3, desc: 'ตาสีทอง–ฟ้า หายากนิดๆ' },
+  dalmatian:{ name: 'ดัลเมเชียน', icon: '🐕', price: 2800, rar: 3, desc: 'จุดดำเต็มตัว' },
+  husky:    { name: 'ฮัสกี้', icon: '🐺', price: 3000, rar: 3, desc: 'ตาสีฟ้า ขนหนา' },
+  pom:      { name: 'ปอมเมอเรเนียน', icon: '🐕', price: 3200, rar: 3, desc: 'ก้อนขนสีส้มฟูฟ่อง' },
+  poodle:   { name: 'พุดเดิ้ลชมพู', icon: '🐩', price: 3500, rar: 3, desc: 'ผูกโบว์ชมพู' },
+  turtle:   { name: 'เต่าน้อย', icon: '🐢', price: 4000, rar: 3, desc: 'ช้านิด แต่ไม่ทิ้งกัน' },
+  capybara: { name: 'คาปิบาร่า', icon: '🦫', price: 8000, rar: 4, desc: 'ใจเย็นสุดๆ มีส้มบนหัว' },
+  fox:      { name: 'จิ้งจอกส้ม', icon: '🦊', price: 9000, rar: 4, desc: 'หางฟูปลายขาว' },
+  redpanda: { name: 'แพนด้าแดง', icon: '🦝', price: 12000, rar: 4, desc: 'หางลายวงแหวน' },
+  penguin:  { name: 'เพนกวินน้อย', icon: '🐧', price: 15000, rar: 4, desc: 'ขนปุยเทาเดินเตาะแตะ' },
+  panda:    { name: 'แพนด้า', icon: '🐼', price: 20000, rar: 5, desc: 'สุดยอดความน่ารัก' },
+  dragon:   { name: 'มังกรน้อย', icon: '🐲', price: 120000, rar: 5, desc: 'ตำนาน! ปีกเล็กๆ หางม้วน' },
+  unicorn:  { name: 'ยูนิคอร์น', icon: '🦄', price: 150000, rar: 5, desc: 'ตำนาน! แผงคอสีรุ้ง' },
+};
 // which water a spot fishes in: the sea along the east coast, the river in the farm, any other water is "lake" (the lake, ponds)
 function waterPool(x, y) {
   let best = null, bd = 1.7;
@@ -1248,6 +1283,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, RODS, ROD_ORDER, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };
