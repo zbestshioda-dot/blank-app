@@ -1031,17 +1031,18 @@ function frame(t) {
   near = findNear();
   const ab = $('#actBtn');
   if (near) {
-    ab.classList.remove('idle'); $('#actIcon').textContent = near.icon;
+    ab.classList.remove('idle'); let ico = near.icon;
     const closed = near.type === 'door' && near.house === undefined && (near.renov || !isOpen(near.bld));
     const stf = STAFF_AT[near.id];
-    if (stf) { $('#actIcon').textContent = '💬'; staffGreet(stf); }
-    if (near.type === 'pier' && me.cast) $('#actIcon').textContent = fishCue()[0];
-    if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) $('#actIcon').textContent = cookCue(near)[0];
+    if (stf) { ico = '💬'; staffGreet(stf); }
+    if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) ico = cookCue(near)[0];
+    if (near.type === 'pier') actRod(); else actIco(ico);
     $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
       : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : '🎣 เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
-  } else { ab.classList.add('idle'); ab.classList.remove('closed'); $('#actIcon').textContent = '👆'; $('#actLabel').textContent = 'ใช้งาน'; }
+  } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); $('#actLabel').textContent = 'ใช้งาน'; }
+  paintFishCue();
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
   if (panel?.kind === 'player' && !P.get(panel.pid)) closePanel();
   draw(t);
@@ -2634,6 +2635,9 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16e', d: '16 พ.ย. (รอบ 5)', items: [
+    '🎣 <b>ตกปลา: บอกจังหวะกลางจอแล้ว</b> รอปลา · ตวัด! · กดค้างกรอสาย · ปล่อยสาย! (สายจะขาด) · ยกตอนปลาโผล่ พร้อมคำแนะนำสั้นๆ และสีกระพริบตามสถานการณ์',
+    '🎣 ปุ่มใหญ่ตอนอยู่ริมน้ำเปลี่ยนเป็น<b>รูปคันเบ็ดใหม่</b> สีตามเบ็ดที่ถือ (ไม้ไผ่ ไฟเบอร์ คาร์บอน โปร ทอง มังกร) คันโค้งตามแรงปลา สายเปลี่ยนสีตามความตึง และเห็นทุ่น/ปลาที่ปลายสาย'] },
   { v: '2026-11-16d', d: '16 พ.ย. (รอบ 4)', items: [
     '🐞 <b>แก้บัค: วิ่งเก็บขยะขึ้น "ผลการวิ่งผิดปกติ" ไม่ได้เงิน</b> ยิ่งวิ่งนานยิ่งเจอบ่อย (ระบบนับว่าเก็บของเร็วเกินไป ทั้งที่ยิ่งวิ่งเร็วของก็มาถี่ขึ้นจริง) · ตอนนี้ตรวจจากระยะทางแทน และถ้าผิดปกติจริงจะบอกเหตุผลชัดๆ · ได้สูงสุด ฿400 ต่อรอบ บอกไว้ในหน้าสรุปแล้ว ขอบคุณที่แจ้งบัคค่ะ 🙏'] },
   { v: '2026-11-16c', d: '16 พ.ย. (รอบ 3)', items: [
@@ -4304,6 +4308,32 @@ function fishAt() {
   const d = FG ? .7 + FG.dist * (L - .7 + .6) : L, t = performance.now() / 1000;
   const sw = FG ? Math.sin(t * (FG.run ? 2.6 : 1.1) + FG.sway) * (.25 + .55 * FG.dist) * (FG.mode === 'land' ? .4 : 1) : 0;
   return { x: s.rx + ux * d - uy * sw, y: s.ry + uy * d + ux * sw };
+}
+// the big button's icon: set only when it changes (an emoji, or the drawn fishing rod)
+let actIconKey = '';
+function actIco(txt, html) { const k = html ? txt : 'T' + txt; if (k === actIconKey) return; actIconKey = k; const el = $('#actIcon'); if (html) el.innerHTML = html; else el.textContent = txt; }
+// the fishing rod on the big button: the rod you hold (its colour), bending with the pull, the line to the float / fish
+const ROD_COL = { bamboo: ['#c9a35a', '#8a6a2c'], fiber: ['#3a7bd5', '#1d4e8f'], carbon: ['#3b3b44', '#15151a'], pro: ['#1f8a5b', '#0f5236'], gold: ['#f2c94c', '#a87a12'], dragon: ['#b23ad6', '#5e157a'] };
+function actRod() {
+  const c = me.cast, st = !c ? 'idle' : c.state === 'wait' ? 'wait' : c.state === 'bite' ? 'bite' : FG?.mode === 'land' ? 'land' : 'fight';
+  const ten = st === 'fight' ? Math.round((FG?.ten || 0) * 4) : st === 'bite' ? 2 : 0, rod = me.rodEq || 'bamboo', key = `rod:${rod}:${st}:${ten}:${reelHold ? 1 : 0}`;
+  if (key === actIconKey) return;
+  const [c1, c2] = ROD_COL[rod] || ROD_COL.bamboo, bend = [2, 6, 11, 16, 21][ten];
+  const tipX = 40 - bend * .35, tipY = 8 + bend * .9, lineCol = ten >= 3 ? '#ff4a3a' : ten >= 2 ? '#ffd34d' : '#ffffff';
+  const end = st === 'idle' ? '' : st === 'wait' ? `<line x1="${tipX}" y1="${tipY}" x2="${tipX + 2}" y2="40" stroke="${lineCol}" stroke-width="1.2"/><circle cx="${tipX + 2}" cy="40" r="3" fill="#fff"/><path d="M${tipX - 1} 40a3 3 0 0 1 6 0z" fill="#e0453a"/>`
+    : st === 'bite' ? `<line x1="${tipX}" y1="${tipY}" x2="${tipX + 2}" y2="42" stroke="${lineCol}" stroke-width="1.4"/><text x="${tipX + 4}" y="38" font-size="12" font-weight="900" fill="#ffd34d" stroke="#000" stroke-width=".8">!</text>`
+    : `<line x1="${tipX}" y1="${tipY}" x2="${tipX + 3}" y2="40" stroke="${lineCol}" stroke-width="1.6"/><path d="M${tipX - 4} 41q5-5 10 0q-5 5-10 0z" fill="#9fb3c2" stroke="#26323a" stroke-width=".8"/><path d="M${tipX + 6} 41l3-3v6z" fill="#9fb3c2"/>`;
+  actIco(key, `<svg class="rodIco ${st}" viewBox="0 0 48 48" width="1em" height="1em"><path d="M6 44 Q${26 - bend * .4} ${30 - bend * .2} ${tipX} ${tipY}" fill="none" stroke="#2a1a0e" stroke-width="5" stroke-linecap="round"/><path d="M6 44 Q${26 - bend * .4} ${30 - bend * .2} ${tipX} ${tipY}" fill="none" stroke="${c1}" stroke-width="2.6" stroke-linecap="round"/><path d="M5 45 L13 37" stroke="#7a4a22" stroke-width="5" stroke-linecap="round"/><circle cx="14" cy="38" r="4" fill="#c8ccd2" stroke="#2a1a0e" stroke-width="1.4"/><circle cx="14" cy="38" r="1.4" fill="${c2}"/>${end}</svg>`);
+}
+// the big cue on screen while fishing (strike now / hold to reel / let it run / lift it out)
+function paintFishCue() {
+  const el = $('#fishCue'); if (!el) return;
+  const c = me?.cast; if (!c || near?.type !== 'pier') { if (!el.classList.contains('hidden')) el.classList.add('hidden'); return; }
+  const [ic, txt] = fishCue(), cls = c.state === 'bite' ? 'bite' : !FG ? 'wait' : FG.mode === 'land' ? 'land' : FG.ten > .78 ? 'warn' : FG.slack > 1.2 ? 'warn' : reelHold ? 'reel' : 'hold';
+  const sub = { wait: 'ทุ่นไหวเบาๆ = ปลาแค่แตะ อย่าเพิ่งกด', bite: 'ทุ่นจมแล้ว! กดปุ่มใหญ่ทันที', hold: 'กดค้างปุ่มใหญ่เพื่อกรอสาย', reel: 'ดีมาก! ดูสีสาย ถ้าแดงให้ปล่อย', warn: FG && FG.ten > .78 ? 'สายตึงจะขาด! ปล่อยนิ้วก่อน' : 'สายหย่อนนานเบ็ดจะหลุด กรอสาย!', land: 'ปลาหมดแรงแล้ว แตะตอนมันกระโดดโผล่' }[cls];
+  const html = `<b>${ic} ${txt}</b><small>${sub}</small>`;
+  if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+  el.className = 'fc-' + cls;
 }
 // the big button's icon + label while fishing
 function fishCue() {

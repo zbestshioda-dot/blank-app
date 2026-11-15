@@ -1036,3 +1036,16 @@ body.hasEvent #topBar{top:146px!important}
 /* profile photo: round, like the status card */
 .prof .ph{border-radius:50%!important;border:3px solid #6b4a1e!important;background:#e9d4ad;box-shadow:0 0 0 2px #c9a45a,0 3px 6px rgba(0,0,0,.3)}
 .prof .phWrap .ph{display:block}
+
+/* fishing: the cue in the middle of the screen, and the rod drawn on the big button */
+#fishCue{position:fixed;left:50%;bottom:29%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;font-family:var(--ui);background:rgba(20,14,8,.78);color:#fff;border:3px solid #c9a45a;border-radius:16px;padding:8px 18px;min-width:220px;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+#fishCue.hidden{display:none}#fishCue b{display:block;font-size:22px;letter-spacing:.5px}#fishCue small{display:block;font-size:12.5px;opacity:.85;margin-top:2px}
+#fishCue.fc-wait{opacity:.85}#fishCue.fc-wait b{font-size:17px}
+#fishCue.fc-bite{border-color:#ffd34d;background:rgba(120,70,0,.9);animation:fcPulse .35s ease-in-out infinite alternate}
+#fishCue.fc-hold{border-color:#7fc3ff}#fishCue.fc-reel{border-color:#7fe08a}
+#fishCue.fc-warn{border-color:#ff5a4a;background:rgba(110,10,0,.88);animation:fcShake .18s linear infinite}
+#fishCue.fc-land{border-color:#7fe08a;background:rgba(10,80,30,.88);animation:fcPulse .5s ease-in-out infinite alternate}
+@keyframes fcPulse{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.08)}}
+@keyframes fcShake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 4px))}75%{transform:translateX(calc(-50% + 4px))}}
+.rodIco{display:block;width:1.15em;height:1.15em;filter:drop-shadow(0 2px 0 rgba(0,0,0,.35))}.rodIco.bite{animation:fcRod .12s linear infinite alternate}
+@keyframes fcRod{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
