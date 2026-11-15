@@ -2103,7 +2103,7 @@ let panelOpenT = 0;
 function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
-  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); refreshPanel(true);
+  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); refreshPanel(true);
   if (p.kind === 'chat') setTimeout(() => $('#chatIn')?.focus(), 50);
 }
 function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
@@ -2167,6 +2167,8 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  phMap() { closePanel(); mapZoom = 1; openMap(); },
+  phClose() { closePanel(); },
   soilStore() { const h = wd?.houses?.[me.house]; if (!h) return; for (const k of me.furniture || []) if (G.shop.furniture[fbase(k)]?.tile && furnPos(h, k)) send({ t: 'hplace', k, store: 1 }); },
   stock(m, root) { const q = m.qty || Math.floor(+root.querySelector('#skQty')?.value || 0); if (!(q > 0)) return toast('ใส่จำนวนหุ้น', '📈', false); send({ t: 'act', st: m.st, a: 'stock', op: m.op, id: m.id, qty: q }); },
   callMin() { closePanel(); toast('ย่อสายไว้แล้ว แตะแถบ 📞 ด้านบนเพื่อเปิด', '📞'); },
@@ -2760,6 +2762,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16z', d: '16 พ.ย. (รอบ 26)', items: ['📱 <b>มือถือโฉมใหม่</b> เปิดมาเป็นหน้าจอโทรศัพท์จริงๆ มีวอลเปเปอร์เมือง นาฬิกา และแอป 16 อัน (โทร แชท จดหมาย เดลิเวอรี หุ้น บิล แผนที่ เพื่อน โปรไฟล์ ตั้งค่า เควสต์ รางวัล สัตว์เลี้ยง สมุดปลา อากาศ เพลง) · ปัดแถบล่าง/กด ‹ เพื่อกลับหน้าหลัก'] },
   { v: '2026-11-16y', d: '16 พ.ย. (รอบ 25)', items: ['🥚 เพิ่มอีสเตอร์เอ้กแล้ว', '🎣 เห็นคนอื่นตกปลาแล้ว (คันเบ็ด สายเบ็ด ทุ่นลอย ทุ่นจมตอนปลากิน สายตึงตอนเย่อปลา) ไม่ใช่ยืนเฉยๆ'] },
   { v: '2026-11-16x', d: '16 พ.ย. (รอบ 24)', items: [
     '🚶 <b>เดินลื่นขึ้น</b> เดินเฉียดต้นไม้ เสาไฟ กระถางดอกไม้ หรือมุมตึก ตัวละครจะไถลอ้อมไปเอง ไม่ติดค้าง · นิ้วที่สองแตะจอไม่ทำให้จอยหลุดแล้ว',
@@ -3521,9 +3524,22 @@ function riderJobs() {
     return itemRowRaw(it.icon, `${esc(it.name)} → ${esc(j.cust)}`, `${state} · ค่าส่ง <b style="color:var(--acc)">${money(j.fee)}</b>${j.tip ? ` + ทิป ${money(j.tip)}` : ''} · ${where}`, btn);
   }).join('')}</div>`;
 }
+// 📱 the phone: a pixel handset with a home screen of apps; each app opens on the screen, or the matching menu
+const PH_APPS = [
+  ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }], ['แชท', { fn: 'open', kind: 'chat' }], ['จดหมาย', { fn: 'open', kind: 'mail' }], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }],
+  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }], ['แผนที่', { fn: 'phMap' }], ['เพื่อน', { fn: 'open', kind: 'friends' }],
+  ['โปรไฟล์', { fn: 'open', kind: 'profile' }], ['ตั้งค่า', { fn: 'open', kind: 'settings' }], ['เควสต์', { fn: 'open', kind: 'quests' }], ['รางวัล', { fn: 'open', kind: 'achv' }],
+  ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }], ['อากาศ', { fn: 'qtab', set: { tab: 'wx' } }], ['เพลง', { fn: 'qtab', set: { tab: 'music' } }]];
+const PH_TITLE = { contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
-  const tab = p.tab || (call ? 'call' : 'contacts');
-  const tabs = `<div class="tabs">${[['contacts', '📇 รายชื่อ'], ['call', call ? '📞 กำลังคุย' : '📞 โทร'], ['food', '🍔 อาหาร'], ['bills', (me.bills || []).length ? '🧾 บิล ❗' : '🧾 บิล'], ...(job('rider') ? [['rider', '🛵 ไรเดอร์']] : []), ...(job('police') ? [['police', '🚨 แจ้งเหตุ']] : [])].map(([k, l]) => B(l, { fn: 'mtab', set: { tab: k } }, tab === k ? 'primary' : '')).join('')}</div>`;
+  const tab = p.tab || (call ? 'call' : 'home');
+  const dt = me?.date, clock = hhmm(hourNow());
+  const status = `<div class="phStat"><b>${clock}</b><span>📶 🔋</span></div>`;
+  if (tab === 'home') {
+    const badge = i => (i === 0 && call) || (i === 5 && (me.bills || []).length) || (i === 11 && achTodo().length) ? '<em></em>' : '';
+    const apps = PH_APPS.map(([l, m], i) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(i)}<small>${l}</small></button>`).join('');
+    return `<div class="phone"><div class="phScr home">${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
+  }
   let body = '';
   if (tab === 'contacts') {
     const onl = new Set((me.friends || []).filter(f => f.on).map(f => f.p));
@@ -3545,7 +3561,12 @@ function phonePanel(p) {
       <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" min="0" max="500" value="0" style="width:90px"> ฿</div><div class="list">${rows}</div>`;
   } else if (tab === 'rider') body = riderJobs();
   else if (tab === 'bills') body = billsBox();
-  return `<h2>📱 มือถือ</h2>${tabs}${body}`;
+  else if (tab === 'fish') body = fishBook();
+  else if (tab === 'wx') { const ev = wd?.ev, h = hourNow(); body = `<div class="phWx"><div class="big">${ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️'}</div><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small><div class="jobbox">${ev ? esc(ev.text) : 'วันนี้อากาศปกติ ไม่มีเหตุการณ์พิเศษ'}</div></div>`; }
+  else if (tab === 'music') body = `<div class="phWx"><div class="big">🎵</div><b>${(h => h >= 6 && h < 19 ? 'เพลงกลางวัน' : 'เพลงกลางคืน')(hourNow())}</b><small>เพลงเปลี่ยนเองตามเวลาในเกม</small></div><div class="grid2">${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🔇 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'primary' : '')}${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'primary' : '')}</div>`;
+  const sub = tab === 'contacts' || tab === 'call' ? `<div class="tabs">${B('📇 รายชื่อ', { fn: 'qtab', set: { tab: 'contacts' } }, tab === 'contacts' ? 'primary' : '')}${B(call ? '📞 กำลังคุย' : '📞 สาย', { fn: 'qtab', set: { tab: 'call' } }, tab === 'call' ? 'primary' : '')}</div>`
+    : (tab === 'food' || tab === 'rider') && job('rider') ? `<div class="tabs">${B('🍔 สั่งอาหาร', { fn: 'qtab', set: { tab: 'food' } }, tab === 'food' ? 'primary' : '')}${B('🛵 งานไรเดอร์', { fn: 'qtab', set: { tab: 'rider' } }, tab === 'rider' ? 'primary' : '')}</div>` : '';
+  return `<div class="phone"><div class="phScr">${status}<div class="phHead"><button data-m='{"fn":"qtab","set":{"tab":"home"}}'>‹</button><b>${PH_TITLE[tab] || ''}</b></div><div class="phBody">${sub}${body}</div><button class="phBar" data-m='{"fn":"qtab","set":{"tab":"home"}}' title="หน้าหลัก"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
 }
 
 // ------------------------------------------------------------------ map readability
