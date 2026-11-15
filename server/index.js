@@ -2627,7 +2627,7 @@ function move(a, m) {
   // sends a burst of moves is not pulled back to where it was
   a.mvb = Math.min(moveCap(a), (a.mvb ?? moveCap(a)) + SPEED * speedOf(a) * Math.max(runMul(a), a.runT > t - 1500 ? D.RUN.mul : 1) * 1.35 * dt);
   const d = Math.hypot(x - a.x, y - a.y);
-  if (d > a.mvb + 0.05 || !pathClear(a.x, a.y, x, y)) return place(a, a.x, a.y);
+  if (d > a.mvb + 0.05 || !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y))) return place(a, a.x, a.y);
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0)) standUp(a);
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
@@ -2638,6 +2638,11 @@ function move(a, m) {
   if (x !== a.x || y !== a.y) { a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; }
   a.f = clamp(Math.floor(+m.f) || 0, 0, 7);
   if (a.cast && Math.hypot(a.x - a.cast.x, a.y - a.cast.y) > 1.2) { a.cast = null; markMe(a); toast(a, 'เดินออกมา เก็บเบ็ดแล้ว', '🎣', false); }
+}
+// helicopters fly over buildings and walls, but stay inside the map they are on (same margins as the client)
+function flyClear(x0, y0, x1, y1) {
+  const A = D.areaAt(x0, y0);
+  return !!A && D.areaAt(x1, y1)?.id === A.id && x1 > A.x + .55 && y1 > A.y + .75 && x1 < A.x + A.w - .55 && y1 < A.y + A.h - .35;
 }
 // the step must not cross a wall (sampled); a tiny radius slack absorbs the client's rounding to 2 decimals
 function pathClear(x0, y0, x1, y1) {

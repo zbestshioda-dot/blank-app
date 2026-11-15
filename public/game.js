@@ -1061,6 +1061,7 @@ function frame(t) {
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
   if (panel?.kind === 'player' && !P.get(panel.pid)) closePanel();
   draw(t);
+  nearBtns(t);
 }
 requestAnimationFrame(frame);
 
@@ -1880,7 +1881,43 @@ function staffGreet(n) {
   const t = performance.now(); if (t - n.greetT < 20000) return;
   n.greetT = t; if (n.his) n.cur = n.his[Math.floor(Math.random() * n.his.length)]; n.bubble = n.line(me).trim(); n.bt = t + 5000;
 }
+// two quick buttons over the nearest other player's head (within reach): view their profile / add them as a friend
+let nbFor = null, nbSig = '';
+function nearBtns(t) {
+  const el = $('#nearBtns'), m = myId != null && P.get(myId);
+  let best = null, bd = 2.6;
+  if (m && !panel && !me?.down) for (const p of P.values()) {
+    if (p.id === myId || p.npc || p.bot || p.tagT !== t) continue;      // only players drawn on screen this frame
+    const d = Math.hypot(p.x - m.x, p.y - m.y);
+    if (d < bd) { bd = d; best = p; }
+  }
+  if (!best) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); nbFor = null; return; }
+  const friend = (me.contacts || []).some(c => c.n === best.name);
+  const sig = best.id + '|' + friend;
+  if (sig !== nbSig) {
+    nbSig = sig;
+    el.innerHTML = `<button data-nb="info">👤 ข้อมูล</button><button data-nb="add" class="${friend ? 'done' : 'add'}" ${friend ? 'disabled' : ''}>${friend ? '✓ เพื่อนกันแล้ว' : '➕ เพิ่มเพื่อน'}</button>`;
+  }
+  nbFor = best.id;
+  el.style.transform = `translate(${Math.round(best.tagX)}px,${Math.round(best.tagY)}px) translate(-50%,-100%)`;
+  el.classList.remove('hidden');
+}
+function initNearBtns() {
+  const el = $('#nearBtns');
+  const stop = e => e.stopPropagation();
+  ['pointerdown', 'touchstart', 'mousedown'].forEach(k => el.addEventListener(k, stop, { passive: true }));
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    const b = e.target.closest('button'); if (!b || nbFor == null) return;
+    const o = P.get(nbFor); if (!o) return;
+    FX.play('click');
+    if (b.dataset.nb === 'info') openPanel({ kind: 'player', pid: o.id });
+    else if (b.dataset.nb === 'add' && !b.disabled) { send({ t: 'req', kind: 'phone', to: o.id }); b.disabled = true; b.textContent = '⏳ ส่งคำขอแล้ว'; }
+  });
+}
+initNearBtns();
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
+  if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .82 : .5); p.tagT = t; }
   const icon = p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);

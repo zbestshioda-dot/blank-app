@@ -1090,3 +1090,11 @@ body.hasEvent #topBar{top:146px!important}
 #fishCue{top:31%!important;bottom:auto!important;min-width:0!important;padding:3px 12px 4px!important;border-width:2px!important;border-radius:12px!important;max-width:min(300px,86vw)}
 #fishCue b{font-size:15px!important}#fishCue small{font-size:10.5px!important;margin-top:0!important}
 #fishCue.fc-wait b{font-size:14px!important}
+
+/* quick buttons over a nearby player's head */
+#nearBtns{position:fixed;left:0;top:0;z-index:6;display:flex;gap:6px;pointer-events:auto;will-change:transform}
+#nearBtns.hidden{display:none}
+#nearBtns button{font:700 12px 'Mitr','Noto Sans Thai',sans-serif;color:#3a1d0e;padding:5px 10px;border-radius:14px;border:2px solid #5c3a1e;background:linear-gradient(#fff3d6,#f1d6a0);box-shadow:0 2px 0 #5c3a1e;white-space:nowrap;cursor:pointer}
+#nearBtns button.add{background:linear-gradient(#b8f08a,#5cbf3a);color:#173d0a}
+#nearBtns button.done,#nearBtns button:disabled{opacity:.75;cursor:default}
+#nearBtns button:active:not(:disabled){transform:translateY(2px);box-shadow:none}
