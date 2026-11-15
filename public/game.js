@@ -331,7 +331,7 @@ function handle(m) {
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
       G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop();
-      $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden');
+      $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       if (tutPending) setTimeout(() => me && showTut(0), 400);
@@ -762,13 +762,16 @@ const blockedAt = (x, y) => { const r = G.radius; return yardLocked(x, y) || sol
 const keys = {};
 let joy = null;
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') { if (e.key === 'Escape') e.target.blur(); return; }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
   keys[e.key.toLowerCase()] = true;
   if (!G) return;
   if (e.key === 'e' || e.key === ' ') { e.preventDefault(); if (FG) { if (!e.repeat) fightPress(); reelHold = true; return; } if (!e.repeat) onAction(); }
   if (e.key === 'Enter' && !panel) { e.preventDefault(); openChatBox(); }
   if (e.key === 'Escape') { closePanel(); }
-  if (e.key === 'b') openPanel({ kind: 'bag' });
+  if (e.key === 'b' || e.key === 'i') openPanel({ kind: 'bag' });
+  if (e.key === 'm') { if ($('#mapView').classList.contains('hidden')) { mapZoom = 1; openMap(); } else $('#mapX').click(); }
+  if (e.key === 'q') openPanel({ kind: 'quests' });
+  if (e.key === 'h' || e.key === '?') openPanel({ kind: 'keys' });
   if (e.key === 'p') openPanel({ kind: 'phone' });
   if (e.key === 'r') $('#restBtn').click();
   if (e.key === 'f') talk();
@@ -780,22 +783,28 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
 let TS = 40, VW = 0, VH = 0, DPR = 1;
+// the mouse wheel zooms the town in and out (computers); kept between visits
+let zoomMul = 1; try { zoomMul = clamp(+localStorage.getItem('lt_zoom') || 1, .7, 1.6); } catch { }
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   VW = innerWidth; VH = innerHeight;
   cv.width = VW * DPR; cv.height = VH * DPR;
-  TS = Math.round(clamp(Math.min(VW, VH) / 9.5, 34, 54));   // whole pixels: tile seams stay put while scrolling
+  TS = Math.round(clamp(Math.min(VW, VH) / 9.5, 34, 54) * zoomMul);   // whole pixels: tile seams stay put while scrolling
 }
 addEventListener('resize', resize); resize();
+cv.addEventListener('wheel', e => { if (!G) return; e.preventDefault(); zoomMul = clamp(zoomMul * (e.deltaY < 0 ? 1.1 : 1 / 1.1), .7, 1.6); try { localStorage.setItem('lt_zoom', zoomMul.toFixed(2)); } catch { } resize(); }, { passive: false });
 
-let down = null;
+let down = null, mouseHold = null, lastPtrMouse = false;
 cv.addEventListener('pointerdown', e => {
   if (!G) return;
+  lastPtrMouse = e.pointerType === 'mouse';
   cv.setPointerCapture(e.pointerId);
   down = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
   if (e.pointerType === 'touch' || e.pointerType === 'pen') joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
+  else if (e.button === 0) mouseHold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
 });
 cv.addEventListener('pointermove', e => {
+  if (mouseHold && mouseHold.id === e.pointerId) { mouseHold.x = e.clientX; mouseHold.y = e.clientY; }
   if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) down.moved = true;
   if (joy && joy.id === e.pointerId) {
     let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), max = 50;
@@ -805,6 +814,7 @@ cv.addEventListener('pointermove', e => {
   }
 });
 const endPtr = e => {
+  if (mouseHold && mouseHold.id === e.pointerId) { const held = performance.now() - mouseHold.t > 260; mouseHold = null; if (held && down) down.moved = true; }
   if (down && down.id === e.pointerId) { if (!down.moved && performance.now() - down.t < 350) onTap(e.clientX, e.clientY); down = null; }
   if (joy && joy.id === e.pointerId) { joy = null; $('#stick').style.display = 'none'; }
 };
@@ -831,7 +841,7 @@ function onTap(sx, sy) {
   if (!G || !me || sx == null) return;
   const c = camera(), wx = (sx + c.x) / TS, wy = (sy + c.y) / TS, m = P.get(myId); if (!m) return;
   if (placing) return placeTap(wx, wy);
-  const here = areaOf(m.x, m.y)?.id;
+  const here = areaOf(m.x, m.y)?.id, myRoom = roomOf(m.x, m.y);
   for (const q of [...PETST.values(), ...(myRoom?.rk === 'petshop' ? shopPets(myRoom) : [])]) {   // petting a pet (yours, someone's or the shop's) makes it hop happily
     if (areaOf(q.x, q.y)?.id !== here || Math.hypot(q.x - wx, (q.y - .35) - wy) > .6) continue;
     return petPlay(q, true);
@@ -842,6 +852,7 @@ function onTap(sx, sy) {
     const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
   }
   if (hit) { FX.play('click'); if (hit.npc && !hit.bot) return talkToTown(hit); return openPanel({ kind: 'player', pid: hit.id }); }
+  if (lastPtrMouse && !me.down) { autoNav = false; walkTo(wx, wy); }   // computers: click the ground to walk there
 }
 // ---- tap-to-walk: breadth-first path over free tiles of the current area, followed by the movement loop
 let autoPath = null, autoNav = false, autoT = 0;
@@ -1002,6 +1013,7 @@ function frame(t) {
     let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
     let dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
     if (joy && Math.hypot(joy.dx, joy.dy) > 0.15) { dx = joy.dx; dy = joy.dy; }
+    if (mouseHold && !dx && !dy && performance.now() - mouseHold.t > 260) { const c = camera(), hx = (mouseHold.x + c.x) / TS - m.rx, hy = (mouseHold.y + c.y) / TS - (m.ry - .35), l = Math.hypot(hx, hy); if (l > .3) { dx = hx / l; dy = hy / l; } }
     if (dx || dy) { autoPath = null; autoNav = false; }
     else if (autoNav && guide && !me.down) autoGuide(m);
     if (!dx && !dy && autoPath && !me.down) { const st = autoStep(m, dt); if (st) [dx, dy] = st; }
@@ -1916,6 +1928,7 @@ function initNearBtns() {
   });
 }
 initNearBtns();
+$('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .82 : .5); p.tagT = t; }
   const icon = p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
@@ -3279,6 +3292,14 @@ function renderPanel(p) {
       return `<h2>⛶ หน้าจอ</h2><div class="sub">${canFs ? 'เต็มจอซ่อนแถบเบราว์เซอร์ · แนวนอนจะล็อกจอให้เป็นแนวนอน (มือถือ Android)' : 'iPhone/iPad ใช้เต็มจอจากเบราว์เซอร์ไม่ได้: กดปุ่มแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ · หมุนเครื่องเป็นแนวนอนได้เลย'}</div>
         <div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
         ${fsOn ? B('📱 แนวตั้ง (ปลดล็อกการหมุน)', { fn: 'fs', mode: 'free' }, 'big') : ''}`;
+    }
+    case 'keys': {
+      const K = (k, d) => `<div class="keyRow"><span>${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</span><em>${d}</em></div>`;
+      return `<h2>⌨️ เล่นบนคอม</h2><div class="sub">ใช้ได้ทั้งคีย์บอร์ดและเมาส์ · กด <kbd>H</kbd> เพื่อเปิดหน้านี้อีกครั้ง</div><div class="keyGrid">
+        ${K('W A S D', 'เดิน (หรือปุ่มลูกศร)')}${K('Shift', 'กดค้างเพื่อวิ่ง')}${K('E Space', 'ใช้งาน / เข้าอาคาร / ดึงเบ็ด')}${K('F', 'คุยกับคนใกล้ๆ')}
+        ${K('R', 'นั่งพัก')}${K('Enter T', 'พิมพ์แชท')}${K('B I', 'กระเป๋า')}${K('P', 'มือถือ')}
+        ${K('M', 'แผนที่')}${K('Q', 'เควสต์')}${K('Esc', 'ปิดหน้าต่าง')}${K('H', 'คีย์ลัด (หน้านี้)')}
+        ${K('🖱️คลิก', 'คลิกพื้นเพื่อเดินไปตรงนั้น · คลิกคนเพื่อดูข้อมูล')}${K('🖱️กดค้าง', 'เดินตามเมาส์')}${K('🖱️ล้อ', 'ซูมเข้า/ออก')}</div>`;
     }
     case 'help':
       return `<h2>❔ วิธีเล่น</h2><div class="sub" style="font-size:14px;line-height:1.7">
