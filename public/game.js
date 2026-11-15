@@ -1101,7 +1101,6 @@ function draw(t) {
   if (myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
-  FX.scene(night > 0.3 ? 'night' : 'day');
   for (const s of G.stations) {
     if (!inside(s.x, s.y)) continue;
     const px = s.x * TS + X, py = s.y * TS + Y;
@@ -2857,7 +2856,7 @@ function renderPanel(p) {
           const pl = n ? `<b style="color:var(--ok)">ผู้เล่น ${money(m2.best)}</b> (${n} ชิ้น)` : '<span style="opacity:.6">ไม่มีผู้เล่นวางขาย</span>';
           return itemRow(id, `<div class="col2">${B(n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}${(G.items[id].rar || 0) >= 3 ? '' : B(`NPC ${money(m2.sell || 0)}`, { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div>`, `${pl}${(G.items[id].rar || 0) >= 3 ? ' · ปลาหายาก ร้าน NPC ไม่มีขาย' : ` · ร้าน NPC ${money(m2.sell || 0)}`}`);
         }).join('');
-        body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div>${search}${cats}<div class="shopGrid">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
+        body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div>${search}${cats}<div class="list">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
       } else if (tab === 'sell') {
         const inv = Object.entries(me.inv).filter(([id, q]) => q > 0 && match(id));
         body = inv.map(([id, q]) => {
@@ -3013,11 +3012,7 @@ function renderPanel(p) {
         ${mine.length ? '' : '<div class="jobbox">ยังไม่มีสัตว์เลี้ยง · ไปรับเลี้ยงที่ร้านสัตว์เลี้ยง 🐾 (ถนนเหนือ) ได้เลย</div>'}`;
     }
     case 'bag': {
-      const invIds = Object.entries(me.inv).filter(([, q]) => q > 0).map(([id]) => id);
-      const selId = p.sel && (me.inv[p.sel] || 0) > 0 ? p.sel : invIds[0] || null;
-      const grid = invIds.map(id => B(`${G.items[id].icon}<b>${me.inv[id]}</b>`, { fn: 'mtab', set: { sel: id } }, 'slot' + (id === selId ? ' sel' : ''))).join('');
-      const sd = selId ? G.items[selId] : null;
-      const detail = sd ? `<div class="item detailCard"><div class="em">${sd.icon}</div><div class="nm">${esc(sd.name)}<small>x${me.inv[selId]} · ~${money(sd.base)}${sd.eat ? ' · ' + eatText(sd.eat) : ''}</small></div>${sd.eat ? B('ใช้', { t: 'use', item: selId }, 'good') : ''}</div>` : '';
+      const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
       const rod = G.rods[me.rodEq] ? `${G.rods[me.rodEq].icon} ${G.rods[me.rodEq].name} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
