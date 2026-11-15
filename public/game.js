@@ -237,6 +237,13 @@ const promo = (() => {
   else {
     v.src = 'assets/ui/login_promo.mp4'; v.addEventListener('error', off); v.play().catch(() => { });
     v.addEventListener('playing', () => login.classList.add('vidOn'), { once: true });
+    // captions follow the video's clock (each scene gets its own line), and the end card gets the real button label
+    const caps = [...document.querySelectorAll('#promoPhone .pcap, #promoPhone .pcta, #promoPhone .pitems i')];
+    const sync = () => {
+      if (login.classList.contains('hidden')) return; requestAnimationFrame(sync);
+      const t = v.currentTime; for (const c of caps) c.classList.toggle('on', t >= +c.dataset.a && t < +c.dataset.b);
+    };
+    requestAnimationFrame(sync);
   }
   snd.onclick = e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => { }); try { localStorage.setItem('lt_snd', v.muted ? '0' : '1'); } catch { } label(); };
   // browsers only allow sound after a tap: if the player liked sound last time, turn it on at their first tap
@@ -2000,7 +2007,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 const NEWS = [
   { v: '2026-11-15k', d: '15 พ.ย. (รอบ 11)', items: [
     '🎬 <b>หน้าล็อกอินเป็นวิดีโอโปรโมท</b> เปิดเกมมาเจอวิดีโอเมืองขยับได้ทันที (กดปุ่ม 🔊 เพื่อเปิดเสียง) · บนมือถือเต็มจอ กด "เข้าเมืองเลย!" · ถ้าเคยเล่นแล้วกด "เล่นต่อ" ได้ทันที',
-    '📦 กล่องล็อกอินเล็กลง ตัดข้อความที่ไม่จำเป็นออก เหลือแค่ช่อง ID/PIN กับปุ่มเข้าเมือง' ] },
+    '📦 กล่องล็อกอินเล็กลง ตัดข้อความที่ไม่จำเป็นออก เหลือแค่ช่อง ID/PIN กับปุ่มเข้าเมือง',
+    '🎞️ วิดีโอใหม่ (ไม่มีตัวหนังสือในคลิป) ขึ้นคำบรรยายตามฉาก: เลือกอาชีพ เมืองจริงผู้เล่นจริง ตกปลา ทำสวน สร้างตัวละคร ซื้อบ้าน' ] },
   { v: '2026-11-15j', d: '15 พ.ย. (รอบ 10)', items: [
     '🔑 <b>ฟอร์มล็อกอินใหม่</b> ช่องกรอกมีไอคอน กดดู/ซ่อน PIN ได้ ปุ่มเข้าเมืองขึ้นสถานะกำลังเข้า ใส่ผิดการ์ดสั่นเตือน มีขั้นตอน 1-2-3 และเคล็ดลับหมุนเวียน',
     '🧍 <b>หน้าสร้างตัวละครใหม่</b> ตัวละครตัวใหญ่เดินอยู่บนแท่น กดลูกศรหมุนดูได้รอบตัว เลือกเพศและสีเสื้อแล้วเห็นผลทันที' ] },
