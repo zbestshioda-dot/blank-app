@@ -289,23 +289,23 @@ function sceneCTA(t, s) {
 
 function ogCard(t) {
   g.clearRect(0, 0, W, H);
-  town(t, 1650, ROAD_Y - 10, 0.56);
-  const gr = g.createLinearGradient(0, 0, W, 0);
-  gr.addColorStop(0, 'rgba(20,8,2,.86)'); gr.addColorStop(.55, 'rgba(20,8,2,.55)'); gr.addColorStop(1, 'rgba(20,8,2,.05)');
+  town(t, 1500, ROAD_Y - 10, 0.56);
+  const cx = W / 2;
+  const gr = g.createRadialGradient(cx, H / 2, 40, cx, H / 2, W * .62);
+  gr.addColorStop(0, 'rgba(20,8,2,.62)'); gr.addColorStop(1, 'rgba(20,8,2,.42)');
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  rays(178, 110, t, '#ffe08a', 16, .10);
-  text('เมืองชีวิตนี้', 178, 70, 50, { grad: ['#ffffff', '#ffe08a'] });
-  text('เลือกได้', 182, 132, 66, { grad: ['#ffe35a', '#ff8a1f'], rot: -.04 });
-  text('L I F E   T O W N', 178, 192, 22, { weight: 900, color: '#ffe8c0', sw: .3 });
-  text('เกมจำลองชีวิตออนไลน์ · เล่นฟรี ไม่ต้องโหลด', 175, 246, 15, { color: '#7cf3ff', weight: 800, sw: .3 });
-  g.save(); g.translate(175, 285);
+  rays(cx, 120, t, '#ffe08a', 16, .12);
+  if (PIN) { g.imageSmoothingEnabled = false; g.drawImage(PIN, cx - 30, 14, 60, 68); }
+  text('เมืองชีวิตนี้', cx, 112, 46, { grad: ['#ffffff', '#ffe08a'] });
+  text('เลือกได้', cx + 3, 166, 60, { grad: ['#ffe35a', '#ff8a1f'], rot: -.04 });
+  text('L I F E   T O W N', cx, 212, 20, { weight: 900, color: '#ffe8c0', sw: .3 });
+  text('เกมจำลองชีวิตออนไลน์ · เล่นฟรี ไม่ต้องโหลด', cx, 246, 15, { color: '#7cf3ff', weight: 800, sw: .3 });
+  g.save(); g.translate(cx, 285);
   const bg = g.createLinearGradient(0, -18, 0, 18); bg.addColorStop(0, '#ffe066'); bg.addColorStop(1, '#f0a020');
   g.fillStyle = '#5c3a1e'; g.beginPath(); g.roundRect(-92, -15, 184, 36, 14); g.fill();
   g.fillStyle = bg; g.beginPath(); g.roundRect(-92, -18, 184, 35, 14); g.fill();
   g.lineWidth = 2; g.strokeStyle = '#5c3a1e'; g.stroke();
   g.font = '900 19px "Noto Sans Thai"'; g.fillStyle = '#3a1d0e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('เข้าเมืองเลย! ▶', 0, 0); g.restore();
-  const cast = [0, 5, 6, 4, 2, 7];
-  cast.forEach((c, i) => { const x = 370 + i * 40, y = 300 - (i % 2) * 6; shadow(x, y, 15); chara(CAREERS[c][0], x, y, .78, 'front', 0, false, i + 2); });
 }
 window.ogCard = ogCard;
 window.render = render;
