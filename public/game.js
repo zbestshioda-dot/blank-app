@@ -534,6 +534,7 @@ function paintDogChip() {
 }
 setInterval(paintDogChip, 500);
 $('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
+$('#cbOn').onclick = () => openPanel({ kind: 'friends' });
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -541,7 +542,7 @@ const CAREER_ICON = c => G?.careers[c]?.icon || '';
 function paintCardClock(h) {
   const dt = me?.date; if (dt) $('#cDate').textContent = `${dt.day} ${G.months[dt.month]}`;
   $('#cTime').textContent = hhmm(h);
-  if (wd) $('#cOn').textContent = `${wd.on} ออนไลน์`;
+  if (wd) $('#cbOn').textContent = `${wd.on} ออนไลน์`;
   $('#cWx').textContent = wd?.ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️';
 }
 // today's quests listed in the card: tap one and you walk there by yourself
@@ -2715,6 +2716,7 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16w', d: '16 พ.ย. (รอบ 23)', items: ['💬 ตัวเลขผู้เล่นที่ออนไลน์ย้ายจากการ์ดสถานะไปอยู่ท้ายแถบแท็บในกล่องแชท แตะเพื่อดูรายชื่อคนที่ออนไลน์'] },
   { v: '2026-11-16v', d: '16 พ.ย. (รอบ 22)', items: [
     '👥 เดินเข้าใกล้ผู้เล่นคนอื่น จะมีปุ่ม <b>ข้อมูล</b> และ <b>เพิ่มเพื่อน</b> ขึ้นเหนือชื่อเขา',
     '🚁 แก้บั๊ก<b>เฮลิคอปเตอร์โดนดึงกลับ</b>ตอนบินข้ามตึก',
