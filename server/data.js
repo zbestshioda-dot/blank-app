@@ -342,9 +342,9 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   const nearWay = (x, y, r) => { for (let j = -r; j <= r; j++) for (let k = -r; k <= r; k++) if (way(get(x + k, y + j) || '.')) return true; return false; };
   const propNear = (x, y, r) => PROPS.some(p => Math.hypot(p.x - x, p.y - y) < r) || STATIONS.some(s => s.area === 'town' && Math.hypot(s.x - x, s.y - y) < r + .5);
   // 0) new shops, all closed for renovation for now: two pet shops and two gyms (added here so nothing older moves)
-  for (const [id, spr, x, front, label, icon] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️'],
-    ['pet2', 'b_pet2', 12, 13, 'ร้านสัตว์เลี้ยง สาขา 2', '🐶'], ['gym2', 'b_gym2', 60, 45, 'โรงยิมมวย', '🥊']]) {
-    const b = B(id, spr, x, front, { label, icon, deco: true, renov: true });
+  for (const [id, spr, x, front, label, icon, st] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾', 'petshop1'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️'],
+    ['pet2', 'b_pet2', 12, 13, 'ร้านสัตว์เลี้ยง สาขา 2', '🐶', 'petshop2'], ['gym2', 'b_gym2', 60, 45, 'โรงยิมมวย', '🥊']]) {
+    const b = B(id, spr, x, front, st ? { label, icon, st, stype: 'petshop', noSlot: true } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
     for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
     for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
     // a paved doorstep from the door down to the street
@@ -443,7 +443,7 @@ const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
 for (const b of [0, 1, 2].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
-    STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
+    STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
     continue;
   }
   const kind = b.rk || (b.house !== undefined ? 'house' : b.id);
@@ -603,7 +603,7 @@ const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeM
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
-  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21] };
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift

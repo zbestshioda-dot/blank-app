@@ -1199,6 +1199,14 @@ function act(a, m) {
     }
     case 'icu.quit': { if (a.icu) { a.icu = null; a.icuNext = now() + D.ICU.next / 2; markMe(a); toast(a, 'ส่งต่อเคสให้หมอคนอื่นแล้ว', '🚑', false); } return; }
     case 'fishclub.info': return;
+    case 'petshop.buy': {                                  // adopt a pet at a pet shop (kept forever) and bring it out
+      m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;
+      a.pets = a.pets || [];
+      if (a.pets.includes(m.id)) return toast(a, `คุณมี${P.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, P.price)) return;
+      a.pets.push(m.id); a.pet = m.id; markMe(a); joy(a, 6 + P.rar * 3); sendRoster();
+      return toast(a, `${P.icon} รับ${P.name}มาเลี้ยงแล้ว! มันเดินตามคุณไปทุกที่ — แตะที่ตัวมันเพื่อเล่นด้วย`, '🐾');
+    }
     case 'fishclub.rod': case 'staff.rod': {                 // buy a rod (it goes into the bag and into your hand)
       const id = D.RODS[m.rod] ? m.rod : 'bamboo', r = D.RODS[id];
       a.rods = a.rods || [];
@@ -2497,14 +2505,6 @@ function onMessage(ws, raw) {
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
     case 'use': return useItem(a, m.item);
-    case 'pet.buy': {                                      // adopt a pet (kept forever) and bring it out
-      const P = D.PETS[m.id]; if (!P) return;
-      a.pets = a.pets || [];
-      if (a.pets.includes(m.id)) return toast(a, `คุณมี${P.name}แล้ว`, 'ℹ️', false);
-      if (!pay(a, P.price)) return;
-      a.pets.push(m.id); a.pet = m.id; markMe(a); joy(a, 6 + P.rar * 3); sendRoster();
-      return toast(a, `${P.icon} รับ${P.name}มาเลี้ยงแล้ว! มันเดินตามคุณไปทุกที่ — แตะที่ตัวมันเพื่อเล่นด้วย`, '🐾');
-    }
     case 'pet.call': {                                     // bring one out (or put it away with an empty id)
       if (m.id && !(a.pets || []).includes(m.id)) return;
       a.pet = m.id || ''; markMe(a); sendRoster();

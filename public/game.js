@@ -2097,11 +2097,13 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15o', d: '15 พ.ย. (รอบ 15)', items: [
+    '🐾 <b>ร้านสัตว์เลี้ยงเปิดให้บริการแล้ว!</b> ทั้ง 2 สาขา (ถนนเหนือ · ถนนเหนือฝั่งตะวันตก) เปิด 09:00–21:00 เดินไปที่เคาน์เตอร์หน้าร้านเพื่อเลือกรับเลี้ยงสัตว์ได้ทั้ง 32 ชนิด แล้วเรียกออกมาเดินตามที่ 🎒 กระเป๋า · 🏋️ ฟิตเนสและ 🥊 โรงยิมยังปิดปรับปรุง'] },
   { v: '2026-11-15n', d: '15 พ.ย. (รอบ 14)', items: [
     '🗺️ <b>มินิแมพ/แผนที่ใหญ่อัปเดต</b> อาคารที่ปิดปรับปรุง (ร้านสัตว์เลี้ยง ฟิตเนส โรงยิม ห้องสมุด ร้านดอกไม้ สถานีดับเพลิง) เป็นสี <b>เหลืองอำพัน</b> เห็นชัดว่าเข้าไม่ได้ และสัตว์เลี้ยงของคุณเป็น <b>จุดสีชมพู</b> บนมินิแมพ'] },
   { v: '2026-11-15m', d: '15 พ.ย. (รอบ 13)', items: [
     '🐾 <b>สัตว์เลี้ยง 32 ชนิด!</b> หมา แมว กระต่าย แฮมสเตอร์ เม่น กระรอก ลูกเป็ด จิ้งจอก แพนด้า เพนกวิน คาปิบาร่า ไปจนถึง 🐲 มังกรน้อย และ 🦄 ยูนิคอร์น แบ่งความหายากทั่วไป–มหากาพย์',
-    '🎒 รับเลี้ยงได้ที่ <b>กระเป๋า → 🐾 เปิดสัตว์เลี้ยง</b> (ร้านสัตว์เลี้ยงยังปิดปรับปรุง) เรียกออกมาเดินตามได้ทุกที่ เข้าตึก/วาร์ปก็ตามมา และผู้เล่นคนอื่นก็เห็นสัตว์ของคุณ',
+    '🎒 รับเลี้ยงได้ที่ <b>กระเป๋า → 🐾 เปิดสัตว์เลี้ยง</b> (ที่ร้านสัตว์เลี้ยง) เรียกออกมาเดินตามได้ทุกที่ เข้าตึก/วาร์ปก็ตามมา และผู้เล่นคนอื่นก็เห็นสัตว์ของคุณ',
     '🦘 <b>กระโดดน่ารัก</b> วิ่งตามแล้วเด้งดึ๋งๆ มีหายใจเบาๆ กระโดดเล่นเองเป็นพักๆ และ <b>แตะที่ตัวมัน</b>เพื่อให้กระโดดดีใจพร้อมหัวใจ ❤'] },
   { v: '2026-11-15l', d: '15 พ.ย. (รอบ 12)', items: [
     '🐾 <b>ร้านสัตว์เลี้ยง 2 สาขา</b> (ถนนเหนือ · ถนนเหนือฝั่งตะวันตก) และ 🏋️ <b>ฟิตเนส</b> กับ 🥊 <b>โรงยิมมวย</b> เปิดตัวบนแผนที่แล้ว · ตอนนี้ปิดปรับปรุง รอเปิดเร็วๆ นี้' ] },
@@ -2348,15 +2350,17 @@ function renderPanel(p) {
       }).join('');
       return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่/ต่ออายุได้ที่นี่</div><div class="list">${degRow}${rows}</div>`;
     }
-    case 'pets': {
-      const have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => G.pets[a].price - G.pets[b].price);
+    case 'pets': case 'petshop': {
+      const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => G.pets[a].price - G.pets[b].price);
       const card = id => { const pt = G.pets[id], own = have.includes(id), on = me.pet === id;
-        const btn = own ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : B(money(pt.price), { t: 'pet.buy', id }, 'good', me.money < pt.price);
+        const btn = own ? (!shopMode || on) ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : '<small>มีแล้ว ✓</small>' : B(money(pt.price), { t: 'act', st: p.st, a: 'buy', pet: id }, 'good', me.money < pt.price);
         return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
       const mine = ids.filter(id => have.includes(id)), shop = ids.filter(id => !have.includes(id));
-      return `<h2>🐾 สัตว์เลี้ยง</h2><div class="sub">${me.pet ? `ตอนนี้ ${G.pets[me.pet].icon} <b>${esc(G.pets[me.pet].name)}</b> เดินตามคุณอยู่ · แตะที่ตัวมันเพื่อเล่นด้วย` : 'เรียกสัตว์เลี้ยงออกมาเดินตามคุณได้ (ร้านสัตว์เลี้ยงปิดปรับปรุง · รับเลี้ยงที่นี่ไปก่อน)'} · เลี้ยงได้ทีละ 1 ตัว</div>
+      if (shopMode) return `<h2>🐾 ${esc(STN(p.st)?.label || 'ร้านสัตว์เลี้ยง')}</h2><div class="sub">${hoursTxt('petshop')} · รับเลี้ยงแล้วเรียกออกมาเดินตามได้ที่ 🎒 กระเป๋า · เลี้ยงได้ทีละ 1 ตัว · มี ${have.length}/${ids.length} ตัว</div>
+        <div class="looks">${ids.map(card).join('')}</div>`;
+      return `<h2>🐾 สัตว์เลี้ยง</h2><div class="sub">${me.pet ? `ตอนนี้ ${G.pets[me.pet].icon} <b>${esc(G.pets[me.pet].name)}</b> เดินตามคุณอยู่ · แตะที่ตัวมันเพื่อเล่นด้วย` : 'เรียกสัตว์เลี้ยงออกมาเดินตามคุณได้ (รับเลี้ยงเพิ่มที่ร้านสัตว์เลี้ยง 🐾 ถนนเหนือ)'} · เลี้ยงได้ทีละ 1 ตัว</div>
         ${mine.length ? `<div class="secT">💖 สัตว์เลี้ยงของฉัน (${mine.length})</div><div class="looks">${mine.map(card).join('')}</div>` : ''}
-        <div class="secT">🏪 รับเลี้ยง (${shop.length})</div><div class="looks">${shop.map(card).join('')}</div>`;
+        ${mine.length ? '' : '<div class="jobbox">ยังไม่มีสัตว์เลี้ยง · ไปรับเลี้ยงที่ร้านสัตว์เลี้ยง 🐾 (ถนนเหนือ) ได้เลย</div>'}`;
     }
     case 'bag': {
       const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
