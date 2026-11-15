@@ -105,7 +105,7 @@ window.FX = (() => {
   const CHORDS = [[261.6, 329.6, 392], [220, 261.6, 329.6], [174.6, 220, 261.6], [196, 246.9, 293.7]];
   const PENTA = [523.3, 587.3, 659.3, 784, 880, 1046.5];
   function startMusic() {
-    if (musicTimer || !ac) return;
+    if (musicTimer || !ac || window.BGM_EXT) return;   // the game plays its own day / night tracks instead
     nextAt = ac.currentTime + 0.1;
     musicTimer = setInterval(() => {
       if (!st.music || ac.state !== 'running') { nextAt = ac.currentTime + 0.1; return; }

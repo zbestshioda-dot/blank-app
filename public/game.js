@@ -285,18 +285,11 @@ const promo = (() => {
   const lite = (navigator.connection && navigator.connection.saveData) || matchMedia('(prefers-reduced-motion:reduce)').matches;
   let wantSound = false; try { wantSound = localStorage.getItem('lt_snd') === '1'; } catch { }
   const off = () => login.classList.remove('hasVid');
-  const label = () => { snd.textContent = v.muted ? '🔇' : '🔊'; };
+  const label = () => { snd.textContent = v.muted ? '🔇' : '🔊'; $('#sndHint')?.classList.toggle('hidden', !v.muted); };
   if (lite) { v.removeAttribute('autoplay'); login.classList.add('posterOnly'); }
   else {
-    v.src = 'assets/ui/login_promo.mp4'; v.addEventListener('error', off); v.play().catch(() => { });
+    v.src = 'assets/ui/login_promo.mp4?v=2'; v.addEventListener('error', off); v.play().catch(() => { });
     v.addEventListener('playing', () => login.classList.add('vidOn'), { once: true });
-    // captions follow the video's clock (each scene gets its own line), and the end card gets the real button label
-    const caps = [...document.querySelectorAll('#promoPhone .pcap, #promoPhone .pcta, #promoPhone .pitems i')];
-    const sync = () => {
-      if (login.classList.contains('hidden')) return; requestAnimationFrame(sync);
-      const t = v.currentTime; for (const c of caps) c.classList.toggle('on', t >= +c.dataset.a && t < +c.dataset.b);
-    };
-    requestAnimationFrame(sync);
   }
   snd.onclick = e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => { }); try { localStorage.setItem('lt_snd', v.muted ? '0' : '1'); } catch { } label(); };
   // browsers only allow sound after a tap: if the player liked sound last time, turn it on at their first tap
@@ -642,6 +635,24 @@ function paintEvent() {
 // same clock as the server: days are slow, nights run twice as fast (server/data.js CLOCK)
 const hourOfPhase = m => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 }, dayH = c.dusk - c.dawn; return m < c.dayMin ? c.dawn + m * dayH / c.dayMin : (c.dusk + (m - c.dayMin) * (24 - dayH) / (24 - c.dayMin)) % 24; };
 const hourNow = () => FORCE_PHASE !== null ? +FORCE_PHASE * 24 : hourOfPhase(((((Date.now() + clockOff + (wd?.toff || 0)) % G.dayMs) + G.dayMs) % G.dayMs) / 60000);
+// ---- background music: a day track and a night track (assets/music), cross-faded as the in-game clock turns
+window.BGM_EXT = true;
+const BGM = { day: null, night: null, vol: .42 };
+function bgmTick() {
+  if (!G || !me) return;
+  const h = hourNow(), want = FX.opts.music ? (h >= 6 && h < 18.5 ? 'day' : 'night') : null;
+  for (const k of ['day', 'night']) {
+    let a = BGM[k];
+    if (!a && k === want) { a = BGM[k] = new Audio(`assets/music/${k}.mp3?v=1`); a.loop = true; a.volume = 0; a.preload = 'auto'; }
+    if (!a) continue;
+    const target = k === want ? BGM.vol : 0;
+    a.volume = Math.max(0, Math.min(1, a.volume + (target - a.volume) * .06));
+    if (target > 0 && a.paused) a.play().catch(() => { });
+    if (target === 0 && a.volume < .01 && !a.paused) a.pause();
+  }
+}
+setInterval(bgmTick, 100);
+addEventListener('pointerdown', () => { for (const k of ['day', 'night']) { const a = BGM[k]; if (a && a.paused && a.volume > 0) a.play().catch(() => { }); } });   // after a tap the browser lets it play
 const dayNow = () => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 }, mid = (c.dayMin + (24 - c.dusk) * (24 - c.dayMin) / (24 - (c.dusk - c.dawn))) * 60000; return Math.floor((Date.now() + clockOff + (wd?.toff || 0) + G.dayMs - mid) / G.dayMs); };
 const isInside = rid => { const m = P.get(myId); return !!m && roomOf(m.x, m.y)?.id === rid; };
 const FORCE_PHASE = new URLSearchParams(location.search).get('phase');   // ?phase=0.95 previews a time of day
@@ -2643,6 +2654,9 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16h', d: '16 พ.ย. (รอบ 8)', items: [
+    '🎬 <b>หน้าล็อกอินใหม่</b> วิดีโอโปรโมทตัวใหม่ (ฉากจริงในเกม) กรอบเรืองแสงสีรุ้งบนคอม ปุ่มเข้าเมืองมีแสงวิ่ง แตะ 🔊 เพื่อฟังเพลง',
+    '🎵 <b>เพลงประกอบใหม่</b> กลางวันกับกลางคืนมีเพลงคนละเพลง เปลี่ยนนุ่มๆ ตามเวลาในเกม (ปิด/เปิดได้ที่ ⚙️ ตั้งค่า → เพลง)'] },
   { v: '2026-11-16g', d: '16 พ.ย. (รอบ 7)', items: ['🗺️ เอาหมุดสีม่วง (NPC อาชีพ) ออกจากแผนที่ใหญ่แล้ว แผนที่ดูโล่งขึ้น'] },
   { v: '2026-11-16f', d: '16 พ.ย. (รอบ 6)', items: [
     '📋 <b>ภารกิจอาชีพย้ายไปอยู่ที่ NPC ของแต่ละอาชีพ</b> เช่น ภารกิจตำรวจคุยกับจ่าที่สถานีตำรวจ ภารกิจหมอคุยกับหมอที่โรงพยาบาล ภารกิจไรเดอร์ที่ศูนย์ไรเดอร์ ฯลฯ แล้วเลือก "📋 รับภารกิจ" · เกษตรกรรับที่ประตูไร่ (ไร่ยังปิดปรับปรุง)'] },
