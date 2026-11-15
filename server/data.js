@@ -345,7 +345,7 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   // 0) new shops, all closed for renovation for now: two pet shops and two gyms (added here so nothing older moves)
   for (const [id, spr, x, front, label, icon, st] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾', 'petshop1'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️'],
     ['pet2', 'b_pet2', 5, 13, 'ร้านสัตว์เลี้ยง สาขา 2', '🐶', 'petshop2'], ['gym2', 'b_gym2', 60, 45, 'โรงยิมมวย', '🥊']]) {
-    const b = B(id, spr, x, front, st ? { label, icon, st, stype: 'petshop', noSlot: true } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
+    const b = B(id, spr, x, front, st ? { label, icon, st, stype: 'petshop', rk: 'petshop', layout: 'petshop', late: 2 } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
     for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
     for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
     // a paved doorstep from the door down to the street
@@ -416,6 +416,10 @@ const LAYOUT = {
     ['c_noodles', 2.6, 8.4], ['c_hotdog2', 11.0, 8.6], ['c_icecream', 12.8, 8.7], ['c_stool', 4.8, 8.9], ['c_rug1', 7, 9.45, false], ['c_clock', 4.6, 1.0, false], ['c_fan', 12.6, 1.3, false]],
   cstore4: [['c_cashier', 7, 2.5], ['c_cups', 9.4, 2.4], ['c_coffee', 10.5, 2.3], ['c_fridge', 12.4, 2.9], ['c_atm', 1.4, 2.8], ['c_bags', 2.8, 2.8], ['c_chips', 2.6, 5.8], ['c_boxes', 11.6, 6.0],
     ['c_toiletry', 2.8, 8.4], ['c_freezer', 11.2, 8.4], ['c_mop', 5.0, 8.9], ['c_bin', 8.9, 9.0], ['c_rug2', 7, 9.45, false], ['c_clock', 7, 1.0, false], ['c_notice', 4.6, 1.6, false]],
+  // pet shop: aquarium and shelves along the back, baskets and a rug on the floor (the live pets are drawn by the client); sales desk top centre
+  petshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.6, 1.1], ['f_window', 10.4, 1.1], ['x_wclock', 7, 0.95, false], ['f_aquarium', 1.7, 2.7], ['x_aquarium', 12.3, 2.7],
+    ['f_rug_round', 7, 7.2, false], ['x_shelf_s', 1.6, 8.8], ['x_shelf_s', 12.4, 8.8], ['f_plant', 4.6, 9.0], ['f_plant2', 9.4, 9.0],
+    ['i_pricestand', 5.2, 5.2, false], ['i_pricestand', 8.8, 5.2, false]],
   // furniture showroom: sofa corner, bedroom set, dining set and lamps on display; the sales desk is top centre
   furnshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.4, 1.1], ['f_window', 10.6, 1.1], ['x_wclock', 7, 0.95, false], ['f_bookshelf_wide', 1.9, 2.7], ['x_sideboard', 12.2, 2.6],
     ['f_rug_red', 3.4, 6.3], ['f_sofa_red', 3.4, 5.6], ['f_armchair', 5.4, 6.2], ['f_floorlamp', 1.4, 6.0], ['f_bed_pink', 11.4, 5.9], ['f_drawer', 12.9, 5.6], ['x_flamp', 9.6, 5.8],

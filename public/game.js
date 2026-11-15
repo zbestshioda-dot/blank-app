@@ -753,7 +753,7 @@ function onTap(sx, sy) {
   const c = camera(), wx = (sx + c.x) / TS, wy = (sy + c.y) / TS, m = P.get(myId); if (!m) return;
   if (placing) return placeTap(wx, wy);
   const here = areaOf(m.x, m.y)?.id;
-  for (const [oid, q] of PETST) {                              // petting a pet (yours or someone's) makes it hop happily
+  for (const q of [...PETST.values(), ...(myRoom?.rk === 'petshop' ? shopPets(myRoom) : [])]) {   // petting a pet (yours, someone's or the shop's) makes it hop happily
     if (areaOf(q.x, q.y)?.id !== here || Math.hypot(q.x - wx, (q.y - .35) - wy) > .6) continue;
     return petPlay(q, true);
   }
@@ -1024,6 +1024,7 @@ function draw(t) {
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);   // helicopters fly over the roofs
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
+  if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
   for (const a of ambs) if (a.area === A?.id) { if (!a.body.gone) ents.push([a.body.ry + .3, 4, a.body]); ents.push([a.y + halfY(a), 5, a]); }
@@ -1174,6 +1175,20 @@ function drawPlot(s, px, py, t) {
 // hops by itself now and then, and hops + sends hearts when you tap it
 const PETST = new Map();
 const petDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+// the animals living in a pet shop: they stay put, breathe, hop now and then, and hop for a tap
+const SHOP_PETS = { r_pet1: [['shiba', 3.4, 5.2], ['tabby', 10.6, 5.3], ['rabbit', 5.2, 7.6], ['hamster', 8.8, 7.6], ['poodle', 7, 6.4], ['duck', 2.4, 8], ['chick', 11.7, 8], ['corgi', 4.6, 4.7]],
+  r_pet2: [['golden', 3.4, 5.2], ['whitecat', 10.6, 5.3], ['lop', 5.2, 7.6], ['guinea', 8.8, 7.6], ['pom', 7, 6.4], ['hedgehog', 2.4, 8], ['penguin', 11.7, 8], ['husky', 9.6, 4.7]] };
+const SHOPPETS = new Map();
+function shopPets(room) {
+  let a = SHOPPETS.get(room.id);
+  if (!a) {
+    a = (SHOP_PETS[room.id] || []).map(([id, dx, dy], i) => ({ id, x: room.x + dx, y: room.y + dy, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 420, idleAt: performance.now() + 400 + i * 700, shop: 1 }));
+    SHOPPETS.set(room.id, a);
+  }
+  const now0 = performance.now();
+  for (const q of a) if (now0 > q.idleAt) { q.idleAt = now0 + 2200 + Math.random() * 4500; petPlay(q, false); q.big = .7 + Math.random() * .6; if (Math.random() < .5) q.flip = !q.flip; }
+  return a;
+}
 function petPlay(q, love) {
   q.hop = performance.now(); q.big = love ? 1.7 : 1; q.hopDur = love ? 520 : 420;
   if (love) { FX.play('pop'); FX.float(q.x, q.y - .9, '❤', '#ff6b9a', .55); FX.burst(q.x, q.y - .5, '#ff9ec0', 8); if (navigator.vibrate) navigator.vibrate(12); }
@@ -1334,6 +1349,8 @@ function buildStaff() {
   }
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
+  { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ! อยากได้เพื่อนตัวฟูไหมคะ', 'ทุกตัวสุขภาพดีค่ะ ลูบได้นะคะ', 'ตัวไหนถูกใจ ลองแตะดูได้เลยค่ะ'] },
+  { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: -1.9, dy: 0.7, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
   { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', dx: .6, dy: -1.15, lk: { hair: 'silver', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมครับ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ครับ'] },
   { st: 'furnshop', name: 'น้องเก่ง (ร้านเฟอร์นิเจอร์)', short: 'น้องเก่ง', icon: '🛋️', dx: .6, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['โซฟาตัวนี้นั่งสบายมากครับ', 'จัดบ้านสวย อยู่แล้วมีความสุขนะ', 'ซื้อแล้วส่งถึงบ้านเลยครับ'] },
@@ -1735,7 +1752,7 @@ function icuDraw() {
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
 const NPC_FACE = { staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_police: 'police_f', keep_school: 'elder_m',
-  keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f' };
+  keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
   staff_office: [['บริษัทเราส่งเอกสารไปทั่วเมืองทุกวันเลยค่ะ', 'ยิ่งส่งไกล ค่าส่งยิ่งเยอะนะคะ', 'หลังห้าโมงเย็นยังทำโอทีได้ถึงสามทุ่ม ได้เงินเพิ่มอีกด้วย'], ['ใครอยากเข้ามาทำงานที่นี่ต้องจบปริญญาตรีก่อนนะคะ', 'ไปเรียนที่มหาวิทยาลัยได้ นั่งเรียนครบชั่วโมงก็ได้หนึ่งคาบ'], ['ช่วงนี้ดิฉันอยากได้เก้าอี้ทำงานตัวใหม่จัง', 'ตัวเก่านั่งแล้วปวดหลังมากเลยค่ะ 😅']],
@@ -1756,6 +1773,8 @@ const TALK = {
   keep_barber: [['ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน', 'มาย้อมสีใหม่ ให้ตัวเองดูโดดเด่นสิครับ'], ['สีที่เคยทำไปแล้ว เปลี่ยนกลับได้ฟรีนะ'], ['ทำผมใหม่แล้วความสุขเพิ่มด้วยนะ', 'วิทยาศาสตร์ยืนยัน... มั้งครับ 😆']],
   keep_estate: [['บ้านในหมู่บ้านจัดสรร ซื้อหรือเช่าก็ได้ค่ะ', 'มีลานบ้านไว้ทำสวนด้วยนะคะ'], ['ปล่อยเช่าบ้าน มีรายได้ทุกเดือนค่ะ'], ['ทำงานหนักแล้วอย่าลืมพักนะคะ', 'ไปนั่งเล่นที่จัตุรัสบ้าง ชีวิตจะได้สมดุล']],
   keep_cstore2: [['ผมเรียนอยู่มหาวิทยาลัยครับ ทำงานพิเศษตอนเย็น', 'มาเมืองนี้ใหม่ๆ ยังไม่ค่อยรู้จักใครเลย'], ['ดึกๆ หิวก็แวะมาได้นะครับ', 'ข้าวกล่องอุ่นไมโครเวฟให้ด้วย']],
+  keep_petshop1: [['น้องๆ ที่นี่ฉีดวัคซีนครบทุกตัวค่ะ', 'อยากได้ตัวไหน บอกได้เลยนะคะ'], ['สัตว์เลี้ยงเดินตามเราได้ทุกที่เลยค่ะ', 'แตะที่ตัวเขาดู จะกระโดดดีใจด้วยนะ']],
+  keep_petshop2: [['ผมเลี้ยงหมามาตั้งแต่เด็กครับ', 'เลยมาเปิดร้านนี้เลย'], ['ตัวหายากอย่างมังกรกับยูนิคอร์น ก็มีนะครับ', 'ต้องเก็บเงินหน่อย แต่คุ้มครับ']],
   keep_cstore4: [['ยายเปิดร้านนี้มาตั้งแต่หมู่บ้านเพิ่งสร้าง', 'เห็นเด็กๆ โตกันมาทุกคนเลย'], ['ผอมลงนะหลาน กินข้าวกินปลาบ้างสิ', 'ข้าวกล่องในตู้อร่อยนะ ยายชิมแล้ว']],
   keep_furnshop: [['ซื้อเฟอร์นิเจอร์แล้วส่งถึงบ้านเลยครับ', 'จัดวางเองได้ด้วยปุ่ม 🛋️ จัดบ้าน'], ['บ้านสบาย นอนหลับสบาย ความสุขก็เพิ่มขึ้นครับ'], ['ผมใส่ฮู้ดทั้งวันเพราะในร้านแอร์เย็นมากครับ 🥶']],
   cstore: [['เปิดยี่สิบสี่ชั่วโมงทุกวันค่ะ', 'น้ำ ขนม ข้าวกล่อง ยา มีครบ'], ['ดึกๆ หิวก็แวะมาได้นะคะ'], ['รับถุงไหมคะ... อ๋อ ไม่รับ ช่วยโลกด้วย ดีมากค่ะ 🌱']],
@@ -2097,6 +2116,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15q', d: '15 พ.ย. (รอบ 17)', items: [
+    '🐾 <b>เดินเข้าร้านสัตว์เลี้ยงได้แล้ว!</b> ทั้ง 2 สาขามีห้องด้านใน ตู้ปลา และสัตว์ตัวเป็นๆ เดินเล่นกระโดดอยู่ในร้าน แตะที่ตัวมันได้ · มีพนักงานประจำร้าน น้องมะลิ (สาขา 1) และ พี่ภูผา (สาขา 2) คุยแล้วดูรายการสัตว์เลี้ยงได้เลย'] },
   { v: '2026-11-15p', d: '15 พ.ย. (รอบ 16)', items: [
     '🐶 <b>ร้านสัตว์เลี้ยง สาขา 2</b> ย้ายมาอยู่มุมตะวันตกเฉียงเหนือแทนบ้านสองหลังเดิม · ทั้งสองสาขาอยู่ใน 🗺️ รายการสถานที่ของแผนที่ กดเพื่อเดินไปหาได้เหมือนอาคารอื่น',
     '🤫 บอทผู้เล่นไม่พิมพ์ในแชทโลกอีกแล้ว'] },
@@ -2825,9 +2846,9 @@ function tex(name, tx, ty, px, py) {
   return true;
 }
 const FLOOR = { fashion: 'fl_marble', police: 'fl_concrete', office: 'fl_carpet_blue', market: 'fl_beige', warehouse: 'fl_concrete', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_concrete',
-  restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_mint', school: 'fl_tatami', bank: 'fl_marble', house: 'fl_wood', cstore: 'fl_white' };
+  restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_mint', school: 'fl_tatami', bank: 'fl_marble', house: 'fl_wood', cstore: 'fl_white', petshop: 'fl_wood' };
 const WALL = { fashion: '#f6d6e4', police: '#c7d3e6', office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', rider: '#3f6b63', dealer: '#dfe6ec', toolshop: '#b9a17f',
-  restaurant: '#e9cfa4', kitchen: '#f3f3f3', hospital: '#e6f1f6', school: '#cfe0c4', bank: '#efe2bb', house: '#ecd2b2', cstore: '#e4efe9' };
+  restaurant: '#e9cfa4', kitchen: '#f3f3f3', hospital: '#e6f1f6', school: '#cfe0c4', bank: '#efe2bb', house: '#ecd2b2', cstore: '#e4efe9', petshop: '#f6e6c8' };
 function under(tx, ty) {
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) { const c = tileAt(tx + dx, ty + dy); if (',=kmspc'.includes(c)) return c; }
   return '.';
