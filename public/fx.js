@@ -78,6 +78,20 @@ window.FX = (() => {
     sleep() { tone(392, 0.6, { vol: 0.08, attack: 0.1 }); tone(330, 0.8, { vol: 0.08, at: 0.3, attack: 0.1 }); },
     heal() { [N.E5, N.A5, N.C6].forEach((f, i) => tone(f, 0.4, { vol: 0.1, at: i * 0.1, attack: 0.02 })); },
     notice() { tone(N.G5, 0.12, { vol: 0.06 }); tone(N.C6, 0.2, { vol: 0.06, at: 0.08 }); },
+    // pet voices: arg = [kind, volume scale]; each kind is a few short synthesised notes with a little random pitch so it never sounds the same twice
+    pet(arg) {
+      const [k, v = 1] = Array.isArray(arg) ? arg : [arg], r = 1 + (Math.random() - .5) * .14;
+      if (k === 'dog') { tone(520 * r, 0.09, { type: 'sawtooth', vol: .09 * v, slide: 330 }); noise(0.08, { freq: 900, q: 1.2, vol: .07 * v }); tone(560 * r, 0.1, { type: 'sawtooth', vol: .08 * v, slide: 340, at: 0.14 }); }
+      else if (k === 'bigdog') { tone(260 * r, 0.14, { type: 'sawtooth', vol: .1 * v, slide: 170 }); noise(0.1, { freq: 500, q: 1, vol: .07 * v }); }
+      else if (k === 'cat') { tone(560 * r, 0.14, { vol: .1 * v, slide: 900, attack: .03 }); tone(900 * r, 0.3, { vol: .1 * v, slide: 520, at: 0.13, attack: .02 }); }
+      else if (k === 'bird') { for (let i = 0; i < 2; i++) tone(2100 * r, 0.06, { type: 'triangle', vol: .08 * v, slide: 2900, at: i * 0.09 }); }
+      else if (k === 'duck') { for (let i = 0; i < 2; i++) { tone(430 * r, 0.1, { type: 'square', vol: .05 * v, slide: 330, at: i * 0.14 }); noise(0.09, { freq: 1200, q: 2, vol: .05 * v, at: i * 0.14 }); } }
+      else if (k === 'squeak') { tone(1500 * r, 0.07, { vol: .08 * v, slide: 2300 }); tone(1800 * r, 0.06, { vol: .07 * v, slide: 2400, at: 0.09 }); }
+      else if (k === 'low') { tone(160 * r, 0.25, { type: 'triangle', vol: .12 * v, slide: 210, attack: .04 }); }
+      else if (k === 'magic') { [N.E6, N.G6, N.C6 * 2].forEach((f, i) => tone(f * r, 0.3, { vol: .07 * v, at: i * 0.07 })); }
+      else if (k === 'roar') { tone(200 * r, 0.3, { type: 'sawtooth', vol: .08 * v, slide: 120 }); tone(900 * r, 0.12, { vol: .05 * v, slide: 1500, at: 0.05 }); }
+      else tone(900 * r, 0.1, { vol: .08 * v, slide: 1300 });
+    },
     whoosh() { noise(0.25, { freq: 400, sweep: 2500, q: 0.7, vol: 0.12 }); },
   };
   function play(name, arg) { if (!st.sfx) return; ensure(); try { SFX[name] && SFX[name](arg); } catch { } }

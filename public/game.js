@@ -1189,8 +1189,12 @@ function shopPets(room) {
   for (const q of a) if (now0 > q.idleAt) { q.idleAt = now0 + 2200 + Math.random() * 4500; petPlay(q, false); q.big = .7 + Math.random() * .6; if (Math.random() < .5) q.flip = !q.flip; }
   return a;
 }
+const PET_VOICE = { shiba: 'dog', golden: 'bigdog', corgi: 'dog', pug: 'dog', husky: 'bigdog', dalmatian: 'bigdog', poodle: 'dog', pom: 'dog', chihuahua: 'dog', tabby: 'cat', blackcat: 'cat', whitecat: 'cat', siamese: 'cat', calico: 'cat', britcat: 'cat', oddeye: 'cat',
+  chick: 'bird', duck: 'duck', penguin: 'duck', rabbit: 'squeak', lop: 'squeak', hamster: 'squeak', guinea: 'squeak', hedgehog: 'squeak', squirrel: 'squeak', fox: 'dog', redpanda: 'squeak', panda: 'low', capybara: 'low', turtle: 'low', dragon: 'roar', unicorn: 'magic' };
 function petPlay(q, love) {
   q.hop = performance.now(); q.big = love ? 1.7 : 1; q.hopDur = love ? 520 : 420;
+  // voices: always when tapped; now and then for your own pet and the shop's animals (never other players' pets, to keep it quiet)
+  if (love || (q.shop || q.owner === myId) && Math.random() < .3) FX.play('pet', [PET_VOICE[q.id] || 'squeak', love ? 1 : .55]);
   if (love) { FX.play('pop'); FX.float(q.x, q.y - .9, '❤', '#ff6b9a', .55); FX.burst(q.x, q.y - .5, '#ff9ec0', 8); if (navigator.vibrate) navigator.vibrate(12); }
 }
 function stepPets(dt) {
@@ -1200,8 +1204,8 @@ function stepPets(dt) {
     let q = PETST.get(p.id);
     const head = [p.rx, p.ry], area = areaOf(p.x, p.y)?.id;
     if (!q || q.id !== p.pt) {                                      // just called out: pops up next to the owner with a big hop
-      q = { id: p.pt, x: p.rx - .7, y: p.ry + .1, trail: [head], area, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 420, idleAt: now0 + 2500 };
-      PETST.set(p.id, q); petPlay(q, false); q.big = 1.5; if (vis0(q)) { FX.burst(q.x, q.y - .4, '#ffe27a', 10); FX.play('pop'); }
+      q = { id: p.pt, owner: p.id, x: p.rx - .7, y: p.ry + .1, trail: [head], area, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 420, idleAt: now0 + 2500 };
+      PETST.set(p.id, q); petPlay(q, false); q.big = 1.5; if (p.id === myId) FX.play('pet', [PET_VOICE[q.id] || 'squeak', .8]); if (vis0(q)) { FX.burst(q.x, q.y - .4, '#ffe27a', 10); FX.play('pop'); }
     }
     const last = q.trail[q.trail.length - 1];
     if (area !== q.area || petDist(head, last) > 3) { q.area = area; q.trail = [head]; q.x = p.rx - .6; q.y = p.ry + .1; }   // door / teleport: it comes along
@@ -2116,6 +2120,8 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15r', d: '15 พ.ย. (รอบ 18)', items: [
+    '🔊 <b>เสียงสัตว์เลี้ยง!</b> หมาเห่า แมวร้องเมี้ยว ลูกเจี๊ยบเจี๊ยบ เป็ดก๊าบ กระต่ายร้องแหลมๆ แพนด้าครางเบาๆ มังกรคำราม และยูนิคอร์นมีเสียงวิบวับ · ได้ยินตอนแตะที่ตัวมัน ตอนเรียกออกมา และตอนมันกระโดดเล่นเองบางครั้ง (ปิดได้ที่ ⚙️ เสียง)'] },
   { v: '2026-11-15q', d: '15 พ.ย. (รอบ 17)', items: [
     '🐾 <b>เดินเข้าร้านสัตว์เลี้ยงได้แล้ว!</b> ทั้ง 2 สาขามีห้องด้านใน ตู้ปลา และสัตว์ตัวเป็นๆ เดินเล่นกระโดดอยู่ในร้าน แตะที่ตัวมันได้ · มีพนักงานประจำร้าน น้องมะลิ (สาขา 1) และ พี่ภูผา (สาขา 2) คุยแล้วดูรายการสัตว์เลี้ยงได้เลย'] },
   { v: '2026-11-15p', d: '15 พ.ย. (รอบ 16)', items: [
