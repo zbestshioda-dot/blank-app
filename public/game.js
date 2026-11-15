@@ -2,7 +2,7 @@
 (() => {
 const $ = s => document.querySelector(s);
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
-const job = c => me?.career === c || !!me?.admin;   // admins can do every job's work
+const job = c => me?.career === c || !!me?.admin && me.god?.alljobs !== false;   // admins can do every job's work (unless switched off)
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // ---- pixel icons: emoji anywhere in the page (panels, buttons, toasts, the HUD) are swapped for the game's own pixel-art
 // icons (public/assets/icons.webp). Text drawn on the canvas keeps its emoji.
@@ -2230,6 +2230,8 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
+  godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0)) return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
+  godName(m, root) { send({ t: 'god', op: 'rename', name: root.querySelector('#godName')?.value || '' }); },
 };
 let bugList = null;
 // quest givers: every quest comes from a townsperson with a painted portrait (public/assets/portraits.*)
@@ -3458,6 +3460,10 @@ function renderPanel(p) {
       const g = me.god || {};
       const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small></div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
+        <div class="secT">💰 เพิ่มเงิน (ไม่จำกัด)</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="1" placeholder="จำนวนเงิน เช่น 1000000">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}</div>
+        <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
+        <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
+        <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏃 ความเร็ว x<span id="godSpdV">${(g.speed || 1).toFixed(1)}</span></b><small>เลื่อนปรับได้ 1–5 เท่า (กดค้างปุ่มวิ่งได้อีก)</small></span><input id="godSpd" type="range" min="1" max="5" step="0.5" value="${g.speed || 1}" style="width:130px"></div>
