@@ -1229,46 +1229,35 @@ function act(a, m) {
       if (a.rods.includes(id)) return toast(a, `คุณมี${r.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, r.price)) return;
       a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4);
-      return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่ม 🎣 ตกปลา`, '🎣');
+      return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่มใหญ่เพื่อเหวี่ยงเบ็ด`, '🎣');
     }
-    case 'pier.cast': {
+    case 'pier.cast': {                    // cast from the water's edge (the big button); the float lands a couple of tiles out
       if (!rodOf(a)) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (เริ่ม ${money(D.RODS.bamboo.price)})`, '🎣', false);
       if (a.cast) return;
       if (!spend(a, 8)) return;
-      const bite = now() + rnd(2500, 7000);
-      // timing game: a marker sweeps the bar; the catch zone is wider with a better rod and a higher level
-      const w = Math.min(0.6, rodOf(a).zone + 0.008 * (fishLv(a) - 1)), z0 = rnd(0.05, 0.95 - w);
-      a.cast = { state: 'wait', bite, expire: bite + 5200, st: s.id, zone: [+z0.toFixed(3), +(z0 + w).toFixed(3)], speed: +rnd(0.75, 1.15).toFixed(2) }; markMe(a);
+      const bite = now() + rnd(3500, 9500) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
+      a.cast = { state: 'wait', bite, win: Math.round(650 + r.zone * 2000 + 15 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
       return;
     }
-    case 'pier.reel': {
+    case 'pier.reel': case 'pier.hook': {   // strike: too early (only a nibble) scares the fish, inside the bite window hooks it and the fight starts
+      const c = a.cast; if (!c) return;
+      if (c.state === 'wait') { a.cast = null; markMe(a); return toast(a, 'ตวัดเร็วไป ทุ่นแค่ไหวเพราะปลาแตะเหยื่อ ปลาตกใจหนีไปแล้ว', '💨', false); }
+      if (c.state !== 'bite') return;
+      const id = rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
+      const pow = id ? clamp(.22 + .16 * rar + (it.base >= 1500 ? .08 : 0), .2, 1) : .12;
+      c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((1.5 + rar * 1.6) * 1000);
+      c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(300 + r.zone * 650), seed: rint(1, 1e9), min: c.min };
+      markMe(a); return send(a, { t: 'hooked', fight: c.fight });
+    }
+    case 'pier.land': {                     // the fish was played out and lifted at the right moment
+      const c = a.cast; if (!c || c.state !== 'fight') return;
+      if (now() - c.t0 < c.min) { a.cast = null; markMe(a); return toast(a, 'ดึงแรงเกินไป ปลาหลุด!', '💨', false); }
+      a.cast = null; return giveCatch(a, c.fish);
+    }
+    case 'pier.lose': {                     // the line snapped, the fish ran off with it or the hook slipped
       if (!a.cast) return;
-      if (a.cast.state === 'wait') { a.cast = null; markMe(a); return toast(a, 'ดึงเร็วเกินไป ปลาตกใจหนีไปแล้ว', '💨', false); }
-      const zone = a.cast.zone, pos = +m.pos;
-      a.cast = null;
-      if (!(pos >= zone[0] - 0.02 && pos <= zone[1] + 0.02)) { markMe(a); return toast(a, 'กดไม่ตรงจังหวะ ปลาหลุดไปแล้ว! ลองใหม่', '💨', false); }
-      const before = fishLv(a);
-      const id = rollFish(a, s.pool); a.xp.fisher = (a.xp.fisher || 0) + 1;
-      if (fishLv(a) > before) {
-        toast(a, `เลเวลตกปลาเพิ่มเป็น Lv.${fishLv(a)}!${fishLv(a) >= D.FISHING.maxLv ? '' : ` (เลเวลสูงสุด ${D.FISHING.maxLv} ได้ชุดนักตกปลา)`}`, '🎣');
-        if (fishLv(a) >= D.FISHING.maxLv && !(a.outfits || []).includes('fisher')) {
-          a.outfits = [...(a.outfits || []), 'fisher']; joy(a, 15);
-          toast(a, 'ตกปลาถึงเลเวลสูงสุด! ได้รับรางวัล 🎽 ชุดนักตกปลา ใส่ได้ที่ ⚙️ ตั้งค่า → ชุด', '🏆');
-          feed(`🎣 ${a.name} เป็นนักตกปลาระดับสูงสุด ได้รับชุดนักตกปลา!`);
-        }
-      }
-      infect(a, 'injury', 0.02);
-      if (ev('rain')) infect(a, 'cold', 0.03);
-      if (!id) { markMe(a); return toast(a, 'ได้ขยะ 🥫 ... ไม่มีราคา', '🥫', false); }
-      addItem(a, id, 1); markMe(a); quest(a, 'fish'); stat(a, 'fish');
-      if (id === 'shark') stat(a, 'shark'); if (id === 'chest') stat(a, 'chest'); if (id === 'goldenfish') stat(a, 'goldenfish');
-      const it = D.ITEMS[id], rar = it.rar || 1, rn = D.FISH_RARITY[rar] || '';
-      if (rar >= 4) stat(a, 'epicfish');
-      a.fishdex = a.fishdex || {}; const first = !a.fishdex[id]; a.fishdex[id] = (a.fishdex[id] || 0) + 1;
-      stat(a, 'fishdex', Object.keys(a.fishdex).filter(k => D.ITEMS[k]?.rar).length, true);
-      if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
-      send(a, { t: 'catch', item: id, first });
-      return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
+      const why = { snap: '💥 สายขาด! ดึงตอนปลากำลังสู้แรงเกินไป', run: '🐟 ปลาลากสายออกไปไกลจนหลุด', slack: '〰️ สายหย่อนนานไป เบ็ดหลุดจากปากปลา', miss: '💦 ยกไม่ทันจังหวะ ปลาดิ้นหลุดไปแล้ว' }[m.why] || 'ปลาหลุดไปแล้ว';
+      a.cast = null; markMe(a); return toast(a, why, '🎣', false);
     }
     // ---------------- gardens
     case 'lot.buy': {
@@ -1684,6 +1673,31 @@ function dogTick(a, t) {
   }
   if (t > c.until) { a.dogq = null; a.dogNext = t + D.DOGQ.next * 2; markMe(a); toast(a, `⏰ หมดเวลา! ตามหา "น้อง${c.name}" ไม่ทัน ${c.owner}เสียใจมาก เคสล้มเหลว`, '😢', false); joy(a, -4); }
 }
+// a fish (or junk) landed: xp, the bag, the fish book, the news feed
+function giveCatch(a, id) {
+  const before = fishLv(a);
+  a.xp.fisher = (a.xp.fisher || 0) + 1;
+  if (fishLv(a) > before) {
+    toast(a, `เลเวลตกปลาเพิ่มเป็น Lv.${fishLv(a)}!${fishLv(a) >= D.FISHING.maxLv ? '' : ` (เลเวลสูงสุด ${D.FISHING.maxLv} ได้ชุดนักตกปลา)`}`, '🎣');
+    if (fishLv(a) >= D.FISHING.maxLv && !(a.outfits || []).includes('fisher')) {
+      a.outfits = [...(a.outfits || []), 'fisher']; joy(a, 15);
+      toast(a, 'ตกปลาถึงเลเวลสูงสุด! ได้รับรางวัล 🎽 ชุดนักตกปลา ใส่ได้ที่ ⚙️ ตั้งค่า → ชุด', '🏆');
+      feed(`🎣 ${a.name} เป็นนักตกปลาระดับสูงสุด ได้รับชุดนักตกปลา!`);
+    }
+  }
+  infect(a, 'injury', 0.02);
+  if (ev('rain')) infect(a, 'cold', 0.03);
+  if (!id) { markMe(a); return toast(a, 'ได้ขยะ 🥫 ... ไม่มีราคา', '🥫', false); }
+  addItem(a, id, 1); markMe(a); quest(a, 'fish'); stat(a, 'fish');
+  if (id === 'shark') stat(a, 'shark'); if (id === 'chest') stat(a, 'chest'); if (id === 'goldenfish') stat(a, 'goldenfish');
+  const it = D.ITEMS[id], rar = it.rar || 1, rn = D.FISH_RARITY[rar] || '';
+  if (rar >= 4) stat(a, 'epicfish');
+  a.fishdex = a.fishdex || {}; const first = !a.fishdex[id]; a.fishdex[id] = (a.fishdex[id] || 0) + 1;
+  stat(a, 'fishdex', Object.keys(a.fishdex).filter(k => D.ITEMS[k]?.rar).length, true);
+  if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
+  send(a, { t: 'catch', item: id, first });
+  return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
+}
 function moodTick(a, t, indoors) {
   // happiness drifts down; good things push it up, hardship pushes it down
   let d = -D.HAPPY.decay;
@@ -1976,7 +1990,7 @@ const BOT_REPLY = [
   [/สวัสดี|หวัดดี|ดีจ้า|hello|hi\b|ทัก/i, ['สวัสดีครับ 😄', 'หวัดดีจ้า', 'ดีครับบ', 'ทักทายย 👋']],
   [/งาน|สมัคร|อาชีพ/, ['ไปคุยกับเจ้าหน้าที่ตามตึกได้เลย', 'ไรเดอร์เงินดีนะ แต่ต้องมีใบขับขี่', 'ลองเป็นชาวไร่ดู ไม่ต้องมีวุฒิ']],
   [/เงิน|รวย|จน/, ['ตกปลาขายก็ได้เงินนะ', 'ทำงานไปเรื่อยๆ เดี๋ยวก็รวย 555', 'จนเหมือนกัน 😭']],
-  [/ปลา|ตก/, ['ท่าตกปลาริมทะเลได้ปลาใหญ่', 'ต้องกดตอนเข้าแถบเขียวนะ']],
+  [/ปลา|ตก/, ['ท่าตกปลาริมทะเลได้ปลาใหญ่', 'ทุ่นจมแล้วค่อยตวัดนะ']],
   [/หิว|กิน|ข้าว/, ['ร้านอาหารอยู่ใจกลางเมือง', 'ไปกินด้วยกันมั้ย']],
   [/เพื่อน|แอด/, ['ได้เลย 😊', 'ยินดีที่ได้รู้จักนะ']],
   [/555|ฮา|lol/i, ['555+', 'ขำ 😂']],
@@ -2294,7 +2308,7 @@ function meView(a) {
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
-    pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, zone: a.cast.state === 'bite' ? a.cast.zone : null, speed: a.cast.speed } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
+    pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
@@ -2488,7 +2502,7 @@ function move(a, m) {
   }
   if (x !== a.x || y !== a.y) { a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; }
   a.f = clamp(Math.floor(+m.f) || 0, 0, 7);
-  if (a.cast && Math.hypot(a.x - ST[a.cast.st].x, a.y - ST[a.cast.st].y) > ST[a.cast.st].r + 1.2) { a.cast = null; markMe(a); }
+  if (a.cast && Math.hypot(a.x - a.cast.x, a.y - a.cast.y) > 1.2) { a.cast = null; markMe(a); toast(a, 'เดินออกมา เก็บเบ็ดแล้ว', '🎣', false); }
 }
 // the step must not cross a wall (sampled); a tiny radius slack absorbs the client's rounding to 2 decimals
 function pathClear(x0, y0, x1, y1) {
@@ -2857,8 +2871,9 @@ function tick() {
       }
     }
     if (a.cast) {
-      if (a.cast.state === 'wait' && t >= a.cast.bite) { a.cast.state = 'bite'; send(a, { t: 'bite', zone: a.cast.zone, speed: a.cast.speed }); markMe(a); }
-      else if (a.cast.state === 'bite' && t > a.cast.expire) { a.cast = null; markMe(a); toast(a, 'ปลาหนีไปแล้ว ช้าเกิน!', '💨', false); }
+      if (a.cast.state === 'wait' && t >= a.cast.bite) { a.cast.state = 'bite'; a.cast.expire = t + a.cast.win + 300; send(a, { t: 'bite', win: a.cast.win }); markMe(a); }
+      else if (a.cast.state === 'bite' && t > a.cast.expire) { a.cast = null; markMe(a); toast(a, 'ตวัดไม่ทัน ปลาฉกเหยื่อแล้วหนีไป', '💨', false); }
+      else if (a.cast.state === 'fight' && t > a.cast.t0 + 150000) { a.cast = null; markMe(a); }
     }
     if (a.trade && (dist(a.trade.a, a.trade.b) > 8 || areaId(a.trade.a) !== areaId(a.trade.b))) tradeClose(a.trade, 'อยู่ไกลกันเกินไป ยกเลิกการแลกเปลี่ยน');
     if (godLock(a)) a.energy = a.hunger = a.health = a.happy = 100;

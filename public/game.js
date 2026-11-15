@@ -335,7 +335,8 @@ function handle(m) {
       if (panel?.kind === 'chat') refreshPanel(true);
       break;
     }
-    case 'bite': fishBite = { t: performance.now(), zone: m.zone, speed: m.speed || 1 }; if (panel?.kind !== 'pier' && near?.type === 'pier') openPanel({ kind: 'pier', st: near.id }); FX.play('bite'); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 0.9); FX.float(bobber.x, bobber.y - .3, '‼️', '#fff', .6); } if (navigator.vibrate) navigator.vibrate(200); break;
+    case 'bite': fishBiteT = performance.now(); FX.play('bite'); if (navigator.vibrate) navigator.vibrate([60, 40, 90]); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 1.1); FX.burst(bobber.x, bobber.y, '#dff4ff', 10); } break;
+    case 'hooked': fightStart(m.fight); break;
     case 'req': showReq(m); break;
     case 'ring': showRing(m); break;
     case 'call': {
@@ -696,7 +697,7 @@ addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') { if (e.key === 'Escape') e.target.blur(); return; }
   keys[e.key.toLowerCase()] = true;
   if (!G) return;
-  if (e.key === 'e' || e.key === ' ') { e.preventDefault(); onAction(); }
+  if (e.key === 'e' || e.key === ' ') { e.preventDefault(); if (FG) { if (!e.repeat) fightPress(); reelHold = true; return; } if (!e.repeat) onAction(); }
   if (e.key === 'Enter' && !panel) { e.preventDefault(); openChatBox(); }
   if (e.key === 'Escape') { closePanel(); }
   if (e.key === 'b') openPanel({ kind: 'bag' });
@@ -706,7 +707,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Shift' && !running) { shiftRun = true; setRun(true); }
   if (e.key === 'c' || e.key === 't' || e.key === 'Enter' && panel) { e.preventDefault(); openChatBox(); }
 });
-addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'e' || e.key === ' ') reelHold = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
@@ -897,8 +898,11 @@ function onAction() {
   if (near.type === 'trash') return toast('ถังขยะ · ขอทานคุ้ยหาของได้', '🗑️', false);
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
-  if (near.type === 'pier' && me.cast) return reel();                // the big button reels in too
-  if (near.type === 'pier' && !me.cast && me.rod && panel?.st === near.id) return doAct(near.id, 'cast');
+  if (near.type === 'pier') {                                         // fishing is all on the big button: cast, strike, (hold to reel), lift
+    if (!me.cast) { if (t < actCd) return; actCd = t + 900; return doAct(near.id, 'cast'); }
+    if (me.cast.state === 'fight') return fightPress();
+    return strike();
+  }
   if (panel?.st === near.id) { closePanel(); return; }
   if (dlgQ) { dlgTap(); return; }
   if (STAFF_AT[near.id]) return talkTo(STAFF_AT[near.id], near.id);
@@ -907,8 +911,8 @@ function onAction() {
 // the big button: tap = use / enter, press and hold = run while held
 {
   const ab = $('#actBtn'); let hold = null;
-  ab.addEventListener('pointerdown', e => { e.preventDefault(); ab.setPointerCapture?.(e.pointerId); hold = { id: e.pointerId, ran: false, tm: setTimeout(() => { if (hold) { hold.ran = true; setRun(true); if (navigator.vibrate) navigator.vibrate(20); } }, 320) }; });
-  const up = e => { if (!hold || hold.id !== e.pointerId) return; clearTimeout(hold.tm); const ran = hold.ran; hold = null; if (ran) setRun(false); else if (e.type === 'pointerup') onAction(); };
+  ab.addEventListener('pointerdown', e => { e.preventDefault(); ab.setPointerCapture?.(e.pointerId); if (FG) { reelHold = true; fightPress(); hold = { id: e.pointerId, fish: 1 }; return; } hold = { id: e.pointerId, ran: false, tm: setTimeout(() => { if (hold) { hold.ran = true; setRun(true); if (navigator.vibrate) navigator.vibrate(20); } }, 320) }; });
+  const up = e => { if (!hold || hold.id !== e.pointerId) return; if (hold.fish) { reelHold = false; hold = null; return; } clearTimeout(hold.tm); const ran = hold.ran; hold = null; if (ran) setRun(false); else if (e.type === 'pointerup') onAction(); };
   ab.addEventListener('pointerup', up); ab.addEventListener('pointercancel', up);
   ab.addEventListener('contextmenu', e => e.preventDefault());
 }
@@ -958,7 +962,7 @@ function frame(t) {
     if (sendT > 0.066 && sig !== lastSent) { sendT = 0; lastSent = sig; send({ t: 'p', x: +m.x.toFixed(2), y: +m.y.toFixed(2), f: m.f, fx: fixId }); }
   }
   for (const p of P.values()) if (p.id !== myId) { const k = Math.min(1, dt * 12); p.rx += (p.x - p.rx) * k; p.ry += (p.y - p.ry) * k; }
-  stepPets(dt);
+  stepPets(dt); stepFight(dt);
 
   near = findNear();
   const ab = $('#actBtn');
@@ -967,15 +971,14 @@ function frame(t) {
     const closed = near.type === 'door' && near.house === undefined && (near.renov || !isOpen(near.bld));
     const stf = STAFF_AT[near.id];
     if (stf) { $('#actIcon').textContent = '💬'; staffGreet(stf); }
-    if (near.type === 'pier' && me.cast) $('#actIcon').textContent = me.cast.state === 'bite' ? '‼️' : '⏳';
+    if (near.type === 'pier' && me.cast) $('#actIcon').textContent = fishCue()[0];
     $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
       : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
-      : near.type === 'pier' && me.cast ? (me.cast.state === 'bite' ? 'กดตอนเข้าเขียว!' : 'รอปลา...') : near.label;
+      : near.type === 'pier' ? (me.cast ? fishCue()[1] : '🎣 เหวี่ยงเบ็ด') : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); $('#actIcon').textContent = '👆'; $('#actLabel').textContent = 'ใช้งาน'; }
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
   if (panel?.kind === 'player' && !P.get(panel.pid)) closePanel();
-  drawFishBar();
   draw(t);
 }
 requestAnimationFrame(frame);
@@ -1362,7 +1365,7 @@ function npcPatient(b, s) {
 const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FACE): gender, hair, clothes
   office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', g: 'f', lk: { hair: 'brown', shirt: 'white' }, hi: 'สวัสดีค่ะ สนใจร่วมงานกับไทยเทคไหมคะ?', yes: 'ทำงานให้ตรงเวลานะคะ เข้างาน 8 โมง!' },
   farmer:   { name: 'พี่ข้าวหอม (ประธานสหกรณ์)', short: 'พี่ข้าวหอม', g: 'f', lk: { hair: 'brown', shirt: 'red' }, hi: 'มาทำไร่ด้วยกันไหม ได้กินผักสดทุกวันเลยนะ', yes: 'ดูแลแปลงดีๆ นะ' },
-  fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: 'มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: 'ปลากินเบ็ดแล้วกดให้ตรงแถบเขียวนะ!' },
+  fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: 'มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: 'ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
   merchant: { name: 'เฮียชัย (เจ้าของคลังสินค้า)', short: 'เฮียชัย', lk: { hair: 'brown' }, hi: 'ของถูกเอาไปขายแพง กำไรงามนะ สนใจไหม?', yes: 'ซื้อถูกขายแพง จำไว้!' },
   chef:     { name: 'เชฟหมี (หัวหน้าครัว)', short: 'เชฟหมี', lk: { hair: 'black' }, hi: 'อยากเป็นเชฟต้องมีใบรับรองนะ แล้วมาปรุงด้วยกัน', yes: 'วัตถุดิบดี อาหารก็อร่อย!' },
   doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะคะ', yes: 'อยู่ในโรงพยาบาลช่วงเวรได้เงินเดือนทุกชั่วโมงนะคะ' },
@@ -1644,7 +1647,7 @@ const FN = {
   icuGo() { closePanel(); icuOpen(); },
   share() { shareGame(); },
   look(m) { send({ t: 'look', ...m.set }); },
-  reel() { reel(); },
+  reel() { strike(); },
   bug(m, root) { const v = root.querySelector('#bugIn').value.trim(); if (v.length < 5) return toast('เขียนรายละเอียดอีกนิด', '🐞', false); send({ t: 'bug', text: v, ua: navigator.userAgent.slice(0, 160) + ` ${innerWidth}x${innerHeight}` }); root.querySelector('#bugIn').value = ''; },
   reset(m, root) {
     const pin = root.querySelector('#resetPin').value, ok = root.querySelector('#resetOk').value.trim();
@@ -1924,7 +1927,7 @@ function rodRows(st) {
   const have = me.rods || [];
   return G.rodOrder.filter(k => st || have.includes(k)).map(k => {
     const r = G.rods[k], own = have.includes(k), on = me.rodEq === k;
-    const stats = `แถบเขียว ${Math.round(r.zone * 100)}% · โชคปลาหายาก x${r.luck} · ขยะ ${Math.round(r.junk * 100)}%`;
+    const stats = `ตวัดง่าย/สายเหนียว ${Math.round(r.zone * 100)}% · โชคปลาหายาก x${r.luck} · ขยะ ${Math.round(r.junk * 100)}%`;
     const btn = own ? B(on ? 'ถืออยู่ ✓' : 'ถือเบ็ดนี้', { t: 'rod', id: k }, on ? 'primary' : 'good', on) : B(money(r.price), { t: 'act', st, a: 'rod', rod: k }, 'good', me.money < r.price);
     return itemRowRaw(r.icon, `${esc(r.name)}${on ? ' <span class="tag">ในมือ</span>' : ''}`, `${esc(r.desc)} · ${stats}`, btn);
   }).join('') || '<div class="sub">ยังไม่มีเบ็ด · ซื้อได้กับน้าเล็กที่สมาคมประมง</div>';
@@ -2158,6 +2161,11 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15u', d: '15 พ.ย. (รอบ 21)', items: [
+    '🎣 <b>ตกปลาแบบใหม่ สมจริง ไม่มีแถบมินิเกมแล้ว</b> ยืนริมน้ำแล้วกด<b>ปุ่มใหญ่</b>เหวี่ยงเบ็ดได้เลย ทุ่นลอยอยู่ในน้ำจริง',
+    '🫧 ทุ่นไหวเบาๆ = ปลาแค่แตะเหยื่อ (ตวัดตอนนี้ปลาตกใจหนี) · <b>ทุ่นจมเมื่อไหร่ กดตวัดทันที</b>',
+    '💪 <b>เย่อเบ็ด</b>: กดค้าง = กรอสาย ปล่อย = ผ่อนสาย ปลาจะวิ่งสู้เป็นช่วงๆ คันเบ็ดโค้ง สายเปลี่ยนเป็นเหลือง/แดงเมื่อตึง ถ้าฝืนกรอตอนสายแดง <b>สายขาด</b> ปล่อยนานไปปลา<b>ลากสายหนี</b> สายหย่อนนานไป<b>เบ็ดหลุด</b> · ปลายิ่งหายากยิ่งสู้นาน',
+    '🐟 ปลาหมดแรงเข้าฝั่งแล้วจะดิ้นกระโดดโผล่ <b>กดยกให้ตรงตอนมันโผล่</b> พลาด 3 ครั้งหลุด · เบ็ดดีตวัดง่ายขึ้น สายเหนียวขึ้น จังหวะยกกว้างขึ้น'] },
   { v: '2026-11-15t', d: '15 พ.ย. (รอบ 20)', items: [
     '📱 <b>ลดขนาดหน้าต่างด้านล่าง (Bottom Sheet) ทุกอัน</b> เตี้ยลงและแคบลง เห็นฉากเกมด้านบนมากขึ้น พร้อมลดขนาดตัวอักษร ปุ่ม แถวรายการ การ์ด และแท็บด้านในทุกหน้า (กระเป๋า ร้านค้า สัตว์เลี้ยง เควสต์ ฯลฯ) · เลื่อนดูเนื้อหาที่เหลือได้เหมือนเดิม'] },
   { v: '2026-11-15s', d: '15 พ.ย. (รอบ 19)', items: [
@@ -2527,7 +2535,7 @@ function renderPanel(p) {
         const outfit = (me.outfits || []).includes('fisher') ? `<div class="jobbox ok">🎽 คุณได้ชุดนักตกปลาแล้ว! ใส่ได้ที่ ⚙️ ตั้งค่า</div>` : `<div class="sub">🏆 ตกปลาจนถึง Lv.${G.fishing.maxLv} ได้รางวัล <b>ชุดนักตกปลา</b></div>`;
         return `<h2>🎣 น้าเล็ก · ร้านเบ็ดสมาคมประมง</h2><div class="sub">ตกปลา Lv.${me.fishLv}/${G.fishing.maxLv} · เบ็ดที่ดีขึ้น = แถบเขียวกว้างขึ้น ขยะน้อยลง ปลาหายากกินเบ็ดบ่อยขึ้น · ซื้อแล้วเก็บในกระเป๋า เปลี่ยนเบ็ดได้ตลอด</div>
           <div class="list">${rodRows(st)}</div>${outfit}
-          <div class="sub" style="margin-top:8px">วิธีตก: เดินไปยืน<b>ริมน้ำที่ไหนก็ได้</b> (ทะเลสาบ บ่อน้ำ ชายหาด สะพาน) → ปุ่ม 🎣 ตกปลา → พอปลากินเบ็ด ขีดขาวจะวิ่งไปมา <b>กดตอนอยู่ในแถบเขียว</b> · ทะเลกับน้ำจืดมีปลาคนละชนิด</div>`;
+          <div class="sub" style="margin-top:8px">วิธีตก: เดินไปยืน<b>ริมน้ำที่ไหนก็ได้</b> (ทะเลสาบ บ่อน้ำ ชายหาด สะพาน) → กด<b>ปุ่มใหญ่</b>เหวี่ยงเบ็ด → ทุ่นไหวเบาๆ คือปลาแตะเหยื่อ (อย่าเพิ่ง!) <b>ทุ่นจมเมื่อไหร่ กดตวัด</b> → <b>กดค้าง = กรอสาย ปล่อย = ผ่อนสาย</b> สายแดงเมื่อไหร่ต้องผ่อน ไม่งั้นขาด → ปลาหมดแรงเข้าฝั่งแล้ว<b>ยกตอนมันกระโดดโผล่</b> · ทะเลกับน้ำจืดมีปลาคนละชนิด</div>`;
       }
       return `<h2>💬 ${esc(STAFF_AT[st]?.name || 'เจ้าหน้าที่')}</h2>${applyBox(key, st)}`;
     }
@@ -2671,7 +2679,7 @@ function renderPanel(p) {
       return `<h2>❔ วิธีเล่น</h2><div class="sub" style="font-size:14px;line-height:1.7">
         👣 <b>เดิน</b>: มือถือแตะค้างแล้วลาก · เปิด 🗺️ แผนที่แล้ว<b>แตะสถานที่</b> ตัวละครจะเดินไปเอง (มีเส้นนำทาง) · แตะตัวคนอื่นเพื่อดูข้อมูล · คอม WASD/ลูกศร<br>
         🟡 <b>ปุ่มใหญ่ขวาล่าง</b>: แตะ = เข้าอาคาร/ใช้งาน/ดึงเบ็ด (คอม: E) · <b>กดค้าง = วิ่ง</b> (คอม: Shift) · ออกจากอาคารแค่เดินลงไปที่พรมหน้าประตู · 💬 <b>คุย</b> กับคนใกล้ๆ (F) · 😌 <b>พัก</b> (R) · 😀 อิโมจิบนหัว<br>
-        💰 <b>เริ่มต้นไม่มีเงิน?</b> ซื้อเบ็ดที่สมาคมประมงแล้ว<b>ตกปลาขาย</b> · กดตอนขีดขาวอยู่ในแถบเขียว<br>
+        💰 <b>เริ่มต้นไม่มีเงิน?</b> ซื้อเบ็ดที่สมาคมประมงแล้ว<b>ตกปลาขาย</b> · ทุ่นจมแล้วกดตวัด เย่อปลาเข้าฝั่ง แล้วยกตอนมันโผล่<br>
         💼 <b>หางาน</b>: คุยกับ NPC เจ้าหน้าที่ (💬) ที่ยืนข้างเคาน์เตอร์ของแต่ละที่ · เปลี่ยนงานแล้วรอ 5 นาที<br>
         🎓 <b>เรียน</b>: ลงทะเบียนที่มหาวิทยาลัย แล้วนั่งที่โต๊ะเรียน 1 ชั่วโมงในเกม = 1 คาบ · ใบขับขี่ต้องต่ออายุทุกปี<br>
         🕐 <b>เวลา</b>: 1 วันในเกม = 24 นาที (กลางคืน 19:00–07:00 ผ่านไปใน 3 นาที) · ร้านต่างๆ มีเวลาเปิด-ปิด<br>
@@ -3508,7 +3516,7 @@ const TUT = () => [
   ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือตัวละครที่มีป้ายชื่อ<b>สีเหลือง</b> ผู้เล่นคนอื่นก็อยู่ในเมืองเดียวกัน'],
   ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b><br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร'],
   ['🚪', 'เข้าอาคาร', 'เดินไปหน้าประตู แล้วกด<b>ปุ่มกลมสีเหลือง</b> (คอม: E) · ร้านต่างๆ มี<b>เวลาเปิด-ปิด</b> ดูได้ที่ป้าย'],
-  ['🎣', 'หาเงินก้อนแรก', 'แนะนำให้<b>ตกปลา</b>ก่อน! ซื้อเบ็ดกับ<b>น้าเล็ก</b>ที่สมาคมประมง (ริมทะเลสาบ) แล้วไปท่าตกปลา · พอปลากินเบ็ด <b>กดตอนขีดขาวอยู่ในแถบเขียว</b> · เอาปลาไปขายได้เลย'],
+  ['🎣', 'หาเงินก้อนแรก', 'แนะนำให้<b>ตกปลา</b>ก่อน! ซื้อเบ็ดกับ<b>น้าเล็ก</b>ที่สมาคมประมง (ริมทะเลสาบ) แล้วไปท่าตกปลา · ยืนริมน้ำแล้วกดปุ่มใหญ่เหวี่ยงเบ็ด พอ<b>ทุ่นจมกดตวัด</b> กดค้างเย่อปลาเข้าฝั่ง แล้ว<b>ยกตอนปลาโผล่</b> · เอาปลาไปขายได้เลย'],
   ['💼', 'หางานทำ', 'คุณเริ่มต้น<b>ว่างงาน</b> · คุยกับ <b>NPC เจ้าหน้าที่ 💬</b> ที่ยืนข้างเคาน์เตอร์ เช่น พ่อค้า (คลังสินค้า), เกษตรกร (สหกรณ์ในไร่) · งานบริษัท/หมอต้องเรียนจบที่มหาวิทยาลัยก่อน'],
   ['❤️', 'ดูแลตัวเอง', 'กินให้อิ่ม ป่วยต้องหาหมอ · <b>นั่งพัก</b> (😌) ได้ทุกที่ ฟื้นพลังงานและเลือด · <b>แตะแถบสถานะ</b>เพื่อดูวิธีเพิ่ม · 💬 ปุ่ม<b>คุย</b>ไว้คุยกับคนใกล้ๆ'],
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป (ยกเลิกได้ที่ปุ่มใต้สถานะ) · เมนู 💼 บอกว่าแต่ละงานสมัครที่ไหน'],
@@ -3710,23 +3718,91 @@ function dzInfo(id) {
   toast(`${d.name}: ${d.sym.join(', ')} · สาเหตุ: ${d.cause} · ${d.self}`, d.icon, false);
 }
 
-// ------------------------------------------------------------------ fishing timing game
-// after a bite a white marker sweeps the bar; press while it is inside the green zone
-let fishBite = null;
-const fishPos = () => { if (!fishBite) return -1; const ph = ((performance.now() - fishBite.t) / 1000 * fishBite.speed * 0.95) % 2; return ph < 1 ? ph : 2 - ph; };
-function reel() {
-  if (!me?.cast) return;
-  const st = near?.type === 'pier' ? near.id : panel?.kind === 'pier' ? panel.st : null; if (!st) return;
-  const pos = me.cast.state === 'bite' && fishBite ? +fishPos().toFixed(3) : -1;
-  FX.play('click'); doAct(st, 'reel', { pos });
-  if (pos >= 0) { const z = fishBite.zone, hit = pos >= z[0] - .02 && pos <= z[1] + .02; FX.play(hit ? 'splash' : 'fail'); }
-  fishBite = null;
+// ------------------------------------------------------------------ fishing: cast, strike, play the fish, lift it out
+// Everything happens in the world on the big button. Wait: the float bobs, small nibbles dip it (striking then scares
+// the fish). Bite: the float is yanked under - strike now. Fight: hold = reel in, let go = give line. A running fish
+// pulls hard: keep reeling and the line snaps; give it line for too long and it runs off; leave the line slack and the
+// hook slips. A tired fish comes in; at the bank it thrashes and breaks the surface - lift exactly then.
+let fishBiteT = 0, FG = null, reelHold = false, nibble = { at: 0, t: 0 };
+function strike() {
+  if (!me?.cast || !waterNear) return;
+  FX.play(me.cast.state === 'bite' ? 'splash' : 'fail'); doAct('water', 'hook');
 }
-function drawFishBar() {
-  const mk = document.getElementById('fMark'); if (!mk || !fishBite) return;
-  const zn = document.getElementById('fZone'), z = fishBite.zone || [0.4, 0.6];
-  if (!zn.dataset.set) { zn.dataset.set = 1; zn.style.left = z[0] * 100 + '%'; zn.style.width = (z[1] - z[0]) * 100 + '%'; const bar = document.getElementById('fBar'); bar.onpointerdown = e => { e.preventDefault(); reel(); }; }
-  mk.style.left = fishPos() * 100 + '%';
+function fightStart(f) {
+  const r = (n => () => (n = (n * 16807) % 2147483647) / 2147483647)(f.seed || 7);
+  FG = { ...f, rnd: r, t0: performance.now(), dist: 1, ten: .35, sta: 1, run: false, pt: performance.now() + 400, slack: 0, mode: 'fight', miss: 0, surf: 0, surfEnd: 0, lastTick: 0, str0: 0, sway: r() * 6 };
+  FX.play('splash'); if (navigator.vibrate) navigator.vibrate(120); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 700, 1.3); FX.burst(bobber.x, bobber.y, '#dff4ff', 14); }
+}
+function fightEnd(ok, why) {
+  if (!FG) return; FG = null; reelHold = false;
+  if (ok) { doAct('water', 'land'); FX.play('splash'); const s = P.get(myId); if (s) FX.burst(s.x, s.y - .2, '#dff4ff', 16); }
+  else { doAct('water', 'lose', { why }); FX.play('fail'); if (navigator.vibrate) navigator.vibrate(why === 'snap' ? [40, 30, 40] : 30); }
+}
+// a press: in the land phase it is the lift; otherwise just the start of a hold
+function fightPress() {
+  if (!FG || FG.mode !== 'land') return;
+  const now0 = performance.now();
+  if (now0 >= FG.surf && now0 <= FG.surfEnd) return fightEnd(true);
+  FG.miss++; FG.ten = Math.min(.95, FG.ten + .25); FX.play('splash'); if (fishAt()) FX.ring(fishAt().x, fishAt().y, '#fff', 400, .7);
+  if (FG.miss >= 3) fightEnd(false, 'miss');
+}
+function stepFight(dt) {
+  if (!FG) return;
+  if (!me?.cast && performance.now() - FG.t0 > 1500) { FG = null; reelHold = false; return; }   // (the 'me' update can arrive a moment after 'hooked')
+  const now0 = performance.now(), r = FG.rnd, hold = reelHold, el = now0 - FG.t0;
+  if (FG.mode === 'fight') {
+    if (now0 > FG.pt) {                                    // the fish alternates between runs and rests
+      FG.run = !FG.run;
+      FG.pt = now0 + (FG.run ? (700 + r() * 1100) * (.7 + FG.pow * .6) : (900 + r() * 1400) * (1.3 - FG.pow * .5));
+      FG.str0 = FG.pow * (.6 + r() * .6) * (.45 + FG.sta * .55);
+      if (FG.run) { if (navigator.vibrate) navigator.vibrate(Math.round(40 + FG.str0 * 80)); const f = fishAt(); if (f) FX.ring(f.x, f.y, '#fff', 500, .5 + FG.str0); }
+    }
+    if (FG.run) {
+      const st = FG.str0;
+      if (hold) { FG.ten += 1.15 * st / FG.str * dt * 1.7; FG.dist -= .02 * dt; FG.sta -= .16 * st * dt; }
+      else { FG.ten += (st * .35 - .55) * dt; FG.dist += .11 * st * dt; FG.sta -= .07 * st * dt; }
+      if (Math.random() < dt * 6) { const f = fishAt(); if (f) FX.burst(f.x, f.y, '#e8f7ff', 2); }
+    } else {
+      if (hold) { FG.dist -= (.14 + .12 * (1 - FG.pow)) * (.55 + .45 * (1 - FG.sta)) * dt * (1 + (FG.str - 1) * .5); FG.ten += (.45 - FG.ten) * 2.2 * dt; }
+      else { FG.ten -= .55 * dt; FG.sta = Math.min(1, FG.sta + .025 * dt); }
+    }
+    FG.ten = Math.max(0, FG.ten); FG.sta = Math.max(0, FG.sta);
+    FG.slack = FG.ten < .08 ? FG.slack + dt : Math.max(0, FG.slack - dt * 2);
+    if (hold && now0 - FG.lastTick > (FG.run ? 140 : 85)) { FG.lastTick = now0; FX.play('reel', FG.ten); }
+    if (FG.ten > .78 && Math.random() < dt * 4) FX.play('creak', FG.ten);
+    if (FG.ten >= 1) return fightEnd(false, 'snap');
+    if (FG.dist >= 1.5) return fightEnd(false, 'run');
+    if (FG.slack > 2.8) return fightEnd(false, 'slack');
+    if (FG.dist <= .12) {
+      if (el < (FG.min || 0) + 400) FG.dist = .13;              // (the server wants a little fight first)
+      else { FG.mode = 'land'; FG.dist = .1; FG.surf = now0 + 500 + r() * 600; FG.surfEnd = FG.surf + FG.land; FG.landT = now0; }
+    }
+  } else {                                                   // at the bank: it thrashes and breaks the surface now and then
+    FG.ten = .55 + Math.sin(now0 / 90) * .12;
+    if (now0 > FG.surfEnd) { FG.surf = now0 + 650 + r() * 750; FG.surfEnd = FG.surf + FG.land; }
+    if (now0 >= FG.surf && !FG.splashed) { FG.splashed = true; FX.play('splash'); const f = fishAt(); if (f) { FX.ring(f.x, f.y, '#fff', 450, .9); FX.burst(f.x, f.y - .2, '#e8f7ff', 8); } }
+    if (now0 > FG.surfEnd) FG.splashed = false;
+    if (now0 - FG.landT > 7000) { FG.mode = 'fight'; FG.dist = .45; FG.run = true; FG.pt = now0 + 1200; FG.str0 = FG.pow; FG.miss = 0; }   // it dives again
+  }
+}
+// where the hooked fish is: out along the cast line, swinging side to side, closer as you reel it in
+function fishAt() {
+  const s = P.get(myId); if (!s || !bobber) return null;
+  const dx = bobber.x - s.rx, dy = bobber.y - s.ry, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+  const d = FG ? .7 + FG.dist * (L - .7 + .6) : L, t = performance.now() / 1000;
+  const sw = FG ? Math.sin(t * (FG.run ? 2.6 : 1.1) + FG.sway) * (.25 + .55 * FG.dist) * (FG.mode === 'land' ? .4 : 1) : 0;
+  return { x: s.rx + ux * d - uy * sw, y: s.ry + uy * d + ux * sw };
+}
+// the big button's icon + label while fishing
+function fishCue() {
+  const c = me?.cast; if (!c) return ['🎣', '🎣 เหวี่ยงเบ็ด'];
+  if (c.state === 'wait') return ['⏳', 'รอปลากินเบ็ด...'];
+  if (c.state === 'bite') return ['‼️', 'ตวัด!'];
+  if (!FG) return ['🎣', 'กำลังสู้กับปลา'];
+  if (FG.mode === 'land') return ['🐟', 'ยกตอนปลาโผล่!'];
+  if (FG.ten > .78) return ['⚠️', reelHold ? 'ปล่อยสาย!' : 'สายตึงมาก'];
+  if (FG.slack > 1.2) return ['〰️', 'สายหย่อน กรอ!'];
+  return reelHold ? ['🌀', 'กรอสาย...'] : ['✊', 'กดค้าง = กรอสาย'];
 }
 
 // ------------------------------------------------------------------ sound & effects glue
@@ -3747,30 +3823,79 @@ function onMeDiff(a, b) {
   if (b.energy - a.energy >= 8) FX.float(x + .5, y + .2, `+${Math.round(b.energy - a.energy)}⚡`, '#f2c94c', .34);
   if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }
   if (b.hunger - a.hunger >= 8) FX.float(x, y + .4, `+${Math.round(b.hunger - a.hunger)}🍗`, '#8fe3a6', .34);
-  if (!a.cast && b.cast) { bobber = findWater(s.x, s.y); FX.play('whoosh'); if (bobber) setTimeout(() => { FX.play('splash'); FX.ring(bobber.x, bobber.y, '#fff', 800, 1); }, 250); }
-  if (!b.cast) { bobber = null; fishBite = null; }
+  if (!a.cast && b.cast) { bobber = findWater(s.x, s.y); castT = performance.now(); FX.play('whoosh'); if (bobber) setTimeout(() => { FX.play('splash'); FX.ring(bobber.x, bobber.y, '#fff', 800, 1); }, 380); }
+  if (!b.cast) { bobber = null; FG = null; reelHold = false; }
   if (!a.down && b.down) { FX.play('fail'); closePanel(); }
   if (a.down && !b.down) FX.play('heal');
 }
 const ICON_SFX = { '🍳': 'sizzle', '🍛': 'munch', '🍜': 'munch', '🍲': 'munch', '🥗': 'munch', '😴': 'sleep', '😌': 'sleep', '🏥': 'heal', '💉': 'heal', '💓': 'heal', '🎓': 'levelup', '🌱': 'pop', '📦': 'pop', '🔔': 'ding', '🛵': 'notice' };
 function toastSfx(m) { if (!m.ok) return FX.play('fail'); if (ICON_SFX[m.icon]) FX.play(ICON_SFX[m.icon]); }
+// the float lands 2-3 tiles out, in the direction with the most open water
+let castT = 0;
 function findWater(x, y) {
-  for (let d = 1; d <= 3; d++) for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-    const tx = Math.floor(x + dx * d), ty = Math.floor(y + dy * d);
-    if (tileAt(tx, ty) === 'w') return { x: tx + .5, y: ty + .5 };
+  let best = null, bn = 0;
+  for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [.7, .7], [-.7, .7], [.7, -.7], [-.7, -.7]]) {
+    let n = 0, far = null;
+    for (let d = 1; d <= 4; d++) { const tx = Math.floor(x + dx * d), ty = Math.floor(y + dy * d); if (tileAt(tx, ty) === 'w') { n++; if (d <= 3.2) far = { x: x + dx * Math.min(d, 2.8), y: y + dy * Math.min(d, 2.8) }; } else if (n) break; }
+    if (far && n > bn) { bn = n; best = far; }
   }
-  return null;
+  return best;
 }
 function drawBobber(X, Y, t) {
   if (!bobber || !me?.cast) return;
   const s = P.get(myId); if (!s) return;
-  const bite = me.cast.state === 'bite';
-  const bx = bobber.x * TS + X + (bite ? Math.sin(t / 30) * 3 : 0), by = bobber.y * TS + Y + (bite ? Math.sin(t / 45) * 4 + 4 : Math.sin(t / 400) * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(s.rx * TS + X, s.ry * TS + Y - TS * .2); ctx.quadraticCurveTo((s.rx * TS + X + bx) / 2, Math.min(s.ry * TS + Y, by) - TS * .6, bx, by); ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx, by, TS * .12, 0, 7); ctx.fill();
-  ctx.fillStyle = '#e0453a'; ctx.beginPath(); ctx.arc(bx, by, TS * .12, Math.PI, 0); ctx.fill();
-  if (bite && Math.random() < .08) FX.ring(bobber.x, bobber.y, '#fff', 500, .6);
+  const c = me.cast, now0 = performance.now(), fl = Math.min(1, (now0 - castT) / 380);
+  const px = s.rx * TS + X, py = s.ry * TS + Y + TS * .32, hx = px + (bobber.x > s.rx ? 1 : -1) * TS * .18, hy = py - TS * .78;
+  const tens = FG ? FG.ten : c.state === 'bite' ? .5 : .1;
+  // the rod: from the hands up toward the water, bending more the harder the fish pulls
+  const ddx = bobber.x - s.rx, ddy = bobber.y - s.ry, dl = Math.hypot(ddx, ddy) || 1, ux = ddx / dl, uy = ddy / dl, side = ux >= -.05 ? 1 : -1;
+  const bend = TS * (.06 + tens * .5);
+  const tx0 = hx + ux * TS * .75 + side * TS * .45, ty0 = hy + uy * TS * .45 - TS * .85;   // held up and out over the water
+  const tx = tx0 + ux * bend * .5, ty = ty0 + bend;                                        // the tip dips toward the fish
+  const cx0 = (hx + tx0) / 2 - side * bend * .15, cy0 = (hy + ty0) / 2 - bend * .25;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#4a2e16'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(cx0, cy0, tx, ty); ctx.stroke();
+  ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(cx0, cy0, tx, ty); ctx.stroke();
+  // where the line ends: the float, or the fish once it is hooked
+  let ex, ey, sub = false;
+  if (FG) { const f = fishAt(); ex = f.x * TS + X; ey = f.y * TS + Y; }
+  else {
+    ex = (s.rx + (bobber.x - s.rx) * fl) * TS + X; ey = (s.ry + (bobber.y - s.ry) * fl) * TS + Y - Math.sin(fl * Math.PI) * TS * 1.2;
+    if (fl >= 1) {
+      ey += Math.sin(t / 420) * 1.5;
+      if (c.state === 'wait') {                              // nibbles: the float dips a little now and then (don't strike yet!)
+        if (now0 > nibble.at) { nibble = { at: now0 + 1400 + Math.random() * 2600, t: now0 }; if (Math.random() < .7) FX.ring(bobber.x, bobber.y, '#fff', 380, .35); }
+        const u = (now0 - nibble.t) / 260; if (u < 1) ey += Math.sin(u * Math.PI) * TS * .09;
+      } else if (c.state === 'bite') { sub = true; ex += Math.sin(t / 35) * 3; ey += TS * .1; if (Math.random() < .2) FX.ring(bobber.x, bobber.y, '#fff', 300, .5); }
+    }
+  }
+  // the line: sags when slack, straight and red-hot when it is about to snap
+  const col = tens > .8 ? ((now0 / 90 | 0) % 2 ? '#ff4a3a' : '#ffd0c8') : tens > .55 ? '#ffd34d' : 'rgba(255,255,255,.85)';
+  const sag = FG ? TS * Math.max(0, .5 - tens) * 1.4 : fl < 1 ? 0 : TS * .45;
+  ctx.strokeStyle = col; ctx.lineWidth = tens > .55 ? 1.8 : 1.3;
+  ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo((tx + ex) / 2, (ty + ey) / 2 + sag, ex, ey); ctx.stroke();
+  if (FG) {                                                  // the fish: a dark shape under the water, splashing on its runs; at the bank it leaps
+    const f = fishAt(), big = TS * (.22 + FG.pow * .3), leap = FG.mode === 'land' && now0 >= FG.surf && now0 <= FG.surfEnd;
+    ctx.save(); ctx.translate(ex, ey);
+    if (leap) {
+      const u = (now0 - FG.surf) / FG.land, hgt = Math.sin(u * Math.PI) * TS * .55;
+      ctx.translate(0, -hgt); ctx.rotate(Math.sin(u * Math.PI * 2) * .6);
+      ctx.fillStyle = '#c7d4dc'; ctx.beginPath(); ctx.ellipse(0, 0, big, big * .42, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-big * .9, 0); ctx.lineTo(-big * 1.45, -big * .4); ctx.lineTo(-big * 1.45, big * .4); ctx.fill();
+      ctx.fillStyle = '#26323a'; ctx.beginPath(); ctx.arc(big * .55, -big * .08, big * .09, 0, 7); ctx.fill();
+    } else {
+      ctx.globalAlpha = .38 + .25 * (1 - FG.dist); ctx.fillStyle = '#10232e';
+      ctx.rotate(Math.sin(t / 160) * .3); ctx.beginPath(); ctx.ellipse(0, 0, big, big * .42, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-big * .9, 0); ctx.lineTo(-big * 1.4, -big * .35); ctx.lineTo(-big * 1.4, big * .35); ctx.fill();
+    }
+    ctx.restore();
+    if (FG.run && Math.random() < .25) FX.ring(f.x, f.y, '#fff', 300, .3 + FG.str0 * .4);
+    return;
+  }
+  // the float
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, TS * .1, 0, sub ? Math.PI : 7, sub); ctx.fill();
+  ctx.fillStyle = '#e0453a'; ctx.beginPath(); ctx.arc(ex, ey, TS * .1, Math.PI, 0); if (!sub) ctx.fill();
+  if (sub) { ctx.font = `800 ${Math.round(TS * .45)}px sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd34d'; ctx.fillText('!', ex, ey - TS * .5); }
 }
 
 // ------------------------------------------------------------------ trade window

@@ -92,6 +92,8 @@ window.FX = (() => {
       else if (k === 'roar') { tone(200 * r, 0.3, { type: 'sawtooth', vol: .08 * v, slide: 120 }); tone(900 * r, 0.12, { vol: .05 * v, slide: 1500, at: 0.05 }); }
       else tone(900 * r, 0.1, { vol: .08 * v, slide: 1300 });
     },
+    reel(ten = .3) { noise(0.025, { freq: 3200 + ten * 1500, q: 4, vol: 0.05 }); },
+    creak(ten = .8) { tone(180 + ten * 120, 0.18, { type: 'sawtooth', vol: 0.025, slide: 150 + ten * 60, attack: .03 }); },
     whoosh() { noise(0.25, { freq: 400, sweep: 2500, q: 0.7, vol: 0.12 }); },
   };
   function play(name, arg) { if (!st.sfx) return; ensure(); try { SFX[name] && SFX[name](arg); } catch { } }
