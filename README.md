@@ -95,7 +95,7 @@ npm start          # http://localhost:3000
 เกมนี้ใช้ WebSocket ต้องรันบนเซิร์ฟเวอร์ Node.js (ใช้ Streamlit Cloud ไม่ได้) ตัวอย่างบน [Render](https://render.com):
 1. New → **Web Service** → เลือก repo นี้และ branch ที่ต้องการ
 2. Render อ่าน `render.yaml` ให้เอง (Build: `npm install`, Start: `npm start`)
-3. ได้ลิงก์ `https://xxx.onrender.com` ส่งให้เพื่อนได้เลย
+3. ได้ลิงก์ `https://lifetown.onrender.com` ส่งให้เพื่อนได้เลย
 
 ### เก็บข้อมูลผู้เล่นถาวร (แนะนำ)
 ถ้าไม่ตั้งค่าอะไร ข้อมูลจะเก็บในไฟล์ ซึ่งหายทุกครั้งที่ Render deploy/รีสตาร์ท ให้ใช้ Postgres ฟรีแทน:
