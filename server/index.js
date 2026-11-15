@@ -44,6 +44,7 @@ for (const [k, it] of Object.entries(D.ITEMS)) {
 let event = null;                           // { id, text, until }
 let nextEventAt = Date.now() + (process.env.EVENT_NOW ? 2000 : 120_000);   // EVENT_NOW=1 starts an event right away (testing)
 const chatLog = [];                         // town-wide announcements only
+let announceText = '';                      // the admin's notice in the red ticker at the top ('' = the default CBT notice); chat "all <text>"
 const reqs = new Map();                     // pending requests (trade / heal / call)
 let nextId = 1, dirty = false;
 
@@ -2464,7 +2465,7 @@ function worldView() {
   const lb = [...accounts.values()].map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
     .sort((x, y) => y.w - x.w).slice(0, 10);
   return {
-    t: 'wd', now: t, toff: D.TIME_OFF, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
+    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
@@ -2662,6 +2663,11 @@ function onMessage(ws, raw) {
     case 'p': return move(a, m);
     case 'chat': {                          // local chat: only people near you see it (bubble over your head)
       const text = cleanText(m.text, 120); if (!text) return;
+      if (isAdmin(a) && /^all(\s|$)/i.test(text)) {   // admin: "all <text>" replaces the ticker notice for everyone, "all" alone restores the CBT notice
+        announceText = text.slice(3).trim();
+        broadcast({ t: 'announce', text: announceText });
+        return toast(a, announceText ? 'ตั้งประกาศแถบด้านบนให้ทุกคนแล้ว' : 'กลับไปใช้ประกาศ CBT เดิมแล้ว', '📢');
+      }
       if (m.ch === 'world') {                 // town-wide chat: everyone reads it in the chat box, no bubble over the head
         if (!cd(a, 'wchat', 3000)) return;
         const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };

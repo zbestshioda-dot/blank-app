@@ -338,7 +338,8 @@ function handle(m) {
       else setTimeout(() => me && checkNews(), 900);
       break;
     case 'me': { const prev = me; me = m; if (!prev || prev.frame !== m.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
-    case 'wd': { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
+    case 'announce': setTicker(m.text); showTicker(); break;
+    case 'wd': { if ((m.ann || '') !== tickerAnn) setTicker(m.ann); const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
     case 'roster': {
       const ids = new Set();
       for (const p of m.players) {
@@ -736,6 +737,9 @@ $('#emoPick').innerHTML = EMOJIS.map(e => `<button data-e="${e}">${e}</button>`)
 $('#emoPick').querySelectorAll('[data-e]').forEach(b => b.onclick = () => { send({ t: 'emo', e: b.dataset.e }); $('#emoPick').classList.add('hidden'); });
 $('#emoBtn').onclick = () => { FX.play('click'); $('#emoPick').classList.toggle('hidden'); };
 // the CBT notice scrolls across the top now and then
+const TICKER_DEFAULT = '📢 เซิฟนี้เป็น CBT เมื่อเกมสมบูรณ์ข้อมูลจะถูกรีเซ็ต';
+let tickerAnn = '';
+function setTicker(text) { tickerAnn = text || ''; $('#ticker').firstElementChild.textContent = tickerAnn ? '📢 ' + tickerAnn : TICKER_DEFAULT; }
 function showTicker() { const t = $('#ticker'); if (!G) return; t.classList.remove('hidden'); const sp = t.firstElementChild; sp.style.animation = 'none'; void sp.offsetWidth; sp.style.animation = ''; setTimeout(() => t.classList.add('hidden'), 16500); }
 setTimeout(showTicker, 8000); setInterval(showTicker, 180000);
 // away from the keyboard: no touch / key for 2 minutes = "ไม่อยู่"
@@ -1911,6 +1915,7 @@ function nearBtns(t) {
     el.innerHTML = `<button data-nb="info">👤 ข้อมูล</button><button data-nb="add" class="${friend ? 'done' : 'add'}" ${friend ? 'disabled' : ''}>${friend ? '✓ เพื่อนกันแล้ว' : '➕ เพิ่มเพื่อน'}</button>`;
   }
   nbFor = best.id;
+  el.style.fontSize = Math.round(TS * .27) + 'px';   // same text size as the name tag
   el.style.transform = `translate(${Math.round(best.tagX)}px,${Math.round(best.tagY)}px) translate(-50%,-100%)`;
   el.classList.remove('hidden');
 }
@@ -1930,7 +1935,7 @@ function initNearBtns() {
 initNearBtns();
 $('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
-  if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .82 : .5); p.tagT = t; }
+  if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .8 : .46); p.tagT = t; }
   const icon = p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
@@ -2710,6 +2715,12 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-16v', d: '16 พ.ย. (รอบ 22)', items: [
+    '👥 เดินเข้าใกล้ผู้เล่นคนอื่น จะมีปุ่ม <b>ข้อมูล</b> และ <b>เพิ่มเพื่อน</b> ขึ้นเหนือชื่อเขา',
+    '🚁 แก้บั๊ก<b>เฮลิคอปเตอร์โดนดึงกลับ</b>ตอนบินข้ามตึก',
+    '💻 <b>เล่นบนคอมง่ายขึ้น</b> คลิกพื้นเพื่อเดิน · กดเมาส์ค้างเดินตามเมาส์ · ล้อเมาส์ซูม · M แผนที่ · Q เควสต์ · กด H ดูปุ่มลัดทั้งหมด',
+    '👆 แก้บั๊กแตะตัวผู้เล่นคนอื่นแล้วโปรไฟล์ไม่เปิด',
+    '📢 แอดมินเปลี่ยนข้อความประกาศแถบแดงด้านบนได้'] },
   { v: '2026-11-16u', d: '16 พ.ย. (รอบ 21)', items: ['🎣 ป้ายบอกจังหวะตกปลา (รอปลากินเบ็ด / ตวัด! / กรอสาย) ย้ายขึ้นไปอยู่เหนือตัวละครและเล็กลง ไม่บังผิวน้ำ'] },
   { v: '2026-11-16t', d: '16 พ.ย. (รอบ 20)', items: [
     '🎣 <b>ตกปลาง่ายขึ้นมาก</b> ตวัดได้นานขึ้นเกือบเท่าตัวหลังทุ่นจม · ตวัดเร็วไปไม่เสียปลาแล้ว แค่รอทุ่นจมใหม่ · เย่อสบายขึ้น (สายขาดยากขึ้น ปลาหนียากขึ้น กรอสายเร็วขึ้น สู้สั้นลง) · ยกปลาได้ช่วงกว้างขึ้นและพลาดได้ 5 ครั้ง',
