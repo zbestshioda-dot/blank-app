@@ -775,7 +775,7 @@ function apply(a, career) {
     chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
     doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (ปั๊มหัวใจ/ผ่าตัด) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
-    police: 'ลาดตระเวนนอกอาคารได้เบี้ยเลี้ยง รับแจ้งเหตุ 191 แล้วตามจับโจรได้ค่าหัว',
+    police: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 แล้วตามจับโจรได้ค่าหัว',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
   };
   toast(a, `ยินดีด้วย! ได้งานเป็น ${c.icon} ${c.name} · ${tips[career]}`, c.icon);
@@ -1160,6 +1160,22 @@ function act(a, m) {
     }
     // ---------------- fishing (anyone with a rod)
     // ---------------- ICU: emergency cases (doctors). A random case: CPR (press on the beat) or surgery (stop the marker in the zone)
+    case 'police.dog': {
+      if (!need(a, 'police')) return;
+      if (a.dogq) return toast(a, 'คุณมีเคสหมาหายอยู่แล้ว', 'ℹ️', false);
+      if ((a.dogNext || 0) > now()) return toast(a, `ยังไม่มีเคสใหม่ รออีก ${Math.ceil((a.dogNext - now()) / 1000)} วินาที`, '⏳', false);
+      if (areaId(a) !== 'town' && !D.roomAt(a.x, a.y)) return;
+      const out = D.roomAt(a.x, a.y)?.outside, from = out ? { x: out.x, y: out.y } : a, sp = dogSpot({ x: from.x, y: from.y, area: 'town' });
+      if (!sp) return toast(a, 'ยังไม่มีเคสหมาหายในตอนนี้ ลองใหม่อีกครั้ง', 'ℹ️', false);
+      if (!spend(a, D.DOGQ.energy)) return;
+      const limit = Math.round(Math.max(150, Math.min(420, sp[2] / SPEED * 2.5 + 75)) * 1000), t = now();
+      const bl = D.BUILDINGS.filter(b => b.label && (!b.area || b.area === 'town')).map(b => [b, Math.hypot(b.x + b.w / 2 - sp[0], b.y + b.h - sp[1])]).sort((p, q) => p[1] - q[1])[0];
+      const jit = () => rnd(-6, 6);
+      a.dogq = { dog: pick(D.DOGQ.dogs), name: pick(D.DOGQ.names), owner: pick(D.DOGQ.owners), x: sp[0] + .5, y: sp[1] + .5, t0: t, limit, until: t + limit,
+        hint: bl && bl[1] < 14 ? `ใกล้ ${bl[0].label}` : (D.areaAt(sp[0], sp[1])?.name || 'ในเมือง'), hc: [Math.round(sp[0] + jit()), Math.round(sp[1] + jit()), 12] };
+      markMe(a); return toast(a, `🐕 ${a.dogq.owner}แจ้งว่า "น้อง${a.dogq.name}" หายไป! ตามหาให้เจอภายใน ${Math.round(limit / 60000 * 10) / 10} นาที`, '🐕');
+    }
+    case 'police.dogquit': { if (a.dogq) { a.dogq = null; a.dogNext = now() + D.DOGQ.next; markMe(a); toast(a, 'ยกเลิกเคสหมาหายแล้ว', 'ℹ️', false); } return; }
     case 'icu.start': {
       if (!need(a, 'doctor')) return;
       if (a.icu) return;
@@ -1641,6 +1657,33 @@ function holdsHome(a) {
   if (a.rent && a.rent.until > now()) return a.rent.idx;
   return -1;
 }
+// ---- lost-dog cases (police): a dog hides somewhere reachable in town; find it (walk up to it) before the time limit
+function dogSpot(a) {
+  const A = D.AREAS.find(r => r.id === 'town'), sx = Math.floor(a.x), sy = Math.floor(a.y);
+  if (areaId(a) !== 'town') return null;
+  const dist = new Map([[sy * 4096 + sx, 0]]), q = [[sx, sy]], far = [];
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i], d = dist.get(y * 4096 + x);
+    if (d >= D.DOGQ.minSteps && d <= D.DOGQ.maxSteps && Math.hypot(x - sx, y - sy) >= 28 && D.TILES[y][x] !== 'D' && !D.roomAt(x + .5, y + .5)) far.push([x, y, d]);
+    if (d >= D.DOGQ.maxSteps) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = ny * 4096 + nx;
+      if (nx <= A.x || ny <= A.y || nx >= A.x + A.w - 1 || ny >= A.y + A.h - 1 || dist.has(k) || D.blocked(nx + .5, ny + .5)) continue;
+      dist.set(k, d + 1); q.push([nx, ny]);
+    }
+  }
+  return far.length ? pick(far) : null;
+}
+function dogTick(a, t) {
+  const c = a.dogq;
+  if (areaId(a) === 'town' && Math.hypot(a.x - c.x, a.y - c.y) < 1.5) {          // found!
+    const min = (t - c.t0) / 60000, early = t - c.t0 < c.limit * .5;
+    const pay = Math.round((D.DOGQ.base + D.DOGQ.perMin * min) * (early ? 1 + D.DOGQ.early : 1) * jobPay(a) * (1 + BOOST[tier(a, 'police')]));
+    a.dogq = null; a.dogNext = t + D.DOGQ.next; earn(a, pay); addXp(a, 1); stat(a, 'dogs'); joy(a, 6); markMe(a);
+    return toast(a, `🐕 เจอ "น้อง${c.name}" แล้ว! ส่งคืน${c.owner} ใช้เวลา ${Math.floor(min)} นาที ${Math.round((min % 1) * 60)} วิ${early ? ' · เจอเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🐕');
+  }
+  if (t > c.until) { a.dogq = null; a.dogNext = t + D.DOGQ.next * 2; markMe(a); toast(a, `⏰ หมดเวลา! ตามหา "น้อง${c.name}" ไม่ทัน ${c.owner}เสียใจมาก เคสล้มเหลว`, '😢', false); joy(a, -4); }
+}
 function moodTick(a, t, indoors) {
   // happiness drifts down; good things push it up, hardship pushes it down
   let d = -D.HAPPY.decay;
@@ -1670,11 +1713,7 @@ function moodTick(a, t, indoors) {
   if (a.pose === 'beg' && a.career === 'beggar' && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
     const c = Math.round(rint(4, 14) * jobPay(a)); earn(a, c); if (Math.random() < .5) addXp(a, .5); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
   }
-  // police on patrol (outside, on their feet) earn a small allowance
-  if (a.career === 'police' && !indoors && !a.pose && t - (a.lastMoveT || 0) < 15000) {
-    a.patrol = (a.patrol || 0) + D.POLICE.patrolWage / 60 * (1 + BOOST[tier(a, 'police')]);
-    if (a.patrol >= D.POLICE.patrolWage) { earn(a, a.patrol * jobPay(a)); a.patrol = 0; addXp(a, .5); }
-  }
+  if (a.dogq) dogTick(a, t);
 }
 
 // how good a place is for begging: busy streets near shops > quiet corners > indoors; night is slow
@@ -2260,6 +2299,7 @@ function meView(a) {
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
     run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
+    dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
     icu: a.icu ? { kind: a.icu.kind, who: a.icu.who, cpr: a.icu.cpr, zones: a.icu.zones, speeds: a.icu.speeds } : null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),

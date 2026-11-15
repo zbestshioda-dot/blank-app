@@ -617,6 +617,11 @@ const DOCTOR = { start: 8, end: 20, wage: [125, 140, 158, 178, 200, 225, 255] };
 const ICU = { pay: [80, 90, 100, 115, 130, 150, 175], next: 30000, energy: 6,
   cpr: { n: 20, bpm: [100, 110, 120] }, surgery: { steps: 5 },
   patients: ['คุณสมชาย (หัวใจหยุดเต้น)', 'ป้าบุญมี (หมดสติกลางตลาด)', 'น้องปิ่น (อุบัติเหตุจักรยาน)', 'ลุงเหม (ไส้ติ่งแตก)', 'พี่ก้อง (ถูกรถชน)', 'คุณยายทองคำ (หัวใจวาย)', 'หนุ่มนักวิ่ง (ล้มหมดสติ)', 'ช่างไฟ (ไฟดูด)'] };   // above office: needs a degree + licence
+// lost-dog cases for police: find the dog before the time runs out; pay = base + perMin x the minutes the search took (x a speed bonus when found early)
+const DOGQ = { next: 45000, energy: 5, base: 100, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
+  dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],
+  names: ['โมจิ', 'ถุงเงิน', 'ทองดี', 'บราวนี่', 'ข้าวปั้น', 'ลัคกี้', 'มะลิ', 'ซุปเปอร์', 'โบว์', 'หมูกรอบ', 'ลาเต้', 'ขาวจั๊วะ'],
+  owners: ['คุณยายบุญมี', 'น้องปิ่น', 'ลุงสมชาย', 'ป้าแดง', 'คุณหมอใจดี', 'เด็กชายต้น', 'พี่ติ๊ก', 'ครูสมศรี'] };
 // calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
 const MONTH_DAYS = 5;
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -853,7 +858,7 @@ const CAREERS = {
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ซื้อของราคาส่งจากคลัง ไปวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: ปั๊มหัวใจให้ตรงจังหวะ หรือผ่าตัดให้แม่น ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
-  police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ลาดตระเวนได้เบี้ยเลี้ยง รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
+  police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา รับแจ้งเหตุ 191 เห็นตำแหน่งโจรบนแผนที่ตำรวจ จับกุมได้ค่าหัว' },
   beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'นั่งขอทานได้ทุกที่ (ปุ่ม 🥣) ได้เศษเงินจากคนผ่านไปมา ที่คนพลุกพล่านได้บ่อยกว่า ผู้เล่นที่บริจาคให้จะมีความสุขเพิ่ม' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
@@ -936,7 +941,7 @@ const TOOLS = {
   merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ราคาส่งถูกลง 6%', 'ราคาส่งถูกลง 12%', 'ราคาส่งถูกลง 18%'] },
   chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
-  police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['เบี้ยเลี้ยง +15%', 'เบี้ยเลี้ยง +30%', 'เบี้ยเลี้ยง +50%'] },
+  police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['ค่าตอบแทน +15%', 'ค่าตอบแทน +30%', 'ค่าตอบแทน +50%'] },
   thief:    { name: 'ถุงมือล้วงกระเป๋า', icon: '🧤', fx: ['ล้วงสำเร็จง่ายขึ้น', 'ล้วงสำเร็จง่ายขึ้นมาก', 'ล้วงแทบไม่พลาด'] },
   beggar:   { name: 'ป้ายกระดาษซึ้งๆ', icon: '🪧', fx: ['คนให้เงินบ่อยขึ้น 15%', 'คนให้เงินบ่อยขึ้น 30%', 'คนให้เงินบ่อยขึ้น 50%'] },
   rider:    { name: 'กล่องเก็บความร้อน', icon: '📦', fx: ['ค่าส่ง +10%', 'ค่าส่ง +20%', 'ค่าส่ง +35%'] },
@@ -1288,6 +1293,6 @@ module.exports = {
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

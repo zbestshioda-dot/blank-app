@@ -473,6 +473,16 @@ function showRing(r) {
   FX.play('ding'); setTimeout(() => FX.play('ding'), 600); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 function paintCallChip() { const c = $('#callChip'); if (call) { c.classList.remove('hidden'); c.classList.toggle('unread', !!call.unread); c.textContent = call.unread ? `📞 ${call.with} · 💬 ${call.unread} ใหม่` : `📞 คุยกับ ${call.with}`; } else c.classList.add('hidden'); }
+function paintDogChip() {
+  const c = $('#dogChip'), q = me?.dogq;
+  if (!q) return c.classList.add('hidden');
+  const left = Math.max(0, Math.ceil((q.until - Date.now() - clockOff) / 1000));
+  const tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  c.classList.remove('hidden'); c.classList.toggle('late', left < 30); c.textContent = `🐕 ตามหา น้อง${q.name} · ${tm}`;
+  document.querySelectorAll('.dogcd').forEach(el => { el.textContent = tm; });
+}
+setInterval(paintDogChip, 500);
+$('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -1024,6 +1034,7 @@ function draw(t) {
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);   // helicopters fly over the roofs
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
+  { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
@@ -1191,6 +1202,17 @@ function shopPets(room) {
 }
 const PET_VOICE = { shiba: 'dog', golden: 'bigdog', corgi: 'dog', pug: 'dog', husky: 'bigdog', dalmatian: 'bigdog', poodle: 'dog', pom: 'dog', chihuahua: 'dog', tabby: 'cat', blackcat: 'cat', whitecat: 'cat', siamese: 'cat', calico: 'cat', britcat: 'cat', oddeye: 'cat',
   chick: 'bird', duck: 'duck', penguin: 'duck', rabbit: 'squeak', lop: 'squeak', hamster: 'squeak', guinea: 'squeak', hedgehog: 'squeak', squirrel: 'squeak', fox: 'dog', redpanda: 'squeak', panda: 'low', capybara: 'low', turtle: 'low', dragon: 'roar', unicorn: 'magic' };
+// the police case's lost dog: sits out in town (only the officer on the case sees it), looks around, hops, barks when you are close
+let lostQ = null;
+function lostDog() {
+  const c = me?.dogq, m = P.get(myId);
+  if (!c || !m || areaOf(m.x, m.y)?.id !== 'town') { lostQ = null; return null; }
+  if (!lostQ || lostQ.key !== c.t0) lostQ = { key: c.t0, id: c.dog, x: c.x, y: c.y, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 420, idleAt: performance.now() + 1500, shop: 0, lost: 1, barkAt: 0 };
+  const now0 = performance.now(), d = Math.hypot(m.rx - c.x, m.ry - c.y);
+  if (now0 > lostQ.idleAt) { lostQ.idleAt = now0 + 1800 + Math.random() * 2500; petPlay(lostQ, false); lostQ.big = .8 + Math.random() * .5; lostQ.flip = Math.random() < .5; }
+  if (now0 > lostQ.barkAt && d < 16) { lostQ.barkAt = now0 + 2800 + Math.random() * 2500; FX.play('pet', [PET_VOICE[c.dog] || 'dog', Math.max(.12, 1 - d / 16)]); if (d < 9) FX.float(c.x, c.y - 1, '🐕', '#fff', .45); }
+  return d < 11 ? lostQ : null;                    // out of sight until you are close
+}
 function petPlay(q, love) {
   q.hop = performance.now(); q.big = love ? 1.7 : 1; q.hopDur = love ? 520 : 420;
   // voices: always when tapped; now and then for your own pet and the shop's animals (never other players' pets, to keep it quiet)
@@ -1259,9 +1281,24 @@ function drawPet(q, X, Y, t) {
   const group = q.view === 'up' ? 1 : q.view === 'side' ? 2 : 0, nf = meta.n[group];
   const fr = q.moving ? Math.floor(q.phase * 1.5) % Math.max(1, nf) : 0;   // idle = frame 0
   const sw = size * sx, sh = size * sy;
+  const legend = G.pets?.[q.id]?.rar >= 5;
+  if (legend) petGlow(px, py - h - sh * .45, size, now0);
   ctx.save(); ctx.translate(px, py - h);
   if (q.view === 'side' && q.flip) ctx.scale(-1, 1);
   ctx.drawImage(petImg, (group * 4 + fr) * C, meta.row * C, C, C, -sw / 2, -sh + size * .03, sw, sh);
+  ctx.restore();
+}
+// legendary pets (rarity 5) shimmer: a soft halo and four-point stars drifting around them
+function petGlow(cx, cy, size, t) {
+  ctx.save();
+  const hue = (t / 12) % 360, g = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * .75);
+  g.addColorStop(0, `hsla(${hue},100%,80%,.28)`); g.addColorStop(1, `hsla(${hue},100%,80%,0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, size * .75, 0, 7); ctx.fill();
+  for (let i = 0; i < 6; i++) {
+    const ph = (t / 1100 + i / 6) % 1, a = i * 2.4 + t / 2500, r = size * (.28 + .3 * ((i * 37) % 10) / 10), x = cx + Math.cos(a) * r, y = cy - ph * size * .6 + Math.sin(a) * r * .5, s = size * .09 * Math.sin(ph * Math.PI);
+    ctx.fillStyle = `hsla(${(hue + i * 55) % 360},100%,${i % 2 ? 90 : 75}%,${Math.sin(ph * Math.PI)})`;
+    ctx.beginPath(); ctx.moveTo(x, y - s * 2); ctx.quadraticCurveTo(x, y, x + s * 2, y); ctx.quadraticCurveTo(x, y, x, y + s * 2); ctx.quadraticCurveTo(x, y, x - s * 2, y); ctx.quadraticCurveTo(x, y, x, y - s * 2); ctx.fill();
+  }
   ctx.restore();
 }
 // a pet's face for the shop / bag lists
@@ -1504,6 +1541,7 @@ function drawMini() {
     g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2);
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
+  if (me?.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc; g.strokeStyle = (performance.now() / 400 | 0) % 2 ? '#ffd23a' : '#ff9f1a'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((hx - A.x) * 2, (hy - A.y) * 2, hr * 2, 0, 7); g.stroke(); g.setLineDash([]); g.font = '16px serif'; g.textAlign = 'center'; g.fillText('🐕', (hx - A.x) * 2, (hy - A.y) * 2 + 6); }
   { const q = PETST.get(myId); if (q && mapOf(areaOf(q.x, q.y)?.id) === mapId) { const mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 4.5, 0, 7); g.fill(); g.fillStyle = '#ff7eb0'; g.beginPath(); g.arc(mx, my, 3, 0, 7); g.fill(); } }   // your pet: a pink dot
   { // you: drawn last, bigger, with a pulsing ring so you can always find yourself
     const q = outPos(m.rx, m.ry), mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2, k = (performance.now() % 1200) / 1200;
@@ -2120,6 +2158,9 @@ const needCareer = c => me.career === c ? '' : `<div class="sub" style="color:va
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-15s', d: '15 พ.ย. (รอบ 19)', items: [
+    '🐾 <b>สัตว์เลี้ยงย้ายมาอยู่ในเมนู</b> (แถบเมนูด้านบน ปุ่ม 🐾) ไม่ต้องเปิดกระเป๋าแล้ว · สัตว์เลี้ยง<b>ระดับตำนาน</b> (🐼 แพนด้า 🐲 มังกรน้อย 🦄 ยูนิคอร์น) มี <b>ประกายระยิบระยับ</b>ตอนเดินอยู่ข้างคุณ',
+    '👮 <b>ตำรวจเปลี่ยนจากลาดตระเวน เป็นเควส "ตามหาหมาที่หายไป"</b> รับเคสที่สถานีตำรวจ หมาจะหลบอยู่ที่ไหนสักแห่งในเมือง ฟังเสียงเห่าและดูวงสีเหลืองบนมินิแมพ ค่าตอบแทน = ฐาน + ตามเวลาที่ใช้ตามหา (เจอเร็วกว่าครึ่งเวลาโบนัส +25%) · มีเวลาจำกัด 2.5–7 นาทีตามระยะทาง ถ้าไม่เจอทันถือว่าล้มเหลว'] },
   { v: '2026-11-15r', d: '15 พ.ย. (รอบ 18)', items: [
     '🔊 <b>เสียงสัตว์เลี้ยง!</b> หมาเห่า แมวร้องเมี้ยว ลูกเจี๊ยบเจี๊ยบ เป็ดก๊าบ กระต่ายร้องแหลมๆ แพนด้าครางเบาๆ มังกรคำราม และยูนิคอร์นมีเสียงวิบวับ · ได้ยินตอนแตะที่ตัวมัน ตอนเรียกออกมา และตอนมันกระโดดเล่นเองบางครั้ง (ปิดได้ที่ ⚙️ เสียง)'] },
   { v: '2026-11-15q', d: '15 พ.ย. (รอบ 17)', items: [
@@ -2128,7 +2169,7 @@ const NEWS = [
     '🐶 <b>ร้านสัตว์เลี้ยง สาขา 2</b> ย้ายมาอยู่มุมตะวันตกเฉียงเหนือแทนบ้านสองหลังเดิม · ทั้งสองสาขาอยู่ใน 🗺️ รายการสถานที่ของแผนที่ กดเพื่อเดินไปหาได้เหมือนอาคารอื่น',
     '🤫 บอทผู้เล่นไม่พิมพ์ในแชทโลกอีกแล้ว'] },
   { v: '2026-11-15o', d: '15 พ.ย. (รอบ 15)', items: [
-    '🐾 <b>ร้านสัตว์เลี้ยงเปิดให้บริการแล้ว!</b> ทั้ง 2 สาขา (ถนนเหนือ · ถนนเหนือฝั่งตะวันตก) เปิด 09:00–21:00 เดินไปที่เคาน์เตอร์หน้าร้านเพื่อเลือกรับเลี้ยงสัตว์ได้ทั้ง 32 ชนิด แล้วเรียกออกมาเดินตามที่ 🎒 กระเป๋า · 🏋️ ฟิตเนสและ 🥊 โรงยิมยังปิดปรับปรุง'] },
+    '🐾 <b>ร้านสัตว์เลี้ยงเปิดให้บริการแล้ว!</b> ทั้ง 2 สาขา (ถนนเหนือ · ถนนเหนือฝั่งตะวันตก) เปิด 09:00–21:00 เดินไปที่เคาน์เตอร์หน้าร้านเพื่อเลือกรับเลี้ยงสัตว์ได้ทั้ง 32 ชนิด แล้วเรียกออกมาเดินตามที่เมนู 🐾 สัตว์เลี้ยง · 🏋️ ฟิตเนสและ 🥊 โรงยิมยังปิดปรับปรุง'] },
   { v: '2026-11-15n', d: '15 พ.ย. (รอบ 14)', items: [
     '🗺️ <b>มินิแมพ/แผนที่ใหญ่อัปเดต</b> อาคารที่ปิดปรับปรุง (ร้านสัตว์เลี้ยง ฟิตเนส โรงยิม ห้องสมุด ร้านดอกไม้ สถานีดับเพลิง) เป็นสี <b>เหลืองอำพัน</b> เห็นชัดว่าเข้าไม่ได้ และสัตว์เลี้ยงของคุณเป็น <b>จุดสีชมพู</b> บนมินิแมพ'] },
   { v: '2026-11-15m', d: '15 พ.ย. (รอบ 13)', items: [
@@ -2386,7 +2427,7 @@ function renderPanel(p) {
         const btn = own ? (!shopMode || on) ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : '<small>มีแล้ว ✓</small>' : B(money(pt.price), { t: 'act', st: p.st, a: 'buy', pet: id }, 'good', me.money < pt.price);
         return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
       const mine = ids.filter(id => have.includes(id)), shop = ids.filter(id => !have.includes(id));
-      if (shopMode) return `<h2>🐾 ${esc(STN(p.st)?.label || 'ร้านสัตว์เลี้ยง')}</h2><div class="sub">${hoursTxt('petshop')} · รับเลี้ยงแล้วเรียกออกมาเดินตามได้ที่ 🎒 กระเป๋า · เลี้ยงได้ทีละ 1 ตัว · มี ${have.length}/${ids.length} ตัว</div>
+      if (shopMode) return `<h2>🐾 ${esc(STN(p.st)?.label || 'ร้านสัตว์เลี้ยง')}</h2><div class="sub">${hoursTxt('petshop')} · รับเลี้ยงแล้วเรียกออกมาเดินตามได้ที่เมนู 🐾 สัตว์เลี้ยง · เลี้ยงได้ทีละ 1 ตัว · มี ${have.length}/${ids.length} ตัว</div>
         <div class="looks">${ids.map(card).join('')}</div>`;
       return `<h2>🐾 สัตว์เลี้ยง</h2><div class="sub">${me.pet ? `ตอนนี้ ${G.pets[me.pet].icon} <b>${esc(G.pets[me.pet].name)}</b> เดินตามคุณอยู่ · แตะที่ตัวมันเพื่อเล่นด้วย` : 'เรียกสัตว์เลี้ยงออกมาเดินตามคุณได้ (รับเลี้ยงเพิ่มที่ร้านสัตว์เลี้ยง 🐾 ถนนเหนือ)'} · เลี้ยงได้ทีละ 1 ตัว</div>
         ${mine.length ? `<div class="secT">💖 สัตว์เลี้ยงของฉัน (${mine.length})</div><div class="looks">${mine.map(card).join('')}</div>` : ''}
@@ -2402,7 +2443,6 @@ function renderPanel(p) {
       const job = me.career !== 'none' && G.careers[me.career]?.where;
       const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(G.outfitDefs[id]?.name || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
       return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>
-        <div class="secT">🐾 สัตว์เลี้ยง</div><div class="setRow"><span><b>${me.pet && G.pets[me.pet] ? G.pets[me.pet].icon + ' ' + esc(G.pets[me.pet].name) : 'ยังไม่ได้เรียกสัตว์เลี้ยง'}</b><small>มี ${(me.pets || []).length}/${Object.keys(G.pets).length} ตัว · เรียกออกมาเดินตาม กระโดดน่ารัก</small></span>${B('🐾 เปิดสัตว์เลี้ยง', { fn: 'openPets' })}</div>
         <div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>
         <div class="secT">👕 ชุด</div>
         <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
@@ -2556,7 +2596,7 @@ function renderPanel(p) {
           return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`}`;
     }
-    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจได้เบี้ยเลี้ยงตอนลาดตระเวนนอกอาคาร + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? policeReports() : ''}`;
+    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) + ค่าหัวเมื่อจับโจร · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${me.career === 'police' ? dogBox(st) + policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · ขอทานนั่งได้ทุกที่ (ปุ่ม 🥣) ที่คนพลุกพล่านอย่างหน้าร้าน/จัตุรัสได้เงินบ่อยกว่า</div>${staffHint('beggar')}`;
     case 'crowd': return `<h2>👥 ${esc(STN(st).label)}</h2><div class="sub">ผู้คนพลุกพล่าน · ใครก็ล้วงกระเป๋าได้ (ทุก 1 นาที) ตอนล้วงจะใส่ชุดโจรทันที คนเห็นแจ้งตำรวจได้ และสายตรวจจะวิ่งไล่จับ · ถ้าพลาดอาจถูกจับคาหนังคาเขา</div>${me.career === 'police' ? '<div class="sub">👮 ตำรวจล้วงกระเป๋าไม่ได้</div>' : B('🕶️ ล้วงกระเป๋าในฝูงชน (⚡8)', { t: 'act', st, a: 'pick' }, 'warn big')}`;
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
@@ -2767,6 +2807,12 @@ function houseDoor(s, st) {
     if (me.house >= 0) body += '<div class="sub" style="color:var(--bad)">คุณมีบ้านแล้ว</div>';
   }
   return `<h2>🏠 บ้านเลขที่ ${i + 1}${owner ? ` · ของ ${esc(owner)}` : ' · ว่าง'}</h2>${body}`;
+}
+// the lost-dog case: take it at the station, find the dog out in town before the time is up
+function dogBox(st) {
+  const c = me.dogq, cd = Math.max(0, Math.ceil(((me.dogNext || 0) - (Date.now() + clockOff)) / 1000));
+  if (c) return `<div class="jobbox">🐕 <b>เคสหมาหาย: น้อง${esc(c.name)}</b> (${G.pets[c.dog]?.name || ''}) · เจ้าของ ${esc(c.owner)}<br>📍 มีคนเห็นแถว <b>${esc(c.hint)}</b> · เหลือเวลา <b class="dogcd"></b><br><small>เดินไปให้ใกล้ตัวมันเพื่อพบ · ฟังเสียงเห่า และดูวงสีเหลืองบนแผนที่ · เจอเร็วได้โบนัส</small>${B('ยกเลิกเคส', { t: 'act', st, a: 'dogquit' })}</div>`;
+  return `<div class="jobbox">🐕 <b>เคสหมาหาย</b> · ค่าตอบแทนตามเวลาที่ใช้ตามหา (ตามไกลได้มาก) · เวลาจำกัด ถ้าไม่เจอทันถือว่าล้มเหลว${cd > 0 ? `<br><small>เคสใหม่เข้าในอีก ${cd} วินาที</small>` : ''}${B('📋 รับเคสหมาหาย (⚡5)', { t: 'act', st, a: 'dog' }, 'primary', cd > 0)}</div>`;
 }
 function policeReports() {
   const r = me.reports || [];
@@ -3417,6 +3463,7 @@ function openMap(mapId, keepScroll) {
     g.fillStyle = pl.hl ? '#ffc94d' : '#8b4fc4'; g.beginPath(); g.moveTo(pl.x, pl.y + r * 1.3); g.arc(pl.x, pl.y - r * .2, r, Math.PI * .8, Math.PI * 2.2); g.fill();
     g.font = `${Math.round(r * 1.15)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
   });
+  if (me.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc, [x, y] = L(hx, hy); g.strokeStyle = '#ffb300'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.arc(x, y, hr * k, 0, 7); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,200,0,.12)'; g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐕', x, y); }
   // police only: where reported thieves were seen
   if (me.career === 'police') for (const rp of me.reports || []) if (mapOf(rp.area) === mapId) {
     const q = AREA[rp.area]?.kind === 'room' ? AREA[rp.area].outside : rp, [x, y] = L(q.x, q.y);

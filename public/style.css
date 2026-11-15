@@ -930,3 +930,4 @@ body.hasEvent #topBar{top:146px!important}
 
 /* pets */
 .petcard canvas{width:84px;height:84px;image-rendering:auto}.petcard.on{outline:2px solid var(--acc);border-radius:12px}.petcard .rtag{margin:2px 0 4px}
+#dogChip{position:absolute;left:50%;transform:translateX(-50%);top:88px;background:linear-gradient(#e9b24a,#c07d1e);color:#fff;border-color:#6d440a;font-weight:600;border-radius:20px;padding:6px 14px;white-space:nowrap}#dogChip.late{background:linear-gradient(#e0574a,#a3281e);animation:mgPulse 1s ease-in-out infinite}
