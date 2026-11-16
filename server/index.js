@@ -1,0 +1,3240 @@
+'use strict';
+// Authoritative multiplayer server: HTTP (static client) + WebSocket (game).
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const { WebSocketServer } = require('ws');
+const D = require('./data');
+const store = require('./store');
+const Q = require('./quests');
+
+const PORT = process.env.PORT || 3000;
+const PUBLIC = path.join(__dirname, '..', 'public');
+const SPEED = 3.0;                          // tiles / second on foot
+const TICK = 100;
+// admins (lower-case login IDs). Admins play with normal stats; the god-mode menu can switch on
+// "no cooldowns" / "locked full stats" and top up money. Extra admins via ADMINS=a,b
+const ADMINS = new Set(['james2324', ...String(process.env.ADMINS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean)]);
+const isAdmin = a => !!a && ADMINS.has(String(a.login || a.name).toLowerCase());
+const godLock = a => isAdmin(a) && !!a.god?.lock;          // god mode: stats locked full, never sick / knocked out / jailed
+const godNoCd = a => isAdmin(a) && !!a.god?.nocd;          // god mode: every cooldown skipped
+const ADMIN_NAME = 'อนุทิน', ADMIN_TITLE = 'นายกเทศมนตรี';
+// names nobody else may use (or imitate) for their character
+const RESERVED = ['อนุทิน', 'นายกเทศ', 'แอดมิน', 'ผู้ดูแลระบบ', 'ทีมงาน', 'gamemaster', 'admin', 'moderator', 'official', 'gm', 'mod'];
+// compare names loosely: no spaces/punctuation/zero-width/tone marks, look-alike digits folded into letters
+const nameKey = n => String(n).normalize('NFKC').toLowerCase().replace(/[\s._\-\u200b-\u200d\u2060\ufeff]/g, '').replace(/[่้๊๋็์ํ]/g, '')
+  .replace(/[0@]/g, 'o').replace(/[1!|l]/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's');
+const impersonates = n => { const k = nameKey(n); return RESERVED.some(r => { const rk = nameKey(r); return rk.length <= 3 ? k === rk : k.includes(rk); }); };
+const VERSION = 4;                          // save-format version (2 = new world, 3 = happiness/bills/ม.6, 4 = no thief/fisher jobs, no vehicles)
+// a hash of the client files: when it changes (a new deploy) open games are told to refresh
+const BUILD = crypto.createHash('sha1').update(['index.html', 'game.js', 'style.css', 'fx.js', 'assets/atlas.json'].map(f => { try { return fs.readFileSync(path.join(__dirname, '..', 'public', f)); } catch { return ''; } }).join('|')).digest('hex').slice(0, 10);
+
+// ------------------------------------------------------------------ state
+const accounts = new Map();                 // lowercase name -> account
+const byPhone = new Map();                  // phone number -> account
+const online = new Map();                   // id -> account
+const ST = Object.fromEntries(D.STATIONS.map(s => [s.id, s]));
+const market = {};                          // item -> { mult, target }
+const stock = {};                           // wholesale stock
+for (const [k, it] of Object.entries(D.ITEMS)) {
+  market[k] = { mult: 1, target: 1 };
+  if (it.wholesale) stock[k] = it.stock;
+}
+let event = null;                           // { id, text, until }
+let nextEventAt = Date.now() + (process.env.EVENT_NOW ? 2000 : 120_000);   // EVENT_NOW=1 starts an event right away (testing)
+const chatLog = [];                         // town-wide announcements only
+let announceText = '📢 จะอัปเดตอีกครั้งในวันศุกร์ · แมพใหม่ สวนสนุกที่จะเพิ่มพลังใจ ยะฮู้! ❤️';                      // the admin's notice in the red ticker at the top ('' = the default CBT notice); chat "all <text>"
+const reqs = new Map();                     // pending requests (trade / heal / call)
+let nextId = 1, dirty = false;
+
+// ------------------------------------------------------------------ helpers
+const now = () => Date.now();
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rint = (a, b) => Math.floor(rnd(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const ev = id => event && event.id === id;
+// job levels: each level needs more experience than the last, and each action gives less the higher you are
+// (office keeps its own ladder: 3 good shifts per promotion)
+const JOB_MAX = 50;
+const xpNeed = L => Math.round(10 + 4 * Math.pow(L - 1, 1.4));
+function jobXp(xp) { let L = 1; xp = +xp || 0; while (L < JOB_MAX && xp >= xpNeed(L)) { xp -= xpNeed(L); L++; } return { L, cur: xp, need: xpNeed(L) }; }
+const lvl = (a, c = a.career) => c === 'office' ? 1 + Math.floor((a.xp[c] || 0) / 3) : jobXp(a.xp[c] || 0).L;
+const xpGain = L => 1 / (1 + 0.08 * (L - 1));          // Lv1 100% · Lv5 76% · Lv10 58% · Lv20 40%
+const jobPay = a => 1 + 0.06 * (lvl(a) - 1);            // every level pays 6% more
+const money = n => '฿' + Math.round(n).toLocaleString('en-US');
+const cleanText = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
+const hourNow = () => D.hourAt(now());
+const hhmm = h => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
+const areaId = a => D.areaAt(a.x, a.y)?.id;
+
+function send(a, obj) { if (a.ws && a.ws.readyState === 1) a.ws.send(JSON.stringify(obj)); }
+function broadcast(obj) { const s = JSON.stringify(obj); for (const a of online.values()) if (a.ws.readyState === 1) a.ws.send(s); }
+function toast(a, msg, icon = '✅', ok = true) { send(a, { t: 'toast', msg, icon, ok }); }
+function feed(text) {
+  const m = { t: 'chat', sys: true, text, ts: now() };
+  chatLog.push(m); if (chatLog.length > 40) chatLog.shift();
+  broadcast(m);
+}
+function markMe(a) { a.meDirty = true; dirty = true; }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function wellbeing(a) {
+  let m = 1;
+  if (a.hunger < 15) m *= 0.7;
+  if (a.health < 30) m *= 0.6;
+  for (const d of a.dz || []) m *= D.DISEASES[d]?.income || 1;
+  return m;
+}
+
+// ------------------------------------------------------------------ achievements
+function stat(a, key, n = 1, absolute = false) {
+  a.stats = a.stats || {};
+  a.stats[key] = absolute ? Math.max(a.stats[key] || 0, n) : (a.stats[key] || 0) + n;
+  for (const ac of D.ACHIEVEMENTS) {
+    if (ac.stat !== key || (a.ach || []).includes(ac.id) || a.stats[key] < ac.n) continue;
+    a.ach = [...(a.ach || []), ac.id];
+    if (!a.title) a.title = ac.id;
+    toast(a, `ปลดล็อกความสำเร็จ "${ac.title}" — ${ac.desc} (ตั้งเป็นฉายาบนหัวได้ที่เมนู 🏅)`, '🏅');
+    send(a, { t: 'ach', id: ac.id }); joy(a, 10);
+    feed(`🏅 ${a.name} ได้รับฉายา "${ac.title}"`);
+    sendRoster();
+  }
+  markMe(a);
+}
+// admins: every job unlocked unless they switch it off; the mayor title can be switched off too (then their own title shows)
+const allJobs = a => isAdmin(a) && a.god?.alljobs !== false;
+const adminTitle = a => isAdmin(a) && !a.god?.notitle;
+const titleOf = a => adminTitle(a) ? ADMIN_TITLE : D.ACHIEVEMENTS.find(x => x.id === a.title)?.title || '';
+const titleRar = a => adminTitle(a) ? 6 : D.ACHIEVEMENTS.find(x => x.id === a.title)?.r || 0;
+
+// ------------------------------------------------------------------ diseases
+const DZ = D.DISEASES;
+const dzProd = (a, key) => (a.dz || []).reduce((m, d) => m * (DZ[d]?.[key] || 1), 1);
+const newbie = a => now() - (a.created || now()) < 3 * 3600e3 || (a.earned || 0) < 3000;
+function infect(a, id, chance = 1) {
+  if (godLock(a)) return false;
+  if (Math.random() > chance || !DZ[id] || (a.dz || []).includes(id) || (a.dz || []).length >= 3 || a.down) return false;
+  if ((a.immune?.[id] || 0) > now()) return false;
+  if (newbie(a)) return false;                       // new players (first 3 hours) do not catch anything yet
+  a.dz = [...(a.dz || []), id];
+  const d = DZ[id];
+  toast(a, `คุณป่วยเป็น${d.name}! อาการ: ${d.sym.slice(0, 2).join(', ')} · ${d.self}`, d.icon, false);
+  markMe(a); sendRoster(); return true;
+}
+function cure(a, id) {
+  if (!(a.dz || []).includes(id)) return false;
+  a.dz = a.dz.filter(x => x !== id);
+  a.immune = { ...(a.immune || {}), [id]: now() + 240000 };
+  markMe(a); sendRoster(); return true;
+}
+function sleepWell(a) { a.awake = 0; cure(a, 'insomnia'); cure(a, 'exhaust'); }
+
+// ------------------------------------------------------------------ positions, rooms, seats
+const ROOM = Object.fromEntries(D.ROOMS.map(r => [r.id, r]));
+const chairs = new Array(8).fill(null);        // office chairs -> account
+const desks = new Array(8).fill(null);         // university desks -> account
+const beds = new Array(6).fill(null);          // hospital beds -> account | npc patient
+function standUp(a) {
+  if (a.chair >= 0) { if (chairs[a.chair] === a) chairs[a.chair] = null; a.chair = -1; }
+  if (a.desk >= 0) { if (desks[a.desk] === a) desks[a.desk] = null; a.desk = -1; }
+  if (a.bed >= 0) { if (beds[a.bed] === a) beds[a.bed] = null; a.bed = -1; wdAt = 0; }
+  if (a.pose) { a.pose = null; a.seat = null; }
+  sendRoster();
+}
+function place(a, x, y, tp) {
+  a.x = x; a.y = y; a.mvb = moveCap(a); a.moved = true; a.lastPosT = now();
+  a.fixId = (a.fixId || 0) + 1;
+  send(a, { t: 'fix', x, y, tp: tp ? 1 : 0, fx: a.fixId });
+}
+function teleport(a, x, y) { a.cast = null; standUp(a); place(a, x, y, true); markMe(a); }
+function buildingOpen(bid, h = hourNow()) { return D.isOpen(bid, h); }
+function enterRoom(a, m) {
+  if (a.down) return;
+  const s = ST[m.st]; if (!s || s.type !== 'door') return;
+  const room = ROOM[s.to]; if (!room) return;
+  if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 1.2) return toast(a, 'เดินไปที่ประตูก่อน', '🚪', false);
+  const master = isAdmin(a) && a.god?.doors;              // god mode: every door opens
+  if (s.renov && !master) return toast(a, `${s.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
+  if (s.house === undefined && !buildingOpen(s.bld) && !master) {
+    const o = D.HOURS[s.bld];
+    return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false);
+  }
+  if (s.house !== undefined) {
+    const i = s.house, o = houses[i], tn = tenants[i];
+    if (o === a && tn && tn !== a && !master) return toast(a, `บ้านของคุณปล่อยให้ ${tn.name} เช่าอยู่ เข้าได้อีกครั้งเมื่อหมดสัญญาเช่า`, '🔑', false);
+    if (o !== a && tn !== a && !master) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
+  }
+  if (!cd(a, 'door', 1200, true)) return;
+  if (s.yspawn) return teleport(a, s.yspawn.x, s.yspawn.y);   // the estate-street door opens onto the house's own yard
+  teleport(a, room.spawn.x, room.spawn.y);
+}
+// vegetable fields in your own yard: anyone with a house can farm here (farmers grow faster and harvest more)
+function yardFarm(a, m) {
+  if (a.down) return;
+  const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องเป็นเจ้าของบ้านก่อน', '🏡', false);
+  const k = String(m.k || ''), f = D.FURNITURE[fbase(k)], pos = a.fpos?.[k], yard = D.YARDS[i];
+  if (!f?.field || !furnOf(a).includes(k) || !pos || pos[0] !== YARD_FL) return;
+  if (Math.hypot(a.x - (yard.x + pos[1]), a.y - (yard.y + pos[2] - .5)) > 2.2) return toast(a, 'เดินเข้าไปใกล้แปลงผักก่อน', '⚠️', false);
+  a.ycrops = { ...(a.ycrops || {}) }; const pl = a.ycrops[k];
+  if (f.tile) return soilFarm(a, k, m);
+  if (m.op === 'plant') {
+    const c = D.CROPS[m.crop]; if (!c) return;
+    if (pl) return toast(a, 'แปลงนี้ปลูกอยู่แล้ว', '⚠️', false);
+    if (!pay(a, c.seed)) return;
+    if (!spend(a, 5)) { a.money += c.seed; return; }
+    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')) * (a.career === 'farmer' ? 1 : 1.25);
+    a.ycrops[k] = [m.crop, now() + c.grow * 1000 * g]; markMe(a); wdAt = 0;
+    return toast(a, `ปลูก${D.ITEMS[m.crop].name}แล้ว`, '🌱');
+  }
+  if (m.op === 'harvest') {
+    if (!pl) return toast(a, 'แปลงว่าง', '⚠️', false);
+    if (pl[1] > now()) return toast(a, 'พืชยังไม่โต', '🌱', false);
+    if (!spend(a, 6)) return;
+    const c = D.CROPS[pl[0]], n = rint(c.min, c.max) + Math.floor(lvl(a) / 3) + tier(a, 'farmer');
+    addItem(a, pl[0], n); delete a.ycrops[k]; addXp(a); markMe(a); quest(a, 'harvest'); stat(a, 'harvest'); wdAt = 0;
+    if (pl[0] === 'durian') stat(a, 'durian');
+    return toast(a, `เก็บเกี่ยว ${D.ITEMS[pl[0]].icon}${D.ITEMS[pl[0]].name} ได้ ${n} หน่วย`, '🧺');
+  }
+}
+// soil tiles: each cell grows one plant; 'all' works on the whole connected bed the tapped cell belongs to
+function soilBed(a, k) {
+  const cell = o => { const p = a.fpos[o]; return p && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.tile ? `${Math.floor(p[1])},${Math.round(p[2]) - 1}` : null; };
+  const at = new Map(); for (const o of furnOf(a)) { const c = cell(o); if (c) at.set(c, o); }
+  const out = [k], seen = new Set([cell(k)]);
+  for (let i = 0; i < out.length; i++) { const [x, y] = cell(out[i]).split(',').map(Number); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const c = `${x + dx},${y + dy}`; if (at.has(c) && !seen.has(c)) { seen.add(c); out.push(at.get(c)); } } }
+  return out;
+}
+function soilFarm(a, k, m) {
+  const keys = m.all ? soilBed(a, k) : [k];
+  if (m.op === 'plant') {
+    const c = D.CROPS[m.crop]; if (!c) return;
+    const empty = keys.filter(o => !a.ycrops[o]); if (!empty.length) return toast(a, 'แปลงนี้ปลูกเต็มแล้ว', '⚠️', false);
+    const seed = Math.ceil(c.seed / 3), cost = seed * empty.length, energy = Math.max(2, Math.ceil(empty.length * .8));
+    if (a.money < cost) return toast(a, `เงินไม่พอ (ค่าเมล็ด ${money(cost)})`, '💸', false);
+    if (!spend(a, energy)) return;
+    a.money -= cost;
+    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')) * (a.career === 'farmer' ? 1 : 1.25), ready = now() + c.grow * 1000 * g;
+    for (const o of empty) a.ycrops[o] = [m.crop, ready];
+    markMe(a); wdAt = 0;
+    return toast(a, `ปลูก${D.ITEMS[m.crop].name} ${empty.length} ช่อง (ค่าเมล็ด ${money(cost)})`, '🌱');
+  }
+  if (m.op === 'harvest') {
+    const ripe = keys.filter(o => a.ycrops[o] && a.ycrops[o][1] <= now()); if (!ripe.length) return toast(a, 'ยังไม่มีอะไรสุก', '🌱', false);
+    if (!spend(a, Math.max(2, Math.ceil(ripe.length * .8)))) return;
+    const got = {};
+    for (const o of ripe) { const id = a.ycrops[o][0]; got[id] = (got[id] || 0) + rint(1, 2) + (Math.random() < .15 * tier(a, 'farmer') ? 1 : 0); delete a.ycrops[o]; }
+    for (const [id, n] of Object.entries(got)) { addItem(a, id, n); if (id === 'durian') stat(a, 'durian'); }
+    addXp(a); markMe(a); quest(a, 'harvest'); stat(a, 'harvest'); wdAt = 0;
+    return toast(a, `เก็บเกี่ยว ${Object.entries(got).map(([id, n]) => `${D.ITEMS[id].icon}${D.ITEMS[id].name} ${n}`).join(' · ')}`, '🧺');
+  }
+}
+function exitRoom(a) {
+  if (a.down) return;
+  const room = D.roomAt(a.x, a.y);
+  if (!room || Math.hypot(a.x - room.exit.x, a.y - room.exit.y) > 2.4) return;
+  if (!cd(a, 'door', 1200, true)) return;
+  teleport(a, room.outside.x, room.outside.y);
+}
+
+// ------------------------------------------------------------------ money
+function earn(a, amount) {
+  amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a);
+  if (amount > 0) {
+    quest(a, 'earn', amount);
+    if (a.loan > 0) { const r = Math.min(a.loan, Math.ceil(amount * D.BANK.repayShare)); a.money -= r; a.loan -= r; }   // loans auto-repay from income
+  }
+  return amount;
+}
+function credit(o, amount) {          // pay someone who may be offline
+  amount = Math.round(amount); o.money += amount; o.earned += amount; o.sd = true; dirty = true;
+  if (o.ws) { quest(o, 'earn', amount); markMe(o); }
+}
+const tier = (a, c) => (a.tools && a.tools[c]) || 0;
+const BOOST = [0, .15, .3, .5];
+const houseOf = a => (a.house >= 0 ? a.house : -1);
+const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];
+const fbase = k => String(k).split('#')[0];   // partition pieces can be owned many times: wdoor, wdoor#2, wdoor#3 ...
+const FURN_MULTI_MAX = 40;
+const YARD_FL = 9;                                   // fpos floor number that means "out in the yard"
+// every new home comes with two vegetable fields already laid out either side of the path
+function starterYard(a) {
+  a.yfree = 1; a.fpos = { ...(a.fpos || {}) };
+  for (const [k, x] of [['gfield', 12.5], ['gfield#2', 19.5]]) if (!(a.furniture || []).includes(k)) { a.furniture = [...(a.furniture || []), k]; a.fpos[k] = [YARD_FL, x, 16]; }
+}
+const yardOpen = (a, z) => D.YARD.start.includes(z) || (a.yz || []).includes(z);   // bought furniture + login-reward pieces (kept even without a house)
+const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
+const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) : 0;
+const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
+const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
+const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
+const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1);   // riding a vehicle outdoors
+const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
+const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
+function accrue(a) {
+  const t = now(), days = Math.min(D.BANK.offlineDays, (t - (a.bankT || t)) / D.DAY_MS); a.bankT = t;
+  if (a.bank > 0 && days > 0) a.bank += Math.min(a.bank, D.BANK.cap) * (Math.pow(1 + D.BANK.rate, days) - 1);
+  if (a.loan > 0 && days > 0) a.loan += a.loan * (Math.pow(1 + D.BANK.loanRate, days) - 1);
+}
+function quest(a, type, n = 1) {
+  for (const e of Q.progress(a, type, n)) {
+    send(a, { t: 'quest', ...e });
+    if (e.kind === 'all') feed(`📜 ${a.name} ทำเควสต์ประจำวันครบทั้ง 3 ข้อ! (ติดต่อกัน ${e.streak} วัน)`);
+    if (e.kind === 'wall') { feed(`🗓️ ${a.name} ทำเควสต์รายสัปดาห์ครบทั้งหมด!`); stat(a, 'weekAll'); }
+  }
+  markMe(a);
+}
+// each merchant has their own allocation at the warehouse that refills over time, so merchants never empty the shelves on each other
+function wstock(a, id) {
+  const it = D.ITEMS[id], t = now(); a.wst = a.wst || {};
+  const e = a.wst[id] || (a.wst[id] = [it.stock, t]);
+  e[0] = Math.min(it.stock, e[0] + (t - e[1]) / 1000 / it.refill); e[1] = t;
+  return e[0];
+}
+const wstockView = a => Object.fromEntries(Object.keys(D.ITEMS).filter(k => D.ITEMS[k].wholesale).map(k => [k, Math.floor(wstock(a, k))]));
+// shops get tired of the same goods from the same seller: each merchant has their own price pressure per item (recovers ~0.4%/s)
+function msat(a, id) {
+  const t = now(); a.msat = a.msat || {}; const e = a.msat[id] || (a.msat[id] = [1, t]);
+  e[0] = Math.min(1, e[0] + (t - e[1]) / 1000 * 0.004); e[1] = t; return e;
+}
+// what the market's buyers pay this player per unit for their own trade's goods (merchant goods, chef dishes): shown in the sell tab
+function tradePrices(a) {
+  const kind = { merchant: 'goods', chef: 'meal' }[a.career]; if (!kind) return null;
+  const out = {}; for (const id in a.inv) if (a.inv[id] > 0 && D.ITEMS[id]?.kind === kind) out[id] = Math.round(npcBuyPrice(a, id, NPC_BUY) * msat(a, id)[0] * jobPay(a));
+  return out;
+}
+function spend(a, e) {
+  if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) กินอาหารหรือนั่งพักก่อน`, '😴', false); return false; }
+  a.energy -= e;
+  a.hunger = Math.max(0, a.hunger - e * 0.12);
+  if (a.energy < 20) infect(a, 'exhaust', 0.1);
+  return true;
+}
+function pay(a, amount) {
+  if (a.money < amount) { toast(a, `เงินไม่พอ (ต้องใช้ ${money(amount)})`, '💸', false); return false; }
+  a.money -= amount; return true;
+}
+function cd(a, key, ms, quiet) {
+  const t = now();
+  if (godNoCd(a)) { a.cd[key] = 0; return true; }
+  if ((a.cd[key] || 0) > t) { if (!quiet) toast(a, `รออีก ${Math.ceil((a.cd[key] - t) / 1000)} วินาที`, '⏳', false); return false; }
+  a.cd[key] = t + ms; return true;
+}
+function addItem(a, id, n) { a.inv[id] = (a.inv[id] || 0) + n; if (a.inv[id] <= 0) delete a.inv[id]; }
+function need(a, career) {
+  if (allJobs(a)) return true;                       // admins can do every job's work (switchable)
+  if (a.career !== career) {
+    const c = D.CAREERS[career], w = c.where && ST[c.where];
+    toast(a, `ต้องเป็น${c.name}ก่อน — ไปสมัครงานที่ ${w ? w.label : '-'}`, '🚫', false); return false;
+  }
+  return true;
+}
+function addXp(a, n = 1) {
+  const c = a.career; if (!c || c === 'none') return;
+  const before = lvl(a), g = c === 'office' ? n : n * xpGain(before);
+  a.xp[c] = +((a.xp[c] || 0) + g).toFixed(3); markMe(a);
+  if (c !== 'office' && lvl(a) > before) { toast(a, `🎉 เลเวลอาชีพ${D.CAREERS[c].name}อัปเป็น Lv.${lvl(a)}! ได้เงินจากงานเพิ่มเป็น +${Math.round((jobPay(a) - 1) * 100)}%`, '⭐'); if (lvl(a) % 5 === 0) feed(`⭐ ${a.name} เลเวล${D.CAREERS[c].name}ถึง Lv.${lvl(a)}`); }
+}
+// licences that expire: the driving licence must be renewed every in-game year (1 real day)
+const LICENSE_YEAR = 12 * D.MONTH_DAYS * D.DAY_MS;
+const licExpired = (a, id) => (a.licenses || []).includes(id) && !!D.LICENSES[id]?.renew && (a.licExp?.[id] || 0) < now();
+const hasLic = (a, id) => (a.licenses || []).includes(id) && !licExpired(a, id);
+// fishing is open to everyone; its own level comes from catches (stored as xp.fisher)
+const rodOf = a => D.RODS[(a.rods || []).includes(a.rodEq) ? a.rodEq : (a.rods || [])[0]] || null;   // the rod in hand
+const fishLv = a => Math.min(D.FISHING.maxLv, 1 + Math.floor((a.xp?.fisher || 0) / D.FISHING.xpPerLv));
+
+const NPC_BUY = 0.3;                         // NPC shops buy at a fraction of what players pay each other
+const NPC_SELL = 2.5;
+const FISH_RATE = 0.45;
+// chefs: a dish sells to the restaurants for what its ingredients cost at the kitchen counter + a cook's fee
+// (12 energy a dish, ~0.75 dishes a minute on natural energy => ~฿55/min at Lv.1, on par with police; cheaper ingredients bought from players are extra profit)
+const CHEF_MARGIN = 72;
+const CHEF_COST = Object.fromEntries(D.RECIPES.map(r => [r.id, Object.entries(r.in).reduce((s, [k, q]) => s + Math.ceil(D.ITEMS[k].base * 1.3) * q, 0)]));                       // the fish club pays this share of the market price (fishing sits just above begging on the pay ladder)                         // ...and sell at a big markup
+function marketPrice(id) {
+  const it = D.ITEMS[id];
+  let p = it.base * market[id].mult;
+  if (ev('festival') && (it.kind === 'meal' || it.kind === 'goods')) p *= 1.2;
+  if (ev('drought') && it.kind === 'crop') p *= 1.3;
+  return p;
+}
+function npcBuyPrice(a, id, rate = NPC_BUY) {
+  const it = D.ITEMS[id];
+  let b = 1;
+  if (a.career === 'merchant' && it.kind === 'goods') rate = 0.74 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
+  else if (a.career === 'merchant') b += 0.05;
+  if (a.career === 'chef' && it.kind === 'meal' && CHEF_COST[id]) return (CHEF_COST[id] + CHEF_MARGIN) * marketPrice(id) / it.base;   // restaurants pay chefs the ingredients (kitchen price) plus a fixed cook's fee, so every recipe pays about the same
+  if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
+  if (it.kind === 'fish') b += 0.01 * Math.min(8, fishLv(a) - 1);       // experienced anglers know the buyers
+  return marketPrice(id) * rate * b;
+}
+const npcSellPrice = id => Math.ceil(D.ITEMS[id].base * NPC_SELL);
+function worth(a) {
+  let w = a.money + (a.bank || 0) - (a.loan || 0);
+  for (const [k, q] of Object.entries(a.inv)) w += (D.ITEMS[k]?.base || 0) * q * 0.5;
+  for (const L of a.listings || []) w += (D.ITEMS[L.item]?.base || 0) * L.qty * 0.5;
+  for (const [, t] of Object.entries(a.tools || {})) for (let i = 0; i < t; i++) w += D.TOOL_PRICES[i] * 0.5;
+  if (a.house >= 0) { w += D.HOUSE_PRICES[a.house] * 0.7; for (const f of a.furniture || []) w += (D.FURNITURE[fbase(f)]?.price || 0) * 0.5; }
+  for (const f of a.keep || []) w += (D.FURNITURE[f]?.price || 0) * 0.5;
+  w += stockValue(a);
+  if (a.garden) w += D.GARDEN.lotPrice * 0.6;
+  return w;
+}
+
+// ------------------------------------------------------------------ persistence
+function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
+const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg'];
+let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
+async function load() {
+  const rows = await store.loadAll();
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
+  for (const a of accounts.values()) {
+    for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
+    if (a.house >= 0) { if (houses[a.house]) a.house = -1; else houses[a.house] = a; }
+    if (a.garden) { if (lots[a.garden.lot]) a.garden = null; else lots[a.garden.lot] = a; }
+    if (a.rent && a.rent.until > now()) tenants[a.rent.idx] = a; else a.rent = null;
+    byPhone.set(a.phone, a);
+  }
+  console.log(`loaded ${accounts.size} players`);
+}
+function newPhone() { let p; do p = String(rint(100000, 999999)); while (byPhone.has(p)); return p; }
+function hydrate(r) {
+  const a = Object.assign({
+    avatar: 0, money: 1000, energy: 100, hunger: 100, health: 100, career: 'none', licenses: [], xp: {},
+    inv: {}, x: D.SPAWN.x, y: D.SPAWN.y, earned: 0, created: now(), quests: null, qStreak: 0, lastLogin: '', loginStreak: 0, tools: {}, vehicles: [], house: -1, hlv: 0, fpos: {}, yz: [], ycrops: {},
+    furniture: [], bank: 0, bankT: now(), loan: 0, dz: [], awake: 0, listings: [], contacts: [], stats: {}, ach: [], title: '', jobChanges: [],
+    enrolled: false, classes: 0, office: null, garden: null, rent: null, houseSale: 0, houseRent: 0, down: null,
+    gender: 'm', look: null, wardrobe: null, god: null, rod: 0, hideJob: false, outfit: '', outfits: [], pets: [], pet: '', frames: [], frame: -1, licExp: {}, phoneAsk: {}, school: null,
+    happy: 80, bills: [], billMonth: null, usage: { sleep: 0 }, utilOff: false, craving: null,
+  }, r, { ws: null, id: null, f: 0, bed: -1, chair: -1, pose: null, seat: null, immune: {}, cd: {}, cast: null, trade: null, call: null, lastPosT: now(), moved: false, meDirty: false, desk: -1, afk: false, emo: null, thiefUntil: 0 });
+  if ((a.v || 1) < 2) {                            // migrate saves from the old single-map town
+    if (!D.CAREERS[a.career]) a.career = 'none';
+    a.licenses = (a.licenses || []).filter(l => D.LICENSES[l]);
+    if (a.licenses.includes('medicine') || a.career === 'office') a.licenses = [...new Set([...a.licenses, 'degree'])];
+    if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; }   // the old houses were demolished: refund
+    a.x = D.SPAWN.x; a.y = D.SPAWN.y; a.v = 2;
+  }
+  if (a.house >= 0 && !a.yfree) starterYard(a);    // homes bought before yards existed get their two starter fields too
+  if (!a.look || !a.look.pants) {                   // looks moved to the pixel character: refund the old hairstyles/hats, keep the shirt colour
+    const OLD = { swept: 900, m: 600, pony: 1400, bun: 1400, braid: 1800, beanie: 900, straw: 700, beret: 1600, green: 1600, hood: 2500 };
+    const W = a.wardrobe || {}; a.money += [...(W.hair || []), ...(W.hat || [])].reduce((t, k) => t + (OLD[k] || 0), 0) + Math.max(0, (W.shirt || []).length - 1) * 500;
+    const sh = { blue: 'blue', green: 'green', yellow: 'yellow' }[a.look?.shirt] || D.SHIRTS[(a.avatar || 0) % 4];
+    a.look = { hair: 'brown', shirt: sh, pants: 'gray' }; a.wardrobe = { hair: ['brown'], shirt: [sh], pants: ['gray'] };
+  }
+  if (a.v < 3) {                                   // ม.6 became a requirement for the degree
+    if (a.licenses.includes('degree')) a.licenses = [...new Set([...a.licenses, 'hs'])];
+    if (a.enrolled === true) a.enrolled = 'degree';
+    a.v = 3;
+  }
+  if ((a.v || 3) < 4) {                           // thief and fisher stopped being jobs; vehicles were removed (refunded in full)
+    if (a.career === 'thief' || a.career === 'fisher') { if (a.career === 'fisher') a.rod = 1; a.career = 'none'; }
+    if ((a.xp?.fisher || 0) > 0) a.rod = Math.max(a.rod || 0, 1);
+    a.money += (a.vehicles || []).reduce((t, v) => t + ({ skate: 2000, bike: 6500, scooter: 22000, car: 75000 }[v] || 0), 0); a.vehicles = [];
+    if ((a.licenses || []).includes('driving')) a.licExp = { ...(a.licExp || {}), driving: now() + LICENSE_YEAR };
+    a.v = 4;
+  }
+  if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
+  // fixed character names for special accounts (login ID -> character name)
+  const RENAME = isAdmin(a) && !a.god?.renamed && String(a.login).toLowerCase() === 'james2324' ? ADMIN_NAME : null;
+  if (RENAME && a.name !== RENAME) { a.name = RENAME; a.sd = true; }
+  if (!isAdmin(a) && impersonates(a.name)) { a.name = 'ชาวเมือง' + String(a.login).slice(0, 8); a.sd = true; }   // nobody else may look like the admin
+  if (!a.phone || byPhone.has(a.phone) && byPhone.get(a.phone) !== a) a.phone = newPhone();
+  byPhone.set(a.phone, a);
+  if (a.rod && !(a.rods || []).length) {         // the old single rod + its three toolshop upgrades become rods in the bag
+    const T = (a.tools || {}).fisher || 0, top = [0, 2, 3, 4][T];
+    a.rods = D.ROD_ORDER.slice(0, top + 1); a.rodEq = D.ROD_ORDER[top];
+  }
+  return a;
+}
+let saving = false;
+async function save(force) {
+  if ((!dirty && !force) || saving) return;
+  saving = true; dirty = false;
+  const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
+  const changed = [...accounts.values()].filter(a => a.ws || a.sd);
+  const meta = { login: '__meta', bugs, botCap, ann: announceText }, wroteBugs = bugsDirty; bugsDirty = false;
+  try {
+    await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
+    changed.forEach(a => { if (!a.ws) a.sd = false; });
+  } catch (e) { dirty = true; if (wroteBugs) bugsDirty = true; console.error('save failed:', e.message); }
+  saving = false;
+}
+
+// ------------------------------------------------------------------ stock market
+const sHash = (i, k) => { let h = Math.imul(i, 374761393) ^ Math.imul(k + 1, 668265263) ^ 0x5bd1e995; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+const sGauss = (i, k) => Math.sqrt(-2 * Math.log(Math.max(1e-9, sHash(i, k)))) * Math.cos(2 * Math.PI * sHash(i, k + 7919));
+const mkt = D.STOCKS.map(s => ({ ...s, lp: Math.log(s.base), hist: [] }));
+let stockI = 0;                                         // index of the last finished candle
+function stockCandle(i, bias) {
+  for (let si = 0; si < mkt.length; si++) {
+    const s = mkt[si], fair = Math.log(s.base) + 0.3 * Math.sin(i / 1700 + si * 2.1) + 0.12 * Math.sin(i / 370 + si);
+    const trend = (sHash(Math.floor(i / 160), si * 13 + 3) - 0.5) * s.vol * 0.35;
+    const o = Math.exp(s.lp); let hi = o, lo = o;
+    for (let k = 0; k < 5; k++) {
+      s.lp += 0.004 * (fair - s.lp) + (trend + (bias?.[si] || 0)) / 5 + s.vol / 2.236 * sGauss(i * 5 + k, si * 101);
+      const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p);
+    }
+    if (sHash(i, si * 31 + 5) < 0.003) { s.lp += (sHash(i, si * 31 + 6) < 0.5 ? -1 : 1) * s.vol * (4 + 4 * sHash(i, si * 31 + 7)); const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p); }   // news
+    s.lp = Math.max(Math.log(s.base * 0.12), Math.min(Math.log(s.base * 8), s.lp));
+    const c = Math.exp(s.lp), v = Math.round(1000 * (0.5 + sHash(i, si * 57)) * (1 + Math.abs(Math.log(c / o)) * 60));
+    s.hist.push([+o.toFixed(2), +hi.toFixed(2), +lo.toFixed(2), +c.toFixed(2), v]); if (s.hist.length > D.STOCK.keep) s.hist.shift();
+  }
+}
+{ const n = Math.floor((Date.now() - D.STOCK.epoch) / D.STOCK.candleMs); for (let i = 1; i <= n; i++) stockCandle(i); stockI = n; }
+const stockPrice = id => { const s = mkt.find(x => x.id === id); return s ? s.hist[s.hist.length - 1][3] : 0; };
+function stockTick() {
+  const n = Math.floor((Date.now() - D.STOCK.epoch) / D.STOCK.candleMs);
+  while (stockI < n) { stockI++; stockCandle(stockI, mkt.map(s => (event && s.ev?.[event.id]) || 0)); wdAt = 0; }
+}
+const stockView = () => ({ i: stockI, ms: D.STOCK.candleMs, l: mkt.map(s => { const h = s.hist, c = h[h.length - 1][3], p = h[Math.max(0, h.length - 49)][3]; return [s.id, c, +((c / p - 1) * 100).toFixed(2), h.slice(-24).map(x => x[3])]; }) });
+const stockValue = a => Object.entries(a.stocks || {}).reduce((t, [id, [q]]) => t + q * stockPrice(id), 0);
+function stockTrade(a, m) {
+  const s = mkt.find(x => x.id === m.id); if (!s) return;
+  const p = stockPrice(s.id), q = Math.floor(+m.qty);
+  if (!(q > 0) || q > 100000) return toast(a, 'ใส่จำนวนหุ้นให้ถูกต้อง', '📈', false);
+  const gross = p * q, fee = Math.max(D.STOCK.feeMin, Math.round(gross * D.STOCK.fee));
+  a.stocks = { ...(a.stocks || {}) }; const cur = a.stocks[s.id] || [0, 0];
+  if (m.op === 'buy') {
+    if (!pay(a, Math.ceil(gross) + fee)) return;
+    a.stocks[s.id] = [cur[0] + q, +((cur[0] * cur[1] + gross) / (cur[0] + q)).toFixed(4)]; stat(a, 'trades');
+    toast(a, `ซื้อ ${s.icon}${s.id} ${q.toLocaleString()} หุ้น @${p.toFixed(2)} รวม ${money(Math.ceil(gross) + fee)} (ค่าธรรมเนียม ${money(fee)})`, '📈');
+  } else {
+    if (cur[0] < q) return toast(a, `มี ${s.id} แค่ ${cur[0].toLocaleString()} หุ้น`, '📉', false);
+    const get = Math.floor(gross) - fee, pl = Math.round(gross - q * cur[1]) - fee;
+    a.money += get; if (cur[0] - q > 0) a.stocks[s.id] = [cur[0] - q, cur[1]]; else delete a.stocks[s.id]; stat(a, 'trades');
+    if (pl >= 5000) feed(`📈 ${a.name} ขายหุ้น ${s.id} กำไร ${money(pl)}!`);
+    toast(a, `ขาย ${s.icon}${s.id} ${q.toLocaleString()} หุ้น @${p.toFixed(2)} ได้ ${money(get)} · ${pl >= 0 ? 'กำไร' : 'ขาดทุน'} ${money(Math.abs(pl))}`, pl >= 0 ? '💹' : '📉');
+  }
+  markMe(a); dirty = true;
+}
+
+// ------------------------------------------------------------------ world objects owned by players
+const houses = D.HOUSE_PRICES.map(() => null);    // house idx -> owner account
+const tenants = D.HOUSE_PRICES.map(() => null);   // house idx -> tenant account
+const lots = D.LOTS.map(() => null);              // garden lot idx -> owner account
+
+// ------------------------------------------------------------------ food delivery
+const orders = new Map();                          // id -> order
+let nextOrder = 1, npcOrderAt = 0;
+const MENU = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].menu);
+const PICKUP = ST.restaurant;                      // the restaurant counter (inside)
+const RESTO_OUT = D.ROOMS.find(r => r.bld === 'restaurant').outside;
+function deliveryFee(x, y) {
+  let area = D.areaAt(x, y)?.id || 'town'; if (area.startsWith('yard')) area = 'housing';   // a home yard is reached through the estate street
+  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
+  const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' ? 25 : 0);
+  return Math.round(D.RIDER.baseFee + d * D.RIDER.perTile);
+}
+const ridersOnline = () => [...online.values()].filter(r => r.career === 'rider' && !r.down);
+function orderView(o) {
+  return { id: o.id, item: o.item, state: o.state, fee: o.fee, tip: o.tip, cust: o.custName, npc: !!o.npc, rider: o.riderName || '', t: o.t,
+    dest: o.npc ? { x: o.npc.x, y: o.npc.y } : null, area: o.npc ? o.npc.area : null };
+}
+function ordersChanged() { for (const a of online.values()) if (a.career === 'rider' || allJobs(a) || [...orders.values()].some(o => o.cust === a)) markMe(a); }
+function placeOrder(a, m) {
+  const id = m.item, it = D.ITEMS[id];
+  if (!it || !it.menu) return;
+  if (!buildingOpen('restaurant')) return toast(a, 'ร้านอาหารปิดแล้ว (เปิด 07:00–23:00)', '🔒', false);
+  if ([...orders.values()].filter(o => o.cust === a).length >= 2) return toast(a, 'สั่งได้ทีละไม่เกิน 2 ออเดอร์', '🛵', false);
+  const fee = Math.round(deliveryFee(a.x, a.y) * (ev('hungry') ? 1.3 : 1)), tip = clamp(Math.floor(+m.tip) || 0, 0, 500);
+  const total = it.base + fee + tip;
+  if (!pay(a, total)) return;
+  const o = { id: nextOrder++, cust: a, custName: a.name, item: id, price: it.base, fee, tip, state: 'open', t: now(), rider: null };
+  orders.set(o.id, o); markMe(a);
+  const rs = ridersOnline();
+  rs.forEach(r => toast(r, `🛵 ออเดอร์ใหม่! ${it.icon}${it.name} ส่งให้ ${a.name} ค่าส่ง ${money(fee)}${tip ? ` + ทิป ${money(tip)}` : ''} (เปิดแอพไรเดอร์ใน 📱)`, '🔔'));
+  toast(a, rs.length ? `สั่ง ${it.icon}${it.name} แล้ว ${money(total)} รอไรเดอร์รับออเดอร์ (มีไรเดอร์ออนไลน์ ${rs.length} คน)` : `สั่ง ${it.icon}${it.name} แล้ว ${money(total)} — ตอนนี้ไม่มีไรเดอร์ ร้านจะส่งเองแต่ช้ากว่า`, '🛵');
+  ordersChanged();
+}
+function spawnNpcOrder() {
+  const spots = [...D.STATIONS.filter(s => s.type === 'door' && s.house !== undefined && s.area === 'housing'), ...D.STATIONS.filter(s => s.type === 'seat' && (s.area === 'town' || s.area === 'housing'))];
+  const s = pick(spots), id = pick(MENU);
+  const fee = Math.round(deliveryFee(s.x, s.y) * (ev('hungry') ? 1.3 : 1));
+  const o = { id: nextOrder++, cust: null, custName: pick(D.NPC_NAMES), item: id, price: 0, fee, tip: rint(0, 3) ? 0 : rint(10, D.RIDER.tipMax),
+    state: 'open', t: now(), rider: null, npc: { x: s.x, y: s.y + (s.type === 'door' ? .4 : 0), area: s.area } };
+  orders.set(o.id, o); ordersChanged();
+}
+// an NPC customer waits at the delivery spot (in front of their house / on a bench) while a rider has their order
+function custNpcAdd(o) {
+  if (!o.npc || npcs.some(n => n.custOf === o.id)) return;
+  const sp = D.blocked(o.npc.x, o.npc.y) ? (standNear(o.npc.area, o.npc.x, o.npc.y) || [o.npc.x, o.npc.y]) : [o.npc.x, o.npc.y];
+  o.npc.x = sp[0]; o.npc.y = sp[1];
+  npcs.push({ id: -(2000 + o.id), custOf: o.id, name: `${o.custName} (รออาหาร)`, area: o.npc.area, x: sp[0], y: sp[1], f: 6, path: [], wait: 1e9, look: randLook(), g: Math.random() < .5 ? 'f' : 'm', speed: 1, next: () => null, stay: () => 1e9 });
+  npcRosterDirty = true;
+}
+function custNpcDel(o) { const i = npcs.findIndex(n => n.custOf === o.id); if (i >= 0) { npcs.splice(i, 1); npcRosterDirty = true; } }
+function cancelOrder(o, why) {
+  orders.delete(o.id); custNpcDel(o);
+  if (o.cust) { o.cust.money += o.price + o.fee + o.tip; o.cust.sd = true; markMe(o.cust); toast(o.cust, `ออเดอร์ ${D.ITEMS[o.item].name} ถูกยกเลิก (${why}) คืนเงินแล้ว`, '↩️', false); }
+  if (o.rider) toast(o.rider, `ออเดอร์ของ ${o.custName} ถูกยกเลิก (${why})`, '↩️', false);
+  ordersChanged();
+}
+function finishOrder(o, rider) {
+  orders.delete(o.id); custNpcDel(o);
+  if (o.cust) { addItem(o.cust, o.item, 1); markMe(o.cust); o.cust.sd = true; }
+  if (rider) {
+    const got = earn(rider, (o.fee * (1 + [0, .1, .2, .35][tier(rider, 'rider')]) * jobPay(rider) + o.tip) * wellbeing(rider));
+    addXp(rider); stat(rider, 'delivered'); quest(rider, 'deliver');
+    toast(rider, `ส่งอาหารให้ ${o.custName} สำเร็จ! ได้ ${money(got)}${o.tip ? ` (รวมทิป ${money(o.tip)})` : ''}`, '🛵');
+    if (o.cust) toast(o.cust, `${rider.name} มาส่ง ${D.ITEMS[o.item].icon}${D.ITEMS[o.item].name} แล้ว! (อยู่ในกระเป๋า 🎒)`, '🛵');
+  } else if (o.cust) toast(o.cust, `ร้านมาส่ง ${D.ITEMS[o.item].icon}${D.ITEMS[o.item].name} แล้ว (อยู่ในกระเป๋า 🎒)`, '🛵');
+  ordersChanged();
+}
+function riderAct(a, m) {
+  const o = orders.get(+m.id);
+  if (m.t === 'order_cancel') { if (o && o.cust === a && o.state === 'open') cancelOrder(o, 'ลูกค้ายกเลิก'); return; }
+  if (!need(a, 'rider')) return;
+  if (!o) return toast(a, 'ออเดอร์นี้ไม่มีแล้ว', '🛵', false);
+  if (m.t === 'order_take') {
+    if (o.state !== 'open') return toast(a, 'มีไรเดอร์คนอื่นรับไปแล้ว', '🛵', false);
+    if (o.cust === a) return toast(a, 'รับออเดอร์ของตัวเองไม่ได้', '🛵', false);
+    if ([...orders.values()].filter(x => x.rider === a).length >= 3) return toast(a, 'รับได้ทีละไม่เกิน 3 ออเดอร์', '🛵', false);
+    if (!hasLic(a, 'driving')) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุแล้ว! ต่ออายุที่มหาวิทยาลัย (ปีละครั้ง)' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
+    o.state = 'taken'; o.rider = a; o.riderName = a.name; o.takenAt = now(); custNpcAdd(o);
+    if (o.cust) toast(o.cust, `${a.name} รับออเดอร์แล้ว กำลังไปรับอาหารที่ร้าน`, '🛵');
+    toast(a, 'รับออเดอร์แล้ว! ไปรับอาหารที่เคาน์เตอร์ร้านอาหารก่อน', '🛵');
+    return ordersChanged();
+  }
+  if (m.t === 'order_drop') { if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; custNpcDel(o); ordersChanged(); } return; }
+  if (m.t === 'order_deliver') {
+    if (o.rider !== a || o.state !== 'picked') return toast(a, 'ยังไม่ได้รับอาหารจากร้าน', '🛵', false);
+    const tgt = o.cust ? o.cust : o.npc, ok = tgt && areaId(a) === (o.cust ? areaId(o.cust) : o.npc.area) && Math.hypot(a.x - tgt.x, a.y - tgt.y) < 2.5;
+    if (o.cust && !o.cust.ws) return cancelOrder(o, 'ลูกค้าออฟไลน์');
+    if (!ok) return toast(a, `ต้องไปให้ถึงตัวลูกค้าก่อน (${o.custName})`, '📍', false);
+    return finishOrder(o, a);
+  }
+}
+
+// ------------------------------------------------------------------ NPC patients (so doctors always have work)
+let npcPatientAt = now() + 30000, npcSeq = 1;
+function spawnPatient() {
+  const free = beds.map((b, i) => b ? -1 : i).filter(i => i >= 0);
+  if (free.length < 2) return;
+  const d = pick(Object.keys(DZ).filter(k => k !== 'insomnia'));
+  beds[pick(free)] = { npc: true, id: 'npc' + npcSeq++, name: pick(D.NPC_NAMES), dz: [d], health: rint(35, 70), until: now() + 300000 };
+  wdAt = 0;
+  for (const a of online.values()) if (a.career === 'doctor') toast(a, `🛏️ มีคนไข้ใหม่มารอที่โรงพยาบาล`, '🩺');
+}
+
+// ------------------------------------------------------------------ knocked out
+function knockOut(a) {
+  if (godLock(a)) { a.health = 100; return; }
+  a.cast = null; standUp(a);
+  if (a.trade) tradeClose(a.trade, `${a.name} หมดสติ`);
+  if (a.hunger <= 5) {               // starving: collapse right where you are
+    a.down = { kind: 'veg', t: now() };
+    toast(a, 'คุณหิวจนหมดแรง ล้มลงนอนเป็นผัก... รอสักพักร่างกายจะฟื้นขึ้นมาเอง', '🥬', false);
+    feed(`🥬 ${a.name} หิวจนล้มลงข้างทาง`);
+  } else {                           // otherwise an ambulance takes you to hospital
+    // people nearby see an ambulance come for you (you are already at the hospital on your own screen)
+    const here = D.areaAt(a.x, a.y);
+    if (here && here.kind === 'map') { const ev = { t: 'amb', id: a.id, x: +a.x.toFixed(2), y: +a.y.toFixed(2), area: here.id }; for (const o of online.values()) if (o !== a && areaId(o) === here.id) send(o, ev); }
+    const docsOn = [...online.values()].some(o => o.career === 'doctor' && o !== a && !o.down);
+    a.down = { kind: 'hosp', t: now(), until: now() + (docsOn ? 60000 : 25000), free: newbie(a) || a.money < 500 };
+    let i = beds.findIndex(b => !b);
+    if (i < 0) i = beds.findIndex(b => b && b.npc);
+    if (i >= 0) { beds[i] = a; a.bed = i; const s = ST['bed' + i]; place(a, s.x, s.y, true); }
+    else { const r = ROOM.r_hospital; place(a, r.x + 5, r.y + 6, true); }
+    const docs = [...online.values()].filter(o => o.career === 'doctor' && o !== a && !o.down);
+    toast(a, `คุณหมดสติ! รถพยาบาลพามาส่งเตียงโรงพยาบาล${docs.length ? ` รอหมอช่วย (หมอออนไลน์ ${docs.length} คน) ถ้าไม่มีใครช่วย เจ้าหน้าที่จะช่วยใน 2 นาที` : ' ไม่มีหมอออนไลน์ เจ้าหน้าที่จะช่วยให้ฟื้นใน 1 นาที (ค่ารักษาแพง)'}`, '🚑', false);
+    joy(a, -15);
+    feed(`🚑 ${a.name} หมดสติถูกส่งโรงพยาบาล`);
+    for (const d of docs) toast(d, `🚑 ${a.name} หมดสติอยู่ที่โรงพยาบาล รีบไปช่วยด่วน!`, '🚨');
+    wdAt = 0;
+  }
+  markMe(a); sendRoster();
+}
+function revive(a, hp, by) {
+  a.down = null; a.health = Math.max(a.health, hp);
+  if (a.hunger < 15) a.hunger = 15;
+  markMe(a); sendRoster();
+  toast(a, by ? `${by} ช่วยให้คุณฟื้นแล้ว` : 'คุณฟื้นขึ้นมาแล้ว รีบหาอะไรกินและดูแลสุขภาพด้วย', '💓');
+}
+
+// ------------------------------------------------------------------ office work: run documents around town (shift 08:00–17:00, overtime to 21:00)
+// Pick up an envelope at the office's front desk, carry it to the building it is addressed to, come back for the next one.
+// Each run pays by distance from the level's wage; the first pick-up of the day is the clock-in (late after 08:15 = -30%).
+const DOC_DESTS = D.STATIONS.filter(s => s.type === 'door' && s.house === undefined && s.area === 'town' && !s.renov && s.bld !== 'office' && D.ROOMS.some(r => r.bld === s.bld))
+  .concat(D.STATIONS.filter(s => s.type === 'market'));
+const OFFICE_DOOR = ST.door_office || D.STATIONS.find(s => s.id === 'door_office');
+function officeDay(a, day) { return a.office || (a.office = { strikes: 0, day: -1, late: false, pend: 0, hours: 0, n: 0, closed: -1, absent: -1 }); }
+function docPickup(a) {
+  const h = hourNow(), t = now(), day = D.dayAt(t), o = officeDay(a, day);
+  if (h >= D.SHIFT.ot || h < D.SHIFT.start - 1) return toast(a, `ตอนนี้ไม่ใช่เวลางาน (${hhmm(D.SHIFT.start)}–${hhmm(D.SHIFT.end)} · โอทีถึง ${hhmm(D.SHIFT.ot)})`, '🕗', false);
+  if (h >= D.SHIFT.end && o.day !== day) return toast(a, 'โอทีทำได้เฉพาะคนที่เข้างานวันนี้แล้ว', '🕗', false);
+  if (o.closed === day) return toast(a, 'วันนี้เลิกงานแล้ว พรุ่งนี้ค่อยมาใหม่', '🏢', false);
+  if (a.docjob) return toast(a, `ยังมีเอกสารต้องไปส่งที่ ${ST[a.docjob.dest]?.label || ''}`, '📄', false);
+  if (h < D.SHIFT.start) return toast(a, `รอเข้างาน ${hhmm(D.SHIFT.start)} ก่อนนะ`, '🕗', false);
+  if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำงาน... (ความสุขต่ำมาก)', '😞', false);
+  if (!spend(a, 2)) return;
+  if (o.day !== day) {                                 // first envelope of the day = clocking in
+    o.day = day; o.late = false; o.pend = 0; o.hours = 0; o.n = 0; o.strikes = 0; stat(a, 'ontime');   // no clock-in time: start whenever you like during work hours
+  }
+  const pool = DOC_DESTS.filter(s => s.id !== a.lastDoc), dest = pick(pool);
+  const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), d = Math.hypot(dest.x - OFFICE_DOOR.x, dest.y - OFFICE_DOOR.y);
+  a.docjob = { dest: dest.id, pay: Math.round(D.OFFICE_WAGE[l - 1] * (0.2 + d / 100)), day, t };   // ~฿45/min of walking at Lv.1
+  a.lastDoc = dest.id; markMe(a);
+  return toast(a, `📄 รับเอกสารแล้ว ส่งที่ ${dest.label} · ค่าส่ง ~${money(a.docjob.pay)}${h >= D.SHIFT.end ? ` (โอที x${D.SHIFT.otMul})` : ''}`, '📄');
+}
+function officeTick(a, t, h, dt) {
+  const day = D.dayAt(t), o = officeDay(a, day), j = a.docjob;
+  if (j) {
+    const s = ST[j.dest];
+    if (j.day !== day || h >= D.SHIFT.ot || !s) { a.docjob = null; markMe(a); toast(a, 'หมดเวลางาน เอกสารที่ยังไม่ได้ส่งถูกเก็บคืนบริษัท', '📄', false); }
+    else if (D.roomAt(a.x, a.y)?.bld === s.bld || areaId(a) === s.area && Math.hypot(a.x - s.x, a.y - s.y) < 2.2) {
+      const ot = h >= D.SHIFT.end;
+      const got = earn(a, j.pay * (ot ? D.SHIFT.otMul : 1) * (o.late ? 0.7 : 1) * wellbeing(a) * (1 + [0, .1, .2, .3][tier(a, 'office')]));
+      a.docjob = null; o.n = (o.n || 0) + 1; o.hours += 1; quest(a, 'work'); stat(a, 'docs'); joy(a, 1); markMe(a);
+      toast(a, `ส่งเอกสารที่ ${s.label} เรียบร้อย ได้ ${money(got)}${ot ? ' (โอที)' : ''} · กลับไปรับงานต่อที่บริษัท (วันนี้ ${o.n} งาน)`, '✅');
+    }
+  }
+  if (o.day === day && h >= D.SHIFT.ot && o.closed !== day) {
+    o.closed = day;
+    const before = lvl(a, 'office');
+    if ((o.n || 0) >= 4) { addXp(a); stat(a, 'shifts'); }
+    let msg = `เลิกงานแล้ว! วันนี้ส่งเอกสาร ${o.n || 0} งาน`;
+    if (lvl(a, 'office') > before && lvl(a, 'office') <= D.OFFICE_TITLES.length) {
+      msg += ` 🎊 เลื่อนเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`; stat(a, 'promo');
+      feed(`🎊 ${a.name} ได้เลื่อนตำแหน่งเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`);
+    }
+    toast(a, msg, '🏢');
+  }
+  // (no lateness or absence penalties for document runners)
+}
+// doctors: paid for every game hour spent inside the hospital during the shift (patients' fees come on top)
+function doctorTick(a, t, h, dt) {
+  const inside = D.roomAt(a.x, a.y)?.id === 'r_hospital', day = D.dayAt(t);
+  const o = a.doc && a.doc.day === day ? a.doc : (a.doc = { day, hours: 0, pend: 0, on: false });
+  const onDuty = inside && !a.down && h >= D.DOCTOR.start && h < D.DOCTOR.end;
+  if (onDuty && depressed(a)) { if (o.on) { o.on = false; toast(a, 'ซึมเศร้า ทำงานไม่ได้... (ความสุขต่ำมาก)', '😞', false); } return; }
+  if (onDuty !== o.on) {
+    o.on = onDuty;
+    if (onDuty) toast(a, `เข้าเวรแล้ว 🩺 อยู่ในโรงพยาบาลจนถึง ${hhmm(D.DOCTOR.end)} ได้เงินเดือนทุกชั่วโมง (+ค่ารักษาคนไข้)`, '🩺');
+    else if (inside && h >= D.DOCTOR.end) toast(a, `หมดเวรแล้ว วันนี้ทำงาน ${o.hours.toFixed(1)} ชม.`, '🏥');
+    else if (!inside && h >= D.DOCTOR.start && h < D.DOCTOR.end) toast(a, 'ออกจากโรงพยาบาล = หยุดนับเวลางาน (กลับเข้าไปเพื่อรับเงินเดือนต่อ)', '🩺', false);
+    markMe(a);
+  }
+  if (!onDuty) return;
+  const l = Math.min(lvl(a, 'doctor'), D.DOCTOR.wage.length), gh = dt * D.gameRate(h);
+  o.pend += D.DOCTOR.wage[l - 1] * gh * wellbeing(a) * (1 + BOOST[tier(a, 'doctor')]);
+  o.hours += gh;
+  if (o.pend >= D.DOCTOR.wage[l - 1]) { earn(a, o.pend); o.pend = 0; if (o.hours >= 4 && !o.xp) { o.xp = 1; addXp(a); } }
+}
+// university: sit at a desk; one game hour seated = one class
+function studyTick(a, h, dt) {
+  const id = a.enrolled, L = id && D.LICENSES[id];
+  if (!L) { standUp(a); return; }
+  if (!D.isOpen('school', h)) { standUp(a); return toast(a, 'มหาวิทยาลัยปิดแล้ว พรุ่งนี้มาเรียนต่อ', '🎓', false); }
+  if (depressed(a)) { standUp(a); return toast(a, 'ไม่มีจิตใจจะเรียน... (ความสุขต่ำมาก)', '😞', false); }
+  a.energy = Math.max(0, a.energy - 0.05 * dt);
+  if (a.energy <= 1) { standUp(a); return toast(a, 'หมดแรง! ไปกินอะไรแล้วค่อยกลับมาเรียน', '😵', false); }
+  const S = a.school && a.school.id === id ? a.school : (a.school = { id, p: 0 });
+  S.p += dt * D.gameRate(h);
+  if (S.p < 1) { if (Math.random() < 0.2) markMe(a); return; }
+  S.p = 0; a.classes = (a.classes || 0) + 1; markMe(a); quest(a, 'study');
+  if (a.classes >= L.classes) {
+    standUp(a);
+    a.enrolled = false; a.school = null; a.licenses = [...a.licenses, id]; joy(a, 15);
+    if (id === 'degree') stat(a, 'degree', 1, true);
+    feed(`🎓 ${a.name} เรียนจบ${L.name}แล้ว!`);
+    return toast(a, id === 'hs' ? 'จบ ม.6 แล้ว! เรียนต่อปริญญาตรี หรือสอบนายสิบตำรวจได้' : 'ยินดีด้วย! จบปริญญาตรีแล้ว สมัครงานบริษัทได้ และเรียนต่อหมอได้', '🎓');
+  }
+  toast(a, `เรียนจบคาบที่ ${a.classes}/${L.classes} แล้ว นั่งต่อเพื่อเรียนคาบถัดไป`, '📖');
+}
+function fireCheck(a) {
+  const o = a.office;
+  if (o.strikes < 3 || Math.random() > 0.25 + 0.15 * (o.strikes - 3)) return false;
+  standUp(a);
+  a.career = 'none'; a.xp.office = 0; a.office = null; joy(a, -20); markMe(a); sendRoster();
+  toast(a, 'คุณถูกเลิกจ้างเพราะมาสาย/ขาดงานบ่อย! ต้องไปสมัครงานใหม่ และเงินเดือนจะเริ่มนับใหม่', '📦', false);
+  feed(`📦 ${a.name} ถูกบริษัทเลิกจ้าง`);
+  return true;
+}
+
+// ------------------------------------------------------------------ careers
+function jobCooldown(a) {
+  if (godNoCd(a)) return 0;
+  const t = now(), recent = (a.jobChanges || []).filter(x => t - x < 86400e3);
+  if (!recent.length) return 0;
+  const mins = D.JOB_COOLDOWN_MIN[Math.min(recent.length, D.JOB_COOLDOWN_MIN.length - 1)];
+  return Math.max(0, Math.max(...recent) + mins * 60000 - t);
+}
+function apply(a, career) {
+  const c = D.CAREERS[career]; if (!c || career === 'none') return;
+  if (a.career === career) return toast(a, `คุณเป็น${c.name}อยู่แล้ว`, 'ℹ️', false);
+  for (const l of c.need || []) if (!hasLic(a, l)) return toast(a, licExpired(a, l) ? `${D.LICENSES[l].name}หมดอายุแล้ว ต่ออายุที่มหาวิทยาลัยก่อน` : `ต้องมี${D.LICENSES[l].name}ก่อน (ที่มหาวิทยาลัย)`, '🎓', false);
+  if (career === 'beggar' && a.money + (a.bank || 0) > 2000) return toast(a, `มีเงินเกิน ${money(2000)} (รวมเงินฝาก) เป็นขอทานไม่ได้แล้ว`, '🥣', false);
+  const wait = jobCooldown(a);
+  if (wait > 0) return toast(a, `เพิ่งเปลี่ยนงานไป ต้องรออีก ${Math.ceil(wait / 60000)} นาทีถึงจะสมัครงานใหม่ได้`, '⏳', false);
+  if (a.career === 'office') { a.xp.office = 0; a.office = null; }
+  if (a.career !== 'none' || (a.jobChanges || []).length) a.jobChanges = [...(a.jobChanges || []).filter(x => now() - x < 86400e3), now()];
+  else a.jobChanges = [now() - 86400e3 + 1000];             // the very first job does not count against you
+  standUp(a); a.career = career; a.cast = null; markMe(a); sendRoster();
+  feed(`💼 ${a.name} ได้งานเป็น${c.name}`);
+  const tips = {
+    office: 'เข้างาน 08:00 (สายได้ไม่เกิน 08:15) นั่งที่โต๊ะทำงานว่างตัวไหนก็ได้ ได้ค่าแรงตามชั่วโมงที่นั่ง เลิก 17:00',
+    farmer: 'ซื้อสวนของตัวเองได้ที่ป้ายหน้าแปลงในไร่ แล้วเริ่มปลูกได้เลย',
+    merchant: 'ประมูลสินค้าที่โรงประมูล เดาราคาแข่งกับคู่แข่ง ซื้อได้ต่ำกว่ามูลค่าจริง = กำไร',
+    chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
+    doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (กู้ชีพ ผ่าตัด ห้ามเลือด ฯลฯ ลงมือทำในห้องจริง) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
+    rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
+    police: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง',
+    beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
+  };
+  toast(a, `ยินดีด้วย! ได้งานเป็น ${c.icon} ${c.name} · ${tips[career]}`, c.icon);
+}
+function resign(a) {
+  if (a.career === 'none') return;
+  const c = D.CAREERS[a.career];
+  if (a.career === 'office') { a.xp.office = 0; a.office = null; }
+  standUp(a); a.career = 'none'; a.cast = null; markMe(a); sendRoster();
+  for (const o of orders.values()) if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; }
+  toast(a, `ลาออกจากงาน${c.name}แล้ว`, '📦');
+}
+
+// ------------------------------------------------------------------ fishing
+function rollFish(a, pool) {
+  const l = fishLv(a), rod = rodOf(a) || D.RODS.bamboo;
+  const table = D.FISH[pool] || D.FISH.lake;
+  const ws = table.map(([id, w]) => {
+    if (id === null) return Math.max(5, w - l) * rod.junk;
+    const r = D.ITEMS[id].rar || 1;
+    if (r >= 3) w *= rod.luck * (r >= 4 ? rod.luck : 1) ** .5 * (ev('bloom') ? 2 : 1);   // rarer fish gain the most from a good rod
+    else if (r === 2) w *= Math.sqrt(rod.luck);
+    return w;
+  });
+  let r = Math.random() * ws.reduce((s, v) => s + v, 0);
+  for (let i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0) return table[i][0]; }
+  return 'sfish';
+}
+
+// ------------------------------------------------------------------ station actions
+// fishing from any water's edge: a spot made on the fly where the player stands
+function waterSpot(a) {
+  const pool = D.waterPool(a.x, a.y); if (!pool) return null;
+  return { id: 'water', type: 'pier', pool, label: 'ตกปลา', icon: '🎣', x: a.x, y: a.y, r: 3, area: areaId(a) };
+}
+// ------------------------------------------------------------------ easter eggs
+const dayKey = () => new Date(now() + 7 * 3600e3).toISOString().slice(0, 10);   // Thai calendar day
+const eggOf = a => { a.egg = a.egg || {}; a.egg.s = a.egg.s || []; return a.egg; };
+// the legendary fish: the east corner of the lake, around midnight in game, once a day per player
+function legendRoll(a, c) {
+  const L = D.EGG.legend, h = c.ch ?? hourNow();   // the hour you cast at
+  if (c.pool !== 'lake' || Math.hypot(c.x - L.x, c.y - L.y) > L.r || !(h >= 23.75 || h < 1.25)) return null;
+  if (eggOf(a).ld === dayKey() || Math.random() >= L.odds) return null;
+  return 'mayorkoi';
+}
+// the mayor walks around disguised as one of the AI townsfolk; whoever spots them (talks to them up close) wins today's prize
+let mayorBot = null, mayorDayK = '';
+const mayorPool = () => npcs.filter(n => n.area === 'town' && (n.folk || n.bot));   // townsfolk walking around town
+function mayorNow() {
+  const d = dayKey();
+  if (d !== mayorDayK || !mayorPool().some(n => n.id === mayorBot)) { mayorDayK = d; const bs = mayorPool(); mayorBot = bs.length ? pick(bs).id : null; }
+  return mayorBot;
+}
+function eggMayor(a, bn) {
+  if (bn.id !== mayorNow() || bn.area !== areaId(a) || dist(a, bn) > 4) return;
+  const e = eggOf(a), d = dayKey();
+  if (e.md === d) return send(a, { t: 'egg', k: 'mayor', name: bn.name, again: 1 });
+  e.md = d; a.gems = (a.gems || 0) + D.EGG.mayorGems; stat(a, 'mayorfound'); joy(a, 8); markMe(a);
+  feed(`🕵️ ${a.name} จับได้ว่านายกฯ ปลอมตัวเป็น "${bn.name}" มาเดินเล่นในเมือง!`);
+  send(a, { t: 'egg', k: 'mayor', name: bn.name, gems: D.EGG.mayorGems });
+  const bs = mayorPool().filter(n => n.id !== bn.id); if (bs.length) mayorBot = pick(bs).id;   // the mayor slips away into someone else
+}
+function act(a, m) {
+  const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
+  if (!s && m.st === 'water') { if (a.cast) { a.cast = null; markMe(a); } return toast(a, 'ต้องยืนติดริมน้ำก่อนถึงจะตกปลาได้', '🎣', false); }
+  if (!s) return;
+  if (a.down) return toast(a, 'คุณหมดสติอยู่ ทำอะไรไม่ได้', '💤', false);
+  if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
+  const h = hourNow();
+  if (!D.isOpen(s.type, h)) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
+  const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
+  if (WORK.has(key) && depressed(a)) return toast(a, 'คุณซึมเศร้า ไม่มีจิตใจจะทำอะไรเลย... ลองกินของที่อยากกิน นั่งเล่นที่จัตุรัส หรือโทรคุยกับเพื่อน', '😞', false);
+  const wb = wellbeing(a);
+  if (m.a === 'apply') { if (s.type !== 'staff' && D.CAREERS[m.career]?.where !== s.type || s.type === 'staff' && s.career !== m.career) return; return apply(a, m.career); }
+  switch (key) {
+    // ---------------- getting around
+    case 'gate.go': {
+      const g = D.GATES[s.to]; if (!g) return;
+      if (s.renov && !(isAdmin(a) && a.god?.doors)) return toast(a, 'ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
+      if (!cd(a, 'door', 1200, true)) return;
+      return teleport(a, g.x, g.y);
+    }
+    case 'seat.sit': {
+      for (const o of online.values()) if (o !== a && o.seat === s.id) return toast(a, 'ที่นั่งนี้มีคนนั่งแล้ว', '🪑', false);
+      standUp(a); a.pose = 'seat'; a.seat = s.id; place(a, s.x, s.y); quest(a, 'sit'); sendRoster(); joy(a, 3);
+      return toast(a, 'นั่งพักที่โต๊ะ พลังงานฟื้นเร็วขึ้น คุยกับคนรอบๆ ได้ (เดินเพื่อลุก)', '🪑');
+    }
+    case 'bank.bills': return payBills(a);
+    case 'fashion.buy': case 'barber.buy': {
+      if ((s.type === 'barber') !== (m.cat === 'hair')) return toast(a, s.type === 'barber' ? 'ร้านทำผมทำได้แค่ผม' : 'ย้อมผมได้ที่ร้านทำผม 💈', '💈', false);
+      const cat = D.LOOKS[m.cat], it = cat && cat[m.id]; if (!it) return;
+      const W = a.wardrobe; if (W[m.cat].includes(m.id)) return wear(a, m);
+      if (!pay(a, it.price)) return;
+      W[m.cat] = [...W[m.cat], m.id]; joy(a, 8); wear(a, m);
+      return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย!`, '💇');
+    }
+    case 'fashion.outfit': {                // whole outfits: bought once, then worn / taken off from here or the settings
+      const it = D.OUTFITS[m.id]; if (!it || !it.price) return;
+      if ((a.outfits || []).includes(m.id)) { a.outfit = a.outfit === m.id ? '' : m.id; markMe(a); return sendRoster(); }
+      if (!pay(a, it.price)) return;
+      a.outfits = [...(a.outfits || []), m.id]; a.outfit = m.id; joy(a, 15); markMe(a); sendRoster();
+      if (it.price >= 250000) feed(`👗 ${a.name} ถอย${it.name}มาใส่ ราคา ${money(it.price)}!`);
+      return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย! (ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า หรือที่ร้านนี้)`, '👗');
+    }
+    // ---------------- office
+    case 'trash.run': case 'trash.dig': {   // beggars: an endless run through the street picking up rubbish (played on the client)
+      if (a.career !== 'beggar' && !allJobs(a)) return toast(a, 'วิ่งเก็บขยะได้เฉพาะขอทาน', '🗑️', false);
+      if (now() < (a.runNext || 0)) return toast(a, `เหนื่อยอยู่ พักอีก ${Math.ceil((a.runNext - now()) / 1000)} วินาทีค่อยวิ่งใหม่`, '😮‍💨', false);
+      if (!spend(a, 6)) return;
+      a.run0 = now(); markMe(a); return send(a, { t: 'trashrun', seed: rint(1, 1e9) });
+    }
+    case 'chair.sit': {                       // the desks are just furniture now: office work is running documents
+      return toast(a, 'งานบริษัทตอนนี้คือส่งเอกสาร 📄 รับงานได้ที่ฝ่ายบุคคล (เคาน์เตอร์หน้าออฟฟิศ)', '📄', false);
+    }
+    case 'office.resign': return resign(a);
+    case 'office.job': if (!need(a, 'office')) return; return docPickup(a);
+    // ---------------- market
+    case 'market.list': {
+      const id = m.item, it = D.ITEMS[id];
+      const q = Math.floor(+m.qty), price = Math.floor(+m.price);
+      if (!it || !(q > 0) || !(price > 0)) return toast(a, 'ใส่จำนวนและราคาให้ถูกต้อง', '⚠️', false);
+      if ((a.inv[id] || 0) < q) return toast(a, 'มีของไม่พอ', '⚠️', false);
+      if (price > it.base * 5) return toast(a, `ตั้งราคาได้ไม่เกิน ${money(it.base * 5)} ต่อชิ้น`, '⚠️', false);
+      if ((a.listings || []).length >= 8) return toast(a, 'วางขายได้พร้อมกันไม่เกิน 8 รายการ', '⚠️', false);
+      addItem(a, id, -q);
+      a.listings = [...(a.listings || []), { id: nextListing++, item: id, qty: q, price }];
+      markMe(a); wdAt = 0;
+      return toast(a, `วางขาย ${it.icon}${it.name} x${q} ราคา ${money(price)}/ชิ้น`, '🏷️');
+    }
+    case 'market.unlist': {
+      const L = (a.listings || []).find(x => x.id === +m.id); if (!L) return;
+      a.listings = a.listings.filter(x => x !== L); addItem(a, L.item, L.qty); markMe(a); wdAt = 0;
+      return toast(a, `เก็บ ${D.ITEMS[L.item].name} x${L.qty} กลับเข้ากระเป๋า`, '📦');
+    }
+    case 'market.buy': {
+      const id = m.item, it = D.ITEMS[id]; if (!it) return;
+      let want = clamp(Math.floor(+m.qty) || 1, 1, 50), bought = 0, spent = 0;
+      const soldBy = new Map(), offers = [];
+      for (const o of accounts.values()) if (o !== a) for (const L of o.listings || []) if (L.item === id) offers.push([L, o]);
+      offers.sort((x, y) => x[0].price - y[0].price);
+      if (!offers.length) return toast(a, 'ตอนนี้ไม่มีผู้เล่นวางขายของชิ้นนี้', '🏪', false);
+      for (const [L, o] of offers) {
+        while (want > 0 && L.qty > 0 && a.money >= L.price) {
+          a.money -= L.price; L.qty--; want--; bought++; spent += L.price; soldBy.set(o, (soldBy.get(o) || 0) + 1);
+          credit(o, Math.floor(L.price * 0.92));                     // 8% market fee
+        }
+        if (L.qty <= 0) o.listings = o.listings.filter(x => x !== L);
+        if (want <= 0 || a.money < L.price) break;
+      }
+      for (const [o, n] of soldBy) { stat(o, 'psold', n); if (o.ws) { quest(o, 'sell', n); toast(o, `${a.name} ซื้อ ${it.icon}${it.name} ของคุณ ${n} ชิ้น`, '💰'); } }
+      if (!bought) return toast(a, 'เงินไม่พอ', '💸', false);
+      addItem(a, id, bought); markMe(a); wdAt = 0;
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${bought} จากผู้เล่น รวม ${money(spent)}`, '🛍️');
+    }
+    case 'cstore.buy': {                      // the 24-hour convenience store: always stocked, a little dearer than the market
+      const id = m.item, it = D.ITEMS[id]; if (!it || !D.CSTORE.items.includes(id)) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = Math.ceil(it.base * D.CSTORE.markup);
+      if (!pay(a, unit * q)) return;
+      addItem(a, id, q); markMe(a); quest(a, 'buy', q);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ${money(unit * q)} · ขอบคุณที่ใช้บริการ 🙏`, '🏪');
+    }
+    case 'market.npcbuy': {
+      const id = m.item, it = D.ITEMS[id]; if (!it || it.kind === 'fish' && (it.base >= 1000 || it.rar >= 3) || it.menu) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = npcSellPrice(id);
+      if (!pay(a, unit * q)) return;
+      addItem(a, id, q); markMe(a);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} จากร้าน NPC ${money(unit * q)} (แพงกว่าซื้อจากผู้เล่น)`, '🏪');
+    }
+    case 'market.sell': case 'farmbuy.sell': case 'fishclub.sell': {
+      const id = m.item, it = D.ITEMS[id];
+      if (s.type === 'farmbuy' && it?.kind !== 'crop') return toast(a, 'จุดนี้รับซื้อเฉพาะพืชผล', '⚖️', false);
+      if (s.type === 'fishclub' && it?.kind !== 'fish') return toast(a, 'สมาคมรับซื้อเฉพาะปลา', '🎣', false);
+      const have = a.inv[id] || 0;
+      let q = m.qty === 'all' ? have : Math.floor(+m.qty);
+      if (!it || !(q > 0)) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
+      q = Math.min(q, have, 500);
+      if (q <= 0) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
+      if (!cd(a, 'sell', 300)) return;
+      const rate = s.type === 'market' ? NPC_BUY : s.type === 'fishclub' ? FISH_RATE : 0.5;   // the fish club and the farm buyer pay far better than the market's NPC
+      let total = 0;
+      const own = a.career === 'merchant' && it.kind === 'goods' || a.career === 'chef' && it.kind === 'meal' ? msat(a, id) : null;   // a merchant's restock sales only press their own price, not everyone's
+      for (let i = 0; i < q; i++) { if (own) { total += npcBuyPrice(a, id, rate) * own[0]; own[0] = Math.max(0.55, own[0] * 0.985); } else { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); } }
+      addItem(a, id, -q);
+      if ({ merchant: 'goods', farmer: 'crop', chef: 'meal' }[a.career] === it.kind) total *= jobPay(a);   // your own trade's goods sell better the higher your job level
+      const got = earn(a, total); quest(a, 'sell', q);
+      return toast(a, `ขาย ${it.icon}${it.name} x${q} ให้ NPC ได้ ${money(got)} (วางขายให้ผู้เล่นที่ตลาดกลางได้ราคาดีกว่ามาก)`, '💰');
+    }
+    // ---------------- merchant
+    case 'warehouse.auction': return aucStart(a);
+    case 'warehouse.bid': return aucBid(a, m);
+    case 'warehouse.buy': {
+      if (!need(a, 'merchant')) return;
+      const id = m.item, it = D.ITEMS[id];
+      if (!it || !it.wholesale) return;
+      let q = clamp(Math.floor(+m.qty) || 1, 1, 10);
+      const myStock = wstock(a, id);
+      if (myStock < q) q = Math.floor(myStock);
+      if (q <= 0) return toast(a, 'สินค้าหมดสต็อก รอเติมของหน่อย', '📦', false);
+      const unit = Math.round(it.wholesale * (1 - 0.06 * tier(a, 'merchant')));
+      if (a.money < unit * q) return toast(a, `เงินไม่พอ (ต้องใช้ ${money(unit * q)})`, '💸', false);
+      if (!spend(a, 4)) return;
+      a.money -= unit * q;
+      a.wst[id][0] -= q; addItem(a, id, q); addXp(a, 0.5); markMe(a); quest(a, 'buy', q); stat(a, 'wholesale', q);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(unit * q)}`, '📦');
+    }
+    // ---------------- food
+    case 'restaurant.eat': {
+      const it = D.ITEMS[m.item]; if (!it || !it.menu) return;
+      if (!cd(a, 'eat', 4000)) return;
+      if (!pay(a, it.base)) { a.cd.eat = 0; return; }
+      a.hunger = Math.min(100, a.hunger + it.eat.hunger); a.energy = Math.min(100, a.energy + (it.eat.energy || 0));
+      if (it.base < 100) infect(a, 'poison', 0.03);
+      ate(a, m.item);
+      markMe(a); quest(a, 'eat');
+      return toast(a, `กิน${it.name} อิ่ม +${it.eat.hunger}`, it.icon);
+    }
+    case 'restaurant.buy': {                         // take-away: keep it in your bag for later
+      const it = D.ITEMS[m.item]; if (!it || !it.menu) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 10);
+      if (!pay(a, it.base * q)) return;
+      addItem(a, m.item, q); markMe(a);
+      return toast(a, `ซื้อ${it.icon}${it.name} x${q} ใส่กระเป๋าแล้ว ${money(it.base * q)} (กินได้ทุกเมื่อในกระเป๋า 🎒)`, '🥡');
+    }
+    case 'restaurant.pickup': {
+      if (!need(a, 'rider')) return;
+      const mine = [...orders.values()].filter(o => o.rider === a && o.state === 'taken');
+      if (!mine.length) return toast(a, 'ไม่มีออเดอร์ที่ต้องรับ (รับออเดอร์ในแอพไรเดอร์ 📱 ก่อน)', '🛵', false);
+      mine.forEach(o => { o.state = 'picked'; if (o.cust) toast(o.cust, `${a.name} รับอาหารแล้ว กำลังไปส่ง`, '🛵'); });
+      ordersChanged();
+      return toast(a, `รับอาหาร ${mine.length} ออเดอร์แล้ว! ไปส่งให้ลูกค้า (ดูทางในแอพ)`, '🥡');
+    }
+    case 'kitchen.cook': {                  // start a cooking battle: the ingredients come out of your bag onto the counter
+      if (!need(a, 'chef')) return;
+      if (a.cook) return toast(a, 'กำลังทำออเดอร์อยู่ ทำให้เสร็จก่อนนะ', '🍳', false);
+      const r = D.RECIPES.find(x => x.id === m.rid); if (!r) return;
+      for (const [k, q] of Object.entries(r.in)) if ((a.inv[k] || 0) < q) return toast(a, 'วัตถุดิบไม่พอ', '🥬', false);
+      if (!cd(a, 'cook', 1500) || !spend(a, 12)) return;
+      for (const [k, q] of Object.entries(r.in)) addItem(a, k, -q);
+      const comps = Object.keys(r.in).map(ing => ({ ing, ops: r.ops[ing] || [], k: 0, at: 'pantry', t: 0, prog: 0, ready: false, burnt: false }));
+      const sec = 20 + comps.reduce((s0, c) => s0 + 9 + c.ops.reduce((x, o) => x + D.COOK[o] + 7, 0), 0);
+      const limit = Math.round(sec * 1.35 * 1000), t = now();
+      a.cook = { rid: r.id, comps, hand: -1, plated: false, t0: t, limit, until: t + limit, ckAt: 0 };
+      markMe(a); return toast(a, `🔥 ออเดอร์เข้า! ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} ภายใน ${Math.round(limit / 1000)} วินาที — เริ่มที่ 🧺 ตู้วัตถุดิบ`, '🍳');
+    }
+    case 'kitchen.serve': {
+      const c = a.cook; if (!c || c.hand !== 'plate') return toast(a, 'ยังไม่มีจานพร้อมเสิร์ฟ', 'ℹ️', false);
+      a.cook = null;
+      const it = D.ITEMS[c.rid], left = Math.max(0, (c.until - now()) / c.limit), extra = Math.random() < 0.2 * tier(a, 'chef') + (left > .4 ? .25 : 0) ? 1 : 0;
+      const tip = Math.round(it.base * .35 * left * jobPay(a));
+      addItem(a, c.rid, 1 + extra); addXp(a); quest(a, 'cook'); stat(a, 'cooked', 1 + extra); if (tip > 0) earn(a, tip); markMe(a);
+      if (Math.random() < 0.02) infect(a, 'injury');
+      send(a, { t: 'kfx', kind: 'serve' });
+      return toast(a, `🛎️ เสิร์ฟ ${it.icon}${it.name} สำเร็จ! เหลือเวลา ${Math.round(left * 100)}%${extra ? ' · ทำไว ได้เพิ่มอีก 1 จาน!' : ''}${tip ? ` · ทิป ${money(tip)}` : ''}`, '🍳');
+    }
+    case 'kpantry.use': case 'kboard.use': case 'kpan.use': case 'kpot.use': case 'kgrill.use': case 'kplate.use': return cookUse(a, s);
+    case 'kitchen.buy': {
+      if (!need(a, 'chef')) return;
+      const id = m.item, it = D.ITEMS[id];
+      if (!it || !D.RECIPES.some(r => id in r.in)) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), cost = Math.ceil(D.ITEMS[id].base * 1.3) * q;
+      if (!pay(a, cost)) return;
+      addItem(a, id, q); markMe(a);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคา ${money(cost)} (แพงกว่าซื้อจากผู้เล่นมาก)`, '🛒');
+    }
+    // ---------------- shops
+    case 'toolshop.buy': {
+      const c = m.career, def = D.TOOLS[c]; if (!def) return;
+      const cur = tier(a, c);
+      if (cur >= 3) return toast(a, `${def.name}ของคุณอัปเกรดสูงสุดแล้ว`, 'ℹ️', false);
+      if (!pay(a, D.TOOL_PRICES[cur])) return;
+      a.tools = { ...a.tools, [c]: cur + 1 }; markMe(a);
+      if (cur + 1 === 3) feed(`🛠️ ${a.name} อัปเกรด${def.name}ถึงระดับสูงสุด!`);
+      return toast(a, `อัปเกรด ${def.icon}${def.name} เป็นระดับ ${cur + 1}: ${def.fx[cur]}`, '🛠️');
+    }
+    case 'school.dtest': return startTest(a, 'driving', s);
+    case 'school.ptest': return startTest(a, 'policeExam', s);
+    case 'school.answer': {
+      const T = a.dtest; if (!T) return;
+      a.dtest = null;
+      const ans = Array.isArray(m.ans) ? m.ans : [];
+      const right = T.qs.filter((q, i) => +ans[i] === q.ok).length;
+      if (right < T.qs.length) return toast(a, `สอบไม่ผ่าน ตอบถูก ${right}/${T.qs.length} ข้อ ต้องจ่ายค่าสอบใหม่`, '❌', false);
+      if (!a.licenses.includes(T.lic)) a.licenses = [...a.licenses, T.lic];
+      if (D.LICENSES[T.lic].renew) a.licExp = { ...(a.licExp || {}), [T.lic]: now() + LICENSE_YEAR };
+      markMe(a); joy(a, 10);
+      return toast(a, T.lic === 'driving' ? 'สอบใบขับขี่ผ่าน! สมัครไรเดอร์ได้แล้ว (ต้องต่ออายุทุกปีในเกม = ทุก 1 วันจริง)' : 'สอบนายสิบตำรวจผ่าน! ไปสมัครเป็นตำรวจได้ที่สถานีตำรวจ', T.lic === 'driving' ? '🪪' : '👮');
+    }
+    case 'bank.stock': return stockTrade(a, m);
+    case 'bank.deposit': case 'bank.withdraw': case 'bank.borrow': case 'bank.repay': {
+      accrue(a);
+      let amt = Math.floor(+m.amt) || 0;
+      if (amt <= 0) return toast(a, 'ใส่จำนวนเงินก่อน', '⚠️', false);
+      if (m.a === 'deposit') { amt = Math.min(amt, Math.floor(a.money)); if (amt <= 0) return toast(a, 'ไม่มีเงินสดให้ฝาก', '💸', false); a.money -= amt; a.bank += amt; toast(a, `ฝากเงิน ${money(amt)}`, '🏦'); }
+      if (m.a === 'withdraw') { amt = Math.min(amt, Math.floor(a.bank)); if (amt <= 0) return toast(a, 'ไม่มีเงินในบัญชี', '💸', false); a.bank -= amt; a.money += amt; toast(a, `ถอนเงิน ${money(amt)}`, '🏦'); }
+      if (m.a === 'borrow') {
+        const room = Math.floor((D.BANK.loanMax - a.loan) / (1 + D.BANK.loanFee)); amt = Math.min(amt, room);
+        if (amt <= 0) return toast(a, `กู้ได้สูงสุด ${money(D.BANK.loanMax)} (รวมค่าธรรมเนียมและดอกเบี้ย) ใช้คืนก่อนนะ`, '🏦', false);
+        a.money += amt; a.loan += Math.ceil(amt * (1 + D.BANK.loanFee)); toast(a, `กู้เงิน ${money(amt)} (ยอดหนี้ ${money(amt * (1 + D.BANK.loanFee))} · ดอกเบี้ย ${D.BANK.loanRate * 100}% ต่อวันเกม ใช้คืนเร็วเสียน้อย)`, '🏦');
+      }
+      if (m.a === 'repay') { amt = Math.min(amt, Math.floor(a.money), Math.ceil(a.loan)); if (amt <= 0) return toast(a, a.loan > 0 ? 'เงินสดไม่พอ' : 'คุณไม่มีหนี้', 'ℹ️', false); a.money -= amt; a.loan -= amt; toast(a, `ชำระหนี้ ${money(amt)}${a.loan <= 0 ? ' — ปลดหนี้แล้ว! 🎉' : ''}`, '🏦'); }
+      a.loan = Math.max(0, a.loan); return markMe(a);
+    }
+    // ---------------- university
+    case 'school.enroll': {
+      const id = m.lic === 'hs' ? 'hs' : 'degree', L = D.LICENSES[id];
+      if (a.licenses.includes(id)) return toast(a, `คุณจบ${L.name}แล้ว`, 'ℹ️', false);
+      if (L.need && !a.licenses.includes(L.need)) return toast(a, `ต้องจบ${D.LICENSES[L.need].name}ก่อน`, '🎓', false);
+      if (a.enrolled) return toast(a, `คุณกำลังเรียน${D.LICENSES[a.enrolled].name}อยู่ กด "เข้าเรียน" ได้เลย`, 'ℹ️', false);
+      if (!pay(a, L.price)) return;
+      a.enrolled = id; a.classes = 0; markMe(a);
+      return toast(a, `ลงทะเบียนเรียน${L.name}แล้ว! ต้องเข้าเรียน ${L.classes} คาบ (คาบละ 1 ชั่วโมงในเกม)`, '🎓');
+    }
+    case 'school.class': return toast(a, 'เดินไปนั่งที่ 📖 โต๊ะเรียนตัวไหนก็ได้ นั่งเรียนครบ 1 ชั่วโมงในเกม = 1 คาบ', '📖');
+    case 'sdesk.sit': {
+      const id = a.enrolled; if (!id || !D.LICENSES[id]) return toast(a, 'ต้องลงทะเบียนเรียนที่เคาน์เตอร์มหาวิทยาลัยก่อน', '🎓', false);
+      if (desks[s.idx] && desks[s.idx] !== a) return toast(a, 'โต๊ะนี้มีคนนั่งแล้ว', '📖', false);
+      if (a.energy < 5) return toast(a, 'เหนื่อยเกินไป กินอะไรหรือพักก่อนค่อยมาเรียน', '😴', false);
+      standUp(a); desks[s.idx] = a; a.desk = s.idx; a.pose = 'study'; place(a, s.x, s.y); sendRoster(); markMe(a);
+      const L = D.LICENSES[id];
+      return toast(a, `นั่งเรียน${L.name}แล้ว (คาบที่ ${(a.classes || 0) + 1}/${L.classes}) นั่งครบ 1 ชั่วโมงในเกมจะได้ 1 คาบ · เดินเพื่อลุก`, '📖');
+    }
+    case 'school.renew': {
+      const L = D.LICENSES.driving;
+      if (!(a.licenses || []).includes('driving')) return toast(a, 'ยังไม่มีใบขับขี่ ต้องสอบก่อน', '🪪', false);
+      const left = (a.licExp?.driving || 0) - now();
+      if (left > LICENSE_YEAR / 4) return toast(a, `ใบขับขี่ยังไม่หมดอายุ (ต่ออายุได้เมื่อเหลือไม่ถึง 3 เดือนในเกม)`, '🪪', false);
+      if (!pay(a, L.renew)) return;
+      a.licExp = { ...(a.licExp || {}), driving: Math.max(now(), a.licExp?.driving || 0) + LICENSE_YEAR }; markMe(a);
+      return toast(a, `ต่ออายุใบขับขี่แล้ว ${money(L.renew)} ใช้ได้อีก 1 ปีในเกม`, '🪪');
+    }
+    case 'school.learn': {
+      const l = D.LICENSES[m.lic]; if (!l || l.classes || l.test || l.where !== 'school') return;
+      if (a.licenses.includes(m.lic)) return toast(a, 'คุณมีใบนี้แล้ว', 'ℹ️', false);
+      if (l.need && !a.licenses.includes(l.need)) return toast(a, `ต้องจบ${D.LICENSES[l.need].name}ก่อน`, '🎓', false);
+      if (!pay(a, l.price)) return;
+      a.licenses = [...a.licenses, m.lic]; markMe(a);
+      return toast(a, `ได้รับ ${l.name} แล้ว! ไปสมัครงานได้เลย`, '🎓');
+    }
+    // ---------------- hospital
+    case 'hospital.medbuy': {
+      const it = D.ITEMS[m.item]; if (!it || !it.pharmacy) return;
+      if (!pay(a, it.base)) return;
+      addItem(a, m.item, 1); markMe(a);
+      return toast(a, `ซื้อ ${it.icon}${it.name} ${money(it.base)} ใส่กระเป๋าแล้ว (กดใช้ในกระเป๋า 🎒)`, '💊');
+    }
+    case 'hospital.heal': {
+      if (a.health >= 98 && !(a.dz || []).length) return toast(a, 'คุณสุขภาพดีอยู่แล้ว', 'ℹ️', false);
+      const price = (a.dz || []).length ? 1500 + 500 * (a.dz.length - 1) : 800;
+      if (!pay(a, price)) return;
+      a.health = Math.min(100, a.health + 40); for (const d of [...(a.dz || [])]) cure(a, d); markMe(a);
+      return toast(a, `พยาบาล NPC รักษา ${money(price)} — หายป่วยแล้ว (นอนรอหมอผู้เล่นที่เตียงถูกกว่ามาก)`, '🏥');
+    }
+    case 'bed.lie': {
+      if (beds[s.idx] && beds[s.idx] !== a) return toast(a, 'เตียงนี้มีคนนอนอยู่แล้ว', '🛏️', false);
+      if (a.career === 'doctor' && !(a.dz || []).length) return toast(a, 'คุณเป็นหมอ เดินไปที่เตียงที่มีคนไข้แล้วรักษาได้เลย', 'ℹ️', false);
+      standUp(a); beds[s.idx] = a; a.bed = s.idx; a.pose = 'bed'; place(a, s.x, s.y);
+      sendRoster(); wdAt = 0; markMe(a);
+      const docs = [...online.values()].filter(o => o.career === 'doctor' && o !== a);
+      for (const d of docs) toast(d, `🛏️ ${a.name} นอนรอหมออยู่ที่โรงพยาบาล เตียง ${s.idx + 1}`, '🩺');
+      return toast(a, docs.length ? `นอนรอหมอแล้ว (หมอออนไลน์ ${docs.length} คน) ค่ารักษาประมาณ ฿300` : 'นอนรอหมอแล้ว ตอนนี้ไม่มีหมอผู้เล่น หมอเวร NPC จะเดินมารักษาให้ (~฿450)', '🛏️');
+    }
+    case 'bed.revive': case 'bed.treat': {
+      if (!need(a, 'doctor')) return;
+      const pt = beds[s.idx];
+      if (!pt || pt === a) return toast(a, 'เตียงนี้ยังไม่มีคนไข้', '🛏️', false);
+      if (!cd(a, 'treat', 1500) || !spend(a, 8)) return;
+      const boost = (1 + BOOST[tier(a, 'doctor')]) * jobPay(a) * wb;
+      if (m.a === 'revive') {
+        if (!pt.down) return toast(a, 'คนไข้รู้สึกตัวดีอยู่แล้ว', 'ℹ️', false);
+        const fee = Math.min(400, Math.floor(pt.money)); pt.money -= fee;
+        const got = earn(a, (fee + 200) * boost); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2); stat(a, 'revived');
+        feed(`💓 หมอ${a.name} ช่วยชีวิต ${pt.name} สำเร็จ`);
+        return toast(a, `ช่วยให้ ${pt.name} ฟื้นแล้ว ได้ ${money(got)} · ต่อไปวินิจฉัยโรคที่ป่วยอยู่`, '💓');
+      }
+      if (pt.down) return toast(a, 'คนไข้หมดสติอยู่ ต้องช่วยให้ฟื้นก่อน', '💓', false);
+      const target = (pt.dz || [])[0];
+      if (!target) {                                    // check-up only
+        let fee = 25;
+        if (!pt.npc) { const f = Math.min(150, Math.floor(pt.money)); pt.money -= f; fee = f + 40; markMe(pt); toast(pt, `หมอ${a.name}ตรวจร่างกายให้ สุขภาพ +25`, '🩺'); }
+        pt.health = Math.min(100, pt.health + 25);
+        const got = earn(a, fee * boost); addXp(a);
+        if (pt.npc) beds[s.idx] = null; wdAt = 0;
+        return toast(a, `ตรวจร่างกาย ${pt.name} เรียบร้อย ได้ ${money(got)}`, '🩺');
+      }
+      if (DZ[target].cure !== m.tx) {
+        pt.health = Math.max(1, pt.health - 5); if (!pt.npc) { markMe(pt); toast(pt, `หมอ${a.name}วินิจฉัยผิด! อาการยังไม่ดีขึ้น (สุขภาพ -5)`, '😣', false); }
+        wdAt = 0;
+        return toast(a, 'วินิจฉัยผิด! คนไข้ไม่ได้เป็นโรคที่รักษานี้ ลองดูอาการอีกครั้ง', '❌', false);
+      }
+      let fee = 55;
+      if (pt.npc) pt.dz = pt.dz.filter(x => x !== target);
+      else { cure(pt, target); const f = Math.min(300, Math.floor(pt.money)); pt.money -= f; fee = f + 60; markMe(pt); toast(pt, `หมอ${a.name}รักษา${DZ[target].name}หายแล้ว! (ค่ารักษา ${money(f)})`, '💉'); }
+      pt.health = Math.min(100, pt.health + 20);
+      const got = earn(a, fee * boost); addXp(a, 2); quest(a, 'treat'); stat(a, 'treated');
+      if (!pt.dz.length) { if (pt.npc) beds[s.idx] = null; else standUp(pt); }
+      wdAt = 0;
+      if (!pt.npc) feed(`🩺 หมอ${a.name} รักษา${DZ[target].name}ให้ ${pt.name} สำเร็จ`);
+      return toast(a, `วินิจฉัยถูกต้อง! รักษา${DZ[target].name}หาย ได้ ${money(got)}`, '💉');
+    }
+    // ---------------- fishing (anyone with a rod)
+    // ---------------- ICU: emergency cases (doctors). A random case: CPR (press on the beat) or surgery (stop the marker in the zone)
+    case 'police.dog': {
+      if (!need(a, 'police')) return;
+      if (a.dogq) return toast(a, 'คุณมีเคสหมาหายอยู่แล้ว', 'ℹ️', false);
+      if ((a.dogNext || 0) > now()) return toast(a, `ยังไม่มีเคสใหม่ รออีก ${Math.ceil((a.dogNext - now()) / 1000)} วินาที`, '⏳', false);
+      if (areaId(a) !== 'town' && !D.roomAt(a.x, a.y)) return;
+      const out = D.roomAt(a.x, a.y)?.outside, from = out ? { x: out.x, y: out.y } : a, sp = dogSpot({ x: from.x, y: from.y, area: 'town' });
+      if (!sp) return toast(a, 'ยังไม่มีเคสหมาหายในตอนนี้ ลองใหม่อีกครั้ง', 'ℹ️', false);
+      if (!spend(a, D.DOGQ.energy)) return;
+      const limit = Math.round(Math.max(150, Math.min(420, sp[2] / SPEED * 2.5 + 75)) * 1000), t = now();
+      const bl = D.BUILDINGS.filter(b => b.label && (!b.area || b.area === 'town')).map(b => [b, Math.hypot(b.x + b.w / 2 - sp[0], b.y + b.h - sp[1])]).sort((p, q) => p[1] - q[1])[0];
+      const jit = () => rnd(-6, 6);
+      a.dogq = { dog: pick(D.DOGQ.dogs), name: pick(D.DOGQ.names), owner: pick(D.DOGQ.owners), x: sp[0] + .5, y: sp[1] + .5, t0: t, limit, until: t + limit,
+        hint: bl && bl[1] < 14 ? `ใกล้ ${bl[0].label}` : (D.areaAt(sp[0], sp[1])?.name || 'ในเมือง'), hc: [Math.round(sp[0] + jit()), Math.round(sp[1] + jit()), 12] };
+      markMe(a); return toast(a, `🐕 ${a.dogq.owner}แจ้งว่า "น้อง${a.dogq.name}" หายไป! ตามหาให้เจอภายใน ${Math.round(limit / 60000 * 10) / 10} นาที`, '🐕');
+    }
+    case 'police.dogquit': { if (a.dogq) { a.dogq = null; a.dogNext = now() + D.DOGQ.next; markMe(a); toast(a, 'ยกเลิกเคสหมาหายแล้ว', 'ℹ️', false); } return; }
+    case 'icu.start': {                     // an emergency case, played out in the hospital: fetch what is needed, work on the patient
+      if (!need(a, 'doctor')) return;
+      if (a.mis) return toast(a, 'คุณมีเคส/ภารกิจค้างอยู่แล้ว', 'ℹ️', false);
+      if ((a.icuNext || 0) > now() && !(isAdmin(a) && a.god?.nocd)) return toast(a, `เคสถัดไปยังไม่เข้า รออีก ${Math.ceil((a.icuNext - now()) / 1000)} วินาที`, '⏳', false);
+      if (!spend(a, D.ICU.energy)) return;
+      const l = lvl(a, 'doctor'), base = D.ICU.pay[Math.min(l, D.ICU.pay.length) - 1];
+      a.mis = icuCase(a, pick(ICU_CASES), base * 2.2); markMe(a);
+      return toast(a, `🚨 ${a.mis.title} — ${a.mis.story}`, '🚑');
+    }
+    case 'icu.quit': { if (a.mis?.kind === 'icu') { a.mis = null; a.icuNext = now() + D.ICU.next / 2; markMe(a); toast(a, 'ส่งต่อเคสให้หมอคนอื่นแล้ว', '🚑', false); } return; }
+    case 'fishclub.info': return;
+    case 'petshop.buy': {                                  // adopt a pet at a pet shop (kept forever) and bring it out
+      m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;
+      a.pets = a.pets || [];
+      if (a.pets.includes(m.id)) return toast(a, `คุณมี${P.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, P.price)) return;
+      a.pets.push(m.id); a.pet = m.id; markMe(a); joy(a, 6 + P.rar * 3); sendRoster();
+      return toast(a, `${P.icon} รับ${P.name}มาเลี้ยงแล้ว! มันเดินตามคุณไปทุกที่ — แตะที่ตัวมันเพื่อเล่นด้วย`, '🐾');
+    }
+    case 'fishclub.rod': case 'staff.rod': {                 // buy a rod (it goes into the bag and into your hand)
+      const id = D.RODS[m.rod] ? m.rod : 'bamboo', r = D.RODS[id];
+      a.rods = a.rods || [];
+      if (a.rods.includes(id)) return toast(a, `คุณมี${r.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, r.price)) return;
+      a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4);
+      return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่มใหญ่เพื่อเหวี่ยงเบ็ด`, '🎣');
+    }
+    case 'wish.toss': {                    // the wishing fountain: a ฿10 coin, a fortune, and once a day maybe ฿1,000 back
+      const E = D.EGG, e = eggOf(a), d = dayKey(); if (e.d !== d) { e.d = d; e.wn = 0; e.ww = 0; }
+      if (!cd(a, 'wish', 1200, true)) return;
+      if (e.wn >= E.wishDay) return toast(a, `วันนี้โยนเหรียญครบ ${E.wishDay} ครั้งแล้ว น้ำพุขอพักก่อน พรุ่งนี้มาใหม่นะ`, '⛲', false);
+      if (!pay(a, E.wishCost)) return;
+      e.wn++; const win = !e.ww && Math.random() < 1 / E.wishOdds, f = pick(D.FORTUNES);
+      if (win) { e.ww = 1; a.money += E.wishWin; a.earned += E.wishWin; stat(a, 'wishwin'); joy(a, 8); feed(`⛲✨ ${a.name} โยนเหรียญที่น้ำพุแล้วได้ ${money(E.wishWin)}!`); }
+      markMe(a); send(a, { t: 'egg', k: 'wish', win: win ? E.wishWin : 0, f });
+      return;
+    }
+    case 'secret.read': {                  // one of the five little signs in the corners of town
+      const E = D.EGG, e = eggOf(a);
+      if (e.s.includes(s.n)) return toast(a, `🪧 "คุณเจอที่ลับแล้ว!" · ป้ายนี้คุณเจอไปแล้ว (${e.s.length}/5)`, '🪧', false);
+      e.s.push(s.n); a.gems = (a.gems || 0) + E.secretGems; stat(a, 'secrets', e.s.length, true); joy(a, 6);
+      let frame = false;
+      if (e.s.length >= 5) { a.frames = a.frames || []; if (!a.frames.includes(E.secretFrame)) { a.frames.push(E.secretFrame); frame = true; } }
+      feed(e.s.length >= 5 ? `🗺️ ${a.name} เจอที่ลับครบทั้ง 5 จุดในเมือง!` : `🪧 ${a.name} เจอที่ลับในเมือง! (${e.s.length}/5)`);
+      markMe(a); send(a, { t: 'egg', k: 'secret', n: e.s.length, gems: E.secretGems, frame: frame ? D.FRAMES[E.secretFrame].name : '' });
+      return;
+    }
+    case 'pier.cast': {                    // cast from the water's edge (the big button); the float lands a couple of tiles out
+      if (!rodOf(a)) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (เริ่ม ${money(D.RODS.bamboo.price)})`, '🎣', false);
+      if (a.cast) return;
+      if (!spend(a, 8)) return;
+      const bite = now() + rnd(3500, 9500) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
+      a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round(1500 + r.zone * 2500 + 25 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
+      return;
+    }
+    case 'pier.reel': case 'pier.hook': {   // strike: too early (only a nibble) scares the fish, inside the bite window hooks it and the fight starts
+      const c = a.cast; if (!c) return;
+      if (c.state === 'wait') { c.bite = Math.max(c.bite, now() + 1500); markMe(a); return toast(a, 'ยังไม่ใช่! ทุ่นแค่ไหว รอให้ทุ่นจมก่อนค่อยตวัด', '⏳', false); }
+      if (c.state !== 'bite') return;
+      const id = legendRoll(a, c) || rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
+      const pow = id ? clamp(.18 + .1 * rar + (it.base >= 1500 ? .05 : 0), .15, .75) : .1;
+      c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((0.8 + rar * 0.8) * 1000);
+      c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(750 + r.zone * 1000), seed: rint(1, 1e9), min: c.min };
+      markMe(a); return send(a, { t: 'hooked', fight: c.fight });
+    }
+    case 'pier.land': {                     // the fish was played out and lifted at the right moment
+      const c = a.cast; if (!c || c.state !== 'fight') return;
+      if (now() - c.t0 < c.min) { a.cast = null; markMe(a); return toast(a, 'ดึงแรงเกินไป ปลาหลุด!', '💨', false); }
+      a.cast = null; return giveCatch(a, c.fish);
+    }
+    case 'pier.lose': {                     // the line snapped, the fish ran off with it or the hook slipped
+      if (!a.cast) return;
+      const why = { snap: '💥 สายขาด! ดึงตอนปลากำลังสู้แรงเกินไป', run: '🐟 ปลาลากสายออกไปไกลจนหลุด', slack: '〰️ สายหย่อนนานไป เบ็ดหลุดจากปากปลา', miss: '💦 ยกไม่ทันจังหวะ ปลาดิ้นหลุดไปแล้ว' }[m.why] || 'ปลาหลุดไปแล้ว';
+      a.cast = null; markMe(a); return toast(a, why, '🎣', false);
+    }
+    // ---------------- gardens
+    case 'lot.buy': {
+      if (!need(a, 'farmer')) return;
+      if (lots[s.lot]) return toast(a, `สวนนี้เป็นของ ${lots[s.lot].name} แล้ว`, '🪧', false);
+      if (a.garden) return toast(a, 'คุณมีสวนแล้ว (ขายสวนเดิมก่อนถึงจะซื้อใหม่ได้)', '🪧', false);
+      if (!pay(a, D.GARDEN.lotPrice)) return;
+      a.garden = { lot: s.lot, n: D.GARDEN.startPlots, crops: new Array(D.GARDEN.maxPlots).fill(null) };
+      lots[s.lot] = a; markMe(a); wdAt = 0; stat(a, 'plots', a.garden.n, true);
+      feed(`🌾 ${a.name} ซื้อสวนแปลงที่ ${s.lot + 1} ที่ไร่ชานเมือง`);
+      return toast(a, `ได้สวนแล้ว! มี ${a.garden.n} แปลงปลูก ขยายเพิ่มได้ที่ป้ายนี้`, '🌾');
+    }
+    case 'lot.expand': {
+      const g = a.garden; if (!g || g.lot !== s.lot) return toast(a, 'นี่ไม่ใช่สวนของคุณ', '🔒', false);
+      if (g.n >= D.GARDEN.maxPlots) return toast(a, 'สวนของคุณขยายเต็มแล้ว', 'ℹ️', false);
+      if (!pay(a, D.GARDEN.expand[g.n])) return;
+      g.n++; markMe(a); wdAt = 0; stat(a, 'plots', g.n, true);
+      return toast(a, `ขยายสวนแล้ว ตอนนี้มี ${g.n} แปลง`, '🌱');
+    }
+    case 'lot.sell': {
+      const g = a.garden; if (!g || g.lot !== s.lot) return toast(a, 'นี่ไม่ใช่สวนของคุณ', '🔒', false);
+      const back = Math.round((D.GARDEN.lotPrice + D.GARDEN.expand.slice(0, g.n).reduce((x, y) => x + y, 0)) * 0.6);
+      lots[g.lot] = null; a.garden = null; a.money += back; markMe(a); wdAt = 0;
+      return toast(a, `ขายสวนคืนสหกรณ์ได้ ${money(back)}`, '🪧');
+    }
+    case 'gplot.plant': {
+      if (!need(a, 'farmer')) return;
+      const g = a.garden; if (!g || g.lot !== s.lot) return toast(a, lots[s.lot] ? `สวนของ ${lots[s.lot].name}` : 'สวนนี้ยังไม่มีเจ้าของ ซื้อได้ที่ป้ายหน้าสวน', '🔒', false);
+      if (s.n >= g.n) return toast(a, 'แปลงนี้ยังไม่ได้ขยาย (ขยายที่ป้ายหน้าสวน)', '🔒', false);
+      const c = D.CROPS[m.crop]; if (!c) return;
+      if (g.crops[s.n]) return toast(a, 'แปลงนี้ปลูกอยู่แล้ว', '⚠️', false);
+      if (!pay(a, c.seed)) return;
+      if (!spend(a, 5)) { a.money += c.seed; return; }
+      const f = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer'));
+      g.crops[s.n] = [m.crop, now() + c.grow * 1000 * f, false];
+      markMe(a); wdAt = 0;
+      if (ev('rain')) infect(a, 'cold', 0.02);
+      return toast(a, `ปลูก${D.ITEMS[m.crop].name}แล้ว`, '🌱');
+    }
+    case 'gplot.harvest': {
+      if (!need(a, 'farmer')) return;
+      const g = a.garden; if (!g || g.lot !== s.lot) return toast(a, 'นี่ไม่ใช่สวนของคุณ', '🔒', false);
+      const p = g.crops[s.n];
+      if (!p) return toast(a, 'แปลงว่าง', '⚠️', false);
+      if (p[1] > now()) return toast(a, 'พืชยังไม่โต', '🌱', false);
+      if (!spend(a, 6)) return;
+      const c = D.CROPS[p[0]];
+      const n = rint(c.min, c.max) + Math.floor(lvl(a) / 3) + tier(a, 'farmer');
+      addItem(a, p[0], n); g.crops[s.n] = null; addXp(a); markMe(a); quest(a, 'harvest'); stat(a, 'harvest'); wdAt = 0;
+      if (p[0] === 'durian') stat(a, 'durian');
+      infect(a, 'injury', 0.015);
+      return toast(a, `เก็บเกี่ยว ${D.ITEMS[p[0]].icon}${D.ITEMS[p[0]].name} ได้ ${n} หน่วย`, '🧺');
+    }
+    // ---------------- houses
+    case 'house.buy': {
+      const i = s.house, o = houses[i];
+      if (o === a) return toast(a, 'บ้านหลังนี้เป็นของคุณแล้ว', 'ℹ️', false);
+      if (a.house >= 0) return toast(a, 'คุณมีบ้านแล้ว (ขายหลังเดิมก่อน)', '🏠', false);
+      if (tenants[i] && tenants[i] !== a) return toast(a, 'บ้านหลังนี้มีคนเช่าอยู่', '🏠', false);
+      if (o && !o.houseSale) return toast(a, `บ้านของ ${o.name} ไม่ได้ประกาศขาย`, '🏠', false);
+      const price = o ? o.houseSale : D.HOUSE_PRICES[i];
+      if (!pay(a, price)) return;
+      if (o) { credit(o, price); o.house = -1; o.furniture = []; o.hlv = 0; o.fpos = {}; o.yz = []; o.ycrops = {}; o.houseSale = 0; o.houseRent = 0; if (o.ws) toast(o, `${a.name} ซื้อบ้านของคุณแล้ว ได้ ${money(price)}`, '🏠'); }
+      if (tenants[i] === a) { tenants[i] = null; a.rent = null; }
+      houses[i] = a; a.house = i; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.houseSale = 0; a.houseRent = 0; starterYard(a); markMe(a); wdAt = 0;
+      feed(`🏠 ${a.name} ซื้อบ้านหลังใหม่ในหมู่บ้านจัดสรร!`);
+      return toast(a, 'ยินดีด้วย! ได้บ้านแล้ว พร้อมสวนรอบบ้านและแปลงผัก 2 แปลง · ขยายสวนได้ที่ป้าย 🔓 ซื้อของแต่งสวนที่ร้านเฟอร์นิเจอร์', '🏠');
+    }
+    case 'house.rent': {
+      const i = s.house, o = houses[i], days = [1, 3, 7].includes(+m.days) ? +m.days : 1;
+      if (o === a) return toast(a, 'นี่บ้านของคุณเอง', 'ℹ️', false);
+      if (a.house >= 0) return toast(a, 'คุณมีบ้านอยู่แล้ว', 'ℹ️', false);
+      if (tenants[i] && tenants[i] !== a) return toast(a, `${tenants[i].name} เช่าอยู่`, '🏠', false);
+      if (a.rent && a.rent.idx !== i) return toast(a, 'คุณเช่าบ้านหลังอื่นอยู่', '🏠', false);
+      if (o && !o.houseRent) return toast(a, `${o.name} ไม่ได้ปล่อยเช่า`, '🏠', false);
+      const perDay = o ? o.houseRent : D.HOUSE_RENT[i], cost = perDay * days;
+      if (!pay(a, cost)) return;
+      if (o) { credit(o, cost); if (o.ws) toast(o, `${a.name} เช่าบ้านของคุณ ${days} วัน ได้ ${money(cost)}`, '🏠'); }
+      const from = a.rent && a.rent.idx === i ? Math.max(now(), a.rent.until) : now();
+      a.rent = { idx: i, until: from + days * D.DAY_MS }; tenants[i] = a; markMe(a); wdAt = 0;
+      if (o && o.ws && D.roomAt(o.x, o.y)?.house === i) { standUp(o); const rm = D.roomAt(o.x, o.y); teleport(o, rm.outside.x, rm.outside.y); toast(o, `${a.name} เช่าบ้านของคุณแล้ว คุณต้องออกจากบ้านจนกว่าจะหมดสัญญา`, '🔑', false); }
+      return toast(a, `เช่าบ้านหลังนี้ ${days} วัน (${money(cost)}) นอนในบ้านได้แล้ว`, '🔑');
+    }
+    case 'house.sell': {
+      if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
+      if (tenants[s.house]) return toast(a, 'มีผู้เช่าอยู่ ขายไม่ได้จนกว่าจะหมดสัญญา', '🏠', false);
+      const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
+      houses[s.house] = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
+      return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
+    }
+    case 'house.list': case 'house.rentout': {
+      if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
+      const p = Math.max(0, Math.floor(+m.price) || 0);
+      if (m.a === 'list') { a.houseSale = Math.min(p, D.HOUSE_PRICES[s.house] * 4); toast(a, p ? `ประกาศขายบ้าน ${money(a.houseSale)}` : 'ยกเลิกประกาศขายแล้ว', '🪧'); }
+      else { a.houseRent = Math.min(p, D.HOUSE_RENT[s.house] * 4); toast(a, p ? `ปล่อยเช่า ${money(a.houseRent)}/วัน (ระหว่างมีผู้เช่า คุณนอนบ้านนี้ไม่ได้)` : 'ยกเลิกปล่อยเช่าแล้ว', '🔑'); }
+      markMe(a); wdAt = 0; return;
+    }
+    case 'house.furnish': {
+      if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
+      const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
+      if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, f.price)) return;
+      a.furniture = [...a.furniture, m.item]; markMe(a); wdAt = 0;
+      return toast(a, `ซื้อ ${f.icon}${f.name} ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
+    }
+    case 'furnshop.buy': {                  // the furniture shop: same items as the house menu, delivered to your own house
+      if (a.house < 0 || houses[a.house] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่หน้าบ้านแต่ละหลัง 🏡', '🛋️', false);
+      const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
+      let key = m.item;
+      if (f.multi) {                        // walls, doors, screens, garden pieces: buy as many as you need (up to 20 at a time)
+        const max = f.max || FURN_MULTI_MAX, have = a.furniture.filter(k => fbase(k) === m.item).length, q = Math.min(clamp(Math.floor(+m.qty) || 1, 1, 20), max - have);
+        if (q <= 0) return toast(a, `มี${f.name}ครบ ${max} ชิ้นแล้ว`, 'ℹ️', false);
+        if (!pay(a, f.price * q)) return;
+        const add = []; for (let n = 1, made = 0; made < q; n++) { const k = n === 1 ? m.item : `${m.item}#${n}`; if (!a.furniture.includes(k)) { add.push(k); made++; } }
+        a.furniture = [...a.furniture, ...add]; joy(a, 1); markMe(a); wdAt = 0;
+        return toast(a, `ซื้อ ${f.icon}${f.name} x${q} แล้ว (มี ${have + q} ชิ้น) · วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
+      } else if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
+      if (!pay(a, f.price)) return;
+      a.furniture = [...a.furniture, key]; joy(a, 5); markMe(a); wdAt = 0;
+      return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)}) · จัดวางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
+    }
+    case 'dealer.buy': case 'dealer.sell': {   // the car showroom
+      const v = D.VEHICLES[m.v]; if (!v) return;
+      const own = (a.vehicles || []).includes(m.v);
+      if (m.a === 'sell') {
+        if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false); const back = Math.round(v.price * .6);
+        a.vehicles = a.vehicles.filter(x => x !== m.v); if (a.ride === m.v) a.ride = ''; a.money += back; markMe(a); sendRoster();
+        return toast(a, `ขาย${v.name}ให้โชว์รูม ได้ ${money(back)} (60%)`, '💰');
+      }
+      if (own) return toast(a, `มี${v.name}แล้ว`, 'ℹ️', false);
+      if (v.job && a.career !== v.job) return toast(a, `${v.name} ขายเฉพาะตำรวจ`, '🚓', false);
+      if (v.license && !(a.licenses || []).includes(v.license)) return toast(a, 'ต้องมีใบขับขี่ก่อน สอบได้ที่มหาวิทยาลัย 🪪', '🪪', false);
+      if (v.gem && isAdmin(a)) { /* admins: unlimited diamonds */ }
+      else if (v.gem) { if ((a.gems || 0) < v.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${v.gem} (มี 💎${a.gems || 0})`, '💎', false); a.gems -= v.gem; }
+      else if (!pay(a, v.price)) return;
+      a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
+      if (v.gem || v.price >= 250000) feed(`${v.gem ? '💎' : ''}${v.icon} ${a.name} ถอย${v.name}${v.gem ? ' รุ่นพิเศษ!' : 'ป้ายแดง!'}`);
+      return toast(a, `ได้${v.name}แล้ว! กดปุ่ม ${v.icon} ขี่/ลงรถ ได้ทุกที่นอกอาคาร`, v.icon);
+    }
+    case 'yzone.unlock': {                    // home yard: open up one more zone of ground
+      const i = s.idx; if (houses[i] !== a) return toast(a, 'เฉพาะเจ้าของบ้านเท่านั้นที่ขยายสวนได้', '🔒', false);
+      if (yardOpen(a, s.z)) return toast(a, 'พื้นที่นี้ปลดล็อกแล้ว', 'ℹ️', false);
+      const price = D.YARD.price[(a.yz || []).length]; if (!pay(a, price)) return;
+      a.yz = [...(a.yz || []), s.z]; markMe(a); wdAt = 0; joy(a, 6);
+      feed(`🌳 ${a.name} ขยายสวนรอบบ้านเป็น ${3 + a.yz.length}/9 ส่วน`);
+      return toast(a, `ปลดล็อกพื้นที่สวนแล้ว! (${3 + a.yz.length}/9) จัดวางของและแปลงผักได้ด้วยปุ่ม 🛋️ จัดบ้าน`, '🌳');
+    }
+    case 'hstair.go': case 'hstair.build': {   // house floors: stairs up/down, and building the next floor
+      const i = s.idx, o = houses[i], tn = tenants[i], master = isAdmin(a) && a.god?.doors;
+      const to = s.down ? s.fl - 1 : s.fl + 1;
+      if (m.a === 'build') {
+        if (o !== a) return toast(a, 'ขยายบ้านได้เฉพาะเจ้าของบ้าน', '🔒', false);
+        if (to !== 2 + (a.hlv || 0) || to > D.HOUSE_FLOORS) return;
+        if (!pay(a, D.FLOOR_PRICE[to])) return;
+        a.hlv = (a.hlv || 0) + 1; joy(a, 20); markMe(a); wdAt = 0;
+        feed(`🏗️ ${a.name} ต่อเติมบ้านเป็น ${to} ชั้นแล้ว!`);
+        toast(a, `สร้างชั้น ${to} เสร็จแล้ว! ขึ้นบันไดไปจัดห้องใหม่ได้เลย`, '🏗️');
+      }
+      if (!s.down) {
+        if (!master && !((o === a && (!tn || tn === a)) || tn === a)) return toast(a, 'ขึ้นชั้นบนได้เฉพาะเจ้าของบ้านและผู้เช่า', '🔒', false);
+        if (!master && to > 1 + ((o && o.hlv) || 0)) return toast(a, o === a ? `ยังไม่มีชั้น ${to} — ต่อเติมได้ ${money(D.FLOOR_PRICE[to])}` : `บ้านหลังนี้ยังไม่มีชั้น ${to}`, '🏗️', false);
+      }
+      const r = D.floorRoom(i, to); if (!r) return;
+      if (!cd(a, 'door', 800, true)) return;
+      standUp(a);
+      const st = D.STATIONS.find(x => x.type === 'hstair' && x.idx === i && x.fl === to && (s.down ? !x.down : x.down));
+      return st ? teleport(a, st.x + (s.down ? (st.x < r.x + 7 ? 1.3 : -1.3) : -1.4), st.y - .1) : teleport(a, r.spawn.x, r.spawn.y);
+    }
+    case 'hbed.sleep': {
+      const i = s.idx, own = houses[i] === a && !tenants[i], rent = tenants[i] === a;
+      if (!own && !rent) return toast(a, houses[i] === a ? 'บ้านนี้ปล่อยเช่าอยู่ คุณนอนไม่ได้' : 'นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า', '🔒', false);
+      if (a.utilOff) return toast(a, 'ถูกตัดน้ำตัดไฟเพราะค้างค่าน้ำค่าไฟ! จ่ายบิลที่ธนาคารหรือในแอพมือถือก่อน', '🔌', false);
+      if (!cd(a, 'homesleep', 120000)) return;
+      const e = 50 + (own ? comfort(a) * 2 : 0);
+      a.energy = Math.min(100, a.energy + e); a.health = Math.min(100, a.health + 5); sleepWell(a);
+      a.usage = { sleep: (a.usage?.sleep || 0) + 1 }; joy(a, 6 + (own ? comfort(a) : 0));
+      markMe(a);
+      return toast(a, `นอนหลับสบาย พลังงาน +${e} หายง่วงแล้ว 😊`, '😴');
+    }
+  }
+}
+
+function useItem(a, id) {
+  const it = D.ITEMS[id];
+  if (a.down || !it || !it.eat || !a.inv[id]) return;
+  if (!cd(a, 'use', 400)) return;
+  addItem(a, id, -1);
+  const e = it.eat;
+  if (e.hunger) { a.hunger = Math.min(100, a.hunger + e.hunger); quest(a, 'eat'); }
+  if (e.energy) a.energy = Math.min(100, a.energy + e.energy);
+  if (e.health) a.health = Math.min(100, a.health + e.health);
+  if (e.happy) joy(a, e.happy);
+  const healed = (it.cures || []).filter(d => cure(a, d));
+  if (healed.length) toast(a, `หายจาก${healed.map(d => DZ[d].name).join(', ')}แล้ว`, '💊');
+  if (id === 'snack') infect(a, 'poison', 0.04);
+  if (it.kind === 'crop') infect(a, 'poison', 0.12);          // raw produce
+  ate(a, id);
+  markMe(a);
+  toast(a, `ใช้ ${it.icon}${it.name}`, it.icon);
+}
+
+// ------------------------------------------------------------------ player-to-player
+const playerById = id => online.get(id);
+function nearPlayer(a, id, r) {
+  const o = playerById(id);
+  if (!o || o === a || areaId(o) !== areaId(a)) return null;
+  return dist(a, o) <= r ? o : null;
+}
+function tradeState(a) {
+  const tr = a.trade; if (!tr) return;
+  const other = tr.a === a ? tr.b : tr.a;
+  const mine = tr.a === a ? tr.oa : tr.ob, theirs = tr.a === a ? tr.ob : tr.oa;
+  send(a, { t: 'trade', open: true, with: pubInfo(other), mine, theirs });
+}
+function tradeClose(tr, reason) { for (const p of [tr.a, tr.b]) if (p.trade === tr) { p.trade = null; send(p, { t: 'trade', open: false, reason }); } }
+function tradeOffer(a, m) {
+  const tr = a.trade; if (!tr) return;
+  const o = { money: clamp(Math.floor(+m.money) || 0, 0, Math.floor(a.money)), items: {}, ok: false };
+  let n = 0;
+  for (const [k, q] of Object.entries(m.items || {})) { const qq = Math.min(Math.floor(+q) || 0, a.inv[k] || 0); if (D.ITEMS[k] && qq > 0 && n++ < 12) o.items[k] = qq; }
+  if (tr.a === a) tr.oa = o; else tr.ob = o;
+  tr.oa.ok = false; tr.ob.ok = false;
+  tradeState(tr.a); tradeState(tr.b);
+}
+function tradeConfirm(a) {
+  const tr = a.trade; if (!tr) return;
+  (tr.a === a ? tr.oa : tr.ob).ok = true;
+  if (!(tr.oa.ok && tr.ob.ok)) { tradeState(tr.a); tradeState(tr.b); return; }
+  const valid = (p, o) => p.money >= o.money && Object.entries(o.items).every(([k, q]) => (p.inv[k] || 0) >= q);
+  if (!valid(tr.a, tr.oa) || !valid(tr.b, tr.ob)) return tradeClose(tr, 'ของไม่ครบแล้ว ยกเลิกการแลกเปลี่ยน');
+  const move = (from, to, o) => { from.money -= o.money; to.money += o.money; for (const [k, q] of Object.entries(o.items)) { addItem(from, k, -q); addItem(to, k, q); } };
+  move(tr.a, tr.b, tr.oa); move(tr.b, tr.a, tr.ob);
+  quest(tr.a, 'trade'); quest(tr.b, 'trade'); stat(tr.a, 'trades'); stat(tr.b, 'trades');
+  markMe(tr.a); markMe(tr.b);
+  tradeClose(tr, '✅ แลกเปลี่ยนสำเร็จ!');
+}
+function request(a, m) {
+  if (a.down) return;
+  const bn = botById(+m.to);
+  if (bn) { if (dist(a, bn) > 6) return toast(a, 'เดินเข้าไปใกล้ผู้เล่นคนนั้นก่อน', '⚠️', false); botSay(bn, pick(['ขอโทษนะ ตอนนี้ไม่ว่าง 🙏', 'ไว้ทีหลังนะ กำลังทำงานอยู่', 'ยังไม่สะดวกอะ'])); return toast(a, `${bn.name} ปฏิเสธคำขอ (ไม่ว่าง)`, '🙅', false); }
+  const o = nearPlayer(a, m.to, 6);
+  if (!o) return toast(a, 'เดินเข้าไปใกล้ผู้เล่นคนนั้นก่อน', '⚠️', false);
+  if (m.kind === 'trade') {
+    if (a.trade || o.trade) return toast(a, 'ฝ่ายใดฝ่ายหนึ่งกำลังแลกเปลี่ยนอยู่', '⚠️', false);
+  } else if (m.kind === 'heal') {
+    if (a.career !== 'doctor' && !allJobs(a)) return toast(a, 'ต้องเป็นแพทย์เท่านั้น', '🚫', false);
+    if (o.health >= 95) return toast(a, `${o.name} สุขภาพดีอยู่แล้ว`, 'ℹ️', false);
+  } else if (m.kind === 'phone') {
+    if ((a.contacts || []).some(c => c.p === o.phone)) return toast(a, `มีเบอร์ ${o.name} อยู่แล้ว`, '📇', false);
+    const ask = (a.phoneAsk || {})[o.login];
+    if (ask && ask.until > now() && !godNoCd(a)) return toast(a, `${o.name} ปฏิเสธไป 2 ครั้งแล้ว ขอเบอร์คนนี้ได้อีกใน ${Math.ceil((ask.until - now()) / 60000)} นาที`, '⏳', false);
+  } else return;
+  for (const r of reqs.values()) if (r.from === a && r.to === o && r.kind === m.kind) return toast(a, 'ส่งคำขอไปแล้ว รอสักครู่', '⏳', false);
+  const fee = m.kind === 'heal' ? clamp(Math.floor(+m.fee) || 0, 0, 1000) : 0;
+  const id = nextId++;
+  reqs.set(id, { id, kind: m.kind, from: a, to: o, fee, exp: now() + 20000 });
+  send(o, { t: 'req', id, kind: m.kind, from: pubInfo(a), fee });
+  toast(a, `ส่งคำขอให้ ${o.name} แล้ว`, '📨');
+}
+function answerReq(a, m) {
+  const r = reqs.get(m.id);
+  if (!r || r.to !== a) return;
+  reqs.delete(r.id);
+  const f = r.from;
+  if (r.kind === 'call') return answerCall(a, f, m.ok);
+  if (r.kind === 'phone') return answerPhone(a, f, m.ok);
+  if (!m.ok) return toast(f, `${a.name} ปฏิเสธ`, '🙅', false);
+  if (!online.has(f.id) || dist(a, f) > 7 || areaId(a) !== areaId(f)) return toast(a, 'อีกฝ่ายอยู่ไกลเกินไปแล้ว', '⚠️', false);
+  if (r.kind === 'trade') {
+    if (a.trade || f.trade) return toast(a, 'กำลังแลกเปลี่ยนอยู่', '⚠️', false);
+    const tr = { a: f, b: a, oa: { money: 0, items: {}, ok: false }, ob: { money: 0, items: {}, ok: false } };
+    f.trade = a.trade = tr; tradeState(f); tradeState(a);
+  } else if (r.kind === 'heal') {
+    if (a.money < r.fee) return toast(a, 'เงินไม่พอจ่ายค่ารักษา', '💸', false);
+    a.money -= r.fee; earn(f, r.fee);
+    const heal = 25 + 4 * lvl(f, 'doctor') + 8 * tier(f, 'doctor');
+    a.health = Math.min(100, a.health + heal); f.xp.doctor = (f.xp.doctor || 0) + 1;
+    markMe(a); markMe(f);
+    toast(a, `${f.name} ปฐมพยาบาลให้ สุขภาพ +${heal} (จ่าย ${money(r.fee)})`, '💉');
+    toast(f, `ปฐมพยาบาล ${a.name} สำเร็จ ได้ค่ารักษา ${money(r.fee)}`, '💉');
+  }
+}
+
+// asking someone for their number: yes saves both numbers; two no's in a row = 10 minutes before you can ask them again
+function answerPhone(a, f, ok) {
+  f.phoneAsk = f.phoneAsk || {};
+  if (!ok) {
+    const prev = f.phoneAsk[a.login] || { n: 0, until: 0 }, n = prev.until > now() ? 1 : prev.n + 1;
+    f.phoneAsk[a.login] = n >= 2 ? { n: 0, until: now() + 10 * 60000 } : { n, until: 0 }; markMe(f);
+    return toast(f, n >= 2 ? `${a.name} ไม่ให้เบอร์อีกแล้ว — ขอคนนี้ได้อีกใน 10 นาที` : `${a.name} ไม่ให้เบอร์`, '🙅', false);
+  }
+  delete f.phoneAsk[a.login];
+  const add = (x, y) => { if (!(x.contacts || []).some(c => c.p === y.phone) && (x.contacts || []).length < 30) x.contacts = [...(x.contacts || []), { p: y.phone, n: y.name }]; markMe(x); };
+  add(f, a); add(a, f);
+  toast(f, `${a.name} ให้เบอร์แล้ว 📇 ${a.phone} (บันทึกในรายชื่อให้แล้ว)`, '📱'); toast(a, `แลกเบอร์กับ ${f.name} แล้ว (บันทึกในรายชื่อให้แล้ว)`, '📱');
+}
+
+// ------------------------------------------------------------------ phone: contacts and calls
+function phoneAct(a, m) {
+  if (m.t === 'contact_add') {
+    const num = String(m.phone || '').replace(/\D/g, '');
+    const o = byPhone.get(num);
+    if (!o) return toast(a, 'ไม่พบเบอร์นี้', '📵', false);
+    if (o === a) return toast(a, 'นี่เบอร์ของคุณเอง', '📱', false);
+    if ((a.contacts || []).some(c => c.p === num)) return toast(a, `มี ${o.name} ในรายชื่อแล้ว`, '📇', false);
+    if ((a.contacts || []).length >= 30) return toast(a, 'รายชื่อเต็มแล้ว (30)', '📇', false);
+    a.contacts = [...(a.contacts || []), { p: num, n: o.name }]; markMe(a);
+    return toast(a, `บันทึกเบอร์ ${o.name} แล้ว`, '📇');
+  }
+  if (m.t === 'contact_pin') { const c = (a.contacts || []).find(c => c.p === String(m.phone)); if (c) { c.fav = !c.fav; markMe(a); } return; }
+  if (m.t === 'contact_del') { a.contacts = (a.contacts || []).filter(c => c.p !== String(m.phone)); return markMe(a); }
+  if (m.t === 'call') {
+    if (a.down) return toast(a, 'คุณหมดสติอยู่ โทรไม่ได้', '📵', false);
+    const o = byPhone.get(String(m.phone));
+    if (!o || !o.ws) return toast(a, 'เลขหมายที่ท่านเรียก ไม่สามารถติดต่อได้ในขณะนี้ (ออฟไลน์)', '📵', false);
+    if (a.call || o.call) return toast(a, 'สายไม่ว่าง', '📵', false);
+    for (const r of reqs.values()) if (r.kind === 'call' && (r.from === a || r.to === o)) return toast(a, 'กำลังโทรอยู่...', '📞', false);
+    const id = nextId++;
+    reqs.set(id, { id, kind: 'call', from: a, to: o, exp: now() + 25000 });
+    const known = (o.contacts || []).find(c => c.p === a.phone);
+    send(o, { t: 'ring', id, name: a.name, phone: a.phone, known: !!known });
+    return toast(a, `กำลังโทรหา ${o.name}...`, '📞');
+  }
+  if (m.t === 'call_msg') {
+    const c = a.call; if (!c) return;
+    const text = cleanText(m.text, 120); if (!text || !cd(a, 'chat', 600, true)) return;
+    send(a, { t: 'call_msg', me: true, text }); send(c.peer, { t: 'call_msg', me: false, name: a.name, text });
+    return;
+  }
+  if (m.t === 'call_end') return endCall(a, 'วางสายแล้ว');
+}
+const CALL_FEE = 5;                 // ฿ per started minute, paid by whoever dialled
+function callBill(a) {
+  const c = a.call; if (!c || !c.payer) return;
+  if (now() - c.t < c.billed * 60000) return;
+  if (a.money < CALL_FEE) return endCall(a, 'เงินไม่พอจ่ายค่าโทร');
+  a.money -= CALL_FEE; c.billed++; markMe(a);
+  send(a, { t: 'call_fee', mins: c.billed, paid: c.billed * CALL_FEE });
+}
+function answerCall(a, f, ok) {
+  if (!ok) return toast(f, `${a.name} ไม่รับสาย`, '📵', false);
+  if (!f.ws || f.call || a.call) return;
+  f.call = { peer: a, payer: true, t: now(), billed: 0 }; a.call = { peer: f, t: now() };          // the caller pays per started minute
+  send(f, { t: 'call', open: true, with: a.name, phone: a.phone, fee: CALL_FEE, payer: 1 }); send(a, { t: 'call', open: true, with: f.name, phone: f.phone, fee: CALL_FEE, payer: 0 });
+  callBill(f);
+  stat(f, 'calls'); joy(f, 8); joy(a, 8);
+}
+function endCall(a, why) {
+  const c = a.call; if (!c) return;
+  a.call = null; send(a, { t: 'call', open: false, why });
+  if (c.peer.call?.peer === a) { c.peer.call = null; send(c.peer, { t: 'call', open: false, why: `${a.name} ${why}` }); }
+}
+
+function startTest(a, lic, s) {
+  const L = D.LICENSES[lic];
+  if (a.licenses.includes(lic)) return toast(a, `คุณมี${L.name}แล้ว`, 'ℹ️', false);
+  if (L.need && !a.licenses.includes(L.need)) return toast(a, `ต้องจบ${D.LICENSES[L.need].name}ก่อนถึงจะสอบได้`, '🎓', false);
+  if (!cd(a, 'dtest', 20000)) return;
+  if (!pay(a, L.price)) { a.cd.dtest = 0; return; }
+  const qs = [...(lic === 'driving' ? D.DRIVING_TEST : D.POLICE_TEST)].sort(() => Math.random() - .5).slice(0, 3);
+  a.dtest = { lic, qs }; markMe(a);
+  return send(a, { t: 'dtest', lic, st: s.id, title: L.name, qs: qs.map(q => ({ q: q.q, a: q.a })) });
+}
+
+// ------------------------------------------------------------------ happiness
+const depressed = a => (a.happy ?? 80) < D.HAPPY.low;
+function joy(a, n) {
+  if (godLock(a)) { a.happy = 100; return; }
+  const was = depressed(a);
+  a.happy = clamp((a.happy ?? 80) + n, 0, 100); markMe(a);
+  if (!was && depressed(a)) { toast(a, 'คุณรู้สึกซึมเศร้า ไม่มีจิตใจจะทำอะไร... ทำงานไม่ได้จนกว่าจะมีความสุขขึ้น', '😞', false); sendRoster(); }
+  if (was && !depressed(a)) { toast(a, 'รู้สึกดีขึ้นแล้ว! กลับมามีแรงใจทำงาน', '😊'); sendRoster(); }
+}
+// things you can be craving: everything edible
+const CRAVE = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].eat && D.ITEMS[k].kind !== 'goods' || k === 'snack');
+function ate(a, id) {
+  joy(a, D.ITEMS[id].kind === 'meal' ? 3 : 1);
+  if (a.craving && a.craving.item === id) {
+    joy(a, D.HAPPY.crave); stat(a, 'cravings');
+    toast(a, `ได้กิน${D.ITEMS[id].name}ที่อยากกินแล้ว! มีความสุขมาก 😋 (+${D.HAPPY.crave})`, '😋');
+    a.craving = null; a.craveNext = now() + rnd(5, 10) * 60000;
+  }
+}
+const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'warehouse.auction', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'sdesk.sit']);
+function holdsHome(a) {
+  if (a.house >= 0 && !tenants[a.house]) return a.house;
+  if (a.rent && a.rent.until > now()) return a.rent.idx;
+  return -1;
+}
+// ---- riders: "steal the customer" - an orange rival rider shows up in town; walk into them and it is a turn-based battle
+const RB_NAMES = ['บอย', 'แจ็ค', 'ต้อม', 'เบียร์', 'ก้อง', 'นัท', 'ปอนด์', 'ตี๋'];
+const RB_CUST = ['ป้าแดง', 'คุณนายใจดี', 'พี่ต้นออฟฟิศ', 'น้องข้าวหอม', 'ลุงจุก', 'คุณแพร'];
+const RB_MOVES = { dash: ['บิดคันเร่ง', 22, .95], cut: ['มุดทางลัด', 34, .72], honk: ['บีบแตรข่ม', 0, .9], smile: ['ยิ้มหวานให้ลูกค้า', 0, 1] };
+const RB_FOE = { block: ['ปาดหน้า', 24, .9], corner: ['เลี้ยวมุมแคบ', 32, .7], shout: ['ตะโกนข่ม', 0, .85], call: ['โทรหาลูกค้าก่อน', 0, 1] };
+function rbStats(L, bonus = 0) { return { lv: L, max: 60 + 8 * L, hp: 60 + 8 * L, atk: 10 + 2 * L + bonus, def: 8 + L + bonus * .5, spd: 10 + L + bonus, deb: 0, cd: 0 }; }
+function rivalSpawn(a, force) {
+  if (a.career !== 'rider' && !allJobs(a) || a.rb || a.rival || areaId(a) !== 'town') return false;
+  const opts = reachFrom(a.x, a.y, 16, 45, 9); if (!opts.length) return false;
+  const c = pick(opts), L = Math.max(1, lvl(a) + rint(-1, 1));
+  a.rival = { x: c[0] + .5, y: c[1] + .5, until: now() + 180000, name: `ไรเดอร์ส้ม${pick(RB_NAMES)}`, lv: L, cust: pick(RB_CUST) };
+  markMe(a); send(a, { t: 'rbfx', kind: 'spawn' });
+  toast(a, `📣 ${a.rival.name} กำลังจะไปแย่งลูกค้า (${a.rival.cust}) ของคุณ! ตามไปขวางเลย (จุดสีส้มบนมินิแมพ)`, '🧡');
+  return true;
+}
+function rivalTick(a, t) {
+  if (a.career !== 'rider' && !allJobs(a)) { if (a.rival) { a.rival = null; markMe(a); } return; }
+  if (a.career === 'rider' && !a.rival && !a.rb && t > (a.rivalNext || (a.rivalNext = t + rnd(120, 240) * 1000))) { a.rivalNext = t + rnd(240, 420) * 1000; rivalSpawn(a); }
+  const r = a.rival; if (!r) return;
+  if (t > r.until) { a.rival = null; markMe(a); return toast(a, `${r.name} แย่งลูกค้าไปส่งแล้ว... ช้าไปนิด`, '🧡', false); }
+  if (areaId(a) === 'town' && Math.hypot(a.x - r.x, a.y - r.y) < 1.5) {          // caught up: battle!
+    const bike = a.ride && D.VEHICLES[a.ride] ? 3 : 0;
+    a.rb = { foe: { ...rbStats(r.lv), name: r.name }, me: { ...rbStats(lvl(a), bike), name: a.name, drinks: 2 }, cust: r.cust, turn: 0 };
+    a.rival = null; markMe(a); send(a, { t: 'rb', start: 1, st: rbView(a) });
+  }
+}
+const rbView = a => a.rb && { foe: a.rb.foe, me: a.rb.me, cust: a.rb.cust };
+function rbHit(att, dfn, pow, ev, who, mvName) {
+  const crit = Math.random() < 1 / 12, d = Math.max(1, Math.round(pow * (att.atk * (att.deb > 0 ? .75 : 1)) / dfn.def * rnd(.85, 1) * (crit ? 1.5 : 1)));
+  dfn.hp = Math.max(0, dfn.hp - d); ev.push({ who, text: crit ? 'ได้ผลดีเยี่ยม! (คริติคอล)' : `ได้ผล! ${dfn.name} เสียแรงใจ ${d}`, dmg: d, tgt: who === 'me' ? 'foe' : 'me', crit });
+}
+function rbAct(a, m) {
+  const b = a.rb; if (!b) return;
+  const me = b.me, foe = b.foe, ev = [];
+  if (m.mv === 'run') { a.rb = null; joy(a, -2); markMe(a); return send(a, { t: 'rb', end: 'run', ev: [{ who: 'me', text: `${me.name} ยอมถอย... ${foe.name} แย่งลูกค้าไปได้` }] }); }
+  const myTurn = () => {
+    if (m.mv === 'drink') {
+      if (me.drinks <= 0) { ev.push({ who: 'me', text: 'เครื่องดื่มชูกำลังหมดแล้ว!' }); return; }
+      me.drinks--; const h = Math.min(me.max - me.hp, 35); me.hp += h; ev.push({ who: 'me', text: `${me.name} ดื่มเครื่องดื่มชูกำลัง! แรงใจ +${h}`, heal: h, tgt: 'me' }); return;
+    }
+    const mv = RB_MOVES[m.mv]; if (!mv) return;
+    ev.push({ who: 'me', text: `${me.name} ใช้ ${mv[0]}!`, mv: m.mv });
+    if (m.mv === 'smile') {
+      if (me.cd > 0) { ev.push({ who: 'me', text: 'ยิ้มบ่อยไปลูกค้าเริ่มเขิน... ไม่ได้ผล' }); return; }
+      const h = Math.min(me.max - me.hp, Math.round(me.max * .28)); me.hp += h; me.cd = 2; ev.push({ who: 'me', text: `ลูกค้าประทับใจ! แรงใจ +${h}`, heal: h, tgt: 'me' }); return;
+    }
+    if (Math.random() > mv[2]) { ev.push({ who: 'me', text: 'แต่พลาด!', miss: 1 }); return; }
+    if (m.mv === 'honk') { foe.deb = 3; ev.push({ who: 'me', text: `${foe.name} ตกใจ! พลังโจมตีลดลง`, tgt: 'foe', debuff: 1 }); return; }
+    rbHit(me, foe, mv[1], ev, 'me');
+  };
+  const foeTurn = () => {
+    let k = 'block'; const r = Math.random();
+    if (foe.hp < foe.max * .35 && foe.cd <= 0) k = 'call'; else if (me.deb <= 0 && r < .22) k = 'shout'; else k = r < .62 ? 'block' : 'corner';
+    const mv = RB_FOE[k]; ev.push({ who: 'foe', text: `${foe.name} ใช้ ${mv[0]}!`, mv: k });
+    if (k === 'call') { const h = Math.min(foe.max - foe.hp, Math.round(foe.max * .3)); foe.hp += h; foe.cd = 3; ev.push({ who: 'foe', text: `ลูกค้าใจอ่อน! ${foe.name} แรงใจ +${h}`, heal: h, tgt: 'foe' }); return; }
+    if (Math.random() > mv[2]) { ev.push({ who: 'foe', text: 'แต่พลาด!', miss: 1 }); return; }
+    if (k === 'shout') { me.deb = 3; ev.push({ who: 'foe', text: `${me.name} เสียขวัญ! พลังโจมตีลดลง`, tgt: 'me', debuff: 1 }); return; }
+    rbHit(foe, me, mv[1], ev, 'foe');
+  };
+  const first = me.spd > foe.spd || me.spd === foe.spd && Math.random() < .5;
+  for (const f of first ? [myTurn, foeTurn] : [foeTurn, myTurn]) { f(); if (me.hp <= 0 || foe.hp <= 0) break; }
+  for (const x of [me, foe]) { if (x.deb > 0) x.deb--; if (x.cd > 0) x.cd--; }
+  b.turn++;
+  if (foe.hp <= 0 || me.hp <= 0) {
+    const won = foe.hp <= 0; a.rb = null;
+    if (won) {
+      const pay = Math.round((120 + 40 * lvl(a)) * jobPay(a) * (1 + (BOOST[tier(a, 'rider')] || 0)));
+      earn(a, pay); addXp(a, 1); stat(a, 'rbwin'); joy(a, 6);
+      ev.push({ who: 'me', text: `${foe.name} หมดแรงใจ! ${b.cust} เลือกคุณ · ได้ค่าส่ง+ทิป ${money(pay)}`, win: 1 });
+    } else { a.energy = Math.max(0, a.energy - 5); joy(a, -3); ev.push({ who: 'foe', text: `${me.name} หมดแรงใจ... ${foe.name} แย่งลูกค้าไปได้`, lose: 1 }); }
+    markMe(a); return send(a, { t: 'rb', end: won ? 'win' : 'lose', ev, st: { foe, me } });
+  }
+  send(a, { t: 'rb', ev, st: rbView(a) });
+}
+// ---- the auction house (merchants): a lot comes up, you and three rival bidders each hand in one sealed bid (a guess of
+// what it is worth); the highest bid wins and pays it. The house buys the lot back from the winner at its true value,
+// so bidding under the true value is profit and bidding over it is a loss. An appraiser gives a rough range.
+const AUC_BOTS = [['เสี่ยเฮง', 'ใจถึง', .82, 1.08], ['เจ๊หมวย', 'เขี้ยว', .62, .92], ['ลุงชาญ', 'ระวังตัว', .55, .88], ['คุณหญิงมาลี', 'รวยแต่ไม่รู้ราคา', .6, 1.2], ['เฮียหมง', 'นักเก็ง', .7, 1.02], ['พี่บอย', 'มือใหม่', .45, 1.15]];
+const AUC_LOTS = [['ลังสินค้าจากโกดังปิดกิจการ', '📦', 'goods'], ['ของสดล็อตใหญ่จากสหกรณ์', '🧺', 'crop'], ['ปลาจากเรือประมงเช้านี้', '🐟', 'fish'], ['อาหารเหลือจากงานเลี้ยง', '🍱', 'meal'], ['กล่องปริศนาของสะสม', '🎁', 'mix']];
+const AUC_COND = [['ดีมาก', 1.15], ['ดี', 1], ['พอใช้', .85], ['มีตำหนิ', .65]];
+function aucStart(a) {
+  if (!need(a, 'merchant')) return;
+  if (a.auc && a.auc.stage === 'bid') return;
+  if ((a.aucNext || 0) > now()) return toast(a, 'ล็อตถัดไปกำลังขึ้นเวที รอแป๊บ', '⏳', false);
+  if (!spend(a, 4)) return;
+  const [name, icon, kind] = pick(AUC_LOTS), pool = Object.entries(D.ITEMS).filter(([, it]) => it.base >= 6 && (kind === 'mix' ? true : it.kind === kind));
+  const n = kind === 'mix' ? rint(2, 4) : rint(1, 3), items = {};
+  for (let i = 0; i < n; i++) { const [id, it] = pick(pool); items[id] = (items[id] || 0) + Math.max(1, Math.round(rnd(1, 12) * Math.min(1, 300 / it.base))); }
+  const [cond, cm] = pick(AUC_COND), mk = id => market[id]?.mult || 1;
+  const real = Math.max(50, Math.round(Object.entries(items).reduce((s0, [id, q]) => s0 + D.ITEMS[id].base * q * mk(id), 0) * cm / 10) * 10);
+  const err = [.3, .22, .15, .09][tier(a, 'merchant')], c0 = real * rnd(1 - err * .6, 1 + err * .6);
+  const t = now(), bots = [...AUC_BOTS].sort(() => Math.random() - .5).slice(0, 3).map(([bn, style, lo, hi]) => ({ name: bn, style, bid: Math.round(real * rnd(lo, hi) / 10) * 10, at: t + rint(3000, 17000) }));
+  a.auc = { stage: 'bid', name, icon, items, cond, real, lo: Math.round(c0 * (1 - err) / 10) * 10, hi: Math.round(c0 * (1 + err) / 10) * 10, t0: t, until: t + 20000, bots, my: 0 };
+  markMe(a); send(a, { t: 'afx', kind: 'gavel' });
+}
+function aucBid(a, m) {
+  const c = a.auc; if (!c || c.stage !== 'bid' || now() > c.until) return;
+  const v = Math.round(+m.amt || 0); if (!(v > 0)) return toast(a, 'ใส่ราคาที่จะประมูลก่อน', 'ℹ️', false);
+  if (v > a.money) return toast(a, `เงินสดไม่พอ (มี ${money(a.money)})`, '💸', false);
+  c.my = v; markMe(a); send(a, { t: 'afx', kind: 'bid' });
+}
+function aucTick(a, t) {
+  const c = a.auc; if (c.stage !== 'bid') return;
+  for (const b of c.bots) if (!b.sent && t >= b.at) { b.sent = true; markMe(a); }
+  if (t < c.until) return;
+  const all = [...c.bots.map(b => ({ name: b.name, bid: b.bid, at: b.at })), ...(c.my ? [{ name: a.name, bid: c.my, at: 0, me: 1 }] : [])].sort((x, y) => y.bid - x.bid || x.at - y.at);
+  const win = all[0]; c.stage = 'done'; c.result = all.map(x => [x.name, x.bid, x.me ? 1 : 0]); c.win = win.name;
+  a.aucNext = t + 2500;
+  if (win.me) {
+    const net = c.real - win.bid; a.money -= win.bid; earn(a, c.real); addXp(a, .6); quest(a, 'buy', 1); stat(a, 'wholesale', Object.values(c.items).reduce((x, y) => x + y, 0));
+    if (net > 0) joy(a, 3); c.net = net;
+    toast(a, net >= 0 ? `🔨 ชนะประมูล! จ่าย ${money(win.bid)} ของจริงมีค่า ${money(c.real)} กำไร ${money(net)}` : `🔨 ชนะประมูล... แต่จ่าย ${money(win.bid)} ของมีค่าแค่ ${money(c.real)} ขาดทุน ${money(-net)}`, net >= 0 ? '💰' : '📉', net >= 0);
+  } else toast(a, `🔨 ${win.name} ชนะไปที่ ${money(win.bid)} (มูลค่าจริง ${money(c.real)})`, '🔨', false);
+  send(a, { t: 'afx', kind: win.me ? (c.net >= 0 ? 'win' : 'lose') : 'other' }); markMe(a);
+}
+// ---- the cooking battle: carry each ingredient around the kitchen (pantry -> board / pan / pot / grill -> plate -> serve)
+const OP_AT = { chop: 'board', fry: 'pan', boil: 'pot', grill: 'grill' };
+const AT_NAME = { board: 'เขียง', pan: 'กระทะ', pot: 'หม้อ', grill: 'เตาย่าง' };
+function cookUse(a, s) {
+  const c = a.cook; if (!c) return toast(a, 'ยังไม่มีออเดอร์ · รับออเดอร์ที่เคาน์เตอร์ครัว (ปรุงอาหาร)', '🍳', false);
+  const where = s.type.slice(1), held = typeof c.hand === 'number' && c.hand >= 0 ? c.comps[c.hand] : null, I = id => D.ITEMS[id];
+  const nextOp = cp => cp.ops[cp.k];
+  if (where === 'pantry') {
+    if (held && held.k === 0 && !held.ready) { held.at = 'pantry'; c.hand = -1; markMe(a); return; }       // put it back
+    if (held || c.hand === 'plate') return toast(a, 'มือเต็มแล้ว วางของในมือก่อน', '✋', false);
+    const i = c.comps.findIndex(cp => cp.at === 'pantry'); if (i < 0) return toast(a, 'หยิบวัตถุดิบครบแล้ว', 'ℹ️', false);
+    c.hand = i; c.comps[i].at = 'hand'; markMe(a); return send(a, { t: 'kfx', kind: 'pick' });
+  }
+  if (where === 'plate') {
+    if (held) {
+      if (held.k < held.ops.length) return toast(a, `${I(held.ing).name}ยังไม่พร้อม ต้อง${{ chop: 'สับ', fry: 'ผัด', boil: 'ต้ม', grill: 'ย่าง' }[nextOp(held)]}ก่อน`, '⚠️', false);
+      held.at = 'plate'; c.hand = -1;
+      if (c.comps.every(cp => cp.at === 'plate')) { c.plated = true; send(a, { t: 'kfx', kind: 'plated' }); toast(a, `จัดจาน ${I(c.rid).icon}${I(c.rid).name} เสร็จ! ยกไปเสิร์ฟที่เคาน์เตอร์ด้านบน`, '🍽️'); }
+      else send(a, { t: 'kfx', kind: 'drop' });
+      markMe(a); return;
+    }
+    if (c.plated && c.hand === -1) { c.hand = 'plate'; markMe(a); return send(a, { t: 'kfx', kind: 'pick' }); }
+    return toast(a, c.plated ? 'มือเต็มแล้ว' : 'เอาวัตถุดิบที่ทำเสร็จแล้วมาวางจัดจาน', 'ℹ️', false);
+  }
+  // board / pan / pot / grill
+  const here = c.comps.map((cp, i) => [cp, i]).filter(([cp]) => cp.at === where);
+  if (held) {
+    if (OP_AT[nextOp(held)] !== where) return toast(a, held.k >= held.ops.length ? `${I(held.ing).name}พร้อมแล้ว เอาไปวางที่ 🍽️ โต๊ะจัดจาน` : `${I(held.ing).name}ต้องไปที่${AT_NAME[OP_AT[nextOp(held)]]}`, '⚠️', false);
+    if ((where === 'board' || where === 'pan') && here.length) return toast(a, `${AT_NAME[where]}ไม่ว่าง`, '✋', false);
+    if (where === 'grill' && here.length >= D.COOK.grillMax) return toast(a, 'เตาย่างเต็มแล้ว', '✋', false);
+    held.at = where; held.t = now(); held.prog = 0; held.ready = false; held.burnt = false; c.hand = -1; markMe(a);
+    return send(a, { t: 'kfx', kind: where });
+  }
+  if (c.hand === 'plate') return toast(a, 'ถือจานอยู่ เอาไปเสิร์ฟที่เคาน์เตอร์', '🍽️', false);
+  if (!here.length) return toast(a, `${AT_NAME[where]}ว่างอยู่`, 'ℹ️', false);
+  const [cp, i] = here.find(([x]) => x.ready || x.burnt) || here[0];
+  if (cp.burnt) {                                       // ruined: throw it out and start that ingredient again (if you still have one)
+    if ((a.inv[cp.ing] || 0) < 1) { a.cook = null; markMe(a); send(a, { t: 'kfx', kind: 'fail' }); return toast(a, `💀 ${I(cp.ing).name}${where === 'grill' ? 'ไหม้' : 'เละ'} และไม่มีวัตถุดิบสำรอง ออเดอร์ล้มเหลว!`, '🍳', false); }
+    addItem(a, cp.ing, -1); Object.assign(cp, { k: 0, at: 'pantry', t: 0, prog: 0, ready: false, burnt: false }); markMe(a);
+    return toast(a, `🗑️ ทิ้ง${I(cp.ing).name}ที่${where === 'grill' ? 'ไหม้' : 'เละ'} ใช้วัตถุดิบสำรองจากกระเป๋าเริ่มใหม่ (หยิบที่ตู้วัตถุดิบ)`, '🍳', false);
+  }
+  if (!cp.ready) return toast(a, where === 'board' || where === 'pan' ? `ยืนอยู่ตรงนี้เพื่อ${where === 'board' ? 'สับ' : 'ผัด'}ให้เสร็จก่อน` : `${I(cp.ing).name}ยังไม่สุก รออีกนิด`, '⏳', false);
+  cp.k++; cp.ready = false; cp.at = 'hand'; c.hand = i; markMe(a); return send(a, { t: 'kfx', kind: 'pick' });
+}
+function cookTick(a, t, dt) {
+  const c = a.cook;
+  if (t > c.until) { a.cook = null; markMe(a); send(a, { t: 'kfx', kind: 'fail' }); return toast(a, `⏰ หมดเวลา! ลูกค้ารอ${D.ITEMS[c.rid].name}ไม่ไหว ออเดอร์ล้มเหลว`, '😢', false); }
+  const room = D.roomAt(a.x, a.y); if (room?.rk !== 'kitchen') return;
+  let live = false, changed = false;
+  for (const cp of c.comps) {
+    const op = cp.ops[cp.k];
+    if ((cp.at === 'board' || cp.at === 'pan') && !cp.ready) {        // chopping / stir-frying: only while you stand there
+      const st = ST[cp.at === 'board' ? 'k_board' : 'k_pan'];
+      if (Math.hypot(a.x - st.x, a.y - st.y) < 1.5) { cp.prog += dt; live = true; if (cp.prog >= D.COOK[op]) { cp.ready = true; changed = true; send(a, { t: 'kfx', kind: 'ready' }); } }
+    }
+    if ((cp.at === 'pot' || cp.at === 'grill') && !cp.burnt) {          // boiling / grilling: on their own, but don't forget them
+      const el = (t - cp.t) / 1000;
+      if (!cp.ready && el >= D.COOK[op]) { cp.ready = true; changed = true; send(a, { t: 'kfx', kind: 'ready' }); }
+      if (el >= D.COOK[op] + D.COOK.window[op]) { cp.burnt = true; cp.ready = false; changed = true; send(a, { t: 'kfx', kind: 'burnt' }); toast(a, `🔥 ${D.ITEMS[cp.ing].name}${cp.at === 'grill' ? 'ไหม้' : 'เละ'}แล้ว! รีบเอาไปทิ้งแล้วทำใหม่`, '💀', false); }
+    }
+  }
+  if (changed) markMe(a);
+  if (live && t > c.ckAt) { c.ckAt = t + 200; send(a, { t: 'ck', prog: c.comps.map(cp => +cp.prog.toFixed(2)) }); }
+}
+// ---- job missions (server/missions.js): a short story per career played out in town, step by step
+const MIS = require('./missions');
+// reachable town tiles from (x, y): [x, y, steps] with min..max steps of walking and at least minE straight-line distance
+function reachFrom(x0, y0, min, max, minE = 0) {
+  const A = D.AREAS.find(r => r.id === 'town'), sx = Math.floor(x0), sy = Math.floor(y0), out = [];
+  const dist = new Map([[sy * 4096 + sx, 0]]), q = [[sx, sy]];
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i], d = dist.get(y * 4096 + x);
+    if (d >= min && d <= max && Math.hypot(x - sx, y - sy) >= minE && D.TILES[y][x] !== 'D' && !D.roomAt(x + .5, y + .5)) out.push([x, y, d]);
+    if (d >= max) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = ny * 4096 + nx;
+      if (nx <= A.x || ny <= A.y || nx >= A.x + A.w - 1 || ny >= A.y + A.h - 1 || dist.has(k) || D.blocked(nx + .5, ny + .5)) continue;
+      dist.set(k, d + 1); q.push([nx, ny]);
+    }
+  }
+  return out;
+}
+const misLook = who => {
+  const [kind, name] = who.includes(':') ? who.split(':') : ['m', who], h = [...name].reduce((s, c) => s * 31 + c.charCodeAt(0) >>> 0, 7);
+  const hair = kind === 'o' ? 'silver' : ['brown', 'black', 'blonde', 'red', 'brown'][h % 5], shirt = D.SHIRTS[h % D.SHIRTS.length];
+  return { name, g: kind === 'f' || (kind === 'o' && h % 2) || (kind === 'k' && h % 2) ? 'f' : 'm', lk: { hair, shirt, pants: ['gray', 'blue', 'black', 'brown'][(h >> 3) % 4] }, kid: kind === 'k' };
+};
+function misPlace(where, prev) {
+  if (where === 'here') return { x: prev.x, y: prev.y, d: 0 };
+  if (where === 'far' || where === 'near') {
+    const opts = where === 'far' ? reachFrom(prev.x, prev.y, 30, 90, 16) : reachFrom(prev.x, prev.y, 6, 18, 4);
+    const c = opts.length ? pick(opts) : [Math.floor(prev.x), Math.floor(prev.y), 0];
+    return { x: c[0] + .5, y: c[1] + .5, d: c[2] };
+  }
+  const st = ST[MIS.PLACES[where] || where]; if (!st) return { x: prev.x, y: prev.y, d: 0 };
+  let x = st.x, y = st.y;
+  if (D.blocked(x, y)) { const n = standNear('town', x, y + .6); if (n) [x, y] = n; }
+  return { x, y, d: Math.round(Math.hypot(x - prev.x, y - prev.y) * 1.4), label: st.label };
+}
+function misBuild(a, car, force) {
+  const list = MIS.M[car]; if (!list) return null;
+  a.misRecent = (a.misRecent || []).filter(i => i < list.length);
+  let idx; do idx = rint(0, list.length - 1); while (a.misRecent.includes(idx) && a.misRecent.length < list.length - 1);
+  if (force != null && list[force]) idx = force;                    // (admins can pick one, for testing)
+  a.misRecent = [...a.misRecent, idx].slice(-6);
+  const [title, icon, story, raw] = list[idx];
+  const out = D.roomAt(a.x, a.y)?.outside; let prev = out ? { x: out.x, y: out.y } : { x: a.x, y: a.y };
+  let est = 40; const steps = [];
+  for (const r of raw) {
+    const k = r[0], pl = misPlace(r[1], prev), st = { k, x: pl.x, y: pl.y };
+    est += (pl.d || Math.hypot(pl.x - prev.x, pl.y - prev.y) * 1.4) / SPEED * 2.3;
+    if (k === 'go') st.label = r[2];
+    else if (k === 'find') { st.icon = r[2]; st.label = r[3]; st.hc = [Math.round(pl.x + rnd(-5, 5)), Math.round(pl.y + rnd(-5, 5)), 10]; est += 25; }
+    else if (k === 'collect') {
+      st.icon = r[3]; st.label = r[4]; const pool = reachFrom(pl.x, pl.y, 0, 10), items = [];
+      for (let i = 0; i < 40 && items.length < r[2] && pool.length; i++) { const c = pick(pool); if (items.every(([x, y]) => Math.hypot(x - c[0] - .5, y - c[1] - .5) >= 2)) items.push([c[0] + .5, c[1] + .5, 0]); }
+      st.items = items; st.hc = [Math.round(pl.x), Math.round(pl.y), 9]; est += items.length * 6;
+    }
+    else if (k === 'deliver') { st.who = misLook(r[2]); st.label = r[3]; }
+    else if (k === 'work') { st.sec = r[2]; st.icon = r[3]; st.label = r[4]; st.prog = 0; est += r[2] * 1.3; }
+    else if (k === 'chase') { st.animal = r[2]; st.label = r[3]; st.cx = pl.x; st.cy = pl.y; st.flee = 0; est += 40; }
+    else if (k === 'escort') {
+      st.who = misLook(r[3]); st.label = r[4]; const to = misPlace(r[2], pl); st.to = { x: to.x, y: to.y }; st.fx = pl.x; st.fy = pl.y; st.phase = 0;
+      est += (to.d || Math.hypot(to.x - pl.x, to.y - pl.y) * 1.4) / 2.4 * 2 + 10; prev = to; steps.push(st); continue;
+    }
+    else if (k === 'talk') { st.who = misLook(r[2]); st.q = r[3]; st.ans = r[4]; st.right = r[5]; st.label = `คุยกับ${st.who.name}`; est += 20; }
+    steps.push(st); prev = { x: st.x, y: st.y };
+  }
+  const limit = Math.round(clamp(est, 120, 720) * 1000), t = now();
+  return { car, idx, title, icon, story, steps, i: 0, t0: t, limit, until: t + limit, trail: [], mtAt: 0 };
+}
+// ICU cases: steps at spots in the hospital (x, y relative to the hospital room); 'bed' = the ICU bed
+const ICU_CASES = [
+  ['หัวใจหยุดเต้น!', '💓', 'คนไข้หมดสติ ชีพจรหาย ต้องกู้ชีพด่วน', [['go', 'cab', 'หยิบเครื่องกระตุกหัวใจ (AED) ที่ตู้ยา'], ['work', 'bed', 12, '💓', 'ปั๊มหัวใจและช็อกไฟฟ้าจนชีพจรกลับมา'], ['go', 'fridge', 'หยิบยาอะดรีนาลีนจากตู้เย็นยา'], ['work', 'bed', 5, '💉', 'ฉีดยาและเฝ้าดูสัญญาณชีพ']]],
+  ['ไส้ติ่งแตก', '🔪', 'คนไข้ปวดท้องขวาล่างรุนแรง ต้องผ่าตัดทันที', [['go', 'cab', 'เตรียมชุดเครื่องมือผ่าตัด'], ['work', 'fridge', 4, '🧼', 'ล้างมือ ใส่ถุงมือและชุดผ่าตัด'], ['work', 'bed', 14, '🔪', 'ผ่าตัดไส้ติ่ง'], ['work', 'bed', 6, '🧵', 'เย็บแผล'], ['go', 'desk', 'ส่งรายงานผ่าตัดให้พยาบาล']]],
+  ['หอบหืดกำเริบ', '🫁', 'เด็กหายใจไม่ออก ริมฝีปากเริ่มเขียว', [['go', 'fridge', 'หยิบยาพ่นขยายหลอดลม'], ['go', 'iv', 'เข็นถังออกซิเจนมา'], ['work', 'bed', 9, '🫁', 'ให้ออกซิเจนและพ่นยา']]],
+  ['กระดูกขาหัก', '🦴', 'คนงานตกนั่งร้าน ขาผิดรูป', [['work', 'xray', 6, '🩻', 'เอกซเรย์ดูแนวกระดูก'], ['go', 'cab', 'หยิบเฝือกและผ้าพัน'], ['work', 'bed', 10, '🦴', 'จัดกระดูกและใส่เฝือก']]],
+  ['เสียเลือดมาก', '🩸', 'อุบัติเหตุรถชน เลือดออกไม่หยุด', [['work', 'bed', 6, '🩹', 'กดห้ามเลือด'], ['go', 'fridge', 'หยิบถุงเลือดกรุ๊ปโอ'], ['go', 'iv', 'เตรียมเสาน้ำเกลือ'], ['work', 'bed', 8, '💉', 'ให้เลือดและน้ำเกลือ']]],
+  ['แพ้อาหารรุนแรง', '⚠️', 'คนไข้กินกุ้งแล้วหน้าบวม หายใจลำบาก', [['go', 'fridge', 'หยิบยาฉีดแก้แพ้'], ['work', 'bed', 5, '💉', 'ฉีดยาแก้แพ้'], ['work', 'monitor', 6, '📈', 'เฝ้าดูชีพจรและความดัน']]],
+  ['ไข้เลือดออกช็อก', '🦟', 'เด็กไข้สูงหลายวัน ความดันตก', [['work', 'desk', 4, '📋', 'อ่านประวัติและผลเลือด'], ['go', 'iv', 'เตรียมน้ำเกลือ'], ['work', 'bed', 10, '💧', 'ให้สารน้ำทางหลอดเลือด'], ['work', 'monitor', 5, '📈', 'เช็กความดันจนคงที่']]],
+  ['ถูกของมีคมบาด', '🩹', 'แผลลึกที่แขน ต้องเย็บด่วน', [['go', 'cab', 'หยิบชุดเย็บแผล'], ['work', 'bed', 5, '🧴', 'ล้างแผลและฉีดยาชา'], ['work', 'bed', 8, '🧵', 'เย็บแผล']]],
+];
+function icuCase(a, def, pay) {
+  const R = D.AREAS.find(r => r.id === 'r_hospital'), P = { cab: [1.6, 3.9], fridge: [5.6, 3.8], xray: [14.2, 4.6], iv: [13.6, 6.6], desk: [3.5, 3.6], monitor: [12.25, 4.0] };
+  const at = w => { if (w === 'bed') return [ST.icu.x, ST.icu.y - .6]; const [x, y] = P[w]; const n = D.blocked(R.x + x, R.y + y) ? standNear('r_hospital', R.x + x, R.y + y) : [R.x + x, R.y + y]; return n; };
+  const [title, icon, story, raw] = def, steps = raw.map(r => { const [x, y] = at(r[1]); return r[0] === 'go' ? { k: 'go', x, y, label: r[2], area: 'r_hospital' } : { k: 'work', x, y, sec: r[2], icon: r[3], label: r[4], prog: 0, area: 'r_hospital' }; });
+  const limit = Math.round((25 + steps.reduce((s0, st) => s0 + (st.sec || 0) + 6, 0)) * 1.45 * 1000), t = now();
+  return { kind: 'icu', car: 'doctor', idx: -1, title, icon, story: `${pick(D.ICU.patients)} · ${story}`, steps, i: 0, t0: t, limit, until: t + limit, trail: [], mtAt: 0, payFixed: Math.round(pay) };
+}
+function misView(a) {
+  const m = a.mis; if (!m) return null;
+  const c = m.steps[m.i];
+  const cur = c && { area: c.area || 'town', k: c.k, x: c.x, y: c.y, label: c.label, icon: c.icon, who: c.who, items: c.items, sec: c.sec, prog: c.prog, hc: c.hc, animal: c.animal, to: c.to, phase: c.phase, fx: c.fx, fy: c.fy, cx: c.cx, cy: c.cy };
+  return { kind: m.kind || '', title: m.title, icon: m.icon, story: m.story, i: m.i, until: m.until, t0: m.t0, steps: m.steps.map((s, j) => ({ k: s.k, label: s.label, done: j < m.i })), cur };
+}
+function misNext(a) {
+  const m = a.mis; m.i++;
+  if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
+  const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
+  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((110 + 80 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
+  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else a.misNext = t + 30000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
+  toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🏅');
+}
+const FX0 = (a, kind) => send(a, { t: 'mfx', kind });
+function misTick(a, t, dt) {
+  const m = a.mis, c = m.steps[m.i];
+  if (t > m.until) { a.mis = null; if (m.kind === 'icu') a.icuNext = t + D.ICU.next; else a.misNext = t + 60000; joy(a, -3); markMe(a); return toast(a, `⏰ หมดเวลา! ภารกิจ "${m.title}" ล้มเหลว`, '😢', false); }
+  if (!c || areaId(a) !== (c.area || 'town')) return;
+  const d = Math.hypot(a.x - c.x, a.y - c.y);
+  const last = m.trail[m.trail.length - 1]; if (!last || Math.hypot(a.x - last[0], a.y - last[1]) > .35) { m.trail.push([a.x, a.y]); if (m.trail.length > 80) m.trail.shift(); }
+  let live = false;
+  switch (c.k) {
+    case 'go': case 'deliver': if (d < 1.6) misNext(a); return;
+    case 'find': if (d < 1.4) misNext(a); return;
+    case 'talk':
+      if (d < 1.8 && !c.asked && t > (c.askAt || 0)) { c.asked = true; send(a, { t: 'mq', who: c.who, q: c.q, ans: c.ans }); }
+      if (d > 4) c.asked = false;
+      return;
+    case 'collect': {
+      let got = false;
+      for (const it of c.items) if (!it[2] && Math.hypot(a.x - it[0], a.y - it[1]) < 1.2) { it[2] = 1; got = true; }
+      if (got) { FX0(a, 'pick'); if (c.items.every(it => it[2])) misNext(a); else markMe(a); }
+      return;
+    }
+    case 'work':
+      if (d < 1.9 && !a.down) { c.prog = Math.min(c.sec, c.prog + dt); live = true; if (c.prog >= c.sec) return misNext(a); }
+      break;
+    case 'chase': {
+      const pd = Math.hypot(a.x - c.cx, a.y - c.cy);
+      if (pd < 1.05) { FX0(a, 'catch'); return misNext(a); }
+      let tx = 0, ty = 0, sp;
+      if (pd < 6) { c.flee += dt; sp = c.flee > 9 ? 1.7 : 2.5; tx = (c.cx - a.x) / pd; ty = (c.cy - a.y) / pd; }
+      else { sp = .55; if (!c.wd || t > c.wdT) { const an = rnd(0, 6.28); c.wd = [Math.cos(an), Math.sin(an)]; c.wdT = t + rnd(1500, 3500); } [tx, ty] = c.wd; }
+      let best = null, bs = -1e9;
+      for (let k = 0; k < 12; k++) {                     // pick the free direction closest to "away"
+        const an = Math.atan2(ty, tx) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * .45 + rnd(-.15, .15), nx = c.cx + Math.cos(an) * sp * dt, ny = c.cy + Math.sin(an) * sp * dt;
+        if (D.blocked(nx, ny) || D.areaAt(nx, ny)?.id !== 'town') continue;
+        const sc = -Math.abs(k) * .3 + (pd < 6 ? Math.hypot(nx - a.x, ny - a.y) * 3 : 0);
+        if (sc > bs) { bs = sc; best = [nx, ny]; }
+      }
+      if (best) { c.cx = best[0]; c.cy = best[1]; } else if (c.wd) c.wdT = 0;
+      live = true; break;
+    }
+    case 'escort': {
+      if (c.phase === 0) { if (Math.hypot(a.x - c.fx, a.y - c.fy) < 1.6) { c.phase = 1; m.trail = [[a.x, a.y]]; markMe(a); } live = true; break; }
+      const fd = Math.hypot(a.x - c.fx, a.y - c.fy); c.wait = fd > 9;
+      if (fd > 1.4 && !c.wait) {                         // follow your footsteps (never through walls)
+        while (m.trail.length > 1 && Math.hypot(m.trail[0][0] - c.fx, m.trail[0][1] - c.fy) < .3) m.trail.shift();
+        const tgt = m.trail[0] || [a.x, a.y];
+        const dx = tgt[0] - c.fx, dy = tgt[1] - c.fy, l = Math.hypot(dx, dy) || 1, st = Math.min(l, 2.5 * dt);
+        c.fx += dx / l * st; c.fy += dy / l * st;
+      }
+      if (Math.hypot(c.fx - c.to.x, c.fy - c.to.y) < 2.2) return misNext(a);
+      live = true; break;
+    }
+  }
+  if (live && t > m.mtAt) { m.mtAt = t + 200; send(a, { t: 'mt', k: c.k, prog: c.prog, cx: c.cx, cy: c.cy, fx: c.fx, fy: c.fy, wait: c.wait ? 1 : 0, phase: c.phase }); }
+}
+function misAct(a, m) {
+  if (m.op === 'start') {
+    const car = allJobs(a) && MIS.M[m.car] ? m.car : a.career;
+    if (!car || car === 'none' || !MIS.M[car]) return toast(a, 'ต้องมีอาชีพก่อน ถึงจะรับภารกิจได้', 'ℹ️', false);
+    if (a.mis) return toast(a, 'คุณมีภารกิจค้างอยู่แล้ว', 'ℹ️', false);
+    if (!isAdmin(a)) {                                    // missions are handed out by the job's NPC (farmers: at the farm gate while the farm is closed)
+      const st = ST[m.st], ok = st && (st.id === 'staff_' + car || car === 'farmer' && st.id === 'gate_farm') && areaId(a) === st.area && Math.hypot(a.x - st.x, a.y - st.y) < (st.r || 1.5) + 2.5;
+      if (!ok) return toast(a, 'รับภารกิจได้ที่ NPC ของอาชีพคุณ', '📋', false);
+    }
+    if ((a.misNext || 0) > now() && !(isAdmin(a) && a.god?.nocd)) return toast(a, `ยังไม่มีงานใหม่ รออีก ${Math.ceil((a.misNext - now()) / 1000)} วินาที`, '⏳', false);
+    const out = D.roomAt(a.x, a.y)?.outside, where = out ? D.areaAt(out.x, out.y)?.id : areaId(a);
+    if (where !== 'town') return toast(a, 'ภารกิจอาชีพทำในตัวเมือง กลับเข้าเมืองก่อนนะ', '🏙️', false);
+    if (a.down) return;
+    if (!spend(a, 5)) return;
+    a.mis = misBuild(a, car, isAdmin(a) && m.idx != null ? +m.idx : null); markMe(a);
+    return toast(a, `${a.mis.icon} ภารกิจใหม่: ${a.mis.title} — ${a.mis.story} (เวลา ${Math.round(a.mis.limit / 6000) / 10} นาที)`, '📋');
+  }
+  if (!a.mis) return;
+  if (m.op === 'quit') { if (a.mis.kind === 'icu') a.icuNext = now() + D.ICU.next / 2; else a.misNext = now() + 30000; a.mis = null; markMe(a); return toast(a, 'ยกเลิกภารกิจแล้ว', 'ℹ️', false); }
+  if (m.op === 'answer') {
+    const c = a.mis.steps[a.mis.i]; if (!c || c.k !== 'talk' || !c.asked) return;
+    if (+m.i === c.right) { toast(a, `✅ ${c.who.name}: ขอบคุณมาก เข้าใจแล้ว!`, '💬'); return misNext(a); }
+    a.mis.until -= 20000; c.asked = false; c.askAt = now() + 2500; markMe(a);
+    return toast(a, `❌ ${c.who.name} ดูไม่ค่อยพอใจคำตอบนี้... (เสียเวลา 20 วิ) ลองคุยใหม่อีกครั้ง`, '💬', false);
+  }
+}
+// ---- lost-dog cases (police): a dog hides somewhere reachable in town; find it (walk up to it) before the time limit
+function dogSpot(a) {
+  const A = D.AREAS.find(r => r.id === 'town'), sx = Math.floor(a.x), sy = Math.floor(a.y);
+  if (areaId(a) !== 'town') return null;
+  const dist = new Map([[sy * 4096 + sx, 0]]), q = [[sx, sy]], far = [];
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i], d = dist.get(y * 4096 + x);
+    if (d >= D.DOGQ.minSteps && d <= D.DOGQ.maxSteps && Math.hypot(x - sx, y - sy) >= 28 && D.TILES[y][x] !== 'D' && !D.roomAt(x + .5, y + .5)) far.push([x, y, d]);
+    if (d >= D.DOGQ.maxSteps) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = ny * 4096 + nx;
+      if (nx <= A.x || ny <= A.y || nx >= A.x + A.w - 1 || ny >= A.y + A.h - 1 || dist.has(k) || D.blocked(nx + .5, ny + .5)) continue;
+      dist.set(k, d + 1); q.push([nx, ny]);
+    }
+  }
+  return far.length ? pick(far) : null;
+}
+function dogTick(a, t) {
+  const c = a.dogq;
+  if (areaId(a) === 'town' && Math.hypot(a.x - c.x, a.y - c.y) < 1.5) {          // found!
+    const min = (t - c.t0) / 60000, early = t - c.t0 < c.limit * .5;
+    const pay = Math.round((D.DOGQ.base + D.DOGQ.perMin * min) * (early ? 1 + D.DOGQ.early : 1) * jobPay(a) * (1 + BOOST[tier(a, 'police')]));
+    a.dogq = null; a.dogNext = t + D.DOGQ.next; earn(a, pay); addXp(a, 1); stat(a, 'dogs'); joy(a, 6); markMe(a);
+    return toast(a, `🐕 เจอ "น้อง${c.name}" แล้ว! ส่งคืน${c.owner} ใช้เวลา ${Math.floor(min)} นาที ${Math.round((min % 1) * 60)} วิ${early ? ' · เจอเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🐕');
+  }
+  if (t > c.until) { a.dogq = null; a.dogNext = t + D.DOGQ.next * 2; markMe(a); toast(a, `⏰ หมดเวลา! ตามหา "น้อง${c.name}" ไม่ทัน ${c.owner}เสียใจมาก เคสล้มเหลว`, '😢', false); joy(a, -4); }
+}
+// a fish (or junk) landed: xp, the bag, the fish book, the news feed
+function giveCatch(a, id) {
+  const before = fishLv(a);
+  a.xp.fisher = (a.xp.fisher || 0) + 1;
+  if (fishLv(a) > before) {
+    toast(a, `เลเวลตกปลาเพิ่มเป็น Lv.${fishLv(a)}!${fishLv(a) >= D.FISHING.maxLv ? '' : ` (เลเวลสูงสุด ${D.FISHING.maxLv} ได้ชุดนักตกปลา)`}`, '🎣');
+    if (fishLv(a) >= D.FISHING.maxLv && !(a.outfits || []).includes('fisher')) {
+      a.outfits = [...(a.outfits || []), 'fisher']; joy(a, 15);
+      toast(a, 'ตกปลาถึงเลเวลสูงสุด! ได้รับรางวัล 🎽 ชุดนักตกปลา ใส่ได้ที่ ⚙️ ตั้งค่า → ชุด', '🏆');
+      feed(`🎣 ${a.name} เป็นนักตกปลาระดับสูงสุด ได้รับชุดนักตกปลา!`);
+    }
+  }
+  infect(a, 'injury', 0.02);
+  if (ev('rain')) infect(a, 'cold', 0.03);
+  if (!id) { markMe(a); return toast(a, 'ได้ขยะ 🥫 ... ไม่มีราคา', '🥫', false); }
+  addItem(a, id, 1); markMe(a); quest(a, 'fish'); stat(a, 'fish');
+  if (id === 'shark') stat(a, 'shark'); if (id === 'chest') stat(a, 'chest'); if (id === 'goldenfish') stat(a, 'goldenfish');
+  const it = D.ITEMS[id], rar = it.rar || 1, rn = D.FISH_RARITY[rar] || '';
+  if (rar >= 4) stat(a, 'epicfish');
+  a.fishdex = a.fishdex || {}; const first = !a.fishdex[id]; a.fishdex[id] = (a.fishdex[id] || 0) + 1;
+  stat(a, 'fishdex', Object.keys(a.fishdex).filter(k => D.ITEMS[k]?.rar).length, true);
+  if (it.legend) { eggOf(a).ld = dayKey(); stat(a, 'legendfish'); feed(`🎉 ${a.name} พบปลาในตำนาน! ${it.icon} ${it.name}`); send(a, { t: 'egg', k: 'legend' }); }
+  else if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
+
+  send(a, { t: 'catch', item: id, first });
+  return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
+}
+function moodTick(a, t, indoors) {
+  // happiness drifts down; good things push it up, hardship pushes it down
+  let d = -D.HAPPY.decay;
+  if (a.hunger < 20) d -= 0.02;
+  d -= 0.01 * (a.dz || []).length;
+  if (a.down) d -= 0.02;
+  if (a.utilOff) d -= 0.01;
+  if (a.pose === 'seat') d += 0.09;
+  if (a.pose === 'rest') d += 0.01;
+  if (a.afk) d = Math.max(d, 0);                  // away from the screen: nothing drifts down
+  if (a.call) d += 0.04;
+  if (holdsHome(a) >= 0 && D.roomAt(a.x, a.y)?.house === holdsHome(a)) d += 0.03 + 0.005 * comfort(a);
+  joy(a, d);
+  // cravings: "I really want to eat X" (admins have no needs)
+  if (!a.down && !godLock(a)) {
+    if (!a.craving && t > (a.craveNext || 0)) {
+      if (!a.craveNext) a.craveNext = t + rnd(1, 3) * 60000;
+      else { const id = pick(CRAVE); a.craving = { item: id, until: t + 6 * 60000 }; send(a, { t: 'crave', item: id }); toast(a, `อยากกิน${D.ITEMS[id].icon}${D.ITEMS[id].name}จัง! กินภายใน 6 นาทีจะมีความสุขเพิ่มมาก`, '🤤'); markMe(a); }
+    } else if (a.craving && t > a.craving.until) {
+      toast(a, `ไม่ได้กิน${D.ITEMS[a.craving.item].name}ที่อยากกิน... เศร้าจัง`, '😔', false); joy(a, -5);
+      a.craving = null; a.craveNext = t + rnd(5, 10) * 60000;
+    }
+  }
+  // monthly water & electricity bills
+  billUp(a);
+  // begging: passers-by drop coins now and then
+  if (a.pose === 'beg' && (a.career === 'beggar' || allJobs(a)) && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
+    const c = Math.round(rint(4, 14) * jobPay(a)); earn(a, c); if (Math.random() < .5) addXp(a, .5); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
+  }
+  if (a.dogq) dogTick(a, t);
+}
+
+// how good a place is for begging: busy streets near shops > quiet corners > indoors; night is slow
+function begSpot(a) {
+  const area = areaId(a); if (area !== 'town' && area !== 'housing' && area !== 'farm') return 0.3;
+  let m = area === 'town' ? 0.7 : 0.45;
+  if (D.STATIONS.some(s => s.type === 'door' && s.house === undefined && s.area === area && Math.hypot(s.x - a.x, s.y - a.y) < 6)) m = 1;
+  const h = hourNow(); if (h >= 22 || h < 6) m *= 0.4;
+  return m;
+}
+
+// ------------------------------------------------------------------ water & electricity (billed every in-game month)
+function billUp(a) {
+  const cur = D.monthIdx(now());
+  if (a.billMonth == null) { a.billMonth = cur; return; }
+  if (a.billMonth >= cur) return;
+  let n = 0;
+  while (a.billMonth < cur && n < 3) {
+    a.billMonth++; n++;
+    const home = holdsHome(a);
+    // an unpaid bill from before last month: water and power get cut, plus a late fee
+    for (const b of a.bills || []) if (!b.late && a.billMonth > b.m + 1) {
+      b.late = true; const fee = Math.round((b.water + b.elec) * D.UTIL.lateFee); b.elec += fee; a.utilOff = true;
+      toast(a, `ค้างค่าน้ำค่าไฟเกินกำหนด! ถูกตัดน้ำตัดไฟ + ค่าปรับ ${money(fee)} (นอนที่บ้านไม่ได้)`, '🔌', false); joy(a, -10);
+    }
+    if (home < 0) continue;
+    const sl = Math.min(20, a.usage?.sleep || 0), cf = houses[home] === a ? comfort(a) : 0;
+    const bill = { m: a.billMonth - 1, home, water: D.UTIL.water + D.UTIL.waterPerSleep * sl, elec: D.UTIL.elec + D.UTIL.elecPerComfort * cf + D.UTIL.elecPerSleep * sl };
+    a.bills = [...(a.bills || []), bill]; a.usage = { sleep: 0 };
+    const dt = D.MONTHS[(bill.m) % 12];
+    toast(a, `📬 บิลค่าน้ำ ${money(bill.water)} + ค่าไฟ ${money(bill.elec)} ประจำเดือน${dt} มาแล้ว จ่ายภายในสิ้นเดือนหน้า (ธนาคาร / แอพมือถือ)`, '🧾');
+  }
+  a.billMonth = cur; markMe(a);
+}
+function payBills(a) {
+  const due = (a.bills || []).reduce((s, b) => s + b.water + b.elec, 0);
+  if (!due) return toast(a, 'ไม่มีบิลค้างจ่าย', '🧾');
+  if (!pay(a, due)) return;
+  a.bills = []; const was = a.utilOff; a.utilOff = false; markMe(a);
+  toast(a, `จ่ายค่าน้ำค่าไฟ ${money(due)} เรียบร้อย${was ? ' — ต่อน้ำต่อไฟให้แล้ว' : ''}`, '🧾');
+}
+
+// ------------------------------------------------------------------ beggars, thieves and police
+function donate(a, m) {
+  if (a.down) return;
+  const bn = botById(+m.to);
+  if (bn && bn.c === 'beggar' && dist(a, bn) <= 5) { const amt = clamp(Math.floor(+m.amt) || 0, 1, 100000); if (a.money < amt) return toast(a, 'เงินไม่พอ', '💸', false); a.money -= amt; markMe(a); joy(a, 4); botSay(bn, pick(['ขอบคุณมากครับ 🙏', 'ขอให้รวยๆ นะ', 'บุญรักษานะครับ'])); return toast(a, `บริจาคให้ ${bn.name} ${money(amt)} อิ่มบุญ 😇`, '🥣'); }
+  const o = nearPlayer(a, m.to, 5);
+  if (!o) return toast(a, 'เดินเข้าไปใกล้ก่อน', '⚠️', false);
+  if (o.career !== 'beggar') return toast(a, `${o.name} ไม่ได้เป็นขอทาน`, '⚠️', false);
+  const amt = clamp(Math.floor(+m.amt) || 0, 1, 100000);
+  if (!pay(a, amt)) return;
+  earn(o, amt); stat(o, 'alms'); stat(a, 'donated'); joy(o, 4);
+  const j = Math.min(D.HAPPY.donateMax, 4 + Math.floor(amt / 15)); joy(a, j);
+  toast(a, `บริจาค ${money(amt)} ให้ ${o.name} อิ่มบุญ มีความสุข +${j}`, '🙏'); toast(o, `${a.name} บริจาคให้คุณ ${money(amt)}`, '🙏');
+  if (amt >= 500) feed(`🙏 ${a.name} ใจบุญ บริจาคให้ขอทาน ${money(amt)}`);
+}
+// ------------------------------------------------------------------ looks
+function wear(a, m) {
+  const cat = m.cat; if (!D.LOOKS[cat]) return;
+  if (m.id && !a.wardrobe[cat].includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่น (ผมที่ร้านทำผม) ก่อน', '💇', false);
+  if (!m.id) return;
+  a.look = { ...a.look, [cat]: m.id || '' }; markMe(a); sendRoster();
+}
+
+// ------------------------------------------------------------------ NPCs: townsfolk, job workers, the patrol and the hospital doctor
+// All NPCs walk tile paths (BFS inside their own area). Townsfolk wander the village; a worker NPC for every job
+// shows up and does that job whenever no player in that job is online; the patrol chases reported thieves.
+const npcs = [];
+const walkCache = {};
+function walkableIn(areaId) {
+  if (walkCache[areaId]) return walkCache[areaId];
+  const A = D.AREAS.find(r => r.id === areaId), out = [];
+  for (let y = A.y + 1; y < A.y + A.h - 1; y++) for (let x = A.x + 1; x < A.x + A.w - 1; x++) if (!D.blocked(x + .5, y + .5) && D.TILES[y][x] !== 'D') out.push([x, y]);
+  return (walkCache[areaId] = out);
+}
+// shortest tile walk from n to goal [x, y] inside area A (null = unreachable)
+function routeTo(n, goal, areaId) {
+  const A = D.AREAS.find(r => r.id === areaId), sx = Math.floor(n.x), sy = Math.floor(n.y), gx = Math.floor(goal[0]), gy = Math.floor(goal[1]);
+  const key = (x, y) => y * D.W + x, prev = new Map([[key(sx, sy), -1]]), q = [[sx, sy]];
+  for (let h = 0; h < q.length && q.length < 12000; h++) {
+    const [x, y] = q[h]; if (x === gx && y === gy) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = key(nx, ny);
+      if (prev.has(k) || nx < A.x || ny < A.y || nx >= A.x + A.w || ny >= A.y + A.h || D.blocked(nx + .5, ny + .5)) continue;
+      prev.set(k, key(x, y)); q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(key(gx, gy))) return null;
+  const out = []; let k = key(gx, gy);
+  while (k !== -1) { out.push([k % D.W + .5, Math.floor(k / D.W) + .5]); k = prev.get(k); }
+  out.reverse(); out.shift();
+  if (out.length) out[out.length - 1] = [goal[0], goal[1]];
+  return out;
+}
+const HAIRS = Object.keys(D.LOOKS.hair), SH = Object.keys(D.LOOKS.shirt), PA = Object.keys(D.LOOKS.pants);
+const randLook = () => ({ hair: pick(['brown', 'brown', 'black', 'black', ...HAIRS]), shirt: pick(SH), pants: pick(PA) });
+let npcRosterDirty = false;
+{
+  const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
+  D.FOLK.town.forEach((p, i) => {
+    const [x, y] = pick(walkableIn('town'));
+    npcs.push({ id: -(i + 1), folk: 1, name: p.name, face: p.face, area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+      g: p.g, look: { ...p.look }, speed: p.kid ? rnd(1.4, 1.8) : rnd(1.1, 1.6), pickedAt: 0,
+      next: function () { return folkNext(this, spots); }, stay: () => rnd(4, 14) });
+  });
+}
+// people living in the housing estate stroll around it too
+{
+  const hs = walkableIn('housing');
+  D.FOLK.housing.forEach((p, i) => {
+    const [x, y] = pick(hs);
+    npcs.push({ id: -(40 + i), folk: 1, name: p.name, face: p.face, area: 'housing', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+      g: p.g, look: { ...p.look }, speed: rnd(1.1, 1.5), pickedAt: 0, next: () => pick(hs).map(v => v + .5), stay: () => rnd(4, 14) });
+  });
+}
+// townsfolk go in and out of open shops through the front door, just like players
+const PUBLIC_DOORS = D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov && ROOM[s.to]);
+function folkNext(n, spots) {
+  if (n.inside) {
+    if (n.inside.left-- > 0) { const w = walkableIn(n.area); return w.length ? pick(w).map(v => v + .5) : [n.inside.room.exit.x, n.inside.room.exit.y]; }
+    n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y];
+  }
+  if (Math.random() < .3) {
+    const d = pick(PUBLIC_DOORS.filter(s => buildingOpen(s.bld)));
+    if (d) { n.goingIn = d; return [d.x, d.y]; }
+  }
+  return Math.random() < .7 ? pick(spots) : pick(walkableIn('town')).map(v => v + .5);
+}
+// called when a townsperson reaches the end of its walk: step through a door if that was the plan
+function folkArrive(n) {
+  if (n.goingIn) {
+    const room = ROOM[n.goingIn.to]; n.goingIn = null;
+    if (!room) return false;
+    n.x = room.spawn.x; n.y = room.spawn.y; n.area = room.id; n.inside = { room, left: 1 + Math.floor(Math.random() * 3) }; n.wait = rnd(1, 3);
+    return true;
+  }
+  if (n.leaving) {
+    const room = n.inside?.room; n.leaving = false; n.inside = null;
+    if (!room) return false;
+    n.x = room.outside.x; n.y = room.outside.y; n.area = 'town'; n.wait = rnd(2, 5);
+    return true;
+  }
+  return false;
+}
+// ------------------------------------------------------------------ AI players
+// 3–6 make-believe townspeople who behave like players: they come and go, walk to a job's staff to apply,
+// go to work, fish, shop, take a break, chat (and answer when you talk to them). They show up as ordinary
+// online players everywhere (roster, map, online count, profiles); they just never trade or take calls.
+const BOT_NAMES = ['มิ้นท์ตี้', 'BossKung', 'น้องพลอย', 'ต้นกล้า99', 'JayZ_TH', 'ปลาทูน่า', 'KaiJeaw', 'แพรวา', 'NongBam', 'อาร์มแกร่ง', 'Fern.ny', 'บอสหนุ่ม',
+  'PimPim', 'โอ๊ตคุง', 'MaxPower', 'จุ๊บแจง', 'Toey_Nara', 'เก่งกาจ', 'บีมมี่', 'Kanomtom', 'ไอซ์ซี่', 'Nutty_99', 'ฟ้าใส', 'GolfGG'];
+const BOT_SAY = {
+  any: ['มีใครว่างบ้าง', 'วันนี้เงินเข้าดีมาก 555', 'เหนื่อยจัง', 'ใครรู้ที่ตกปลาดีๆ บ้าง', 'หิวแล้วอะ', 'เดินหลงอีกแล้ว 😅', 'สวัสดีทุกคน', 'เมืองนี้น่าอยู่ดี', 'ใกล้จะเลเวลอัปแล้ว!', 'ใครอยู่แถวนี้บ้าง'],
+  none: ['หางานอยู่ มีงานไหนดีบ้าง', 'ว่างงานอะ ไปสมัครงานก่อนดีกว่า'],
+  rider: ['ส่งของรอบที่สิบแล้ว 🛵', 'ทิปวันนี้ดีมาก'], farmer: ['ผักโตไวมากวันนี้', 'เดี๋ยวไปรดน้ำผักก่อน'], merchant: ['ของราคาส่งขึ้นอีกแล้ว', 'ใครอยากซื้อของบ้าง ราคาดี'],
+  chef: ['ทำต้มยำขายดีมาก', 'วัตถุดิบหมดอีกแล้ว'], doctor: ['ใครป่วยมาหาหมอได้นะ', 'เวรวันนี้ยาวมาก'], police: [ 'ลาดตระเวนอยู่ 👮'],
+  office: ['ประชุมอีกแล้ว', 'เงินเดือนออกพอดี'], beggar: ['ขอเศษเงินหน่อยครับ 🙏', 'วันนี้ได้นิดเดียวเอง'],
+};
+const BOT_REPLY = [
+  [/สวัสดี|หวัดดี|ดีจ้า|hello|hi\b|ทัก/i, ['สวัสดีครับ 😄', 'หวัดดีจ้า', 'ดีครับบ', 'ทักทายย 👋']],
+  [/งาน|สมัคร|อาชีพ/, ['ไปคุยกับเจ้าหน้าที่ตามตึกได้เลย', 'ไรเดอร์เงินดีนะ แต่ต้องมีใบขับขี่', 'ลองเป็นชาวไร่ดู ไม่ต้องมีวุฒิ']],
+  [/เงิน|รวย|จน/, ['ตกปลาขายก็ได้เงินนะ', 'ทำงานไปเรื่อยๆ เดี๋ยวก็รวย 555', 'จนเหมือนกัน 😭']],
+  [/ปลา|ตก/, ['ท่าตกปลาริมทะเลได้ปลาใหญ่', 'ทุ่นจมแล้วค่อยตวัดนะ']],
+  [/หิว|กิน|ข้าว/, ['ร้านอาหารอยู่ใจกลางเมือง', 'ไปกินด้วยกันมั้ย']],
+  [/เพื่อน|แอด/, ['ได้เลย 😊', 'ยินดีที่ได้รู้จักนะ']],
+  [/555|ฮา|lol/i, ['555+', 'ขำ 😂']],
+  [/บาย|ไปก่อน|bye/i, ['บายย 👋', 'ไว้เจอกันใหม่']],
+];
+const BOT_DEFAULT = ['อืมๆ', 'จริงด้วย', 'ใช่ๆ', 'โอเคเลย 👍', 'งั้นเหรอ', '😄'];
+const BOT_JOBS = Object.keys(D.CAREERS).filter(k => k !== 'none' && ST['staff_' + k] && (D.AREAS.find(r => r.id === ST['staff_' + k].area)?.kind === 'room' || ST['staff_' + k].area === 'town'));
+let botSeq = 0, botEventAt = now() + 60000, botWorldAt = now() + 90000;
+const bots = () => npcs.filter(n => n.bot);
+const botById = id => npcs.find(n => n.bot && n.id === id);
+// nearest free tile to a point inside an area (somewhere a bot can stand)
+function standNear(area, x, y) {
+  let best = null, bd = 1e9;
+  for (const [tx, ty] of walkableIn(area)) { const d = Math.hypot(tx + .5 - x, ty + .5 - y); if (d < bd && d > .6) { bd = d; best = [tx + .5, ty + .5]; } }
+  return best;
+}
+const stepAt = (st, d, stay, say) => { const s = ST[st]; if (!s) return null; const p = standNear(s.area, s.x, s.y + .8); return p && { area: s.area, x: p[0], y: p[1], d, stay, say, st }; };
+// what a bot does next: get a job first, then mostly work, with breaks for fishing, shopping and hanging around
+function botPlan(n) {
+  const b = n.bot, plan = [];
+  if (n.c === 'none' || Math.random() < .04) {
+    const job = pick(BOT_JOBS.filter(j => j !== n.c));
+    const s = job && stepAt('staff_' + job, 'apply', rnd(3, 6)); if (s) { s.job = job; plan.push(s); }
+  }
+  const r = Math.random(), work = D.CAREERS[plan[0]?.job || n.c]?.where;
+  if (work && r < .55) { const s = stepAt(work, 'work', rnd(40, 110)); if (s) plan.push(s); }
+  else if (r < .72) { const s = stepAt(pick(['pier_l1', 'pier_l2', 'pier_s1', 'pier_s2']), 'fish', rnd(30, 70)); if (s) plan.push(s); }
+  else if (r < .9) {
+    const d = pick(PUBLIC_DOORS.filter(s => buildingOpen(s.bld)));
+    const rm = d && ROOM[d.to], w = rm && walkableIn(rm.id); if (w?.length) { const [x, y] = pick(w); plan.push({ area: rm.id, x: x + .5, y: y + .5, d: 'shop', stay: rnd(8, 20) }); }
+  }
+  if (!plan.length) { const [x, y] = pick(walkableIn('town')); plan.push({ area: 'town', x: x + .5, y: y + .5, d: 'idle', stay: rnd(5, 15) }); }
+  b.plan = plan;
+}
+function botNext(n) {
+  const b = n.bot; if (!b.plan.length) botPlan(n);
+  const s = b.plan[0];
+  if (n.area === s.area) return [s.x, s.y];
+  if (n.inside) { n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y]; }
+  const door = PUBLIC_DOORS.find(d => d.to === s.area && buildingOpen(d.bld));
+  if (!door) { b.plan.shift(); return null; }
+  n.goingIn = door; return [door.x, door.y];
+}
+// reached the end of a walk: if it was the plan's spot, do the thing there and stay a while
+function botArrive(n) {
+  const b = n.bot, s = b.plan[0];
+  if (!s || n.area !== s.area || Math.hypot(n.x - s.x, n.y - s.y) > 1) return .4;
+  b.plan.shift();
+  if (s.d === 'apply') { n.c = s.job; b.xp = 0; b.lv = 1; botSay(n, pick([`สมัครเป็น${D.CAREERS[s.job].name}แล้ว!`, `ได้งาน${D.CAREERS[s.job].name}แล้ว เย้`, 'สมัครงานเรียบร้อย'])); npcRosterDirty = true; }
+  if (s.d === 'work' || s.d === 'fish') b.busy = { d: s.d, until: now() + s.stay * 1000 };
+  return s.stay;
+}
+const BOTS_TALK = false;   // AI players keep quiet: no chat lines, no replies, no join/leave greetings in chat
+function botSay(n, text) {
+  if (!BOTS_TALK) return;
+  const msg = { t: 'chat', id: n.id, name: n.name, c: n.c, text, ts: now() };
+  for (const o of online.values()) if (areaId(o) === n.area && dist(o, n) <= 14) send(o, msg);
+}
+function botJoin(quiet) {
+  const used = new Set(bots().map(n => n.name)), free = BOT_NAMES.filter(x => !used.has(x)), name = pick(free.length ? free : BOT_NAMES);
+  if (!name) return;
+  const sp = standNear('town', D.SPAWN.x + rnd(-3, 3), D.SPAWN.y + rnd(-2, 2)) || [D.SPAWN.x, D.SPAWN.y];
+  const g = Math.random() < .5 ? 'f' : 'm', lv = rint(1, 9);
+  const n = { id: -(500 + botSeq++), bot: { plan: [], xp: rnd(0, 1), lv, days: rint(1, 40), worth: rint(800, 25000), fishLv: rint(1, 6), title: Math.random() < .5 ? pick(D.ACHIEVEMENTS.filter(x => x.r <= 2)) : null },
+    name, area: 'town', x: sp[0], y: sp[1], f: 6, path: [], wait: rnd(1, 3), g, look: randLook(), speed: rnd(1.5, 2.1), pickedAt: 0,
+    c: Math.random() < .5 ? 'none' : pick(BOT_JOBS) };
+  if (n.c === 'none') n.bot.lv = 1;
+  n.next = () => botNext(n); n.stay = () => botArrive(n);
+  npcs.push(n); npcRosterDirty = true;
+  if (!quiet) feed(`👋 ${name} เข้าเมือง`);
+}
+function botLeave(n, quiet) {
+  const i = npcs.indexOf(n); if (i < 0) return;
+  npcs.splice(i, 1); npcRosterDirty = true; if (!quiet) feed(`🚪 ${n.name} ออกจากเมือง`);
+}
+// every so often someone logs off or a new one arrives, keeping 3–6 around; bots level up and chat
+let botLastT = now();
+function botTick(t) {
+  const dt = Math.min(2, (t - botLastT) / 1000); botLastT = t;
+  for (const n of bots()) {
+    const b = n.bot;
+    if (b.busy && t > b.busy.until) b.busy = null;
+    if (b.busy?.d === 'work' && n.c !== 'none' && Math.random() < dt / 60) {                 // about one bit of work a minute, levels slow down like a player's
+      b.xp += 1 / (4 + 1.5 * (b.lv - 1));
+      if (b.xp >= 1) { b.xp = 0; b.lv++; npcRosterDirty = true; if (Math.random() < .5) botSay(n, pick(['เลเวลอัปแล้ว! 🎉', `Lv.${b.lv} แล้ว เย้`, 'อัปเลเวลอีกแล้ว 😆'])); }
+    }
+    if (Math.random() < dt / 150) botSay(n, pick(Math.random() < .5 ? BOT_SAY.any : BOT_SAY[n.c] || BOT_SAY.any));
+  }
+  if (t > botWorldAt) {
+    botWorldAt = t + rnd(120, 300) * 1000;
+    const n = pick(bots());
+    if (BOTS_TALK && n && online.size) { const wm = { t: 'chat', w: 1, id: n.id, name: n.name, c: n.c, text: pick([...BOT_SAY.any, ...(BOT_SAY[n.c] || [])]), ts: now() }; chatLog.push(wm); if (chatLog.length > 40) chatLog.shift(); broadcast(wm); }
+  }
+  if (t > botEventAt) {
+    botEventAt = t + rnd(150, 420) * 1000;
+    // the AI townsfolk are being retired: one slips away now and then (never right next to a player, no message), none come back
+    const away = bots().filter(n => !n.inside && ![...online.values()].some(o => areaId(o) === n.area && dist(o, n) < 16));
+    if (away.length) { botLeave(pick(away), true); botCap = bots().length; bugsDirty = true; dirty = true; }
+  }
+}
+// a player said something near a bot (or named it in world chat): it answers after a moment, like a person typing
+function botHear(a, text, world) {
+  if (!BOTS_TALK) return;
+  const cand = world ? bots().filter(n => text.includes(n.name)) : bots().filter(n => n.area === areaId(a) && dist(n, a) <= 8);
+  const n = pick(cand); if (!n || n.bot.replyAt > now() || (!world && Math.random() < .35)) return;
+  n.bot.replyAt = now() + 6000;
+  const hit = BOT_REPLY.find(([re]) => re.test(text)), line = pick(hit ? hit[1] : BOT_DEFAULT);
+  setTimeout(() => {
+    if (!npcs.includes(n)) return;
+    if (world) { const wm = { t: 'chat', w: 1, id: n.id, name: n.name, c: n.c, text: `@${a.name} ${line}`, ts: now() }; chatLog.push(wm); if (chatLog.length > 40) chatLog.shift(); broadcast(wm); }
+    else botSay(n, line);
+  }, rnd(1500, 4000));
+}
+const botPub = n => ({ id: n.id, name: n.name, av: 0, c: n.c, lv: n.bot.lv, dz: [], pose: null, title: n.bot.title?.title || '', tr: n.bot.title?.r || 0, pic: 0, w: 0, sad: 0, g: n.g, lk: n.look, adm: 0,
+  of: D.CAREERS[n.c]?.where ? n.c : '', th: 0, afk: 0, x: n.x, y: n.y, f: n.f });
+
+// worker NPCs: where they walk and what they do there (only while no player has that job)
+const ST_XY = id => { const s = ST[id]; return s ? [s.x, s.y] : null; };
+const roomPts = (rid, pts) => { const r = ROOM[rid]; return pts.map(([dx, dy]) => [r.x + dx, r.y + dy]).filter(([x, y]) => !D.blocked(x, y)); };
+const WORKERS = [
+  { career: 'office', name: 'คุณเก่ง (พนักงาน)', area: 'r_office', look: { hair: 'black', shirt: 'white', pants: 'black' },
+    pts: () => D.STATIONS.filter(s => s.type === 'chair' && !chairs[s.idx]).map(s => [s.x, s.y]), pose: () => (hourNow() >= D.SHIFT.start && hourNow() < D.SHIFT.end ? 'chair' : null), stay: () => rnd(40, 90) },
+  { career: 'farmer', name: 'ลุงสม (ชาวไร่)', area: 'farm', pts: () => D.STATIONS.filter(s => s.type === 'gplot' && !lots[s.lot]).map(s => [s.x, s.y + 1.1]).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(6, 12) },
+  { career: 'merchant', name: 'เจ๊หมวย (แม่ค้า)', area: 'town', pts: () => { const m = ST.market; return [[m.x - 2.4, m.y], [m.x + 2.4, m.y], [m.x - 1.2, m.y + .3], [m.x + 1.2, m.y + .3]].filter(([x, y]) => !D.blocked(x, y)); }, stay: () => rnd(5, 12) },
+  { career: 'chef', name: 'เชฟต้อม', area: 'r_kitchen', pts: () => roomPts('r_kitchen', [[4.9, 3.4], [9.6, 3.4], [7, 3.4], [7, 5.4]]), stay: () => rnd(4, 9) },
+  { career: 'doctor', name: 'หมอแนน (แพทย์เวร)', area: 'r_hospital', always: true, pts: () => D.STATIONS.filter(s => s.type === 'bed').map(s => [s.x, s.y + .95]).concat(roomPts('r_hospital', [[5, 5]])).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 8), job: npcDoctor },
+  { career: 'rider', name: 'พี่บอย (ไรเดอร์)', area: 'town', pts: () => [ST_XY('door_restaurant'), ...D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined).map(s => [s.x, s.y + .3])].filter(p => p && !D.blocked(p[0], p[1])), stay: () => rnd(3, 6), speed: 2.4 },
+  { career: 'beggar', name: 'ตาผล (ขอทาน)', area: 'town', pts: () => [[53.5, 38.6], [64.5, 33.5], [76.5, 33.5], [27, 33.5]].filter(([x, y]) => !D.blocked(x, y) && ![...online.values()].some(o => Math.hypot(o.x - x, o.y - y) < 1)), pose: () => 'beg', stay: () => rnd(60, 160) },
+  { career: 'police', name: 'ดาบชัย (สายตรวจ)', area: 'town', always: true, cop: true, pts: () => D.STATIONS.filter(s => s.area === 'town' && /^(crowd|door)$/.test(s.type) && s.house === undefined).map(s => [s.x, s.y + (s.type === 'door' ? .3 : 0)]).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 10), speed: 1.6 },
+];
+// the restaurant waiter (always there), and police patrols for the farm and the housing estate too
+const areaPts = id => walkableIn(id).map(p => [p[0] + .5, p[1] + .5]);
+WORKERS.push(
+  { career: 'waiter', name: 'น้องฝน (เด็กเสิร์ฟ)', area: 'r_restaurant', always: true, desc: 'เด็กเสิร์ฟร้านอาหาร เดินเสิร์ฟอาหารและเก็บโต๊ะทั้งวัน', look: { hair: 'black', shirt: 'white', pants: 'black' }, pts: () => areaPts('r_restaurant'), stay: () => rnd(1.5, 4), speed: 1.7 },
+  { career: 'police', name: 'จ่าแดง (สายตรวจ)', area: 'town', always: true, cop: true, pts: () => areaPts('town').filter(() => Math.random() < .05), stay: () => rnd(4, 10), speed: 1.6 },
+  { career: 'police', name: 'ดาบเอก (สายตรวจไร่)', area: 'farm', always: true, cop: true, pts: () => areaPts('farm').filter(() => Math.random() < .08), stay: () => rnd(5, 12), speed: 1.6 },
+  { career: 'police', name: 'จ่าต้น (สายตรวจหมู่บ้าน)', area: 'housing', always: true, cop: true, pts: () => areaPts('housing').filter(() => Math.random() < .08), stay: () => rnd(5, 12), speed: 1.6 },
+);
+WORKERS.forEach((w, i) => {
+  const [x, y] = pick(w.pts().length ? w.pts() : walkableIn(w.area).map(p => [p[0] + .5, p[1] + .5]));
+  npcs.push({ id: -(100 + i), worker: w, name: w.name, c: w.career, area: w.area, x, y, f: 6, path: [], wait: rnd(0, 3), on: false,
+    g: i % 3 ? 'm' : 'f', look: { ...randLook(), ...(w.look || {}) }, speed: w.speed || 1.3, pose: null,
+    next: () => { const p = w.pts(); return p.length ? pick(p) : null; }, stay: w.stay });
+});
+const workerOn = n => !!n.worker && (n.worker.always || ![...online.values()].some(a => a.career === n.worker.career && !a.down));
+// the NPC doctor: treats waiting patients when no player doctor is around
+function npcDoctor(n) {
+  if (n.busyT > now() || [...online.values()].some(a => a.career === 'doctor' && !a.down)) return;   // player doctors get the patients
+  const i = beds.findIndex(b => b && (b.npc || !b.down && (b.dz || []).length) && Math.hypot(ST['bed' + beds.indexOf(b)].x - n.x, ST['bed' + beds.indexOf(b)].y + .95 - n.y) < 1.6);
+  if (i < 0) return;
+  const pt = beds[i]; n.busyT = now() + 9000;
+  if (pt.npc) { if (Math.random() < .5) { beds[i] = null; wdAt = 0; } else pt.health = Math.min(100, pt.health + 20); return; }
+  const d = pt.dz[0], fee = Math.min(450, Math.floor(pt.money));
+  pt.money -= fee; cure(pt, d); pt.health = Math.min(100, pt.health + 15); markMe(pt);
+  toast(pt, `${n.name} รักษา${DZ[d].name}ให้แล้ว ค่ารักษา ${money(fee)} (หมอผู้เล่นถูกกว่า)`, '🩺');
+  if (!(pt.dz || []).length) standUp(pt);
+}
+function npcTick(dt, ps) {
+  for (const n of npcs) {
+    if (n.worker) {
+      const on = workerOn(n);
+      if (on !== n.on) { n.on = on; npcRosterDirty = true; if (!on) { n.chase = null; n.pose = null; } }
+      if (!on) continue;
+      if (n.worker.job && !n.path.length) n.worker.job(n);
+    }
+    if (n.wait > 0) { n.wait -= dt; if (n.say && Math.random() < dt / 20) n.say = null; continue; }
+    if (!n.path.length) {
+      if (n.pose) { n.pose = null; npcRosterDirty = true; }
+      const goal = n.next(); n.path = goal ? routeTo(n, goal, n.area) || [] : [];
+      if (!n.path.length && (n.folk || n.bot)) { n.goingIn = null; if (n.leaving) folkArrive(n); else if (n.bot && goal) n.bot.plan.shift(); }   // could not reach the door: give up (or just step outside)
+      n.wait = n.path.length ? 0 : 2; if (!n.path.length) continue;
+    }
+    const [tx, ty] = n.path[0], dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy), st = n.speed * dt;
+    if (d <= st) {
+      n.x = tx; n.y = ty; n.path.shift();
+      if (!n.path.length && (n.folk || n.bot) && folkArrive(n)) { ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]); continue; }
+      if (!n.path.length && !n.chase) { n.wait = n.stay(); const pose = n.worker?.pose?.(); if (pose) { n.pose = pose; n.f = 6; npcRosterDirty = true; } }
+    } else { n.x += dx / d * st; n.y += dy / d * st; }
+    if (d > 0.01) n.f = Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4))) % 8;
+    ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]);
+  }
+  if (npcRosterDirty) { npcRosterDirty = false; sendRoster(); }
+  // now and then a villager near someone says something (bubble over their head)
+  if (Math.random() < dt / 40) {
+    const n = pick(npcs.filter(x => x.folk)), near = [...online.values()].filter(o => areaId(o) === n.area && dist(o, n) <= 14);
+    if (near.length) { const msg = { t: 'chat', id: n.id, name: n.name, text: pick(D.NPC_LINES), ts: now(), npc: 1 }; near.forEach(o => send(o, msg)); }
+  }
+}
+const npcVisible = n => !n.worker || n.on;
+const npcInfo = n => n.bot ? botPub(n) : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
+  of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
+// what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
+function outfitOf(a) {
+  if (a.god?.cloak && isAdmin(a)) return 'admin';           // admin-only cloak + aura (god mode)
+  if (a.outfit && (a.outfits || []).includes(a.outfit)) return a.outfit;
+  if (!a.hideJob && D.CAREERS[a.career]?.where) return a.career;
+  return '';
+}
+function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || []).includes(f.id) || f.locked && isAdmin(a)) ? f.id : -1; }
+function pubInfo(a) {
+  return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
+    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
+    of: outfitOf(a), afk: a.afk ? 1 : 0, veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
+}
+// others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
+const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
+function sendRoster() {
+  const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
+  const pub = JSON.stringify({ t: 'roster', players: all.filter(p => !p._h).concat(npc) });
+  for (const o of online.values()) {
+    if (o.ws.readyState !== 1) continue;
+    if (hidden(o)) o.ws.send(JSON.stringify({ t: 'roster', players: all.filter(p => !p._h || p.id === o.id).concat(npc) }));   // you still see yourself
+    else o.ws.send(pub);
+  }
+}
+function jobView(a) {
+  const c = a.career; if (!c || c === 'none') return null;
+  if (c === 'office') { const x = a.xp.office || 0; return { L: lvl(a), cur: x % 3, need: 3, gain: 100, pay: 0 }; }
+  const j = jobXp(a.xp[c] || 0); return { L: j.L, cur: +j.cur.toFixed(2), need: j.need, gain: Math.round(xpGain(j.L) * 100), pay: Math.round((jobPay(a) - 1) * 100), max: j.L >= JOB_MAX ? 1 : 0 };
+}
+function meView(a) {
+  const isRider = a.career === 'rider' || allJobs(a);
+  const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
+  const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
+  return {
+    t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
+    career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
+    pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
+    office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
+    gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
+    mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
+    auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
+    cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
+    dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
+    icu: null, icuNext: a.icuNext || 0,
+    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
+    happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
+    mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
+    jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
+    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_GEMS,
+  };
+}
+function worldView() {
+  const t = now();
+  const lb = [...accounts.values()].map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
+    .sort((x, y) => y.w - x.w).slice(0, 10);
+  return {
+    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
+    stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
+    lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
+    beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}]),
+    chairs: chairs.map(c => c ? c.name : ''),
+    ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(),
+  };
+}
+function marketView() {
+  const best = {};
+  for (const o of accounts.values()) for (const L of o.listings || []) {
+    const b = best[L.item] || (best[L.item] = { p: Infinity, n: 0 });
+    b.p = Math.min(b.p, L.price); b.n += L.qty;
+  }
+  const out = {};
+  for (const k in D.ITEMS) out[k] = { npc: Math.round(npcBuyPrice({ career: '' }, k)), farm: Math.round(npcBuyPrice({ career: '' }, k, D.ITEMS[k].kind === 'fish' ? FISH_RATE : 0.5)), sell: npcSellPrice(k), ref: Math.round(marketPrice(k)), best: best[k] ? best[k].p : 0, n: best[k] ? best[k].n : 0 };
+  return out;
+}
+
+// ------------------------------------------------------------------ connection
+const byName = n => { n = String(n || '').toLowerCase(); for (const a of accounts.values()) if (a.name.toLowerCase() === n) return a; return null; };
+function login(ws, m) {
+  // m.name is the login ID; the character's display name (a.name) is chosen once at creation
+  const name = cleanText(m.name, 16);
+  if (!accounts.has(name.toLowerCase())) {     // new IDs: English letters and digits only (older Thai IDs still log in)
+    if (/[^\x20-\x7e]/.test(name)) return fail(ws, 'ID ใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น (A-Z, 0-9, _ - .)');
+    if (!/^[A-Za-z0-9_.-]{2,16}$/.test(name)) return fail(ws, 'ID ต้องยาว 2-16 ตัว ใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข และ _ - . (ห้ามเว้นวรรค)');
+  }
+  const pin = String(m.pin ?? '');
+  if (!/^\d{4,8}$/.test(pin)) return fail(ws, 'PIN ต้องเป็นตัวเลข 4-8 หลัก');
+  const lname = name.toLowerCase(), t = now();
+  const lock = loginFails.get('n:' + lname), ipLock = loginFails.get('i:' + ws.ip);
+  if (lock && lock.until > t) return fail(ws, `ใส่ PIN ผิดหลายครั้ง ลองใหม่ในอีก ${Math.ceil((lock.until - t) / 60000)} นาที`);
+  if (ipLock && ipLock.until > t) return fail(ws, `ลองเข้าสู่ระบบผิดบ่อยเกินไป ลองใหม่ในอีก ${Math.ceil((ipLock.until - t) / 60000)} นาที`);
+  let a = accounts.get(lname), isNew = false;
+  if (a) {
+    if (hashPin(pin, a.salt) !== a.hash) {
+      loginFail('n:' + lname, 5, 5 * 60000); loginFail('i:' + ws.ip, 15, 10 * 60000);
+      return fail(ws, 'ID นี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
+    }
+    loginFails.delete('n:' + lname);
+    if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
+  } else {
+    // a brand-new ID: the client first shows the one-time character creator, then logs in again with create:1
+    if (!m.create) return ws.send(JSON.stringify({ t: 'newchar', name }));
+    const cname = String(m.cname ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
+    if (!/^[\p{L}\p{M}\p{N}_. -]{2,16}$/u.test(cname)) return send({ ws }, { t: 'loginfail', msg: 'ชื่อตัวละครต้องยาว 2-16 ตัว (ไทย/อังกฤษ/ตัวเลข)', create: 1 });
+    if (byName(cname)) return send({ ws }, { t: 'loginfail', msg: `ชื่อตัวละคร "${cname}" มีคนใช้แล้ว`, create: 1 });
+    if (impersonates(cname)) return send({ ws }, { t: 'loginfail', msg: 'ห้ามตั้งชื่อเลียนแบบแอดมินหรือทีมงาน ลองชื่ออื่นนะ', create: 1 });
+    const salt = crypto.randomBytes(8).toString('hex');
+    const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
+    a = hydrate({ v: VERSION, login: name, name: cname, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
+      look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
+    accounts.set(lname, a); isNew = true;
+  }
+  Q.ensure(a);
+  const daily = dailyLogin(a);
+  a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
+  if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
+  if (D.areaAt(a.x, a.y)?.id === 'farm' && !isAdmin(a)) { const g = D.GATES.town_from_farm; a.x = g.x; a.y = g.y; }   // the farm is closed for renovation: back to the town gate
+  if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
+  a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
+  online.set(a.id, a);
+  dirty = true;
+  setTimeout(() => a.ws === ws && billUp(a), 1500);
+  send(a, {
+    t: 'init', id: a.id,
+    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
+    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
+  });
+  send(a, meView(a)); send(a, worldView());
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
+  if (daily) send(a, { t: 'daily', ...daily });
+  if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
+  sendRoster();
+  if (!hidden(a)) feed(`👋 ${a.name} เข้าเมือง`);
+}
+function fail(ws, msg) { ws.send(JSON.stringify({ t: 'loginfail', msg })); }
+
+const loginFails = new Map();
+function loginFail(key, max, ms) {
+  const t = now(), r = loginFails.get(key);
+  const e = r && r.reset > t ? r : { n: 0, reset: t + ms, until: 0 };
+  if (++e.n >= max) { e.until = t + ms; e.n = 0; }
+  loginFails.set(key, e);
+}
+setInterval(() => { const t = now(); for (const [k, v] of loginFails) if (v.reset < t && v.until < t) loginFails.delete(k); }, 60000).unref();
+
+// daily login bonus: grows each consecutive day, capped at day 7 (kept small to fight inflation)
+const LOGIN_BONUS = [50, 80, 100, 120, 150, 200, 300];
+// daily bonus grows for 7 days in a row, then keeps rising slowly (+฿10 a day up to ฿500);
+// every 30 days you have logged in (in total, a missed day does not reset it) there is a big reward:
+// cash plus a piece of gift furniture you can only get this way (cash instead once you own them all)
+const loginReward = s => s <= 7 ? LOGIN_BONUS[s - 1] : Math.min(500, 300 + 10 * (s - 7));
+const BIG_EVERY = 30, BIG_ITEMS = ['bookcase', 'gclock', 'teddy', 'flamp', 'vase'];
+function bigReward(a, n) {        // the n-th big reward (1, 2, ...)
+  const item = BIG_ITEMS.find(k => !(a.keep || []).includes(k)) || null;
+  return { cash: 3000 + 1000 * Math.min(n - 1, 5) + (item ? 0 : 5000), item };
+}
+function loginView(a) {
+  const days = a.loginDays || 0, s = a.loginStreak || 0, next = BIG_EVERY - (days % BIG_EVERY);
+  const nb = bigReward(a, Math.floor(days / BIG_EVERY) + 1);
+  return { streak: s, days, today: a.lastLogin === Q.dayKey() ? loginReward(Math.max(1, s)) : 0, tomorrow: loginReward(s + 1), toBig: next === BIG_EVERY && a.lastLogin === Q.dayKey() && days ? BIG_EVERY : next,
+    big: { cash: nb.cash, item: nb.item }, table: LOGIN_BONUS, every: BIG_EVERY, keep: a.keep || [] };
+}
+function dailyLogin(a) {
+  const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
+  if (a.loginDays == null) a.loginDays = a.loginStreak || 0;     // older saves: start the total from the streak
+  if (a.lastLogin === today) return null;
+  a.loginStreak = a.lastLogin === yesterday ? (a.loginStreak || 0) + 1 : 1;
+  a.lastLogin = today; a.loginDays = (a.loginDays || 0) + 1;
+  const reward = loginReward(a.loginStreak), gems = a.loginStreak % 7 === 0 ? 10 : 2;
+  a.money += reward; a.earned += reward; a.gems = (a.gems || 0) + gems; dirty = true;
+  let big = null;
+  if (a.loginDays % BIG_EVERY === 0) {
+    big = bigReward(a, a.loginDays / BIG_EVERY); a.gems += 50; big.gems = 50;
+    a.money += big.cash; a.earned += big.cash;
+    if (big.item) a.keep = [...(a.keep || []), big.item];
+    setTimeout(() => feed(`🎉 ${a.name} เข้าเกมครบ ${a.loginDays} วัน ได้รางวัลใหญ่${big.item ? ` ${D.FURNITURE[big.item].icon}${D.FURNITURE[big.item].name}` : ''}!`), 2000);
+  }
+  setTimeout(() => a.ws && stat(a, 'loginDays', a.loginDays, true), 2500);
+  return { streak: a.loginStreak, reward, gems, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
+}
+// achievements: each one has a cash reward by rarity, collected from the achievements page
+const ACH_GEMS = [0, 5, 7, 10, 12, 15, 15, 20];   // achievements pay 💎 diamonds by rarity (no cash)
+function achClaim(a, id) {
+  const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
+  if (!todo.length) return toast(a, 'ไม่มีรางวัลให้รับ', '🏅', false);
+  let gem = 0;
+  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) gem += ACH_GEMS[ac.r || 1]; }
+  a.achGot = [...got, ...todo]; a.gems = (a.gems || 0) + gem; markMe(a); dirty = true;
+  toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ 💎${gem}`, '💎');
+}
+
+function detach(a) {
+  if (!a.id) return;
+  if (a.trade) tradeClose(a.trade, `${a.name} ออกจากเกม`);
+  if (a.call) endCall(a, 'ออฟไลน์');
+  for (const [id, r] of reqs) if (r.from === a || r.to === a) reqs.delete(id);
+  for (const o of [...orders.values()]) { if (o.cust === a && o.state === 'open') cancelOrder(o, 'ลูกค้าออฟไลน์'); else if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; } }
+  standUp(a);
+  online.delete(a.id);
+  a.ws = null; a.cast = null; a.sd = true; a.afk = false; dirty = true;
+  sendRoster();
+}
+
+// movement: the client simulates, the server checks the step against the same tile map
+function move(a, m) {
+  const x = +m.x, y = +m.y;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  // moves sent before the client saw our last correction are stale: drop them quietly instead of correcting again
+  if ((+m.fx || 0) < (a.fixId || 0)) return;
+  if (a.down) return place(a, a.x, a.y);
+  const t = now(), dt = Math.min(4, (t - a.lastPosT) / 1000);
+  a.lastPosT = t;
+  // budget refills at the player's speed (+35% slack); it can bank ~4 s of walking, so a phone that stalls and then
+  // sends a burst of moves is not pulled back to where it was
+  a.mvb = Math.min(moveCap(a), (a.mvb ?? moveCap(a)) + SPEED * speedOf(a) * Math.max(runMul(a), a.runT > t - 1500 ? D.RUN.mul : 1) * 1.35 * dt);
+  const d = Math.hypot(x - a.x, y - a.y);
+  if (d > a.mvb + 0.05 || !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y))) return place(a, a.x, a.y);
+  a.mvb -= d;
+  if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0)) standUp(a);
+  if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
+  if (a.run && !godLock(a) && !riding(a)) {               // running burns energy; too tired = back to walking
+    a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); a.runT = t;
+    if (a.energy <= D.RUN.minEnergy) { a.run = false; markMe(a); toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหวแล้ว พักหรือกินอะไรก่อน', '🥵', false); }
+  }
+  if (x !== a.x || y !== a.y) { a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; }
+  a.f = clamp(Math.floor(+m.f) || 0, 0, 7);
+  if (a.cast && Math.hypot(a.x - a.cast.x, a.y - a.cast.y) > 1.2) { a.cast = null; markMe(a); toast(a, 'เดินออกมา เก็บเบ็ดแล้ว', '🎣', false); }
+}
+// helicopters fly over buildings and walls, but stay inside the map they are on (same margins as the client)
+function flyClear(x0, y0, x1, y1) {
+  const A = D.areaAt(x0, y0);
+  return !!A && D.areaAt(x1, y1)?.id === A.id && x1 > A.x + .55 && y1 > A.y + .75 && x1 < A.x + A.w - .55 && y1 < A.y + A.h - .35;
+}
+// the step must not cross a wall (sampled); a tiny radius slack absorbs the client's rounding to 2 decimals
+function pathClear(x0, y0, x1, y1) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.2));
+  // the client slides along walls one axis at a time; checking with a smaller radius keeps corner cuts legal
+  for (let i = 1; i <= n; i++) if (D.blocked(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, i === n ? D.RADIUS - 0.04 : D.RADIUS - 0.12)) return false;
+  return D.areaAt(x1, y1)?.id === D.areaAt(x0, y0)?.id;
+}
+
+function onMessage(ws, raw) {
+  let m; try { m = JSON.parse(raw); } catch { return; }
+  if (!m || typeof m !== 'object') return;
+  const a = ws.acct;
+  if (m.t === 'login') { if (!a) login(ws, m); return; }
+  if (!a || a.ws !== ws) return;
+  switch (m.t) {
+    case 'p': return move(a, m);
+    case 'chat': {                          // local chat: only people near you see it (bubble over your head)
+      const text = cleanText(m.text, 120); if (!text) return;
+      if (isAdmin(a) && /^all(\s|$)/i.test(text)) {   // admin: "all <text>" replaces the ticker notice for everyone, "all" alone restores the CBT notice
+        announceText = text.slice(3).trim();
+        broadcast({ t: 'announce', text: announceText }); bugsDirty = true; dirty = true;   // kept across restarts
+        return toast(a, announceText ? 'ตั้งประกาศแถบด้านบนให้ทุกคนแล้ว' : 'กลับไปใช้ประกาศ CBT เดิมแล้ว', '📢');
+      }
+      if (m.ch === 'world') {                 // town-wide chat: everyone reads it in the chat box, no bubble over the head
+        if (!cd(a, 'wchat', 3000)) return;
+        const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };
+        chatLog.push(wm); if (chatLog.length > 40) chatLog.shift();
+        broadcast(wm); return botHear(a, text, true);
+      }
+      if (!cd(a, 'chat', 800)) return;
+      const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now() };
+      const here = areaId(a);
+      let heard = 0;
+      for (const o of online.values()) if (areaId(o) === here && dist(o, a) <= 14) { send(o, msg); if (o !== a) heard++; }
+      const nb = bots().filter(n => n.area === here && dist(n, a) <= 14).length; heard += nb; botHear(a, text, false);
+      if (!heard) toast(a, 'ไม่มีใครอยู่ใกล้พอจะได้ยิน (โทรหาเพื่อนได้ใน 📱)', '💬', false);
+      else if (cd(a, 'chatjoy', 20000, true)) joy(a, 2);
+      return quest(a, 'chat');
+    }
+    case 'act': return act(a, m);
+    case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
+    case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
+
+    case 'achclaim': return achClaim(a, String(m.id || 'all'));
+    case 'minigame': {                      // (mini-games were removed from the game)
+      return;
+      const max = { math: 40, mail: 45, memo: 30 }[m.game]; if (!max) return;
+      if (a.desk >= 0) {                    // students: just something to break the boredom (a little happiness, no money)
+        if (!cd(a, 'minigame', 15000, true)) return;
+        const sc = clamp(Math.floor(+m.score) || 0, 0, max); joy(a, sc >= 10 ? 4 : 2);
+        return toast(a, `🎮 คะแนน ${sc} · หายเบื่อแล้ว ความสุข +${sc >= 10 ? 4 : 2}`, '🎮');
+      }
+      if (a.career !== 'office' || !(a.chair >= 0) || !cd(a, 'minigame', 15000, true)) return;
+      const sc = clamp(Math.floor(+m.score) || 0, 0, max), day = D.dayAt(now());
+      if (a.mgDay !== day) { a.mgDay = day; a.mgPaid = 0; }
+      const bonus = Math.min(300 - a.mgPaid, Math.round(sc * 2 * jobPay(a)));
+      joy(a, sc >= 10 ? 3 : 1);
+      if (bonus > 0) { a.mgPaid += bonus; earn(a, bonus); return toast(a, `🎮 คะแนน ${sc} · โบนัส ${money(bonus)} ความสุข +${sc >= 10 ? 3 : 1}${a.mgPaid >= 300 ? ' (ครบโบนัสวันนี้แล้ว)' : ''}`, '🎮'); }
+      return toast(a, `🎮 คะแนน ${sc} · ความสุขเพิ่มขึ้น (โบนัสเงินวันนี้ครบแล้ว)`, '🎮');
+    }
+    case 'enter': return enterRoom(a, m);
+    case 'exit': return exitRoom(a);
+    case 'use': return useItem(a, m.item);
+    case 'pet.call': {                                     // bring one out (or put it away with an empty id)
+      if (m.id && !(a.pets || []).includes(m.id)) return;
+      a.pet = m.id || ''; markMe(a); sendRoster();
+      return toast(a, a.pet ? `เรียก${D.PETS[a.pet].icon}${D.PETS[a.pet].name}ออกมาแล้ว` : 'เก็บสัตว์เลี้ยงแล้ว', '🐾', false);
+    }
+    case 'rod': {                                          // hold another rod from the bag
+      if (!(a.rods || []).includes(m.id) || a.cast) return;
+      a.rodEq = m.id; markMe(a); return toast(a, `ถือ${D.RODS[m.id].icon}${D.RODS[m.id].name}แล้ว`, '🎣');
+    }
+    case 'rest': {
+      if (a.down) return;
+      if (m.on === false) { if (a.pose === 'rest') { a.pose = null; sendRoster(); markMe(a); } return; }
+      standUp(a); a.pose = 'rest'; markMe(a); sendRoster();
+      return toast(a, 'นั่งพักหลับตา... พลังงานฟื้นเร็วขึ้น 3 เท่า และเลือดค่อยๆ ฟื้น (ถ้าไม่หิว) · เดินเพื่อลุก', '😌');
+    }
+    case 'beg': {                           // beggars can sit down anywhere
+      if (a.down || !need(a, 'beggar')) return;
+      if (m.on === false || a.pose === 'beg') { if (a.pose === 'beg') { standUp(a); markMe(a); toast(a, 'เลิกนั่งขอทานแล้ว', '🥣'); } return; }
+      if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำอะไร...', '😞', false);
+      standUp(a); a.pose = 'beg'; a.seat = null; markMe(a); sendRoster();
+      const m2 = begSpot(a);
+      return toast(a, `นั่งขอทานตรงนี้แล้ว ${m2 >= 1.1 ? '— ทำเลดี คนผ่านเยอะ 👍' : m2 >= 0.9 ? '— คนผ่านพอสมควร' : '— ที่นี่คนผ่านน้อย ลองไปหน้าร้านหรือจัตุรัส'} (เดินเพื่อลุก)`, '🥣');
+    }
+    case 'run': {
+      const on = !!m.on && a.energy > D.RUN.minEnergy;
+      if (m.on && !on) toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false);
+      if (a.run && !on) a.runT = now();        // moves already in flight were sent at running speed
+      a.run = on; return markMe(a);
+    }
+    case 'afk': { const on = !!m.on; if (a.afk !== on) { a.afk = on; sendRoster(); } return; }
+    case 'emo': {                           // an emoji over your head for everyone nearby
+      const e = EMOJIS.includes(m.e) ? m.e : null; if (!e || !cd(a, 'emo', 1500, true)) return;
+      const msg = { t: 'emo', id: a.id, e }, here = areaId(a);
+      for (const o of online.values()) if (areaId(o) === here && dist(o, a) <= 16) send(o, msg);
+      if (a.afk) { a.afk = false; sendRoster(); }
+      return;
+    }
+    case 'look': {                          // hide your job clothes / wear a reward outfit
+      if ('hideJob' in m) a.hideJob = !!m.hideJob;
+      if ('outfit' in m) a.outfit = (a.outfits || []).includes(m.outfit) ? m.outfit : '';
+      markMe(a); return sendRoster();
+    }
+    case 'bug': return bugReport(a, m);
+    case 'unstick': {                         // the client could not walk for a while: drop anything that pins the player, resync the position
+      if (!cd(a, 'unstick', 3000, true)) return;
+      if (a.cast) a.cast = null; if (a.pose && a.pose !== 'jail' && !a.down) standUp(a);
+      if (D.blocked(a.x, a.y)) { const n = standNear(areaId(a), a.x, a.y); if (n) { a.x = n[0]; a.y = n[1]; } }
+      console.log(`[unstick] ${a.name} at ${a.x.toFixed(1)},${a.y.toFixed(1)} ${cleanText(m.why || '', 160)}`);
+      place(a, a.x, a.y); markMe(a); return;
+    }
+    case 'god': return godAct(a, m);
+    case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
+      if (!a.run0 || a.career !== 'beggar' && !allJobs(a)) return;
+      const sec = (now() - a.run0) / 1000; a.run0 = 0; a.runNext = now() + 15000;
+      // plausibility, from how the run is built: at most 30 m/s, at most ~6 pieces of rubbish per 8 m row, one coin per row
+      const n = k => clamp(Math.floor(+m[k] || 0), 0, 9999), cups = n('cups'), cans = n('cans'), bottles = n('bottles'), coins = n('coins'), dist = n('dist'), items = cups + cans + bottles + coins;
+      const why = dist > sec * 31 + 40 ? `ระยะทาง ${dist} ม. เกินกว่าที่วิ่งได้ใน ${Math.round(sec)} วินาที` : items > dist * .8 + 8 ? `เก็บของ ${items} ชิ้น มากเกินกว่าที่มีบนถนน ${dist} ม.` : coins > dist / 8 + 2 ? `เหรียญ ${coins} เหรียญ มากเกินกว่าที่มีบนถนน ${dist} ม.` : '';
+      if (why) { markMe(a); return toast(a, `⚠️ ผลการวิ่งผิดปกติ ไม่ได้รับเงิน: ${why} (ถ้าเล่นปกติแล้วเจอแบบนี้ กด 🐞 แจ้งบัคได้เลย)`, '⚠️', false); }
+      const raw = Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + (BOOST[tier(a, 'beggar')] || 0))), pay = Math.min(400, raw);
+      if (pay > 0) earn(a, pay); addXp(a, Math.min(2, (cups + cans + bottles) / 25)); stat(a, 'trash', cups + cans + bottles); joy(a, 3); markMe(a);
+      if (dist > (a.stats?.runBest || 0)) stat(a, 'runBest', dist, true);
+      return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}${raw > pay ? ` (เต็มเพดาน ฿400 ต่อรอบ จากที่คิดได้ ${money(raw)})` : ''}`, '♻️');
+    }
+    case 'frame': {                         // profile frames: buy one, wear it (or take it off with -1)
+      const f = D.FRAMES[+m.id];
+      if (m.op === 'wear') { if (+m.id === -1) { a.frame = -1; markMe(a); return; } if (!f || !(a.frames || []).includes(f.id) && !(f.locked && isAdmin(a))) return; a.frame = f.id; markMe(a); return toast(a, `ใส่${f.name}แล้ว`, '🖼️'); }
+      if (m.op === 'buy') {
+        if (!f) return; if (f.locked) return toast(a, 'กรอบพิเศษยังล็อกอยู่ เร็วๆ นี้!', '🔒', false);
+        a.frames = a.frames || []; if (a.frames.includes(f.id)) return;
+        if (!pay(a, f.price)) return;
+        a.frames.push(f.id); a.frame = f.id; joy(a, 4); markMe(a); return toast(a, `ได้${f.name}แล้ว! ใส่ให้แล้ว`, '🖼️');
+      }
+      return;
+    }
+    case 'mission': return misAct(a, m);
+    case 'rb': return rbAct(a, m);
+    case 'rbseek': { if (a.career !== 'rider' && !allJobs(a)) return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
+    case 'reset': return resetChar(a, m);
+    case 'resign': return resign(a);
+    case 'paybills': return payBills(a);
+    case 'donate': return donate(a, m);
+
+    case 'ride': {                           // get on / off one of your vehicles
+      const k = String(m.v || '');
+      if (!k || a.ride === k && !m.on) { if (D.VEHICLES[a.ride]?.fly && D.blocked(a.x, a.y)) return toast(a, 'หาที่โล่งลงจอดก่อน 🚁', '🚁', false); a.ride = ''; }
+      else {
+        const v = D.VEHICLES[k]; if (!v || !(a.vehicles || []).includes(k)) return;
+        if (v.license && !hasLic(a, v.license)) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุ! ต่ออายุที่มหาวิทยาลัยก่อนขับ' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
+        a.ride = k;
+      }
+      a.mvb = moveCap(a); markMe(a); return sendRoster();
+    }
+    case 'wear': return wear(a, m);
+    case 'yfarm': return yardFarm(a, m);
+    case 'hplace': {                        // arrange your own furniture: put a piece on a floor of your house, or put it away
+      const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);
+      const k = String(m.k || ''); if (!furnOf(a).includes(k)) return;
+      a.fpos = { ...(a.fpos || {}) };
+      const fd = D.FURNITURE[fbase(k)];
+      if (m.del) {                          // throw away a spare partition piece for half its price back
+        if (!fd?.multi || !a.furniture.includes(k)) return;
+        a.furniture = a.furniture.filter(x => x !== k); delete a.fpos[k]; if (a.ycrops) delete a.ycrops[k]; credit(a, Math.round(fd.price / 2));
+        toast(a, `ขาย${fd.name}คืน ได้ ${money(Math.round(fd.price / 2))}`, '♻️');
+      } else if (m.store) { a.fpos[k] = [0]; if (fd?.tile) { if (a.ycrops) delete a.ycrops[k]; } else toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
+      else {
+        const fl = Math.round(+m.fl) || 1, x = +m.x, y = +m.y;
+        if (fl === YARD_FL) {                 // out in the yard: only on ground that has been unlocked
+          if (!(x >= .7 && x <= D.YARD.w - .7 && y >= 1.5 && y <= D.YARD.h - .8)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
+          if (fd?.tile) {                     // soil tiles sit on the grid, one per cell, and join up with their neighbours
+            const cx = Math.floor(x), cy = Math.round(y) - 1;
+            if (!yardOpen(a, D.yardZone(cx + .5, cy + .5))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
+            if (Object.entries(a.fpos).some(([o, p]) => o !== k && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.tile && Math.floor(p[1]) === cx && Math.round(p[2]) - 1 === cy)) return toast(a, 'ช่องนี้มีแปลงดินแล้ว', '🟫', false);
+            a.fpos[k] = [fl, cx + .5, cy + 1]; markMe(a); wdAt = 0; return;
+          }
+          if (!yardOpen(a, D.yardZone(x, y))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
+        } else if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
+        a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20];
+      }
+      markMe(a); wdAt = 0; return;
+    }
+
+
+    case 'title': { if (!m.id || (a.ach || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
+    case 'order': return placeOrder(a, m);
+    case 'order_take': case 'order_drop': case 'order_deliver': case 'order_cancel': return riderAct(a, m);
+    case 'contact_add': case 'contact_del': case 'contact_pin': case 'call': case 'call_msg': case 'call_end': return phoneAct(a, m);
+    case 'req': return request(a, m);
+    case 'req_ans': return answerReq(a, m);
+    case 'trade_offer': return tradeOffer(a, m);
+    case 'trade_chat': {                    // chatting inside the trade window
+      const tr = a.trade, text = cleanText(m.text, 120); if (!tr || !text || !cd(a, 'tchat', 600, true)) return;
+      for (const p of [tr.a, tr.b]) send(p, { t: 'tchat', name: a.name, mine: p === a, text });
+      return;
+    }
+    case 'pic': {                           // profile photo from the phone's album (already shrunk to a small JPEG by the client)
+      const d = String(m.data || '');
+      if (d && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d) || d.length > 24000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '🖼️', false);
+      if (!cd(a, 'pic', 8000)) return;
+      a.pic = d || ''; markMe(a); sendRoster(); send(a, { t: 'mypic', pic: a.pic });
+      return toast(a, d ? 'เปลี่ยนรูปโปรไฟล์แล้ว' : 'ลบรูปโปรไฟล์แล้ว', '🖼️');
+    }
+    case 'info': {                          // someone's profile: tap a player
+      const bn = botById(+m.id);
+      if (bn) eggMayor(a, bn);
+      if (bn) { const b = bn.bot; return send(a, { t: 'info', id: bn.id, name: bn.name, pic: '', c: bn.c, lv: b.lv, title: b.title?.title || '', tr: b.title?.r || 0, adm: 0, ach: b.title ? [[b.title.title, b.title.r]] : [], worth: b.worth, days: b.days, fishLv: b.fishLv, home: 0, degree: 0, phone: '' }); }
+      const o = playerById(m.id); if (!o || o.npc) return;
+      const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(Boolean).sort((x, y) => y.r - x.r);
+      return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', fr: frameOf(o), c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
+        ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
+        home: o.house >= 0 ? o.house + 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
+    }
+    case 'mail': {                          // letters: reach anyone, online or not
+      const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
+      if (!text || !to) return toast(a, 'ใส่ชื่อผู้รับและข้อความ', '✉️', false);
+      const bm = bots().find(x => x.name === to);
+      if (bm) { if (!cd(a, 'mail', 5000)) return; stat(a, 'mails'); if (Math.random() < .6) setTimeout(() => { if (!a.ws) return; a.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: bm.name, text: pick(['ได้รับจดหมายแล้วนะ ขอบคุณที่ทักมา 😊', 'สวัสดีครับ ไว้เจอกันในเมืองนะ', 'ขอบคุณจ้า ว่างๆ ไปตกปลาด้วยกัน']), t: now(), read: 0 }, ...(a.mail || [])].slice(0, 50); markMe(a); send(a, { t: 'mail', list: a.mail }); toast(a, `📬 จดหมายใหม่จาก ${bm.name}`, '📬'); }, rnd(20, 60) * 1000); send(a, { t: 'mailsent', to: bm.name }); return toast(a, `ส่งข้อความถึง ${bm.name} แล้ว`, '✅'); }
+      const o = [...accounts.values()].find(x => x.name === to);
+      if (!o) return toast(a, `ไม่พบผู้เล่นชื่อ "${to}"`, '✉️', false);
+      if (o === a) return toast(a, 'ส่งจดหมายถึงตัวเองไม่ได้', '✉️', false);
+      if (!cd(a, 'mail', 5000)) return;
+      o.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: a.name, text, t: now(), read: 0 }, ...(o.mail || [])].slice(0, 50);
+      markMe(o); stat(a, 'mails'); dirty = true; send(o, { t: 'mail', list: o.mail });
+      if (o.ws) toast(o, `📬 จดหมายใหม่จาก ${a.name}`, '📬');
+      send(a, { t: 'mailsent', to: o.name });
+      return toast(a, `ส่งข้อความถึง ${o.name} แล้ว`, '✅');
+    }
+    case 'stockhist': { const s = mkt.find(x => x.id === m.id); if (s) send(a, { t: 'stockhist', id: s.id, i: stockI, c: s.hist }); return; }
+    case 'mailget': return send(a, { t: 'mail', list: a.mail || [] });
+    case 'mailread': { let ch = false; for (const x of a.mail || []) if (!x.read) { x.read = 1; ch = true; } if (ch) markMe(a); return; }
+    case 'maildel': { a.mail = (a.mail || []).filter(x => x.id !== m.id); markMe(a); return send(a, { t: 'mail', list: a.mail }); }
+    case 'trade_confirm': return tradeConfirm(a);
+    case 'trade_cancel': if (a.trade) tradeClose(a.trade, `${a.name} ยกเลิกการแลกเปลี่ยน`); return;
+    case 'quest_reroll': {
+      const err = Q.reroll(a, Math.floor(+m.i));
+      if (err) return toast(a, err, '📜', false);
+      markMe(a); return toast(a, 'เปลี่ยนเควสต์แล้ว', '📜');
+    }
+  }
+}
+
+const EMOJIS = ['😀', '😂', '😍', '😎', '😭', '😡', '👍', '👋', '🙏', '❤️', '🎉', '💤', '❓', '🤔', '😱', '🔥'];
+
+// ------------------------------------------------------------------ bug reports (kept with the saves; admins read them in god mode)
+let bugs = [], bugsDirty = false;
+function bugReport(a, m) {
+  const text = cleanText(m.text, 600); if (text.length < 5) return toast(a, 'เขียนรายละเอียดอีกนิด (อย่างน้อย 5 ตัวอักษร)', '🐞', false);
+  if (!cd(a, 'bug', 60000)) return;
+  const area = D.areaAt(a.x, a.y);
+  bugs.push({ t: now(), by: a.name, login: a.login, text, where: `${area?.name || area?.label || '?'} (${a.x.toFixed(1)}, ${a.y.toFixed(1)})`, ua: cleanText(m.ua, 160), st: cleanText(m.st, 300), build: BUILD });
+  if (bugs.length > 300) bugs = bugs.slice(-300);
+  bugsDirty = true; dirty = true;
+  console.log(`[bug] ${a.name}: ${text}`);
+  for (const o of online.values()) if (isAdmin(o) && o !== a) toast(o, `🐞 แจ้งบัคใหม่จาก ${a.name}`, '🐞');
+  toast(a, 'ส่งรายงานบัคแล้ว ขอบคุณมากที่ช่วยกันทำให้เกมดีขึ้น 🙏', '🐞');
+}
+
+// ------------------------------------------------------------------ god mode (admins only)
+function godAct(a, m) {
+  if (!isAdmin(a)) return;
+  a.god = a.god || {};
+  if (m.op === 'nocd') { a.god.nocd = !a.god.nocd; if (a.god.nocd) a.cd = {}; toast(a, a.god.nocd ? 'God mode: ไม่มีคูลดาวน์' : 'ปิด: ไม่มีคูลดาวน์', '⚡'); }
+  else if (m.op === 'lock') { a.god.lock = !a.god.lock; toast(a, a.god.lock ? 'God mode: ล็อกสเตตัสเต็ม (ไม่ป่วย/ไม่หมดสติ)' : 'ปิด: ล็อกสเตตัส', '🛡️'); }
+  else if (m.op === 'fill') {
+    a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
+    for (const d of [...(a.dz || [])]) cure(a, d);
+    if (a.down) revive(a, 100);
+    toast(a, 'สเตตัสเต็มแล้ว', '💯');
+  } else if (m.op === 'cloak') { a.god.cloak = !a.god.cloak; markMe(a); sendRoster(); toast(a, a.god.cloak ? 'สวมชุดคลุมแอดมิน + ออร่า' : 'ถอดชุดคลุมแอดมิน', '🌑'); }
+  else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
+  else if (m.op === 'addmoney') { const v = Math.floor(+m.v); if (!Number.isSafeInteger(v) || v <= 0 || a.money + v > Number.MAX_SAFE_INTEGER) return toast(a, 'ใส่จำนวนเงินให้ถูกต้อง', '💰', false); a.money += v; toast(a, `เพิ่มเงิน ${money(v)} แล้ว`, '💰'); }
+  else if (m.op === 'alljobs') { a.god.alljobs = a.god.alljobs === false; ordersChanged(); toast(a, a.god.alljobs === false ? 'ปิดแล้ว: ทำได้เฉพาะงานของอาชีพตัวเอง' : 'เปิดแล้ว: ทำงานได้ทุกอาชีพ', '💼'); }
+  else if (m.op === 'notitle') { a.god.notitle = !a.god.notitle; sendRoster(); toast(a, a.god.notitle ? 'ซ่อนฉายานายกเทศมนตรีแล้ว (ใช้ฉายาของตัวเองแทน)' : 'แสดงฉายานายกเทศมนตรีแล้ว', '🏅'); }
+  else if (m.op === 'rename') {
+    const nm = String(m.name || '').replace(/[\u0000-\u001f<>]/g, '').trim();
+    if (nm.length < 2 || nm.length > 16) return toast(a, 'ชื่อต้องยาว 2–16 ตัวอักษร', '✏️', false);
+    if ([...accounts.values()].some(o => o !== a && String(o.name).toLowerCase() === nm.toLowerCase())) return toast(a, 'ชื่อนี้มีคนใช้แล้ว', '✏️', false);
+    a.name = nm; a.god.renamed = true; a.sd = true; sendRoster(); toast(a, `เปลี่ยนชื่อเป็น "${nm}" แล้ว`, '✏️');
+  }
+  else if (m.op === 'speed') { a.god.speed = clamp(+m.v || 1, 1, 5); a.mvb = moveCap(a); }
+  else if (m.op === 'warp') { a.god.warp = !a.god.warp; toast(a, a.god.warp ? 'วาร์ป: เปิดแผนที่แล้วแตะจุดที่ต้องการ' : 'ปิดวาร์ป', '✨'); }
+  else if (m.op === 'warpto') {
+    const x = +m.x, y = +m.y; if (!a.god.warp || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const ar = D.areaAt(x, y); if (!ar || D.blocked(x, y)) return toast(a, 'วาร์ปไปตรงนั้นไม่ได้ (ติดสิ่งกีดขวาง)', '✨', false);
+    if (a.down) return; teleport(a, x, y); sendRoster(); return;
+  }
+  else if (m.op === 'doors') { a.god.doors = !a.god.doors; toast(a, a.god.doors ? 'God mode: เข้าได้ทุกอาคาร แม้ปิดแล้ว' : 'ปิด: เข้าได้ทุกอาคาร', '🚪'); }
+  else if (m.op === 'invis') { a.god.invis = !a.god.invis; toast(a, a.god.invis ? 'God mode: ล่องหน คนอื่นมองไม่เห็นคุณ' : 'ปิดล่องหน คนอื่นเห็นคุณแล้ว', '👻'); }
+  else if (m.op === 'bugs') return send(a, { t: 'bugs', list: bugs.slice(-60).reverse() });
+  else if (m.op === 'bugclear') { bugs = []; bugsDirty = true; dirty = true; return send(a, { t: 'bugs', list: [] }); }
+  markMe(a); sendRoster();
+}
+
+// ------------------------------------------------------------------ start over: wipe the character's progress (keeps ID, PIN, name, phone number, looks)
+function resetChar(a, m) {
+  if (hashPin(String(m.pin ?? ''), a.salt) !== a.hash) return toast(a, 'PIN ไม่ถูกต้อง ยังไม่ได้รีเซ็ต', '🔒', false);
+  if (a.trade) tradeClose(a.trade, `${a.name} รีเซ็ตตัวละคร`);
+  if (a.call) endCall(a, 'วางสาย');
+  standUp(a);
+  for (const o of [...orders.values()]) { if (o.cust === a) cancelOrder(o, 'ลูกค้ารีเซ็ตตัวละคร'); else if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; } }
+  if (a.house >= 0 && houses[a.house] === a) houses[a.house] = null;
+  if (a.rent && tenants[a.rent.idx] === a) tenants[a.rent.idx] = null;
+  if (a.garden && lots[a.garden.lot] === a) lots[a.garden.lot] = null;
+  const keep = { v: VERSION, login: a.login, name: a.name, salt: a.salt, hash: a.hash, phone: a.phone, gender: a.gender, avatar: a.avatar, contacts: a.contacts, god: a.god, pic: a.pic, mail: a.mail,
+    look: { hair: 'brown', shirt: a.look?.shirt && D.SHIRTS.includes(a.look.shirt) ? a.look.shirt : 'white', pants: 'gray' } };
+  keep.wardrobe = { hair: ['brown'], shirt: [keep.look.shirt], pants: ['gray'] };
+  byPhone.delete(a.phone);
+  const fresh = hydrate(keep);
+  for (const k of SAVE_KEYS) a[k] = fresh[k];
+  byPhone.set(a.phone, a);
+  a.cd = {}; a.office = null; a.doc = null;
+  Q.ensure(a);
+  place(a, D.SPAWN.x, D.SPAWN.y, true); markMe(a); sendRoster(); wdAt = 0; dirty = true; a.sd = true;
+  send(a, { t: 'reset' });
+  toast(a, 'รีเซ็ตตัวละครแล้ว เริ่มต้นชีวิตใหม่ในเมือง! 🌱', '🌱');
+}
+
+// ------------------------------------------------------------------ simulation
+let lastTick = now(), wdAt = 0, saveAt = 0, slowAt = 0, marketAt = 0, lastHour = hourNow();
+function tick() {
+  stockTick();
+  { let ch = false; for (const a of online.values()) { const v = castPub(a); if (v !== (a._fc || 0)) { a._fc = v; ch = true; } } if (ch) sendRoster(); }
+  const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;
+  const h = hourNow();
+
+  // events
+  if (event && t > event.until) { event = null; feed('🌤️ เหตุการณ์พิเศษจบลงแล้ว'); wdAt = 0; }
+  if (!event && t > nextEventAt) {
+    const e = D.EVENTS[rint(0, D.EVENTS.length - 1)];
+    event = { ...e, until: t + rnd(150, 240) * 1000 };
+    nextEventAt = event.until + rnd(150, 300) * 1000;
+    feed(e.text); wdAt = 0;
+  }
+  // market recovery + wholesale refill
+  for (const k in market) {
+    const mk = market[k];
+    mk.mult += (mk.target - mk.mult) * 0.0012 * dt * 10;
+    const it = D.ITEMS[k];
+    if (it.wholesale && stock[k] < it.stock) stock[k] = Math.min(it.stock, stock[k] + dt / it.refill);
+  }
+  if (t > marketAt) { marketAt = t + 45000; for (const k in market) market[k].target = clamp(market[k].target + rnd(-0.08, 0.08) + (1 - market[k].target) * 0.2, 0.8, 1.25); }
+
+  // closing time: buildings throw everybody out (houses and the hospital never close)
+  const crossed = (x) => lastHour < x && h >= x || (lastHour > h && (x > lastHour || x <= h));
+  for (const [kind, [open, close]] of Object.entries(D.HOURS)) if (close < 24 && crossed(close)) {
+    const room = D.ROOMS.find(r => r.rk === kind);
+    if (room) for (const a of online.values()) if (D.roomAt(a.x, a.y) === room && !(isAdmin(a) && a.god?.doors)) { teleport(a, room.outside.x, room.outside.y); toast(a, `${room.label}ปิดทำการแล้ว (${hhmm(close)}) เปิดอีกครั้ง ${hhmm(open)}`, '🔒'); }
+  }
+  if (crossed(D.SHIFT.end)) feed('🏢 17:00 หมดเวลางานปกติ พนักงานที่ยังส่งเอกสารต่อได้ค่าโอที x1.25 ถึง 21:00');
+  if (crossed(D.SHIFT.start - 0.5)) for (const a of online.values()) if (a.career === 'office') toast(a, 'อีก 30 นาทีเข้างาน (08:00) ไปรับงานส่งเอกสารที่บริษัทให้ทัน', '⏰');
+  lastHour = h;
+
+  const slow = t > slowAt; if (slow) slowAt = t + 1000;
+  const flu = ev('flu');
+  for (const a of online.values()) {
+    const indoors = !!D.roomAt(a.x, a.y);
+    if (a.mis) misTick(a, t, dt);
+    if (a.cook) cookTick(a, t, dt);
+    if (a.auc) aucTick(a, t);
+    if (a.career === 'rider' || a.rival) rivalTick(a, t);
+    if (godLock(a)) {   // god mode: locked stats
+      a.energy = a.hunger = a.health = a.happy = 100; a.awake = 0; a.lowFood = a.starve = a.wet = 0;
+      if ((a.dz || []).length) { a.dz = []; sendRoster(); }
+      if (a.down) { a.down = null; sendRoster(); }
+      a.craving = null; a.utilOff = false;
+    }
+    // ---- energy, hunger, health
+    const restMul = a.pose === 'rest' ? 3 : a.pose === 'seat' ? 2 : a.pose === 'bed' ? 2 : 1;
+    if (a.pose !== 'chair' && a.pose !== 'study') a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt);
+    a.hunger = Math.max(0, a.hunger - 0.045 * dzProd(a, 'hunger') * (flu ? 1.3 : 1) * (a.down ? 0.2 : 1) * dt);
+    if (!a.down) {
+      if (a.hunger < 15) { a.lowFood = (a.lowFood || 0) + dt; if (a.lowFood > 60) a.health -= 0.08 * dt; } else a.lowFood = 0;
+      if (a.hunger <= 0) a.health -= 0.25 * dt;
+      else if (a.hunger > 60 && a.health < 100 && !(a.dz || []).length) a.health = Math.min(100, a.health + 0.05 * dt);
+      // sitting down to rest heals (slowly while sick, not at all while starving)
+      if ((a.pose === 'rest' || a.pose === 'seat') && a.hunger > 25 && a.health < 100) a.health = Math.min(100, a.health + ((a.dz || []).length ? 0.1 : 0.5) * dt);
+      for (const d of a.dz || []) a.health -= (DZ[d].drain || 0) * (flu && (d === 'flu' || d === 'cold') ? 2.5 : 1) * dt;
+      a.health = Math.max(0, a.health);
+    }
+    // ---- sleepiness
+    if (a.pose === 'rest' || a.pose === 'bed') { a.awake = Math.max(0, (a.awake || 0) - 4 * dt); if (a.awake === 0 && (a.dz || []).some(d => d === 'insomnia' || d === 'exhaust') && a.pose === 'rest') sleepWell(a); }
+    else a.awake = (a.awake || 0) + dt;
+    if (slow) moodTick(a, t, indoors);
+    if (slow && !isAdmin(a)) {               // beggars: out of poverty past ฿2,000
+      if (a.career === 'beggar' && a.money + (a.bank || 0) > 2000) { a.career = 'none'; a.pose === 'beg' && standUp(a); markMe(a); sendRoster(); toast(a, '🎉 มีเงินเกิน ฿2,000 แล้ว! พ้นจากการเป็นขอทาน ไปสมัครงานใหม่ได้เลย', '🎉'); feed(`🎉 ${a.name} พ้นจากการเป็นขอทานแล้ว!`); }
+    }
+    if (slow && !a.down) {
+      // ---- ways to get sick (often enough that doctors have work)
+      if (a.awake > 40 * 60) infect(a, 'insomnia', 0.02);
+      if (ev('rain') && !indoors) { a.wet = (a.wet || 0) + 1; if (a.wet > 40) infect(a, 'cold', 0.01); } else a.wet = Math.max(0, (a.wet || 0) - 2);
+      if (flu) { infect(a, 'flu', indoors ? 0.002 : 0.004); infect(a, 'cold', 0.002); }
+      if (!indoors) infect(a, 'cold', 0.0007);
+      if (a.hunger <= 0) { a.starve = (a.starve || 0) + 1; if (a.starve > 60) infect(a, 'malnut'); } else a.starve = 0;
+      if (a.hunger >= 80) cure(a, 'malnut');
+      // contagion: standing next to someone with a cold or the flu
+      if ((a.dz || []).some(d => d === 'cold' || d === 'flu')) for (const o of online.values()) if (o !== a && areaId(o) === areaId(a) && dist(o, a) < 2.5) infect(o, a.dz.includes('flu') ? 'flu' : 'cold', 0.01);
+      if (a.career === 'office') officeTick(a, t, h, 1);
+      if (a.desk >= 0) studyTick(a, h, 1);
+      if (a.call?.payer) callBill(a);
+      // (leaving begging is handled with the ฿2,000 rule above)
+      if ((a.licenses || []).includes('driving') && a.licExp?.driving) {
+        const left = a.licExp.driving - t;
+        if (left < 0 && !a.licWarned2) { a.licWarned2 = true; toast(a, 'ใบขับขี่หมดอายุแล้ว! ต่ออายุได้ที่มหาวิทยาลัย (ไรเดอร์รับออเดอร์ไม่ได้จนกว่าจะต่อ)', '🪪', false); }
+        else if (left > 0 && left < LICENSE_YEAR / 12 && !a.licWarned) { a.licWarned = true; toast(a, 'ใบขับขี่ใกล้หมดอายุ (เหลือไม่ถึง 1 เดือนในเกม) ต่ออายุได้ที่มหาวิทยาลัย', '🪪'); }
+      }
+    }
+    // ---- knocked out
+    if (!a.down && a.health <= 0) knockOut(a);
+    else if (a.down) {
+      if (a.down.kind === 'veg') {
+        a.health = Math.min(100, a.health + 0.12 * dt);
+        if (a.health >= 15) revive(a, 15);
+      } else if (a.down.kind === 'hosp') {
+        if (t > (a.down.until || a.down.t + 60000)) {
+          // the staff patch you up properly: illnesses treated, a decent amount of health back; free for new / broke players
+          const fee = a.down.free ? 0 : Math.min(600, Math.round(a.money * 0.1)); a.money -= fee;
+          a.dz = []; a.immune = a.immune || {}; for (const k of Object.keys(DZ)) a.immune[k] = now() + 10 * 60000;
+          revive(a, 70); sendRoster(); toast(a, `🏥 ฟื้นแล้ว! เจ้าหน้าที่รักษาโรคให้หายหมด (กันป่วยซ้ำ 10 นาที) · ${fee ? `ค่ารักษา ${money(fee)}` : 'รักษาฟรี 💚'}`, '🏥');
+        }
+      }
+    }
+    if (a.cast) {
+      if (a.cast.state === 'wait' && t >= a.cast.bite) { a.cast.state = 'bite'; a.cast.expire = t + a.cast.win + 300; send(a, { t: 'bite', win: a.cast.win }); markMe(a); }
+      else if (a.cast.state === 'bite' && t > a.cast.expire) { a.cast = null; markMe(a); toast(a, 'ตวัดไม่ทัน ปลาฉกเหยื่อแล้วหนีไป', '💨', false); }
+      else if (a.cast.state === 'fight' && t > a.cast.t0 + 150000) { a.cast = null; markMe(a); }
+    }
+    if (a.trade && (dist(a.trade.a, a.trade.b) > 8 || areaId(a.trade.a) !== areaId(a.trade.b))) tradeClose(a.trade, 'อยู่ไกลกันเกินไป ยกเลิกการแลกเปลี่ยน');
+    if (godLock(a)) a.energy = a.hunger = a.health = a.happy = 100;
+    if (a.meDirty || t % 2000 < TICK) { a.meDirty = false; send(a, meView(a)); }
+  }
+  if (slow) {
+    // garden: tell owners their crops are ready
+    for (const o of lots) if (o && o.garden && o.ws) o.garden.crops.forEach(c => { if (c && !c[2] && c[1] <= t) { c[2] = true; toast(o, `${D.ITEMS[c[0]].name}ในสวนของคุณโตแล้ว! ไปเก็บเกี่ยวได้`, '🌾'); } });
+    // rentals expire
+    tenants.forEach((a, i) => { if (a && a.rent && a.rent.until < t) { tenants[i] = null; a.rent = null; a.sd = true; if (a.ws) { toast(a, 'สัญญาเช่าบ้านหมดแล้ว ต่อสัญญาได้ที่หน้าบ้าน', '🔑', false); markMe(a); } wdAt = 0; } });
+    // NPC patients
+    for (let i = 0; i < beds.length; i++) { const b = beds[i]; if (b && b.npc && b.until < t) { beds[i] = null; wdAt = 0; } }
+    if (t > npcPatientAt) { const docs = [...online.values()].some(o => o.career === 'doctor'); npcPatientAt = t + (docs ? rnd(60000, 120000) : rnd(150000, 300000)); spawnPatient(); }
+    // food delivery
+    for (const o of [...orders.values()]) {
+      if (o.state === 'open' && !o.npc && t - o.t > (ridersOnline().length ? 90000 : 60000)) finishOrder(o, null);
+      else if (o.state === 'open' && o.npc && t - o.t > 240000) { orders.delete(o.id); custNpcDel(o); ordersChanged(); }
+      else if (o.state !== 'open' && o.takenAt && t - o.takenAt > 360000) { const r = o.rider; o.state = 'open'; o.rider = null; o.riderName = ''; o.takenAt = 0; if (r) toast(r, `ส่งออเดอร์ของ ${o.custName} ช้าเกินไป ออเดอร์ถูกส่งต่อให้คนอื่น`, '⌛', false); ordersChanged(); }
+    }
+    if (t > npcOrderAt) {
+      npcOrderAt = t + D.RIDER.npcEvery * 1000 / (ev('hungry') ? 1.5 : 1);
+      const rs = ridersOnline().length;
+      if (rs && buildingOpen('restaurant') && [...orders.values()].filter(o => o.npc && o.state === 'open').length < 2 + rs) spawnNpcOrder();
+    }
+    for (const a of online.values()) if (a.stats) { const w = Math.round(worth(a)); if (w >= 100000 && !(a.ach || []).includes('gen2')) stat(a, 'worth', w, true); }
+  }
+  for (const [id, r] of reqs) if (t > r.exp) { reqs.delete(id); toast(r.from, r.kind === 'call' ? `${r.to.name} ไม่รับสาย` : `${r.to.name} ไม่ตอบรับ`, '⌛', false); }
+  // bank interest
+  if (slow && t % 30000 < 1000) for (const a of online.values()) if (a.bank > 0 || a.loan > 0) { accrue(a); markMe(a); }
+
+  // positions
+  const ps = [];
+  for (const a of online.values()) if (a.moved) { a.moved = false; ps.push([a.id, +a.x.toFixed(2), +a.y.toFixed(2), a.f]); }
+    if (online.size) { botTick(t); npcTick(dt, ps); }
+  if (ps.length) {
+    const hid = new Set([...online.values()].filter(hidden).map(a => a.id));
+    if (!hid.size) broadcast({ t: 'ps', p: ps });
+    else { const pub = JSON.stringify({ t: 'ps', p: ps.filter(q => !hid.has(q[0])) }); for (const o of online.values()) if (o.ws.readyState === 1) o.ws.send(hid.has(o.id) ? JSON.stringify({ t: 'ps', p: ps.filter(q => !hid.has(q[0]) || q[0] === o.id) }) : pub); }
+  }
+
+  if (t > wdAt) { wdAt = t + 1000; broadcast(worldView()); }
+  if (t > saveAt) { saveAt = t + 15000; save(); }
+}
+
+// ------------------------------------------------------------------ http
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp4': 'video/mp4', '.jpg': 'image/jpeg' };
+const server = http.createServer((req, res) => {
+  const url = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
+  if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town
+  const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
+  if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
+  if (path.extname(file) === '.mp4') {            // video: streamed with Range support (Safari/iOS refuse to play video without it)
+    return fs.stat(file, (err, st) => {
+      if (err || !st.isFile()) { res.writeHead(404); return res.end('not found'); }
+      const h = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400' };
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (!m) { res.writeHead(200, { ...h, 'Content-Length': st.size }); return fs.createReadStream(file).pipe(res); }
+      let a = m[1] === '' ? Math.max(0, st.size - +m[2]) : +m[1], b = m[1] === '' || m[2] === '' ? st.size - 1 : Math.min(+m[2], st.size - 1);
+      if (a > b || a >= st.size) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
+      res.writeHead(206, { ...h, 'Content-Range': `bytes ${a}-${b}/${st.size}`, 'Content-Length': b - a + 1 });
+      fs.createReadStream(file, { start: a, end: b }).pipe(res);
+    });
+  }
+  fs.readFile(file, (err, buf) => {
+    if (err) { res.writeHead(404); return res.end('not found'); }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.end(buf);
+  });
+});
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 32768 });
+wss.on('connection', (ws, req) => {
+  ws.ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  let count = 0, winStart = now();
+  ws.on('message', raw => {
+    const t = now();
+    if (t - winStart > 1000) { winStart = t; count = 0; }
+    if (++count > 60) return;
+    const str = raw.toString();
+    if (str.length > 4096 && !str.startsWith('{"t":"pic"')) return;   // only a profile photo may be large
+    onMessage(ws, str);
+  });
+  ws.on('close', () => { if (ws.acct && ws.acct.ws === ws) detach(ws.acct); });
+  ws.on('error', () => {});
+  const ka = setInterval(() => { if (ws.readyState === 1) ws.ping(); }, 25000);
+  ws.on('close', () => clearInterval(ka));
+});
+
+const SELF_URL = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL;
+if (SELF_URL) {
+  setInterval(() => { fetch(SELF_URL.replace(/\/$/, '') + '/healthz').catch(() => {}); }, 9 * 60 * 1000);
+  console.log('keep-alive ping enabled for', SELF_URL);
+}
+
+let closing = false;
+async function shutdown() {
+  if (closing) return; closing = true;
+  setTimeout(() => process.exit(0), 5000).unref();
+  await save(true); await store.close(); process.exit(0);
+}
+process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
+
+async function main() {
+  await store.init();
+  await load();
+  for (let i = Math.min(botCap, rint(3, 6)); i > 0; i--) botJoin(true);   // only as many as are still left
+  setInterval(tick, TICK);
+  server.listen(PORT, () => console.log(`Life Town running on http://localhost:${PORT}`));
+}
+if (require.main === module) main().catch(e => { console.error('fatal:', e); process.exit(1); });
+module.exports = { server };

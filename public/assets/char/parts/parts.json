@@ -1,0 +1,71 @@
+{
+ "parts": {
+  "head": {
+   "file": "head.png",
+   "size": [
+    22,
+    29
+   ],
+   "pivot": [
+    11,
+    29
+   ]
+  },
+  "torso": {
+   "file": "torso.png",
+   "size": [
+    27,
+    32
+   ],
+   "pivot": [
+    13,
+    0
+   ]
+  },
+  "leg_l": {
+   "file": "leg_l.png",
+   "size": [
+    14,
+    35
+   ],
+   "pivot": [
+    7,
+    0
+   ]
+  },
+  "leg_r": {
+   "file": "leg_r.png",
+   "size": [
+    14,
+    35
+   ],
+   "pivot": [
+    7,
+    0
+   ]
+  },
+  "arm_l": {
+   "file": "arm_l.png",
+   "size": [
+    12,
+    34
+   ],
+   "pivot": [
+    6,
+    0
+   ]
+  },
+  "arm_r": {
+   "file": "arm_r.png",
+   "size": [
+    12,
+    34
+   ],
+   "pivot": [
+    6,
+    0
+   ]
+  }
+ },
+ "source": "tools/build_character_parts.py"
+}
