@@ -9,7 +9,7 @@ const D = require('./data');
 const store = require('./store');
 const Q = require('./quests');
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 0000;
 const PUBLIC = path.join(__dirname, '..', 'public');
 const SPEED = 3.0;                          // tiles / second on foot
 const TICK = 100;
