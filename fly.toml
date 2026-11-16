@@ -1,12 +1,20 @@
-# fly.toml app configuration file generated for sleepxzx on 2026-11-16T19:26:33Z
+# fly.toml app configuration file generated for newlifetownth on 2026-11-16T19:46:44Z
 #
 # See https://docs.fly.io/reference/configuration for information about how to use this file.
 #
 
-app = 'sleepxzx'
+app = 'newlifetownth'
 primary_region = 'sin'
 
 [build]
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
