@@ -345,7 +345,7 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   // 0) new shops, all closed for renovation for now: two pet shops and two gyms (added here so nothing older moves)
   for (const [id, spr, x, front, label, icon, st] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾', 'petshop1'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️'],
     ['pet2', 'b_pet2', 5, 13, 'ร้านสัตว์เลี้ยง สาขา 2', '🐶', 'petshop2'], ['gym2', 'b_gym2', 60, 45, 'โรงยิมมวย', '🥊']]) {
-    const b = B(id, spr, x, front, st ? { label, icon, st, stype: 'petshop', rk: 'petshop', layout: 'petshop', late: 2 } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
+    const b = B(id, spr, x, front, st ? { label, icon, st, stype: 'petshop', rk: 'petshop', layout: id === 'pet2' ? 'petshop2' : 'petshop', late: 2 } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
     for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
     for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
     // a paved doorstep from the door down to the street
@@ -403,7 +403,7 @@ const LAYOUT = {
   toolshop: [['x_toolbox', 2.2, 2.6], ['x_mshelf', 4.3, 2.7], ['x_cashdesk', 7, 2.5], ['x_workbench', 9.6, 2.6], ['f_shelf_c', 11.9, 2.8], ['x_storage', 2.4, 6.4], ['x_seeds', 4.8, 6.0, false], ['x_barrow', 10.8, 6.4], ['x_bucket2', 1.8, 8.7], ['x_jack', 4.0, 8.6], ['x_ghose', 10.4, 8.7], ['x_ladder2', 12.5, 8.7], ['i_lantern', 5, 1.15, false], ['i_clock', 9.4, 1.0, false]],
   restaurant: [['x_plant', 1.6, 2.8], ['x_coffeebar', 3.9, 2.5], ['x_counter', 7, 2.4], ['x_cakecase', 9.9, 2.5], ['x_drinkfridge', 12.1, 2.7], ['x_wclock', 5.4, 0.95, false], ['i_hanging', 12.6, 1.25, false], ['x_cafeset', 3.4, 5.7], ['x_cafeset', 10.6, 5.7], ['x_cafeset', 3.4, 8.6], ['x_cafeset', 10.6, 8.6], ['x_menu', 5.4, 9.15, false], ['x_bell', 7.9, 1.75, false]],
   kitchen: [['f_stove', 6.0, 6.3], ['x_hood', 4.6, 1.45, false], ['x_oven', 2.4, 2.6], ['x_souppot', 4.6, 2.6], ['x_prep', 7.2, 2.5], ['x_sink', 10.3, 2.5], ['x_breadrack', 2.0, 6.4], ['f_bench', 10.5, 6.6], ['x_tray', 10.5, 5.75, false], ['x_freezer', 2.6, 8.7], ['i_rice_sack', 4.4, 8.6], ['x_ice', 10.0, 8.8], ['f_fridge', 12.3, 8.7], ['x_ext', 12.6, 5.0], ['i_clock', 7.4, 1.0, false], ['x_dishrack', 12.0, 1.95, false]],
-  hospital: [['f_reception2', 3.5, 2.5], ['x_medcab', 1.6, 2.7], ['f_window', 6.4, 1.1], ['f_firstaid', 9.2, 1.1, false], ['x_medfridge', 5.6, 2.8], ['x_waitseats', 2.6, 6.2], ['x_waitseats', 2.6, 8.4], ['x_plant', 5.2, 10.7], ['x_wheelchair2', 14.0, 10.6], ['x_iv', 15.0, 6.6], ['x_monitor', 9.75, 3.0], ['x_monitor', 12.25, 3.0], ['x_stretcher', 5.4, 6.8], ['x_xray', 15.0, 3.2], ['x_clock', 4.0, 1.0, false], ['i_bin_blue', 1.6, 10.6, false], ['x_magrack', 1.6, 4.6]],
+  hospital: [['f_reception2', 3.5, 2.5], ['x_medcab', 1.6, 2.7], ['f_window', 6.4, 1.1], ['f_firstaid', 9.2, 1.1, false], ['x_medfridge', 5.6, 2.8], ['x_waitseats', 2.6, 6.2], ['x_waitseats', 2.6, 8.4], ['x_plant', 5.2, 10.7], ['x_wheelchair2', 14.0, 10.6], ['x_iv', 15.0, 6.6], ['x_monitor', 9.75, 3.0], ['x_monitor', 12.25, 3.0], ['x_stretcher', 5.4, 6.8, false], ['x_xray', 15.0, 3.2], ['x_clock', 4.0, 1.0, false], ['i_bin_blue', 1.6, 10.6, false], ['x_magrack', 1.6, 4.6]],
   school: [['x_board', 7, 1.75, false], ['x_tdesk', 7, 2.6], ['f_books', 1.8, 2.6], ['f_bookshelf_wide', 3.8, 2.6], ['x_globe', 10.0, 2.6], ['x_cubby', 12.0, 2.7], ['x_locker', 1.6, 5.4], ['x_locker', 1.6, 7.6], ['x_clock', 11.0, 1.0, false], ['i_calendar', 4.8, 1.05, false], ['x_plant', 12.6, 8.8], ['i_backpack', 7, 8.6, false]],
   police: [['x_pdesk', 7, 2.4], ['x_lockers', 2.2, 2.6], ['f_filing_grey', 4.2, 2.6], ['x_radio', 9.4, 2.7], ['f_corkboard', 10.4, 1.15, false], ['x_cuffs', 5.4, 1.15, false], ['x_alarm', 12.4, 1.2, false], ['x_pcdesk2', 3.0, 5.6], ['f_bunk', 11.5, 7.4], ['f_bunk2', 9.5, 7.4], ['x_metaldoor', 12.2, 4.6], ['x_cones', 2.2, 8.8], ['x_barricade', 4.4, 8.8], ['f_plant', 12.6, 8.7], ['x_wclock', 7, 0.95, false]],
   bank: [['x_safe', 1.8, 2.7], ['x_bankcounter', 4.5, 2.4], ['x_bankcounter', 7, 2.4], ['x_bankcounter', 9.5, 2.4], ['x_vault', 12.0, 2.6], ['x_clock', 7, 0.95, false], ['f_rug_blue', 7, 6.6], ['x_waitseats', 2.6, 6.2], ['x_waitseats', 11.4, 6.2], ['x_atm', 1.6, 8.8], ['x_atm', 2.8, 8.8], ['x_plant', 12.4, 8.8], ['x_magrack', 10.6, 8.8], ['f_pictures', 4, 1.05], ['f_pictures', 10, 1.05]],
@@ -419,6 +419,10 @@ const LAYOUT = {
   // pet shop: aquarium and shelves along the back, baskets and a rug on the floor (the live pets are drawn by the client); sales desk top centre
   petshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.6, 1.1], ['f_window', 10.4, 1.1], ['x_wclock', 7, 0.95, false], ['f_aquarium', 1.7, 2.7], ['x_aquarium', 12.3, 2.7],
     ['f_rug_round', 7, 7.2, false], ['x_shelf_s', 1.6, 8.8], ['x_shelf_s', 12.4, 8.8], ['f_plant', 4.6, 9.0], ['f_plant2', 9.4, 9.0],
+    ['i_pricestand', 5.2, 5.2, false], ['i_pricestand', 8.8, 5.2, false]],
+  // pet shop branch 2: its own look (blue rug, aquariums swapped, cat statue and ferns)
+  petshop2: [['x_cashdesk', 7, 2.5], ['f_window', 3.6, 1.1], ['f_window', 10.4, 1.1], ['x_wclock', 7, 0.95, false], ['x_aquarium', 1.7, 2.7], ['f_aquarium', 12.3, 2.7],
+    ['x_fern', 4.2, 2.7], ['x_plant', 9.8, 2.7], ['f_rug_blue', 7, 7.2, false], ['x_mshelf', 1.6, 8.8], ['x_shelf_s', 12.4, 8.8], ['o_catstatue', 4.6, 9.0], ['x_fern', 9.4, 9.0],
     ['i_pricestand', 5.2, 5.2, false], ['i_pricestand', 8.8, 5.2, false]],
   // furniture showroom: sofa corner, bedroom set, dining set and lamps on display; the sales desk is top centre
   furnshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.4, 1.1], ['f_window', 10.6, 1.1], ['x_wclock', 7, 0.95, false], ['f_bookshelf_wide', 1.9, 2.7], ['x_sideboard', 12.2, 2.6],
@@ -613,13 +617,13 @@ const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeM
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
-  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [5, 21], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
-const DOCTOR = { start: 8, end: 20, wage: [125, 140, 158, 178, 200, 225, 255] };   // (old shift pay, kept for reference)
+const DOCTOR = { start: 8, end: 20, wage: [88, 98, 110, 125, 140, 158, 178] };   // (old shift pay, kept for reference)
 // ICU cases: pay per case by level, x (0.6 + 0.6 * score); a new case is ready this long after the last one
-const ICU = { pay: [80, 90, 100, 115, 130, 150, 175], next: 30000, energy: 6,
+const ICU = { pay: [55, 62, 70, 80, 90, 104, 120], next: 75000, energy: 6,
   cpr: { n: 20, bpm: [100, 110, 120] }, surgery: { steps: 5 },
   patients: ['คุณสมชาย (หัวใจหยุดเต้น)', 'ป้าบุญมี (หมดสติกลางตลาด)', 'น้องปิ่น (อุบัติเหตุจักรยาน)', 'ลุงเหม (ไส้ติ่งแตก)', 'พี่ก้อง (ถูกรถชน)', 'คุณยายทองคำ (หัวใจวาย)', 'หนุ่มนักวิ่ง (ล้มหมดสติ)', 'ช่างไฟ (ไฟดูด)'] };   // above office: needs a degree + licence
 // lost-dog cases for police: find the dog before the time runs out; pay = base + perMin x the minutes the search took (x a speed bonus when found early)
@@ -909,7 +913,7 @@ const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนัก�
 const OFFICE_WAGE = [80, 92, 106, 122, 140, 160, 185];          // per game hour seated
 const RIDER = { baseFee: 18, perTile: 0.45, npcEvery: 55, tipMax: 30 };
 // running: faster, costs energy per tile; you stop running when energy gets low
-const RUN = { mul: 1.6, energyPerTile: 0.3, minEnergy: 5 };
+const RUN = { mul: 1.2, energyPerTile: 0.3, minEnergy: 5 };
 const POLICE = { patrolWage: 48, bounty: 300, jailSec: 75, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 4.3, begMax: 5000 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 

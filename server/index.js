@@ -386,7 +386,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -437,6 +437,7 @@ function hydrate(r) {
     if ((a.licenses || []).includes('driving')) a.licExp = { ...(a.licExp || {}), driving: now() + LICENSE_YEAR };
     a.v = 4;
   }
+  if (a.career === 'rider' && !a.riderBike && !(a.vehicles || []).includes('delivery')) { a.vehicles = [...(a.vehicles || []), 'delivery']; a.riderBike = 1; }   // riders already on the job get the company bike too
   if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
   // fixed character names for special accounts (login ID -> character name)
   const RENAME = isAdmin(a) && !a.god?.renamed && String(a.login).toLowerCase() === 'james2324' ? ADMIN_NAME : null;
@@ -492,6 +493,20 @@ function stockTick() {
 }
 const stockView = () => ({ i: stockI, ms: D.STOCK.candleMs, l: mkt.map(s => { const h = s.hist, c = h[h.length - 1][3], p = h[Math.max(0, h.length - 49)][3]; return [s.id, c, +((c / p - 1) * 100).toFixed(2), h.slice(-24).map(x => x[3])]; }) });
 const stockValue = a => Object.entries(a.stocks || {}).reduce((t, [id, [q]]) => t + q * stockPrice(id), 0);
+function bankOp(a, m) {   // deposit / withdraw / borrow / repay: at the bank counter or from the phone
+  accrue(a);
+  let amt = Math.floor(+m.amt) || 0;
+  if (amt <= 0) return toast(a, 'ใส่จำนวนเงินก่อน', '⚠️', false);
+  if (m.a === 'deposit') { amt = Math.min(amt, Math.floor(a.money)); if (amt <= 0) return toast(a, 'ไม่มีเงินสดให้ฝาก', '💸', false); a.money -= amt; a.bank += amt; toast(a, `ฝากเงิน ${money(amt)}`, '🏦'); }
+  if (m.a === 'withdraw') { amt = Math.min(amt, Math.floor(a.bank)); if (amt <= 0) return toast(a, 'ไม่มีเงินในบัญชี', '💸', false); a.bank -= amt; a.money += amt; toast(a, `ถอนเงิน ${money(amt)}`, '🏦'); }
+  if (m.a === 'borrow') {
+    const room = Math.floor((D.BANK.loanMax - a.loan) / (1 + D.BANK.loanFee)); amt = Math.min(amt, room);
+    if (amt <= 0) return toast(a, `กู้ได้สูงสุด ${money(D.BANK.loanMax)} (รวมค่าธรรมเนียมและดอกเบี้ย) ใช้คืนก่อนนะ`, '🏦', false);
+    a.money += amt; a.loan += Math.ceil(amt * (1 + D.BANK.loanFee)); toast(a, `กู้เงิน ${money(amt)} (ยอดหนี้ ${money(amt * (1 + D.BANK.loanFee))} · ดอกเบี้ย ${D.BANK.loanRate * 100}% ต่อวันเกม ใช้คืนเร็วเสียน้อย)`, '🏦');
+  }
+  if (m.a === 'repay') { amt = Math.min(amt, Math.floor(a.money), Math.ceil(a.loan)); if (amt <= 0) return toast(a, a.loan > 0 ? 'เงินสดไม่พอ' : 'คุณไม่มีหนี้', 'ℹ️', false); a.money -= amt; a.loan -= amt; toast(a, `ชำระหนี้ ${money(amt)}${a.loan <= 0 ? ' — ปลดหนี้แล้ว! 🎉' : ''}`, '🏦'); }
+  a.loan = Math.max(0, a.loan); return markMe(a);
+}
 function stockTrade(a, m) {
   const s = mkt.find(x => x.id === m.id); if (!s) return;
   const p = stockPrice(s.id), q = Math.floor(+m.qty);
@@ -626,7 +641,7 @@ function knockOut(a) {
   a.cast = null; standUp(a);
   if (a.trade) tradeClose(a.trade, `${a.name} หมดสติ`);
   if (a.hunger <= 5) {               // starving: collapse right where you are
-    a.down = { kind: 'veg', t: now() };
+    a.down = { kind: 'veg', t: now(), until: now() + 6000 };
     toast(a, 'คุณหิวจนหมดแรง ล้มลงนอนเป็นผัก... รอสักพักร่างกายจะฟื้นขึ้นมาเอง', '🥬', false);
     feed(`🥬 ${a.name} หิวจนล้มลงข้างทาง`);
   } else {                           // otherwise an ambulance takes you to hospital
@@ -763,6 +778,17 @@ function jobCooldown(a) {
   const mins = D.JOB_COOLDOWN_MIN[Math.min(recent.length, D.JOB_COOLDOWN_MIN.length - 1)];
   return Math.max(0, Math.max(...recent) + mins * 60000 - t);
 }
+// riders get a company delivery bike for free; it goes back to the rider hub when they change job
+function riderBikeGive(a) {
+  if ((a.vehicles || []).includes('delivery')) return;
+  a.vehicles = [...(a.vehicles || []), 'delivery']; a.riderBike = 1;
+  toast(a, '🛵 ศูนย์ไรเดอร์ให้ยืม "มอไซค์ส่งอาหาร" ฟรี 1 คัน! กดปุ่ม 🛵 เพื่อขี่ · ถ้าเปลี่ยนอาชีพ บริษัทจะยึดรถคืน', '🛵');
+}
+function riderBikeTake(a) {
+  if (!a.riderBike) return;
+  a.riderBike = 0; a.vehicles = (a.vehicles || []).filter(x => x !== 'delivery'); if (a.ride === 'delivery') a.ride = '';
+  toast(a, '🛵 ศูนย์ไรเดอร์ยึดรถมอไซค์ส่งอาหารคืนแล้ว (เพราะเปลี่ยนอาชีพ)', '🛵', false);
+}
 function apply(a, career) {
   const c = D.CAREERS[career]; if (!c || career === 'none') return;
   if (a.career === career) return toast(a, `คุณเป็น${c.name}อยู่แล้ว`, 'ℹ️', false);
@@ -773,7 +799,10 @@ function apply(a, career) {
   if (a.career === 'office') { a.xp.office = 0; a.office = null; }
   if (a.career !== 'none' || (a.jobChanges || []).length) a.jobChanges = [...(a.jobChanges || []).filter(x => now() - x < 86400e3), now()];
   else a.jobChanges = [now() - 86400e3 + 1000];             // the very first job does not count against you
-  standUp(a); a.career = career; a.cast = null; markMe(a); sendRoster();
+  if (a.career === 'rider' && career !== 'rider') riderBikeTake(a);
+  standUp(a); a.career = career; a.cast = null;
+  if (career === 'rider') riderBikeGive(a);
+  markMe(a); sendRoster();
   feed(`💼 ${a.name} ได้งานเป็น${c.name}`);
   const tips = {
     office: 'เข้างาน 08:00 (สายได้ไม่เกิน 08:15) นั่งที่โต๊ะทำงานว่างตัวไหนก็ได้ ได้ค่าแรงตามชั่วโมงที่นั่ง เลิก 17:00',
@@ -791,6 +820,7 @@ function resign(a) {
   if (a.career === 'none') return;
   const c = D.CAREERS[a.career];
   if (a.career === 'office') { a.xp.office = 0; a.office = null; }
+  if (a.career === 'rider') riderBikeTake(a);
   standUp(a); a.career = 'none'; a.cast = null; markMe(a); sendRoster();
   for (const o of orders.values()) if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; }
   toast(a, `ลาออกจากงาน${c.name}แล้ว`, '📦');
@@ -1071,20 +1101,7 @@ function act(a, m) {
       return toast(a, T.lic === 'driving' ? 'สอบใบขับขี่ผ่าน! สมัครไรเดอร์ได้แล้ว (ต้องต่ออายุทุกปีในเกม = ทุก 1 วันจริง)' : 'สอบนายสิบตำรวจผ่าน! ไปสมัครเป็นตำรวจได้ที่สถานีตำรวจ', T.lic === 'driving' ? '🪪' : '👮');
     }
     case 'bank.stock': return stockTrade(a, m);
-    case 'bank.deposit': case 'bank.withdraw': case 'bank.borrow': case 'bank.repay': {
-      accrue(a);
-      let amt = Math.floor(+m.amt) || 0;
-      if (amt <= 0) return toast(a, 'ใส่จำนวนเงินก่อน', '⚠️', false);
-      if (m.a === 'deposit') { amt = Math.min(amt, Math.floor(a.money)); if (amt <= 0) return toast(a, 'ไม่มีเงินสดให้ฝาก', '💸', false); a.money -= amt; a.bank += amt; toast(a, `ฝากเงิน ${money(amt)}`, '🏦'); }
-      if (m.a === 'withdraw') { amt = Math.min(amt, Math.floor(a.bank)); if (amt <= 0) return toast(a, 'ไม่มีเงินในบัญชี', '💸', false); a.bank -= amt; a.money += amt; toast(a, `ถอนเงิน ${money(amt)}`, '🏦'); }
-      if (m.a === 'borrow') {
-        const room = Math.floor((D.BANK.loanMax - a.loan) / (1 + D.BANK.loanFee)); amt = Math.min(amt, room);
-        if (amt <= 0) return toast(a, `กู้ได้สูงสุด ${money(D.BANK.loanMax)} (รวมค่าธรรมเนียมและดอกเบี้ย) ใช้คืนก่อนนะ`, '🏦', false);
-        a.money += amt; a.loan += Math.ceil(amt * (1 + D.BANK.loanFee)); toast(a, `กู้เงิน ${money(amt)} (ยอดหนี้ ${money(amt * (1 + D.BANK.loanFee))} · ดอกเบี้ย ${D.BANK.loanRate * 100}% ต่อวันเกม ใช้คืนเร็วเสียน้อย)`, '🏦');
-      }
-      if (m.a === 'repay') { amt = Math.min(amt, Math.floor(a.money), Math.ceil(a.loan)); if (amt <= 0) return toast(a, a.loan > 0 ? 'เงินสดไม่พอ' : 'คุณไม่มีหนี้', 'ℹ️', false); a.money -= amt; a.loan -= amt; toast(a, `ชำระหนี้ ${money(amt)}${a.loan <= 0 ? ' — ปลดหนี้แล้ว! 🎉' : ''}`, '🏦'); }
-      a.loan = Math.max(0, a.loan); return markMe(a);
-    }
+    case 'bank.deposit': case 'bank.withdraw': case 'bank.borrow': case 'bank.repay': return bankOp(a, m);
     // ---------------- university
     case 'school.enroll': {
       const id = m.lic === 'hs' ? 'hs' : 'degree', L = D.LICENSES[id];
@@ -1153,7 +1170,7 @@ function act(a, m) {
       if (m.a === 'revive') {
         if (!pt.down) return toast(a, 'คนไข้รู้สึกตัวดีอยู่แล้ว', 'ℹ️', false);
         const fee = Math.min(400, Math.floor(pt.money)); pt.money -= fee;
-        const got = earn(a, (fee + 200) * boost); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2); stat(a, 'revived');
+        const got = earn(a, (fee + 120) * boost); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2); stat(a, 'revived');
         feed(`💓 หมอ${a.name} ช่วยชีวิต ${pt.name} สำเร็จ`);
         return toast(a, `ช่วยให้ ${pt.name} ฟื้นแล้ว ได้ ${money(got)} · ต่อไปวินิจฉัยโรคที่ป่วยอยู่`, '💓');
       }
@@ -1251,8 +1268,8 @@ function act(a, m) {
       if (!rodOf(a)) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (เริ่ม ${money(D.RODS.bamboo.price)})`, '🎣', false);
       if (a.cast) return;
       if (!spend(a, 8)) return;
-      const bite = now() + rnd(3500, 9500) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
-      a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round(1500 + r.zone * 2500 + 25 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
+      const bite = now() + rnd(2500, 7000) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
+      a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round(2200 + r.zone * 3000 + 30 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
       return;
     }
     case 'pier.reel': case 'pier.hook': {   // strike: too early (only a nibble) scares the fish, inside the bite window hooks it and the fight starts
@@ -1260,9 +1277,9 @@ function act(a, m) {
       if (c.state === 'wait') { c.bite = Math.max(c.bite, now() + 1500); markMe(a); return toast(a, 'ยังไม่ใช่! ทุ่นแค่ไหว รอให้ทุ่นจมก่อนค่อยตวัด', '⏳', false); }
       if (c.state !== 'bite') return;
       const id = legendRoll(a, c) || rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
-      const pow = id ? clamp(.18 + .1 * rar + (it.base >= 1500 ? .05 : 0), .15, .75) : .1;
-      c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((0.8 + rar * 0.8) * 1000);
-      c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(750 + r.zone * 1000), seed: rint(1, 1e9), min: c.min };
+      const pow = id ? clamp(.14 + .085 * rar + (it.base >= 1500 ? .04 : 0), .12, .62) : .1;
+      c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((0.6 + rar * 0.6) * 1000);
+      c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(1100 + r.zone * 1300), seed: rint(1, 1e9), min: c.min };
       markMe(a); return send(a, { t: 'hooked', fight: c.fight });
     }
     case 'pier.land': {                     // the fish was played out and lifted at the right moment
@@ -1399,7 +1416,8 @@ function act(a, m) {
       const v = D.VEHICLES[m.v]; if (!v) return;
       const own = (a.vehicles || []).includes(m.v);
       if (m.a === 'sell') {
-        if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false); const back = Math.round(v.price * .6);
+        if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false);
+        if (m.v === 'delivery' && a.riderBike) return toast(a, 'รถคันนี้เป็นของศูนย์ไรเดอร์ (ยืมใช้) ขายไม่ได้', '🛵', false); const back = Math.round(v.price * .6);
         a.vehicles = a.vehicles.filter(x => x !== m.v); if (a.ride === m.v) a.ride = ''; a.money += back; markMe(a); sendRoster();
         return toast(a, `ขาย${v.name}ให้โชว์รูม ได้ ${money(back)} (60%)`, '💰');
       }
@@ -2740,6 +2758,7 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
 
@@ -2991,6 +3010,16 @@ function godAct(a, m) {
   else if (m.op === 'doors') { a.god.doors = !a.god.doors; toast(a, a.god.doors ? 'God mode: เข้าได้ทุกอาคาร แม้ปิดแล้ว' : 'ปิด: เข้าได้ทุกอาคาร', '🚪'); }
   else if (m.op === 'invis') { a.god.invis = !a.god.invis; toast(a, a.god.invis ? 'God mode: ล่องหน คนอื่นมองไม่เห็นคุณ' : 'ปิดล่องหน คนอื่นเห็นคุณแล้ว', '👻'); }
   else if (m.op === 'bugs') return send(a, { t: 'bugs', list: bugs.slice(-60).reverse() });
+  else if (m.op === 'bugreply') {   // tell the player who reported a bug that it is fixed (a letter in their mailbox)
+    const b = bugs.find(x => x.t === +m.bt && (x.login || '') === (m.login || '')); if (!b) return toast(a, 'ไม่พบรายงานนี้แล้ว', '🐞', false);
+    const o = accounts.get(String(b.login || '').toLowerCase()) || [...accounts.values()].find(x => x.login === b.login || x.name === b.by);
+    if (!o) return toast(a, `ไม่พบผู้เล่น ${b.by}`, '🐞', false);
+    const text = cleanText(m.text, 500) || `🛠️ บัคที่คุณแจ้งมา "${b.text.slice(0, 80)}${b.text.length > 80 ? '…' : ''}" ทีมงานแก้ไขเรียบร้อยแล้วครับ ขอบคุณมากที่ช่วยแจ้งนะครับ 🙏`;
+    o.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: '🛠️ ทีมงาน Life Town', text, t: now(), read: 0 }, ...(o.mail || [])].slice(0, 50);
+    markMe(o); dirty = true; send(o, { t: 'mail', list: o.mail }); if (o.ws) toast(o, '📬 จดหมายใหม่จากทีมงาน: บัคที่คุณแจ้งแก้แล้ว', '📬');
+    b.done = 1; bugsDirty = true;
+    toast(a, `ส่งจดหมายแจ้ง ${o.name} แล้ว`, '✅'); return send(a, { t: 'bugs', list: bugs.slice(-60).reverse() });
+  }
   else if (m.op === 'bugclear') { bugs = []; bugsDirty = true; dirty = true; return send(a, { t: 'bugs', list: [] }); }
   markMe(a); sendRoster();
 }
@@ -3112,8 +3141,7 @@ function tick() {
     if (!a.down && a.health <= 0) knockOut(a);
     else if (a.down) {
       if (a.down.kind === 'veg') {
-        a.health = Math.min(100, a.health + 0.12 * dt);
-        if (a.health >= 15) revive(a, 15);
+        if (t > (a.down.until || a.down.t + 6000)) revive(a, 15);
       } else if (a.down.kind === 'hosp') {
         if (t > (a.down.until || a.down.t + 60000)) {
           // the staff patch you up properly: illnesses treated, a decent amount of health back; free for new / broke players
