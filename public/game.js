@@ -153,7 +153,7 @@ function femOutfitFrame(sheet, step, lk) {
   chCache.set(key, c); return c;
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const OUTFIT_SHEET = { doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
+const OUTFIT_SHEET = { cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -292,6 +292,29 @@ function loginBusy(on) {
   if (on) busyT = setTimeout(() => loginBusy(false), 9000);
 }
 function loginShake() { const f = $('#createBox').classList.contains('hidden') ? $('#loginForm') : $('#createBox'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
+// 🔑 Google sign-in (only when the server has a Google client ID): log in with a Google account linked in the settings
+let gMode = 'login', gReady = null;
+function gLoad(gid) {
+  if (gReady || !gid) return gReady;
+  return gReady = new Promise(ok => { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = () => { try { google.accounts.id.initialize({ client_id: gid, callback: r => gGot(r.credential) }); ok(true); } catch { ok(false); } }; sc.onerror = () => ok(false); document.head.appendChild(sc); });
+}
+function gGot(cred) {
+  if (!cred) return;
+  if (gMode === 'link') { send({ t: 'glink', google: cred }); mgClose(); return; }
+  creds = { google: cred }; $('#loginErr').textContent = ''; loginBusy(true); wantLogin = true; connect();
+}
+function gButton(el, w) { try { google.accounts.id.renderButton(el, { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'th', width: Math.min(300, w || 280) }); } catch { } }
+fetch('api/gcfg').then(r => r.json()).then(j => { if (!j.gid) return; gLoad(j.gid).then(ok => { if (!ok) return; $('#gWrap').classList.remove('hidden'); gMode = 'login'; gButton($('#gBtn'), $('#loginForm').clientWidth - 40); }); }).catch(() => { });
+function gLinkOpen() {
+  if (!G.gid) return toast('ยังไม่เปิดใช้การผูกบัญชี Google', '🔑', false);
+  gLoad(G.gid).then(ok => {
+    if (!ok) return toast('โหลดระบบ Google ไม่ได้ ลองใหม่อีกครั้ง', '🔑', false);
+    gMode = 'link'; closePanel(); mgStop(); $('#mg').classList.remove('hidden');
+    $('#mgBody').innerHTML = `<h2>🔑 ผูกบัญชี Google</h2><div class="sub" style="margin:8px 0 12px">กดปุ่มด้านล่างแล้วเลือกบัญชี Google ของคุณ · ครั้งหน้าที่หน้าเข้าเกม กด "ลงชื่อเข้าใช้ด้วย Google" ได้เลย ไม่ต้องจำ ID/PIN</div><div class="gLinkBtn" id="gLinkBtn"></div>`;
+    gButton($('#gLinkBtn'), 300);
+  });
+}
 $('#loginForm').onsubmit = e => {
   e.preventDefault();
   // the server has the final say: new characters must use English/digits, old Thai-named characters still log in
@@ -328,7 +351,7 @@ const promo = (() => {
   const saved = !!(creds && creds.name && creds.pin), start = $('#startBtn');
   const open = () => { form.classList.add('open'); setTimeout(() => $(saved && $('#inName').value ? '#inPin' : '#inName').focus(), 120); };
   if (saved) { start.textContent = `▶ เล่นต่อ · ${creds.name}`; }
-  start.onclick = () => { if (saved && !form.classList.contains('open')) { loginBusy(true); creds = { name: creds.name, pin: creds.pin }; wantLogin = true; connect(); } else open(); };
+  start.onclick = () => { if (saved && !form.classList.contains('open')) { loginBusy(true); creds = { name: creds.name, pin: creds.pin, tok: creds.tok }; wantLogin = true; connect(); } else open(); };
   $('#otherAcct').onclick = () => { $('#inName').value = ''; $('#inPin').value = ''; open(); };
   $('#promoPhone').onclick = () => { if (matchMedia('(max-width:860px)').matches) return; $('#inName').focus(); };   // desktop: the "enter the city" button in the video focuses the form
   return { open, stop() { v.pause(); v.removeAttribute('src'); v.load(); } };
@@ -352,7 +375,7 @@ const doAct = (st, a, extra = {}) => send({ t: 'act', st, a, ...extra });
 
 function handle(m) {
   switch (m.t) {
-    case 'loginfail': loginBusy(false); loginShake(); promo.open(); $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
+    case 'loginfail': if (creds?.tok || creds?.google) { try { localStorage.removeItem('lt_creds'); } catch { } creds = null; } loginBusy(false); loginShake(); promo.open(); $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
     case 'newchar':     // new ID: pick gender + first shirt once
       loginBusy(false); wantLogin = false; $('#loginForm').classList.add('hidden'); $('#createBox').classList.remove('hidden');
       $('#createName').textContent = 'ยินดีต้อนรับ ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
@@ -360,7 +383,7 @@ function handle(m) {
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
       G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
-      creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop();
+      creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
@@ -386,6 +409,8 @@ function handle(m) {
     }
     case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { if (Math.hypot(x - s.x, y - s.y) > 4) { s.rx = x; s.ry = y; } s.x = x; s.y = y; s.f = f; } } break;
     case 'whl': { const o = P.get(m.id); if (o) { o.whlT = performance.now() + 1400; if (Math.hypot(o.x - (P.get(myId)?.x || 0), o.y - (P.get(myId)?.y || 0)) < 12) FX.play('rev'); } break; }
+    case 'jg': jgOpen(m.k, m.seed); break;
+    case 'caught': FX.play('levelup'); { const s0 = P.get(myId); if (s0) { FX.burst(s0.x, s0.y - .6, '#ff4a4a', 18); FX.float(s0.x, s0.y - 1, '🚓 จับได้!', '#ffe14d', .6); } } break;
     case 'taxi': {
       const t0 = performance.now();
       if (m.phase === 'come') { taxiFx = { k: 'taxi', dx: 1, dy: 0, x: m.x - 5, y: m.y + .2, fx: m.x - 5, tx: m.x - 1.3, t0, dur: m.wait - 900 }; FX.play('notice'); setTimeout(() => FX.play('pop'), m.wait - 1000); }
@@ -574,7 +599,7 @@ function paintDogChip() {
   if (!q) return c.classList.add('hidden');
   const left = Math.max(0, Math.ceil((q.until - Date.now() - clockOff) / 1000));
   const tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  c.classList.remove('hidden'); c.classList.toggle('late', left < 30); c.textContent = `🐕 ตามหา น้อง${q.name} · ${tm}`;
+  c.classList.remove('hidden'); c.classList.toggle('late', left < 30); c.textContent = q.kind === 'thief' ? `🚨 จับโจร ${q.name} · ${tm}` : `🐕 ตามหา น้อง${q.name} · ${tm}`;
   document.querySelectorAll('.dogcd').forEach(el => { el.textContent = tm; });
 }
 setInterval(paintDogChip, 500);
@@ -645,7 +670,7 @@ function paintHud() {
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
-  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.add('hidden'); if (!$('#mg').classList.contains('hidden')) mgClose();   // (mini-games were removed)
+  const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.add('hidden'); if (!$('#mg').classList.contains('hidden') && !JG.cur && !$('#mgBody .mgEnd') && !$('#gLinkBtn')) mgClose();   // (mini-games were removed)
   $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
   $('#begBtn').classList.toggle('hidden', !job('beggar'));
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
@@ -1236,6 +1261,7 @@ function draw(t) {
   }   // helicopters fly over the roofs
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3) && !roomOf(p.x, p.y)) ents.push([q.y + .3, 6, q]); }   // pets wait outside: none indoors
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
+  { const q = thiefNpc(); if (q && vis(q.rx, q.ry, 3)) ents.push([q.ry + .3, 4, q]); }
   misEnts(ents, vis);
   rivalEnts(ents, vis);
   if (me?.cook && myRoom?.rk === 'kitchen') ents.push([1e8, 7, { k: 'cook' }]);
@@ -1804,12 +1830,23 @@ function misMini(g, A, mapId) {
 let lostQ = null;
 function lostDog() {
   const c = me?.dogq, m = P.get(myId);
-  if (!c || !m || areaOf(m.x, m.y)?.id !== 'town') { lostQ = null; return null; }
+  if (!c || c.kind === 'thief' || !m || areaOf(m.x, m.y)?.id !== 'town') { lostQ = null; return null; }
   if (!lostQ || lostQ.key !== c.t0) lostQ = { key: c.t0, id: c.dog, x: c.x, y: c.y, view: 'down', flip: false, phase: 0, moving: false, hop: 0, big: 1, hopDur: 420, idleAt: performance.now() + 1500, shop: 0, lost: 1, barkAt: 0 };
   const now0 = performance.now(), d = Math.hypot(m.rx - c.x, m.ry - c.y);
   if (now0 > lostQ.idleAt) { lostQ.idleAt = now0 + 1800 + Math.random() * 2500; petPlay(lostQ, false); lostQ.big = .8 + Math.random() * .5; lostQ.flip = Math.random() < .5; }
   if (now0 > lostQ.barkAt && d < 16) { lostQ.barkAt = now0 + 2800 + Math.random() * 2500; FX.play('pet', [PET_VOICE[c.dog] || 'dog', Math.max(.12, 1 - d / 16)]); if (d < 9) FX.float(c.x, c.y - 1, '🐕', '#fff', .45); }
   return d < 11 ? lostQ : null;                    // out of sight until you are close
+}
+// the thief on a police case: a masked figure with a red name, pacing where he was seen (only the officer on the case sees him)
+let thiefQ = null;
+function thiefNpc() {
+  const c = me?.dogq, m = P.get(myId);
+  if (!c || c.kind !== 'thief' || !m || areaOf(m.x, m.y)?.id !== 'town') { thiefQ = null; return null; }
+  if (!thiefQ || thiefQ.key !== c.t0) thiefQ = { key: c.t0, id: 'thief', npc: 1, red: 1, of: 'thief', g: 'm', name: c.name, lk: { hair: 'black', shirt: 'black', pants: 'black' }, dz: [], x: c.x, y: c.y, rx: c.x, ry: c.y, f: 6 };
+  const t = performance.now() / 1000, d = Math.hypot(m.rx - c.x, m.ry - c.y), nx = c.x + Math.sin(t * .7) * .9;
+  thiefQ.f = Math.cos(t * .7) > 0 ? 2 : 6; thiefQ.x = nx; thiefQ.rx = nx;
+  if (d < 6 && !thiefQ.seen) { thiefQ.seen = 1; FX.float(c.x, c.y - 1.4, '😱', '#fff', .55); FX.play('notice'); }
+  return d < 30 ? thiefQ : null;
 }
 function petPlay(q, love) {
   q.hop = performance.now(); q.big = love ? 1.7 : 1; q.hopDur = love ? 520 : 420;
@@ -2263,6 +2300,7 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะคะ', yes: 'อยู่ในโรงพยาบาลช่วงเวรได้เงินเดือนทุกชั่วโมงนะคะ' },
   rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', lk: { hair: 'black' }, hi: 'มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน', yes: 'ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
   police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: 'เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ', yes: 'ถ้ามีแจ้งเหตุ 191 รีบไปนะ' },
+  cashier:  { name: 'พี่แนน (ผู้จัดการร้าน)', short: 'พี่แนน', g: 'f', lk: { hair: 'brown', shirt: 'green' }, hi: 'ร้านเรารับพนักงานแคชเชียร์อยู่นะ ไม่ต้องมีวุฒิ สนใจไหม?', yes: 'ถึงกะแล้ว! ไปยืนแคชเชียร์ คิดเงินทอนให้ถูกนะ' },
   beggar:   { name: 'ลุงจุก (ศาลาประชาคม)', short: 'ลุงจุก', lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: 'ไม่มีงานทำก็มาเป็นขอทานกับลุงได้นะ วิ่งเก็บขยะที่ถังขยะ หรือนั่งขอทานก็ได้ เก็บให้เกิน 2,000 บาทก็พ้นแล้ว', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะ' },
 };
 let STAFF = [], STAFF_AT = {};
@@ -2352,10 +2390,10 @@ initNearBtns();
 $('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .8 : .46); p.tagT = t; }
-  const icon = p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
+  const icon = p.red ? '🦹' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
-  else sign(label, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
+  else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
   if (p.title) {
     ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58);
@@ -2483,6 +2521,7 @@ function drawMini() {
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
   misMini(g, A, mapId);
+  if (me?.dogq?.kind === 'thief' && mapId === 'town') { const b = (performance.now() / 300 | 0) % 2, x0 = (me.dogq.x - A.x) * 2, y0 = (me.dogq.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x0, y0, 8, 0, 7); g.fill(); g.fillStyle = b ? '#ff2a2a' : '#a80000'; g.beginPath(); g.arc(x0, y0, 6, 0, 7); g.fill(); }
   if (me?.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc; g.strokeStyle = (performance.now() / 400 | 0) % 2 ? '#ffd23a' : '#ff9f1a'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((hx - A.x) * 2, (hy - A.y) * 2, hr * 2, 0, 7); g.stroke(); g.setLineDash([]); g.font = '16px serif'; g.textAlign = 'center'; g.fillText('🐕', (hx - A.x) * 2, (hy - A.y) * 2 + 6); }
   { const q = PETST.get(myId); if (q && mapOf(areaOf(q.x, q.y)?.id) === mapId) { const mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 4.5, 0, 7); g.fill(); g.fillStyle = '#ff7eb0'; g.beginPath(); g.arc(mx, my, 3, 0, 7); g.fill(); } }   // your pet: a pink dot
   { // you: drawn last, bigger, with a pulsing ring so you can always find yourself
@@ -3201,6 +3240,14 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-18e', d: '18 พ.ย. (รอบ 36)', items: [
+    '👮 ตำรวจ: เคสใหม่ 🚨 ตามจับโจร! รับแจ้งเหตุที่สถานี แล้วขับรถสายตรวจไปตามจุดแดงบนแผนที่ โจรชื่อสีแดง ถึงตัวก็จับได้ (จับไวได้โบนัส)',
+    '🔍 ตำรวจ: เกมจับผิดภาพหาโจรปลอมตัว 5 ภาพ · 🎯 เกมซ้อมยิงเป้า (ห้ามยิงป้ายพลเมือง) ได้ค่าแรงตามคะแนน',
+    '🧾 อาชีพใหม่: พนักงานซูเปอร์มาร์เก็ต! สมัครกับพี่แนนที่ร้านสะดวกซื้อสาขาถนนเหนือ ไม่ต้องมีวุฒิ · ยืนแคชเชียร์ คิดเงินแล้วเลือกเงินทอนให้ถูก',
+    '🥬 เชฟ: เปลี่ยนจากเกมแข่งทำอาหาร เป็นเกมวิ่งเก็บผัก กระโดดข้ามน้องหมาน้องแมว เก็บผักได้มากได้เงินมาก (นับเป็นเควสปรุงอาหาร)',
+    '🔑 ผูกบัญชี Google ได้ที่ ตั้งค่า แล้วเข้าเกมด้วยปุ่ม Google ไม่ต้องจำ ID/PIN',
+    '🐞 แก้หน้าสถานีตำรวจเปิดไม่ขึ้นสำหรับตำรวจ',
+  ] },
   { v: '2026-11-18d', d: '18 พ.ย. (รอบ 35)', items: [
     '🛵 ซ้อนท้ายเพื่อนได้แล้ว! แตะที่เพื่อนที่ขี่มอไซค์/ขับรถ แล้วกด "ขอซ้อนท้าย" หรือ "ขอขึ้นรถ" (มอไซค์ซ้อนได้ 1 คน · รถยนต์ 3 คน · รถตู้ 5 คน) กดปุ่มใหญ่ "ลงรถ" เพื่อลง',
     '🔥 ขี่มอไซค์แล้วกดปุ่มใหญ่ = สับโดด! ยกล้อหน้าโชว์เท่ๆ',
@@ -3469,7 +3516,8 @@ function renderPanel(p) {
       const rows = (G.cstore?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.cstore.markup), e = it.eat || {};
         return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
           [e.hunger && `อิ่ม +${e.hunger}`, e.energy && `พลัง +${e.energy}`, e.health && `เลือด +${e.health}`, e.happy && `สุข +${e.happy}`].filter(Boolean).join(' · ') + ` · มีอยู่ ${me.inv[id] || 0}`); }).join('');
-      return `<h2>🏪 ร้านสะดวกซื้อ 24 ชม.</h2><div class="sub">เปิดตลอด 24 ชั่วโมง ของมีเสมอ ไม่ต้องรอใครวางขาย · ราคาสูงกว่าตลาดนิดหน่อย</div><div class="list">${rows}</div>`;
+      const cashier = job('cashier') ? jgBox('cash', 'เข้ากะแคชเชียร์ คิดเงินทอนลูกค้า 10 คน') : '';
+      return cashier + `<h2>🏪 ร้านสะดวกซื้อ 24 ชม.</h2><div class="sub">เปิดตลอด 24 ชั่วโมง ของมีเสมอ ไม่ต้องรอใครวางขาย · ราคาสูงกว่าตลาดนิดหน่อย</div><div class="list">${rows}</div>`;
     }
     case 'warehouse': {
       const c = me.auc, head = `<h2>🔨 โรงประมูล</h2><div class="sub">${hoursTxt('warehouse')} · ล็อตละ 20 วินาที ยื่นซองประมูลได้ครั้งเดียว (แก้ราคาได้ก่อนหมดเวลา) แข่งกับคู่แข่ง 3 คน · ใครเสนอสูงสุดชนะและจ่ายตามที่เสนอ · ได้ของมาแล้วโรงประมูลรับซื้อคืนในราคาจริงทันที: <b>ต่ำกว่าราคาจริง = กำไร</b> สูงกว่า = ขาดทุน</div>`;
@@ -3493,6 +3541,7 @@ function renderPanel(p) {
       return `<h2>🍜 ร้านอาหาร</h2><div class="sub">${hoursTxt('restaurant')} · <b>ซื้อตุนใส่กระเป๋า</b>ไว้กินทีหลังได้ (กดใช้ในกระเป๋า 🎒) · สั่งให้มาส่งได้ผ่านแอพในมือถือ 📱 · ของราคาถูกอาจทำให้🤢อาหารเป็นพิษ</div>${pick}<div class="list">${rows}</div>`;
     }
     case 'kitchen': {
+      if (true) return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · เชฟวิ่งไปตลาดเก็บผักสดมาเข้าครัว ได้ค่าแรงตามผักที่เก็บได้</div>${staffHint('chef')}${job('chef') ? jgBox('run', 'วิ่งเก็บผัก กระโดดข้ามน้องหมาน้องแมว') : '<div class="jobbox">เฉพาะ<b>เชฟ</b> · สมัครได้ที่นี่ (ต้องมีใบรับรองการทำอาหาร)</div>'}`;
       const rows = G.recipes.map(r => {
         const out = G.items[r.id]; const ok = Object.entries(r.in).every(([i, q]) => (me.inv[i] || 0) >= q);
         const ing = Object.entries(r.in).map(([i, q]) => `${G.items[i].icon}${q} (มี ${me.inv[i] || 0})`).join(' + ');
@@ -3768,7 +3817,7 @@ function renderPanel(p) {
           return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`}`;
     }
-    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) + policeReports() : ''}`;
+    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคสตามจับโจร 🚨 เคสหมาหาย 🐕 เล่นจับผิดภาพหาโจร 🔍 และซ้อมยิงเป้า 🎯 · ได้รถสายตรวจขับฟรี · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · สมัครเป็นขอทานได้ที่นี่ (เงินสด+ฝากไม่เกิน ฿2,000) · หาเงินโดย<b>วิ่งเก็บขยะ</b>ที่ถังขยะ หรือนั่งขอทาน (ปุ่ม 🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ</div>${staffHint('beggar')}`;
     case 'ride': {
       const S = STN(st), R = G.rides?.[S?.k]; if (!R) return '';
@@ -3943,6 +3992,7 @@ function renderPanel(p) {
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}
+        ${G.gid ? `<div class="secT">🔑 บัญชี Google</div>${me.gmail ? `<div class="jobbox ok">✅ ผูกกับ <b>${esc(me.gmail)}</b> แล้ว · เข้าเกมด้วยปุ่ม Google ได้เลย${B('ยกเลิกการผูก', { t: 'glink', off: 1 })}</div>` : `<div class="sub">ผูกไว้แล้วเข้าเกมด้วย Google ได้ ไม่ต้องจำ ID/PIN · ย้ายเครื่องก็เข้าได้</div>${B('🔑 ผูกบัญชี Google', { fn: 'gLink' }, 'primary big')}`}` : ''}
         ${me.admin ? `<div class="secT">👑 แอดมิน</div>${B('👑 เปิด God mode', { fn: 'open', kind: 'god' }, 'primary big')}` : ''}
         <div class="secT">🎮 อื่นๆ</div>
         <div class="grid2">${B('📤 ชวนเพื่อน', { fn: 'share' }, 'good')}${B('🐞 แจ้งบัค', { fn: 'open', kind: 'bug' })}${B('❔ วิธีเล่น', { fn: 'open', kind: 'help' })}${B('📖 บทช่วยสอน', { fn: 'tut' })}${B('🆕 อัปเดต', { fn: 'open', kind: 'news' })}</div>
@@ -3999,6 +4049,12 @@ function houseDoor(s, st) {
 }
 // the lost-dog case: take it at the station, find the dog out in town before the time is up
 function dogBox(st) {
+  const c0 = me.dogq, tcd = Math.max(0, Math.ceil(((me.thiefNext || 0) - (Date.now() + clockOff)) / 1000));
+  if (c0?.kind === 'thief') return `<div class="jobbox">🚨 <b>ตามจับโจร: <span style="color:#e0332a">${esc(c0.name)}</span></b> · ฉก${esc(c0.stole)}<br>📍 เห็นล่าสุดแถว <b>${esc(c0.hint)}</b> · เหลือเวลา <b class="dogcd"></b><br><small>ดู <b style="color:#e0332a">จุดแดง</b> บนมินิแมพ ขับรถสายตรวจไปให้ถึงตัว (ชื่อสีแดง) จับเร็วได้โบนัส</small>${B('ยกเลิกเคส', { t: 'act', st, a: 'dogquit' })}</div>`;
+  const thief = `<div class="jobbox">🚨 <b>ตามจับโจร</b> · ขับรถตามจุดแดงบนแผนที่ไปจับโจรชื่อสีแดง · ค่าตอบแทนสูง${tcd > 0 ? `<br><small>แจ้งเหตุใหม่ในอีก ${tcd} วินาที</small>` : ''}${B(`🚓 รับแจ้งเหตุ (⚡${Math.ceil(6 * (G.energyMul || 1))})`, { t: 'act', st, a: 'thief' }, 'primary', tcd > 0 || !!c0)}</div>`;
+  return (c0 ? '' : thief) + dogBox0(st) + jgBox('spot', 'หาคนร้ายที่ปลอมตัวในฝูงชน 5 ภาพ') + jgBox('shoot', 'ซ้อมยิงเป้า 30 วินาที อย่ายิงโดนพลเมือง');
+}
+function dogBox0(st) {
   const c = me.dogq, cd = Math.max(0, Math.ceil(((me.dogNext || 0) - (Date.now() + clockOff)) / 1000));
   if (c) return `<div class="jobbox">🐕 <b>เคสหมาหาย: น้อง${esc(c.name)}</b> (${G.pets[c.dog]?.name || ''}) · เจ้าของ ${esc(c.owner)}<br>📍 มีคนเห็นแถว <b>${esc(c.hint)}</b> · เหลือเวลา <b class="dogcd"></b><br><small>เดินไปให้ใกล้ตัวมันเพื่อพบ · ฟังเสียงเห่า และดูวงสีเหลืองบนแผนที่ · เจอเร็วได้โบนัส</small>${B('ยกเลิกเคส', { t: 'act', st, a: 'dogquit' })}</div>`;
   return `<div class="jobbox">🐕 <b>เคสหมาหาย</b> · ค่าตอบแทนตามเวลาที่ใช้ตามหา (ตามไกลได้มาก) · เวลาจำกัด ถ้าไม่เจอทันถือว่าล้มเหลว${cd > 0 ? `<br><small>เคสใหม่เข้าในอีก ${cd} วินาที</small>` : ''}${B('📋 รับเคสหมาหาย (⚡5)', { t: 'act', st, a: 'dog' }, 'primary', cd > 0)}</div>`;
@@ -4562,7 +4618,7 @@ function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
-const CAREER_TARGET = { police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
+const CAREER_TARGET = { cashier: 'cstore', police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
 function setGuide(key, quiet, auto) {
   const g = targetOf(key); if (!g) return;
@@ -4691,6 +4747,7 @@ function openMap(mapId, keepScroll) {
     g.fillStyle = pl.hl ? '#ffc94d' : '#8b4fc4'; g.beginPath(); g.moveTo(pl.x, pl.y + r * 1.3); g.arc(pl.x, pl.y - r * .2, r, Math.PI * .8, Math.PI * 2.2); g.fill();
     g.font = `${Math.round(r * 1.15)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
   });
+  if (me.dogq?.kind === 'thief' && mapId === 'town') { const [x, y] = L(me.dogq.x, me.dogq.y); g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(x, y, r * 1.1, 0, 7); g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦹', x, y - r * 1.6); }
   if (me.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc, [x, y] = L(hx, hy); g.strokeStyle = '#ffb300'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.arc(x, y, hr * k, 0, 7); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,200,0,.12)'; g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐕', x, y); }
   // online players as coloured dots with their names; you are the big white dot with a ring
   let onHere = 0;
@@ -5202,6 +5259,166 @@ function renderTrade() {
   $('#tCancel').onclick = () => send({ t: 'trade_cancel' });
 }
 setInterval(() => { if (trade) renderTrade(); }, 800);
+// ------------------------------------------------------------------ job mini-games (police / cashier / chef)
+// The server starts a round (energy, cooldown) and pays the score at the end; the game itself is played here.
+const JG = { cur: null };
+const jgRng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+function jgStop(report) {
+  const g = JG.cur; if (!g) return; JG.cur = null;
+  clearInterval(g.iv); cancelAnimationFrame(g.raf); if (g.off) g.off();
+  if (report) send({ t: 'jg', op: 'end', k: g.k, score: g.score });
+}
+function jgHead(g, extra = '') { const J = G.jobGames[g.k]; return `<h2>${J.icon} ${esc(J.name)}</h2><div class="mgTop"><span>คะแนน <b id="jgS">${g.score}</b>${extra}</span><span class="tm">⏱ <b id="mgT"></b></span></div><div class="mgTimer"><u id="mgU"></u></div>`; }
+function jgClock(g, secs, onEnd) {           // a countdown bar; g.end can be pulled in (wrong answers cost time)
+  g.end = performance.now() + secs * 1000;
+  g.iv = setInterval(() => {
+    if (JG.cur !== g) return;
+    const left = Math.max(0, g.end - performance.now()), t = $('#mgT'), u = $('#mgU');
+    if (t) t.textContent = (left / 1000).toFixed(1); if (u) u.style.width = left / (secs * 10) + '%';
+    if (!left) (onEnd || jgFinish)(g);
+  }, 100);
+}
+const jgScore = g => { const s = $('#jgS'); if (s) s.textContent = g.score; };
+function jgFinish(g) {
+  if (JG.cur !== g) return;
+  jgStop(true); FX.play(g.score > 0 ? 'levelup' : 'fail');
+  const J = G.jobGames[g.k], est = Math.round(Math.min(g.score, J.max) * J.per);
+  $('#mgBody').innerHTML = `<h2>${J.icon} ${esc(J.name)}</h2><div class="mgEnd"><div class="sub">${esc(g.endWhy || 'หมดเวลา!')}</div><div class="sub">คะแนน</div><div class="big">${g.score}</div><div class="sub">ค่าแรงประมาณ ${money(est)}+ (โบนัสตามเลเวล) เข้ากระเป๋าแล้ว</div></div>
+    <div class="grid2">${B(`🔁 เล่นอีกรอบ ⚡${Math.ceil(J.energy * (G.energyMul || 1))}`, { fn: 'jgGo', k: g.k }, 'primary')}${B('ปิด', { fn: 'jgClose' })}</div>`;
+  bindPanel($('#mgBody'));
+}
+FN.gLink = gLinkOpen;
+FN.jgGo = m => send({ t: 'jg', op: 'start', k: m.k });
+FN.jgClose = () => { jgStop(true); mgClose(); };
+function jgOpen(k, seed) {
+  mgStop(); jgStop(false); $('#mg').classList.remove('hidden'); FX.play('notice');
+  const g = JG.cur = { k, score: 0, r: jgRng(seed), t0: performance.now() };
+  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, run: jgRun })[k]?.(g);
+}
+const jgPick = (g, a) => a[Math.floor(g.r() * a.length)];
+
+// 🔍 spot the difference: the same crowd twice; in the right picture one person is someone else - that's the thief
+function jgSpot(g) {
+  const CROWD = ['🧑', '👩', '👨', '🧔', '👵', '👴', '👱', '🧒', '👧', '👦', '👲', '🧕', '👮', '🤵', '👷', '💂'];
+  g.round = 0;
+  const next = () => {
+    if (JG.cur !== g) return;
+    if (g.round >= 5) { g.endWhy = 'จับโจรครบทุกภาพ เก่งมาก!'; return jgFinish(g); }
+    const n = 20, L = Array.from({ length: n }, () => jgPick(g, CROWD)), i = Math.floor(g.r() * n), R = L.slice();
+    do R[i] = jgPick(g, CROWD); while (R[i] === L[i]);
+    const grid = (a, side) => `<div class="jgGrid">${a.map((e, j) => `<button data-s="${side}" data-j="${j}">${e}</button>`).join('')}</div>`;
+    $('#mgBody').innerHTML = jgHead(g, ` · ภาพ ${g.round + 1}/5`) + `<div class="sub">แตะคนที่ <b>ต่างจากภาพซ้าย</b> ในภาพขวา = โจรปลอมตัว! (แตะผิด -4 วิ)</div><div class="jgPair">${grid(L, 'l')}${grid(R, 'r')}</div>`;
+    $('#mgBody').querySelectorAll('[data-j]').forEach(b => b.onclick = () => {
+      const ok = b.dataset.s === 'r' && +b.dataset.j === i;
+      if (ok) { b.classList.add('ok'); g.score++; g.round++; jgScore(g); FX.play('ding'); setTimeout(next, 350); }
+      else { b.classList.add('bad'); g.end -= 4000; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(40); }
+    });
+  };
+  jgClock(g, 45); next();
+}
+
+// 🎯 target practice: targets pop up, tap them; cardboard citizens must not be shot
+function jgShoot(g) {
+  $('#mgBody').innerHTML = jgHead(g) + `<div class="sub">แตะเป้า 🎯 ให้ไว (+1) · ห้ามยิงป้ายพลเมือง 🙋 (-2)</div><canvas id="jgC" class="jgCan" width="400" height="300"></canvas>`;
+  const c = $('#jgC'), x = c.getContext('2d'), T = [], fx = [];
+  let spawn = 0, last = performance.now(), aim = null;
+  const hit = e => {
+    const r = c.getBoundingClientRect(), px = (e.clientX - r.left) * c.width / r.width, py = (e.clientY - r.top) * c.height / r.height; aim = [px, py, performance.now()];
+    FX.play('chop');
+    for (let i = T.length - 1; i >= 0; i--) { const t = T[i]; if (Math.hypot(px - t.x, py - t.y) < t.r) { T.splice(i, 1);
+      if (t.civ) { g.score = Math.max(0, g.score - 2); FX.play('fail'); fx.push([t.x, t.y, '-2', '#ff5a4a', performance.now()]); if (navigator.vibrate) navigator.vibrate(60); }
+      else { g.score++; FX.play('ding'); fx.push([t.x, t.y, '+1', '#ffe14d', performance.now()]); }
+      jgScore(g); return; } }
+  };
+  c.addEventListener('pointerdown', hit);
+  const loop = now => {
+    if (JG.cur !== g) return;
+    const dt = Math.min(.05, (now - last) / 1000); last = now; spawn -= dt;
+    if (spawn <= 0) { spawn = .45 + g.r() * .45; T.push({ x: 40 + g.r() * 320, y: 50 + g.r() * 210, r: 26, civ: g.r() < .22, born: now, life: 1100 + g.r() * 700 }); }
+    x.fillStyle = '#5b3a22'; x.fillRect(0, 0, 400, 300); x.fillStyle = '#7a5130'; for (let i = 0; i < 400; i += 50) x.fillRect(i, 0, 3, 300);
+    x.fillStyle = '#c9a26a'; x.fillRect(0, 270, 400, 30);
+    for (let i = T.length - 1; i >= 0; i--) {
+      const t = T[i], age = now - t.born; if (age > t.life) { T.splice(i, 1); continue; }
+      const s = Math.min(1, age / 150, (t.life - age) / 150);
+      x.save(); x.translate(t.x, t.y); x.scale(1, s);
+      if (t.civ) { x.font = '44px serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('🙋', 0, 0); }
+      else for (const [rr, col] of [[26, '#fff'], [20, '#e53b2c'], [13, '#fff'], [6, '#e53b2c']]) { x.fillStyle = col; x.beginPath(); x.arc(0, 0, rr, 0, 7); x.fill(); }
+      x.restore();
+    }
+    for (let i = fx.length - 1; i >= 0; i--) { const [fx0, fy, tx, col, t0] = fx[i], k = (now - t0) / 600; if (k > 1) { fx.splice(i, 1); continue; } x.globalAlpha = 1 - k; x.fillStyle = col; x.font = '700 22px sans-serif'; x.textAlign = 'center'; x.fillText(tx, fx0, fy - 30 * k); x.globalAlpha = 1; }
+    if (aim && now - aim[2] < 250) { x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.arc(aim[0], aim[1], 14, 0, 7); x.moveTo(aim[0] - 20, aim[1]); x.lineTo(aim[0] + 20, aim[1]); x.moveTo(aim[0], aim[1] - 20); x.lineTo(aim[0], aim[1] + 20); x.stroke(); }
+    g.raf = requestAnimationFrame(loop);
+  };
+  g.off = () => c.removeEventListener('pointerdown', hit);
+  jgClock(g, 30); g.raf = requestAnimationFrame(loop);
+}
+
+// 🧾 cashier: add up the basket, see what the customer paid with, pick the right change
+function jgCash(g) {
+  const GOODS = [['💧', 'น้ำดื่ม', 10], ['🍞', 'ขนมปัง', 25], ['🥛', 'นมกล่อง', 15], ['🍜', 'บะหมี่กึ่งฯ', 7], ['🥚', 'ไข่ 10 ฟอง', 45], ['🍱', 'ข้าวกล่อง', 39], ['☕', 'กาแฟเย็น', 30], ['🧼', 'สบู่', 22], ['🍫', 'ช็อกโกแลต', 20], ['🍌', 'กล้วย', 18], ['🧃', 'น้ำผลไม้', 12], ['🍦', 'ไอศกรีม', 16]];
+  const FACES = ['🧑', '👩', '👨', '👵', '👴', '🧔', '👧', '👦', '🧕'];
+  const next = () => {
+    if (JG.cur !== g) return;
+    if (g.score >= 10) { g.endWhy = 'คิดเงินครบ 10 คน ไม่มีผิดเลย!'; return jgFinish(g); }
+    const n = 1 + Math.floor(g.r() * 3) + (g.score >= 4 ? 1 : 0), items = Array.from({ length: n }, () => jgPick(g, GOODS)), total = items.reduce((t, i) => t + i[2], 0);
+    const paid = [20, 50, 100, 500, 1000].find(v => v >= total + 1 && g.r() < .7) || [50, 100, 500, 1000].find(v => v > total);
+    const ans = paid - total, opts = new Set([ans]);
+    while (opts.size < 4) { const d = jgPick(g, [-10, -5, -3, -2, -1, 1, 2, 3, 5, 10, 20]); if (ans + d > 0) opts.add(ans + d); }
+    $('#mgBody').innerHTML = jgHead(g, ` · ลูกค้า ${g.score + 1}/10`) + `<div class="jgCash"><div class="cust">${jgPick(g, FACES)}<small>"คิดเงินด้วยครับ"</small></div>
+      <div class="bill">${items.map(i => `<div><span>${i[0]} ${i[1]}</span><b>฿${i[2]}</b></div>`).join('')}<div class="paid"><span>ลูกค้าจ่าย</span><b>💵 ฿${paid}</b></div></div></div>
+      <div class="sub">ต้องทอนเงินเท่าไหร่? (ตอบผิด -5 วิ)</div><div class="mgAns">${[...opts].sort(() => g.r() - .5).map(v => `<button data-v="${v}">฿${v}</button>`).join('')}</div>`;
+    $('#mgBody').querySelectorAll('[data-v]').forEach(b => b.onclick = () => {
+      if (+b.dataset.v === ans) { b.classList.add('ok'); g.score++; jgScore(g); FX.play('coin'); setTimeout(next, 300); }
+      else { b.classList.add('bad'); g.end -= 5000; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(40); }
+    });
+  };
+  jgClock(g, 60); next();
+}
+
+// 🥬 the chef's run: run along the market street, jump over the pets, grab the vegetables (tap / space to jump)
+function jgRun(g) {
+  $('#mgBody').innerHTML = jgHead(g) + `<div class="sub">แตะจอ (หรือกด Space) เพื่อกระโดด · ข้ามสัตว์เลี้ยง 🐶 · เก็บผัก 🥕 ให้ได้มากที่สุด · ชน = จบ</div><canvas id="jgC" class="jgCan" width="420" height="230"></canvas>`;
+  const c = $('#jgC'), x = c.getContext('2d'), GY = 196, me0 = { of: 'chef', g: me.gender, lk: me.look || {} };
+  const PETS = ['🐶', '🐱', '🐰', '🐔', '🐷', '🐢'], VEG = ['🥕', '🥬', '🍅', '🌽', '🥦', '🍆'];
+  const R = { y: 0, vy: 0, sp: 190, dist: 0, obs: [], veg: [], nextO: 1.2, nextV: .6, step: 0, dead: false };
+  let last = performance.now();
+  const jump = e => { if (e) e.preventDefault(); if (R.y === 0 && !R.dead) { R.vy = 560; FX.play('pop'); } };
+  const key = e => { if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); jump(); } };
+  c.addEventListener('pointerdown', jump); addEventListener('keydown', key, true);
+  g.off = () => { c.removeEventListener('pointerdown', jump); removeEventListener('keydown', key, true); };
+  const loop = now => {
+    if (JG.cur !== g) return;
+    const dt = Math.min(.04, (now - last) / 1000); last = now;
+    R.sp = Math.min(420, R.sp + 7 * dt); R.dist += R.sp * dt; R.step += R.sp * dt / 40;
+    R.vy -= 1500 * dt; R.y = Math.max(0, R.y + R.vy * dt); if (R.y === 0) R.vy = 0;
+    if ((R.nextO -= dt) <= 0) { R.obs.push({ x: 440, e: jgPick(g, PETS) }); R.nextO = Math.max(.65, 1.5 - R.sp / 600) + g.r() * 1.1; }
+    if ((R.nextV -= dt) <= 0) { R.veg.push({ x: 440, h: 10 + g.r() * 95, e: jgPick(g, VEG) }); R.nextV = .45 + g.r() * .8; }
+    const px = 70, py = GY - R.y;
+    for (const o of R.obs) { o.x -= R.sp * dt; if (!o.hit && Math.abs(o.x - px) < 20 && R.y < 26) { o.hit = 1; R.dead = true; } }
+    for (const v of R.veg) { v.x -= R.sp * dt; if (!v.got && Math.abs(v.x - px) < 24 && Math.abs((GY - v.h - 14) - (py - 30)) < 34) { v.got = 1; g.score++; jgScore(g); FX.play('coin'); } }
+    R.obs = R.obs.filter(o => o.x > -30); R.veg = R.veg.filter(v => v.x > -30 && !v.got);
+    // street
+    const sky = x.createLinearGradient(0, 0, 0, GY); sky.addColorStop(0, '#9fd6ff'); sky.addColorStop(1, '#e8f6ff'); x.fillStyle = sky; x.fillRect(0, 0, 420, 230);
+    x.fillStyle = '#f4c48a'; for (let i = 0; i < 6; i++) { const bx = ((i * 90 - R.dist * .3) % 540 + 540) % 540 - 60; x.fillRect(bx, GY - 70, 70, 70); x.fillStyle = '#e05a4a'; x.fillRect(bx - 5, GY - 80, 80, 12); x.fillStyle = '#f4c48a'; }
+    x.fillStyle = '#8a8f99'; x.fillRect(0, GY, 420, 34); x.fillStyle = '#c9ccd2'; for (let i = 0; i < 9; i++) x.fillRect(((i * 60 - R.dist) % 540 + 540) % 540 - 60, GY + 14, 30, 4);
+    x.font = '28px serif'; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+    for (const v of R.veg) x.fillText(v.e, v.x, GY - v.h);
+    for (const o of R.obs) { x.save(); x.translate(o.x, GY + 2); x.scale(-1, 1); x.fillText(o.e, 0, 0); x.restore(); }
+    if (chImg) drawCharTo(x, me0, px, py, 64 / CH_ATLAS.h, 'side', R.y > 0 ? 1 : Math.floor(R.step) % 4, false);
+    else { x.fillText('🧑‍🍳', px, py); }
+    if (R.dead) { g.endWhy = 'ชนน้องหมาน้องแมวเข้าแล้ว! 🐾'; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(120); return jgFinish(g); }
+    if (g.score >= 40) { g.endWhy = 'เก็บผักเต็มตะกร้าแล้ว!'; return jgFinish(g); }
+    g.raf = requestAnimationFrame(loop);
+  };
+  jgClock(g, 75, gg => { gg.endWhy = 'หมดเวลา วิ่งได้ไกลมาก!'; jgFinish(gg); }); g.raf = requestAnimationFrame(loop);
+}
+// the boxes that start them, shown in the police / store / kitchen panels
+function jgBox(k, note) {
+  const J = G.jobGames?.[k]; if (!J) return '';
+  const cd = Math.max(0, Math.ceil(((me.jgNext?.[k] || 0) - (Date.now() + clockOff)) / 1000));
+  return `<div class="jobbox">${J.icon} <b>${esc(J.name)}</b> · ${note}<br><small>ค่าแรง ~${money(J.per)} ต่อคะแนน (สูงสุด ${J.max} คะแนน) + โบนัสเลเวล</small>
+    <div style="margin-top:6px">${B(cd > 0 ? `⏳ พักอีก ${cd} วิ` : `▶️ เริ่มเล่น ⚡${Math.ceil(J.energy * (G.energyMul || 1))}`, { fn: 'jgGo', k }, 'primary big', cd > 0)}</div></div>`;
+}
 // ------------------------------------------------------------------ office mini-games (only while seated at your desk)
 // Something to do during long shifts. The score is sent to the server, which may add a small bonus (capped per day).
 const MG = { cur: null, timer: 0 };
@@ -5212,7 +5429,7 @@ const MG_GAMES = {
 };
 const mgBest = k => { try { return +localStorage.getItem('lt_mg_' + k) || 0; } catch { return 0; } };
 const mgSetBest = (k, v) => { try { if (v > mgBest(k)) localStorage.setItem('lt_mg_' + k, v); } catch { } };
-function mgStop() { clearInterval(MG.timer); MG.timer = 0; MG.cur = null; }
+function mgStop() { clearInterval(MG.timer); MG.timer = 0; MG.cur = null; if (JG.cur) jgStop(true); }
 function mgClose() { mgStop(); $('#mg').classList.add('hidden'); }
 $('#mgX').onclick = () => { FX.play('click'); mgClose(); };
 $('#mgBtn').onclick = () => { FX.play('click'); mgMenu(); };
