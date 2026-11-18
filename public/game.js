@@ -2339,7 +2339,7 @@ const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FA
   { st: 'cstore3', name: 'น้องแพร (พนักงานร้าน)', short: 'น้องแพร', icon: '🏪', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'black', shirt: 'blue' }, hi: ['สวัสดีค่ะ เปิด 24 ชั่วโมงค่ะ', 'ข้าวกล่องอุ่นให้ไหมคะ', 'ลอตเตอรี่งวดนี้มาแล้วค่ะ'] },
   { st: 'cstore4', name: 'ยายบุญ (เจ้าของร้าน สาขาหมู่บ้าน)', short: 'ยายบุญ', icon: '🏪', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'silver', shirt: 'yellow', pants: 'brown' }, hi: ['มาแล้วเหรอหลาน', 'กินข้าวหรือยังจ๊ะ', 'น้ำเย็นๆ อยู่ในตู้นะลูก'] },
   { st: 'market', name: 'เจ๊ศรี (ผู้ดูแลตลาดกลาง)', short: 'เจ๊ศรี', icon: '🏪', g: 'f', dx: 2.6, dy: .35, lk: { hair: 'brown', shirt: 'green' }, hi: ['ซื้อขายที่นี่ ราคายุติธรรม', 'วางขายของได้นะ คนซื้อเยอะ', 'ของสดๆ ทั้งนั้นจ้า'] },
-  { st: 'estate', name: 'คุณจิ๋ม (นายหน้าอสังหาฯ)', short: 'คุณจิ๋ม', icon: '🏡', g: 'f', dx: 1.4, dy: 0, lk: { hair: 'brown', shirt: 'pink' }, hi: ['บ้านสวย ทำเลดี ราคาคุ้มค่ะ', 'สนใจซื้อหรือเช่าบ้านไหมคะ', 'ปล่อยเช่าบ้านก็มีรายได้นะคะ'] },
+  { st: 'estate', name: 'คุณจิ๋ม (นายหน้าอสังหาฯ)', short: 'คุณจิ๋ม', icon: '🏡', g: 'f', dx: 1.4, dy: 0, lk: { hair: 'brown', shirt: 'pink' }, hi: ['อยากมีบ้านเป็นของตัวเองไหมคะ ทุกคนซื้อได้เลยค่ะ', 'บ้านเล็ก บ้านกลาง บ้านใหญ่ เลือกแบบได้ 6 แบบค่ะ', 'จะไปบ้านตัวเองหรือไปเยี่ยมบ้านเพื่อน บอกพี่ได้นะคะ'] },
   { st: 'toolshop', name: 'ช่างเปี๊ยก (ร้านอุปกรณ์)', short: 'ช่างเปี๊ยก', icon: '🛠️', dx: .5, dy: -1.1, lk: { hair: 'brown', shirt: 'black' }, hi: ['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดอุปกรณ์อาชีพได้ที่นี่', 'ของแท้ทุกชิ้นรับประกัน'] },
   { st: 'office', name: 'คุณแพรว (ประชาสัมพันธ์บริษัท)', short: 'คุณแพรว', icon: '🏢', g: 'f', dx: .6, dy: -1.15, of: 'office', lk: { hair: 'black' }, hi: ['สวัสดีค่ะ ไทยเทคยินดีต้อนรับค่ะ', 'สมัครงานติดต่อคุณนภาฝ่ายบุคคลได้เลยค่ะ', 'พนักงานเข้างาน 8 โมงนะคะ'] },
   { st: 'fashion', name: 'น้องมุก (ร้านแฟชั่น)', short: 'น้องมุก', icon: '👗', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'brown', shirt: 'pink' }, hi: ['ชุดใหม่มาแล้วค่ะ ลองดูได้นะคะ', 'ชุดนี้ใส่แล้วดูดีมากเลยค่ะ', 'ยินดีต้อนรับค่ะ'] },
@@ -2530,7 +2530,7 @@ function drawMini() {
     g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 9, 0, 7); g.fill();
     g.fillStyle = '#ff2a10'; g.beginPath(); g.arc(mx, my, 6.5, 0, 7); g.fill();
   }
-  $('#miniName').textContent = `🗺️ ${A.name}`;
+  $('#miniName').textContent = `🗺️ ${A.yard && wd?.houses?.[A.house]?.[0] ? 'บ้าน' + wd.houses[A.house][0] : A.name}`;
 }
 
 // ------------------------------------------------------------------ panels
@@ -2818,7 +2818,7 @@ const TALK = {
   keep_school: [['การศึกษาคือการลงทุนที่คุ้มที่สุด', 'เรียนจบ ม.6 ก่อน แล้วค่อยต่อปริญญาตรี'], ['นั่งโต๊ะเรียนครบหนึ่งชั่วโมงในเกม ได้หนึ่งคาบ', 'อย่าโดดเรียนล่ะ ครูเห็นนะ 👀'], ['สอบใบขับขี่ สอบนายสิบ ก็ที่นี่']],
   keep_police: [['มีอะไรให้ช่วยไหมคะ', 'ของหาย โดนขโมย มาแจ้งได้เลย'], [ 'อย่าพกเงินสดเยอะ ฝากธนาคารไว้ปลอดภัยกว่า']],
   keep_barber: [['ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน', 'มาย้อมสีใหม่ ให้ตัวเองดูโดดเด่นสิครับ'], ['สีที่เคยทำไปแล้ว เปลี่ยนกลับได้ฟรีนะ'], ['ทำผมใหม่แล้วความสุขเพิ่มด้วยนะ', 'วิทยาศาสตร์ยืนยัน... มั้งครับ 😆']],
-  keep_estate: [['บ้านในหมู่บ้านจัดสรร ซื้อหรือเช่าก็ได้ค่ะ', 'มีลานบ้านไว้ทำสวนด้วยนะคะ'], ['ปล่อยเช่าบ้าน มีรายได้ทุกเดือนค่ะ'], ['ทำงานหนักแล้วอย่าลืมพักนะคะ', 'ไปนั่งเล่นที่จัตุรัสบ้าง ชีวิตจะได้สมดุล']],
+  keep_estate: [['หมู่บ้านเราพิเศษนะคะ บ้านที่เห็นคือบ้านของคนที่อยู่ในเกมตอนนี้', 'ใครออฟไลน์ บ้านก็จะหลบไปก่อน กลับมาเมื่อไหร่ก็มาตั้งใหม่ค่ะ'], ['บ้านทุกหลังมีสวนไว้ปลูกผักด้วยนะคะ', 'ต่อเติมชั้นสองชั้นสามได้ที่บันไดในบ้านค่ะ'], ['ทำงานหนักแล้วอย่าลืมพักนะคะ', 'ไปนั่งเล่นที่จัตุรัสบ้าง ชีวิตจะได้สมดุล']],
   keep_cstore2: [['ผมเรียนอยู่มหาวิทยาลัยครับ ทำงานพิเศษตอนเย็น', 'มาเมืองนี้ใหม่ๆ ยังไม่ค่อยรู้จักใครเลย'], ['ดึกๆ หิวก็แวะมาได้นะครับ', 'ข้าวกล่องอุ่นไมโครเวฟให้ด้วย']],
   keep_petshop1: [['น้องๆ ที่นี่ฉีดวัคซีนครบทุกตัวค่ะ', 'อยากได้ตัวไหน บอกได้เลยนะคะ'], ['สัตว์เลี้ยงเดินตามเราได้ทุกที่เลยค่ะ', 'แตะที่ตัวเขาดู จะกระโดดดีใจด้วยนะ']],
   keep_petshop2: [['ผมเลี้ยงหมามาตั้งแต่เด็กครับ', 'เลยมาเปิดร้านนี้เลย'], ['ตัวหายากอย่างมังกรกับยูนิคอร์น ก็มีนะครับ', 'ต้องเก็บเงินหน่อย แต่คุ้มครับ']],
@@ -3240,6 +3240,12 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-18f', d: '18 พ.ย. (รอบ 37)', items: [
+    '🏘️ ระบบบ้านใหม่! ทุกคนมีบ้านของตัวเองได้ ไม่จำกัด 12 หลังอีกต่อไป · ซื้อกับคุณจิ๋ม สำนักงานอสังหาฯ (ทางเข้าหมู่บ้าน)',
+    '🏠 เลือกขนาดได้ 3 แบบ: บ้านเล็ก ฿20,000 · บ้านกลาง ฿65,000 (2 ชั้น) · บ้านใหญ่ ฿160,000 (3 ชั้น) และเลือกหน้าตาบ้านได้ 6 แบบ',
+    '✨ หมู่บ้านคือบ้านของคนที่ออนไลน์อยู่! ตอนคุณเข้าเกม บ้านของคุณจะไปตั้งบนแปลงว่าง ออกเกมแล้วบ้านก็หลบไปก่อน (ของในบ้านอยู่ครบ)',
+    '👥 ไปเยี่ยมบ้านเพื่อนได้ (เพื่อนต้องบันทึกเบอร์คุณไว้) · ระบบเช่าบ้านปิดแล้ว คืนค่าเช่าที่เหลือให้อัตโนมัติ · เจ้าของบ้านเดิมได้บ้านแบบใหม่พร้อมของครบ',
+  ] },
   { v: '2026-11-18e', d: '18 พ.ย. (รอบ 36)', items: [
     '👮 ตำรวจ: เคสใหม่ 🚨 ตามจับโจร! รับแจ้งเหตุที่สถานี แล้วขับรถสายตรวจไปตามจุดแดงบนแผนที่ โจรชื่อสีแดง ถึงตัวก็จับได้ (จับไวได้โบนัส)',
     '🔍 ตำรวจ: เกมจับผิดภาพหาโจรปลอมตัว 5 ภาพ · 🎯 เกมซ้อมยิงเป้า (ห้ามยิงป้ายพลเมือง) ได้ค่าแรงตามคะแนน',
@@ -3783,16 +3789,24 @@ function renderPanel(p) {
       return `<h2>${it.icon} ${esc(it.name)}</h2><div class="sub"><span class="cd" data-t="${pl[1]}"></span></div>${B('🧺 เก็บเกี่ยว (⚡6)', { t: 'act', st, a: 'harvest' }, 'primary big')}`;
     }
     case 'estate': {
-      const rows = (wd?.houses || []).map((h, i) => {
-        const [owner, , , sale, rentP, tenant] = h;
-        const status = owner ? `เจ้าของ: ${esc(owner)}${sale ? ` · <b style="color:var(--ok)">ขาย ${money(sale)}</b>` : ''}${rentP ? ` · ให้เช่า ${money(rentP)}/วัน` : ''}` : `<b style="color:var(--ok)">ขาย ${money(G.shop.housePrices[i])}</b> · เช่า ${money(G.shop.houseRent[i])}/วัน`;
-        return itemRowRaw('🏠', `บ้านเลขที่ ${i + 1}${me.house === i ? ' <span class="tag">ของคุณ</span>' : ''}`, status + (tenant ? ` · ผู้เช่า: ${esc(tenant)}` : ''), B('📍', { fn: 'guide', key: 'door_house' + i }, 'good'));
-      }).join('');
-      return `<h2>🏡 สำนักงานอสังหาฯ</h2><div class="sub">${hoursTxt('estate')} · ซื้อ/เช่าได้ที่หน้าบ้านแต่ละหลัง · เจ้าของบ้านประกาศขายหรือปล่อยเช่าให้ผู้เล่นอื่นได้</div><div class="list">${rows}</div>`;
+      const tiers = G.homeTiers || [], styles = G.homeStyles || [], sty = Math.max(0, Math.min(styles.length - 1, p.hstyle ?? me.hown?.style ?? 0));
+      const pickStyle = `<div class="sub" style="margin-top:8px"><b>🎨 เลือกแบบบ้าน</b></div><div class="hStyles">${styles.map(([sp, nm], k) => `<button class="look ${k === sty ? 'on' : ''}" data-m='${JSON.stringify({ fn: 'qtab', set: { hstyle: k } })}'><canvas data-spr="${sp}" width="96" height="80"></canvas><small>${esc(nm)}</small></button>`).join('')}</div>`;
+      const mineSlot = me.house >= 0, friends = [...P.values()].filter(o => o.id !== myId && !o.npc && (me.contacts || []).some(c => c.n === o.name));
+      const visit = friends.length ? `<div class="sub" style="margin-top:10px"><b>👥 ไปเยี่ยมบ้านเพื่อน</b> (เพื่อนต้องบันทึกเบอร์คุณไว้ด้วย)</div><div class="list">${friends.map(o => itemRowRaw('🏡', esc(o.name), 'ออนไลน์อยู่', B('ไปเยี่ยม', { t: 'act', st, a: 'visit', id: o.id }, 'good'))).join('')}</div>` : '';
+      if (me.hown) {
+        const T = tiers[me.hown.tier || 0];
+        return `<h2>🏡 สำนักงานอสังหาฯ</h2><div class="sub">${hoursTxt('estate')} · คุณจิ๋มดูแลบ้านทุกหลังในหมู่บ้าน</div>
+          <div class="jobbox ok">${T?.icon || '🏠'} <b>บ้านของคุณ: ${esc(T?.name || 'บ้าน')}</b> · แบบ "${esc(styles[me.hown.style]?.[1] || '')}"<br><small>${mineSlot ? '📍 ตอนนี้ตั้งอยู่ในหมู่บ้านแล้ว' : '⏳ หมู่บ้านเต็มชั่วคราว รอที่ว่างสักครู่'}</small>
+          <div class="grid2" style="margin-top:6px">${B('🏠 พาไปบ้านฉัน', { t: 'act', st, a: 'home' }, 'primary', !mineSlot)}${B('💰 ขายบ้านคืน', { fn: 'confirmSell', st }, 'warn')}</div></div>
+          ${pickStyle}${B(sty === me.hown.style ? 'แบบปัจจุบัน' : `🎨 เปลี่ยนเป็นแบบนี้ ฿3,000`, { t: 'act', st, a: 'style', style: sty }, 'good', sty === me.hown.style)}${visit}`;
+      }
+      const cards = tiers.map((T, k) => itemRowRaw(T.icon, `${esc(T.name)} · <b style="color:var(--acc)">${money(T.price)}</b>`, esc(T.desc), B('ซื้อ', { t: 'act', st, a: 'buy', tier: k, style: sty }, 'good', me.money < T.price))).join('');
+      return `<h2>🏡 สำนักงานอสังหาฯ</h2><div class="sub">${hoursTxt('estate')} · <b>ทุกคนมีบ้านของตัวเองได้</b> · บ้านของคุณจะไปตั้งในหมู่บ้านตอนที่คุณออนไลน์ (หมู่บ้านคือบ้านของคนที่อยู่ในเกมตอนนั้น)</div>
+        ${pickStyle}<div class="sub" style="margin-top:10px"><b>🏠 เลือกขนาดบ้าน</b></div><div class="list">${cards}</div>${visit}`;
     }
     case 'door': return houseDoor(STN(st), st);
     case 'furnshop': {
-      const own = me.house >= 0, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน']];
+      const own = !!me.hown, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน']];
       const tab = cats.some(c => c[0] === p.ftab) ? p.ftab : 'basic';
       const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => a[1].price - b[1].price);
       const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
@@ -4015,37 +4029,17 @@ function billsBox() {
 }
 function houseDoor(s, st) {
   const i = s.house, h = wd?.houses?.[i]; if (!h) return '';
-  const [owner, cf, furn, sale, rentP, tenant, until] = h, price = G.shop.housePrices[i], rent = G.shop.houseRent[i];
-  const mine = me.house === i, iRent = me.rent && me.rent.idx === i;
-  const canEnter = mine || iRent;
-  const enter = canEnter ? B(owner || tenant ? '🚪 เข้าบ้าน' : '🚪 เข้าไปดูบ้าน', { t: 'enter', st }, 'primary big') : (owner || tenant ? '<div class="sub">🔒 เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า</div>' : '<div class="sub">🔒 บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้</div>');
-  const days = r => `<div class="grid3">${[1, 3, 7].map(d => B(`${d} วัน ${money(r * d)}`, { t: 'act', st, a: 'rent', days: d }, 'good')).join('')}</div>`;
-  const left = until ? Math.max(0, Math.round((until - Date.now() - clockOff) / G.dayMs * 10) / 10) : 0;
+  const [owner, cf, furn] = h, mine = me.house === i, friend = owner && !mine && (me.contacts || []).length >= 0;
+  if (!owner) return `<h2>🌱 ที่ดินว่าง</h2><div class="sub">หมู่บ้านนี้เป็นบ้านของผู้เล่นที่ออนไลน์อยู่ · แปลงนี้ว่าง รอบ้านของผู้เล่นคนต่อไป</div><div class="jobbox">🏡 อยากมีบ้าน? ซื้อได้ที่ <b>คุณจิ๋ม สำนักงานอสังหาฯ</b> (ทางเข้าหมู่บ้าน) · ซื้อได้ทุกคน ไม่จำกัด${B('📍 พาไปหาคุณจิ๋ม', { fn: 'guide', key: 'estate' }, 'good')}</div>`;
   if (mine) {
-    const rows = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && !f.cat).map(([k, f]) => itemRowRaw(f.icon, f.name, `ความสบาย +${f.comfort}`, me.furniture.includes(k) ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'furnish', item: k }, 'good'))).join('') + '<div class="sub">🛋️ เฟอร์นิเจอร์อีกกว่า 70 แบบ ที่ร้านเฟอร์นิเจอร์ในเมือง</div>';
-    return `<h2>🏠 บ้านของคุณ (เลขที่ ${i + 1})</h2><div class="sub">ความสบาย ⭐ <b>${me.comfort}</b> → พลังงานฟื้นเร็วขึ้น +${me.comfort * 3}% · ${tenant ? `ผู้เช่า: ${esc(tenant)} (อีก ${left} วัน)` : 'ไม่มีผู้เช่า'}</div>${enter}
-      <div class="sub" style="margin-top:12px"><b>🪧 ประกาศขายให้ผู้เล่น</b> ${me.houseSale ? `(ตอนนี้ ${money(me.houseSale)})` : ''}</div>
-      <div class="rowf"><input id="saleIn" type="number" value="${me.houseSale || price}">${B('ประกาศขาย', { fn: 'price', st, op: 'list', inp: 'saleIn' }, 'good')}${me.houseSale ? B('ยกเลิก', { fn: 'price', st, op: 'list', zero: 1 }) : ''}</div>
-      <div class="sub" style="margin-top:8px"><b>🔑 ปล่อยเช่า</b> ต่อวัน ${me.houseRent ? `(ตอนนี้ ${money(me.houseRent)})` : ''}</div>
-      <div class="rowf"><input id="rentIn" type="number" value="${me.houseRent || rent}">${B('ปล่อยเช่า', { fn: 'price', st, op: 'rentout', inp: 'rentIn' }, 'good')}${me.houseRent ? B('ยกเลิก', { fn: 'price', st, op: 'rentout', zero: 1 }) : ''}</div>
-      <div class="sub" style="margin-top:12px"><b>🛋️ แต่งบ้าน</b></div><div class="list">${rows}</div>
-      ${(me.keep || []).length ? `<div class="sub" style="margin-top:8px"><b>🎁 ของพิเศษจากรางวัลเข้าเกม</b> ${me.keep.map(k => `${G.shop.furniture[k].icon} ${G.shop.furniture[k].name}`).join(' · ')} (ตั้งในบ้านอัตโนมัติ)</div>` : ''}
-      <div style="margin-top:14px">${B('ขายบ้านคืนโครงการ (ได้คืน ~70%)', { t: 'act', st, a: 'sell' }, 'warn')}</div>`;
+    const T = G.homeTiers?.[me.hown?.tier || 0];
+    return `<h2>🏠 บ้านของคุณ</h2><div class="sub">${T ? `${T.icon} ${T.name} · ` : ''}ความสบาย ⭐ <b>${me.comfort}</b> → พลังงานฟื้นเร็วขึ้น +${me.comfort * 3}% · บ้านจะตั้งอยู่ในหมู่บ้านตอนคุณออนไลน์ เพื่อนที่คุณบันทึกเบอร์ไว้เข้ามาเยี่ยมได้</div>
+      ${B('🚪 เข้าบ้าน', { t: 'enter', st }, 'primary big')}
+      <div class="sub" style="margin-top:10px">🛋️ ซื้อเฟอร์นิเจอร์ที่ร้านเฟอร์นิเจอร์ แล้วกดปุ่ม 🛋️ จัดบ้าน · 🏗️ ต่อเติมชั้นได้ที่บันไดในบ้าน · 🔓 ขยายสวนได้ที่ป้ายในสวน</div>
+      ${(me.keep || []).length ? `<div class="sub" style="margin-top:8px"><b>🎁 ของพิเศษจากรางวัลเข้าเกม</b> ${me.keep.map(k => `${G.shop.furniture[k].icon} ${G.shop.furniture[k].name}`).join(' · ')}</div>` : ''}`;
   }
-  let body = `<div class="sub">ความสบาย ⭐ ${cf} ${furn.length ? furn.map(k => G.shop.furniture[fbase(k)]?.icon || '').join('') : ''}</div>`;
-  if (iRent) body += `<div class="jobbox ok">🔑 คุณเช่าบ้านหลังนี้อยู่ เหลืออีก ${left} วัน</div>${enter}<div class="sub" style="margin-top:8px">ต่อสัญญา</div>${days(owner ? rentP : rent)}`;
-  else if (tenant) body += `<div class="sub">มีผู้เช่าอยู่: ${esc(tenant)}</div>${enter}`;
-  else {
-    body += enter;
-    if (!owner) body += `<div class="sub" style="margin-top:10px"><b>ซื้อจากโครงการ</b></div>${B(`🏠 ซื้อบ้าน ${money(price)}`, { t: 'act', st, a: 'buy' }, 'good big', me.house >= 0)}<div class="sub" style="margin-top:10px"><b>เช่ากับโครงการ</b> ${money(rent)}/วัน (1 วัน = 24 นาที)</div>${days(rent)}`;
-    else {
-      if (sale) body += `<div class="sub" style="margin-top:10px"><b>${esc(owner)} ประกาศขาย</b></div>${B(`🏠 ซื้อ ${money(sale)}`, { t: 'act', st, a: 'buy' }, 'good big', me.house >= 0)}`;
-      if (rentP) body += `<div class="sub" style="margin-top:10px"><b>${esc(owner)} ปล่อยเช่า</b> ${money(rentP)}/วัน</div>${days(rentP)}`;
-      if (!sale && !rentP) body += '<div class="sub" style="margin-top:10px">ไม่ได้ประกาศขายหรือให้เช่า</div>';
-    }
-    if (me.house >= 0) body += '<div class="sub" style="color:var(--bad)">คุณมีบ้านแล้ว</div>';
-  }
-  return `<h2>🏠 บ้านเลขที่ ${i + 1}${owner ? ` · ของ ${esc(owner)}` : ' · ว่าง'}</h2>${body}`;
+  return `<h2>🏠 บ้านของ ${esc(owner)}</h2><div class="sub">ความสบาย ⭐ ${cf} ${furn.length ? furn.slice(0, 20).map(k => G.shop.furniture[fbase(k)]?.icon || '').join('') : ''}</div>
+    ${B('🚪 เข้าไปเยี่ยม', { t: 'enter', st }, 'primary big')}<div class="sub">เข้าได้ถ้าเจ้าของบ้านบันทึกเบอร์คุณไว้ (เป็นเพื่อนกัน) · ขอเบอร์ได้โดยแตะที่ตัวผู้เล่น</div>`;
 }
 // the lost-dog case: take it at the station, find the dog out in town before the time is up
 function dogBox(st) {
@@ -4290,15 +4284,28 @@ function drawTile(ch, tx, ty, px, py, tm) {
 }
 function houseInfo(b) {
   const h = wd?.houses?.[b.house]; if (!h) return { label: '🏠' };
-  const [owner, cf, , sale, rentP, tenant] = h, mine = me && me.house === b.house;
-  if (!owner) return { label: tenant ? `🔑 ${tenant}` : `🏷️ ขาย/เช่า #${b.house + 1}`, forSale: !tenant, mine: me?.rent?.idx === b.house };
-  return { label: `🏠 ${owner}${sale ? ' · ขาย' : rentP && !tenant ? ' · ให้เช่า' : ''}`, stars: cf, mine, forSale: !!sale };
+  const [owner, cf] = h, mine = me && me.house === b.house;
+  if (!owner) return { label: '🌱 ที่ว่าง' };
+  return { label: `🏠 บ้าน${owner}`, stars: cf, mine };
+}
+// village homes take the look their owner picked; an empty plot is just a lawn with a little sign
+function homeSprite(b) {
+  const i = b.house ?? b.yhouse; if (i === undefined) return b.sprite;
+  const h = wd?.houses?.[i]; if (!h || !h[0]) return b.house !== undefined ? '' : b.sprite;
+  return G.homeStyles?.[h[11]]?.[0] || b.sprite;
 }
 function drawBuildingSprite(b, X, Y) {
-  if (!spr(b.sprite, b.x + b.w / 2, b.y + b.h + .02, X, Y)) { ctx.fillStyle = '#8a7a6a'; ctx.fillRect(b.x * TS + X, b.y * TS + Y, b.w * TS, b.h * TS); }
+  const sp = homeSprite(b);
+  if (!sp) {
+    const x0 = b.x * TS + X, y0 = b.y * TS + Y;
+    ctx.fillStyle = '#6fae5e'; ctx.fillRect(x0, y0, b.w * TS, b.h * TS); ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = Math.max(2, TS * .08); ctx.setLineDash([TS * .25, TS * .18]); ctx.strokeRect(x0 + 2, y0 + 2, b.w * TS - 4, b.h * TS - 4); ctx.setLineDash([]);
+    ctx.font = `${Math.round(TS * .7)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🌱', x0 + b.w * TS / 2, y0 + b.h * TS / 2);
+    return;
+  }
+  if (!spr(sp, b.x + b.w / 2, b.y + b.h + .02, X, Y)) { ctx.fillStyle = '#8a7a6a'; ctx.fillRect(b.x * TS + X, b.y * TS + Y, b.w * TS, b.h * TS); }
 }
 function drawBuildingSign(b, X, Y) {
-  const s = atlas?.sprites[b.sprite]; const hTiles = s ? s[3] / atlas.tile : b.h;
+  const s = atlas?.sprites[homeSprite(b) || b.sprite]; const hTiles = s ? s[3] / atlas.tile : b.h;
   const cx = (b.x + b.w / 2) * TS + X, top = (b.y + b.h - hTiles) * TS + Y;
   if (b.house !== undefined) {
     const h = houseInfo(b);
@@ -5288,6 +5295,7 @@ function jgFinish(g) {
   bindPanel($('#mgBody'));
 }
 FN.gLink = gLinkOpen;
+FN.confirmSell = m => popup('💰 ขายบ้านคืนโครงการ? เฟอร์นิเจอร์และสวนจะหายไปด้วย (ได้เงินคืนบางส่วน)', [['ขายเลย', 'warn', () => send({ t: 'act', st: m.st, a: 'sell' })], ['ยกเลิก', '', () => { }]]);
 FN.jgGo = m => send({ t: 'jg', op: 'start', k: m.k });
 FN.jgClose = () => { jgStop(true); mgClose(); };
 function jgOpen(k, seed) {
