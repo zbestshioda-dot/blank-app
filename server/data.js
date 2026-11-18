@@ -684,6 +684,15 @@ const ICU = { pay: [55, 62, 70, 80, 90, 104, 120], next: 75000, energy: 6,
   cpr: { n: 20, bpm: [100, 110, 120] }, surgery: { steps: 5 },
   patients: ['คุณสมชาย (หัวใจหยุดเต้น)', 'ป้าบุญมี (หมดสติกลางตลาด)', 'น้องปิ่น (อุบัติเหตุจักรยาน)', 'ลุงเหม (ไส้ติ่งแตก)', 'พี่ก้อง (ถูกรถชน)', 'คุณยายทองคำ (หัวใจวาย)', 'หนุ่มนักวิ่ง (ล้มหมดสติ)', 'ช่างไฟ (ไฟดูด)'] };   // above office: needs a degree + licence
 // lost-dog cases for police: find the dog before the time runs out; pay = base + perMin x the minutes the search took (x a speed bonus when found early)
+// job mini-games, played on the client and paid by the server: score is capped by max and by how long the game ran (rate per second)
+const JOBGAMES = {
+  spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 40, min: 10, max: 5, per: 15, rate: .5 },
+  shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 40, min: 20, max: 30, per: 2.6, rate: 1.6 },
+  cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 25, min: 20, max: 10, per: 7, rate: .4 },
+  run:   { career: 'chef', name: 'เชฟวิ่งเก็บผัก', icon: '🥬', energy: 6, cd: 35, min: 8, max: 40, per: 4, rate: 1.6 },
+};
+// the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
+const THIEFQ = { energy: 6, next: 50000, base: 160, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
 const DOGQ = { next: 45000, energy: 5, base: 100, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
   dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],
   names: ['โมจิ', 'ถุงเงิน', 'ทองดี', 'บราวนี่', 'ข้าวปั้น', 'ลัคกี้', 'มะลิ', 'ซุปเปอร์', 'โบว์', 'หมูกรอบ', 'ลาเต้', 'ขาวจั๊วะ'],
@@ -939,6 +948,7 @@ const CAREERS = {
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง' },
   beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'สมัครได้ถ้ามีเงิน (สด+ฝาก) ไม่เกิน ฿2,000 · วิ่งเก็บขยะที่ถังขยะ (หลบสิ่งกีดขวางไปเรื่อยๆ จนกว่าจะชน) หรือนั่งขอทาน (🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ' },
+  cashier:  { name: 'พนักงานซูเปอร์มาร์เก็ต', icon: '🧾', where: 'cstore', need: [], desc: 'ยืนแคชเชียร์ที่ร้านสะดวกซื้อ/ซูเปอร์มาร์เก็ตสาขาไหนก็ได้ คิดเงินและทอนเงินลูกค้าให้ถูก ยิ่งถูกยิ่งได้มาก' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
 // the degree comes from classes at the university; other licences are bought
@@ -1377,6 +1387,6 @@ module.exports = { EGG, FORTUNES, RIDES, ENERGY_MUL,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

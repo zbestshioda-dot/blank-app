@@ -391,7 +391,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -863,8 +863,9 @@ function apply(a, career) {
     merchant: 'ประมูลสินค้าที่โรงประมูล เดาราคาแข่งกับคู่แข่ง ซื้อได้ต่ำกว่ามูลค่าจริง = กำไร',
     chef: 'ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง แล้วมาปรุงที่ครัวใหญ่',
     doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (กู้ชีพ ผ่าตัด ห้ามเลือด ฯลฯ ลงมือทำในห้องจริง) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
+    cashier: 'ไปที่ร้านสะดวกซื้อสาขาไหนก็ได้ เปิดหน้าร้านแล้วกด "เข้ากะแคชเชียร์" คิดเงินทอนให้ลูกค้าให้ถูก',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
-    police: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง',
+    police: 'ที่สถานีตำรวจ: รับเคสหมาหาย เคสตามจับโจร เล่นจับผิดภาพหาโจร และซ้อมยิงเป้า · ได้รถสายตรวจขับฟรี',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
   };
   toast(a, `ยินดีด้วย! ได้งานเป็น ${c.icon} ${c.name} · ${tips[career]}`, c.icon);
@@ -1283,7 +1284,19 @@ function act(a, m) {
         hint: bl && bl[1] < 14 ? `ใกล้ ${bl[0].label}` : (D.areaAt(sp[0], sp[1])?.name || 'ในเมือง'), hc: [Math.round(sp[0] + jit()), Math.round(sp[1] + jit()), 12] };
       markMe(a); return toast(a, `🐕 ${a.dogq.owner}แจ้งว่า "น้อง${a.dogq.name}" หายไป! ตามหาให้เจอภายใน ${Math.round(limit / 60000 * 10) / 10} นาที`, '🐕');
     }
-    case 'police.dogquit': { if (a.dogq) { a.dogq = null; a.dogNext = now() + D.DOGQ.next; markMe(a); toast(a, 'ยกเลิกเคสหมาหายแล้ว', 'ℹ️', false); } return; }
+    case 'police.thief': {                 // a thief was seen somewhere in town: drive out and catch him (red name, red dot on the map)
+      if (!need(a, 'police')) return;
+      if (a.dogq) return toast(a, 'คุณมีเคสค้างอยู่แล้ว ทำให้จบก่อน', 'ℹ️', false);
+      if ((a.thiefNext || 0) > now() && !godNoCd(a)) return toast(a, `ยังไม่มีแจ้งเหตุใหม่ รออีก ${Math.ceil((a.thiefNext - now()) / 1000)} วินาที`, '⏳', false);
+      const out = D.roomAt(a.x, a.y)?.outside, from = out ? { x: out.x, y: out.y } : a, sp = dogSpot({ x: from.x, y: from.y, area: 'town' });
+      if (!sp) return toast(a, 'ยังไม่มีแจ้งเหตุ ลองใหม่อีกครั้ง', 'ℹ️', false);
+      if (!spend(a, D.THIEFQ.energy)) return;
+      const limit = Math.round(Math.max(150, Math.min(360, sp[2] / SPEED * 2 + 60)) * 1000), t = now();
+      const stole = pick(D.THIEFQ.stole);
+      a.dogq = { kind: 'thief', dog: '', name: pick(D.THIEFQ.names), owner: `เจ้าของ${stole}`, stole, x: sp[0] + .5, y: sp[1] + .5, t0: t, limit, until: t + limit, hint: D.areaAt(sp[0], sp[1])?.name || 'ในเมือง', hc: null };
+      markMe(a); return toast(a, `🚨 แจ้งเหตุ! โจร "${a.dogq.name}" ฉก${a.dogq.stole}แล้วหนี · ดูจุดแดงบนมินิแมพ ขับรถสายตรวจไปจับให้ทันภายใน ${Math.round(limit / 6000) / 10} นาที`, '🚨');
+    }
+    case 'police.dogquit': { if (a.dogq) { if (a.dogq.kind === 'thief') a.thiefNext = now() + D.THIEFQ.next; else a.dogNext = now() + D.DOGQ.next; a.dogq = null; markMe(a); toast(a, 'ยกเลิกเคสหมาหายแล้ว', 'ℹ️', false); } return; }
     case 'icu.start': {                     // an emergency case, played out in the hospital: fetch what is needed, work on the patient
       if (!need(a, 'doctor')) return;
       if (a.mis) return toast(a, 'คุณมีเคส/ภารกิจค้างอยู่แล้ว', 'ℹ️', false);
@@ -1611,6 +1624,30 @@ function passTick() {           // passengers sit where their driver is; off whe
     const d = online.get(p.pass);
     if (!d || !d.ws || !riding(d) || d.down || p.down) { hopOff(p, d ? `${d.name} ลงจากรถแล้ว` : 'คนขับออกจากเกมแล้ว'); continue; }
     if (p.x !== d.x || p.y !== d.y) { p.x = d.x; p.y = d.y; p.f = d.f; p.moved = true; dirty = true; p.lastMoveT = now(); p.passOut = { x: d.x, y: d.y }; }
+  }
+}
+// job mini-games: start (energy, cooldown) -> play on the client -> end (score checked against time, then paid)
+function jobGame(a, m) {
+  const k = String(m.k || ''), J = D.JOBGAMES[k]; if (!J) return;
+  if (m.op === 'start') {
+    if (a.down) return;
+    if (a.career !== J.career && !allJobs(a)) return toast(a, `เกมนี้สำหรับ${D.CAREERS[J.career].name}`, '🚫', false);
+    const nx = (a.jgNext || {})[k] || 0; if (nx > now() && !godNoCd(a)) return toast(a, `พักก่อน อีก ${Math.ceil((nx - now()) / 1000)} วินาทีค่อยเล่นรอบใหม่`, '⏳', false);
+    if (a.jg && now() - a.jg.t0 < 120000) return send(a, { t: 'jg', k: a.jg.k, seed: a.jg.seed });   // still playing
+    if (depressed(a)) return toast(a, 'ไม่มีจิตใจจะทำงาน... (ความสุขต่ำมาก)', '😞', false);
+    if (!spend(a, J.energy)) return;
+    a.jg = { k, t0: now(), seed: rint(1, 1e9) }; markMe(a);
+    return send(a, { t: 'jg', k, seed: a.jg.seed });
+  }
+  if (m.op === 'end') {
+    const g = a.jg; if (!g || g.k !== k) return;
+    a.jg = null; a.jgNext = { ...(a.jgNext || {}), [k]: now() + J.cd * 1000 };
+    const secs = (now() - g.t0) / 1000;
+    const score = Math.max(0, Math.min(J.max, Math.floor(+m.score) || 0, Math.ceil(secs * J.rate) + 1));
+    const pay = Math.round(score * J.per * jobPay(a) * (1 + BOOST[tier(a, J.career)] || 1));
+    if (pay > 0) { earn(a, pay); addXp(a, score >= J.max * .5 ? 1 : .5); joy(a, score >= J.max * .7 ? 4 : 1); quest(a, k === 'run' ? 'cook' : 'work'); }
+    markMe(a);
+    return toast(a, pay > 0 ? `${J.icon} ${J.name}: ได้ ${score} คะแนน · ค่าแรง ${money(pay)}` : `${J.icon} ${J.name}: รอบนี้ยังไม่ได้คะแนน ลองใหม่นะ`, J.icon, pay > 0);
   }
 }
 function request(a, m) {
@@ -2159,6 +2196,17 @@ function dogSpot(a) {
 }
 function dogTick(a, t) {
   const c = a.dogq;
+  if (c.kind === 'thief') {
+    if (areaId(a) === 'town' && Math.hypot(a.x - c.x, a.y - c.y) < 2.2) {
+      const min = (t - c.t0) / 60000, early = t - c.t0 < c.limit * .5;
+      const pay = Math.round((D.THIEFQ.base + D.THIEFQ.perMin * min) * (early ? 1.25 : 1) * jobPay(a) * (1 + BOOST[tier(a, 'police')]));
+      a.dogq = null; a.thiefNext = t + D.THIEFQ.next; earn(a, pay); addXp(a, 1.2); joy(a, 8); markMe(a); send(a, { t: 'caught' });
+      feed(`🚓 ${a.name} จับโจร "${c.name}" ได้แล้ว!`);
+      return toast(a, `🚓 จับ "${c.name}" ได้แล้ว! ได้${c.stole}คืนเจ้าของ · รางวัล ${money(pay)}${early ? ' (จับไว โบนัส +25%)' : ''}`, '🚓');
+    }
+    if (t > c.until) { a.dogq = null; a.thiefNext = t + D.THIEFQ.next * 2; markMe(a); joy(a, -4); toast(a, `⏰ ช้าไป! "${c.name}" หนีออกนอกเมืองไปแล้ว`, '😤', false); }
+    return;
+  }
   if (areaId(a) === 'town' && Math.hypot(a.x - c.x, a.y - c.y) < 1.5) {          // found!
     const min = (t - c.t0) / 60000, early = t - c.t0 < c.limit * .5;
     const pay = Math.round((D.DOGQ.base + D.DOGQ.perMin * min) * (early ? 1 + D.DOGQ.early : 1) * jobPay(a) * (1 + BOOST[tier(a, 'police')]));
@@ -2614,7 +2662,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2624,7 +2672,7 @@ function meView(a) {
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
     cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
-    dogq: a.dogq ? { dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0,
+    dogq: a.dogq ? { kind: a.dogq.kind || 'dog', stole: a.dogq.stole, dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0, thiefNext: a.thiefNext || 0, jgNext: a.jgNext || {},
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
@@ -2660,22 +2708,56 @@ function marketView() {
 
 // ------------------------------------------------------------------ connection
 const byName = n => { n = String(n || '').toLowerCase(); for (const a of accounts.values()) if (a.name.toLowerCase() === n) return a; return null; };
-function login(ws, m) {
+// 🔑 Google sign-in: the browser gets an ID token from Google; we ask Google whether it is genuine and meant for us
+const GOOGLE_ID = process.env.GOOGLE_CLIENT_ID || '';
+async function googleCheck(cred) {
+  if (!GOOGLE_ID || typeof cred !== 'string' || cred.length > 4096) return null;
+  try {
+    const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(cred));
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j.aud !== GOOGLE_ID || !['accounts.google.com', 'https://accounts.google.com'].includes(j.iss) || String(j.email_verified) !== 'true' || +j.exp * 1000 < Date.now()) return null;
+    return { sub: String(j.sub), email: String(j.email || '') };
+  } catch { return null; }
+}
+const byGsub = sub => { for (const a of accounts.values()) if (a.gsub === sub) return a; return null; };
+async function googleLogin(ws, m) {
+  const g = await googleCheck(m.google);
+  if (!g) return fail(ws, 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง');
+  const a = byGsub(g.sub);
+  if (!a) return fail(ws, `บัญชี Google (${g.email}) ยังไม่ได้ผูกกับตัวละคร · เข้าเกมด้วย ID/PIN ก่อน แล้วไปที่ ตั้งค่า → ผูกบัญชี Google`);
+  if (!a.stok) a.stok = crypto.randomBytes(16).toString('hex');
+  return login(ws, { name: a.login }, a);
+}
+async function googleLink(a, m) {
+  if (m.off) { a.gsub = ''; a.gmail = ''; a.stok = ''; markMe(a); dirty = true; return toast(a, 'ยกเลิกการผูกบัญชี Google แล้ว', '🔑'); }
+  const g = await googleCheck(m.google);
+  if (!g) return toast(a, 'ผูกบัญชี Google ไม่สำเร็จ ลองใหม่อีกครั้ง', '🔑', false);
+  const o = byGsub(g.sub); if (o && o !== a) return toast(a, 'บัญชี Google นี้ผูกกับตัวละครอื่นไปแล้ว', '🔑', false);
+  a.gsub = g.sub; a.gmail = g.email; a.sd = true; dirty = true; markMe(a);
+  toast(a, `ผูกบัญชี Google (${g.email}) แล้ว! ครั้งหน้ากด "เข้าสู่ระบบด้วย Google" ได้เลย ไม่ต้องจำ PIN`, '🔑');
+}
+function login(ws, m, pre) {
+  if (m.google && !pre) { googleLogin(ws, m); return; }
+  if (!pre && m.tok && typeof m.tok === 'string') {          // the session key a Google sign-in left on this device
+    const t0 = accounts.get(cleanText(m.name, 16).toLowerCase());
+    if (t0 && t0.stok && t0.gsub && t0.stok === m.tok) pre = t0; else return fail(ws, 'การเข้าสู่ระบบหมดอายุ กด "เข้าสู่ระบบด้วย Google" อีกครั้ง');
+  }
   // m.name is the login ID; the character's display name (a.name) is chosen once at creation
-  const name = cleanText(m.name, 16);
+  const name = pre ? pre.login : cleanText(m.name, 16);
   if (!accounts.has(name.toLowerCase())) {     // new IDs: English letters and digits only (older Thai IDs still log in)
     if (/[^\x20-\x7e]/.test(name)) return fail(ws, 'ID ใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น (A-Z, 0-9, _ - .)');
     if (!/^[A-Za-z0-9_.-]{2,16}$/.test(name)) return fail(ws, 'ID ต้องยาว 2-16 ตัว ใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข และ _ - . (ห้ามเว้นวรรค)');
   }
   const pin = String(m.pin ?? '');
-  if (!/^\d{4,8}$/.test(pin)) return fail(ws, 'PIN ต้องเป็นตัวเลข 4-8 หลัก');
+  if (!pre && !/^\d{4,8}$/.test(pin)) return fail(ws, 'PIN ต้องเป็นตัวเลข 4-8 หลัก');
   const lname = name.toLowerCase(), t = now();
   const lock = loginFails.get('n:' + lname), ipLock = loginFails.get('i:' + ws.ip);
-  if (lock && lock.until > t) return fail(ws, `ใส่ PIN ผิดหลายครั้ง ลองใหม่ในอีก ${Math.ceil((lock.until - t) / 60000)} นาที`);
-  if (ipLock && ipLock.until > t) return fail(ws, `ลองเข้าสู่ระบบผิดบ่อยเกินไป ลองใหม่ในอีก ${Math.ceil((ipLock.until - t) / 60000)} นาที`);
-  let a = accounts.get(lname), isNew = false;
+  if (!pre && lock && lock.until > t) return fail(ws, `ใส่ PIN ผิดหลายครั้ง ลองใหม่ในอีก ${Math.ceil((lock.until - t) / 60000)} นาที`);
+  if (!pre && ipLock && ipLock.until > t) return fail(ws, `ลองเข้าสู่ระบบผิดบ่อยเกินไป ลองใหม่ในอีก ${Math.ceil((ipLock.until - t) / 60000)} นาที`);
+  let a = pre || accounts.get(lname), isNew = false;
   if (a) {
-    if (hashPin(pin, a.salt) !== a.hash) {
+    if (!pre && hashPin(pin, a.salt) !== a.hash) {
       loginFail('n:' + lname, 5, 5 * 60000); loginFail('i:' + ws.ip, 15, 10 * 60000);
       return fail(ws, 'ID นี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
     }
@@ -2705,10 +2787,10 @@ function login(ws, m) {
   dirty = true;
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
-    t: 'init', id: a.id,
+    t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -2719,7 +2801,7 @@ function login(ws, m) {
   sendRoster();
   if (!hidden(a)) feed(`👋 ${a.name} เข้าเมือง`);
 }
-function fail(ws, msg) { ws.send(JSON.stringify({ t: 'loginfail', msg })); }
+function fail(ws, msg) { try { if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'loginfail', msg })); } catch { } }
 
 const loginFails = new Map();
 function loginFail(key, max, ms) {
@@ -2966,6 +3048,8 @@ function onMessage(ws, raw) {
     case 'paybills': return payBills(a);
     case 'donate': return donate(a, m);
 
+    case 'jg': return jobGame(a, m);
+    case 'glink': googleLink(a, m); return;
     case 'hopoff': if (a.pass) hopOff(a); return;
     case 'wheelie': {                        // pop a wheelie on your bike (just for show, and a little fun)
       const v = riding(a); if (!v || v.kind !== 'moto' || a.ride === 'escoot' || !cd(a, 'whl', 1800, true)) return;
@@ -3321,6 +3405,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
+  if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
   if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town
   const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
