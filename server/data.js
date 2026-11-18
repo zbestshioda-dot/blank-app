@@ -10,6 +10,7 @@ const SPR = name => { const s = ATLAS.sprites[name]; return { w: s[2] / ATLAS.ti
 const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, y: 0, w: 110, h: 90 };
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
+const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 70, h: 37 };   // added later, in the free space under the farm (nothing older moves)
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
 const W = YX0 + 4 * 34, H = 90;                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
@@ -66,6 +67,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   rect(94, 33, 2, 45, '=');                                                           // coast road south
   rect(50, 76, 46, 2, '=');                                                           // south road
   rect(49, 4, 2, 20, '=');                                                            // north road
+  rect(49, 78, 2, 11, '=');                                                           // the main road runs on south, out to the amusement park
   rect(14, 14, 74, 2, '='); rect(14, 13, 74, 1, ',');                                 // north street
   rect(49, 40, 2, 36, '=');                                                           // south avenue
   rect(4, 46, 45, 2, '='); rect(4, 45, 45, 1, ',');                                   // south-west lane
@@ -570,7 +572,61 @@ for (const room of ROOMS.filter(r => r.rk === 'house' && !r.floor)) {
 const yardZone = (x, y) => Math.max(0, Math.min(2, Math.floor((x - 1) / YARD.zw))) + 3 * Math.max(0, Math.min(2, Math.floor((y - 1) / YARD.zh)));
 // the room a house floor lives in, and where you arrive on it
 const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house === house && (r.floor || 1) === fl);
-const AREAS = [TOWN, FARM, HOUSING, ...ROOMS, ...YARDS];
+// ================================================================= AMUSEMENT PARK: rides you sit on for a while; every second on a ride
+// gives back energy, health and happiness. A ticket buys a few minutes; walking away gets you off.
+// k: ride, cx/cy: centre of its footprint, w/h: footprint (solid), cap: riders at once, price: ticket, mins: ticket length,
+// gain: per second while riding
+const ENERGY_MUL = 1.3;   // every energy cost (jobs, quests, fishing...) x this
+const RIDES = {
+  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 60, mins: 3, cap: 6, gain: { energy: .5, health: .2, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
+  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 90, mins: 4, cap: 8, gain: { energy: .45, health: .3, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
+  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 120, mins: 2, cap: 6, gain: { energy: .3, health: .1, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
+  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 80, mins: 4, cap: 10, gain: { energy: .6, health: .55, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
+  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 70, mins: 2, cap: 4, gain: { energy: .3, health: .1, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
+  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 40, mins: 2, cap: 3, gain: { energy: .25, health: .1, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
+};
+{
+  const X = PARK.x, Y = PARK.y, P = PARK;
+  rect(P.x, P.y, P.w, P.h, '.');
+  for (let x = P.x; x < P.x + P.w; x++) { set(x, P.y, 'T'); set(x, P.y + P.h - 1, 'T'); }
+  for (let y = P.y; y < P.y + P.h; y++) { set(P.x, y, 'T'); set(P.x + P.w - 1, y, 'T'); }
+  rect(X + 1, Y + 17, 68, 3, 'k');                                   // the main promenade (west to east)
+  rect(X + 33, Y + 2, 4, 33, 'k');                                   // and the cross walk (north to south)
+  const ride = (k, cx, cy, w, h, solid = true) => {
+    const R = RIDES[k], x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+    if (solid) rect(x0, y0, w, h, 'o');
+    const sy = y0 + h + .6;
+    rect(Math.floor(cx) - 1, y0 + h, 2, Math.max(0, Y + 17 - (y0 + h)), 'k');   // a short path from the ride to the promenade (north side)
+    STATIONS.push({ id: 'ride_' + k, type: 'ride', k, label: R.name, icon: R.icon, x: cx, y: sy, r: 1.8, area: 'park', cx, cy, w, h });
+  };
+  ride('carousel', X + 17, Y + 9, 8, 6);
+  ride('ferris', X + 45, Y + 8, 8, 8);
+  ride('coaster', X + 60, Y + 9, 12, 6);
+  // south side: rides open toward the promenade, so their stations sit on their north edge
+  const rideS = (k, cx, cy, w, h, solid = true) => {
+    const R = RIDES[k], x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
+    if (solid) rect(x0, y0, w, h, 'o');
+    rect(Math.floor(cx) - 1, Y + 20, 2, Math.max(0, y0 - (Y + 20)), 'k');
+    STATIONS.push({ id: 'ride_' + k, type: 'ride', k, label: R.name, icon: R.icon, x: cx, y: y0 - .4, r: 1.8, area: 'park', cx, cy, w, h, top: 1 });
+  };
+  rect(X + 6, Y + 23, 18, 10, 'k'); rect(X + 7, Y + 24, 16, 8, 'w');   // the pool: tiled deck, water inside (the water is not walkable)
+  STATIONS.push({ id: 'ride_pool', type: 'ride', k: 'pool', label: RIDES.pool.name, icon: RIDES.pool.icon, x: X + 15, y: Y + 22.6, r: 2, area: 'park', cx: X + 15, cy: Y + 28, w: 16, h: 8, top: 1 });
+  rideS('bumper', X + 46, Y + 27, 10, 6, false);
+  { const x0 = X + 41, y0 = Y + 24; rect(x0, y0, 10, 6, 'k'); for (let i = 0; i < 10; i++) { set(x0 + i, y0, 'o'); set(x0 + i, y0 + 5, 'o'); } for (let j = 0; j < 6; j++) { set(x0, y0 + j, 'o'); set(x0 + 9, y0 + j, 'o'); } }   // the bumper car floor: you drive around inside its rubber wall
+  rideS('shooting', X + 60, Y + 26, 8, 4);
+  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 18.5, r: 1.6, area: 'park' });
+  prop('signpost', X + 4.2, Y + 16.9);
+  for (const [x, y] of [[X + 8, Y + 21], [X + 27, Y + 21], [X + 40, Y + 21], [X + 54, Y + 21], [X + 66, Y + 21]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y - .25, r: 1.1, area: 'park' }); }
+  for (const [x, y] of [[X + 10, Y + 16.9], [X + 30, Y + 16.9], [X + 40, Y + 16.9], [X + 62, Y + 16.9], [X + 30, Y + 21.4], [X + 40, Y + 21.4]]) prop('o_lampball', x, y);
+  for (const [x, y] of [[X + 26, Y + 6], [X + 28, Y + 12], [X + 4, Y + 6], [X + 5, Y + 12], [X + 67, Y + 30], [X + 28, Y + 30], [X + 30, Y + 34]]) prop('tree_pink', x, y);
+  for (let y = P.y; y < P.y + P.h; y++) for (let x = P.x; x < P.x + P.w; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
+  // the way in from town: an arch at the south edge, where the main road leaves town (like the farm and the housing estate)
+  STATIONS.push({ id: 'gate_park', type: 'gate', to: 'park_in', label: 'ไปสวนสนุก', icon: '🎡', x: 50, y: 87.2, r: 1.6, area: 'town' });
+  rect(49, 76, 2, 14, '='); for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][1] >= 88 && TREES[i][0] >= 47 && TREES[i][0] <= 52) TREES.splice(i, 1);   // a gap in the tree line for the road
+  prop('signpost', 52.7, 86.6);
+  GATES.park_in = { x: X + 5, y: Y + 18.5 }; GATES.town_from_park = { x: 50, y: 85.4 };
+}
+const AREAS = [TOWN, FARM, HOUSING, PARK, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
 for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;
@@ -1315,7 +1371,7 @@ const FORTUNES = [
   'โชคดีจะมาตอนที่คุณไม่ทันตั้งตัว', 'วันนี้เหมาะกับการโทรหาเพื่อนเก่า', 'น้ำพุบอกว่า... ขอเหรียญอีกสักเหรียญ', 'ดวงความรักสดใส ยิ้มเยอะๆ นะ',
   'เที่ยงคืนเป็นเวลาของสิ่งแปลกประหลาด', 'คนที่เดินผ่านคุณไปเมื่อกี้ อาจไม่ใช่คนธรรมดา', 'อดทนอีกนิด สิ่งที่รอจะมาถึง', 'วันนี้ใครให้อะไร รับไว้ด้วยรอยยิ้ม',
 ];
-module.exports = { EGG, FORTUNES,
+module.exports = { EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

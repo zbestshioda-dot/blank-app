@@ -141,6 +141,7 @@ function standUp(a) {
   if (a.desk >= 0) { if (desks[a.desk] === a) desks[a.desk] = null; a.desk = -1; }
   if (a.bed >= 0) { if (beds[a.bed] === a) beds[a.bed] = null; a.bed = -1; wdAt = 0; }
   if (a.pose) { a.pose = null; a.seat = null; }
+  a.fun = null;
   sendRoster();
 }
 function place(a, x, y, tp) {
@@ -148,6 +149,8 @@ function place(a, x, y, tp) {
   a.fixId = (a.fixId || 0) + 1;
   send(a, { t: 'fix', x, y, tp: tp ? 1 : 0, fx: a.fixId });
 }
+// off a park ride; out of the bumper car arena too (its wall is closed)
+function rideOff(a) { const k = a.fun?.k; standUp(a); if (k === 'bumper') { const s = D.STATIONS.find(x => x.id === 'ride_bumper'); if (s) place(a, s.x, s.y, true); } }
 function teleport(a, x, y) { a.cast = null; standUp(a); place(a, x, y, true); markMe(a); }
 function buildingOpen(bid, h = hourNow()) { return D.isOpen(bid, h); }
 function enterRoom(a, m) {
@@ -157,7 +160,8 @@ function enterRoom(a, m) {
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 1.2) return toast(a, 'เดินไปที่ประตูก่อน', '🚪', false);
   const master = isAdmin(a) && a.god?.doors;              // god mode: every door opens
   if (s.renov && !master) return toast(a, `${s.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
-  if (s.house === undefined && !buildingOpen(s.bld) && !master) {
+  const riderIn = s.bld === 'restaurant' && [...orders.values()].some(o => o.rider === a && o.state === 'taken');   // a rider with food to collect may slip in the back door
+  if (s.house === undefined && !buildingOpen(s.bld) && !master && !riderIn) {
     const o = D.HOURS[s.bld];
     return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false);
   }
@@ -305,6 +309,7 @@ function tradePrices(a) {
   return out;
 }
 function spend(a, e) {
+  e = Math.ceil(e * D.ENERGY_MUL);   // work and quests tire you more: the amusement park is where you get it back
   if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) กินอาหารหรือนั่งพักก่อน`, '😴', false); return false; }
   a.energy -= e;
   a.hunger = Math.max(0, a.hunger - e * 0.12);
@@ -386,7 +391,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -437,7 +442,8 @@ function hydrate(r) {
     if ((a.licenses || []).includes('driving')) a.licExp = { ...(a.licExp || {}), driving: now() + LICENSE_YEAR };
     a.v = 4;
   }
-  if (a.career === 'rider' && !a.riderBike && !(a.vehicles || []).includes('delivery')) { a.vehicles = [...(a.vehicles || []), 'delivery']; a.riderBike = 1; }   // riders already on the job get the company bike too
+  if (a.career === 'rider' && !a.riderBike && !(a.vehicles || []).includes('delivery')) { a.vehicles = [...(a.vehicles || []), 'delivery']; a.riderBike = 1; }
+  if (a.career === 'police' && !a.policeCar && !(a.vehicles || []).includes('police')) { a.vehicles = [...(a.vehicles || []), 'police']; a.policeCar = 1; }   // riders already on the job get the company bike too
   if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
   // fixed character names for special accounts (login ID -> character name)
   const RENAME = isAdmin(a) && !a.god?.renamed && String(a.login).toLowerCase() === 'james2324' ? ADMIN_NAME : null;
@@ -538,10 +544,44 @@ let nextOrder = 1, npcOrderAt = 0;
 const MENU = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].menu);
 const PICKUP = ST.restaurant;                      // the restaurant counter (inside)
 const RESTO_OUT = D.ROOMS.find(r => r.bld === 'restaurant').outside;
+// 🚕 taxi: call it on the phone (or dial its number), pick where to go; it drives up to you and drops you at the door
+const TAXI = { phone: '888888', base: 35, perTile: 1.6, far: 40, wait: 3500 };
+const TAXI_DEST = [
+  ...D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov).map(s => ({ id: s.id, label: s.label, icon: s.icon, x: s.x, y: s.y + .9 })),
+  { id: 'park', label: 'สวนสนุก', icon: '🎡', ...D.GATES.park_in },
+  { id: 'housing', label: 'หมู่บ้านจัดสรร', icon: '🏘️', ...D.GATES.housing_in },
+  { id: 'square', label: 'จัตุรัสกลางเมือง', icon: '⛲', x: 50, y: 34.5 },
+].filter(d => d.x !== undefined);
+function taxiFee(a, d) {
+  let area = areaId(a) || 'town'; if (area.startsWith('yard')) area = 'housing';
+  const here = area === 'housing' ? { x: 50, y: 4 } : area === 'park' ? { x: 50, y: 87 } : { x: a.x, y: a.y };
+  const there = d.id === 'housing' ? { x: 50, y: 4 } : d.id === 'park' ? { x: 50, y: 87 } : d;
+  return Math.round(TAXI.base + Math.hypot(here.x - there.x, here.y - there.y) * TAXI.perTile + (area !== 'town' ? TAXI.far : 0) + (d.id === 'park' || d.id === 'housing' ? TAXI.far : 0));
+}
+function taxiCall(a, m) {
+  if (a.down) return toast(a, 'คุณหมดสติอยู่ เรียกแท็กซี่ไม่ได้', '🚕', false);
+  const ar = areaId(a);
+  if (!ar || ROOM[ar] || ar === 'farm') return toast(a, 'ออกไปรอริมถนนข้างนอกก่อน แล้วค่อยเรียกแท็กซี่', '🚕', false);
+  if (a.taxi) return toast(a, 'แท็กซี่กำลังมารับ รอแป๊บนึงนะ', '🚕', false);
+  const d = TAXI_DEST.find(x => x.id === m.dest); if (!d) return;
+  if (Math.hypot(a.x - d.x, a.y - d.y) < 3) return toast(a, 'คุณอยู่ตรงนั้นแล้ว', '🚕', false);
+  const fee = taxiFee(a, d);
+  if (!pay(a, fee)) return;
+  a.taxi = d.id; standUp(a); if (a.ride) a.ride = ''; markMe(a);
+  send(a, { t: 'taxi', phase: 'come', x: a.x, y: a.y, wait: TAXI.wait });
+  toast(a, `🚕 เรียกแท็กซี่แล้ว ไป${d.label} ค่าโดยสาร ${money(fee)} · รถกำลังมารับ...`, '🚕');
+  setTimeout(() => {
+    if (a.taxi !== d.id) return; a.taxi = null;
+    if (a.down) { a.money += fee; markMe(a); return toast(a, 'เรียกแท็กซี่ไม่สำเร็จ คืนเงินแล้ว', '🚕', false); }
+    teleport(a, d.x, d.y);
+    send(a, { t: 'taxi', phase: 'drop', x: d.x, y: d.y });
+    toast(a, `🚕 ถึง${d.label}แล้ว ขอบคุณที่ใช้บริการแท็กซี่เมืองชีวิตครับ`, '🚕');
+  }, TAXI.wait);
+}
 function deliveryFee(x, y) {
   let area = D.areaAt(x, y)?.id || 'town'; if (area.startsWith('yard')) area = 'housing';   // a home yard is reached through the estate street
-  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
-  const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' ? 25 : 0);
+  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : area === 'park' ? { x: 50, y: 87 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
+  const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' || area === 'park' ? 25 : 0);
   return Math.round(D.RIDER.baseFee + d * D.RIDER.perTile);
 }
 const ridersOnline = () => [...online.values()].filter(r => r.career === 'rider' && !r.down);
@@ -789,6 +829,16 @@ function riderBikeTake(a) {
   a.riderBike = 0; a.vehicles = (a.vehicles || []).filter(x => x !== 'delivery'); if (a.ride === 'delivery') a.ride = '';
   toast(a, '🛵 ศูนย์ไรเดอร์ยึดรถมอไซค์ส่งอาหารคืนแล้ว (เพราะเปลี่ยนอาชีพ)', '🛵', false);
 }
+function policeCarGive(a) {
+  if ((a.vehicles || []).includes('police')) return;
+  a.vehicles = [...(a.vehicles || []), 'police']; a.policeCar = 1;
+  toast(a, '🚓 สถานีตำรวจให้ยืม "รถสายตรวจ" ฟรี 1 คัน! กดปุ่มรถเพื่อขับ · ถ้าเปลี่ยนอาชีพ สถานีจะยึดรถคืน', '🚓');
+}
+function policeCarTake(a) {
+  if (!a.policeCar) return;
+  a.policeCar = 0; a.vehicles = (a.vehicles || []).filter(x => x !== 'police'); if (a.ride === 'police') a.ride = '';
+  toast(a, '🚓 สถานีตำรวจยึดรถสายตรวจคืนแล้ว (เพราะเปลี่ยนอาชีพ)', '🚓', false);
+}
 function apply(a, career) {
   const c = D.CAREERS[career]; if (!c || career === 'none') return;
   if (a.career === career) return toast(a, `คุณเป็น${c.name}อยู่แล้ว`, 'ℹ️', false);
@@ -800,8 +850,10 @@ function apply(a, career) {
   if (a.career !== 'none' || (a.jobChanges || []).length) a.jobChanges = [...(a.jobChanges || []).filter(x => now() - x < 86400e3), now()];
   else a.jobChanges = [now() - 86400e3 + 1000];             // the very first job does not count against you
   if (a.career === 'rider' && career !== 'rider') riderBikeTake(a);
+  if (a.career === 'police' && career !== 'police') policeCarTake(a);
   standUp(a); a.career = career; a.cast = null;
   if (career === 'rider') riderBikeGive(a);
+  if (career === 'police') policeCarGive(a);
   markMe(a); sendRoster();
   feed(`💼 ${a.name} ได้งานเป็น${c.name}`);
   const tips = {
@@ -821,6 +873,7 @@ function resign(a) {
   const c = D.CAREERS[a.career];
   if (a.career === 'office') { a.xp.office = 0; a.office = null; }
   if (a.career === 'rider') riderBikeTake(a);
+  if (a.career === 'police') policeCarTake(a);
   standUp(a); a.career = 'none'; a.cast = null; markMe(a); sendRoster();
   for (const o of orders.values()) if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; }
   toast(a, `ลาออกจากงาน${c.name}แล้ว`, '📦');
@@ -882,7 +935,7 @@ function act(a, m) {
   if (a.down) return toast(a, 'คุณหมดสติอยู่ ทำอะไรไม่ได้', '💤', false);
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
   const h = hourNow();
-  if (!D.isOpen(s.type, h)) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
+  if (!D.isOpen(s.type, h) && !(s.type === 'restaurant' && m.a === 'pickup')) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
   const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
   if (WORK.has(key) && depressed(a)) return toast(a, 'คุณซึมเศร้า ไม่มีจิตใจจะทำอะไรเลย... ลองกินของที่อยากกิน นั่งเล่นที่จัตุรัส หรือโทรคุยกับเพื่อน', '😞', false);
   const wb = wellbeing(a);
@@ -895,6 +948,19 @@ function act(a, m) {
       if (!cd(a, 'door', 1200, true)) return;
       return teleport(a, g.x, g.y);
     }
+    case 'ride.play': {                    // amusement park: buy a ticket and get on (walking away gets you off)
+      const R = D.RIDES[s.k]; if (!R) return;
+      if (a.fun?.k === s.k) return toast(a, `คุณเล่น${R.name}อยู่แล้ว เดินออกเพื่อลง`, 'ℹ️', false);
+      const riders = [...online.values()].filter(o => o !== a && o.fun?.k === s.k);
+      if (riders.length >= R.cap) return toast(a, `${R.name}เต็มแล้ว (${R.cap} คน) รอคิวสักครู่`, '⏳', false);
+      if (!pay(a, R.price)) return;
+      const used = new Set(riders.map(o => o.fun.slot)); let slot = 0; while (used.has(slot)) slot++;
+      standUp(a); a.cast = null; a.pose = 'fun'; a.fun = { k: s.k, slot, until: now() + R.mins * 60000 };
+      if (s.k === 'bumper') place(a, s.cx - 3 + (slot % 4) * 2, s.cy + .3, true); else place(a, s.x, s.y);   // bumper cars: you drive it yourself inside the arena
+      markMe(a); sendRoster(); joy(a, 2); stat(a, 'rides');
+      return toast(a, s.k === 'bumper' ? `🚗 ขึ้นรถบั๊มพ์แล้ว! ขับไปชนคนอื่นได้เลย ได้พลังงาน เลือด และความสุขทุกวินาที (${R.mins} นาที) · กดปุ่ม "ลงจากรถ" เพื่อออก` : `${R.icon} ขึ้น${R.name}แล้ว! ได้พลังงาน เลือด และความสุขทุกวินาที (${R.mins} นาที) · เดินออกเพื่อลง`, R.icon);
+    }
+    case 'ride.stop': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'seat.sit': {
       for (const o of online.values()) if (o !== a && o.seat === s.id) return toast(a, 'ที่นั่งนี้มีคนนั่งแล้ว', '🪑', false);
       standUp(a); a.pose = 'seat'; a.seat = s.id; place(a, s.x, s.y); quest(a, 'sit'); sendRoster(); joy(a, 3);
@@ -1417,6 +1483,7 @@ function act(a, m) {
       const own = (a.vehicles || []).includes(m.v);
       if (m.a === 'sell') {
         if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false);
+        if (m.v === 'police' && a.policeCar) return toast(a, 'รถสายตรวจเป็นของสถานีตำรวจ (ยืมใช้) ขายไม่ได้', '🚓', false);
         if (m.v === 'delivery' && a.riderBike) return toast(a, 'รถคันนี้เป็นของศูนย์ไรเดอร์ (ยืมใช้) ขายไม่ได้', '🛵', false); const back = Math.round(v.price * .6);
         a.vehicles = a.vehicles.filter(x => x !== m.v); if (a.ride === m.v) a.ride = ''; a.money += back; markMe(a); sendRoster();
         return toast(a, `ขาย${v.name}ให้โชว์รูม ได้ ${money(back)} (60%)`, '💰');
@@ -1698,7 +1765,7 @@ function rivalSpawn(a, force) {
 }
 function rivalTick(a, t) {
   if (a.career !== 'rider' && !allJobs(a)) { if (a.rival) { a.rival = null; markMe(a); } return; }
-  if (a.career === 'rider' && !a.rival && !a.rb && t > (a.rivalNext || (a.rivalNext = t + rnd(120, 240) * 1000))) { a.rivalNext = t + rnd(240, 420) * 1000; rivalSpawn(a); }
+  if (a.career === 'rider' && !a.rival && !a.rb && t > (a.rivalNext || (a.rivalNext = t + rnd(45, 90) * 1000))) { a.rivalNext = t + rnd(100, 200) * 1000; rivalSpawn(a); }
   const r = a.rival; if (!r) return;
   if (t > r.until) { a.rival = null; markMe(a); return toast(a, `${r.name} แย่งลูกค้าไปส่งแล้ว... ช้าไปนิด`, '🧡', false); }
   if (areaId(a) === 'town' && Math.hypot(a.x - r.x, a.y - r.y) < 1.5) {          // caught up: battle!
@@ -2489,7 +2556,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -2608,7 +2675,7 @@ function login(ws, m) {
     t: 'init', id: a.id,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -2703,7 +2770,7 @@ function move(a, m) {
   const d = Math.hypot(x - a.x, y - a.y);
   if (d > a.mvb + 0.05 || !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y))) return place(a, a.x, a.y);
   a.mvb -= d;
-  if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0)) standUp(a);
+  if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper') standUp(a);   // (bumper cars are driven: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
   if (a.run && !godLock(a) && !riding(a)) {               // running burns energy; too tired = back to walking
     a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); a.runT = t;
@@ -2759,6 +2826,7 @@ function onMessage(ws, raw) {
     }
     case 'act': return act(a, m);
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
+    case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
 
@@ -2907,6 +2975,7 @@ function onMessage(ws, raw) {
     case 'title': { if (!m.id || (a.ach || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
     case 'order': return placeOrder(a, m);
     case 'order_take': case 'order_drop': case 'order_deliver': case 'order_cancel': return riderAct(a, m);
+    case 'taxi': return taxiCall(a, m);
     case 'contact_add': case 'contact_del': case 'contact_pin': case 'call': case 'call_msg': case 'call_end': return phoneAct(a, m);
     case 'req': return request(a, m);
     case 'req_ans': return answerReq(a, m);
@@ -3099,6 +3168,12 @@ function tick() {
     }
     // ---- energy, hunger, health
     const restMul = a.pose === 'rest' ? 3 : a.pose === 'seat' ? 2 : a.pose === 'bed' ? 2 : 1;
+    if (a.pose === 'fun' && a.fun) {          // on a park ride: energy, health and happiness come back every second
+      const R = D.RIDES[a.fun.k];
+      if (!R || D.areaAt(a.x, a.y)?.id !== 'park') standUp(a);
+      else if (t > a.fun.until) { rideOff(a); markMe(a); toast(a, `หมดเวลา${R.name}แล้ว ซื้อตั๋วใหม่เพื่อเล่นต่อได้เลย`, R.icon); }
+      else { a.energy = Math.min(100, a.energy + R.gain.energy * dt); if (!a.down) a.health = Math.min(100, a.health + R.gain.health * dt); a.happy = Math.min(100, (a.happy ?? 80) + R.gain.happy * dt); }
+    }
     if (a.pose !== 'chair' && a.pose !== 'study') a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt);
     a.hunger = Math.max(0, a.hunger - 0.045 * dzProd(a, 'hunger') * (flu ? 1.3 : 1) * (a.down ? 0.2 : 1) * dt);
     if (!a.down) {
