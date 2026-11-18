@@ -649,6 +649,7 @@ function riderAct(a, m) {
     if (o.cust === a) return toast(a, 'รับออเดอร์ของตัวเองไม่ได้', '🛵', false);
     if ([...orders.values()].filter(x => x.rider === a).length >= 3) return toast(a, 'รับได้ทีละไม่เกิน 3 ออเดอร์', '🛵', false);
     if (!hasLic(a, 'driving')) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุแล้ว! ต่ออายุที่มหาวิทยาลัย (ปีละครั้ง)' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
+    if (!spend(a, 5)) return;                       // every job / quest costs energy
     o.state = 'taken'; o.rider = a; o.riderName = a.name; o.takenAt = now(); custNpcAdd(o);
     if (o.cust) toast(o.cust, `${a.name} รับออเดอร์แล้ว กำลังไปรับอาหารที่ร้าน`, '🛵');
     toast(a, 'รับออเดอร์แล้ว! ไปรับอาหารที่เคาน์เตอร์ร้านอาหารก่อน', '🛵');
@@ -1595,6 +1596,23 @@ function tradeConfirm(a) {
   markMe(tr.a); markMe(tr.b);
   tradeClose(tr, '✅ แลกเปลี่ยนสำเร็จ!');
 }
+// 🛵 passengers: ride pillion on a friend's bike, or in their car. The passenger just follows the driver around.
+const seatsOf = k => { const v = D.VEHICLES[k]; return !v ? 0 : v.kind === 'moto' ? (k === 'escoot' ? 0 : 1) : v.kind === 'car' ? (k === 'van' ? 5 : k === 'sports' || D.VEHICLES[k].gem ? 1 : 3) : 0; };
+const passengersOf = d => [...online.values()].filter(p => p.pass === d.id);
+function hopOff(p, why) {
+  const d = online.get(p.pass); p.pass = null;
+  const out = d && D.areaAt(d.x, d.y)?.kind !== 'room' && !D.blocked(d.x, d.y + .9) ? { x: d.x, y: d.y + .9 } : p.passOut || { x: p.x, y: p.y };
+  place(p, out.x, out.y, true); markMe(p); sendRoster();
+  if (why) toast(p, why, '🚶', false);
+}
+function passTick() {           // passengers sit where their driver is; off when the driver stops riding or leaves
+  for (const p of online.values()) {
+    if (!p.pass) continue;
+    const d = online.get(p.pass);
+    if (!d || !d.ws || !riding(d) || d.down || p.down) { hopOff(p, d ? `${d.name} ลงจากรถแล้ว` : 'คนขับออกจากเกมแล้ว'); continue; }
+    if (p.x !== d.x || p.y !== d.y) { p.x = d.x; p.y = d.y; p.f = d.f; p.moved = true; dirty = true; p.lastMoveT = now(); p.passOut = { x: d.x, y: d.y }; }
+  }
+}
 function request(a, m) {
   if (a.down) return;
   const bn = botById(+m.to);
@@ -1606,6 +1624,11 @@ function request(a, m) {
   } else if (m.kind === 'heal') {
     if (a.career !== 'doctor' && !allJobs(a)) return toast(a, 'ต้องเป็นแพทย์เท่านั้น', '🚫', false);
     if (o.health >= 95) return toast(a, `${o.name} สุขภาพดีอยู่แล้ว`, 'ℹ️', false);
+  } else if (m.kind === 'hop') {
+    const v = riding(o);
+    if (!v || !seatsOf(o.ride)) return toast(a, `${o.name} ไม่ได้ขี่มอไซค์หรือขับรถที่มีที่นั่งให้ซ้อนอยู่`, '🛵', false);
+    if (a.pass) return toast(a, 'คุณนั่งรถคันอื่นอยู่แล้ว', '🛵', false);
+    if (passengersOf(o).length >= seatsOf(o.ride)) return toast(a, 'รถคันนั้นเต็มแล้ว', '🛵', false);
   } else if (m.kind === 'phone') {
     if ((a.contacts || []).some(c => c.p === o.phone)) return toast(a, `มีเบอร์ ${o.name} อยู่แล้ว`, '📇', false);
     const ask = (a.phoneAsk || {})[o.login];
@@ -1625,6 +1648,14 @@ function answerReq(a, m) {
   const f = r.from;
   if (r.kind === 'call') return answerCall(a, f, m.ok);
   if (r.kind === 'phone') return answerPhone(a, f, m.ok);
+  if (r.kind === 'hop') {
+    if (!m.ok) return toast(f, `${a.name} ไม่ให้ซ้อน`, '🙅', false);
+    if (!riding(a) || passengersOf(a).length >= seatsOf(a.ride) || f.pass || f.down || dist(a, f) > 6) return toast(f, 'ขึ้นรถไม่ได้แล้ว (รถออกไปแล้วหรือเต็ม)', '🛵', false);
+    standUp(f); f.ride = ''; f.cast = null; f.pass = a.id; f.passOut = { x: f.x, y: f.y }; place(f, a.x, a.y, true); markMe(f); sendRoster();
+    const moto = D.VEHICLES[a.ride].kind === 'moto';
+    toast(f, `${moto ? '🛵 ซ้อนท้าย' : '🚗 ขึ้นรถ'} ${a.name} แล้ว! กดปุ่ม "ลงรถ" เพื่อลง`, moto ? '🛵' : '🚗');
+    return toast(a, `${f.name} ${moto ? 'ซ้อนท้าย' : 'ขึ้นรถ'}คุณแล้ว`, moto ? '🛵' : '🚗');
+  }
   if (!m.ok) return toast(f, `${a.name} ปฏิเสธ`, '🙅', false);
   if (!online.has(f.id) || dist(a, f) > 7 || areaId(a) !== areaId(f)) return toast(a, 'อีกฝ่ายอยู่ไกลเกินไปแล้ว', '⚠️', false);
   if (r.kind === 'trade') {
@@ -1769,6 +1800,8 @@ function rivalTick(a, t) {
   const r = a.rival; if (!r) return;
   if (t > r.until) { a.rival = null; markMe(a); return toast(a, `${r.name} แย่งลูกค้าไปส่งแล้ว... ช้าไปนิด`, '🧡', false); }
   if (areaId(a) === 'town' && Math.hypot(a.x - r.x, a.y - r.y) < 1.5) {          // caught up: battle!
+    if (a.energy < 4 * D.ENERGY_MUL) { a.rival = null; markMe(a); return toast(a, `ทันตัว${r.name}แล้ว แต่หมดแรงจะแข่ง (ต้องมีพลังงาน ⚡) — มันแย่งลูกค้าไปแล้ว`, '😵', false); }
+    spend(a, 4);
     const bike = a.ride && D.VEHICLES[a.ride] ? 3 : 0;
     a.rb = { foe: { ...rbStats(r.lv), name: r.name }, me: { ...rbStats(lvl(a), bike), name: a.name, drinks: 2 }, cust: r.cust, turn: 0 };
     a.rival = null; markMe(a); send(a, { t: 'rb', start: 1, st: rbView(a) });
@@ -2556,7 +2589,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -2581,7 +2614,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2762,6 +2795,7 @@ function move(a, m) {
   // moves sent before the client saw our last correction are stale: drop them quietly instead of correcting again
   if ((+m.fx || 0) < (a.fixId || 0)) return;
   if (a.down) return place(a, a.x, a.y);
+  if (a.pass) return;                                       // a passenger goes where the driver goes
   const t = now(), dt = Math.min(4, (t - a.lastPosT) / 1000);
   a.lastPosT = t;
   // budget refills at the player's speed (+35% slack); it can bank ~4 s of walking, so a phone that stalls and then
@@ -2932,11 +2966,19 @@ function onMessage(ws, raw) {
     case 'paybills': return payBills(a);
     case 'donate': return donate(a, m);
 
+    case 'hopoff': if (a.pass) hopOff(a); return;
+    case 'wheelie': {                        // pop a wheelie on your bike (just for show, and a little fun)
+      const v = riding(a); if (!v || v.kind !== 'moto' || a.ride === 'escoot' || !cd(a, 'whl', 1800, true)) return;
+      for (const o of online.values()) if (o.ws && dist(o, a) < 30) send(o, { t: 'whl', id: a.id });
+      if (cd(a, 'whlJoy', 20000, true)) joy(a, 1);
+      return;
+    }
     case 'ride': {                           // get on / off one of your vehicles
       const k = String(m.v || '');
       if (!k || a.ride === k && !m.on) { if (D.VEHICLES[a.ride]?.fly && D.blocked(a.x, a.y)) return toast(a, 'หาที่โล่งลงจอดก่อน 🚁', '🚁', false); a.ride = ''; }
       else {
         const v = D.VEHICLES[k]; if (!v || !(a.vehicles || []).includes(k)) return;
+        if (a.pass) hopOff(a);
         if (v.license && !hasLic(a, v.license)) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุ! ต่ออายุที่มหาวิทยาลัยก่อนขับ' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
         a.ride = k;
       }
@@ -3120,7 +3162,7 @@ function resetChar(a, m) {
 // ------------------------------------------------------------------ simulation
 let lastTick = now(), wdAt = 0, saveAt = 0, slowAt = 0, marketAt = 0, lastHour = hourNow();
 function tick() {
-  stockTick();
+  stockTick(); passTick();
   { let ch = false; for (const a of online.values()) { const v = castPub(a); if (v !== (a._fc || 0)) { a._fc = v; ch = true; } } if (ch) sendRoster(); }
   const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;
   const h = hourNow();
