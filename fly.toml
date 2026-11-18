@@ -3,7 +3,7 @@
 # See https://docs.fly.io/reference/configuration for information about how to use this file.
 #
 
-app = 'sleepxzx'
+app = 'newlifetown'
 primary_region = 'sin'
 
 [build]
