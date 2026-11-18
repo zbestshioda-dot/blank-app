@@ -252,6 +252,14 @@ const GARDEN = { lotPrice: 2500, startPlots: 2, maxPlots: 6, expand: [0, 0, 900,
 // ================================================================= HOUSING (houses to buy / rent)
 const HOUSE_SPRITES = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
 const HOUSE_PRICES = [], HOUSE_RENT = [];
+// homes belong to players, not to the plots: buy one from the estate agent and it stands on a free plot of the village
+// while you are online (the village is made of the homes of whoever is around). Tiers decide the starting floors / yard.
+const HOME_TIERS = [
+  { name: 'บ้านเล็ก', icon: '🏠', price: 20000, floors: 0, zones: 0, desc: 'บ้านชั้นเดียว สวนหน้าบ้าน แปลงผัก 2 แปลง · ต่อเติมทีหลังได้' },
+  { name: 'บ้านกลาง', icon: '🏡', price: 65000, floors: 1, zones: 1, desc: 'บ้าน 2 ชั้น + ขยายสวนให้แล้ว 1 โซน' },
+  { name: 'บ้านใหญ่', icon: '🏘️', price: 160000, floors: 2, zones: 2, desc: 'บ้าน 3 ชั้นเต็ม + ขยายสวนให้แล้ว 2 โซน' },
+];
+const HOME_STYLES = [['h_cottage1', 'กระท่อมไม้'], ['h_gable_red', 'หลังคาจั่วแดง'], ['h_cottage3', 'บ้านสวนอิฐ'], ['h_cottage2', 'บ้านหลังคาเขียว'], ['h_gable_blue', 'หลังคาจั่วฟ้า'], ['h_cottage4', 'บ้านพาสเทล']];
 {
   const X = HOUSING.x;
   rect(X + 2, 21, 64, 2, '='); rect(X + 2, 20, 64, 1, ',');
@@ -1388,5 +1396,5 @@ module.exports = { EGG, FORTUNES, RIDES, ENERGY_MUL,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
-  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
+  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

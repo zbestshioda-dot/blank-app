@@ -166,7 +166,9 @@ function enterRoom(a, m) {
     return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false);
   }
   if (s.house !== undefined) {
-    const i = s.house, o = houses[i], tn = tenants[i];
+    const i = s.house, o = houses[i], tn = null;
+    if (!o && !master) return toast(a, 'ที่ดินแปลงนี้ว่างอยู่ · อยากมีบ้าน ซื้อได้ที่คุณจิ๋ม สำนักงานอสังหาฯ 🏡', '🌱', false);
+    if (o !== a && !master && friendOf(o, a)) { if (!cd(a, 'door', 1200, true)) return; if (s.yspawn) return teleport(a, s.yspawn.x, s.yspawn.y); return teleport(a, room.spawn.x, room.spawn.y); }   // friends may come in
     if (o === a && tn && tn !== a && !master) return toast(a, `บ้านของคุณปล่อยให้ ${tn.name} เช่าอยู่ เข้าได้อีกครั้งเมื่อหมดสัญญาเช่า`, '🔑', false);
     if (o !== a && tn !== a && !master) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
   }
@@ -269,7 +271,7 @@ function starterYard(a) {
 }
 const yardOpen = (a, z) => D.YARD.start.includes(z) || (a.yz || []).includes(z);   // bought furniture + login-reward pieces (kept even without a house)
 const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
-const comfort = a => houseOf(a) >= 0 ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) : 0;
+const comfort = a => a.hown ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) : 0;
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
@@ -391,7 +393,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -399,9 +401,17 @@ async function load() {
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
-    if (a.house >= 0) { if (houses[a.house]) a.house = -1; else houses[a.house] = a; }
+    if (a.house >= 0 && !a.hown) {                     // the old fixed houses become the owner's own home (it now stands wherever there is room)
+      const sp = D.BUILDINGS.find(b => b.house === a.house)?.sprite, st = Math.max(0, D.HOME_STYLES.findIndex(h => h[0] === sp));
+      a.hown = { style: st, tier: Math.min(2, a.hlv || 0) }; a.sd = true;
+    }
+    a.house = -1;                                       // plots are handed out again while players are online
     if (a.garden) { if (lots[a.garden.lot]) a.garden = null; else lots[a.garden.lot] = a; }
-    if (a.rent && a.rent.until > now()) tenants[a.rent.idx] = a; else a.rent = null;
+    if (a.rent) {                                       // renting is gone (anyone can own a home now): give back the days left
+      const left = Math.max(0, Math.ceil((a.rent.until - now()) / D.DAY_MS)); if (left > 0) a.money += left * (D.HOUSE_RENT[a.rent.idx] || 0);
+      a.rent = null; a.sd = true;
+    }
+    a.houseSale = 0; a.houseRent = 0;
     byPhone.set(a.phone, a);
   }
   console.log(`loaded ${accounts.size} players`);
@@ -423,7 +433,7 @@ function hydrate(r) {
     if (a.house >= 0) { a.money += 30000; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; }   // the old houses were demolished: refund
     a.x = D.SPAWN.x; a.y = D.SPAWN.y; a.v = 2;
   }
-  if (a.house >= 0 && !a.yfree) starterYard(a);    // homes bought before yards existed get their two starter fields too
+  if (a.hown && !a.yfree) starterYard(a);    // homes bought before yards existed get their two starter fields too
   if (!a.look || !a.look.pants) {                   // looks moved to the pixel character: refund the old hairstyles/hats, keep the shirt colour
     const OLD = { swept: 900, m: 600, pony: 1400, bun: 1400, braid: 1800, beanie: 900, straw: 700, beret: 1600, green: 1600, hood: 2500 };
     const W = a.wardrobe || {}; a.money += [...(W.hair || []), ...(W.hat || [])].reduce((t, k) => t + (OLD[k] || 0), 0) + Math.max(0, (W.shirt || []).length - 1) * 500;
@@ -535,7 +545,33 @@ function stockTrade(a, m) {
 
 // ------------------------------------------------------------------ world objects owned by players
 const houses = D.HOUSE_PRICES.map(() => null);    // house idx -> owner account
-const tenants = D.HOUSE_PRICES.map(() => null);   // house idx -> tenant account
+const tenants = D.HOUSE_PRICES.map(() => null);   // (renting was removed; kept empty so old checks stay harmless)
+// 🏘️ the village is made of the homes of the players who are online: each owner gets a free plot while around,
+// and the plot is freed when they leave (once their guests have gone too)
+const PLOT_AREAS = D.HOUSE_PRICES.map((_, i) => new Set([...D.ROOMS.filter(r => r.rk === 'house' && r.house === i).map(r => r.id), 'yard' + i]));
+const plotBusy = (i, but) => [...online.values()].some(o => o !== but && o.ws && PLOT_AREAS[i].has(areaId(o)));
+const friendOf = (o, a) => !!o && (o.contacts || []).some(c => c.p === a.phone);
+const canVisit = (a, i) => houses[i] === a || isAdmin(a) && a.god?.doors || friendOf(houses[i], a);
+function plotGive(a) {
+  if (!a.hown || a.house >= 0) return a.house;
+  const free = houses.map((h, i) => i).filter(i => !houses[i] && !plotBusy(i));
+  if (!free.length) return -1;
+  const i = pick(free); houses[i] = a; a.house = i; a.fixYard = 1; markMe(a); wdAt = 0;
+  return i;
+}
+function plotTick() {
+  houses.forEach((o, i) => { if (o && (!o.ws || !o.hown) && !plotBusy(i, o)) { houses[i] = null; o.house = -1; wdAt = 0; } });
+  for (const a of online.values()) if (a.ws && a.hown && a.house < 0 && plotGive(a) >= 0 && a.wakeHome) { a.wakeHome = 0; const y = D.YARDS[a.house]; if (y) teleport(a, y.spawn.x, y.spawn.y); }
+}
+function goHome(a, o = a) {
+  if (o !== a && !canVisit(a, o.house)) return toast(a, `${o.name} ยังไม่ได้บันทึกเบอร์คุณเป็นเพื่อน เข้าบ้านไม่ได้`, '🔒', false);
+  const i = o === a ? plotGive(a) : o.house;
+  if (i < 0) return toast(a, o === a ? 'หมู่บ้านเต็มชั่วคราว รอสักครู่จะมีที่ว่าง' : `${o.name} ยังไม่มีบ้านตั้งในหมู่บ้านตอนนี้`, '🏘️', false);
+  const y = D.YARDS[i]; if (!y) return;
+  if (!cd(a, 'door', 1200, true)) return;
+  teleport(a, y.spawn.x, y.spawn.y);
+  if (o !== a && o.ws) toast(o, `🏡 ${a.name} มาเยี่ยมบ้านคุณ`, '🏡');
+}
 const lots = D.LOTS.map(() => null);              // garden lot idx -> owner account
 
 // ------------------------------------------------------------------ food delivery
@@ -1425,44 +1461,35 @@ function act(a, m) {
       return toast(a, `เก็บเกี่ยว ${D.ITEMS[p[0]].icon}${D.ITEMS[p[0]].name} ได้ ${n} หน่วย`, '🧺');
     }
     // ---------------- houses
-    case 'house.buy': {
-      const i = s.house, o = houses[i];
-      if (o === a) return toast(a, 'บ้านหลังนี้เป็นของคุณแล้ว', 'ℹ️', false);
-      if (a.house >= 0) return toast(a, 'คุณมีบ้านแล้ว (ขายหลังเดิมก่อน)', '🏠', false);
-      if (tenants[i] && tenants[i] !== a) return toast(a, 'บ้านหลังนี้มีคนเช่าอยู่', '🏠', false);
-      if (o && !o.houseSale) return toast(a, `บ้านของ ${o.name} ไม่ได้ประกาศขาย`, '🏠', false);
-      const price = o ? o.houseSale : D.HOUSE_PRICES[i];
-      if (!pay(a, price)) return;
-      if (o) { credit(o, price); o.house = -1; o.furniture = []; o.hlv = 0; o.fpos = {}; o.yz = []; o.ycrops = {}; o.houseSale = 0; o.houseRent = 0; if (o.ws) toast(o, `${a.name} ซื้อบ้านของคุณแล้ว ได้ ${money(price)}`, '🏠'); }
-      if (tenants[i] === a) { tenants[i] = null; a.rent = null; }
-      houses[i] = a; a.house = i; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.houseSale = 0; a.houseRent = 0; starterYard(a); markMe(a); wdAt = 0;
-      feed(`🏠 ${a.name} ซื้อบ้านหลังใหม่ในหมู่บ้านจัดสรร!`);
-      return toast(a, 'ยินดีด้วย! ได้บ้านแล้ว พร้อมสวนรอบบ้านและแปลงผัก 2 แปลง · ขยายสวนได้ที่ป้าย 🔓 ซื้อของแต่งสวนที่ร้านเฟอร์นิเจอร์', '🏠');
-    }
-    case 'house.rent': {
-      const i = s.house, o = houses[i], days = [1, 3, 7].includes(+m.days) ? +m.days : 1;
-      if (o === a) return toast(a, 'นี่บ้านของคุณเอง', 'ℹ️', false);
-      if (a.house >= 0) return toast(a, 'คุณมีบ้านอยู่แล้ว', 'ℹ️', false);
-      if (tenants[i] && tenants[i] !== a) return toast(a, `${tenants[i].name} เช่าอยู่`, '🏠', false);
-      if (a.rent && a.rent.idx !== i) return toast(a, 'คุณเช่าบ้านหลังอื่นอยู่', '🏠', false);
-      if (o && !o.houseRent) return toast(a, `${o.name} ไม่ได้ปล่อยเช่า`, '🏠', false);
-      const perDay = o ? o.houseRent : D.HOUSE_RENT[i], cost = perDay * days;
-      if (!pay(a, cost)) return;
-      if (o) { credit(o, cost); if (o.ws) toast(o, `${a.name} เช่าบ้านของคุณ ${days} วัน ได้ ${money(cost)}`, '🏠'); }
-      const from = a.rent && a.rent.idx === i ? Math.max(now(), a.rent.until) : now();
-      a.rent = { idx: i, until: from + days * D.DAY_MS }; tenants[i] = a; markMe(a); wdAt = 0;
-      if (o && o.ws && D.roomAt(o.x, o.y)?.house === i) { standUp(o); const rm = D.roomAt(o.x, o.y); teleport(o, rm.outside.x, rm.outside.y); toast(o, `${a.name} เช่าบ้านของคุณแล้ว คุณต้องออกจากบ้านจนกว่าจะหมดสัญญา`, '🔑', false); }
-      return toast(a, `เช่าบ้านหลังนี้ ${days} วัน (${money(cost)}) นอนในบ้านได้แล้ว`, '🔑');
-    }
-    case 'house.sell': {
-      if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
-      if (tenants[s.house]) return toast(a, 'มีผู้เช่าอยู่ ขายไม่ได้จนกว่าจะหมดสัญญา', '🏠', false);
-      const back = Math.round(D.HOUSE_PRICES[s.house] * 0.7 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
-      houses[s.house] = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.houseSale = 0; a.houseRent = 0; a.money += back; markMe(a); wdAt = 0;
+    case 'house.buy': case 'house.rent': return toast(a, 'ซื้อบ้านได้ที่คุณจิ๋ม สำนักงานอสังหาฯ (ทางเข้าหมู่บ้าน) 🏡', '🏡', false);
+    case 'house.sell': case 'estate.sell': {
+      if (!a.hown) return toast(a, 'คุณยังไม่มีบ้าน', '🏠', false);
+      if (m.a === 'sell' && s.type !== 'estate' && houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
+      const back = Math.round(D.HOME_TIERS[a.hown.tier || 0].price * 0.6 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
+      if (a.house >= 0 && houses[a.house] === a) { const r = D.roomAt(a.x, a.y), y = D.areaAt(a.x, a.y); if (r?.house === a.house || y?.yard && y.house === a.house) teleport(a, D.GATES.housing_in.x, D.GATES.housing_in.y); houses[a.house] = null; }
+      a.hown = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.money += back; markMe(a); wdAt = 0;
       return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
     }
+    case 'estate.buy': {                    // buy a home from the agent: a size and a look; it stands in the village whenever you are online
+      const T = D.HOME_TIERS[+m.tier], st = clamp(Math.floor(+m.style) || 0, 0, D.HOME_STYLES.length - 1); if (!T) return;
+      if (a.hown) return toast(a, 'คุณมีบ้านแล้ว (ต่อเติมชั้นและขยายสวนได้ที่บ้าน)', '🏠', false);
+      if (!pay(a, T.price)) return;
+      a.hown = { style: st, tier: +m.tier }; a.furniture = (a.furniture || []).filter(k => !D.FURNITURE[fbase(k)]?.field); a.fpos = {}; a.ycrops = {};
+      a.hlv = T.floors; a.yz = [0, 2].slice(0, T.zones); a.yfree = 0; starterYard(a);
+      plotGive(a); markMe(a); wdAt = 0; joy(a, 20);
+      feed(`🏠 ${a.name} ซื้อ${T.name}หลังใหม่!`);
+      return toast(a, `ยินดีด้วย! ได้${T.name}แล้ว 🎉 บ้านของคุณจะตั้งอยู่ในหมู่บ้านตอนที่คุณออนไลน์ · กด "🏠 ไปบ้านฉัน" กับคุณจิ๋มได้เลย`, '🏠');
+    }
+    case 'estate.style': {                  // repaint the outside
+      if (!a.hown) return; const st = clamp(Math.floor(+m.style) || 0, 0, D.HOME_STYLES.length - 1); if (st === a.hown.style) return;
+      if (!pay(a, 3000)) return;
+      a.hown = { ...a.hown, style: st }; markMe(a); wdAt = 0;
+      return toast(a, `เปลี่ยนแบบบ้านเป็น "${D.HOME_STYLES[st][1]}" แล้ว`, '🎨');
+    }
+    case 'estate.home': return a.hown ? goHome(a) : toast(a, 'คุณยังไม่มีบ้าน ซื้อกับคุณจิ๋มได้เลย', '🏠', false);
+    case 'estate.visit': { const o = online.get(+m.id); if (!o || !o.hown) return toast(a, 'ไม่พบบ้านของคนนี้ตอนนี้', '🏘️', false); return goHome(a, o); }
     case 'house.list': case 'house.rentout': {
-      if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
+      return toast(a, 'ระบบประกาศขาย/ปล่อยเช่าบ้านปิดแล้ว ตอนนี้ทุกคนซื้อบ้านของตัวเองได้ที่คุณจิ๋ม', '🏡', false);
       const p = Math.max(0, Math.floor(+m.price) || 0);
       if (m.a === 'list') { a.houseSale = Math.min(p, D.HOUSE_PRICES[s.house] * 4); toast(a, p ? `ประกาศขายบ้าน ${money(a.houseSale)}` : 'ยกเลิกประกาศขายแล้ว', '🪧'); }
       else { a.houseRent = Math.min(p, D.HOUSE_RENT[s.house] * 4); toast(a, p ? `ปล่อยเช่า ${money(a.houseRent)}/วัน (ระหว่างมีผู้เช่า คุณนอนบ้านนี้ไม่ได้)` : 'ยกเลิกปล่อยเช่าแล้ว', '🔑'); }
@@ -1477,7 +1504,7 @@ function act(a, m) {
       return toast(a, `ซื้อ ${f.icon}${f.name} ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
     }
     case 'furnshop.buy': {                  // the furniture shop: same items as the house menu, delivered to your own house
-      if (a.house < 0 || houses[a.house] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่หน้าบ้านแต่ละหลัง 🏡', '🛋️', false);
+      if (!a.hown) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่คุณจิ๋ม สำนักงานอสังหาฯ 🏡', '🛋️', false);
       const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
       let key = m.item;
       if (f.multi) {                        // walls, doors, screens, garden pieces: buy as many as you need (up to 20 at a time)
@@ -1532,7 +1559,7 @@ function act(a, m) {
         toast(a, `สร้างชั้น ${to} เสร็จแล้ว! ขึ้นบันไดไปจัดห้องใหม่ได้เลย`, '🏗️');
       }
       if (!s.down) {
-        if (!master && !((o === a && (!tn || tn === a)) || tn === a)) return toast(a, 'ขึ้นชั้นบนได้เฉพาะเจ้าของบ้านและผู้เช่า', '🔒', false);
+        if (!master && o !== a && !friendOf(o, a)) return toast(a, 'ขึ้นชั้นบนได้เฉพาะเจ้าของบ้านและเพื่อน', '🔒', false);
         if (!master && to > 1 + ((o && o.hlv) || 0)) return toast(a, o === a ? `ยังไม่มีชั้น ${to} — ต่อเติมได้ ${money(D.FLOOR_PRICE[to])}` : `บ้านหลังนี้ยังไม่มีชั้น ${to}`, '🏗️', false);
       }
       const r = D.floorRoom(i, to); if (!r) return;
@@ -2662,7 +2689,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2690,7 +2717,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(),
   };
@@ -2780,6 +2807,7 @@ function login(ws, m, pre) {
   const daily = dailyLogin(a);
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
+  { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
   if (D.areaAt(a.x, a.y)?.id === 'farm' && !isAdmin(a)) { const g = D.GATES.town_from_farm; a.x = g.x; a.y = g.y; }   // the farm is closed for renovation: back to the town gate
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
@@ -2790,7 +2818,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -3126,7 +3154,7 @@ function onMessage(ws, raw) {
       const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(Boolean).sort((x, y) => y.r - x.r);
       return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', fr: frameOf(o), c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
         ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
-        home: o.house >= 0 ? o.house + 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
+        home: o.hown ? 1 : 0, hslot: o.hown && o.house >= 0 ? 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
     }
     case 'mail': {                          // letters: reach anyone, online or not
       const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
@@ -3227,6 +3255,7 @@ function resetChar(a, m) {
   standUp(a);
   for (const o of [...orders.values()]) { if (o.cust === a) cancelOrder(o, 'ลูกค้ารีเซ็ตตัวละคร'); else if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; } }
   if (a.house >= 0 && houses[a.house] === a) houses[a.house] = null;
+  a.hown = null;
   if (a.rent && tenants[a.rent.idx] === a) tenants[a.rent.idx] = null;
   if (a.garden && lots[a.garden.lot] === a) lots[a.garden.lot] = null;
   const keep = { v: VERSION, login: a.login, name: a.name, salt: a.salt, hash: a.hash, phone: a.phone, gender: a.gender, avatar: a.avatar, contacts: a.contacts, god: a.god, pic: a.pic, mail: a.mail,
@@ -3279,6 +3308,7 @@ function tick() {
   lastHour = h;
 
   const slow = t > slowAt; if (slow) slowAt = t + 1000;
+  if (slow) plotTick();
   const flu = ev('flu');
   for (const a of online.values()) {
     const indoors = !!D.roomAt(a.x, a.y);
