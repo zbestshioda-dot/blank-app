@@ -98,6 +98,11 @@ window.FX = (() => {
     chop() { noise(0.04, { freq: 1800, q: 3, vol: 0.12 }); tone(240, 0.05, { type: 'triangle', vol: 0.06 }); },
     reel(ten = .3) { noise(0.025, { freq: 3200 + ten * 1500, q: 4, vol: 0.05 }); },
     creak(ten = .8) { tone(180 + ten * 120, 0.18, { type: 'sawtooth', vol: 0.025, slide: 150 + ten * 60, attack: .03 }); },
+    cast() { noise(0.3, { freq: 900, sweep: 3800, q: 1.2, vol: 0.1 }); tone(1900, 0.22, { type: 'triangle', vol: 0.035, slide: 900, at: 0.04 }); },
+    plop() { tone(620, 0.09, { vol: 0.16, slide: 180 }); noise(0.22, { filter: 'lowpass', freq: 1800, sweep: 300, vol: 0.18, at: 0.03 }); },
+    zing() { noise(0.35, { freq: 4200, q: 6, vol: 0.06, sweep: 2200 }); tone(1300, 0.3, { type: 'sawtooth', vol: 0.02, slide: 700 }); },
+    snap() { noise(0.06, { filter: 'highpass', freq: 3000, vol: 0.3 }); tone(900, 0.12, { type: 'square', vol: 0.06, slide: 120, at: 0.02 }); },
+    landfish() { noise(0.5, { filter: 'lowpass', freq: 2600, sweep: 300, vol: 0.28 }); [N.C5, N.E5, N.G5, N.C6].forEach((f, i) => tone(f, 0.22, { type: 'triangle', vol: 0.12, at: 0.18 + i * 0.07 })); },
     whoosh() { noise(0.25, { freq: 400, sweep: 2500, q: 0.7, vol: 0.12 }); },
   };
   function play(name, arg) { if (!st.sfx) return; ensure(); try { SFX[name] && SFX[name](arg); } catch { } }

@@ -368,7 +368,8 @@ function handle(m) {
         ids.add(p.id);
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, veh: p.veh || '', pt: p.pt || '' });
+        if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', pt: p.pt || '' });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -376,6 +377,12 @@ function handle(m) {
       break;
     }
     case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { if (Math.hypot(x - s.x, y - s.y) > 4) { s.rx = x; s.ry = y; } s.x = x; s.y = y; s.f = f; } } break;
+    case 'taxi': {
+      const t0 = performance.now();
+      if (m.phase === 'come') { taxiFx = { k: 'taxi', dx: 1, dy: 0, x: m.x - 5, y: m.y + .2, fx: m.x - 5, tx: m.x - 1.3, t0, dur: m.wait - 900 }; FX.play('notice'); setTimeout(() => FX.play('pop'), m.wait - 1000); }
+      else { taxiFx = { k: 'taxi', dx: 1, dy: 0, x: m.x - 1.3, y: m.y + .2, fx: m.x - 1.3, tx: m.x + 9, t0: t0 + 700, dur: 1800, ease: 1 }; }
+      break;
+    }
     case 'fix': {
       if (m.fx) fixId = m.fx;
       const s = P.get(myId);
@@ -401,7 +408,12 @@ function handle(m) {
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
       paintChatBox(m);
-      const s = P.get(m.id); if (s && !m.sys && !m.w) { s.bubble = m.text; s.bt = performance.now() + 6500; }
+      const s = P.get(m.id); if (s && !m.sys && !m.w) {
+        const em = (m.text.match(/\p{Extended_Pictographic}(\u200d\p{Extended_Pictographic}|\ufe0f)*/gu) || []).slice(0, 3).join('');   // emoji in a chat line float big over your head
+        const only = em && !m.text.replace(/[\p{Extended_Pictographic}\ufe0f\u200d\s]/gu, '');
+        if (em) { s.emo = em; s.emoT = performance.now() + 4500; }
+        if (!only) { s.bubble = m.text; s.bt = performance.now() + 6500; }
+      }
       if (m.sys) { if (/🦈|💎|🎊|🏅|🎓/.test(m.text)) FX.play('notice'); } else if (m.id !== myId) FX.play('pop');
       if (panel?.kind === 'chat') refreshPanel(true);
       break;
@@ -460,9 +472,9 @@ function handle(m) {
   }
 }
 // ---- the chat box under the status card: tabs, foldable, type straight into it
-let cbTab = 'world', cbFolded = false, cbUnread = 0;
+let cbTab = 'all', cbFolded = false, cbUnread = 0;
 try { cbFolded = localStorage.getItem('lt_cb') === '1'; } catch { }
-const cbShow = m => cbTab === 'all' || (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : !m.sys && !m.w);
+const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : !m.sys && !m.w);
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
   box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
@@ -479,10 +491,10 @@ $('#cbFold').onclick = () => { FX.play('click'); foldChat(true); };
 $('#cbOpen').onclick = () => { FX.play('click'); foldChat(false); };
 document.querySelectorAll('#chatBox [data-ct]').forEach(b => b.onclick = () => {
   cbTab = b.dataset.ct; document.querySelectorAll('#chatBox [data-ct]').forEach(x => x.classList.toggle('on', x === b));
-  $('#cbIn').placeholder = cbTab === 'world' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
+  $('#cbIn').placeholder = cbTab === 'world' || cbTab === 'all' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
   paintChatBox();
 });
-$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (!i.value.trim()) return; const ch = cbTab === 'world' ? 'world' : 'near'; if (!worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; i.blur(); };
+$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (!i.value.trim()) return; const ch = cbTab === 'world' || cbTab === 'all' ? 'world' : 'near'; if (!worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; i.blur(); };
 foldChat(cbFolded);
 function logLine(html, cls, bubbleOnly) {
   const l = $('#log'); const d = document.createElement('div');
@@ -862,8 +874,10 @@ cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e
 addEventListener('pointerup', e => { if (joy && joy.id === e.pointerId) { joy = null; $('#stick').style.display = 'none'; } });
 
 let camLift = 0;
+const camRide = { x: 0, y: 0 };
 function camera() {
   const m = P.get(myId); let x = m ? m.rx + m.ox : 50, y = m ? m.ry + m.oy : 36;
+  if (m?.pose === 'fun' && m.fn) { const fo = funPos(m); if (fo) { camRide.x += (fo.x - camRide.x) * .08; camRide.y += (fo.y - 1 - camRide.y) * .08; x = camRide.x; y = camRide.y; } } else if (m) { camRide.x = x; camRide.y = y; }   // on a ride the view follows you, gently
   if (window.__camAt) { x = window.__camAt[0]; y = window.__camAt[1]; return { x: x * TS - VW / 2, y: y * TS - VH / 2 }; }   // automated screenshots only
   const target = panel && !trade && !(VW > VH && VH <= 520) ? VH * 0.24 : 0;   // landscape popups sit in the middle, no lift
   camLift += (target - camLift) * 0.18;
@@ -1001,6 +1015,7 @@ function findNear() {
   return best;
 }
 function onAction() {
+  if (driving()) return send({ t: 'rideoff' });
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
   const t = performance.now();
   const master = me.admin && me.god?.doors;
@@ -1067,6 +1082,15 @@ function frame(t) {
       if ((dx || dy) && performance.now() > downHintAt) { downHintAt = performance.now() + 4000; toast(me.down.kind === 'jail' ? 'ติดคุกอยู่ เดินไม่ได้ รอพ้นโทษ' : me.down.kind === 'hosp' ? 'คุณหมดสติอยู่บนเตียง เดินไม่ได้ · รอเจ้าหน้าที่รักษาให้ฟื้น (ดูเวลาด้านล่าง)' : 'หิวจนหมดแรง เดินไม่ได้ · กินอะไรสักอย่างเพื่อฟื้น', '🛏️', false); }
       dx = 0; dy = 0;
     }
+    if (driving()) {                          // bumper cars: touching another car bounces you both apart
+      const now0 = performance.now(), s = STN('ride_bumper');
+      if (now0 > bump.until) {
+        const others = [...P.values()].filter(o => o.id !== myId && o.pose === 'fun' && String(o.fn).startsWith('bumper:')).map(o => [o.rx, o.ry]);
+        const used = ridersOf('bumper'); for (let i = 0; i < 4; i++) if (!used.has(i)) { const q = seatPos(s, i, now0 / 1000); others.push([q.x, q.y - .32]); }
+        for (const [ox, oy] of others) { const ddx = m.x - ox, ddy = m.y - oy, dd = Math.hypot(ddx, ddy); if (dd < .85) { bump.x = ddx / (dd || 1); bump.y = ddy / (dd || 1); bump.until = now0 + 380; FX.play('pop'); FX.burst((m.x + ox) / 2, (m.y + oy) / 2 - .4, '#ffd45e', 8); if (navigator.vibrate) navigator.vibrate(60); break; } }
+      }
+      if (now0 < bump.until) { dx = bump.x * 1.4; dy = bump.y * 1.4; }
+    }
     const l = Math.hypot(dx, dy); meMoving = false;
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
@@ -1120,6 +1144,7 @@ function frame(t) {
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); $('#actLabel').textContent = 'ใช้งาน'; }
+  if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); $('#actLabel').textContent = 'ลงจากรถ'; }   // in a bumper car the big button gets you out
   paintFishCue();
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
   if (panel?.kind === 'player' && !P.get(panel.pid)) closePanel();
@@ -1180,7 +1205,13 @@ function draw(t) {
   for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
-  for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);   // helicopters fly over the roofs
+  if (A?.id === 'park') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
+  if (A?.id === 'park' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
+  for (const g of ['gate_park', 'gate_town_p']) { const s = A && STN(g); if (s && s.area === A.id && vis(s.x, s.y, 6)) ents.push([s.y + .7, 10, s]); }
+  for (const p of P.values()) if (vis(p.rx, p.ry, 3)) {
+    const rs = p.pose === 'fun' && p.fn ? STN('ride_' + String(p.fn).split(':')[0]) : null;   // riders are drawn with their ride (in front of it; behind the shooting counter)
+    ents.push([rs ? (rs.k === 'shooting' ? (RIDE_IMG() ? rideBottom(rs) + .4 : rs.cy - rs.h / 2 + .4) : rs.k === 'bumper' ? p.ry + .3 : rideBottom(rs) + .2) : p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);
+  }   // helicopters fly over the roofs
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3) && !roomOf(p.x, p.y)) ents.push([q.y + .3, 6, q]); }   // pets wait outside: none indoors
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   misEnts(ents, vis);
@@ -1190,6 +1221,7 @@ function draw(t) {
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
   for (const a of ambs) if (a.area === A?.id) { if (!a.body.gone) ents.push([a.body.ry + .3, 4, a.body]); ents.push([a.y + halfY(a), 5, a]); }
+  if (taxiFx) { const k = Math.min(1, Math.max(0, (performance.now() - taxiFx.t0) / taxiFx.dur)), e = taxiFx.ease ? k * k : 1 - (1 - k) * (1 - k); taxiFx.x = taxiFx.fx + (taxiFx.tx - taxiFx.fx) * e; if (performance.now() > taxiFx.t0 + taxiFx.dur + 4000) taxiFx = null; else ents.push([taxiFx.y + halfY(taxiFx), 5, taxiFx]); }
   if (A?.id === 'town') { stepTraffic(); for (const c of traffic) if (vis(c.x, c.y, 4)) ents.push([c.y + halfY(c), 5, c]); }
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
@@ -1206,6 +1238,9 @@ function draw(t) {
     else if (k === 5) drawCar(e, X, Y);
     else if (k === 6) drawPet(e, X, Y, t);
     else if (k === 7) drawMisThing(e, X, Y, t);
+    else if (k === 8) drawRideThing(e, X, Y, t);
+    else if (k === 9) { const b2 = rideBottom(e), H0 = rH('car_base', RG.car.w); rdraw('car_roof', e.cx * TS + X, (b2 - H0 + .45) * TS + Y, RG.car.roofW, .5, .93, false, Math.sin(t / 900) * .012); }
+    else if (k === 10) drawParkGate(e.x, e.y + .7, X, Y);
     else drawPlayer(e, X, Y, t);
   }
   if (A?.yard) drawYardLocks(A, X, Y, t);
@@ -1867,9 +1902,10 @@ const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#
 function drawPlayer(p, X, Y, t) {
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
   const snap = v => Math.round(v * DPR) / DPR;
-  const px0 = snap((p.rx + (p.ox || 0)) * TS + X), py0 = snap((p.ry + (p.oy || 0)) * TS + Y + TS * .32);
+  const fo = p.pose === 'fun' && p.fn ? funPos(p) : null;   // on a park ride: drawn where the ride carries them
+  const px0 = snap(fo ? fo.x * TS + X : (p.rx + (p.ox || 0)) * TS + X), py0 = snap(fo ? (fo.y - fo.lift) * TS + Y : (p.ry + (p.oy || 0)) * TS + Y + TS * .32);
   if (px0 < -80 || py0 < -140 || px0 > VW + 80 || py0 > VH + 140) return;
-  const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail' || pose === 'study';
+  const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail' || pose === 'study' || !!fo?.sit;
   const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
   // facing from the 8-way index with hysteresis: on a diagonal keep the current facing if it is one of
   // the two neighbours, so a wobbling joystick does not flip the view (head turning) every frame
@@ -1879,6 +1915,7 @@ function drawPlayer(p, X, Y, t) {
   if (CARD[f8] && p.view && p.view !== dir && performance.now() - (p.viewT || 0) < 120) dir = p.view;   // tiny debounce
   if (dir !== p.view) { p.view = dir; p.viewT = performance.now(); }
   if (sitting || lying) dir = 'down';
+  if (fo?.back) dir = 'up';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
   p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) : 0);
   const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
@@ -1886,15 +1923,20 @@ function drawPlayer(p, X, Y, t) {
   const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
   let px = px0, py = py0;
   const RV = p.veh && !lying && !sitting && G.shop?.vehicles?.[p.veh] && !roomOf(p.x, p.y) ? G.shop.vehicles[p.veh] : null;
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : RV ? (RV.kind !== 'moto' ? (view === 'side' ? 1.2 : .75) : view === 'side' ? .8 : .4) : .32), TS * .11, 0, 0, 7); ctx.fill();
+  if (!fo?.high && !fo?.swim) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : RV ? (RV.kind !== 'moto' ? (view === 'side' ? 1.2 : .75) : view === 'side' ? .8 : .4) : .32), TS * .11, 0, 0, 7); ctx.fill(); }
+  const fk = fo && fo.s.k, fcol = fo && (fo.car || RIDE_COL[(+String(p.fn).split(':')[1] || 0) % RIDE_COL.length]);
+  if (fo && (fk === 'ferris' || fk === 'coaster' || fk === 'bumper' || fk === 'carousel')) drawSeatProp(fk, px, py + (fk === 'carousel' ? 0 : TS * .1), fk === 'coaster' ? '#ffd45e' : fcol, fo);
   if (RV) { drawRide(p, RV, px, py, k, view, dir); nameAndBubble(p, px, py - (RV.kind !== 'moto' ? vehH(p.veh, view) + TS * (RV.kind === 'heli' ? 1.35 : .15) : H * .97 + TS * (p.veh === 'escoot' ? .12 : .32)), p.id === myId, t); return; }
   const aura = p.of === 'admin' && !lying, now0 = performance.now();
   if (aura) drawAura(px, py, H, now0, false);
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
+  else if (fo?.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, p, px, py + Math.sin(t / 380 + p.id) * TS * .05, k, 'front', 0); }   // swimming: only head and shoulders above the water
   else if (sitting) drawCharTo(ctx, p, px, py, k, 'front', 0, false, true);   // seated: whole body, legs folded
   else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
   ctx.restore();
+  if (fo?.swim) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py - H * .42, TS * .45 + Math.sin(t / 300) * 2, TS * .13, 0, 0, 7); ctx.stroke(); swimFx(p.id, fo.x, fo.y - .42 * H / TS, t); }
+  if (fo) drawSeatFront(fk, px, py + (fk === 'carousel' ? 0 : TS * .1), fk === 'coaster' ? '#ffd45e' : fcol, fo);
   if (aura) drawAura(px, py, H, now0, true);
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1905,6 +1947,278 @@ function drawPlayer(p, X, Y, t) {
   const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
   nameAndBubble(p, px, top, mine, t);
+}
+// ------------------------------------------------------------------ amusement park: rides drawn in code (until painted sprites
+// ride_<key> exist in the atlas), and riders moving with them. Riders' real position is the ride's ticket spot; we only draw them on the ride.
+const bump = { x: 0, y: 0, until: 0 };
+const driving = () => { const m = P.get(myId); return !!m && m.pose === 'fun' && String(m.fn).startsWith('bumper:'); };
+const RIDE_SEATS = { carousel: 6, ferris: 8, coaster: 6, bumper: 4, pool: 10, shooting: 3 };
+const RIDE_COL = ['#ff7aa8', '#7ac8ff', '#ffd45e', '#8be08b', '#c79bff', '#ff9f5e', '#5ee0d0', '#ffb3c7', '#9fb6ff', '#ffe28a'];
+const rideBottom = s => s.cy + s.h / 2;
+// ---- painted ride pieces (public/assets/rides.*): the moving parts are separate images, turned and moved in code
+let RIMG = null, RJ = null;
+fetch('assets/rides.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { RJ = j; RIMG = im; }; im.src = 'assets/rides.webp?v=1'; }).catch(() => { });
+const RIDE_IMG = () => !!RIMG;
+// draw piece n with its anchor (ax, ay: 0..1 of the piece) at screen x, y, wT tiles wide; part: [y0, y1] slice (0..1) of the piece only
+function rdraw(n, x, y, wT, ax = .5, ay = 1, flip = false, rot = 0, part = null, src = null) {
+  const r = RJ?.s[n]; if (!r) return;
+  const img = src || RIMG, sx = src ? 0 : r[0], sy = src ? 0 : r[1], w = wT * TS, h = w * r[3] / r[2];
+  const p0 = part ? part[0] : 0, p1 = part ? part[1] : 1;
+  ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot); if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(img, sx, sy + r[3] * p0, r[2], r[3] * (p1 - p0), -w * ax, -h * ay + h * p0, w, h * (p1 - p0));
+  ctx.restore();
+}
+const rH = (n, wT) => { const r = RJ?.s[n]; return r ? wT * r[3] / r[2] : 0; };
+// bumper cars come in colours: the white car multiplied by a colour (the black rubber stays black)
+const TINT = new Map();
+function tinted(n, col) {
+  const key = n + col; let c = TINT.get(key); if (c) return c;
+  const r = RJ.s[n]; c = document.createElement('canvas'); c.width = r[2]; c.height = r[3]; const g = c.getContext('2d');
+  g.drawImage(RIMG, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
+  g.globalCompositeOperation = 'multiply'; g.fillStyle = col; g.fillRect(0, 0, r[2], r[3]);
+  g.globalCompositeOperation = 'destination-in'; g.drawImage(RIMG, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
+  TINT.set(key, c); return c;
+}
+// sizes (tiles) and where things sit in the painted pieces
+const RG = {
+  car: { w: 7, surf: .57, rx: 2.25, ry: .97, horse: 1.75, saddle: 1.12, roofW: 7.6 },
+  fer: { w: 7, hubX: .024 * 7, hubY: .07, R: 3.9, at: 3.72, gw: 1.05, seat: 1.08 },
+  coa: { w: 10, car: 1.25 },
+  bump: { w: 1.25 },
+  shoot: { w: 8, duckY: .5, duck: .72 },
+};
+// the coaster track traced over the painted coaster (0..1 of the picture), a closed loop through the station
+const COASTER_PATH = [[.42, .70], [.25, .66], [.08, .56], [.03, .42], [.10, .31], [.24, .28], [.36, .36], [.48, .47], [.62, .56], [.78, .58], [.92, .49], [.96, .36], [.86, .28], [.72, .31], [.65, .22], [.64, .10], [.53, .02], [.41, .08], [.38, .20], [.45, .32], [.52, .45], [.50, .58], [.46, .66]];
+function coasterImgPt(s, u) {
+  const P = COASTER_PATH, n = P.length, f = ((u % 1) + 1) % 1 * n, i = Math.floor(f), t = f - i;
+  const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+  const cr = (a, b, c, d) => .5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+  const W = RG.coa.w, H = rH('coaster', W), b = rideBottom(s);
+  return { x: s.cx - W / 2 + cr(p0[0], p1[0], p2[0], p3[0]) * W, y: b - H + cr(p0[1], p1[1], p2[1], p3[1]) * H };
+}
+function coasterPt(s, u) {
+  const b = rideBottom(s), a = u * Math.PI * 2;
+  return { x: s.cx + Math.cos(a) * (s.w / 2 - 1.1), y: b - 1.9 + Math.sin(a) * 1.05 - 1.5 * Math.max(0, Math.sin(a * 2)), a };
+}
+// where a rider (or the empty seat) of a ride is now, in world tiles; sit / swim says how to draw them
+function seatPos(s, slot, T) {
+  const b = rideBottom(s);
+  if (RIDE_IMG()) switch (s.k) {             // painted rides: seats follow the pictures
+    case 'carousel': { const G2 = RG.car, a = T * .6 + slot * Math.PI * 2 / 6, H = rH('car_base', G2.w), cy = b - H * (1 - G2.surf), bob = Math.sin(T * 2.4 + slot) * .18;
+      return { x: s.cx + Math.cos(a) * G2.rx, y: cy + Math.sin(a) * G2.ry, lift: G2.saddle + bob, bob, sit: 1, a, flip: Math.sin(a) > 0 }; }
+    case 'ferris': { const F = RG.fer, a = T * .18 + slot * Math.PI * 2 / 8, hx = s.cx + F.hubX, hy = b - rH('fer_stand', F.w) * (1 - F.hubY);
+      return { x: hx + Math.cos(a) * F.at, y: hy + Math.sin(a) * F.at + F.seat, lift: 0, sit: 1, high: 1, ax: hx + Math.cos(a) * F.at, ay: hy + Math.sin(a) * F.at }; }
+    case 'coaster': { const u = (T * .045 + slot * .012) % 1, p = coasterImgPt(s, u), q = coasterImgPt(s, u + .004); return { x: p.x, y: p.y + .1, lift: 0, sit: 1, high: 1, flip: q.x < p.x }; }
+    case 'shooting': return { x: s.cx - 2.4 + slot * 2.4, y: b + .35, lift: 0, back: 1 };
+  }
+  switch (s.k) {
+    case 'carousel': { const a = T * .6 + slot * Math.PI * 2 / 6; return { x: s.cx + Math.cos(a) * (s.w / 2 - 1.4), y: b - 1.15 + Math.sin(a) * .85, lift: .3 + Math.sin(T * 2.4 + slot) * .14, sit: 1, a }; }
+    case 'ferris': { const a = T * .22 + slot * Math.PI * 2 / 8, R = 3.1; return { x: s.cx + Math.cos(a) * R, y: b - 4.5 + Math.sin(a) * R + .6, lift: 0, sit: 1, high: 1 }; }
+    case 'coaster': { const p = coasterPt(s, (T * .16 + slot * .04) % 1); return { x: p.x, y: p.y + .25, lift: 0, sit: 1, high: 1 }; }
+    case 'pool': return { x: s.cx + Math.sin(T * .45 + slot * 1.9) * (s.w / 2 - 1.6), y: s.cy + Math.sin(T * .31 + slot * 2.7) * (s.h / 2 - 1.4) + .5, lift: 0, swim: 1 };
+    case 'bumper': return { x: s.cx + Math.sin(T * .8 + slot * 2.1) * (s.w / 2 - 1.4), y: s.cy + .3 + Math.cos(T * .63 + slot * 1.3) * (s.h / 2 - 1.2), lift: .1, sit: 1, car: RIDE_COL[slot % RIDE_COL.length] };
+    case 'shooting': return { x: s.cx - s.w / 2 + 1.7 + slot * 2.3, y: s.y + .1, lift: 0 };
+  }
+  return { x: s.x, y: s.y, lift: 0 };
+}
+function funPos(p) {
+  const [k, sl] = String(p.fn || '').split(':'), s = STN('ride_' + k); if (!s) return null;
+  if (k === 'bumper') return { x: p.rx + (p.ox || 0), y: p.ry + (p.oy || 0) + .32, lift: .1, sit: 1, car: RIDE_COL[(+sl || 0) % RIDE_COL.length], s, drive: 1 };   // you drive it: drawn where you really are
+  return { ...seatPos(s, +sl || 0, performance.now() / 1000), s };
+}
+// townsfolk riding along on the empty seats, so the park never looks dead (drawn only, they are not players)
+const RIDE_NPC = {};
+function rideNpc(k, i) {
+  const key = k + i; let n = RIDE_NPC[key];
+  if (!n) { const h = [...key].reduce((a, c) => a * 31 + c.charCodeAt(0) >>> 0, 11); n = RIDE_NPC[key] = { id: 'rn' + key, npc: 1, name: '', g: h % 2 ? 'f' : 'm', lk: { hair: ['brown', 'black', 'blonde', 'ginger'][h % 4], shirt: SHIRT_IDS[(h >> 3) % 4], pants: 'gray' }, f: 6, dz: [] }; }
+  return n;
+}
+const RIDE_NPC_ON = { carousel: [1, 3, 4], ferris: [0, 2, 5, 7], coaster: [1, 2, 4], pool: [2, 6, 8] };
+function drawRideNpc(s, i, X, Y, t) {
+  const q = seatPos(s, i, t / 1000), n = rideNpc(s.k, i), k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
+  const px = q.x * TS + X, py = (q.y - q.lift) * TS + Y;
+  if (s.k !== 'pool') drawSeatProp(s.k, px, py + (s.k === 'carousel' ? 0 : TS * .1), s.k === 'coaster' ? '#ffd45e' : RIDE_COL[i % RIDE_COL.length], q);
+  ctx.save();
+  if (q.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, n, px, py + Math.sin(t / 380 + i) * TS * .05, k, 'front', 0); }
+  else drawCharTo(ctx, n, px, py, k, 'front', 0, false, true);
+  ctx.restore();
+  if (q.swim) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py - H * .42, TS * .45 + Math.sin(t / 300 + i) * 2, TS * .13, 0, 0, 7); ctx.stroke(); swimFx(n.id, q.x, q.y - .42 * H / TS, t); }
+  else drawSeatFront(s.k, px, py + (s.k === 'carousel' ? 0 : TS * .1), s.k === 'coaster' ? '#ffd45e' : RIDE_COL[i % RIDE_COL.length], q);
+}
+// swimmers leave ripples and the odd splash
+const SWIM_T = {};
+function swimFx(id, x, y, t) {
+  if ((SWIM_T[id] || 0) > t) return; SWIM_T[id] = t + 650 + Math.random() * 500;
+  FX.ring(x, y, '#ffffff', 900, .7); if (Math.random() < .35) FX.burst(x, y - .1, '#d8f2ff', 5);
+}
+const ridersOf = k => { const used = new Set(); for (const p of P.values()) if (p.pose === 'fun' && String(p.fn).startsWith(k + ':')) used.add(+String(p.fn).split(':')[1]); return used; };
+// what a rider sits in: a horse, a gondola, a coaster car, a bumper car
+function drawSeatProp(k, x, y, col, q) {
+  const u = TS;
+  if (RIDE_IMG() && k !== 'pool') {          // painted seats
+    const y0 = k === 'carousel' ? y : y - u * .1;
+    if (k === 'carousel') rdraw('car_horse', x, y0 + RG.car.saddle * u, RG.car.horse / rH('car_horse', 1), .5, 1, !!q?.flip);
+    else if (k === 'ferris') rdraw('fer_gondola', x, y0 - RG.fer.seat * u, RG.fer.gw, .5, 0);
+    else if (k === 'coaster') rdraw('coaster_car', x, y0 + u * .2, RG.coa.car, .5, 1, !!q?.flip);
+    else if (k === 'bumper') rdraw('bump_car', x, y0 + u * .25, RG.bump.w, .5, 1, false, 0, null, tinted('bump_car', col));
+    return;
+  }
+  ctx.save(); ctx.translate(x, y);
+  if (k === 'carousel') {             // a white horse on a golden pole
+    ctx.fillStyle = '#e8c45a'; ctx.fillRect(-u * .04, -u * 1.6, u * .08, u * 1.6);
+    ctx.fillStyle = '#fff7f0'; ctx.strokeStyle = '#7a5a46'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, -u * .35, u * .38, u * .2, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(u * .36, -u * .62, u * .13, u * .22, -.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillRect(-u * .14, -u * .55, u * .28, u * .1);
+  } else if (k === 'ferris') {        // a hanging gondola
+    ctx.strokeStyle = '#5b5f73'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -u * 1.1); ctx.lineTo(0, -u * .75); ctx.stroke();
+    ctx.fillStyle = col; ctx.strokeStyle = '#3a3448'; ctx.beginPath(); ctx.roundRect(-u * .42, -u * .78, u * .84, u * .7, u * .16); ctx.fill(); ctx.stroke();
+  } else if (k === 'coaster' || k === 'bumper') {   // a little car
+    ctx.fillStyle = col; ctx.strokeStyle = '#2d2a38'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(-u * .48, -u * .42, u * .96, u * .5, u * .18); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-u * .36, -u * .38, u * .5, u * .08);
+    if (k === 'bumper') { ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-u * .3, -u * .42); ctx.lineTo(-u * .3, -u * 1.5); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+// the part of the seat in front of the rider (gondola front, car body) so they look like they sit inside
+function drawSeatFront(k, x, y, col, q) {
+  const u = TS; if (k !== 'ferris' && k !== 'coaster' && k !== 'bumper') return;
+  if (RIDE_IMG()) {                          // the lower front of the painted seat, over the rider's legs
+    const y0 = y - u * .1;
+    if (k === 'ferris') rdraw('fer_gondola', x, y0 - RG.fer.seat * u, RG.fer.gw, .5, 0, false, 0, [.66, 1]);
+    else if (k === 'coaster') rdraw('coaster_car', x, y0 + u * .2, RG.coa.car, .5, 1, !!q?.flip, 0, [.5, 1]);
+    else rdraw('bump_car', x, y0 + u * .25, RG.bump.w, .5, 1, false, 0, [.55, 1], tinted('bump_car', col));
+    return;
+  }
+  ctx.save(); ctx.translate(x, y); ctx.fillStyle = col; ctx.strokeStyle = '#2d2a38'; ctx.lineWidth = 2;
+  if (k === 'ferris') { ctx.beginPath(); ctx.roundRect(-u * .42, -u * .36, u * .84, u * .32, u * .1); ctx.fill(); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.roundRect(-u * .5, -u * .24, u * 1, u * .3, u * .12); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+}
+// the painted version of a ride (true when drawn); moving seats of empty slots are drawn here, riders' seats with the riders
+function drawRideImg(s, X, Y, t, used) {
+  const T = t / 1000, P2 = (x, y) => [x * TS + X, y * TS + Y], b = rideBottom(s);
+  const seats = n => { const out = []; for (let i = 0; i < n; i++) if (!used.has(i)) out.push([i, seatPos(s, i, T)]); return out; };
+  if (s.k === 'carousel') {
+    const [x, y] = P2(s.cx, b); rdraw('car_base', x, y, RG.car.w);
+    for (const [i, q] of seats(6).sort((a, c) => a[1].y - c[1].y)) { const [hx, hy] = P2(q.x, q.y - q.lift); drawSeatProp('carousel', hx, hy, RIDE_COL[i], q); }
+    return true;
+  }
+  if (s.k === 'ferris') {
+    const F = RG.fer, [x, y] = P2(s.cx, b); rdraw('fer_stand', x, y, F.w);
+    const [hx, hy] = P2(s.cx + F.hubX, b - rH('fer_stand', F.w) * (1 - F.hubY)); rdraw('fer_wheel', hx, hy, F.R * 2, .5, .5, false, T * .18);
+    for (const [i, q] of seats(8)) { const [gx, gy] = P2(q.x, q.y); drawSeatProp('ferris', gx, gy + TS * .1, RIDE_COL[i], q); drawSeatFront('ferris', gx, gy + TS * .1, RIDE_COL[i], q); }
+    return true;
+  }
+  if (s.k === 'coaster') {
+    const [x, y] = P2(s.cx, b); rdraw('coaster', x, y, RG.coa.w);
+    for (const [i, q] of seats(6)) { const [cx, cy] = P2(q.x, q.y); drawSeatProp('coaster', cx, cy + TS * .1, '#ffd45e', q); }
+    return true;
+  }
+  if (s.k === 'shooting') {
+    const W = RG.shoot.w, H = rH('shoot_booth', W), [x, y] = P2(s.cx, b); rdraw('shoot_booth', x, y, W);
+    ctx.save(); ctx.beginPath(); const [lx] = P2(s.cx - W * .36, 0), [rx] = P2(s.cx + W * .36, 0); ctx.rect(lx, y - H * TS, rx - lx, H * TS); ctx.clip();
+    for (let i = 0; i < 6; i++) { const dx = ((i * 1.1 + T * .9) % 6.6) - 3.3, [dX, dY] = P2(s.cx + dx, b - H * (1 - .69) + Math.abs(Math.sin(T * 3 + i)) * -.06); rdraw('shoot_duck', dX, dY, RG.shoot.duck, .5, 1); }
+    ctx.restore();
+    return true;
+  }
+  if (s.k === 'pool') {
+    const x0 = s.cx - s.w / 2, y0 = s.cy - s.h / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+    for (let i = 1; i < 4; i++) { const [ax, ay] = P2(x0 + .3, y0 + i * s.h / 4), [bx] = P2(x0 + s.w - .3, 0); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, ay); ctx.stroke(); }
+    ctx.setLineDash([]);
+    { const [lx, ly] = P2(x0 + 1.6, y0 + .1); rdraw('pool_ladder', lx, ly, .7, .5, .3); }
+    { const [rx, ry] = P2(x0 + s.w - 1.4, y0 + s.h + .95); rdraw('pool_ring', rx, ry, .8, .5, 1); }
+    for (const [ux, uy] of [[x0 - 2.3, y0 + s.h - .6], [x0 + s.w + 2.6, y0 + 2.2]]) { const [px, py] = P2(ux, uy); rdraw('pool_umbrella', px, py, 1.9, .5, 1); }
+    return false;   // the water, its lanes and swimmers are drawn as before
+  }
+  if (s.k === 'bumper') {
+    const [x0, y0] = P2(s.cx - s.w / 2, s.cy - s.h / 2), u = TS, W2 = s.w * u, H2 = s.h * u;
+    ctx.fillStyle = '#3b3f52'; ctx.fillRect(x0, y0, W2, H2);
+    ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1; for (let i = 1; i < s.w; i++) { ctx.beginPath(); ctx.moveTo(x0 + i * u, y0); ctx.lineTo(x0 + i * u, y0 + H2); ctx.stroke(); }
+    ctx.strokeStyle = '#ffd45e'; ctx.lineWidth = Math.max(4, u * .2); ctx.strokeRect(x0 + 2, y0 + 2, W2 - 4, H2 - 4);
+    for (const [i, q] of seats(4)) { const [cx, cy] = P2(q.x, q.y); drawSeatProp('bumper', cx, cy + TS * .1, q.car, q); drawSeatFront('bumper', cx, cy + TS * .1, q.car, q); }
+    return true;
+  }
+  return false;
+}
+// the arch over the way in (town side and park side), with the park's name on its board
+function drawParkGate(x, y, X, Y) {
+  if (!RIDE_IMG()) return;
+  const W = 4.4, H = rH('park_gate', W), px = x * TS + X, py = y * TS + Y;
+  rdraw('park_gate', px, py, W);
+  const fs = Math.round(TS * .42); ctx.font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#b4467a'; ctx.fillText('🎡 สวนสนุก', px, py - H * TS * (1 - .205));
+}
+function drawRideThing(s, X, Y, t) {
+  const T = t / 1000, u = TS, P2 = (x, y) => [x * TS + X, y * TS + Y], b = rideBottom(s), used0 = ridersOf(s.k), npcs = (RIDE_NPC_ON[s.k] || []).filter(i => !used0.has(i)), used = new Set([...used0, ...npcs]);
+  if (RIDE_IMG() && drawRideImg(s, X, Y, t, used)) { /* painted */ }
+  else if (s.k === 'carousel') {
+    const [cx, by] = P2(s.cx, b - 1.15), rx = (s.w / 2 - .3) * u;
+    ctx.fillStyle = '#b9894a'; ctx.beginPath(); ctx.ellipse(cx, by + u * .25, rx, u * 1.05, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f6e0b0'; ctx.beginPath(); ctx.ellipse(cx, by, rx, u * 1.0, 0, 0, 7); ctx.fill();
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.fillStyle = (Math.floor(T * 3) + i) % 2 ? '#fff6a8' : '#ffb347'; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * .97, by + u * .18 + Math.sin(a) * u * .97, u * .07, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#e8c45a'; ctx.fillRect(cx - u * .12, by - u * 4.2, u * .24, u * 4.2);
+    for (let i = 0; i < 6; i++) if (!used.has(i)) { const q = seatPos(s, i, T); if (Math.sin(q.a) < 0) { const [x, y] = P2(q.x, q.y - q.lift); drawSeatProp('carousel', x, y, RIDE_COL[i]); } }
+    for (let i = 0; i < 6; i++) if (!used.has(i)) { const q = seatPos(s, i, T); if (Math.sin(q.a) >= 0) { const [x, y] = P2(q.x, q.y - q.lift); drawSeatProp('carousel', x, y, RIDE_COL[i]); } }
+    const [rx0, ry0] = P2(s.cx, b - 5.3), n = 12;            // the striped tent roof, turning slowly
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * Math.PI * 2 + T * .3, a1 = (i + 1) / n * Math.PI * 2 + T * .3;
+      ctx.fillStyle = i % 2 ? '#ff8fb8' : '#fff1dc'; ctx.beginPath(); ctx.moveTo(rx0, ry0 - u * 1.6);
+      ctx.lineTo(rx0 + Math.cos(a0) * rx * 1.05, ry0 + Math.sin(a0) * u * .55); ctx.lineTo(rx0 + Math.cos(a1) * rx * 1.05, ry0 + Math.sin(a1) * u * .55); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = '#a8506e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(rx0, ry0, rx * 1.05, u * .55, 0, 0, Math.PI); ctx.stroke();
+    ctx.fillStyle = '#ffd45e'; ctx.beginPath(); ctx.moveTo(rx0, ry0 - u * 2.3); ctx.lineTo(rx0 + u * .5, ry0 - u * 2.05); ctx.lineTo(rx0, ry0 - u * 1.8); ctx.fill();
+  } else if (s.k === 'ferris') {
+    const [cx, cy] = P2(s.cx, b - 4.5), R = 3.1 * u, [bx, by] = P2(s.cx, b);
+    ctx.strokeStyle = '#8a8fa8'; ctx.lineWidth = Math.max(3, u * .14);
+    ctx.beginPath(); ctx.moveTo(bx - u * 2.6, by - u * .2); ctx.lineTo(cx, cy); ctx.lineTo(bx + u * 2.6, by - u * .2); ctx.stroke();
+    ctx.strokeStyle = '#f2f2ff'; ctx.lineWidth = Math.max(2, u * .1); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#d8d8ec'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 16; i++) { const a = T * .22 + i * Math.PI / 8; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke(); }
+    for (let i = 0; i < 24; i++) { const a = T * .22 + i * Math.PI / 12; ctx.fillStyle = (Math.floor(T * 2) + i) % 3 ? '#fff6a8' : '#ff8fb8'; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R, cy + Math.sin(a) * R, u * .06, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#c86b98'; ctx.beginPath(); ctx.arc(cx, cy, u * .3, 0, 7); ctx.fill();
+    for (let i = 0; i < 8; i++) { const q = seatPos(s, i, T), [x, y] = P2(q.x, q.y); drawSeatProp('ferris', x, y, RIDE_COL[i]); if (!used.has(i)) drawSeatFront('ferris', x, y, RIDE_COL[i]); }
+    ctx.fillStyle = '#7a5a46'; ctx.fillRect(bx - u * 1.2, by - u * .9, u * 2.4, u * .9); ctx.fillStyle = '#ffd45e'; ctx.fillRect(bx - u * 1.3, by - u * 1.15, u * 2.6, u * .3);
+  } else if (s.k === 'coaster') {
+    const pts = []; for (let i = 0; i <= 80; i++) pts.push(coasterPt(s, i / 80));
+    ctx.strokeStyle = '#d9dce8'; ctx.lineWidth = 2;
+    for (let i = 0; i < 80; i += 5) { const [x, y] = P2(pts[i].x, pts[i].y), [, gy] = P2(0, b - .2); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, gy); ctx.stroke(); }
+    ctx.strokeStyle = '#e0484f'; ctx.lineWidth = Math.max(3, u * .16); ctx.beginPath();
+    pts.forEach((p, i) => { const [x, y] = P2(p.x, p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    for (let i = 0; i < 6; i++) if (!used.has(i)) { const q = seatPos(s, i, T), [x, y] = P2(q.x, q.y); drawSeatProp('coaster', x, y, '#ffd45e'); drawSeatFront('coaster', x, y, '#ffd45e'); }
+    const [sx, sy] = P2(s.cx, b - .2); ctx.fillStyle = '#7a5a46'; ctx.fillRect(sx - u * 1.6, sy - u * 1.1, u * 3.2, u * 1.1);
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#e0484f'; ctx.fillRect(sx - u * 1.8 + i * u * .6, sy - u * 1.45, u * .6, u * .35); }
+  } else if (s.k === 'bumper') {
+    const [x0, y0] = P2(s.cx - s.w / 2, s.cy - s.h / 2), W2 = s.w * u, H2 = s.h * u;
+    ctx.fillStyle = '#3b3f52'; ctx.fillRect(x0, y0, W2, H2);
+    ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1; for (let i = 1; i < s.w; i++) { ctx.beginPath(); ctx.moveTo(x0 + i * u, y0); ctx.lineTo(x0 + i * u, y0 + H2); ctx.stroke(); }
+    ctx.strokeStyle = '#ffd45e'; ctx.lineWidth = Math.max(4, u * .2); ctx.strokeRect(x0 + 2, y0 + 2, W2 - 4, H2 - 4);
+    for (let i = 0; i < 4; i++) if (!used.has(i)) { const q = seatPos(s, i, T), [x, y] = P2(q.x, q.y); drawSeatProp('bumper', x, y, q.car); drawSeatFront('bumper', x, y, q.car); }
+    ctx.strokeStyle = 'rgba(200,200,220,.6)'; ctx.lineWidth = 2; for (const fx of [0, 1]) for (const fy of [0, 1]) { ctx.beginPath(); ctx.moveTo(x0 + 4 + fx * (W2 - 8), y0 + 4 + fy * (H2 - 8)); ctx.lineTo(x0 + 4 + fx * (W2 - 8), y0 - u * 1.4 + fy * (H2 - 8)); ctx.stroke(); }
+  } else if (s.k === 'shooting') {
+    const [x0, y0] = P2(s.cx - s.w / 2, s.cy - s.h / 2), W2 = s.w * u, H2 = s.h * u;
+    ctx.fillStyle = '#8a5a3c'; ctx.fillRect(x0, y0 + H2 * .55, W2, H2 * .45);                  // counter (north side faces the promenade)
+    ctx.fillStyle = '#f6e0b0'; ctx.fillRect(x0 + u * .2, y0 + H2 * .55, W2 - u * .4, u * .25);
+    ctx.fillStyle = '#4a3a5c'; ctx.fillRect(x0, y0 - u * 1.4, W2, H2 * .55 + u * 1.4);             // back wall with the targets
+    for (let r = 0; r < 2; r++) for (let i = 0; i < 6; i++) {
+      const x = x0 + ((i * 1.4 + T * (r ? -.9 : .9)) % (s.w)) * u, y = y0 - u * .9 + r * u * .9;
+      ctx.fillStyle = r ? '#ffffff' : '#ffd45e'; ctx.beginPath(); ctx.arc(((x - x0) % W2 + W2) % W2 + x0, y, u * .22, 0, 7); ctx.fill();
+      ctx.fillStyle = '#e0484f'; ctx.beginPath(); ctx.arc(((x - x0) % W2 + W2) % W2 + x0, y, u * .1, 0, 7); ctx.fill();
+    }
+    for (let i = 0; i < Math.ceil(s.w / .8); i++) { ctx.fillStyle = i % 2 ? '#fff' : '#e0484f'; ctx.fillRect(x0 + i * u * .8, y0 - u * 1.9, u * .8, u * .5); }
+  } else if (s.k === 'pool') {
+    const [x0, y0] = P2(s.cx - s.w / 2, s.cy - s.h / 2);
+    ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+    for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x0 + u * .3, y0 + i * s.h * u / 4); ctx.lineTo(x0 + s.w * u - u * .3, y0 + i * s.h * u / 4); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#d8dde8'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0 + u * 1.2, y0 - u * .3); ctx.lineTo(x0 + u * 1.2, y0 + u * .8); ctx.moveTo(x0 + u * 1.7, y0 - u * .3); ctx.lineTo(x0 + u * 1.7, y0 + u * .8); ctx.stroke();
+    ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = u * .16; ctx.beginPath(); ctx.arc(x0 + s.w * u - u * 1.5, y0 + s.h * u + u * .45, u * .3, 0, 7); ctx.stroke();
+  }
+  if (chImg) for (const i of npcs) drawRideNpc(s, i, X, Y, t);
+  const ty = RIDE_IMG() && { carousel: 1, ferris: 1, coaster: 1, shooting: 1 }[s.k] ? b - { carousel: 12.4, ferris: 12.9, coaster: 10.6, shooting: 7.9 }[s.k] : s.top ? s.cy - s.h / 2 - (s.k === 'shooting' ? 2.6 : .9) : b - (s.k === 'ferris' ? 8.2 : s.k === 'carousel' ? 7.9 : s.k === 'coaster' ? 4.6 : .5);
+  const [lx, ly] = P2(s.cx, ty); sign(`${s.icon} ${s.label}`, lx, ly, { size: TS * .3, bg: 'rgba(160,50,110,.92)' });
 }
 const npcPatients = {};
 function npcPatient(b, s) {
@@ -2022,7 +2336,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   }
   if (p.emo && performance.now() < p.emoT) {
     const k = 1 - (p.emoT - performance.now()) / 4200, by = top - TS * (p.title ? 1.25 : 1.0) - Math.sin(Math.min(1, k * 4) * Math.PI / 2) * TS * .25;
-    ctx.font = `${Math.round(TS * .75)}px serif`; ctx.fillText(p.emo, px, by + Math.sin(t / 160) * 2);
+    ctx.font = `${Math.round(TS * .75)}px serif`; ctx.fillText(p.emo, px, by - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2);
   }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
@@ -2205,7 +2519,7 @@ function bindPanel(root) {
   });
   const gs = root.querySelector('#godSpd');
   if (gs) { gs.oninput = () => { $('#godSpdV').textContent = (+gs.value).toFixed(1); }; gs.onchange = () => send({ t: 'god', op: 'speed', v: +gs.value }); }
-  const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (!i.value.trim()) return; if (!worldOk(chatTab)) return; send({ t: 'chat', text: i.value, ch: chatTab }); i.value = ''; };
+  const f = root.querySelector('#chatForm'); if (f) f.onsubmit = e => { e.preventDefault(); const i = $('#chatIn'); if (!i.value.trim()) return; const ch = chatTab === 'all' ? 'world' : chatTab; if (!worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; };
   const cf = root.querySelector('#callForm'); if (cf) cf.onsubmit = e => { e.preventDefault(); const i = $('#callIn'); if (i.value.trim()) send({ t: 'call_msg', text: i.value }); i.value = ''; };
   root.querySelectorAll('[data-staff]').forEach(c => whenChars(() => {
     const n = STAFF.find(x => x.id === c.dataset.staff) || STAFF.find(x => x.career === c.dataset.staff); if (!n) return;
@@ -2255,7 +2569,8 @@ const FN = {
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
-  addContact(m, root) { send({ t: 'contact_add', phone: m.phone || root.querySelector('#phIn').value }); },
+  addContact(m, root) { const ph = String(m.phone || root.querySelector('#phIn').value).replace(/\D/g, ''); if (G.taxi && ph === G.taxi.phone) { panel.tab = 'taxi'; return refreshPanel(true); } send({ t: 'contact_add', phone: ph }); },
+  taxiGo(m) { send({ t: 'taxi', dest: m.dest }); closePanel(); },
   donate(m, root) { send({ t: 'donate', to: m.to, amt: +root.querySelector('#donIn').value || 0 }); },
   order(m, root) { send({ t: 'order', item: m.item, tip: panel?.tip ?? +(root.querySelector('#tipIn')?.value || 0) }); },
   open(m) { openPanel({ kind: m.kind, ...(m.set || {}) }); },
@@ -2609,7 +2924,7 @@ const rarTag = id => { const r = G.items[id]?.rar; return r ? `<span class="rtag
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(it.name)}${rarTag(id)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
-let chatTab = 'world', worldAt = 0;
+let chatTab = 'all', worldAt = 0;
 // world chat: one line every 3 seconds. Too soon -> say so and keep what was typed, so nothing is lost
 function worldOk(ch) {
   if (ch !== 'world') return true;
@@ -2617,7 +2932,7 @@ function worldOk(ch) {
   if (left > 0) { toast(`แชทโลกส่งได้ทุก 3 วินาที · รออีก ${left} วินาที แล้วกดส่งใหม่ได้เลย (ข้อความยังอยู่ในช่องพิมพ์)`, '💬', false); return false; }
   worldAt = Date.now(); return true;
 }
-const chatHtml = () => chatLog.filter(m => m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
 // ---- profile photo, titles by rarity, mail
 let myPic = '', mailList = [], tradeChat = [];
 const infoCache = new Map();
@@ -2836,6 +3151,21 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-18c', d: '18 พ.ย. (รอบ 34)', items: [
+    '🎡 สวนสนุกโฉมใหม่! ม้าหมุน ชิงช้าสวรรค์ รถไฟเหาะ รถบั๊ม บูธยิงเป้า และสระว่ายน้ำ เปลี่ยนเป็นภาพวาดใหม่ทั้งหมด พร้อมซุ้มประตูทางเข้าสวนสนุก',
+    '🛵 ไรเดอร์ที่รับออเดอร์ไว้ เข้าไปรับอาหารได้แม้ร้านอาหารปิดแล้ว · ไรเดอร์ส้มมาแย่งลูกค้าถี่ขึ้น',
+    '🚓 ตำรวจได้รถสายตรวจขับฟรี 1 คัน (ถูกยึดคืนเมื่อเปลี่ยนอาชีพ)',
+    '😀 พิมพ์อีโมจิในแชท จะลอยขึ้นเหนือหัวตัวละคร',
+    '💬 เพิ่มแชท "รวม" (แชทโลก + คนใกล้ๆ ไม่มีข้อความระบบ) ไว้ช่องแรก',
+    '🚕 เปิดบริการแท็กซี่! โทร 888-888 หรือกดแอพแท็กซี่ในมือถือ เลือกปลายทาง รถมารับถึงที่แล้วพาไปส่งหน้าประตู (ค่าโดยสารตามระยะทาง)',
+    '🎡 ย้ายทางเข้าสวนสนุกไปไว้สุดถนนเส้นหลักด้านใต้ของเมือง',
+    '🎣 เพิ่มเสียงตกปลา: เหวี่ยงเบ็ด ทุ่นตกน้ำ ปลาวิ่ง สายขาด และตอนได้ปลา',
+  ] },
+  { v: '2026-11-18b', d: '18 พ.ย. (รอบ 33)', items: [
+    '🎡 <b>เปิดแมพใหม่ สวนสนุก!</b> เดินไปที่ป้าย 🎡 สุดถนนเส้นกลางทางใต้ของเมือง แล้วกดเข้า',
+    '🎠 ม้าหมุน · 🎡 ชิงช้าสวรรค์ · 🎢 รถไฟเหาะ · 🏊 สระว่ายน้ำ · 🚗 รถบั๊มพ์ · 🎯 เกมยิงเป้า เล่นได้จริง ซื้อตั๋วแล้วขึ้นเล่น ได้ <b>⚡ พลังงาน ❤️ เลือด 😊 ความสุข ทุกวินาที</b> แต่ละเครื่องให้ไม่เท่ากัน เดินออกเมื่อไหร่ก็ลง',
+    '🚗 <b>รถบั๊มพ์ขับเองได้จริง</b> ขับไปชนคนอื่นแล้วเด้งกระเด็น (กดปุ่มใหญ่เพื่อลงจากรถ) · 🏊 กระโดดลงสระน้ำกระจาย ว่ายแล้วมีระลอกน้ำ · 🎠🎡 เห็นคนนั่งหมุนไปกับม้าหมุนและชิงช้าสวรรค์ มีชาวเมืองมานั่งเล่นด้วย',
+    '⚡ ทำงานและทำเควสต์ใช้พลังงานมากขึ้น 30% ไปเติมพลังที่สวนสนุกกันนะ'] },
   { v: '2026-11-18a', d: '18 พ.ย. (รอบ 32)', items: [
     '⚖️ <b>ปรับสมดุล</b>: วิ่งช้าลง (รถทุกคันเร็วกว่าวิ่งแล้ว) · อาชีพหมอได้เงินน้อยลง (เงินเวร ค่าช่วยชีวิต และเคส ICU ลดลง เคสถัดไปรอนานขึ้น) · 🎣 ตกปลาง่ายขึ้น (ปลากินเบ็ดไวขึ้น จังหวะตวัดกว้างขึ้น สายขาดยากขึ้น ยกปลาขึ้นง่ายขึ้น) · 🥬 หิวจนหมดแรง ฟื้นใน 6 วินาที',
     '🛵 สมัครเป็น<b>ไรเดอร์ได้มอไซค์ส่งอาหารฟรี 1 คัน</b> (ยืมใช้ ถ้าเปลี่ยนอาชีพบริษัทจะยึดคืน) · ไรเดอร์ตอนนี้ได้รถด้วย',
@@ -3384,6 +3714,15 @@ function renderPanel(p) {
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคส 🐕 ตามหาหมาที่หายไป (ค่าตอบแทนตามเวลาที่ใช้ · หมดเวลา = ล้มเหลว) · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) + policeReports() : ''}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · สมัครเป็นขอทานได้ที่นี่ (เงินสด+ฝากไม่เกิน ฿2,000) · หาเงินโดย<b>วิ่งเก็บขยะ</b>ที่ถังขยะ หรือนั่งขอทาน (ปุ่ม 🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ</div>${staffHint('beggar')}`;
+    case 'ride': {
+      const S = STN(st), R = G.rides?.[S?.k]; if (!R) return '';
+      const mine = P.get(myId), on = mine?.pose === 'fun' && String(mine.fn).startsWith(S.k + ':'), n = ridersOf(S.k).size;
+      const g = R.gain, pm = v => `+${Math.round(v * 60)}/นาที`;
+      return `<h2>${R.icon} ${esc(R.name)}</h2><div class="sub">${esc(R.desc)} · ตั๋วละ <b>${money(R.price)}</b> เล่นได้ ${R.mins} นาที · ตอนนี้มีคนเล่น ${n}/${R.cap}</div>
+        <div class="grid2"><div class="item"><div class="nm">⚡ พลังงาน<small><b style="color:var(--ok)">${pm(g.energy)}</b></small></div></div><div class="item"><div class="nm">❤️ เลือด<small><b style="color:var(--ok)">${pm(g.health)}</b></small></div></div><div class="item"><div class="nm">😊 ความสุข<small><b style="color:var(--ok)">${pm(g.happy)}</b></small></div></div><div class="item"><div class="nm">⏱️ เวลา<small><b>${R.mins} นาที/ตั๋ว</b></small></div></div></div>
+        ${on ? B('🚶 ลงจากเครื่องเล่น', { t: 'rideoff' }, 'big') : B(`🎟️ ซื้อตั๋ว ${money(R.price)} แล้วเล่นเลย`, { t: 'act', st, a: 'play' }, 'primary big', n >= R.cap || me.money < R.price)}
+        <div class="sub" style="margin-top:8px">ระหว่างเล่นได้พลังงาน เลือด และความสุขทุกวินาที · เดินออกเมื่อไหร่ก็ลงจากเครื่องเล่น</div>`;
+    }
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
     case 'seat': return `<h2>🪑 ที่นั่ง</h2>${B('นั่งพัก', { t: 'act', st, a: 'sit' }, 'primary big')}`;
     case 'quests': {
@@ -3443,8 +3782,8 @@ function renderPanel(p) {
       return `<h2>🏆 อันดับเศรษฐี</h2><div class="sub">นับเงินสด + เงินฝาก + ทรัพย์สิน</div><div class="list">${rows}</div>`;
     }
     case 'chat':
-      return `<h2>💬 แชท</h2><div class="tabs">${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}</div>
-        <div class="sub">${chatTab === 'world' ? 'ทุกคนในเมืองอ่านได้ ไม่ขึ้นบนหัว (ส่งได้ทุก 3 วินาที)' : 'ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น'}</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="${chatTab === 'world' ? 'พิมพ์ถึงทุกคน...' : 'พิมพ์ข้อความ...'}" autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
+      return `<h2>💬 แชท</h2><div class="tabs">${B('💬 รวม', { fn: 'chatTab', tab: 'all' }, chatTab === 'all' ? 'primary' : '')}${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}</div>
+        <div class="sub">${chatTab === 'all' ? 'แชทโลก + คนใกล้ๆ รวมกัน (ไม่มีข้อความระบบ) · พิมพ์ที่นี่ = ส่งเข้าแชทโลก' : chatTab === 'world' ? 'ทุกคนในเมืองอ่านได้ ไม่ขึ้นบนหัว (ส่งได้ทุก 3 วินาที)' : 'ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น'}</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="${chatTab === 'world' || chatTab === 'all' ? 'พิมพ์ถึงทุกคน...' : 'พิมพ์ข้อความ...'}" autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
     case 'screen': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⛶ หน้าจอ</h2><div class="sub">${canFs ? 'เต็มจอซ่อนแถบเบราว์เซอร์ · แนวนอนจะล็อกจอให้เป็นแนวนอน (มือถือ Android)' : 'iPhone/iPad ใช้เต็มจอจากเบราว์เซอร์ไม่ได้: กดปุ่มแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ · หมุนเครื่องเป็นแนวนอนได้เลย'}</div>
@@ -3631,10 +3970,10 @@ const PH_APPS = [
 // the rest of the old menu, as plain apps on the last row
 const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
-  ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
+  ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
-const PH_TITLE = { support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
+const PH_TITLE = { taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
   const dt = me?.date, clock = hhmm(hourNow());
@@ -3650,9 +3989,20 @@ function phonePanel(p) {
     const onl = new Set((me.friends || []).filter(f => f.on).map(f => f.p));
     const fav = new Set((me.friends || []).filter(f => f.fav).map(f => f.p)), list = (me.contacts || []).slice().sort((x, y) => fav.has(y.p) - fav.has(x.p) || onl.has(y.p) - onl.has(x.p));
     const rows = list.map(c => itemRowRaw(onl.has(c.p) ? '🟢' : '⚪', `${fav.has(c.p) ? '⭐ ' : ''}${esc(c.n)}`, c.p, `<div class="rowf">${B(fav.has(c.p) ? '★' : '☆', { t: 'contact_pin', phone: c.p }, fav.has(c.p) ? 'primary' : '')}${B('📞', { t: 'call', phone: c.p }, 'good', !!call)}${B('🗑️', { fn: 'delContact', phone: c.p, n: c.n })}</div>`)).join('');
+    const taxiRow = G.taxi ? itemRowRaw('🚕', '<b>แท็กซี่เมืองชีวิต</b>', `${G.taxi.phone.replace(/(\d{3})(\d{3})/, '$1-$2')} · เรียกได้ 24 ชม.`, B('📞 เรียก', { fn: 'qtab', set: { tab: 'taxi' } }, 'good')) : '';
     body = `<div class="jobbox">📱 เบอร์ของคุณ: <b style="font-size:18px;letter-spacing:2px">${me.phone}</b><div class="sub">บอกเบอร์นี้ให้เพื่อน แล้วเพื่อนจะบันทึกและโทรหาคุณได้</div></div>
       <div class="rowf" style="margin:10px 0"><input id="phIn" inputmode="numeric" maxlength="6" placeholder="เบอร์เพื่อน 6 หลัก">${B('บันทึก', { fn: 'addContact' }, 'good')}</div>
-      <div class="list">${rows || '<div class="sub">ยังไม่มีรายชื่อ</div>'}</div>`;
+      <div class="list">${taxiRow}${rows || (taxiRow ? '' : '<div class="sub">ยังไม่มีรายชื่อ</div>')}</div>`;
+  } else if (tab === 'taxi') {
+    const T = G.taxi; if (!T) body = '<div class="sub">ยังไม่เปิดบริการ</div>';
+    else {
+      const AA = areaOf(me.x, me.y), ar = AA?.id || '', area = ar.startsWith('yard') ? 'housing' : ar, inRoom = !AA || AA.kind === 'room' || ar === 'farm';
+      const here = area === 'housing' ? { x: 50, y: 4 } : area === 'park' ? { x: 50, y: 87 } : { x: me.x, y: me.y };
+      const fee = d => { const t = d.id === 'housing' ? { x: 50, y: 4 } : d.id === 'park' ? { x: 50, y: 87 } : d; return Math.round(T.base + Math.hypot(here.x - t.x, here.y - t.y) * T.perTile + (area !== 'town' ? T.far : 0) + (d.id === 'park' || d.id === 'housing' ? T.far : 0)); };
+      const rows = T.dest.filter(d => Math.hypot(me.x - d.x, me.y - d.y) >= 3).map(d => [d, fee(d)]).sort((x, y) => x[1] - y[1])
+        .map(([d, f]) => itemRowRaw(d.icon, esc(d.label), `ค่าโดยสาร <b style="color:var(--acc)">${money(f)}</b>`, B('🚕 ไป', { fn: 'taxiGo', dest: d.id }, 'good', inRoom || me.money < f))).join('');
+      body = `<div class="jobbox">🚕 <b>แท็กซี่เมืองชีวิต</b> · โทร <b style="letter-spacing:1px">${T.phone.replace(/(\d{3})(\d{3})/, '$1-$2')}</b><div class="sub">${inRoom ? '🚪 ออกไปรอริมถนนข้างนอกก่อน แล้วค่อยเรียกรถ' : 'เลือกปลายทาง แท็กซี่จะมารับถึงที่แล้วพาไปส่งหน้าประตู · ยิ่งไกลยิ่งแพง'}</div></div><div class="list">${rows}</div>`;
+    }
   } else if (tab === 'call') {
     if (!call) body = '<div class="sub">ยังไม่มีสาย — โทรหาเพื่อนจากแท็บรายชื่อ (เพื่อนต้องออนไลน์)</div>';
     else { call.unread = 0; setTimeout(paintCallChip, 0); }
@@ -3996,7 +4346,7 @@ const VEH = {
   bus:    { side: 'v_bus_side', front: 'v_bus_front', back: 'v_bus_back', len: 3.8, v: 2.4, deep: 1.7 },
 };
 const FLEET = [['bus', 'red', 'taxi', 'blue', 'yellow', 'police', 'red', 'taxi', 'bus', 'blue', 'yellow', 'taxi', 'red', 'blue'], ['taxi', 'red', 'blue'], ['yellow', 'red', 'blue']];
-let traffic = [], trafT = 0;
+let traffic = [], trafT = 0, taxiFx = null;   // taxiFx: the cab you called, driving up to you / away after the drop
 const routeLen = r => r.reduce((t, a, i) => { const b = r[(i + 1) % r.length]; return t + Math.hypot(b[0] - a[0], b[1] - a[1]); }, 0);
 function routePos(r, d) {                     // point and heading at distance d along a closed route
   const L = routeLen(r); d = ((d % L) + L) % L;
@@ -4150,7 +4500,7 @@ function drawLights(X, Y, dark) {
 }
 
 // ------------------------------------------------------------------ navigation across maps
-const GATE_TO = { farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town' };
+const GATE_TO = { farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
 function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
@@ -4540,8 +4890,8 @@ function fightStart(f) {
 }
 function fightEnd(ok, why) {
   if (!FG) return; FG = null; reelHold = false;
-  if (ok) { doAct('water', 'land'); FX.play('splash'); const s = P.get(myId); if (s) FX.burst(s.x, s.y - .2, '#dff4ff', 16); }
-  else { doAct('water', 'lose', { why }); FX.play('fail'); if (navigator.vibrate) navigator.vibrate(why === 'snap' ? [40, 30, 40] : 30); }
+  if (ok) { doAct('water', 'land'); FX.play('landfish'); const s = P.get(myId); if (s) FX.burst(s.x, s.y - .2, '#dff4ff', 16); }
+  else { doAct('water', 'lose', { why }); FX.play(why === 'snap' ? 'snap' : 'fail'); if (navigator.vibrate) navigator.vibrate(why === 'snap' ? [40, 30, 40] : 30); }
 }
 // a press: in the land phase it is the lift; otherwise just the start of a hold
 function fightPress() {
@@ -4557,7 +4907,7 @@ function stepFight(dt) {
   const now0 = performance.now(), r = FG.rnd, hold = reelHold, el = now0 - FG.t0;
   if (FG.mode === 'fight') {
     if (now0 > FG.pt) {                                    // the fish alternates between runs and rests
-      FG.run = !FG.run;
+      FG.run = !FG.run; if (FG.run) FX.play("zing");
       FG.pt = now0 + (FG.run ? (700 + r() * 1100) * (.7 + FG.pow * .6) : (900 + r() * 1400) * (1.3 - FG.pow * .5));
       FG.str0 = FG.pow * (.6 + r() * .6) * (.45 + FG.sta * .55);
       if (FG.run) { if (navigator.vibrate) navigator.vibrate(Math.round(40 + FG.str0 * 80)); const f = fishAt(); if (f) FX.ring(f.x, f.y, '#fff', 500, .5 + FG.str0); }
@@ -4657,7 +5007,7 @@ function onMeDiff(a, b) {
   if (b.energy - a.energy >= 8) FX.float(x + .5, y + .2, `+${Math.round(b.energy - a.energy)}⚡`, '#f2c94c', .34);
   if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }
   if (b.hunger - a.hunger >= 8) FX.float(x, y + .4, `+${Math.round(b.hunger - a.hunger)}🍗`, '#8fe3a6', .34);
-  if (!a.cast && b.cast) { bobber = findWater(s.x, s.y); castT = performance.now(); FX.play('whoosh'); if (bobber) setTimeout(() => { FX.play('splash'); FX.ring(bobber.x, bobber.y, '#fff', 800, 1); }, 380); }
+  if (!a.cast && b.cast) { bobber = findWater(s.x, s.y); castT = performance.now(); FX.play('cast'); if (bobber) setTimeout(() => { FX.play('plop'); FX.ring(bobber.x, bobber.y, '#fff', 800, 1); }, 380); }
   if (!b.cast) { bobber = null; FG = null; reelHold = false; if (a.cast) holdAfterTp = false; }
   if (!a.down && b.down) { FX.play('fail'); closePanel(); }
   if (a.down && !b.down) FX.play('heal');
