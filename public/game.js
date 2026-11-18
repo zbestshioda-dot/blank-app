@@ -1,4 +1,5 @@
 'use strict';
+const TOUCH_UI = matchMedia('(pointer: coarse)').matches;
 (() => {
 const $ = s => document.querySelector(s);
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
@@ -179,10 +180,11 @@ function drawAura(px, py, H, t, front) {
 // ---- vehicles: atlas sprites w_<key>_s (side, faces left) / _f (front) / _b (back)
 const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's' : view === 'front' ? 'f' : 'b'}`];
 const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
+const VEH_FACE_R = new Set(['suv']);   // side sprites drawn facing right (the rest face left)
 function drawVeh(key, view, faceLeft, px, py) {
   const s = vehSpr(key, view); if (!s || !atlasImg) return;
   const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS;
-  ctx.save(); ctx.translate(px, py + TS * .06); if (view === 'side' && !faceLeft) ctx.scale(-1, 1);
+  ctx.save(); ctx.translate(px, py + TS * .06); if (view === 'side' && !faceLeft !== VEH_FACE_R.has(key)) ctx.scale(-1, 1);
   ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
 }
 function drawRide(p, v, px, py, k, view, dir) {
@@ -241,7 +243,7 @@ paintSw();
 if (creds) { $('#inName').value = creds.name; $('#inPin').value = creds.pin; }
 // share the game with friends (login screen + settings)
 async function shareGame() {
-  const url = 'https://is.gd/lifetown', text = 'มาเล่น "เมืองชีวิตนี้เลือกได้" ด้วยกัน! เกมใช้ชีวิตออนไลน์ หางาน หาเงิน ซื้อบ้าน ตกปลา เล่นบนมือถือได้เลย';
+  const url = 'https://is.gd/newlifetown', text = 'มาเล่น "เมืองชีวิตนี้เลือกได้" ด้วยกัน! เกมใช้ชีวิตออนไลน์ หางาน หาเงิน ซื้อบ้าน ตกปลา เล่นบนมือถือได้เลย';
   try { if (navigator.share) { await navigator.share({ title: 'เมืองชีวิตนี้เลือกได้', text, url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(`${text}\n${url}`); toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย!', '📋'); }
   catch { prompt('คัดลอกลิงก์นี้ส่งให้เพื่อน:', url); }
@@ -324,11 +326,12 @@ const promo = (() => {
   return { open, stop() { v.pause(); v.removeAttribute('src'); v.load(); } };
 })();
 // ------------------------------------------------------------------ network
+let lastMsgT = 0;
 function connect() {
   if (ws && ws.readyState <= 1) { if (ws.readyState === 1) sendLogin(); return; }
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   ws.onopen = () => { if (wantLogin) sendLogin(); };
-  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onmessage = e => { lastMsgT = Date.now(); handle(JSON.parse(e.data)); };
   ws.onclose = () => {
     if (G) toast('การเชื่อมต่อหลุด กำลังเชื่อมต่อใหม่...', '📡', false);
     setTimeout(() => { if (wantLogin) connect(); }, 2000);
@@ -457,7 +460,7 @@ function handle(m) {
   }
 }
 // ---- the chat box under the status card: tabs, foldable, type straight into it
-let cbTab = 'all', cbFolded = false, cbUnread = 0;
+let cbTab = 'world', cbFolded = false, cbUnread = 0;
 try { cbFolded = localStorage.getItem('lt_cb') === '1'; } catch { }
 const cbShow = m => cbTab === 'all' || (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : !m.sys && !m.w);
 function paintChatBox(added) {
@@ -639,7 +642,7 @@ function paintHud() {
 function paintDown() {
   const dn = $('#downView'); if (!me?.down) return;
   const left = me.down.until ? Math.max(0, Math.ceil((me.down.until - Date.now() - clockOff) / 1000)) : 0, mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  dn.innerHTML = me.down.kind === 'veg' ? `<b>🥬 หิวจนหมดแรง นอนเป็นผัก</b><span>ร่างกายจะค่อยๆ ฟื้นเอง (❤️ ${Math.floor(me.health)}/15)</span>`
+  dn.innerHTML = me.down.kind === 'veg' ? `<b>🥬 หิวจนหมดแรง นอนเป็นผัก</b><span>ฟื้นในอีก <b class="big-cd">${mm}</b></span>`
     : me.down.kind === 'jail' ? `<b>⛓️ ติดคุกอยู่ที่สถานีตำรวจ</b><span>พ้นโทษในอีก <b class="big-cd">${mm}</b></span>`
     : `<b>🚑 หมดสติอยู่บนเตียงโรงพยาบาล</b><span>พักฟื้นสักครู่ เจ้าหน้าที่กำลังรักษาให้</span><span>ฟื้นในอีก <b class="big-cd">${mm}</b> · รักษาโรคให้หายด้วย${me.down.free ? ' · <b>ฟรี 💚</b>' : ''}</span>`;
 }
@@ -795,24 +798,26 @@ const blockedAt = (x, y) => { const r = G.radius; return yardLocked(x, y) || sol
 // ------------------------------------------------------------------ input
 const keys = {};
 let joy = null;
+// letter keys by their position, so WASD / E / space work with a Thai keyboard layout too
+const K = e => /^Key[A-Z]$/.test(e.code || '') ? e.code.slice(3).toLowerCase() : e.code === 'Space' ? ' ' : e.key;
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
-  keys[e.key.toLowerCase()] = true;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) { if (K(e) === 'Escape') e.target.blur(); return; }
+  keys[K(e).toLowerCase()] = true;
   if (!G) return;
-  if (e.key === 'e' || e.key === ' ') { e.preventDefault(); if (FG) { if (!e.repeat) fightPress(); reelHold = true; return; } if (!e.repeat) onAction(); }
-  if (e.key === 'Enter' && !panel) { e.preventDefault(); openChatBox(); }
-  if (e.key === 'Escape') { closePanel(); }
-  if (e.key === 'b' || e.key === 'i') openPanel({ kind: 'bag' });
-  if (e.key === 'm') { if ($('#mapView').classList.contains('hidden')) { mapZoom = 1; openMap(); } else $('#mapX').click(); }
-  if (e.key === 'q') openPanel({ kind: 'quests' });
-  if (e.key === 'h' || e.key === '?') openPanel({ kind: 'keys' });
-  if (e.key === 'p') openPanel({ kind: 'phone' });
-  if (e.key === 'r') $('#restBtn').click();
-  if (e.key === 'f') talk();
-  if (e.key === 'Shift' && !running) { shiftRun = true; setRun(true); }
-  if (e.key === 'c' || e.key === 't' || e.key === 'Enter' && panel) { e.preventDefault(); openChatBox(); }
+  if (K(e) === 'e' || K(e) === ' ') { e.preventDefault(); if (FG) { if (!e.repeat) fightPress(); reelHold = true; return; } if (!e.repeat) onAction(); }
+  if (K(e) === 'Enter' && !panel) { e.preventDefault(); openChatBox(); }
+  if (K(e) === 'Escape') { closePanel(); }
+  if (K(e) === 'b' || K(e) === 'i') openPanel({ kind: 'bag' });
+  if (K(e) === 'm') { if ($('#mapView').classList.contains('hidden')) { mapZoom = 1; openMap(); } else $('#mapX').click(); }
+  if (K(e) === 'q') openPanel({ kind: 'quests' });
+  if (K(e) === 'h' || K(e) === '?') openPanel({ kind: 'keys' });
+  if (K(e) === 'p') openPanel({ kind: 'phone' });
+  if (K(e) === 'r') $('#restBtn').click();
+  if (K(e) === 'f') talk();
+  if (K(e) === 'Shift' && !running) { shiftRun = true; setRun(true); }
+  if (K(e) === 'c' || K(e) === 't' || K(e) === 'Enter' && panel) { e.preventDefault(); openChatBox(); }
 });
-addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'e' || e.key === ' ') reelHold = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
+addEventListener('keyup', e => { keys[K(e).toLowerCase()] = false; if (K(e) === 'e' || K(e) === ' ') reelHold = false; if (K(e) === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
@@ -877,6 +882,7 @@ function onTap(sx, sy) {
   if (placing) return placeTap(wx, wy);
   const here = areaOf(m.x, m.y)?.id, myRoom = roomOf(m.x, m.y);
   for (const q of [...PETST.values(), ...(myRoom?.rk === 'petshop' ? shopPets(myRoom) : [])]) {   // petting a pet (yours, someone's or the shop's) makes it hop happily
+    if (PETST.get(q.owner) === q && roomOf(q.x, q.y)) continue;   // (pets are hidden indoors)
     if (areaOf(q.x, q.y)?.id !== here || Math.hypot(q.x - wx, (q.y - .35) - wy) > .6) continue;
     return petPlay(q, true);
   }
@@ -1088,7 +1094,7 @@ function frame(t) {
       stuckT = tryMove && !moved && !wall ? stuckT + dt : 0;
       if (stuckT > 1.2 && performance.now() > unstickAt) { unstickAt = performance.now() + 4000; stuckT = 0; holdAfterTp = false; reelHold = false; if (!me.cast) FG = null; send({ t: 'unstick', x: m.x, y: m.y, why: JSON.stringify({ cast: me.cast?.state || 0, FG: !!FG, joy: !!joy, pose: me.pose || 0, down: me.down?.kind || 0 }) }); } }
     // walking into a gate's yellow circle takes you through it, no button needed
-    if ((dx || dy) && near?.type === 'gate' && Math.hypot(near.x - m.x, near.y - m.y) < near.r * .75 && performance.now() > actCd) { actCd = performance.now() + 2000; autoPath = null; doAct(near.id, 'go'); }
+    if ((dx || dy) && near?.type === 'gate' && near.id.startsWith('ygate') && Math.hypot(near.x - m.x, near.y - m.y) < near.r * .75 && performance.now() > actCd) { actCd = performance.now() + 2000; autoPath = null; doAct(near.id, 'go'); }
     // walking down onto the door mat takes you outside, no button needed
     if (dy > .3 && near?.type === 'exit' && Math.hypot(near.x - m.x, near.y - m.y) < Math.max(.7, near.r * .6) && performance.now() > actCd) { actCd = performance.now() + 1500; autoPath = null; send({ t: 'exit' }); }
     m.rx = m.x; m.ry = m.y;
@@ -1175,7 +1181,7 @@ function draw(t) {
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) ents.push([p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);   // helicopters fly over the roofs
-  for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
+  for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3) && !roomOf(p.x, p.y)) ents.push([q.y + .3, 6, q]); }   // pets wait outside: none indoors
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   misEnts(ents, vis);
   rivalEnts(ents, vis);
@@ -1784,7 +1790,7 @@ function stepPets(dt) {
     if (d > .05) { const sp = Math.min(d * 6.5 + .6, 8.5); step = Math.min(d, sp * dt); q.x += dx / d * step; q.y += dy / d * step; }
     q.moving = step / Math.max(dt, .001) > .8;
     if (q.moving) {
-      q.phase += step * 2.4; q.idleAt = now0 + 2500 + Math.random() * 3500;
+      q.spd = step / Math.max(dt, .001); q.phase += Math.min(step * 2.4, dt * 8); q.idleAt = now0 + 2500 + Math.random() * 3500;
       if (Math.abs(dx) > Math.abs(dy) * 1.1) { q.view = 'side'; q.flip = dx < 0; } else q.view = dy < 0 ? 'up' : 'down';
     } else {
       q.phase = 0;
@@ -1797,6 +1803,7 @@ function stepPets(dt) {
   for (const id of [...PETST.keys()]) if (!P.has(id)) PETST.delete(id);
 }
 const vis0 = q => areaOf(q.x, q.y)?.id === areaOf(P.get(myId)?.x, P.get(myId)?.y)?.id;
+const PET_FACE_L = new Set(['rabbit']);   // side frames drawn facing left (the rest face right)
 function drawPet(q, X, Y, t) {
   if (!PET_AT || !petImg) return;
   const meta = PET_AT.pets[q.id]; if (!meta) return;
@@ -1808,7 +1815,7 @@ function drawPet(q, X, Y, t) {
     h = Math.sin(u * Math.PI) * TS * .55 * q.big;
     sy = u > .8 ? 1 - .14 * Math.sin((u - .8) / .2 * Math.PI) : 1 + .08 * Math.sin(u * Math.PI); sx = 2 - sy;
   }
-  else if (q.moving) { const b = Math.abs(Math.sin(q.phase * Math.PI)); h = b * TS * .2; sy = 1 - .08 * Math.max(0, .25 - b) * 4; sx = 2 - sy; }
+  else if (q.moving) { const b = Math.abs(Math.sin(q.phase * Math.PI)); h = b * TS * .2 * (q.spd > 4.5 ? .35 : 1); sy = 1 - .08 * Math.max(0, .25 - b) * 4; sx = 2 - sy; }
   else { const br = Math.sin(now0 / 420 + q.x * 3); sy = 1 + br * .02; sx = 2 - sy; }                // breathing
   const px = Math.round(q.x * TS + X), py = Math.round(q.y * TS + Y + TS * .32);
   ctx.fillStyle = 'rgba(0,0,0,.25)'; const shr = 1 - Math.min(.45, h / (TS * .9));
@@ -1819,7 +1826,7 @@ function drawPet(q, X, Y, t) {
   const legend = G.pets?.[q.id]?.rar >= 5;
   if (legend) petGlow(px, py - h - sh * .45, size, now0);
   ctx.save(); ctx.translate(px, py - h);
-  if (q.view === 'side' && q.flip) ctx.scale(-1, 1);
+  if (q.view === 'side' && q.flip !== PET_FACE_L.has(q.id)) ctx.scale(-1, 1);
   ctx.drawImage(petImg, (group * 4 + fr) * C, meta.row * C, C, C, -sw / 2, -sh + size * .03, sw, sh);
   ctx.restore();
 }
@@ -1837,11 +1844,24 @@ function petGlow(cx, cy, size, t) {
   ctx.restore();
 }
 // a pet's face for the shop / bag lists
+// the drawn part of a pet's first frame (cells have empty margins that differ per animal), so every icon comes out the same size
+const PET_BOX = new Map();
+function petBox(row) {
+  let b = PET_BOX.get(row); if (b) return b;
+  const C = PET_AT.cell; b = [0, 0, C, C];
+  try {
+    const t = document.createElement('canvas'); t.width = t.height = C; const g = t.getContext('2d'); g.drawImage(petImg, 0, row * C, C, C, 0, 0, C, C);
+    const d = g.getImageData(0, 0, C, C).data; let x0 = C, y0 = C, x1 = -1, y1 = -1;
+    for (let y = 0; y < C; y++) for (let x = 0; x < C; x++) if (d[(y * C + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 >= x0) b = [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+  } catch { }
+  PET_BOX.set(row, b); return b;
+}
 function drawPetIcon(c, id) {
-  const meta = PET_AT.pets[id]; if (!meta) return; const g = c.getContext('2d'), C = PET_AT.cell;
+  const meta = PET_AT.pets[id]; if (!meta) return; const g = c.getContext('2d'), C = PET_AT.cell, [bx, by, bw, bh] = petBox(meta.row);
   g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = true;
-  const k = Math.min(c.width, c.height) * (.62 + meta.sz * .38) / C;
-  g.drawImage(petImg, 0, meta.row * C, C, C, (c.width - C * k) / 2, c.height - C * k + 2, C * k, C * k);
+  const k = Math.min(c.width * .72 / bw, c.height * .72 / bh);
+  g.drawImage(petImg, bx, meta.row * C + by, bw, bh, (c.width - bw * k) / 2, c.height - bh * k - c.height * .08, bw * k, bh * k);
 }
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
 function drawPlayer(p, X, Y, t) {
@@ -1926,7 +1946,7 @@ function buildStaff() {
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ! อยากได้เพื่อนตัวฟูไหมคะ', 'ทุกตัวสุขภาพดีค่ะ ลูบได้นะคะ', 'ตัวไหนถูกใจ ลองแตะดูได้เลยค่ะ'] },
   { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
-  { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: -1.9, dy: 0.7, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
+  { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
   { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', dx: .6, dy: -1.15, lk: { hair: 'silver', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมครับ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ครับ'] },
   { st: 'furnshop', name: 'น้องเก่ง (ร้านเฟอร์นิเจอร์)', short: 'น้องเก่ง', icon: '🛋️', dx: .6, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['โซฟาตัวนี้นั่งสบายมากครับ', 'จัดบ้านสวย อยู่แล้วมีความสุขนะ', 'ซื้อแล้วส่งถึงบ้านเลยครับ'] },
   { st: 'police', name: 'ดาบหญิงสมศรี (เวรประจำโต๊ะ)', short: 'ดาบสมศรี', icon: '👮', g: 'f', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'brown' }, hi: ['มีอะไรให้ช่วยคะ', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะคะ'] },
@@ -1938,6 +1958,10 @@ const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FA
   { st: 'market', name: 'เจ๊ศรี (ผู้ดูแลตลาดกลาง)', short: 'เจ๊ศรี', icon: '🏪', g: 'f', dx: 2.6, dy: .35, lk: { hair: 'brown', shirt: 'green' }, hi: ['ซื้อขายที่นี่ ราคายุติธรรม', 'วางขายของได้นะ คนซื้อเยอะ', 'ของสดๆ ทั้งนั้นจ้า'] },
   { st: 'estate', name: 'คุณจิ๋ม (นายหน้าอสังหาฯ)', short: 'คุณจิ๋ม', icon: '🏡', g: 'f', dx: 1.4, dy: 0, lk: { hair: 'brown', shirt: 'pink' }, hi: ['บ้านสวย ทำเลดี ราคาคุ้มค่ะ', 'สนใจซื้อหรือเช่าบ้านไหมคะ', 'ปล่อยเช่าบ้านก็มีรายได้นะคะ'] },
   { st: 'toolshop', name: 'ช่างเปี๊ยก (ร้านอุปกรณ์)', short: 'ช่างเปี๊ยก', icon: '🛠️', dx: .5, dy: -1.1, lk: { hair: 'brown', shirt: 'black' }, hi: ['เครื่องมือดี งานก็ออกมาดี', 'อัปเกรดอุปกรณ์อาชีพได้ที่นี่', 'ของแท้ทุกชิ้นรับประกัน'] },
+  { st: 'office', name: 'คุณแพรว (ประชาสัมพันธ์บริษัท)', short: 'คุณแพรว', icon: '🏢', g: 'f', dx: .6, dy: -1.15, of: 'office', lk: { hair: 'black' }, hi: ['สวัสดีค่ะ ไทยเทคยินดีต้อนรับค่ะ', 'สมัครงานติดต่อคุณนภาฝ่ายบุคคลได้เลยค่ะ', 'พนักงานเข้างาน 8 โมงนะคะ'] },
+  { st: 'fashion', name: 'น้องมุก (ร้านแฟชั่น)', short: 'น้องมุก', icon: '👗', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'brown', shirt: 'pink' }, hi: ['ชุดใหม่มาแล้วค่ะ ลองดูได้นะคะ', 'ชุดนี้ใส่แล้วดูดีมากเลยค่ะ', 'ยินดีต้อนรับค่ะ'] },
+  { st: 'rider', name: 'พี่แบงค์ (เคาน์เตอร์ศูนย์ไรเดอร์)', short: 'พี่แบงค์', icon: '🛵', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'green' }, hi: ['ออเดอร์เข้าเยอะเลยวันนี้', 'อยากเป็นไรเดอร์ คุยกับพี่ต่อได้เลยครับ', 'ขับขี่ปลอดภัยนะครับ'] },
+  { st: 'dealer', name: 'คุณโอม (พนักงานขายรถ)', short: 'คุณโอม', icon: '🚗', dx: .6, dy: -1.15, of: 'office', lk: { hair: 'brown' }, hi: ['สนใจรุ่นไหนครับ ทดลองดูได้เลย', 'รุ่นนี้ประหยัดน้ำมันมากครับ', 'ซื้อวันนี้ขับออกได้ทันทีครับ'] },
   { st: 'bank', name: 'คุณนิด (พนักงานธนาคาร)', short: 'คุณนิด', icon: '🏦', g: 'f', dx: -2.4, dy: -0.4, of: 'office', lk: { hair: 'brown' }, hi: ['ฝากเงินไว้ได้ดอกเบี้ยนะคะ', 'ยินดีต้อนรับสู่ธนาคารค่ะ', 'กู้เงินได้ แต่อย่าลืมคืนนะคะ'] },
 ];
 function staffGreet(n) {
@@ -2131,11 +2155,19 @@ function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
   panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); refreshPanel(true);
-  if (p.kind === 'chat') setTimeout(() => $('#chatIn')?.focus(), 50);
+  if (p.kind === 'chat' && !TOUCH_UI) setTimeout(() => $('#chatIn')?.focus(), 50);   // phones: no keyboard until they tap the box (it would push the sheet up)
 }
 function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
+// phones: when the keyboard closes the browser can leave the whole page pushed up; put it back
+addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) { if (scrollY || document.documentElement.scrollTop) scrollTo(0, 0); } }, 80));
+// a finger on the panel (tap or scroll): hold redraws until it lifts, so taps are not lost and lists do not jump back
+let panelTouchT = 0;
+addEventListener('pointerdown', e => { if (e.target.closest?.('#panel')) panelTouchT = Infinity; }, true);
+for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { if (panelTouchT === Infinity) panelTouchT = performance.now() + 450; }, true);
+const scKey = e => e.id ? '#' + e.id : e.tagName + [...e.classList].map(c => '.' + CSS.escape(c)).join('');
 function refreshPanel(force) {
   if (!panel || !me) return;
+  if (!force && performance.now() < panelTouchT) return;
   let html = renderPanel(panel);
   const stf = panel.st && STAFF_AT[panel.st];
   if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.id}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
@@ -2145,7 +2177,9 @@ function refreshPanel(force) {
   panelSig = html;
   const body = $('#panelBody'); const keep = ae && body.contains(ae) && ae.id ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
   const scroll = body.parentElement.scrollTop;
+  const keepSc = [...body.querySelectorAll('*')].filter(e => e.scrollTop > 0 || e.scrollLeft > 0).map(e => { const k = scKey(e); return [k, [...body.querySelectorAll(k)].indexOf(e), e.scrollTop, e.scrollLeft]; });
   body.innerHTML = html; bindPanel(body); body.parentElement.scrollTop = scroll;
+  for (const [k, i, t, l] of keepSc) { const e = body.querySelectorAll(k)[i]; if (e) { e.scrollTop = t; e.scrollLeft = l; } }
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch { } } }
   for (const id of ['chatMsgs', 'callMsgs']) { const cm = document.getElementById(id); if (cm) cm.scrollTop = cm.scrollHeight; }
 }
@@ -2153,8 +2187,14 @@ function bindStocks(root) {
   root.querySelectorAll('canvas[data-spark]').forEach(drawSpark);
   root.querySelectorAll('canvas[data-chart]').forEach(c => { drawStockChart(c); const hv = e => { const r = c.getBoundingClientRect(); drawStockChart(c, e.clientX - r.left); }; c.onpointermove = hv; c.onpointerdown = hv; c.onpointerleave = () => drawStockChart(c); });
 }
+function zoomPic(src) {   // a player's photo, big
+  document.querySelector('.howTo')?.remove();
+  const d = document.createElement('div'); d.className = 'howTo'; d.innerHTML = `<div class="howCard" style="text-align:center"><img src="${src}" alt="" style="display:block;width:min(78vw,420px);max-height:62vh;object-fit:contain;border-radius:14px;margin:0 auto 10px;background:#e9d4ad"><button type="button" class="primary">ปิด</button></div>`;
+  d.onclick = () => d.remove(); document.body.appendChild(d);
+}
 function bindPanel(root) {
   bindStocks(root);
+  root.querySelectorAll('img.phZoom').forEach(i => { i.style.cursor = 'zoom-in'; i.onclick = () => zoomPic(i.src); });
   { const ti = root.querySelector('#tipIn'); if (ti) ti.oninput = () => { if (panel) panel.tip = Math.max(0, Math.min(500, Math.floor(+ti.value) || 0)); }; }   // keep the tip through panel redraws
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     if (performance.now() - panelOpenT < 450) return;      // the tap that opened this panel must not also press a button in it
@@ -2190,7 +2230,7 @@ const FN = {
   photo: () => pickPhoto(),
   place: m => startPlace(m.k),
   photoDel: () => send({ t: 'pic', data: '' }),
-  chatTab: m => { chatTab = m.tab; panel.sig = 'x' + m.tab; refreshPanel(true); setTimeout(() => $('#chatIn')?.focus(), 30); },
+  chatTab: m => { chatTab = m.tab; panel.sig = 'x' + m.tab; refreshPanel(true); if (!TOUCH_UI) setTimeout(() => $('#chatIn')?.focus(), 30); },
   mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); },   // the text stays until the server confirms (mailsent)
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
@@ -2198,11 +2238,13 @@ const FN = {
   delContact(m) { popup(`ลบ <b>${esc(m.n)}</b> ออกจากรายชื่อ?`, [['🗑️ ลบ', 'warn', () => send({ t: 'contact_del', phone: m.phone })], ['ยกเลิก', '', () => { }]], 10000); },
   phMap() { closePanel(); mapZoom = 1; openMap(); },
   phClose() { closePanel(); },
+  bugReply(m) { const t = prompt('ข้อความที่จะส่งถึงกล่องจดหมายผู้เล่น (เว้นว่าง = ข้อความมาตรฐาน "แก้ไขเรียบร้อยแล้ว")', ''); if (t === null) return; send({ t: 'god', op: 'bugreply', bt: m.bt, login: m.login, text: t.trim() }); },
+  fbGroup() { if (!FB_GROUP) return toast('กลุ่มเฟสบุ๊คกำลังจะมาเร็วๆ นี้', '👥', false); try { window.open(FB_GROUP, '_blank', 'noopener'); } catch { location.href = FB_GROUP; } },
   soilStore() { const h = wd?.houses?.[me.house]; if (!h) return; for (const k of me.furniture || []) if (G.shop.furniture[fbase(k)]?.tile && furnPos(h, k)) send({ t: 'hplace', k, store: 1 }); },
   stock(m, root) { const q = m.qty || Math.floor(+root.querySelector('#skQty')?.value || 0); if (!(q > 0)) return toast('ใส่จำนวนหุ้น', '📈', false); send(m.st ? { t: 'act', st: m.st, a: 'stock', op: m.op, id: m.id, qty: q } : { t: 'stock', op: m.op, id: m.id, qty: q }); },   // from the phone: no bank needed
   callMin() { closePanel(); toast('ย่อสายไว้แล้ว แตะแถบ 📞 ด้านบนเพื่อเปิด', '📞'); },
   list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
-  bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt').value || 0; send({ t: 'act', st: m.st, a: m.op, amt: v }); },
+  bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt')?.value || 0; send(m.st ? { t: 'act', st: m.st, a: m.op, amt: v } : { t: 'bankop', op: m.op, amt: v }); },   // from the phone: no bank needed
   price(m, root) { send({ t: 'act', st: m.st, a: m.op, price: m.zero ? 0 : +root.querySelector('#' + m.inp).value || 0 }); },
   guide(m) { closePanel(); setGuide(m.key, false, true); },
   guidePt(m) { closePanel(); guide = { x: m.x, y: m.y, area: m.area, label: m.label }; toast(`นำทางไป ${m.label}`, '📍'); paintNav(); placeLog(); },
@@ -2372,11 +2414,11 @@ function icuDraw() {
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
 const NPC_FACE = { staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_police: 'police_f', keep_school: 'elder_m',
-  keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f' };
+  keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
   staff_office: [['บริษัทเราส่งเอกสารไปทั่วเมืองทุกวันเลยค่ะ', 'ยิ่งส่งไกล ค่าส่งยิ่งเยอะนะคะ', 'หลังห้าโมงเย็นยังทำโอทีได้ถึงสามทุ่ม ได้เงินเพิ่มอีกด้วย'], ['ใครอยากเข้ามาทำงานที่นี่ต้องจบปริญญาตรีก่อนนะคะ', 'ไปเรียนที่มหาวิทยาลัยได้ นั่งเรียนครบชั่วโมงก็ได้หนึ่งคาบ'], ['ช่วงนี้ดิฉันอยากได้เก้าอี้ทำงานตัวใหม่จัง', 'ตัวเก่านั่งแล้วปวดหลังมากเลยค่ะ 😅']],
-  staff_fishing: [['ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', 'ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', 'ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วย'], ['สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['มีสมุดภาพปลาที่สมาคมด้วยนะ', 'ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย']],
+  staff_fishing: [['ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', 'ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', 'ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วย'], ['สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['สมุดภาพปลาเปิดดูในมือถือได้นะ', 'ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย']],
   staff_chef: [['อาหารดีเริ่มที่วัตถุดิบดี', 'ปลาสดจากชาวประมง ผักจากชาวไร่ ทำอะไรก็อร่อย'], ['อยากเป็นเชฟต้องมีใบรับรองเชฟก่อนนะ', 'ซื้อได้ที่มหาวิทยาลัย'], ['ต้มยำหม้อนี้ใส่พริกไปสามกำมือ', 'ใครกินไม่ไหวไม่ใช่ความผิดฉันนะ 🌶️']],
   staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่มหาวิทยาลัย'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
   staff_merchant: [['ที่นี่เป็นโรงประมูลแล้ว ล็อตขึ้นเวทีทีละล็อต', 'ยื่นซองเดาราคาแข่งกับเสี่ยเฮง เจ๊หมวย พวกนั้น'], ['ซื้อได้ต่ำกว่ามูลค่าจริงก็กำไร', 'แต่ถ้าใจร้อนเสนอสูงเกินก็ขาดทุนนะ'], ['ฟังผู้ประเมินไว้บ้าง', 'แต่สภาพของก็สำคัญ ของมีตำหนิราคาตกเยอะ']],
@@ -2550,7 +2592,7 @@ const POOL_NAME = { sea: '🌊 ทะเล', lake: '🏞️ น้ำจืด 
 // draws atlas sprites into <canvas data-spr> (furniture/vehicles stand on the bottom edge, fish (.fspr) are centred and can scale up)
 function bindSpr(root) {
   root.querySelectorAll('[data-spr]').forEach(c => { const draw = () => { const sp = atlas?.sprites?.[c.dataset.spr]; if (!sp || !atlasImg) return setTimeout(draw, 300);
-    const fish = c.classList.contains('fspr'), g = c.getContext('2d'), k = fish ? Math.min((c.width - 2) / sp[2], (c.height - 2) / sp[3]) : Math.min((c.width - 8) / sp[2], (c.height - 6) / sp[3], 1.6);
+    const fish = c.classList.contains('fspr'), fit = c.classList.contains('vfit'), g = c.getContext('2d'), k = fish ? Math.min((c.width - 2) / sp[2], (c.height - 2) / sp[3]) : fit ? Math.min((c.width - 20) / sp[2], (c.height - 14) / sp[3]) : Math.min((c.width - 8) / sp[2], (c.height - 6) / sp[3], 1.6);
     g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = !fish || k < 1;
     g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (c.width - sp[2] * k) / 2, fish ? (c.height - sp[3] * k) / 2 : c.height - 3 - sp[3] * k, sp[2] * k, sp[3] * k); }; draw(); });
 }
@@ -2567,7 +2609,7 @@ const rarTag = id => { const r = G.items[id]?.rar; return r ? `<span class="rtag
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(it.name)}${rarTag(id)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
-let chatTab = 'near', worldAt = 0;
+let chatTab = 'world', worldAt = 0;
 // world chat: one line every 3 seconds. Too soon -> say so and keep what was typed, so nothing is lost
 function worldOk(ch) {
   if (ch !== 'world') return true;
@@ -2794,6 +2836,16 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-18a', d: '18 พ.ย. (รอบ 32)', items: [
+    '⚖️ <b>ปรับสมดุล</b>: วิ่งช้าลง (รถทุกคันเร็วกว่าวิ่งแล้ว) · อาชีพหมอได้เงินน้อยลง (เงินเวร ค่าช่วยชีวิต และเคส ICU ลดลง เคสถัดไปรอนานขึ้น) · 🎣 ตกปลาง่ายขึ้น (ปลากินเบ็ดไวขึ้น จังหวะตวัดกว้างขึ้น สายขาดยากขึ้น ยกปลาขึ้นง่ายขึ้น) · 🥬 หิวจนหมดแรง ฟื้นใน 6 วินาที',
+    '🛵 สมัครเป็น<b>ไรเดอร์ได้มอไซค์ส่งอาหารฟรี 1 คัน</b> (ยืมใช้ ถ้าเปลี่ยนอาชีพบริษัทจะยึดคืน) · ไรเดอร์ตอนนี้ได้รถด้วย',
+    '🧑‍💼 มีพนักงานยืนหลังเคาน์เตอร์ที่ บริษัทไทยเทค · ร้านอาหาร · ร้านแฟชั่น · ศูนย์ไรเดอร์ · โชว์รูมรถ · 🏥 เดินทะลุเปลเข็นในโรงพยาบาลได้',
+    '📱 มือถือ: <b>กู้เงิน/ฝาก/ถอน และซื้อหุ้นในมือถือได้แล้ว</b> (ปุ่มกู้ใหญ่ขึ้น) · รายชื่อในโทรศัพท์เลื่อนได้ไม่เด้งกลับ · เปิดหน้าต่างแล้วไม่เด้งคีย์บอร์ดดันจอขึ้น · มีแอป 👥 กลุ่มเฟสบุ๊ค · แตะรูปในข้อมูลผู้เล่นเพื่อดูรูปใหญ่',
+    '💬 เอาแชทรวมออก <b>แชทโลกอยู่ช่องแรก</b> ใกล้ๆ อยู่ช่องถัดไป · ลิงก์แชร์เกมใหม่ is.gd/newlifetown',
+    '🐟 ร้านขายปลาเปิด 24 ชม. · สมุดภาพปลาย้ายไปอยู่ในมือถืออย่างเดียว · 🚗 รูปรถในโชว์รูมและสัตว์ในร้านสัตว์เลี้ยงเล็กลงและขนาดเท่ากันหมด · ร้านสัตว์เลี้ยงสาขา 2 แต่งร้านใหม่ไม่ซ้ำสาขาแรก',
+    '🐾 สัตว์เลี้ยงไม่กระโดดถี่ๆ ตอนวิ่งเร็ว และซ่อนตัวเมื่อเข้าอาคาร · แก้รถ/สัตว์เลี้ยงบางตัวเดินถอยหลัง · 🚪 ทางไปไร่และหมู่บ้านต้องกดเพื่อเข้า (ไม่วาร์ปเองตอนเดินผ่าน)',
+    '💻 คอม: WASD / E / Spacebar ใช้ได้แม้เปิดแป้นภาษาไทย ตกปลาบนคอมได้แล้ว · 📲 สลับแอปแล้วกลับมา ไม่จอดำแล้ว',
+    '🐞 ทีมงานตอบกลับรายงานบัคถึงกล่องจดหมายของผู้แจ้งได้แล้ว'] },
   { v: '2026-11-16z6', d: '16 พ.ย. (รอบ 31)', items: ['📱 จัดแอปในมือถือใหม่ เอาโปรไฟล์ แผนที่ อากาศ ออก (โปรไฟล์ดูได้จากการแตะรูปตัวเอง แผนที่แตะมินิแมพ) · 💼 หน้างานของฉันไม่แสดงภารกิจอาชีพแล้ว รับภารกิจได้ที่ NPC ของแต่ละอาชีพเหมือนเดิม'] },
   { v: '2026-11-16z5', d: '16 พ.ย. (รอบ 30)', items: ['📲 หน้าล็อกอินมีปุ่ม <b>ติดตั้งบนมือถือ</b> · <b>แชร์ลิงก์</b> (is.gd/lifetown) · <b>ติดตั้งในคอม</b> ติดตั้งแล้วมีไอคอนเกม เปิดเต็มจอเหมือนแอป', '💖 มือถือมีแอป <b>สนับสนุน</b> · ผู้จัดทำ นาย วราวุฒิ สีเสือ'] },
   { v: '2026-11-16z4', d: '16 พ.ย. (รอบ 29)', items: [
@@ -3211,7 +3263,7 @@ function renderPanel(p) {
       const cards = Object.entries(G.shop.vehicles).filter(([, v]) => (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
         const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
         const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
-        return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
+        return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas class="vfit" data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
       return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่มหาวิทยาลัย'}</div>
         <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${me.gemInf ? '∞ (แอดมิน)' : (me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
     }
@@ -3229,13 +3281,14 @@ function renderPanel(p) {
         <div class="rowf" style="margin-top:10px"><input id="bankAmt" type="number" min="1" value="1000" inputmode="numeric"></div>
         <div class="grid2" style="margin-top:8px">${B('⬇️ ฝาก', { fn: 'bank', st, op: 'deposit' }, 'good')}${B('⬆️ ถอน', { fn: 'bank', st, op: 'withdraw' })}${B('ฝากทั้งหมด', { fn: 'bank', st, op: 'deposit', all: Math.floor(me.money) })}${B('ถอนทั้งหมด', { fn: 'bank', st, op: 'withdraw', all: me.bank })}</div>
         <div class="sub" style="margin-top:14px"><b>💳 กู้เงิน</b> · สูงสุด ${money(bk.loanMax)} ค่าธรรมเนียม ${bk.loanFee * 100}% + ดอกเบี้ย ${bk.loanRate * 100}% ต่อวันเกมบนยอดหนี้ · ระหว่างเป็นหนี้ ${bk.repayShare * 100}% ของรายได้ถูกหักใช้หนี้อัตโนมัติ</div>
-        <div class="item"><div class="nm">หนี้คงเหลือ<small><b style="color:${me.loan ? 'var(--bad)' : 'var(--ok)'};font-size:16px">${money(me.loan)}</b></small></div>${B('กู้', { fn: 'bank', st, op: 'borrow' })}${B('ใช้คืน', { fn: 'bank', st, op: 'repay' }, me.loan ? 'good' : '', !me.loan)}</div>`;
+        <div class="item"><div class="nm">หนี้คงเหลือ<small><b style="color:${me.loan ? 'var(--bad)' : 'var(--ok)'};font-size:16px">${money(me.loan)}</b></small></div></div>
+        <div class="grid2" style="margin-top:6px">${B('💳 กู้ตามจำนวนที่ใส่', { fn: 'bank', st, op: 'borrow' }, 'primary')}${B('✅ ใช้คืนตามจำนวนที่ใส่', { fn: 'bank', st, op: 'repay' }, me.loan ? 'good' : '', !me.loan)}</div>`;
     }
     case 'pier': {
       const s = STN(st) || waterNear; if (!s) return '<div class="sub">เดินไปริมน้ำก่อนนะ</div>';
       const c = me.cast, pool = G.fish[s.pool] || [];
       const here = pool.filter(([id]) => id && G.items[id].rar), got = here.filter(([id]) => me.fishdex?.[id]).length;
-      const fishes = `${here.length} ชนิด (ตกได้แล้ว ${got}) ` + [1, 2, 3, 4, 5].map(r => [r, here.filter(([id]) => G.items[id].rar === r).length]).filter(([, n]) => n).map(([r, n]) => `<span class="rtag r${r}">${G.fishRarity[r]} ${n}</span>`).join('') + ' · ดูรายชื่อในสมุดภาพปลาที่สมาคมประมง';
+      const fishes = `${here.length} ชนิด (ตกได้แล้ว ${got}) ` + [1, 2, 3, 4, 5].map(r => [r, here.filter(([id]) => G.items[id].rar === r).length]).filter(([, n]) => n).map(([r, n]) => `<span class="rtag r${r}">${G.fishRarity[r]} ${n}</span>`).join('') + ' · ดูรายชื่อในแอปสมุดปลาในมือถือ';
       const rod = G.rods[me.rodEq];
       const head = `<h2>🎣 ${esc(s.label)}</h2><div class="sub">${rod ? `ในมือ: ${rod.icon} <b>${esc(rod.name)}</b> (เปลี่ยนได้ในกระเป๋า) · ` : ''}ปลาแถวนี้: ${fishes} · ตกปลา Lv.${me.fishLv}${me.fishLv >= G.fishing.maxLv ? ' (สูงสุด)' : ` (${me.fishXp % G.fishing.xpPerLv}/${G.fishing.xpPerLv})`}</div>`;
       if (!me.rod) return `${head}<div class="jobbox">🎣 ต้องมี<b>เบ็ดตกปลา</b>ก่อน ซื้อได้กับน้าเล็กที่สมาคมประมง (${money(G.fishing.rod)}) · ใครก็ตกปลาได้ ไม่ต้องสมัครงาน${B('📍 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good big')}</div>`;
@@ -3248,10 +3301,9 @@ function renderPanel(p) {
     case 'fishclub': {
       const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id].kind === 'fish');
       const rows = fish.map(([id, q]) => itemRow(id, B(`ขาย ${money((wd?.mk[id]?.farm || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' }, 'good'), `มี ${q} · รับซื้อ ${money(wd?.mk[id]?.farm || 0)}/ตัว`)).join('');
-      const book = fishBook();
       return `<h2>🎣 สมาคมประมง · ร้านขายปลา</h2><div class="sub">${hoursTxt('fishclub')} · แหล่งตกปลา: 🏞️ ทะเลสาบ (ใต้เมือง) · 🌊 ทะเล (ฝั่งตะวันออก) · 🐟 แม่น้ำ (ไร่ชานเมือง)</div>
         <div class="jobbox">💬 ซื้อเบ็ด/อัปเกรดเบ็ด คุยกับ <b>น้าเล็ก</b> ที่ยืนอยู่ข้างๆ</div>
-        ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}${book}`;
+        ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}<div class="sub" style="margin-top:10px">📖 ดูสมุดภาพปลาได้ในมือถือ (แอปสมุดปลา)</div>`;
     }
     case 'staff': {
       const S = STN(st), key = S.career;
@@ -3364,7 +3416,7 @@ function renderPanel(p) {
     case 'profile': {
       const ti = G.ach.find(x => x.id === me.title), got = (me.ach || []).length;
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
-        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B(p.titles ? '▲ ซ่อนฉายา' : '🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B(p.frames ? '▲ ซ่อนกรอบ' : '🖼️ กรอบรูป', { fn: 'qtab', set: { frames: !p.frames } })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
+        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B(p.titles ? '▲ ซ่อนฉายา' : '🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B(p.frames ? '▲ ซ่อนกรอบ' : '🖼️ กรอบรูป', { fn: 'qtab', set: { frames: !p.frames } })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
         <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div></div>
         ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
@@ -3391,7 +3443,7 @@ function renderPanel(p) {
       return `<h2>🏆 อันดับเศรษฐี</h2><div class="sub">นับเงินสด + เงินฝาก + ทรัพย์สิน</div><div class="list">${rows}</div>`;
     }
     case 'chat':
-      return `<h2>💬 แชท</h2><div class="tabs">${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}</div>
+      return `<h2>💬 แชท</h2><div class="tabs">${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}</div>
         <div class="sub">${chatTab === 'world' ? 'ทุกคนในเมืองอ่านได้ ไม่ขึ้นบนหัว (ส่งได้ทุก 3 วินาที)' : 'ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น'}</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="${chatTab === 'world' ? 'พิมพ์ถึงทุกคน...' : 'พิมพ์ข้อความ...'}" autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
     case 'screen': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
@@ -3432,7 +3484,7 @@ function renderPanel(p) {
       const fee = `<input id="feeIn" type="number" value="200" min="0" max="1000" style="width:90px">`;
       const known = (me.contacts || []).some(c => c.n === o.name);
       const inf = infoCache.get(o.id);
-      const prof = `<div class="prof"><span class="phWrap"><img class="ph" src="${inf?.pic || `assets/ui/face_${o.g === 'f' ? 'f' : 'm'}.png`}" alt="">${frameHtml(inf?.fr ?? -1, 124)}</span><div class="pi">
+      const prof = `<div class="prof"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${inf?.pic || `assets/ui/face_${o.g === 'f' ? 'f' : 'm'}.png`}" alt="">${frameHtml(inf?.fr ?? -1, 124)}</span><div class="pi">
         <div>${CAREER_ICON(o.c)} ${G.careers[o.c]?.name || 'ว่างงาน'} · Lv.${o.lv || 1}</div><div>${titleHtml(o.title, o.tr)}</div>
         ${inf ? `<small>💰 ${money(inf.worth)} · 🎣 Lv.${inf.fishLv} · อยู่ในเมือง ${inf.days} วัน${inf.home ? ` · 🏠 บ้าน #${inf.home}` : ''}${inf.degree ? ' · 🎓' : ''}${inf.phone ? ` · 📱 ${inf.phone}` : ''}</small>` : '<small>กำลังโหลด...</small>'}</div></div>
         ${inf?.ach?.length ? `<div class="tchips">${inf.ach.slice(0, 12).map(([t, r]) => `<span class="rar${r}">🏅 ${esc(t)}</span>`).join('')}</div>` : ''}`;
@@ -3459,7 +3511,7 @@ function renderPanel(p) {
     case 'god': {
       if (!me.admin) return '';
       const g = me.god || {};
-      const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small></div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
+      const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small>${b.done ? '<small style="color:var(--ok)">✅ แจ้งผู้เล่นแล้ว</small>' : B('✅ ตอบกลับว่าแก้แล้ว', { fn: 'bugReply', bt: b.t, login: b.login || '' }, 'good')}</div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
         <div class="secT">💰 เพิ่มเงิน (ไม่จำกัด)</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="1" placeholder="จำนวนเงิน เช่น 1000000">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}</div>
         <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
@@ -3579,7 +3631,9 @@ const PH_APPS = [
 // the rest of the old menu, as plain apps on the last row
 const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
-  ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'], ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
+  ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
+  ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
+const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
 const PH_TITLE = { support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
@@ -3857,6 +3911,20 @@ function silhouettes() {
   const g = c.getContext('2d'); g.drawImage(atlasImg, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
   return shadowAtlas = c;
 }
+// back from another app: phones may have thrown away the canvases (black screen) or left a dead connection; rebuild both
+function gfxRecover() {
+  chCache.clear(); DYE.clear(); gCache.clear(); shadowAtlas = null; shadowBuf = null;
+  cv.width = 0; resize();
+}
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (Date.now() - hiddenAt > 1500) gfxRecover();
+  if (ws && ws.readyState === 1 && Date.now() - lastMsgT > 6000) { try { ws.close(); } catch { } }   // a socket that went quiet in the background: reconnect
+  else if (wantLogin && (!ws || ws.readyState > 1)) connect();
+});
+addEventListener('pageshow', e => { if (e.persisted) { gfxRecover(); if (wantLogin && (!ws || ws.readyState > 1)) connect(); } });
+cv.addEventListener('contextrestored', gfxRecover);
 const FLAT = /^(f_rug|flowerbed|fl_|g_|pond|grass_tuft|manhole|puddle|tuft)/;
 const GROUND_PROP = /^(manhole|puddle|tuft|grass_tuft)$/;
 function drawCastShadows(ents, X, Y, night) {
@@ -3919,11 +3987,11 @@ const ROUTES = [
 ];
 // sprites per kind: side view (faces left, mirrored for right), front (coming toward you), back (driving away)
 const VEH = {
-  red:    { side: 'v_red_side', front: ['car_red', .45], back: 'v_red_back', len: 1.9, v: 3.2 },
-  blue:   { side: 'v_blue_side', front: ['car_blue', .45], back: 'v_blue_back', len: 1.9, v: 3.0 },
-  taxi:   { side: 'v_taxi_side', front: ['taxi', .41], back: 'v_taxi_back', len: 1.9, v: 3.4 },
-  yellow: { side: 'v_yellow_side', front: 'v_yellow_front', back: 'v_yellow_back', len: 1.9, v: 3.1 },
-  police: { side: 'v_police_side', front: 'v_police_front', back: 'v_police_front', len: 1.9, v: 3.3 },
+  red:    { faceR: 1, side: 'v_red_side', front: ['car_red', .45], back: 'v_red_back', len: 1.9, v: 3.2 },
+  blue:   { faceR: 1, side: 'v_blue_side', front: ['car_blue', .45], back: 'v_blue_back', len: 1.9, v: 3.0 },
+  taxi:   { faceR: 1, side: 'v_taxi_side', front: ['taxi', .41], back: 'v_taxi_back', len: 1.9, v: 3.4 },
+  yellow: { faceR: 1, side: 'v_yellow_side', front: 'v_yellow_front', back: 'v_yellow_back', len: 1.9, v: 3.1 },
+  police: { faceR: 1, side: 'v_police_side', front: 'v_police_front', back: 'v_police_front', len: 1.9, v: 3.3 },
   amb:    { side: 'v_amb_side', front: 'v_amb_back', back: 'v_amb_back', len: 2.3, v: 6, deep: 1.2 },
   bus:    { side: 'v_bus_side', front: 'v_bus_front', back: 'v_bus_back', len: 3.8, v: 2.4, deep: 1.7 },
 };
@@ -4044,7 +4112,7 @@ function stepAmbs(dt) {
 }
 function carSprite(c) {
   const V = VEH[c.k];
-  if (c.dx) return [V.side, 1, c.dx > 0];
+  if (c.dx) return [V.side, 1, V.faceR ? c.dx < 0 : c.dx > 0];
   const f = c.dy > 0 ? V.front : V.back;
   return Array.isArray(f) ? [f[0], f[1], false] : [f, 1, false];
 }
@@ -4480,8 +4548,8 @@ function fightPress() {
   if (!FG || FG.mode !== 'land') return;
   const now0 = performance.now();
   if (now0 >= FG.surf && now0 <= FG.surfEnd) return fightEnd(true);
-  FG.miss++; FG.ten = Math.min(.95, FG.ten + .25); FX.play('splash'); if (fishAt()) FX.ring(fishAt().x, fishAt().y, '#fff', 400, .7);
-  if (FG.miss >= 6) fightEnd(false, 'miss');
+  FG.miss++; FG.ten = Math.min(.9, FG.ten + .15); FX.play('splash'); if (fishAt()) FX.ring(fishAt().x, fishAt().y, '#fff', 400, .7);
+  if (FG.miss >= 10) fightEnd(false, 'miss');
 }
 function stepFight(dt) {
   if (!FG) return;
@@ -4496,11 +4564,11 @@ function stepFight(dt) {
     }
     if (FG.run) {
       const st = FG.str0;
-      if (hold) { FG.ten += .7 * st / FG.str * dt * 1.7; FG.dist -= .02 * dt; FG.sta -= .16 * st * dt; }
+      if (hold) { FG.ten += .7 * st / FG.str * dt * 1.15; FG.dist -= .02 * dt; FG.sta -= .16 * st * dt; }
       else { FG.ten += (st * .25 - .6) * dt; FG.dist += .07 * st * dt; FG.sta -= .07 * st * dt; }
       if (Math.random() < dt * 6) { const f = fishAt(); if (f) FX.burst(f.x, f.y, '#e8f7ff', 2); }
     } else {
-      if (hold) { FG.dist -= (.24 + .16 * (1 - FG.pow)) * (.55 + .45 * (1 - FG.sta)) * dt * (1 + (FG.str - 1) * .5); FG.ten += (.45 - FG.ten) * 2.2 * dt; }
+      if (hold) { FG.dist -= 1.35 * (.24 + .16 * (1 - FG.pow)) * (.55 + .45 * (1 - FG.sta)) * dt * (1 + (FG.str - 1) * .5); FG.ten += (.45 - FG.ten) * 2.2 * dt; }
       else { FG.ten -= .55 * dt; FG.sta = Math.min(1, FG.sta + .025 * dt); }
     }
     FG.ten = Math.max(0, FG.ten); FG.sta = Math.max(0, FG.sta);
@@ -4508,8 +4576,8 @@ function stepFight(dt) {
     if (hold && now0 - FG.lastTick > (FG.run ? 140 : 85)) { FG.lastTick = now0; FX.play('reel', FG.ten); }
     if (FG.ten > .78 && Math.random() < dt * 4) FX.play('creak', FG.ten);
     if (FG.ten >= 1) return fightEnd(false, 'snap');
-    if (FG.dist >= 2.2) return fightEnd(false, 'run');
-    if (FG.slack > 5) return fightEnd(false, 'slack');
+    if (FG.dist >= 2.7) return fightEnd(false, 'run');
+    if (FG.slack > 8) return fightEnd(false, 'slack');
     if (FG.dist <= .12) {
       if (el < (FG.min || 0) + 400) FG.dist = .13;              // (the server wants a little fight first)
       else { FG.mode = 'land'; FG.dist = .1; FG.surf = now0 + 500 + r() * 600; FG.surfEnd = FG.surf + FG.land; FG.landT = now0; }
@@ -4519,7 +4587,7 @@ function stepFight(dt) {
     if (now0 > FG.surfEnd) { FG.surf = now0 + 450 + r() * 450; FG.surfEnd = FG.surf + FG.land; }
     if (now0 >= FG.surf && !FG.splashed) { FG.splashed = true; FX.play('splash'); const f = fishAt(); if (f) { FX.ring(f.x, f.y, '#fff', 450, .9); FX.burst(f.x, f.y - .2, '#e8f7ff', 8); } }
     if (now0 > FG.surfEnd) FG.splashed = false;
-    if (now0 - FG.landT > 7000) { FG.mode = 'fight'; FG.dist = .45; FG.run = true; FG.pt = now0 + 1200; FG.str0 = FG.pow; FG.miss = 0; }   // it dives again
+    if (now0 - FG.landT > 11000) { FG.mode = 'fight'; FG.dist = .45; FG.run = true; FG.pt = now0 + 1200; FG.str0 = FG.pow; FG.miss = 0; }   // it dives again
   }
 }
 // where the hooked fish is: out along the cast line, swinging side to side, closer as you reel it in

@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=overlays-content">
 <meta name="theme-color" content="#5a3620">
 <link rel="apple-touch-icon" href="assets/ui/icon192.png">
 <link rel="manifest" href="manifest.json">
@@ -70,9 +70,9 @@
   <!-- notifications: action results (toasts) on top, chat/system lines under them; the column sits under the status card -->
   <div id="feed"><div id="toasts"></div><div id="log"></div>
     <div id="chatBox">
-      <div class="cbHead"><button id="cbFold" title="หุบ/ขยายแชท">‹ หุบ</button><button data-ct="all" class="on">แชทรวม</button><button data-ct="near">ใกล้ๆ</button><button data-ct="world">แชทโลก</button><button data-ct="sys">ระบบ</button><span id="cbOn" title="ผู้เล่นออนไลน์ตอนนี้ · แตะดูรายชื่อ"></span></div>
+      <div class="cbHead"><button id="cbFold" title="หุบ/ขยายแชท">‹ หุบ</button><button data-ct="world" class="on">แชทโลก</button><button data-ct="near">ใกล้ๆ</button><button data-ct="sys">ระบบ</button><span id="cbOn" title="ผู้เล่นออนไลน์ตอนนี้ · แตะดูรายชื่อ"></span></div>
       <div id="cbMsgs"></div>
-      <form id="cbForm" autocomplete="off"><input id="cbIn" maxlength="120" placeholder="แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ"><button type="submit" class="primary">ส่ง</button></form>
+      <form id="cbForm" autocomplete="off"><input id="cbIn" maxlength="120" placeholder="แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)"><button type="submit" class="primary">ส่ง</button></form>
     </div>
     <button id="cbOpen" class="hidden">💬 แชท <b id="cbNew"></b></button>
   </div>
