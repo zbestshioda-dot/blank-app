@@ -466,7 +466,9 @@ function handle(m) {
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
+      $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && showTut(0), 400);
+      else if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600);
       else setTimeout(() => me && checkNews(), 900);
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
@@ -3281,6 +3283,7 @@ function bindPanel(root) {
   }));
   bindSpr(root);
   root.querySelectorAll('[data-pet]').forEach(c => { const draw = () => { if (!PET_AT || !petImg) return setTimeout(draw, 300); drawPetIcon(c, c.dataset.pet); }; draw(); });
+  if (root.querySelector('canvas[data-pp]')) ppStart();
   root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
@@ -3795,6 +3798,47 @@ let godFindRes = null, ledgerRes = null, payRes = null, payAdm = null, payBackRe
 const paySel = { pack: 'p100', m: 'mbank' };
 try { const q = new URLSearchParams(location.search); if (q.get('paid')) payBackRef = q.get('paid').replace(/\D/g, '').slice(0, 20); if (q.get('paid') || q.get('paycancel')) history.replaceState(null, '', location.pathname); } catch { }
 const PAY_ST = { new: ['⏳ รอชำระ', 'var(--muted,#999)'], paid: ['✅ สำเร็จ', 'var(--good)'], review: ['🔎 รอตรวจสอบ', '#e0913a'], exp: ['หมดอายุ', '#999'] };
+// ✨ live previews of the paid items: the sparkly supporter title over your own character, and you in the angel / fairy outfit
+let ppRaf = 0;
+function paintPayPrev(c, t) {
+  let W = c.clientWidth, Hh = c.clientHeight; const d = Math.min(2, window.devicePixelRatio || 1); if (!W || !Hh || !me) return;
+  if (c.width !== Math.round(W * d)) { c.width = Math.round(W * d); c.height = Math.round(Hh * d); }
+  const g = c.getContext('2d'), z = 1.35; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); g.setTransform(d * z, 0, 0, d * z, 0, 0);
+  const mp = P.get(myId) || {}, kind = c.dataset.pp, angel = kind !== 'title'; W /= z; Hh /= z;
+  const p = { id: -77, name: me.name, c: mp.c, g: me.gender, lk: me.look || {}, of: angel ? 'angel' : mp.of, title: kind !== 'angel' ? (G.payTitle?.title || 'ผู้สนับสนุนเมือง') : '', tr: 8 };
+  const H = Hh * .56, k = H / CH_ATLAS.h, px = W / 2, py = Hh * .95, gold = p.g === 'f' ? 'fairy' : 'angel', nm = NAME_MODE;
+  ctx = g; NAME_MODE = 'all';
+  try {
+    if (angel) drawAura(px, py, H, t, false, gold);
+    drawCharTo(g, p, px, py, k, 'front', 0);
+    if (angel) drawAura(px, py, H, t, true, gold);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    nameAndBubble(p, px, py - H * .97, true, t);
+  } finally { ctx = mainCtx; NAME_MODE = nm; }
+}
+function ppLoop() {
+  const cs = document.querySelectorAll('canvas[data-pp]'); if (!cs.length) { ppRaf = 0; return; }
+  const t = performance.now(); cs.forEach(c => { if (c.offsetParent) paintPayPrev(c, t); }); ppRaf = requestAnimationFrame(ppLoop);
+}
+const ppStart = () => whenChars(() => { if (!ppRaf) ppRaf = requestAnimationFrame(ppLoop); });
+const hasAngel = () => (me?.outfits || []).includes('angel'), vipOnC = () => (me?.vipT || 0) > Date.now() + clockOff;
+// banner shown after entering the game (once a day at most if the player ticks "not today"); the ✕ closes it
+function payBanner() {
+  if (!G?.pay?.on || !me || $('#payBan')) return;
+  let skip = ''; try { skip = localStorage.getItem('lt_payban') || ''; } catch { }
+  if (skip === new Date().toDateString()) return;
+  const dw = $('#dailyWrap'); if ((dw && dw.offsetParent) || !$('#tut')?.classList.contains('hidden') && $('#tut')?.offsetParent) return void setTimeout(payBanner, 1500);   // wait for the daily reward / tutorial to close first
+  const showT = !vipOnC(), showA = !hasAngel(); if (!showT && !showA) return;
+  const ofn = G.outfitDefs?.angel ? (me.gender === 'f' && G.outfitDefs.angel.nf ? G.outfitDefs.angel.nf : G.outfitDefs.angel.name) : 'ชุดเทวดา';
+  const el = document.createElement('div'); el.id = 'payBan';
+  el.innerHTML = `<div class="pbBox"><button class="pbX" title="ปิด">✕</button><div class="pbH">✨ ของพิเศษ เฉพาะผู้สนับสนุนเมือง ✨</div>
+    <div class="pbRow">${showT ? `<div class="pbIt"><canvas data-pp="title"></canvas><b>💖 ฉายาวิ้งวับ</b><small>30 วัน · ฿${G.pay.vip}</small></div>` : ''}${showA ? `<div class="pbIt"><canvas data-pp="angel"></canvas><b>😇 ${esc(ofn)}</b><small>ใส่ได้ถาวร · ฿${G.pay.angel}</small></div>` : ''}</div>
+    <button class="primary big pbGo">💎 ดูแพ็กเติมเงิน</button><label class="pbNo"><input type="checkbox"> วันนี้ไม่ต้องแสดงอีก</label></div>`;
+  const close = () => { try { if (el.querySelector('.pbNo input').checked) localStorage.setItem('lt_payban', new Date().toDateString()); } catch { } el.remove(); };
+  el.querySelector('.pbX').onclick = close; el.onclick = e => { if (e.target === el) close(); };
+  el.querySelector('.pbGo').onclick = () => { close(); FN.openTopup(); };
+  document.body.appendChild(el); ppStart();
+}
 function topupHtml() {
   const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า STRIPE_SECRET_KEY ใน Fly.io ก่อน' : ''}</div>`;
@@ -3805,8 +3849,8 @@ function topupHtml() {
   const ofn = G.outfitDefs?.angel ? (me.gender === 'f' && G.outfitDefs.angel.nf ? G.outfitDefs.angel.nf : G.outfitDefs.angel.name) : 'ชุดเทวดา';
   const vipLeft = R.vipT > Date.now() + clockOff ? Math.ceil((R.vipT - Date.now() - clockOff) / 86400e3) : 0;
   const card = p => { const on = p.id === paySel.pack, ok = avail(p), bon = !p.kind && R.first ? Math.round(p.gems * R.bonus) : 0;
-    const head = p.kind === 'title' ? `<b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
-      : p.kind === 'outfit' ? `<b style="font-size:15px">😇 ${esc(ofn)}</b><small>${ok ? 'ชุดพิเศษ + ออร่า · ไม่มีขายในร้าน' : '✅ คุณมีชุดนี้แล้ว'}</small>`
+    const head = p.kind === 'title' ? `<canvas class="ppCv" data-pp="title"></canvas><b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
+      : p.kind === 'outfit' ? `<canvas class="ppCv" data-pp="angel"></canvas><b style="font-size:15px">😇 ${esc(ofn)}</b><small>${ok ? 'ชุดพิเศษ + ออร่า · ไม่มีขายในร้าน' : '✅ คุณมีชุดนี้แล้ว'}</small>`
       : `<b style="font-size:18px">💎${p.gems}</b>${bon ? `<small style="color:var(--good)">+${bon} โบนัส</small>` : ''}`;
     return `<button class="item" ${ok ? '' : 'disabled'} style="display:block;text-align:center;${on ? 'border:3px solid #2fa34a;background:#e4ffd6;box-shadow:0 0 0 2px #2fa34a' : ''}" data-m='${JSON.stringify({ fn: 'payPack', id: p.id })}'>${on ? '<small style="color:#2fa34a;font-weight:800">✓ เลือกอยู่</small>' : ''}${head}<div style="font-weight:800">฿${p.thb}</div>${p.tag && !p.kind ? `<small class="tag">${p.tag}</small>` : ''}</button>`; };
   const special = R.packs.filter(p => p.kind), gems = R.packs.filter(p => !p.kind);
@@ -4071,6 +4115,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19p', d: '19 พ.ย. (รอบ 59)', items: [
+    '💎 เปิดร้านเติมเงิน! กดไอคอน 💎 ข้างมือถือได้เลย',
+    '💖 ฉายาวิ้งวับ "ผู้สนับสนุนเมือง" 30 วัน และ 😇 ชุดเทวดา/นางฟ้า ดูตัวอย่างตัวละครของเราเองก่อนซื้อได้',
+  ] },
   { v: '2026-11-19o', d: '19 พ.ย. (รอบ 58)', items: [
     '⚡ ทำงาน/เควสใช้พลังงานน้อยลงราว 30% ทุกอาชีพ',
     '⏱️ คูลดาวน์เควสอาชีพสั้นลง: ภารกิจ ICU, ตามจับโจร, ตามหาหมา, ภารกิจหมอ และมินิเกมอาชีพ',
