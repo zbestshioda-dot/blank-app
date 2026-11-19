@@ -535,7 +535,9 @@ function ideaOp(a, m) {
 //  rest  - once the player overtakes it, it lets them enjoy the lead for 2-3 days (grows only a little), then chases again
 // Ghosts never lose money (that would look fake), and each one's rest length is random so they don't all wake together.
 let ghosts = [];
-const GHOST = [['เสี่ยต่อ', 'merchant', 0, .035], ['คุณนายเพ็ญ', 'doctor', 1, .05], ['ลุงสมบัติ', 'farmer', 2, .03], ['เจ๊หงส์', 'merchant', 4, .06], ['พี่บิ๊กไรเดอร์', 'rider', 6, .04], ['หมอโอ๊ต', 'doctor', 9, .05]];
+// [name, career, rank slot, margin, title] - names and titles look like ordinary players'
+const GHOST = [['Bankky', 'merchant', 0, .035, 'mer2'], ['มิ้นท์ชอบนอน', 'doctor', 1, .05, 'doc1'], ['KaoHom', 'farmer', 2, .03, 'far3'], ['NoeyNoey', 'merchant', 4, .06, 'gen2'], ['ต้นกล้า', 'rider', 6, .04, 'rid1'], ['Pond_zz', 'doctor', 9, .05, 'fis1']];
+const ghostTi = g => D.ACHIEVEMENTS.find(x => x.id === g.ti)?.title || '';
 const GH = { tick: 5 * 60e3, restMin: 48 * 3600e3, restMax: 72 * 3600e3, restGrow: .02, chase: .012, follow: .04, lazy: .3 };
 function ghostTick() {
   const R = [...accounts.values()].filter(a => !isAdmin(a)).map(a => worth(a)).sort((x, y) => y - x);
@@ -543,6 +545,7 @@ function ghostTick() {
   const want = g => real(g) !== undefined ? real(g) * (1 + g.m) : (R[R.length - 1] ?? 20000) * (.92 - g.k * .04);   // few players: the extra rivals sit below everyone
   if (ghosts.length !== GHOST.length) ghosts = GHOST.map(([n, c, k, m], i) => ({ n, c, k, m, w: ghosts[i]?.w || Math.max(3000, want({ k, m })) }));
   const t = now(), perTick = r => Math.pow(1 + r, GH.tick / 86400e3) - 1;   // a daily rate spread over the 5-minute ticks
+  ghosts.forEach((g, i) => { g.n = accounts.has(GHOST[i][0].toLowerCase()) ? GHOST[i][0] + '_' : GHOST[i][0]; g.c = GHOST[i][1]; g.ti = GHOST[i][4]; });   // keep the saved money, refresh name/look
   for (const g of ghosts) {
     g.st = g.st || 'chase';
     const tgt = Math.max(3000, want(g)), p = real(g);
@@ -3209,7 +3212,7 @@ function meView(a) {
 function worldView() {
   const t = now();
   const lb = [...accounts.values()].filter(a => !isAdmin(a)).map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
-    .concat(ghosts.map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: '' })))
+    .concat(ghosts.map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: ghostTi(g) })))
     .sort((x, y) => y.w - x.w).slice(0, 10);
   return {
     t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
