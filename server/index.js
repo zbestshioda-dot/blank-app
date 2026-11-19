@@ -4229,6 +4229,11 @@ function godAct(a, m) {
     if (o.st === 'paid') return toast(a, 'รายการนี้เติมเพชรไปแล้ว', '💎', false);
     payCredit(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, `ส่งของรายการ ${o.ref} ให้ ${o.l} แล้ว`, '💎');
   }
+  if (m.op === 'payvoid') {                 // take back a test-mode / refunded order
+    const o = payOrders[String(m.ref || '')]; if (!o) return toast(a, 'ไม่พบรายการนี้', '💎', false);
+    if (o.st === 'void') return toast(a, 'รายการนี้ถูกยกเลิกไปแล้ว', '💎', false);
+    const r = payRevoke(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, r, '↩️');
+  }
   if (m.op === 'paycheck') { payVerify(String(m.ref || ''), 'admin').then(() => send(a, payAdminView())); return toast(a, 'กำลังตรวจกับ Stripe…', '🔄'); }
   if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
     const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
@@ -4511,14 +4516,14 @@ function payOp(a, m) {
   const l = lk(a), t = now();
   if (Object.values(payOrders).filter(o => o.l === l && o.st === 'new' && t - o.t < 15 * 60e3).length >= PAY_OPEN) return toast(a, 'มีรายการที่ยังไม่จ่ายหลายรายการแล้ว รอสักครู่ค่อยลองใหม่', '⏳', false);
   let ref; do ref = PAY.newRef(); while (payOrders[ref]);
-  const o = payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'stripe', t, st: 'new' };
+  const o = payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'stripe', t, st: 'new', ...(PAY.SANDBOX ? { sb: 1 } : {}) };
   const label = pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? 'ชุดเทวดา/นางฟ้า' : `💎${pk.gems}`;
   payPrune(); gdirty();
   PAY.createCheckout(o, label).then(({ url, sid }) => { o.sid = sid; gdirty(); send(a, { t: 'payredir', ref, url }); })
     .catch(e => { delete payOrders[ref]; console.log('pay checkout failed', e.message); toast(a, 'เปิดหน้าชำระเงินไม่สำเร็จ ลองใหม่อีกครั้ง', '⚠️', false); });
 }
 async function payVerify(ref, src) {
-  const o = payOrders[ref]; if (!o || o.st === 'paid' || o.busy) return;
+  const o = payOrders[ref]; if (!o || o.st === 'paid' || o.st === 'void' || o.busy) return;
   o.busy = 1;
   try {
     const r = await PAY.checkStatus(o);
@@ -4534,21 +4539,39 @@ function payCredit(o, by) {
   const pk = PAY.PACKS.find(p => p.id === o.pack) || {};
   let got;
   if (pk.kind === 'title') {                 // supporter title: +30 days (stacks), switched on right away
-    const T = D.PAY_TITLE; x.vipT = Math.max(now(), x.vipT || 0) + T.days * 86400e3; x.title = T.id; o.bonus = 0;
+    const T = D.PAY_TITLE; x.vipT = Math.max(now(), x.vipT || 0) + T.days * 86400e3; x.title = T.id; o.bonus = 0; o.gave = { vip: T.days * 86400e3 };
     got = `ฉายาพิเศษ «${T.title}» ใช้ได้ถึง ${new Date(x.vipT + 7 * 3600e3).toISOString().slice(0, 10)} (ใส่ให้แล้ว เปลี่ยนได้ที่ 🏅 ฉายา)`;
   } else if (pk.kind === 'outfit') {         // angel / fairy outfit by gender; if they already had it, refund as diamonds
     const OF = D.OUTFITS[pk.of], nm = x.gender === 'f' && OF.nf ? OF.nf : OF.name; o.bonus = 0;
-    if ((x.outfits || []).includes(pk.of)) { x.gems = (x.gems || 0) + 300; got = `คุณมี${nm}อยู่แล้ว จึงเปลี่ยนเป็น 💎300 ให้แทน`; }
-    else { x.outfits = [...(x.outfits || []), pk.of]; x.outfit = pk.of; got = `${nm} (ใส่ให้แล้ว ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า)`; }
+    if ((x.outfits || []).includes(pk.of)) { x.gems = (x.gems || 0) + 300; o.gave = { gems: 300 }; got = `คุณมี${nm}อยู่แล้ว จึงเปลี่ยนเป็น 💎300 ให้แทน`; }
+    else { x.outfits = [...(x.outfits || []), pk.of]; x.outfit = pk.of; o.gave = { of: pk.of }; got = `${nm} (ใส่ให้แล้ว ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า)`; }
   } else {
     o.bonus = x.paidG ? 0 : Math.round(o.gems * PAY.FIRST_BONUS); x.paidG = 1;
-    x.gems = (x.gems || 0) + o.gems + o.bonus; got = `💎${o.gems}${o.bonus ? ` + โบนัสเติมครั้งแรก 💎${o.bonus}` : ''}`;
+    x.gems = (x.gems || 0) + o.gems + o.bonus; o.gave = { gems: o.gems + o.bonus, fb: o.bonus ? 1 : 0 }; got = `💎${o.gems}${o.bonus ? ` + โบนัสเติมครั้งแรก 💎${o.bonus}` : ''}`;
   }
   x.paidN = (x.paidN || 0) + 1; x.paidThb = (x.paidThb || 0) + o.thb;
   o.st = 'paid'; o.paidT = now(); o.by = by; delete o.why; x.sd = true; dirty = true; gdirty();
   console.log('pay credited', o.ref, o.l, o.pack, o.thb, by);
   sysMail(x, `💖 ชำระเงินสำเร็จ!\n\nได้รับ ${got}\nยอดชำระ ฿${o.thb} · รายการ ${o.ref}\n\nขอบคุณที่สนับสนุนเมืองของเรานะ 💖`);
   if (x.ws) { markMe(x); sendRoster(); send(x, payView(x)); }
+}
+// ↩️ take back what an order gave (a test payment, a refund or a chargeback) and mark it void; unpaid orders are just cancelled
+function payRevoke(o, by) {
+  if (o.st !== 'paid') { o.st = 'void'; o.by = by; o.why = 'ยกเลิกโดยแอดมิน'; gdirty(); return 'ยกเลิกรายการแล้ว'; }
+  const x = accounts.get(o.l), pk = PAY.PACKS.find(p => p.id === o.pack) || {};
+  const gave = o.gave || (pk.kind === 'title' ? { vip: D.PAY_TITLE.days * 86400e3 } : pk.kind === 'outfit' ? { of: pk.of } : { gems: (o.gems || 0) + (o.bonus || 0), fb: o.bonus ? 1 : 0 });
+  let what = '';
+  if (x) {
+    if (gave.vip) { x.vipT = Math.max(0, (x.vipT || 0) - gave.vip); if (x.vipT <= now()) { x.vipT = 0; if (x.title === D.PAY_TITLE.id) x.title = ''; } what = 'ฉายาผู้สนับสนุน 30 วัน'; }
+    if (gave.of) { x.outfits = (x.outfits || []).filter(i => i !== gave.of); if (x.outfit === gave.of) x.outfit = ''; what = 'ชุดเทวดา/นางฟ้า'; }
+    if (gave.gems) { const had = x.gems || 0; x.gems = Math.max(0, had - gave.gems); if (gave.fb) x.paidG = 0; what = `💎${gave.gems}` + (had < gave.gems ? ` (มีเหลือ 💎${had} จึงหักได้เท่านั้น)` : ''); }
+    x.paidN = Math.max(0, (x.paidN || 0) - 1); x.paidThb = Math.max(0, (x.paidThb || 0) - o.thb); x.sd = true; dirty = true;
+    sysMail(x, `ℹ️ รายการเติมเงิน ${o.ref} ถูกยกเลิก\n\nรายการนี้ไม่ได้มีการชำระเงินจริง (เช่น จ่ายในโหมดทดสอบ) ระบบจึงดึง ${what} คืน\nถ้าคิดว่าผิดพลาด แจ้งแอดมินพร้อมเลขรายการได้เลย`);
+    if (x.ws) { markMe(x); sendRoster(); send(x, payView(x)); }
+  }
+  o.st = 'void'; o.voidT = now(); o.by = by; o.why = 'ดึงของคืนแล้ว: ' + (what || '-'); gdirty();
+  console.log('pay revoked', o.ref, o.l, o.pack, by);
+  return `ดึงคืนแล้ว: ${what || '-'}`;
 }
 function payPrune() {
   const t = now(), all = Object.values(payOrders);
