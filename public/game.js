@@ -1333,7 +1333,7 @@ function draw(t) {
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'park') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
-  if (A?.id === 'park' || A?.id === 'temple') crowdEnts(A, ents, vis);
+  if (A?.id === 'park' || A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
   if (A?.id === 'park' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
   if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
@@ -1380,7 +1380,7 @@ function draw(t) {
     else if (k === 11) drawWat(e, X, Y, t);
     else if (k === 12) drawWatWall(e, X, Y);
     else if (k === 13) drawWatTownGate(e, X, Y);
-    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
+    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
     else drawPlayer(e, X, Y, t);
   }
   if (A?.yard) drawYardLocks(A, X, Y, t);
@@ -2382,6 +2382,16 @@ function crowdMake(A) {
       [P0(2, 69.6), P0(25, 69.6), P0(34.4, 69.6), P0(34.4, 58), P0(34.4, 69.6), P0(2, 69.6)]];
     for (let i = 0; i < 16; i++) { const kid = i % 3 === 1; person(i, R[i % R.length], kid ? { small: .72, balloon: pk(BALLOON) } : r() < .2 ? { balloon: pk(BALLOON) } : {}); }
     L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 31.6, y: 68.6, rx: X + 31.6, ry: 68.6, f: 6, path: null, seller: 1 });
+  } else if (A.id === 'town') {
+    // pavements run beside every main road: people stroll along them and stop to look around
+    const seg = (x0, x1, y) => [[x0, y], [x1, y]], walks = [
+      seg(14, 88, 13.5), seg(14, 88, 16.5), seg(4, 40, 30.5), seg(60, 93, 30.5), seg(3, 94, 33.5), seg(5, 48, 45.5), seg(5, 48, 48.5),
+      [[44, 25.5], [57, 25.5], [57, 37.5], [44, 37.5]], [[46, 27.5], [55, 27.5], [55, 35.5], [46, 35.5]]];
+    for (let i = 0; i < 22; i++) { const w = walks[i % walks.length], rt = w.length === 2 ? [w[0], w[1]] : w; person(i, i % 2 && w.length === 2 ? rt.slice().reverse() : rt, i % 5 === 3 ? { small: .72 } : {}); }
+    L.forEach((m, i) => { m.n = i; if (m.path) { m.sp *= 1.15; } });
+    TWNB.length = 0; for (let i = 0; i < 8; i++) TWNB.push({ hx: 44 + r() * 13, hy: 33.2 + r() * 3.4, x: 0, y: 0, z: 0, fly: 0, ph: r() * 7 });
+    for (const b of TWNB) { b.x = b.hx; b.y = b.hy; }
+    TWNC.length = 0; [['🐈', 20, 33.6], ['🐕', 70, 16.6], ['🐈', 32, 45.6], ['🐩', 80, 30.6], ['🐈', 52, 13.6]].forEach(([e, x, y], i) => TWNC.push({ e, x, y, tx: x, ty: y, wait: r() * 3, dir: 1, ph: r() * 6, home: y }));
   } else {
     const P0 = (c, rw) => [X + c, Y + rw];
     const R = [[P0(2, 16.9), P0(21.4, 16.9), P0(21.4, 13.8), P0(21.4, 16.9), P0(30.6, 16.9), P0(30.6, 11), P0(30.6, 16.9), P0(2, 16.9)],
@@ -2393,7 +2403,7 @@ function crowdMake(A) {
   }
   return CROWD[A.id] = L;
 }
-const WATB = [];   // temple pigeons
+const WATB = [], TWNB = [], TWNC = [];   // temple pigeons, town-square pigeons, town cats and dogs
 function crowdEnts(A, ents, vis) {
   const L = CROWD[A.id] || crowdMake(A), now0 = performance.now(), dt = Math.min(.1, (now0 - (CROWD['t' + A.id] || now0)) / 1000); CROWD['t' + A.id] = now0;
   for (const m of L) {
@@ -2405,12 +2415,19 @@ function crowdEnts(A, ents, vis) {
       m.rx += (m.x - m.rx) * .3; m.ry += (m.y - m.ry) * .3;
     }
     if (!vis(m.rx, m.ry, 3)) continue;
+    if (A.id === 'town' && m.n % 3 && (hourNow() >= 22 || hourNow() < 5)) continue;   // the late-night streets are quieter
     ents.push([m.ry + .3, 4, m]);
     if (m.balloon || m.seller) ents.push([m.ry + .31, 14, { fx: 'balloon', m }]);
   }
   if (A.id === 'park') ents.push([69.2, 14, { fx: 'bunting', y: 69.2 }], [72.2, 14, { fx: 'bunting', y: 72.2 }], [1e5, 14, { fx: 'bubbles', x: A.x + 16.5, y: 63.6 }]);
-  if (A.id === 'temple') { const me0 = P.get(myId);
-    for (const b of WATB) {   // pigeons peck about the courtyard and take off when someone walks up
+  if (A.id === 'town') {   // town critters: pigeons in the square, cats and dogs on the pavements
+    for (const c of TWNC) {
+      if (c.wait > 0) c.wait -= dt; else { const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy); if (d < .1) { c.wait = 2 + Math.random() * 6; c.tx = c.x + (Math.random() - .5) * 8; c.ty = c.home; c.tx = clamp(c.tx, 8, 90); } else { const st = Math.min(d, (c.e === '🐈' ? .9 : 1.3) * dt); c.x += dx / d * st; c.y += dy / d * st; c.dir = dx < 0 ? -1 : 1; } }
+      if (vis(c.x, c.y, 2)) ents.push([c.y + .2, 14, { fx: 'critter', c }]);
+    }
+  }
+  if (A.id === 'temple' || A.id === 'town') { const me0 = P.get(myId), PIG = A.id === 'temple' ? WATB : TWNB;
+    for (const b of PIG) {   // pigeons peck about the courtyard and take off when someone walks up
       const near = me0 && Math.hypot(me0.rx - b.x, me0.ry - b.y) < 1.8 || L.some(m => Math.hypot(m.rx - b.x, m.ry - b.y) < .9);
       if (near && !b.fly) { b.fly = 1; b.vx = (Math.random() - .5) * 6; b.vy = -2 - Math.random() * 2; FX.play('pop'); }
       if (b.fly === 1) { b.x += b.vx * dt; b.y += b.vy * dt * .4; b.z += 3.2 * dt; if (b.z > 4) { b.fly = 2; b.back = now0 + 6000 + Math.random() * 6000; } }
@@ -2418,7 +2435,7 @@ function crowdEnts(A, ents, vis) {
       else if (b.fly === 3) { b.x += (b.hx - b.x) * dt * 1.2; b.y += (b.hy - b.y) * dt * 1.2; b.z = Math.max(0, b.z - 2.2 * dt); if (b.z <= 0 && Math.hypot(b.x - b.hx, b.y - b.hy) < .3) b.fly = 0; }
       if (b.fly !== 2 && vis(b.x, b.y, 2)) ents.push([b.y + .1, 14, { fx: 'pigeon', b }]);
     }
-    ents.push([1e5, 14, { fx: 'butterflies' }]);
+    if (A.id === 'temple') ents.push([1e5, 14, { fx: 'butterflies' }]);
   }
 }
 function drawCrowdFx(e, X, Y, t) {
@@ -2447,6 +2464,10 @@ function drawCrowdFx(e, X, Y, t) {
     for (let k = 0; k < 9; k++) { const ph = (T * .18 + k / 9) % 1, x = e.x + Math.sin(T * .8 + k * 2.1) * 1.4 + ph * 2.2, y = e.y - ph * 4.5, r = u * (.08 + (k % 3) * .04);
       ctx.globalAlpha = Math.min(1, (1 - ph) * 2.5) * .8; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x * u + X, y * u + Y, r, 0, 7); ctx.stroke();
       ctx.fillStyle = `hsla(${(k * 40 + T * 60) % 360},90%,75%,.25)`; ctx.fill(); ctx.globalAlpha = 1; }
+  } else if (e.fx === 'critter') {   // a cat or dog trotting along the pavement
+    const c = e.c, px = c.x * u + X, py = c.y * u + Y, moving = c.wait <= 0, bob = moving ? Math.abs(Math.sin(T * 9 + c.ph)) * u * .06 : Math.sin(T * 1.6 + c.ph) * u * .012;
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(px, py, u * .2, u * .06, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(px, py - bob); ctx.scale(-c.dir, 1); ctx.font = `${Math.round(u * .5)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(c.e, 0, u * .06); ctx.restore();
   } else if (e.fx === 'pigeon') {
     const b = e.b, px = b.x * u + X, py = b.y * u + Y, flying = b.fly === 1 || b.fly === 3, z = b.z * u;
     ctx.save(); ctx.translate(px, py); ctx.scale(1.8, 1.8); ctx.translate(-px, -py);
@@ -5428,6 +5449,17 @@ function drawAtmos(t, night, A) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, 9); g.addColorStop(0, `rgba(210,255,140,${.8 * tw})`); g.addColorStop(1, 'rgba(210,255,140,0)'); ctx.fillStyle = g; ctx.fillRect(x - 9, y - 9, 18, 18);
     }
     ctx.restore();
+  }
+  // a small flock crosses the sky now and then (daytime, open maps)
+  if (night < .3 && !rain && (A.id === 'town' || A.id === 'park' || A.id === 'farm' || A.id === 'housing')) {
+    const per = 38000, ph = (t % per) / per;
+    if (ph < .32) {
+      const q = ph / .32, fx = -60 + q * (VW + 120), fy = VH * (.12 + .06 * Math.sin(q * 3)), flap = t / 110;
+      ctx.save(); ctx.strokeStyle = 'rgba(40,40,60,.7)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) { const bx = fx - Math.abs(i - 2) * 18 - (i > 2 ? 0 : 0), by = fy + (i - 2) * 9 + Math.abs(i - 2) * 6, w = Math.sin(flap + i * .8) * 4.5 + 1;
+        ctx.beginPath(); ctx.moveTo(bx - 8, by - w); ctx.quadraticCurveTo(bx - 3, by - w * .2 + 2, bx, by); ctx.quadraticCurveTo(bx + 3, by - w * .2 + 2, bx + 8, by - w); ctx.stroke(); }
+      ctx.restore();
+    }
   }
   // leaves and petals drift down in the daytime on open maps (the temple already has its own)
   if (night < .3 && !rain && A.id !== 'temple') {
