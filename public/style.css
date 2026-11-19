@@ -1329,3 +1329,16 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .znCard.win{border-color:#ffd34d;background:#221a08}
 .znCard.out{opacity:0;transition:opacity .5s}
 @keyframes znIn{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
+
+/* home menu: grouped furniture cards with a count, floor / wallpaper swatches */
+.look.dcard{position:relative}
+.look.dcard .dcnt{position:absolute;top:4px;right:4px;background:#ffc94d;color:#2a1a08;font-size:12px;font-weight:800;border-radius:10px;padding:1px 7px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.look.dcard .col2{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.tabs .tcnt{font-style:normal;font-size:10px;background:rgba(0,0,0,.25);border-radius:8px;padding:0 5px;margin-left:2px}
+.wallSw{width:96px;height:80px;margin:0 auto;border-radius:6px;border:2px solid rgba(0,0,0,.35);
+  background:linear-gradient(to bottom,var(--c) 0 62%,var(--e) 62% 88%,var(--d) 88%)}
+#panel .sheet .wallSw{width:80px;height:68px}
+.wallSw.brick{background:linear-gradient(to bottom,transparent 0 62%,var(--e) 62% 88%,var(--d) 88%),
+  repeating-linear-gradient(to bottom,var(--d) 0 2px,transparent 2px 12px),repeating-linear-gradient(90deg,var(--d) 0 2px,var(--c) 2px 24px)}
+.wallSw.plank{background:linear-gradient(to bottom,transparent 0 62%,var(--e) 62% 88%,var(--d) 88%),repeating-linear-gradient(90deg,var(--d) 0 2px,var(--c) 2px 16px)}
+.wallSw.damask{background:linear-gradient(to bottom,transparent 0 62%,var(--e) 62% 88%,var(--d) 88%),radial-gradient(circle,rgba(255,255,255,.45) 2px,transparent 3px) 0 0/14px 14px,var(--c)}
