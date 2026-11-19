@@ -1416,7 +1416,7 @@ function draw(t) {
     gl.addColorStop(0, 'rgba(255,214,150,.10)'); gl.addColorStop(.7, 'rgba(255,200,140,0)'); gl.addColorStop(1, 'rgba(30,15,5,.28)');
     ctx.fillStyle = gl; ctx.fillRect(r.x * TS + X, r.y * TS + Y, r.w * TS, r.h * TS);
   }
-  if (!myRoom) drawRain(t);
+  if (!myRoom) { drawRain(t); drawAtmos(t, night, A); }
   // inside: no day/night, but the office turns its lights off after work hours
   let dark = myRoom ? 0 : night;
   if (myRoom && myRoom.rk === 'office') { const h = hourNow(); if (h >= G.shift.ot || h < 6) dark = 0.62; }
@@ -5031,9 +5031,12 @@ function drawLights(X, Y, dark) {
   if (drawArea?.id === 'town') for (const c of traffic) { const px = c.x * TS + X, py = c.y * TS + Y, fx = c.dx * (halfX(c) + .9), fy = c.dy * (halfY(c) + .9); glow(px + fx * TS, py + fy * TS, TS * 1.5, `rgba(255,245,200,${dark * .85})`); glow(px - c.dx * halfX(c) * TS, py - c.dy * halfY(c) * TS, TS * .7, `rgba(255,50,30,${dark * .55})`); }
   for (const p of G.props) if (/^(lamp|o_lamp|o_lantern)/.test(p.s)) {
     const px = p.x * TS + X, py = (p.y - (p.s === 'o_lantern' ? .8 : p.s === 'o_lampball' ? 1.15 : 1.6)) * TS + Y; if (px < -200 || py < -200 || px > VW + 200 || py > VH + 200) continue;
-    const g = ctx.createRadialGradient(px, py, 0, px, py, TS * 2.4);
-    g.addColorStop(0, `rgba(255,200,110,${dark * .9})`); g.addColorStop(1, 'rgba(255,200,110,0)');
-    ctx.fillStyle = g; ctx.fillRect(px - TS * 2.4, py - TS * 2.4, TS * 4.8, TS * 4.8);
+    const fl = 1 + Math.sin(performance.now() / 170 + p.x * 3.1 + p.y) * .05 + Math.sin(performance.now() / 61 + p.x) * .025, R = TS * 2.6 * fl;   // a lamp breathes a little
+    const g = ctx.createRadialGradient(px, py, 0, px, py, R);
+    g.addColorStop(0, `rgba(255,236,170,${dark * 1.2})`); g.addColorStop(.18, `rgba(255,208,120,${dark * .85})`); g.addColorStop(1, 'rgba(255,190,100,0)');
+    ctx.fillStyle = g; ctx.fillRect(px - R, py - R, R * 2, R * 2);
+    const pool = ctx.createRadialGradient(px, py + TS * 1.5, 0, px, py + TS * 1.5, TS * 1.7); pool.addColorStop(0, `rgba(255,200,120,${dark * .45})`); pool.addColorStop(1, 'rgba(255,200,120,0)');   // the pool of light on the ground
+    ctx.save(); ctx.translate(0, py + TS * 1.5); ctx.scale(1, .55); ctx.translate(0, -(py + TS * 1.5)); ctx.fillStyle = pool; ctx.fillRect(px - TS * 1.7, py - TS * .2, TS * 3.4, TS * 3.4); ctx.restore();
   }
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -5389,10 +5392,67 @@ function drawRoomLabels(r, X, Y, t) {
   ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
   if (!r.floor) ctx.fillText('⬇ ทางออก', px + Math.floor(r.w / 2) * TS, py + (r.h + .45) * TS + Math.sin(t / 300) * 2);
 }
+
+// ---- atmosphere: dusk/dawn colour grade, fireflies at night, morning mist, drifting leaves/petals, rain ripples
+const ATM = { fly: null, leaf: null, rip: [] };
+function drawAtmos(t, night, A) {
+  if (!A) return;
+  const h = hourNow(), rain = wd?.ev?.id === 'rain';
+  // dusk (16.5-19.5) glows orange-pink along the horizon; dawn (5-7.5) is peach and cool
+  const dusk = clamp(1 - Math.abs(h - 18) / 1.6, 0, 1), dawn = clamp(1 - Math.abs(h - 6.2) / 1.3, 0, 1);
+  if ((dusk > .02 || dawn > .02) && !rain) {
+    const g = ctx.createLinearGradient(0, 0, 0, VH), a = Math.max(dusk, dawn);
+    if (dusk >= dawn) { g.addColorStop(0, `rgba(120,60,150,${.28 * a})`); g.addColorStop(.55, `rgba(255,120,80,${.20 * a})`); g.addColorStop(1, `rgba(255,170,90,${.36 * a})`); }
+    else { g.addColorStop(0, `rgba(255,170,150,${.14 * a})`); g.addColorStop(.6, `rgba(255,214,170,${.10 * a})`); g.addColorStop(1, `rgba(120,150,210,${.16 * a})`); }
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  }
+  // deep night: cool moonlight vignette so the middle of the screen stays readable
+  if (night > .25) { const k = (night - .25) / .3, v = ctx.createRadialGradient(VW / 2, VH * .55, Math.min(VW, VH) * .25, VW / 2, VH * .55, Math.hypot(VW, VH) * .6); v.addColorStop(0, 'rgba(60,90,180,0)'); v.addColorStop(1, `rgba(4,8,30,${.32 * k})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH); }
+  // morning mist: slow pale bands drifting across, gone by 8:30
+  const mist = clamp(1 - Math.max(0, h - 5) / 3.4, 0, 1) * (h < 9 && h > 4.2 ? 1 : 0) + (rain ? .35 : 0);
+  if (mist > .03) {
+    ctx.save();
+    for (let i = 0; i < 4; i++) {
+      const x = ((t / (26000 + i * 7000) + i * .27) % 1.4 - .2) * VW * 1.4 - VW * .2, y = VH * (.18 + i * .22) + Math.sin(t / 5000 + i) * 14, w = VW * .9, hh = VH * .22;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, w * .6); g.addColorStop(0, `rgba(235,240,250,${.2 * mist})`); g.addColorStop(1, 'rgba(235,240,250,0)');
+      ctx.translate(0, y); ctx.scale(1, hh / (w * .6)); ctx.translate(0, -y); ctx.fillStyle = g; ctx.fillRect(x - w, y - w, w * 2, w * 2); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    ctx.restore();
+  }
+  // fireflies: only on grassy maps at night
+  if (night > .3 && !rain && (A.id === 'park' || A.id === 'temple' || A.id === 'farm' || A.id === 'housing' || A.id === 'town')) {
+    if (!ATM.fly) ATM.fly = Array.from({ length: ECO ? 14 : 24 }, () => [Math.random(), Math.random(), Math.random() * 6.28, .4 + Math.random() * .8]);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const f of ATM.fly) {
+      const x = (f[0] + Math.sin(t / 3100 * f[3] + f[2]) * .06) * VW, y = (f[1] + Math.cos(t / 2300 * f[3] + f[2]) * .05) * VH, tw = .5 + .5 * Math.sin(t / 420 * f[3] + f[2]);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 9); g.addColorStop(0, `rgba(210,255,140,${.8 * tw})`); g.addColorStop(1, 'rgba(210,255,140,0)'); ctx.fillStyle = g; ctx.fillRect(x - 9, y - 9, 18, 18);
+    }
+    ctx.restore();
+  }
+  // leaves and petals drift down in the daytime on open maps (the temple already has its own)
+  if (night < .3 && !rain && A.id !== 'temple') {
+    if (!ATM.leaf) ATM.leaf = Array.from({ length: ECO ? 7 : 12 }, () => [Math.random(), Math.random(), Math.random() * 6.28, .5 + Math.random() * .7, Math.floor(Math.random() * 3)]);
+    const cols = A.id === 'park' || A.id === 'housing' ? ['#ffc4d6', '#ffe0ea', '#fff3b0'] : ['#9ccc5c', '#c7d96a', '#e2b95c'];
+    ctx.save();
+    for (const f of ATM.leaf) {
+      const sp = .018 * f[3], y = ((f[1] + t / 1000 * sp) % 1.1 - .05) * VH, x = ((f[0] + t / 1000 * .012 * f[3]) % 1.1 - .05) * VW + Math.sin(t / 900 * f[3] + f[2]) * 18;
+      ctx.translate(x, y); ctx.rotate(t / 700 * f[3] + f[2]); ctx.scale(1, .5 + .5 * Math.abs(Math.sin(t / 500 * f[3] + f[2]))); ctx.fillStyle = cols[f[4]]; ctx.globalAlpha = .85;
+      ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 2.4, 0, 0, 7); ctx.fill(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    ctx.restore();
+  }
+  // rain: rings spread on the ground where drops land
+  if (rain) {
+    if (ATM.rip.length < (ECO ? 10 : 18) && Math.random() < .5) ATM.rip.push([Math.random() * VW, VH * .25 + Math.random() * VH * .75, t]);
+    ctx.save(); ctx.strokeStyle = 'rgba(210,230,255,.55)'; ctx.lineWidth = 1;
+    for (let i = ATM.rip.length - 1; i >= 0; i--) { const r = ATM.rip[i], p = (t - r[2]) / 650; if (p >= 1) { ATM.rip.splice(i, 1); continue; } ctx.globalAlpha = (1 - p) * .7; ctx.beginPath(); ctx.ellipse(r[0], r[1], 2 + p * 11, (2 + p * 11) * .42, 0, 0, 7); ctx.stroke(); }
+    ctx.restore();
+  }
+}
 let rainDrops = null;
 function drawRain(t) {
   if (wd?.ev?.id !== 'rain') return;
-  if (!rainDrops) rainDrops = Array.from({ length: 90 }, () => [Math.random(), Math.random(), .6 + Math.random() * .6]);
+  if (!rainDrops) rainDrops = Array.from({ length: ECO ? 80 : 130 }, () => [Math.random(), Math.random(), .6 + Math.random() * .6]);
   ctx.strokeStyle = 'rgba(190,215,255,.45)'; ctx.lineWidth = 1.4; ctx.beginPath();
   for (const d of rainDrops) {
     const x = ((d[0] * VW + t * .12 * d[2]) % (VW + 40)) - 20, y = ((d[1] * VH + t * .9 * d[2]) % (VH + 40)) - 20;
@@ -5532,17 +5592,19 @@ function fishCue() {
 // ------------------------------------------------------------------ sound & effects glue
 let stepAcc = 0, bobber = null;
 function paintMute() { }
+// a quick soft flash over the whole screen for big moments (level up, big money)
+function flashScreen(rgb, a0) { const d = document.createElement('div'); d.style.cssText = `position:fixed;inset:0;z-index:40;pointer-events:none;background:radial-gradient(circle at 50% 55%,rgba(${rgb},${a0}),rgba(${rgb},0) 70%);opacity:1;transition:opacity .7s ease-out`; document.body.appendChild(d); requestAnimationFrame(() => requestAnimationFrame(() => d.style.opacity = '0')); setTimeout(() => d.remove(), 800); }
 function onMeDiff(a, b) {
   const s = P.get(myId); if (!s) return;
   const x = s.x, y = s.y;
   const dm = b.money - a.money;
   if (dm) { const sp = document.createElement('span'); sp.className = 'mfloat'; sp.style.color = dm > 0 ? '#ffd34d' : '#ff8a7a'; sp.textContent = (dm > 0 ? '+' : '−') + money(Math.abs(dm)); $('#card').appendChild(sp); setTimeout(() => sp.remove(), 1600); }
-  if (dm > 0) { FX.play('coin', dm >= 1000); FX.float(x, y, '+' + money(dm), '#ffd34d', dm >= 1000 ? .55 : .42); if (dm >= 300) FX.burst(x, y, '#ffd34d', Math.min(24, 6 + Math.floor(dm / 200))); }
+  if (dm > 0) { FX.play('coin', dm >= 1000); FX.float(x, y, '+' + money(dm), '#ffd34d', dm >= 1000 ? .55 : .42); if (dm >= 300) FX.burst(x, y, '#ffd34d', Math.min(24, 6 + Math.floor(dm / 200))); FX.sparkle(x, y - .5, '#fff1a8', dm >= 1000 ? 14 : dm >= 200 ? 8 : 4); if (dm >= 3000) flashScreen('255,226,140', .22); }
   else if (dm < 0) { FX.play('spend'); FX.float(x + .4, y, '−' + money(-dm), '#ff8a7a', .34); }
   const gained = [];
   for (const [k, q] of Object.entries(b.inv)) { const d = q - (a.inv[k] || 0); if (d > 0) gained.push(`+${d}${G.items[k].icon}`); }
-  if (gained.length) { FX.play('pop'); FX.float(x - .3, y - .4, gained.join(' '), '#ffffff', .5); FX.burst(x, y, '#ffffff', 6); }
-  if (b.career === a.career && b.lv > a.lv) { FX.play('levelup'); FX.ring(x, y, '#ffd34d', 900, 1.6); FX.float(x, y - .6, `LEVEL UP! Lv.${b.lv}`, '#ffd34d', .55); FX.burst(x, y, '#ffd34d', 20); }
+  if (gained.length) { FX.play('pop'); FX.float(x - .3, y - .4, gained.join(' '), '#ffffff', .5); FX.burst(x, y, '#ffffff', 6); FX.sparkle(x, y - .4, '#ffffff', 5); }
+  if (b.career === a.career && b.lv > a.lv) { FX.play('levelup'); FX.ring(x, y, '#ffd34d', 900, 1.6); FX.float(x, y - .6, `LEVEL UP! Lv.${b.lv}`, '#ffd34d', .55); FX.burst(x, y, '#ffd34d', 20); FX.column(x, y); FX.sparkle(x, y - .6, '#ffffff', 18, 1.4); flashScreen('255,235,170', .3); }
   if (a.energy < 99.5 && b.energy >= 100) toast('พลังงานเต็มแล้ว!', '⚡');
   if (b.energy - a.energy >= 8) FX.float(x + .5, y + .2, `+${Math.round(b.energy - a.energy)}⚡`, '#f2c94c', .34);
   if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }

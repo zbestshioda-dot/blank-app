@@ -148,12 +148,19 @@ window.FX = (() => {
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 2.5; list.push({ k: 'p', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, color, t0: now(), dur: 650 + Math.random() * 300 }); }
   }
   function ring(x, y, color = '#ffffff', dur = 700, max = 1.2) { list.push({ k: 'ring', x, y, color, t0: now(), dur, max }); }
+  // twinkling four-point stars that float up (coins, level-ups, rewards)
+  function sparkle(x, y, color = '#fff6c2', n = 8, spread = .8) {
+    for (let i = 0; i < n; i++) list.push({ k: 'star', x: x + (Math.random() - .5) * spread, y: y - Math.random() * .8, vy: .5 + Math.random() * .9, color, sz: .1 + Math.random() * .14, ph: Math.random() * 6, t0: now() + Math.random() * 220, dur: 800 + Math.random() * 500 });
+  }
+  // a column of light rising from the player (level up)
+  function column(x, y, color = '#ffe28a') { list.push({ k: 'col', x, y, color, t0: now(), dur: 1100 }); }
   function dust(x, y) { list.push({ k: 'dust', x: x + (Math.random() - .5) * .2, y: y + .25, t0: now(), dur: 450 }); }
   function draw(g, X, Y, TS) {
     const t = now();
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i], p = (t - e.t0) / e.dur;
       if (p >= 1) { list.splice(i, 1); continue; }
+      if (p < 0) continue;
       const sx = e.x * TS + X, sy = e.y * TS + Y;
       g.save();
       if (e.k === 'text') {
@@ -168,6 +175,13 @@ window.FX = (() => {
       } else if (e.k === 'ring') {
         g.globalAlpha = 1 - p; g.strokeStyle = e.color; g.lineWidth = 3;
         g.beginPath(); g.ellipse(sx, sy, TS * e.max * p, TS * e.max * p * .55, 0, 0, 7); g.stroke();
+      } else if (e.k === 'star') {
+        const yy = sy - e.vy * TS * p * 1.4, r = TS * e.sz * (.6 + .4 * Math.sin(p * 12 + e.ph)) * (1 - p * .5);
+        g.globalAlpha = Math.sin(p * Math.PI); g.globalCompositeOperation = 'lighter'; g.fillStyle = e.color;
+        g.beginPath(); g.moveTo(sx, yy - r * 1.5); g.quadraticCurveTo(sx, yy, sx + r * 1.5, yy); g.quadraticCurveTo(sx, yy, sx, yy + r * 1.5); g.quadraticCurveTo(sx, yy, sx - r * 1.5, yy); g.quadraticCurveTo(sx, yy, sx, yy - r * 1.5); g.fill();
+      } else if (e.k === 'col') {
+        const w = TS * (.55 + p * .25), hh = TS * (3.2 + p * 1.5), gr = g.createLinearGradient(0, sy - hh, 0, sy);
+        gr.addColorStop(0, 'rgba(255,230,140,0)'); gr.addColorStop(1, e.color); g.globalAlpha = (1 - p) * .55; g.globalCompositeOperation = 'lighter'; g.fillStyle = gr; g.fillRect(sx - w / 2, sy - hh, w, hh);
       } else if (e.k === 'dust') {
         g.globalAlpha = (1 - p) * .35; g.fillStyle = '#e9e2cc';
         g.beginPath(); g.arc(sx, sy, TS * (.06 + p * .12), 0, 7); g.fill();
@@ -176,5 +190,5 @@ window.FX = (() => {
     }
   }
 
-  return { play, float, burst, ring, dust, draw, opts: st, setOpt, ensure, ctx: () => ac };
+  return { play, float, burst, ring, dust, sparkle, column, draw, opts: st, setOpt, ensure, ctx: () => ac };
 })();

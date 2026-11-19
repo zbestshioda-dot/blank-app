@@ -1243,3 +1243,7 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border
   .ldLogo{--w:min(36vw,330px,52vh);top:3vh}
   .ldCard{bottom:7vh;width:min(56vw,520px)}
 }
+
+/* tactile buttons: a quick squish on press, springy release */
+#actBtn,#nearBtns button,#rideBtn,.phApp,.grid2 button{transition:transform .12s cubic-bezier(.3,1.6,.5,1)}
+#actBtn:active,#nearBtns button:active:not(:disabled),#rideBtn:active,.phApp:active,.grid2 button:active{transform:scale(.92)!important}
