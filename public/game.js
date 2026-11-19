@@ -507,6 +507,7 @@ function handle(m) {
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'lotto': window.__lotto = m; if (panel?.kind === 'lotto') refreshPanel(true); break;
     case 'ideas': window.__ideas = m; if (panel?.kind === 'ideas') refreshPanel(true); break;
     case 'mayor': window.__mayor = m; if (panel?.kind === 'mayor') refreshPanel(true); break;
     case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
@@ -3075,6 +3076,8 @@ const FN = {
     if (navigator.share) navigator.share({ title: 'เมืองชีวิตนี้เลือกได้', text, url }).catch(() => { }); else { try { navigator.clipboard.writeText(text + ' ' + url); toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย', '📋'); } catch { prompt('คัดลอกลิงก์นี้', url); } } },
   refCopy() { const R = window.__ref; if (!R) return; try { navigator.clipboard.writeText(R.code); toast('คัดลอกโค้ดแล้ว', '📋'); } catch { prompt('โค้ดของคุณ', R.code); } },
   refUse(m, root) { const c = root.querySelector('#refIn')?.value || ''; if (c.trim().length < 4) return toast('กรอกโค้ดเพื่อน', '🎟️', false); send({ t: 'refuse', code: c }); },
+  openLotto() { send({ t: 'lotto', op: 'view' }); openPanel({ kind: 'lotto' }); },
+  lotto: d => { if (d.pick) { const n = ($('#lottoIn')?.value || '').replace(/\D/g, ''); if (n.length !== 6) return toast('ใส่เลข 6 หลัก', '🎫', false); return send({ t: 'lotto', op: 'buy', num: n }); } send({ t: 'lotto', op: 'buy', qty: d.qty }); },
   openIdeas() { send({ t: 'idea', op: 'list', sort: 'new' }); openPanel({ kind: 'ideas', sort: 'new' }); },
   idea(m, root) {
     if (m.op === 'del' && !confirm('ลบโพสต์นี้?')) return;
@@ -3730,6 +3733,14 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19g', d: '19 พ.ย. (รอบ 44)', items: [
+    '🎫 <b>ลอตเตอรี่มาแล้ว!</b> แอปใหม่ในมือถือ ใบละ ฿100 ออกทุกวันที่ 1 และ 16 เวลา 16:00 น. รางวัลที่ 1 ฿3,000,000 · 3 ตัวท้าย · 2 ตัวท้าย · ถูกรางวัลรับเงินที่จดหมาย (ไอเดียจากคุณ Tood 💡)',
+    '👑 <b>ฉายาเศรษฐี</b> ซื้อได้ที่หน้าเปลี่ยนฉายา ตั้งแต่ ฿1 ล้าน ถึง ฿100 ล้าน',
+    '🧾 <b>ภาษีรายได้รายวัน:</b> ฿20,000 แรกของวันไม่เสีย · ส่วนที่เกินเสีย 10% · เกิน ฿60,000 เสีย 20% · ดูยอดได้ที่ข้อมูลผู้เล่น',
+    '⛽ <b>ค่าน้ำมัน:</b> ขี่รถส่วนตัวเสียค่าน้ำมันตามระยะทาง รถยิ่งแรงยิ่งกินน้ำมัน (รถไรเดอร์กับรถสายตรวจฟรี)',
+    '🥤 เครื่องดื่มชูกำลังกลับมาเพิ่มพลังงาน +20 ดื่มได้วันละ 3 ขวด',
+    '⚖️ ปรับสมดุลรายได้อาชีพ: ออฟฟิศและไรเดอร์ได้เงินเพิ่ม 25% · เคสตำรวจจ่ายตามระยะทาง · หมอไม่อยู่หน้าจอไม่ได้เงินเดือน · หั่นผักได้วันละไม่เกิน ฿3,000',
+  ] },
   { v: '2026-11-19f', d: '19 พ.ย. (รอบ 43)', items: [
     '🪑 <b>นั่งพักได้พลังงานคืนนิดหน่อย</b> (นั่งต่อเนื่อง 10 วินาทีขึ้นไป ฟื้นได้ถึง 50%) · อยากเต็มหลอดต้องนอนเตียงหรือไปสวนสนุก · ขอบคุณไอเดียจากคุณสมรศรี 💡',
     '🏷️ <b>ซ่อนป้ายเหนือหัวได้</b> ที่ ⚙️ ตั้งค่า: แสดงทั้งหมด / แค่ชื่อ / ซ่อนหมด (เหลือแต่ตัวละครกับข้อความแชท) · ไอเดียจากคุณสมรศรีเช่นกัน',
@@ -4009,6 +4020,20 @@ function invitePanel() {
     <div class="sub">เพื่อนที่เข้าเกมครั้งแรกผ่านลิงก์ หรือกรอกโค้ดนี้ภายใน 3 วันแรก<br>🥚 เพื่อนได้ <b>ไข่สัตว์เลี้ยงปริศนา 1 ใบ</b><br>🎁 เมื่อเพื่อนเล่นครบ <b>${R.need || 30} นาที</b> คุณได้ <b>ไข่สัตว์เลี้ยงสุ่ม 1 ใบ + 💎${R.gems}</b> (กดรับที่จดหมาย ✉️)<br>ชวนมาแล้ว <b>${R.n}</b> คน · ได้รางวัลแล้ว <b>${Math.min(R.paid || 0, R.max || 20)}/${R.max || 20}</b> คน</div>
     ${R.canUse ? `<div class="secT">มีโค้ดของเพื่อน?</div><div class="rowf"><input id="refIn" maxlength="8" placeholder="กรอกโค้ด 6 ตัว" style="text-transform:uppercase">${B('ใช้โค้ด', { fn: 'refUse' }, 'good')}</div>` : R.by ? '<div class="sub">✅ คุณใช้โค้ดเพื่อนไปแล้ว</div>' : ''}
     <small style="opacity:.7;word-break:break-all">${esc(link)}</small>`;
+}
+function lottoPanel() {
+  const L = window.__lotto; if (!L) return '<h2>🎫 ลอตเตอรี่</h2><div class="sub">กำลังโหลด…</div>';
+  const th = k => { const [y, m, d] = k.split('-').map(Number); return `${d} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][m - 1]} ${y + 543}`; };
+  const left = Math.max(0, L.at - Date.now()), dd = Math.floor(left / 864e5), hh = Math.floor(left / 36e5) % 24, mm = Math.floor(left / 6e4) % 60;
+  const tk = n => `<span style="display:inline-block;margin:2px;padding:3px 7px;border-radius:7px;background:#fff;border:2px solid #e0404a;font:800 14px monospace;letter-spacing:2px;color:#b0202a">${n}</span>`;
+  const last = L.last ? `<div class="jobbox"><b>ผลงวด ${th(L.last.key)}</b><br>🥇 รางวัลที่ 1: <b style="font:800 20px monospace;letter-spacing:3px">${L.last.first}</b><br>3 ตัวท้าย: <b>${L.last.l3.join(' , ')}</b> · 2 ตัวท้าย: <b>${L.last.l2}</b>${L.myLast && L.myLast.key === L.last.key ? `<br>คุณซื้อ ${L.myLast.n} ใบ · ${L.myLast.won ? `🎉 ถูกรางวัล ${money(L.myLast.won)} (รับที่จดหมาย ✉️)` : 'ไม่ถูกรางวัล'}` : ''}</div>` : '';
+  return `<h2>🎫 ลอตเตอรี่</h2>
+    <div class="sub">ออกทุกวันที่ 1 และ 16 เวลา 16:00 น. (เวลาจริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
+    <div class="jobbox">งวดถัดไป <b>${th(L.key)}</b> · อีก ${dd ? dd + ' วัน ' : ''}${hh} ชม. ${mm} นาที</div>
+    <div class="grid2">${B('🎲 สุ่ม 1 ใบ', { fn: 'lotto', qty: 1 }, 'primary')}${B('🎲 สุ่ม 5 ใบ', { fn: 'lotto', qty: 5 })}${B('🎲 สุ่ม 10 ใบ', { fn: 'lotto', qty: 10 })}</div>
+    <div class="rowf" style="margin-top:6px"><input id="lottoIn" inputmode="numeric" maxlength="6" placeholder="เลือกเลขเอง 6 หลัก">${B('ซื้อเลขนี้', { fn: 'lotto', pick: 1 }, 'good')}</div>
+    <div class="secT">ลอตเตอรี่ของฉันงวดนี้ (${L.my.length} ใบ)</div><div>${L.my.map(tk).join('') || '<small>ยังไม่ได้ซื้อ</small>'}</div>
+    ${last}<small style="opacity:.7">เล่นแต่พอดี เงินในเกมเท่านั้น</small>`;
 }
 function ideasPanel(p) {
   const I = window.__ideas, ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'เมื่อกี้' : m < 60 ? m + ' นาที' : m < 1440 ? Math.floor(m / 60) + ' ชม.' : Math.floor(m / 1440) + ' วัน'; };
@@ -4533,15 +4558,17 @@ function renderPanel(p) {
     case 'rewards': return rewardsPanel();
     case 'ach':
     case 'profile': {
-      const ti = G.ach.find(x => x.id === me.title), got = (me.ach || []).length;
+      const ti = G.ach.find(x => x.id === me.title) || (G.lux || []).find(x => x.id === me.title), got = (me.ach || []).length;
       // changing the title or the frame opens its own page with a back button
       if (p.titles) return `<h2>${B('‹ กลับ', { fn: 'titles' })} 🏅 เปลี่ยนฉายา</h2><div class="sub">สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
-        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="list">${achRows()}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'titles' })}`;
+        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="secT">👑 ฉายาเศรษฐี (ซื้อด้วยเงิน)</div><div class="list">${(G.lux || []).map(T => { const has = (me.luxT || []).includes(T.id), on = me.title === T.id;
+          return `<div class="item ${has ? 'done' : ''}"><div class="em">👑</div><div class="nm">${titleHtml(T.title, T.r)}<span class="rtag r${T.r}">${RAR[T.r] || ''}</span><small>${has ? 'เป็นเจ้าของแล้ว' : money(T.price)}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้', { t: 'title', id: on ? '' : T.id }, on ? 'primary' : 'good') : B(`ซื้อ ${money(T.price)}`, { t: 'luxbuy', id: T.id }, '', me.money < T.price)}</div>`; }).join('')}</div>
+        <div class="list">${achRows()}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'titles' })}`;
       if (p.frames) return `<h2>${B('‹ กลับ', { fn: 'frames' })} 🖼️ กรอบรูป</h2>${frameRows()}${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'frames' })}`;
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
         <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
-        <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div></div>
+        <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div><div class="item"><div class="nm">🧾 ภาษีวันนี้<small>${money(me.taxT?.paid || 0)} (รายได้ ${money(me.taxT?.e || 0)})</small></div></div><div class="item"><div class="nm">⛽ ค่าน้ำมันวันนี้<small>${money(me.fuelT || 0)}</small></div></div></div><div class="sub">ภาษีรายวัน: รายได้ ฿20,000 แรกไม่เสีย · ส่วนที่เกินเสีย 10% · เกิน ฿60,000 เสีย 20% · รีเซ็ตเที่ยงคืน</div>
         ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
           return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
           <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
@@ -4621,6 +4648,7 @@ function renderPanel(p) {
     case 'gang': return gangPanel(p);
     case 'mayor': return mayorPanel();
     case 'ideas': return ideasPanel(p);
+    case 'lotto': return lottoPanel();
     case 'invite': return invitePanel();
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => (b.fav || 0) - (a.fav || 0) || b.on - a.on);
@@ -4746,7 +4774,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
