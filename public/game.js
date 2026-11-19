@@ -498,6 +498,7 @@ function handle(m) {
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'mayor': window.__mayor = m; if (panel?.kind === 'mayor') refreshPanel(true); break;
     case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
@@ -3016,6 +3017,13 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  openMayor() { send({ t: 'mayor', op: 'view' }); openPanel({ kind: 'mayor' }); },
+  mayor(m, root) {
+    if (m.op === 'run' && !confirm('ลงสมัครนายกเมือง ค่าสมัคร ' + (window.__mayor?.K?.fee || 50000).toLocaleString() + ' บาท (ไม่คืนเงิน) ยืนยัน?')) return;
+    if (m.op === 'vote' && !confirm('โหวตให้ ' + m.n + '? โหวตได้ครั้งเดียวต่อรอบ เปลี่ยนไม่ได้')) return;
+    if (m.op === 'ann') return send({ t: 'mayor', op: 'ann', text: root.querySelector('#mAnn')?.value || '' });
+    send({ t: 'mayor', op: m.op, l: m.l, k: m.k });
+  },
   openGang() { send({ t: 'gang', op: 'list' }); openPanel({ kind: 'gang' }); },
   gangTab(m) { panel.gtab = m.tab; if (m.tab === 'rank' || m.tab === 'list') send({ t: 'gang', op: 'list' }); refreshPanel(true); },
   gset(m, root) { panel.gnm = root.querySelector('#gName')?.value ?? panel.gnm; Object.assign(panel, m.set); refreshPanel(true); },
@@ -3893,6 +3901,29 @@ function checkNews() {
 }
 
 // ---- gang / club panel (phone app 🏴)
+function mayorPanel() {
+  const M = window.__mayor; if (!M) return '<h2>🏛️ เลือกตั้งนายกเมือง</h2><div class="sub">กำลังโหลด…</div>';
+  const K = M.K, c = M.cur, ok = v => v ? '✅' : '❌';
+  const cur = c ? `<div class="item"><div class="nm">🏛️ นายกเมืองตอนนี้: <b>${esc(c.n)}</b><small>วาระที่ ${c.terms} · นโยบาย ${c.pol ? M.pol[c.pol].n + ' (' + M.pol[c.pol].d + ')' : 'ยังไม่ได้ประกาศนโยบาย'}${c.ann ? '<br>📢 ' + esc(c.ann) : ''}</small></div></div>` : '<div class="item"><div class="nm">🏛️ ยังไม่มีนายกเมือง<small>ผู้ที่ชนะเลือกตั้งรอบนี้จะได้เป็นคนแรก</small></div></div>';
+  let mine = '';
+  if (M.isMe) {
+    mine = `<div class="secT">👑 หน้าที่นายกเมือง</div>
+      ${B(M.salDone ? '💰 รับเงินเดือนแล้ววันนี้' : `💰 รับเงินเดือน ${money(K.salary)}`, { fn: 'mayor', op: 'sal' }, 'good', !!M.salDone)}
+      <div class="sub" style="margin-top:6px">เลือกนโยบายของเมือง (เปลี่ยนได้ทุกเมื่อ)</div>
+      <div class="grid2">${Object.entries(M.pol).map(([k, v]) => B(v.n, { fn: 'mayor', op: 'pol', k }, c.pol === k ? 'primary' : '')).join('')}</div>
+      ${c.pol ? `<div class="sub">${M.pol[c.pol].d}</div>` : ''}
+      <div class="rowf" style="margin-top:8px"><input id="mAnn" maxlength="70" placeholder="ประกาศถึงชาวเมือง (วันละครั้ง)"></div>
+      ${B(M.annDone ? '📢 วันนี้ประกาศแล้ว' : '📢 ประกาศ', { fn: 'mayor', op: 'ann' }, 'primary', !!M.annDone)}`;
+  }
+  const care = c && c.pol === 'care' ? `<div class="secT">🎁 เบี้ยเมือง</div>${B(M.claimed ? '✅ รับแล้ววันนี้' : `🎁 รับเบี้ยเมือง ${money(K.care)}`, { fn: 'mayor', op: 'claim' }, 'good', !!M.claimed)}` : '';
+  const runBox = M.run ? `<div class="item"><div class="nm">🗳️ คุณเป็นผู้สมัคร · ชื่อเสียง ${M.run.rep}<small>หาเสียงได้อีก ${M.run.left} ครั้งวันนี้ · ครั้งละ ${money(K.camp)} (ชื่อเสียง +1 = 1 คะแนนเสียง/10)</small></div>${B('📣 หาเสียง ' + money(K.camp), { fn: 'mayor', op: 'camp' }, 'good', !M.run.left)}</div>`
+    : `${B('🗳️ ลงสมัคร ' + money(K.fee), { fn: 'mayor', op: 'run' }, 'primary', M.lv < K.minLv || me.money < K.fee)}<div class="sub">ต้องเลเวล ${K.minLv}+ (คุณ Lv.${M.lv}) · เป็นนายกติดกันได้ไม่เกิน ${K.maxTerms} วาระ</div>`;
+  const rows = M.cands.map((r, i) => `<div class="item"><div class="nm">${i === 0 ? '🥇' : '#' + (i + 1)} ${esc(r.n)}<small>${r.v} คะแนนเสียง · ชื่อเสียง ${r.rep} · คะแนนรวม ${r.s}</small></div>${M.voted === r.l ? '<small>✅ คุณโหวตให้</small>' : B('🗳️ โหวต', { fn: 'mayor', op: 'vote', l: r.l, n: r.n }, 'good', !!M.voted || M.lv < K.voteLv || r.l === M.my)}</div>`).join('') || '<div class="sub">ยังไม่มีผู้สมัครในรอบนี้ มาเป็นคนแรกสิ!</div>';
+  return `<h2>🏛️ เลือกตั้งนายกเมือง</h2>${cur}${mine}${care}
+    <div class="secT">🗳️ การเลือกตั้งรอบนี้ · เหลืออีก ${M.left} วัน</div>
+    <div class="sub">คะแนนรวม = คะแนนเสียง×10 + ชื่อเสียง · ใครสูงสุดเมื่อครบรอบได้เป็นนายก 1 วาระ (4 สัปดาห์) · โหวตได้คนละ 1 เสียง ต้องเลเวล ${K.voteLv}+ ${M.voted ? '· ✅ คุณโหวตแล้ว' : ''}</div>
+    ${runBox}${rows}`;
+}
 function gangPanel(p) {
   const g = me.gang, gt = p.gtab || (g ? 'hq' : 'list'), GL = window.__gangs || { list: [], icons: ['🐉'], colors: ['#e0584a'], create: 20000 };
   const bar = (v, mx, col = 'var(--ok)') => `<div style="height:10px;border-radius:6px;background:rgba(0,0,0,.18);overflow:hidden;margin:4px 0"><i style="display:block;height:100%;width:${Math.min(100, mx ? v / mx * 100 : 0)}%;background:${col}"></i></div>`;
@@ -4452,6 +4483,7 @@ function renderPanel(p) {
         ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}`;
     }
     case 'gang': return gangPanel(p);
+    case 'mayor': return mayorPanel();
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => (b.fav || 0) - (a.fav || 0) || b.on - a.on);
       const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', `${f.fav ? '⭐ ' : ''}${esc(f.n)}`, f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call) : '')).join('');
@@ -4574,7 +4606,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
