@@ -477,7 +477,7 @@ function refUse(a, code) {
   markMe(a); toast(a, `ใช้โค้ดของ ${o.name} แล้ว! ไปรับไข่ที่จดหมาย ✉️`, '🎟️');
 }
 // ------------------------------------------------------------------ market: unsold listings are bought by the town at a fair price
-const LIST_AUTO = 2 * 3600e3;   // after 2 hours on the stall
+const LIST_AUTO = 2 * 3600e3, LIST_AUTO_RATE = 0.4;   // after 2 hours on the stall, at 40% of the market price
 function listingsTick() {
   const t = now();
   for (const o of accounts.values()) {
@@ -486,14 +486,18 @@ function listingsTick() {
     for (const L of L0) {
       if (!L.t) { L.t = t; o.sd = true; }
       if (t - L.t < LIST_AUTO) { keep.push(L); continue; }
-      const fair = Math.max(1, Math.floor(Math.min(L.price, marketPrice(L.item) * 0.9)));
-      total += fair * L.qty; n += L.qty;
+      // the town pays a little more than an NPC shop (40% of market vs 30%), never above the asking price, and like an NPC sale it presses the price down
+      for (let i = 0; i < L.qty; i++) {
+        if (!market[L.item] || !D.ITEMS[L.item]) break;
+        total += Math.max(1, Math.min(L.price, marketPrice(L.item) * LIST_AUTO_RATE)); market[L.item].mult = Math.max(0.4, market[L.item].mult * 0.985);
+      }
+      n += L.qty;
     }
     if (!n) continue;
     o.listings = keep; o.sd = true; dirty = true; wdAt = 0;
-    const got = Math.floor(total * 0.92); credit(o, got); stat(o, 'psold', n);
+    const got = Math.floor(total); credit(o, got); stat(o, 'psold', n);
     if (o.ws) { quest(o, 'sell', n); toast(o, `🏪 ของที่วางขายครบ 2 ชั่วโมง ตลาดรับซื้อให้ ${n} ชิ้น ได้ ${money(got)}`, '💰'); markMe(o); }
-    else { sysMail(o, `🏪 ของที่คุณวางขายไว้ครบ 2 ชั่วโมงแล้ว ตลาดกลางรับซื้อให้ ${n} ชิ้น ในราคาตลาด ได้เงิน ${money(got)} เข้ากระเป๋าแล้ว`); }
+    else { sysMail(o, `🏪 ของที่คุณวางขายไว้ครบ 2 ชั่วโมงแล้ว ตลาดกลางรับซื้อให้ ${n} ชิ้น (40% ของราคาตลาด) ได้เงิน ${money(got)} เข้ากระเป๋าแล้ว`); }
   }
 }
 // every minute: count real play (moved in the last 2 minutes) and pay the inviter once the friend reaches REF.needMin
