@@ -1397,7 +1397,20 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   devil:     { name: 'ชุดปีศาจน้อย', how: 'ซื้อที่ร้านแฟชั่น', price: 250000 },
   pilot:     { name: 'ชุดนักบินขับไล่', how: 'ซื้อที่ร้านแฟชั่น', price: 400000 },
   magician:  { name: 'ชุดสุภาพบุรุษนักมายากล', how: 'ซื้อที่ร้านแฟชั่น', price: 650000 },
-  thai:      { name: 'ชุดไทยทองคำ', how: 'ซื้อที่ร้านแฟชั่น', price: 1000000 } };
+  thai:      { name: 'ชุดไทยทองคำ', how: 'ซื้อที่ร้านแฟชั่น', price: 1000000 },
+  // new collection (sorted from plain to fanciest); g = only for that gender, nf = the women's name of a unisex outfit
+  student:   { name: 'ชุดนักเรียนไทย', how: 'ซื้อที่ร้านแฟชั่น', price: 19999 },
+  scout:     { name: 'ชุดลูกเสือ', how: 'ซื้อที่ร้านแฟชั่น', price: 39999, g: 'm' },
+  songkran:  { name: 'ชุดสงกรานต์ฉ่ำน้ำ', how: 'ซื้อที่ร้านแฟชั่น', price: 59999 },
+  lanna:     { name: 'ชุดพื้นเมืองล้านนา', how: 'ซื้อที่ร้านแฟชั่น', price: 79999, g: 'm' },
+  phasin:    { name: 'ชุดผ้าซิ่นพื้นเมือง', how: 'ซื้อที่ร้านแฟชั่น', price: 79999, g: 'f' },
+  muaythai:  { name: 'ชุดนักมวยไทย', how: 'ซื้อที่ร้านแฟชั่น', price: 129999, g: 'm' },
+  bunny:     { name: 'ชุดกระต่ายชมพู', how: 'ซื้อที่ร้านแฟชั่น', price: 149999, g: 'f' },
+  chinese:   { name: 'ชุดตรุษจีนมังกรทอง', nf: 'ชุดกี่เพ้าตรุษจีน', how: 'ซื้อที่ร้านแฟชั่น', price: 199999 },
+  lukthung:  { name: 'ชุดนักร้องลูกทุ่งกากเพชร', how: 'ซื้อที่ร้านแฟชั่น', price: 349999 },
+  chakri:    { name: 'ชุดไทยจักรี', how: 'ซื้อที่ร้านแฟชั่น', price: 888888, g: 'f' },
+  angel:     { name: 'ชุดเทวดา', nf: 'ชุดนางฟ้า', how: 'ซื้อที่ร้านแฟชั่น (💎 เพชร)', gems: 200 },
+  santa:     { name: 'ชุดซานต้า', nf: 'ชุดซานต้าสาว', how: 'ของขวัญปีใหม่ 2570 จากเมือง (ไม่มีขาย)' } };
 const ACHIEVEMENTS = [
   { id: 'egg_legend', r: 7, c: null, stat: 'legendfish', n: 1, title: 'ผู้พิชิตตำนาน', desc: 'ตกปลาในตำนานได้', secret: 1 },
   { id: 'egg_explore', r: 4, c: null, stat: 'secrets', n: 1, title: 'นักสำรวจ', desc: 'เจอที่ลับในเมือง', secret: 1 },

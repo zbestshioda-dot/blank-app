@@ -430,8 +430,16 @@ function mailClaim(a, id) {
   if (g.eggs) addItem(a, 'petegg', g.eggs);
   if (g.gems) a.gems = (a.gems || 0) + g.gems;
   if (g.money) credit(a, g.money);
+  if (g.outfit && D.OUTFITS[g.outfit] && !(a.outfits || []).includes(g.outfit)) { a.outfits = [...(a.outfits || []), g.outfit]; a.outfit = g.outfit; sendRoster(); }
   a.sd = true; markMe(a); send(a, { t: 'mail', list: a.mail });
-  toast(a, `รับของขวัญแล้ว:${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
+  toast(a, `รับของขวัญแล้ว:${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.outfit ? ` 🎽 ${a.gender === 'f' && D.OUTFITS[g.outfit]?.nf || D.OUTFITS[g.outfit]?.name} (ใส่ให้แล้ว)` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
+}
+// New Year 2570 gift: everyone who joined by 31 Dec 2569 (Bangkok) gets the Santa outfit by mail, once
+const SANTA_END = Date.parse('2027-01-01T00:00:00+07:00');
+function santaGift(a) {
+  if (a.santa || (a.created || 0) >= SANTA_END || !a.login || a.login === '__meta') return;
+  a.santa = 1;
+  sysMail(a, `🎄 ถึง ${a.name} ชาวเมืองที่รัก\n\nขอบคุณจากใจที่เลือกมาใช้ชีวิตอยู่ในเมืองเล็กๆ แห่งนี้ ทุกก้าวที่คุณเดิน ทุกงานที่คุณทำ ทุกคำทักทายที่คุณมอบให้เพื่อนบ้าน คือสิ่งที่ทำให้เมืองนี้มีชีวิต\n\nปีนี้เมืองของเราเติบโตขึ้นได้ก็เพราะมีคุณอยู่ด้วย เราจึงขอมอบ ชุดซานต้า ชุดพิเศษที่มีเฉพาะชาวเมืองรุ่นแรกเท่านั้น เป็นของขวัญแทนคำขอบคุณ\n\nขอให้ปีใหม่นี้ของคุณเต็มไปด้วยรอยยิ้ม ความสุข และเรื่องดีๆ ทั้งในเมืองนี้และในชีวิตจริง แล้วมาสร้างความทรงจำด้วยกันต่อนะ ❤️\n\nสวัสดีปีใหม่ 2570 🎁\nด้วยรัก จากทีมงานเมืองชีวิตนี้เลือกได้`, { outfit: 'santa' });
 }
 // a mystery egg: hatches into a pet you do not have yet (rarer ones less often)
 function hatchEgg(a) {
@@ -781,7 +789,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -806,6 +814,7 @@ async function load() {
     byPhone.set(a.phone, a);
   }
   console.log(`loaded ${accounts.size} players`);
+  for (const a of accounts.values()) santaGift(a);
 }
 function newPhone() { let p; do p = String(rint(100000, 999999)); while (byPhone.has(p)); return p; }
 function hydrate(r) {
@@ -1428,12 +1437,16 @@ function act(a, m) {
       return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย!`, '💇');
     }
     case 'fashion.outfit': {                // whole outfits: bought once, then worn / taken off from here or the settings
-      const it = D.OUTFITS[m.id]; if (!it || !it.price) return;
+      const it = D.OUTFITS[m.id]; if (!it) return;
       if ((a.outfits || []).includes(m.id)) { a.outfit = a.outfit === m.id ? '' : m.id; markMe(a); return sendRoster(); }
-      if (!pay(a, it.price)) return;
+      if (!it.price && !it.gems) return;
+      if (it.g && it.g !== a.gender) return toast(a, `ชุดนี้สำหรับ${it.g === 'f' ? 'ผู้หญิง' : 'ผู้ชาย'}เท่านั้น`, '👗', false);
+      const nm = a.gender === 'f' && it.nf ? it.nf : it.name;
+      if (it.gems) { if (!godInf(a) && (a.gems || 0) < it.gems) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${it.gems}`, '💎', false); if (!godInf(a)) a.gems -= it.gems; }
+      else if (!pay(a, it.price)) return;
       a.outfits = [...(a.outfits || []), m.id]; a.outfit = m.id; joy(a, 15); markMe(a); sendRoster();
-      if (it.price >= 250000) feed(`👗 ${a.name} ถอย${it.name}มาใส่ ราคา ${money(it.price)}!`);
-      return toast(a, `ซื้อ${it.name}แล้ว ใส่ให้เลย! (ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า หรือที่ร้านนี้)`, '👗');
+      if (it.price >= 250000 || it.gems) feed(`👗 ${a.name} ถอย${nm}มาใส่ ${it.gems ? `💎${it.gems}` : `ราคา ${money(it.price)}`}!`);
+      return toast(a, `ซื้อ${nm}แล้ว ใส่ให้เลย! (ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า หรือที่ร้านนี้)`, '👗');
     }
     // ---------------- office
     case 'trash.run': case 'trash.dig': {   // beggars: an endless run through the street picking up rubbish (played on the client)
@@ -3315,7 +3328,7 @@ function login(ws, m, pre) {
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
     accounts.set(lname, a); isNew = true;
   }
-  Q.ensure(a);
+  Q.ensure(a); santaGift(a);
   if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) { a.career = 'none'; a.cook = null; setTimeout(() => a.ws === ws && toast(a, 'อาชีพเชฟปิดแล้ว คุณกลับมาว่างงาน เลือกอาชีพใหม่ได้เลย · ที่ครัวใหญ่มีเกมหั่นผักผลไม้ให้ทุกคนเล่นหาเงินแทน 🔪', '🍳'), 4000); }
   const daily = dailyLogin(a);
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
