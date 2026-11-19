@@ -307,6 +307,37 @@ function loadTick() {
   if (!cur && me) return setTimeout(() => loadScr(false), 250);
   setTimeout(loadTick, 120);
 }
+// ---- 💰 Google AdSense H5 Games Ads: off unless the server sends G.ads (the owner sets the Fly secret ADSENSE_CLIENT)
+// Rewarded: the player opens it from the phone, sees the reward first and chooses to watch. Full screen: only between places
+// (going into the temple or the park), never in the first 3 minutes, at most once every 6 minutes.
+const ADS = { ready: false, lastFull: 0, t0: 0 };
+function adsInit() {
+  if (ADS.ready || !G?.ads?.client) return; ADS.ready = true; ADS.t0 = Date.now();
+  window.adsbygoogle = window.adsbygoogle || []; window.adBreak = window.adConfig = o => window.adsbygoogle.push(o);
+  if (document.querySelector('script[src*="adsbygoogle.js"]')) { adConfig({ preloadAdBreaks: 'on', sound: 'on' }); return; }   // the server already put it in the page head
+  const sc = document.createElement('script'); sc.async = true; sc.crossOrigin = 'anonymous';
+  sc.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(G.ads.client);
+  sc.setAttribute('data-ad-client', G.ads.client); sc.setAttribute('data-ad-frequency-hint', '360s'); if (G.ads.test) sc.setAttribute('data-adbreak-test', 'on');
+  document.head.appendChild(sc);
+  adConfig({ preloadAdBreaks: 'on', sound: 'on' });
+}
+const adPause = () => { try { FX.ctx()?.suspend(); } catch { } }, adResume = () => { try { FX.ctx()?.resume(); } catch { } };
+function adReward() {
+  if (!G?.ads || !window.adBreak) return toast('ยังไม่เปิดระบบโฆษณา', '🎁', false);
+  if (!(me?.adLeft > 0)) return toast(`วันนี้ดูโฆษณารับรางวัลครบ ${G.ads.daily} ครั้งแล้ว พรุ่งนี้มาใหม่นะ`, '🎁', false);
+  let asked = false;
+  adBreak({ type: 'reward', name: 'reward_gems', beforeAd: adPause, afterAd: adResume,
+    beforeReward: showAdFn => { asked = true; popup(`🎁 <b>ดูโฆษณาสั้นๆ จนจบ</b> รับ 💎${G.ads.gems} และพลังงาน +${G.ads.energy}<br><small>วันนี้เหลือ ${me.adLeft}/${G.ads.daily} ครั้ง · ปิดก่อนจบจะไม่ได้รางวัล</small>`, [['▶️ ดูโฆษณา', 'good', () => showAdFn()], ['ไม่ดู', '', () => { }]], 30000); },
+    adDismissed: () => toast('ปิดโฆษณาก่อนจบ เลยยังไม่ได้รางวัลนะ', '🎁', false),
+    adViewed: () => send({ t: 'adreward' }),
+    adBreakDone: () => { if (!asked) toast('ตอนนี้ยังไม่มีโฆษณาให้ดู ลองใหม่อีกสักพักนะ', '🎁', false); } });
+  closePanel();
+}
+function adFull(name) {
+  if (!G?.ads || !ADS.ready || !window.adBreak || Date.now() - ADS.t0 < 180000 || Date.now() - ADS.lastFull < 360000) return;
+  ADS.lastFull = Date.now();
+  adBreak({ type: 'next', name, beforeAd: adPause, afterAd: adResume });
+}
 function loginBusy(on) {
   if (on) loadScr(true); else if (!G) loadScr(false);
   const b = $('#loginGo'), c = $('#createOk'); clearTimeout(busyT);
@@ -408,7 +439,7 @@ function handle(m) {
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
-      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
+      G = m; myId = m.id; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
@@ -452,7 +483,7 @@ function handle(m) {
         else { s.ox = s.oy = 0; }
         s.x = s.rx = m.x; s.y = s.ry = m.y; lastSent = '';
       }
-      if (m.tp) { closePanel(); FX.play('whoosh'); holdAfterTp = true; fadeT = performance.now(); }
+      if (m.tp) { setTimeout(() => { const s1 = P.get(myId), id = s1 && areaOf(s1.x, s1.y)?.id; if (id === 'temple' || id === 'park') adFull('enter_' + id); }, 1500); closePanel(); FX.play('whoosh'); holdAfterTp = true; fadeT = performance.now(); }
       break;
     }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
@@ -4457,7 +4488,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
@@ -4470,7 +4501,7 @@ function phonePanel(p) {
   if (tab === 'home') {
     const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
     const apps = PH_APPS.map(([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`).join('')
-      + PH_MORE.filter(a => !a[3] || me.admin).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
+      + PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads)).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
     return `<div class="phone"><div class="phScr home">${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
@@ -5677,6 +5708,7 @@ function jgFinish(g) {
   bindPanel($('#mgBody'));
 }
 FN.gLink = gLinkOpen;
+FN.adReward = () => adReward();
 FN.confirmSell = m => popup('💰 ขายบ้านคืนโครงการ? เฟอร์นิเจอร์และสวนจะหายไปด้วย (ได้เงินคืนบางส่วน)', [['ขายเลย', 'warn', () => send({ t: 'act', st: m.st, a: 'sell' })], ['ยกเลิก', '', () => { }]]);
 FN.jgGo = m => send({ t: 'jg', op: 'start', k: m.k });
 FN.jgClose = () => { jgStop(true); mgClose(); };
