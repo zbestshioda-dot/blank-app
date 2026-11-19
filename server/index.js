@@ -529,17 +529,37 @@ function ideaOp(a, m) {
   gdirty(); ideaView(a, m.sort);
 }
 // ------------------------------------------------------------------ leaderboard rivals
-// Phantom rich folk who only exist on the leaderboard. Each one shadows a real player's rank and keeps
-// creeping up to sit a few percent above them, so there is always someone to beat (and to overtake again).
+// Phantom rich folk who only exist on the leaderboard. Each one shadows a real player's rank like a rival with moods:
+//  chase - creeps up (over a day or so, never in one jump) until it sits a few percent above that player
+//  lead  - stays just ahead, following the player's growth
+//  rest  - once the player overtakes it, it lets them enjoy the lead for 2-3 days (grows only a little), then chases again
+// Ghosts never lose money (that would look fake), and each one's rest length is random so they don't all wake together.
 let ghosts = [];
 const GHOST = [['เสี่ยต่อ', 'merchant', 0, .035], ['คุณนายเพ็ญ', 'doctor', 1, .05], ['ลุงสมบัติ', 'farmer', 2, .03], ['เจ๊หงส์', 'merchant', 4, .06], ['พี่บิ๊กไรเดอร์', 'rider', 6, .04], ['หมอโอ๊ต', 'doctor', 9, .05]];
+const GH = { tick: 5 * 60e3, restMin: 48 * 3600e3, restMax: 72 * 3600e3, restGrow: .02, chase: .012, follow: .04, lazy: .3 };
 function ghostTick() {
   const R = [...accounts.values()].filter(a => !isAdmin(a)).map(a => worth(a)).sort((x, y) => y - x);
-  const want = g => R[g.k] !== undefined ? R[g.k] * (1 + g.m) : (R[R.length - 1] ?? 20000) * (.92 - g.k * .04);   // few players: the extra rivals sit below everyone
+  const real = g => R[g.k];
+  const want = g => real(g) !== undefined ? real(g) * (1 + g.m) : (R[R.length - 1] ?? 20000) * (.92 - g.k * .04);   // few players: the extra rivals sit below everyone
   if (ghosts.length !== GHOST.length) ghosts = GHOST.map(([n, c, k, m], i) => ({ n, c, k, m, w: ghosts[i]?.w || Math.max(3000, want({ k, m })) }));
+  const t = now(), perTick = r => Math.pow(1 + r, GH.tick / 86400e3) - 1;   // a daily rate spread over the 5-minute ticks
   for (const g of ghosts) {
-    const tgt = Math.max(3000, want(g));
-    g.w += g.w < tgt ? (tgt - g.w) * .12 : -(g.w - tgt) * .02;   // catch up fast, fall back slowly
+    g.st = g.st || 'chase';
+    const tgt = Math.max(3000, want(g)), p = real(g);
+    if (p !== undefined && g.w > p) g.ahead = 1;
+    if (p !== undefined && p > g.w && g.ahead && g.st !== 'rest') {   // the player just overtook: let them have it for a while
+      g.st = 'rest'; g.ahead = 0; g.until = t + GH.restMin + Math.random() * (GH.restMax - GH.restMin);
+    }
+    if (g.st === 'rest') {
+      g.w *= 1 + perTick(GH.restGrow);
+      if (t >= g.until) { if (Math.random() < GH.lazy) g.until = t + 24 * 3600e3; else g.st = 'chase'; }   // sometimes it stays lazy one more day
+    } else if (g.st === 'chase') {
+      if (g.w < tgt) g.w += Math.max((tgt - g.w) * GH.chase, g.w * perTick(.05));
+      if (g.w >= tgt * .995) g.st = 'lead';
+    } else {                                                        // lead: keep a nose ahead, never pull away
+      if (g.w < tgt) g.w += (tgt - g.w) * GH.follow;
+      else g.w *= 1 + perTick(.01);
+    }
   }
   gdirty();
 }
