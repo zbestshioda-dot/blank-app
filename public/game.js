@@ -546,6 +546,8 @@ function handle(m) {
       if (panel?.kind === 'chat') refreshPanel(true);
       break;
     }
+    case 'ledger': ledgerRes = m; if (panel?.kind === 'ledger') refreshPanel(true); break;
+    case 'godfind': godFindRes = m; if (panel?.kind === 'god') refreshPanel(true); break;
     case 'quiz': {                                  // classroom pop quiz
       document.querySelectorAll('.req.quiz').forEach(e => e.remove()); if (m.end) break;
       const d = popup(`${m.teacher ? '👩‍🏫 <b>อาจารย์เรียกตอบ!</b>' : '📝 <b>ควิซประจำคาบ</b>'} <small>(${m.sec} วินาที)</small><br>${esc(m.q)}`, m.o.map((txt, i) => [txt, 'good', () => send({ t: 'quizans', i })]), m.sec * 1000);
@@ -1561,6 +1563,15 @@ function drawSoilCrop(e, X, Y, t) {
     if (st === 4) { ctx.font = `${Math.round(TS * .5)}px serif`; ctx.textAlign = 'center'; ctx.fillText(it.icon, px + sway, by - TS * .32 + Math.sin(t / 260 + e[1] * 4) * 1.5); }
   }
   }
+  {                                             // countdown under the crop: time left (or ready) with a thin progress bar
+    const bw = TS * .8, bx = px - bw / 2, ty = py + TS * .5;
+    const lbl = left <= 0 ? 'เก็บได้!' : left >= 3600e3 ? `${Math.floor(left / 3600e3)}ชม.${Math.floor(left % 3600e3 / 60000)}น.` : `${Math.floor(left / 60000)}:${String(Math.floor(left % 60000 / 1000)).padStart(2, '0')}`;
+    ctx.font = `700 ${Math.max(9, Math.round(TS * .2))}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const tw = ctx.measureText(lbl).width + 8;
+    ctx.fillStyle = left <= 0 ? 'rgba(40,120,30,.9)' : 'rgba(20,14,8,.72)'; ctx.fillRect(px - tw / 2, ty - TS * .13, tw, TS * .26);
+    if (left > 0) { ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, ty + TS * .13, bw, 3); ctx.fillStyle = w === 0 ? '#ffb347' : '#6fdc6f'; ctx.fillRect(bx, ty + TS * .13, bw * prog, 3); }
+    ctx.fillStyle = '#fff'; ctx.fillText(lbl, px, ty + 1); ctx.textBaseline = 'alphabetic';
+  }
   if (left > 0 && w === 0) {                    // dry: a little water drop asks to be watered
     const bob = Math.sin(t / 300 + e[1]) * 2; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(px + TS * .3, py - TS * .32 + bob, TS * .14, 0, 7); ctx.fill();
     ctx.font = `${Math.round(TS * .2)}px serif`; ctx.textAlign = 'center'; ctx.fillText('💧', px + TS * .3, py - TS * .25 + bob);
@@ -2155,6 +2166,13 @@ const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#
 let ZB = null, zbImg = null, ZN = { ph: 'off' }, zDecals = [];
 fetch('assets/zombie.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { ZB = j; zbImg = im; }; im.src = 'assets/zombie.webp?v=1'; }).catch(() => {});
 const zDecalImg = new Image(); zDecalImg.src = 'assets/zdecal.webp?v=1';
+const zSilC = {};
+function zSil(row, col) {   // a solid red copy of one zombie frame (cached) for the outline
+  const key = row * 16 + col; if (zSilC[key]) return zSilC[key];
+  const c = document.createElement('canvas'); c.width = ZB.w; c.height = ZB.h; const g = c.getContext('2d');
+  g.drawImage(zbImg, col * ZB.w, row * ZB.h, ZB.w, ZB.h, 0, 0, ZB.w, ZB.h); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#ff2a2a'; g.fillRect(0, 0, ZB.w, ZB.h);
+  return (zSilC[key] = c);
+}
 function drawZombie(p, X, Y, t) {
   const px = Math.round(p.rx * TS + X), py = Math.round(p.ry * TS + Y + TS * .32);
   if (px < -120 || py < -160 || px > VW + 120 || py > VH + 160) return;
@@ -2165,8 +2183,12 @@ function drawZombie(p, X, Y, t) {
   ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (p.zb === 'brute' ? .5 : .32), TS * .12, 0, 0, 7); ctx.fill();
   if (!zbImg) { ctx.font = `${Math.round(TS * .9)}px serif`; ctx.textAlign = 'center'; ctx.fillText('🧟', px, py - TS * .3); return; }
   const k = TS * 1.55 / 96, w = ZB.w * k, h = ZB.h * k, row = ZB.rows[p.zb] || 0;
+  const pul = .75 + Math.sin(t / 180) * .25;             // a pulsing red ring on the ground so they stand out in the dark
+  ctx.strokeStyle = `rgba(255,40,40,${.55 * pul})`; ctx.lineWidth = Math.max(2, TS * .06); ctx.beginPath(); ctx.ellipse(px, py, TS * (p.zb === 'brute' ? .62 : .44), TS * .17, 0, 0, 7); ctx.stroke();
+  const sil = zSil(row, col), o = Math.max(3, Math.round(TS * .075));
   ctx.save(); ctx.translate(px, py);
   if (dir === 'left') ctx.scale(-1, 1);
+  if (sil) { ctx.globalAlpha = pul; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, -o], [-o, o], [o, o]]) ctx.drawImage(sil, -ZB.feet[0] * k + dx, -ZB.feet[1] * k + dy, w, h); ctx.globalAlpha = 1; }   // thick red outline
   ctx.drawImage(zbImg, col * ZB.w, row * ZB.h, ZB.w, ZB.h, -ZB.feet[0] * k, -ZB.feet[1] * k, w, h);
   ctx.restore();
 }
@@ -2188,10 +2210,10 @@ function drawZDecals(X, Y, t, A) {
 }
 function drawZTint(t) {
   if (ZN.ph !== 'on' && ZN.ph !== 'warn') return;
-  const a = ZN.ph === 'on' ? .34 : .14 + Math.sin(t / 250) * .05;
+  const a = ZN.ph === 'on' ? .16 : .1 + Math.sin(t / 250) * .04;   // light, so you can still see where you run
   ctx.fillStyle = `rgba(14,48,26,${a})`; ctx.fillRect(0, 0, VW, VH);
-  const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .3, VW / 2, VH / 2, Math.max(VW, VH) * .75);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, ZN.ph === 'warn' ? `rgba(120,0,0,${.35 + Math.sin(t / 250) * .15})` : 'rgba(0,10,4,.6)');
+  const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .45, VW / 2, VH / 2, Math.max(VW, VH) * .75);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, ZN.ph === 'warn' ? `rgba(120,0,0,${.28 + Math.sin(t / 250) * .1})` : 'rgba(0,10,4,.38)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
 }
 const zIcon = (i, sz) => `<i class="zic" style="width:${sz}px;height:${sz}px;background-size:${sz * 9}px ${sz}px;background-position:-${i * sz}px 0"></i>`;
@@ -2203,11 +2225,12 @@ function znHud() {
   if (ZN.ph === 'warn') { title = `ซอมบี้บุกใน ${mm}`; sub = me && roomOf(me.x, me.y) ? '⚠️ ออกจากอาคารด่วน! อยู่ข้างในจะโดนรุม' : 'อยู่นอกอาคาร เตรียมวิ่งหนี!'; }
   else { title = `เอาตัวรอดอีก ${mm}`; sub = ZN.me === 'alive' ? `ระลอก ${ZN.wave || 1} · ผู้รอด ${ZN.alive} คน · ห้ามให้ซอมบี้ถึงตัว!` : ZN.me === 'dead' ? `คุณสลบแล้ว · ผู้รอด ${ZN.alive} คน` : `ดูอยู่ข้างสนาม · ผู้รอด ${ZN.alive} คน`; }
   el.classList.remove('hidden'); el.classList.toggle('warn', ZN.ph === 'warn'); el.classList.toggle('dead', ZN.me === 'dead');
-  el.innerHTML = `${zIcon(ZN.ph === 'warn' ? 0 : ZN.me === 'dead' ? 6 : 1, 34)}<div><b>${title}</b><small>${sub}</small></div>`;
+  el.innerHTML = `${zIcon(ZN.ph === 'warn' ? 0 : ZN.me === 'dead' ? 6 : 1, 24)}<div><b>${title}</b><small>${sub}</small></div>`;
 }
 setInterval(znHud, 250);
 function znCard(html, cls, ms) {
   const d = document.createElement('div'); d.className = 'znCard ' + (cls || ''); d.innerHTML = html; document.body.appendChild(d);
+  if (ZN.ph === 'on' || ZN.ph === 'warn') ms = Math.min(ms, 2600);   // short while you need to run
   d.onclick = () => d.remove(); setTimeout(() => d.classList.add('out'), ms); setTimeout(() => d.remove(), ms + 600);
 }
 function znMsg(m) {
@@ -2215,12 +2238,12 @@ function znMsg(m) {
     const was = ZN.ph;
     if (m.ph === 'end') {
       ZN = { ph: 'off' }; znHud(); FX.play(m.won ? 'levelup' : 'chime');
-      znCard(`${zIcon(m.won ? 8 : 2, 84)}<b>${m.won ? 'คุณรอดชีวิต!' : 'ฟ้าสางแล้ว'}</b><p>${m.won ? 'รางวัลผู้รอดชีวิตส่งไปที่กล่องจดหมาย ✉️ แล้ว' : `คืนนี้มีผู้รอด ${m.n} คน · เดือนหน้าลองใหม่นะ`}</p>`, m.won ? 'win' : '', 5000);
+      znCard(`${zIcon(m.won ? 8 : 2, 40)}<b>${m.won ? 'คุณรอดชีวิต!' : 'ฟ้าสางแล้ว'}</b><p>${m.won ? 'รางวัลผู้รอดชีวิตส่งไปที่กล่องจดหมาย ✉️ แล้ว' : `คืนนี้มีผู้รอด ${m.n} คน · เดือนหน้าลองใหม่นะ`}</p>`, m.won ? 'win' : '', 5000);
       return;
     }
     ZN = { ...m, endT: performance.now() + Math.max(0, m.end - (Date.now() + clockOff)) };
     if (m.ph === 'warn' && was !== 'warn') { FX.play('alarm'); znCard(`<img src="assets/zbanner.webp?v=1" alt=""><b>คืนปล่อยผี!</b><p>ซอมบี้กำลังบุกเมือง ออกจากอาคารให้ทัน แล้วเอาตัวรอดให้ได้</p>`, 'banner', 4500); }
-    if (m.ph === 'on' && was === 'warn' && m.me === 'alive') znCard(`${zIcon(1, 70)}<b>พวกมันมาแล้ว!</b><p>วิ่งหนี อย่าให้ซอมบี้เข้าใกล้ · ห้ามเข้าอาคาร</p>`, '', 2600);
+    if (m.ph === 'on' && was === 'warn' && m.me === 'alive') znCard(`${zIcon(1, 40)}<b>พวกมันมาแล้ว!</b><p>วิ่งหนี อย่าให้ซอมบี้เข้าใกล้ · ห้ามเข้าอาคาร</p>`, '', 2600);
     znHud();
   } else if (m.t === 'zspawn') {
     const t0 = performance.now();
@@ -2228,7 +2251,7 @@ function znMsg(m) {
   } else if (m.t === 'zdie') {
     FX.play('zbite');
     if (m.why === 'in') znCard(`<img src="assets/zoverrun.webp?v=1" alt=""><b>ซอมบี้ทะลักเข้ามาในอาคาร!</b><p>คุณโดนรุมจนสลบ ฟื้นขึ้นมาที่จัตุรัส</p>`, 'overrun', 4200);
-    else znCard(`${zIcon(6, 80)}<b>โดนกัด!</b><p>คุณสลบไป ฟื้นขึ้นมาที่จัตุรัส · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600);
+    else znCard(`${zIcon(6, 40)}<b>โดนกัด!</b><p>คุณสลบไป ฟื้นขึ้นมาที่จัตุรัส · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600);
   }
 }
 function drawPlayer(p, X, Y, t) {
@@ -3169,12 +3192,14 @@ function refreshPanel(force) {
   if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.id}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
   if (!force && html === panelSig) return;
   const ae = document.activeElement;
-  if (!force && ae && ae.tagName === 'INPUT' && $('#panelBody').contains(ae)) { if (panel.kind === 'chat') { const box = $('#chatMsgs'); if (box) box.innerHTML = chatHtml(); } return; }
+  if (!force && ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && $('#panelBody').contains(ae)) { if (panel.kind === 'chat') { const box = $('#chatMsgs'); if (box) box.innerHTML = chatHtml(); } return; }
   panelSig = html;
   const body = $('#panelBody'); const keep = ae && body.contains(ae) && ae.id ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
   const scroll = body.parentElement.scrollTop;
   const keepSc = [...body.querySelectorAll('*')].filter(e => e.scrollTop > 0 || e.scrollLeft > 0).map(e => { const k = scKey(e); return [k, [...body.querySelectorAll(k)].indexOf(e), e.scrollTop, e.scrollLeft]; });
+  const drafts = [...body.querySelectorAll('input[id]:not([type=checkbox]):not([type=range]),textarea[id]')].filter(e => e.value).map(e => [e.id, e.value]);   // typed text survives a refresh (mobile keyboard closed = not focused)
   body.innerHTML = html; bindPanel(body); body.parentElement.scrollTop = scroll;
+  for (const [id, v] of drafts) { const n = document.getElementById(id); if (n && !n.value && (n.tagName === 'TEXTAREA' || n.type === 'text' || !n.type || n.type === 'search')) n.value = v; }
   for (const [k, i, t, l] of keepSc) { const e = body.querySelectorAll(k)[i]; if (e) { e.scrollTop = t; e.scrollLeft = l; } }
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch { } } }
   for (const id of ['chatMsgs', 'callMsgs']) { const cm = document.getElementById(id); if (cm) cm.scrollTop = cm.scrollHeight; }
@@ -3310,6 +3335,16 @@ const FN = {
   },
   god(m) { send({ t: 'god', op: m.op }); },
   godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0) && m.op !== 'setmoney') return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: m.op || 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
+  openLedger() { ledgerRes = null; send({ t: 'ledger' }); openPanel({ kind: 'ledger' }); },
+  godLedger(m) { ledgerRes = null; send({ t: 'god', op: 'ledger', login: m.login }); openPanel({ kind: 'ledger', admin: 1 }); },
+  rename() {
+    const nm = prompt('ชื่อใหม่ (2–16 ตัวอักษร)\nบัตรเปลี่ยนชื่อใช้ 💎10', me.name || ''); if (nm == null) return;
+    if (nm.trim() === me.name) return;
+    if (!confirm(`เปลี่ยนชื่อเป็น "${nm.trim()}"\nใช้ 💎10 (มี 💎${me.gemInf ? '∞' : me.gems || 0}) ยืนยันไหม?`)) return;
+    send({ t: 'rename', name: nm });
+  },
+  godFind(m, root) { send({ t: 'god', op: 'find', q: root.querySelector('#godFind')?.value || '' }); },
+  godPin(m, root) { const pin = root.querySelector('#godPin_' + m.login)?.value || ''; if (!confirm(`ตั้ง PIN ใหม่ให้ ${m.login} เป็น ${pin}?`)) return; send({ t: 'god', op: 'setpin', login: m.login, pin }); },
   godName(m, root) { send({ t: 'god', op: 'rename', name: root.querySelector('#godName')?.value || '' }); },
 };
 let bugList = null;
@@ -3699,6 +3734,34 @@ function frameHtml(id, sz, fit = true) {
   if (fit && FRAMES_AT.hr?.[id]) { sz = Math.round(sz * 1.18); ps = Math.max(80, Math.min(100, Math.round(2 * FRAMES_AT.hr[id] * sz / (sz0 / 1.62) * 1.06 * 50) * 2)); }
   return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz0}" data-ps="${ps}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
 }
+let godFindRes = null, ledgerRes = null;
+function ledgerHtml(p) {
+  const back = p.admin ? B('‹ กลับ', { fn: 'open', kind: 'god' }) + ' ' : '';
+  if (!ledgerRes) return `<h2>${back}💸 ประวัติการเงิน</h2><div class="sub">กำลังโหลด…</div>`;
+  const L = (ledgerRes.list || []).slice().reverse(), dayOf = t => new Date(t).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+  const today = dayOf(Date.now() + clockOff), td = L.filter(e => dayOf(e[0]) === today);
+  const inc = td.filter(e => e[1] > 0).reduce((s, e) => s + e[1], 0), out = td.filter(e => e[1] < 0).reduce((s, e) => s - e[1], 0);
+  const cats = {}; for (const e of td) if (e[1] < 0) cats[e[2]] = (cats[e[2]] || 0) - e[1];
+  const top = Object.entries(cats).sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, v]) => `${esc(k)} ${money(v)}`).join(' · ');
+  let cur = '', rows = '';
+  for (const e of L) {
+    const d = dayOf(e[0]); if (d !== cur) { cur = d; rows += `<div class="secT">${d === today ? 'วันนี้' : d}</div>`; }
+    const tm = new Date(e[0]).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    rows += `<div class="item"><div class="nm">${esc(e[2])}<small>${tm} · คงเหลือ ${money(e[3])}</small></div><b style="color:${e[1] > 0 ? 'var(--good)' : 'var(--bad)'};white-space:nowrap">${e[1] > 0 ? '+' : '−'}${money(Math.abs(e[1]))}</b></div>`;
+  }
+  return `<h2>${back}💸 ประวัติการเงิน${ledgerRes.who ? ` · ${esc(ledgerRes.who)}` : ''}</h2>
+    <div class="grid2"><div class="item"><div class="nm">📈 รายรับวันนี้<small style="color:var(--good)">+${money(inc)}</small></div></div><div class="item"><div class="nm">📉 รายจ่ายวันนี้<small style="color:var(--bad)">−${money(out)}</small></div></div></div>
+    ${top ? `<div class="sub">จ่ายมากสุดวันนี้: ${top}</div>` : ''}<div class="sub">เก็บ 150 รายการล่าสุด · รายการเดียวกันที่ติดกันในเวลาใกล้กันจะรวมเป็นบรรทัดเดียว</div>
+    <div class="list">${rows || '<div class="sub">ยังไม่มีรายการ (เริ่มบันทึกตั้งแต่อัปเดตนี้)</div>'}</div>`;
+}
+function godFindHtml() {
+  if (!godFindRes) return '';
+  if (!godFindRes.list.length) return `<div class="sub">ไม่พบผู้เล่นที่ตรงกับ "${esc(godFindRes.q)}"</div>`;
+  const d = t => t ? new Date(t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
+    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
+    <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>${B('💸 ดูประวัติการเงิน', { fn: 'godLedger', login: x.login })}</div>`).join('')}</div>`;
+}
 function econHtml() {   // today's pump board and the economy mood (stats panel)
   const e = me.econ; if (!e) return '';
   const d = e.next - e.litre, arr = Math.abs(d) < .05 ? 'ทรงตัว' : d > 0 ? `ขึ้น ${d.toFixed(2)} ฿` : `ลง ${(-d).toFixed(2)} ฿`;
@@ -3903,6 +3966,24 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19m', d: '19 พ.ย. (รอบ 56)', items: [
+    '💸 <b>ประวัติการเงิน</b> แอพใหม่ในมือถือ ดูได้ว่าเงินเข้า-ออกจากอะไร รายรับ/รายจ่ายวันนี้ และจ่ายอะไรมากสุด',
+    '✏️ <b>บัตรเปลี่ยนชื่อ 💎10</b> กด "แก้ไขชื่อ" ที่หน้าข้อมูลผู้เล่น',
+    '📜 แก้เควสต์รายสัปดาห์ที่ค้าง: เควสต์ของอาชีพเก่าเปลี่ยนเป็นเควสต์ที่ทำได้ · เควสต์ทำอาหาร 26 จาน ลดเหลือ 10 จาน (ความคืบหน้าและรางวัลเท่าเดิม)',
+  ] },
+  { v: '2026-11-19l', d: '19 พ.ย. (รอบ 55)', items: [
+    '🍳 <b>ครัวใหญ่ทำอาหารได้แล้ว ใครก็ทำได้</b> รับออเดอร์ เดินไปตู้วัตถุดิบ เขียง กระทะ หม้อ เตาย่าง แล้วจัดจานเสิร์ฟ (หั่นผักผลไม้ยังเล่นได้เหมือนเดิม) · มีเควสต์ทำอาหารให้ทุกคน',
+    '🧾 <b>ค่าจ้างบอกยอดเข้ากระเป๋าจริง</b> ถ้ามีหักภาษีหรือผ่อนเงินกู้อัตโนมัติ จะบอกว่าหักไปเท่าไร',
+    '🧟 <b>คืนปล่อยผีสู้กันในเมือง</b> สวนสนุก หมู่บ้านจัดสรร และวัด ปิดชั่วคราว ใครอยู่ข้างในจะถูกพากลับเข้าเมือง',
+    '💡 แก้บัค: พิมพ์ไอเดียแล้วข้อความหายก่อนกดโพสต์',
+    '📱 <b>อัปเดตและบทช่วยสอนย้ายไปอยู่ในมือถือ</b>',
+  ] },
+  { v: '2026-11-19k', d: '19 พ.ย. (รอบ 54)', items: [
+    '🧟 <b>ซอมบี้มีขอบแดงชัดๆ</b> และวงแดงกระพริบที่พื้น มองเห็นง่ายในที่มืด',
+    '👀 <b>คืนปล่อยผีมองเห็นชัดขึ้น</b> จอมืดน้อยลง ป้ายแจ้งเตือนเล็กลง อยู่ด้านบน ไม่บังทางวิ่ง',
+    '⏱️ <b>พืชในสวนมีเวลานับถอยหลัง</b> ใต้ต้น พร้อมแถบความคืบหน้า ขึ้นว่า "เก็บได้!" เมื่อโตเต็มที่',
+    '🎒 <b>กระเป๋าจัดหมวดหมู่</b> แยกแท็บ ของ / ชุด & เบ็ด / ข้อมูล และแยกหมวด กิน/ใช้ · ปลา · ผลผลิต · ของอื่น',
+  ] },
   { v: '2026-11-19j', d: '19 พ.ย. (รอบ 53)', items: [
     '🧾 <b>ลดภาษีรายได้</b> ฿30,000 แรกต่อวันไม่เสีย ส่วนที่เกินเสียแค่ 5% เกิน ฿100,000 เสีย 10% (เดิม 10% / 20%)',
     '⛽ <b>ราคาน้ำมันขึ้นลงรายวัน</b> เหมือนปั๊มจริง ไม่เกิน ±15% และโดยรวมถูกลงกว่าเดิม ดูราคาวันนี้และพรุ่งนี้ได้ที่หน้าสถิติ',
@@ -4454,14 +4535,13 @@ function renderPanel(p) {
       return `<h2>🍜 ร้านอาหาร</h2><div class="sub">${hoursTxt('restaurant')} · <b>ซื้อตุนใส่กระเป๋า</b>ไว้กินทีหลังได้ (กดใช้ในกระเป๋า 🎒) · สั่งให้มาส่งได้ผ่านแอพในมือถือ 📱 · ของราคาถูกอาจทำให้🤢อาหารเป็นพิษ</div>${pick}<div class="list">${rows}</div>`;
     }
     case 'kitchen': {
-      if (true) return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ครัวรับคนช่วยหั่นผักผลไม้ ใครก็มาทำได้ ไม่ต้องสมัครงาน ได้ค่าแรงตามที่หั่นได้</div>${jgBox('slice', 'ผักผลไม้ลอยขึ้นมา ปาดนิ้วฟันให้ขาด ฟันทีเดียวหลายลูกได้คอมโบ ระวังระเบิด 💣')}`;
       const rows = G.recipes.map(r => {
         const out = G.items[r.id]; const ok = Object.entries(r.in).every(([i, q]) => (me.inv[i] || 0) >= q);
         const ing = Object.entries(r.in).map(([i, q]) => `${G.items[i].icon}${q} (มี ${me.inv[i] || 0})`).join(' + ');
         return itemRow(r.id, B(me.cook ? 'กำลังทำ...' : '🔥 รับออเดอร์ ⚡12', { t: 'act', st, a: 'cook', rid: r.id }, ok && !me.cook ? 'good' : '', !ok || !!me.cook), `${ing} · ${cookSteps(r)} · ขาย ~${money(out.base)}`);
       }).join('');
       const ings = [...new Set(G.recipes.flatMap(r => Object.keys(r.in)))].map(i => { const it = G.items[i], c = Math.ceil(it.base * 1.3); return itemRow(i, `<div class="col2">${B(`ซื้อ ${money(c)}`, { t: 'act', st, a: 'buy', item: i, qty: 1 }, '', me.money < c)}${B('x5', { t: 'act', st, a: 'buy', item: i, qty: 5 }, '', me.money < c * 5)}</div>`, `มีในกระเป๋า ${me.inv[i] || 0}`); }).join('');
-      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ปรุงอาหารขายได้แพงกว่าวัตถุดิบหลายเท่า · ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง (ถูกกว่า) หรือซื้อที่ครัวนี้ (แพงกว่า 30%)</div>${staffHint('chef')}${job('chef') ? `<h3>🍳 เมนู</h3><div class="list">${rows}</div><h3>🛒 วัตถุดิบ</h3><div class="list">${ings}</div>` : ''}`;
+      return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ใครก็มาทำได้ ไม่ต้องสมัครงาน</div><div class="secT">🔪 งานหั่นผักผลไม้ (ได้ค่าแรง)</div>${jgBox('slice', 'ผักผลไม้ลอยขึ้นมา ปาดนิ้วฟันให้ขาด ฟันทีเดียวหลายลูกได้คอมโบ ระวังระเบิด 💣')}<div class="secT">🍳 ทำอาหาร</div><div class="sub">ปรุงอาหารขายได้แพงกว่าวัตถุดิบหลายเท่า · ซื้อวัตถุดิบจากผู้เล่นที่ตลาดกลาง (ถูกกว่า) หรือซื้อที่ครัวนี้ (แพงกว่า 30%)</div><div class="sub">กดรับออเดอร์ แล้วเดินไป 🧺 ตู้วัตถุดิบ → 🔪 เขียง / 🍳 กระทะ / 🍲 หม้อ / 🔥 เตาย่าง → 🍽️ โต๊ะจัดจาน แล้วกลับมาเสิร์ฟที่เคาน์เตอร์</div><h3>🍳 เมนู</h3><div class="list">${rows}</div><h3>🛒 วัตถุดิบ</h3><div class="list">${ings}</div>`;
     }
     case 'hospital': {
       const dz = me.dz || [], price = dz.length ? 1500 + 500 * (dz.length - 1) : 800, waiting = (wd?.beds || []).filter(Boolean).length;
@@ -4591,7 +4671,15 @@ function renderPanel(p) {
         ${mine.length ? '' : '<div class="jobbox">ยังไม่มีสัตว์เลี้ยง · ไปรับเลี้ยงที่ร้านสัตว์เลี้ยง 🐾 (ถนนเหนือ) ได้เลย</div>'}`;
     }
     case 'bag': {
-      const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.egg ? B('🐣 เปิดไข่', { t: 'use', item: id }, 'primary') : it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', it.egg ? `x${q} · ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)` : `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
+      const CATS = [['all', '📦 ทั้งหมด'], ['use', '🍱 กิน/ใช้'], ['fish', '🐟 ปลา'], ['crop', '🌾 ผลผลิต'], ['goods', '🧺 ของอื่น']];
+      const catOf = id => { const it = G.items[id]; return it.eat || it.egg ? 'use' : it.kind === 'fish' ? 'fish' : it.kind === 'crop' ? 'crop' : 'goods'; };
+      const ents = Object.entries(me.inv).filter(([id, q]) => G.items[id] && q > 0), gcat = CATS.some(c => c[0] === p.gcat) ? p.gcat : 'all', gtab = ['items', 'wear', 'info'].includes(p.gtab) ? p.gtab : 'items';
+      const ord = { use: 0, fish: 1, crop: 2, goods: 3 };
+      const shown = ents.filter(([id]) => gcat === 'all' || catOf(id) === gcat).sort((a, b) => ord[catOf(a[0])] - ord[catOf(b[0])] || G.items[b[0]].base * b[1] - G.items[a[0]].base * a[1]);
+      const ctabs = `<div class="tabs ftabs">${CATS.map(([k, l]) => { const n = k === 'all' ? ents.length : ents.filter(([id]) => catOf(id) === k).length; return B(l + (n ? ` <i class="tcnt">${n}</i>` : ''), { fn: 'qtab', set: { gcat: k } }, gcat === k ? 'primary' : ''); }).join('')}</div>`;
+      const totalV = shown.reduce((s, [id, q]) => s + G.items[id].base * q, 0);
+      const gtabs = `<div class="tabs">${[['items', '🎒 ของ'], ['wear', '👕 ชุด & เบ็ด'], ['info', '📋 ข้อมูล']].map(([k, l]) => B(l, { fn: 'qtab', set: { gtab: k } }, gtab === k ? 'primary' : '')).join('')}</div>`;
+      const rows = shown.map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.egg ? B('🐣 เปิดไข่', { t: 'use', item: id }, 'primary') : it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', it.egg ? `x${q} · ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)` : `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
       const rod = G.rods[me.rodEq] ? `${G.rods[me.rodEq].icon} ${G.rods[me.rodEq].name} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
@@ -4599,7 +4687,9 @@ function renderPanel(p) {
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🎣 ตกปลา<small>${rod}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
       const job = me.career !== 'none' && G.careers[me.career]?.where;
       const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(ofName(G.outfitDefs[id]) || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
-      return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>
+      if (gtab === 'items') return `<h2>🎒 กระเป๋า</h2>${gtabs}${ctabs}<div class="sub">${shown.length} อย่าง · มูลค่าประมาณ ${money(totalV)}</div><div class="list">${rows || '<div class="sub">ไม่มีของในหมวดนี้</div>'}</div>`;
+      if (gtab === 'info') return `<h2>🎒 กระเป๋า</h2>${gtabs}<div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}`;
+      return `<h2>🎒 กระเป๋า</h2>${gtabs}
         <div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>
         <div class="secT">👕 ชุด</div>
         <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
@@ -4819,6 +4909,7 @@ function renderPanel(p) {
     case 'achv': return achvPanel();
     case 'rewards': return rewardsPanel();
     case 'ach':
+    case 'ledger': return ledgerHtml(p);
     case 'profile': {
       const ti = G.ach.find(x => x.id === me.title) || (G.lux || []).find(x => x.id === me.title), got = (me.ach || []).length;
       // changing the title or the frame opens its own page with a back button
@@ -4828,7 +4919,7 @@ function renderPanel(p) {
         <div class="list">${achRows()}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'titles' })}`;
       if (p.frames) return `<h2>${B('‹ กลับ', { fn: 'frames' })} 🖼️ กรอบรูป</h2>${frameRows()}${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'frames' })}`;
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
-        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
+        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b> ${B('✏️ แก้ไขชื่อ 💎10', { fn: 'rename' })}<div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
         <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div><div class="item"><div class="nm">🧾 ภาษีวันนี้<small>${money(me.taxT?.paid || 0)} (รายได้ ${money(me.taxT?.e || 0)})</small></div></div><div class="item"><div class="nm">⛽ ค่าน้ำมันวันนี้<small>${money(me.fuelT || 0)}</small></div></div></div>${econHtml()}<div class="sub">ภาษีรายวัน: รายได้ ฿30,000 แรกไม่เสีย · ส่วนที่เกินเสีย 5% · เกิน ฿100,000 เสีย 10%${me.econ?.taxMul < 1 ? ' · <b>วันนี้ลดครึ่งหนึ่ง</b>' : ''} · รีเซ็ตเที่ยงคืน</div>
         ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
@@ -4932,6 +5023,7 @@ function renderPanel(p) {
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
         <div class="setRow"><span><b>♾️ เงิน/เพชรไม่จำกัด</b><small>เปิดอยู่ = ซื้อได้ทุกอย่าง ปิด = กลับไปใช้เงินจริงของคุณ</small></span>${B(me.monInf ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'inf' }, me.monInf ? 'good' : '')}</div>
         <div class="secT">💰 ปรับเงินตัวเอง${me.monInf ? ' <small>(ปิดเงินไม่จำกัดก่อนจึงลด/ตั้งได้)</small>' : ''}</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="0" placeholder="จำนวนเงิน เช่น 1000000"></div><div class="grid2">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}${B('➖ ลด', { fn: 'godMoney', op: 'submoney' }, '', !!me.monInf)}${B('🎯 ตั้งเป็นจำนวนนี้', { fn: 'godMoney', op: 'setmoney' }, '', !!me.monInf)}</div>
+        <div class="secT">🔎 ค้นหาผู้เล่น</div><div class="rowf"><input id="godFind" maxlength="20" placeholder="ไอดี / ชื่อในเกม / เบอร์">${B('ค้นหา', { fn: 'godFind' }, 'primary')}</div>${godFindHtml()}
         <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
@@ -4970,8 +5062,6 @@ function renderPanel(p) {
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}
         ${G.gid ? `<div class="secT">🔑 บัญชี Google</div>${me.gmail ? `<div class="jobbox ok">✅ ผูกกับ <b>${esc(me.gmail)}</b> แล้ว · เข้าเกมด้วยปุ่ม Google ได้เลย${B('ยกเลิกการผูก', { t: 'glink', off: 1 })}</div>` : `<div class="sub">ผูกไว้แล้วเข้าเกมด้วย Google ได้ ไม่ต้องจำ ID/PIN · ย้ายเครื่องก็เข้าได้</div>${B('🔑 ผูกบัญชี Google', { fn: 'gLink' }, 'primary big')}`}` : ''}
         ${me.admin ? `<div class="secT">👑 แอดมิน</div>${B('👑 เปิด God mode', { fn: 'open', kind: 'god' }, 'primary big')}` : ''}
-        <div class="secT">🎮 อื่นๆ</div>
-        <div class="grid2">${B('📤 ชวนเพื่อน', { fn: 'share' }, 'good')}${B('🐞 แจ้งบัค', { fn: 'open', kind: 'bug' })}${B('❔ วิธีเล่น', { fn: 'open', kind: 'help' })}${B('📖 บทช่วยสอน', { fn: 'tut' })}${B('🆕 อัปเดต', { fn: 'open', kind: 'news' })}</div>
         <div class="secT" style="color:var(--bad)">♻️ รีเซ็ตตัวละคร (เริ่มใหม่)</div>
         <div class="sub">ล้างเงิน ของ บ้าน สวน งาน วุฒิ และความสำเร็จทั้งหมด เริ่มใหม่ที่จัตุรัส (ID, PIN, ชื่อ, เบอร์โทร และรายชื่อเพื่อนยังอยู่)</div>
         <div class="grid2"><input id="resetPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN ของคุณ"><input id="resetOk" placeholder='พิมพ์ "รีเซ็ต"'></div>
@@ -5037,7 +5127,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
