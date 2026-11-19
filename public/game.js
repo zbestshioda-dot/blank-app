@@ -2,6 +2,7 @@
 const TOUCH_UI = matchMedia('(pointer: coarse)').matches;
 (() => {
 const $ = s => document.querySelector(s);
+try { const rf = new URLSearchParams(location.search).get('ref'); if (rf) localStorage.setItem('ltRef', rf.toUpperCase()); } catch { }   // invite link: the code is used once this player is in the game
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
 const job = c => me?.career === c || !!me?.admin && me.god?.alljobs !== false;   // admins can do every job's work (unless switched off)
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -452,7 +453,8 @@ function handle(m) {
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       else setTimeout(() => me && checkNews(), 900);
       break;
-    case 'me': { const prev = me; me = m; if (!prev || prev.frame !== m.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
+    case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
+      const prev = me; me = m; if (!prev || prev.frame !== m.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
     case 'announce': setTicker(m.text); showTicker(); break;
     case 'wd': { if ((m.ann || '') !== tickerAnn) setTicker(m.ann); const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
     case 'roster': {
@@ -509,6 +511,8 @@ function handle(m) {
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
+    case 'hatch': { const pt = G.pets[m.id], q = P.get(myId); FX.play('pop'); if (q) { FX.burst(q.x, q.y - .6, '#fff3c4', 24); FX.sparkle(q.x, q.y - .8, '#ffe27a', 18); FX.column(q.x, q.y, m.rar >= 4 ? '#ffd34d' : '#bfe8ff'); } flashScreen(m.rar >= 4 ? '255,220,120' : '255,255,255', .3); if (pt) { const d = document.createElement('div'); d.className = 'hatchPop'; d.innerHTML = `<div><small>🐣 ไข่ฟักแล้ว!</small><canvas data-pet="${m.id}" width="120" height="120"></canvas><b>${pt.icon} ${esc(pt.name)}</b><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><small>ตั้งชื่อได้ในแอพ 🐾 สัตว์เลี้ยง · แตะเพื่อปิด</small></div>`; d.onclick = () => d.remove(); document.body.appendChild(d); try { drawPetIcon(d.querySelector('canvas'), m.id); } catch { } setTimeout(() => d.remove(), 7000); } break; }
+    case 'refcode': window.__ref = m; if (panel?.kind === 'invite') refreshPanel(true); break;
     case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
     case 'tchat': tradeChat.push(m); if (tradeChat.length > 30) tradeChat.shift(); paintTradeChat(); if (!m.mine) FX.play('pop'); break;
     case 'chat': {
@@ -3030,7 +3034,7 @@ function bindPanel(root) {
   root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
-  const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); };
+  const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); }; const mq = root.querySelector('#mqIn'); if (mq) mq.oninput = () => { panel.mq = mq.value; refreshPanel(true); };
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
@@ -3046,6 +3050,12 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  morder(m, root) { const tip = Math.floor(+root.querySelector('#tipIn')?.value || 0); panel.tip = tip; send({ t: 'morder', item: m.item, qty: m.qty, tip }); },
+  openInvite() { send({ t: 'refcode' }); openPanel({ kind: 'invite' }); },
+  refShare() { const R = window.__ref; if (!R) return; const url = location.origin + '/?ref=' + R.code, text = `มาเล่นเมืองชีวิตนี้เลือกได้ด้วยกัน! ใช้โค้ด ${R.code} รับไข่สัตว์เลี้ยงฟรี 🥚`;
+    if (navigator.share) navigator.share({ title: 'เมืองชีวิตนี้เลือกได้', text, url }).catch(() => { }); else { try { navigator.clipboard.writeText(text + ' ' + url); toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย', '📋'); } catch { prompt('คัดลอกลิงก์นี้', url); } } },
+  refCopy() { const R = window.__ref; if (!R) return; try { navigator.clipboard.writeText(R.code); toast('คัดลอกโค้ดแล้ว', '📋'); } catch { prompt('โค้ดของคุณ', R.code); } },
+  refUse(m, root) { const c = root.querySelector('#refIn')?.value || ''; if (c.trim().length < 4) return toast('กรอกโค้ดเพื่อน', '🎟️', false); send({ t: 'refuse', code: c }); },
   openIdeas() { send({ t: 'idea', op: 'list', sort: 'new' }); openPanel({ kind: 'ideas', sort: 'new' }); },
   idea(m, root) {
     if (m.op === 'del' && !confirm('ลบโพสต์นี้?')) return;
@@ -3697,6 +3707,23 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19d', d: '19 พ.ย. (รอบ 41)', items: [
+    '🏛️ <b>ระบบนายกเมือง!</b> เลือกตั้งทุก 4 สัปดาห์ (แอป 🏛️ ในมือถือ) · ลงสมัครได้ตั้งแต่ Lv.8 โหวตได้ตั้งแต่ Lv.5 · นายกได้ฉายา เงินเดือนรายวัน เลือกนโยบายเมือง และประกาศได้วันละครั้ง',
+    '🏷️ ชื่อ แก๊ง และฉายา ไม่ซ้อนกันแล้ว · ป้ายแก๊งเล็กลงเท่าฉายา',
+    '🏅 อันดับมีคู่แข่งใหม่คอยไล่แซง ใครจะขึ้นที่ 1 ต้องสู้! (แอดมินไม่อยู่ในอันดับแล้ว)',
+    '🔋 <b>พลังงาน:</b> อาหารไม่เพิ่มพลังงานแล้ว · นั่งพักไม่ฟื้นพลังงานกับเลือด · พลังงานหมดให้ไปเล่นสวนสนุกหรือนอนเตียงที่บ้าน · มี <b>»»</b> ขึ้นหลังหลอดเวลากำลังฟื้นเร็ว',
+    '🎡 <b>สวนสนุกโฉมใหม่</b> เล็กลง เดินง่าย จัดสวยขึ้น · เครื่องเล่นฟื้นพลังงานและเลือด <b>เร็วขึ้น 4 เท่า</b> · สระว่ายน้ำเดินว่ายไปมาได้ · ร้านขายของในสวนสนุก (ป๊อปคอร์น สายไหม ลูกโป่ง ตุ๊กตา ฯลฯ)',
+    '🐶 ตั้งชื่อสัตว์เลี้ยงได้ · ใส่/ถอดสายจูงได้ (ซื้อสายจูงที่ร้านสัตว์เลี้ยง)',
+    '🏠 ซื้อบ้านได้บ้านโล่ง มีเตียงให้ แต่งเองได้เต็มที่ · <b>เพื่อนกดเข้าชมบ้านได้แล้ว</b> (จากรายชื่อเพื่อน)',
+    '💡 แอปใหม่ <b>ไอเดียทำเกม</b> เสนอไอเดีย กดถูกใจ คอมเมนต์ได้ · เอาแชทออกจากมือถือแล้ว',
+    '✉️ มีซองจดหมายเด้งบนจอเวลามีจดหมายใหม่ · เปลี่ยนฉายา/กรอบรูปเปิดเป็นหน้าใหม่ กดกลับได้',
+    '✨ ชุดไทยทองคำมีออร่าแล้ว · รถหลายคันที่เคยขี่ถอยหลัง หันถูกทางแล้ว',
+    '🚁 เฮลิคอปเตอร์กู้ภัยแดงเลิกขาย · เฮลิคอปเตอร์ขาวราคา 💎10,000',
+    '🏪 <b>ตลาดกลาง:</b> NPC เลิกขายของแล้ว · สั่งของที่ผู้เล่นวางขายได้ในแอปเดลิเวอรี (แท็บ 🏪 ของจากตลาด) ไรเดอร์รับไปส่ง · ของที่วางขายครบ 2 ชั่วโมงแล้วไม่มีคนซื้อ ตลาดรับซื้อให้ในราคาตลาด',
+    '🎟️ <b>ชวนเพื่อน!</b> แชร์โค้ดของคุณ เพื่อนได้ 🥚 ไข่สัตว์เลี้ยง 1 ใบ · เมื่อเพื่อนเล่นครบ 30 นาที คุณได้ 🥚 ไข่สุ่ม + 💎10 (สูงสุด 20 คน) รับที่จดหมาย',
+    '🐣 ไข่สัตว์เลี้ยง: เปิดในกระเป๋าแล้วฟักเป็นสัตว์ที่ยังไม่มี',
+    '🐞 แก้ตัวเลขส่งงานบริษัทเป็น 0 · แก้นั่งเก้าอี้รัวๆ ปั๊มความสุข · แก้ขี่รถลงสระในสวนสนุก · ขี่รถตกปลาไม่ได้แล้ว (ลงจากรถก่อน)',
+  ] },
   { v: '2026-11-19c', d: '19 พ.ย. (รอบ 40)', items: [
     '🛕 <b>ทางเข้าวัดใหม่!</b> วัดหลังใหญ่ตั้งอยู่บนสนามหญ้าใต้บ่อน้ำในเมือง (ทางเดินหินจากถนนเส้นล่าง) เดินเข้าบันไดกลางเพื่อเข้าวัด',
     '🙏 วัดมีชีวิตขึ้น: ญาติโยมเดินไหว้พระ นกพิราบเดินจิกพื้นลาน (เดินเข้าใกล้แล้วบินหนี) ปลาคาร์ปว่ายในสระบัว ผีเสื้อบินรอบกระถางดอกไม้',
@@ -3940,6 +3967,16 @@ function checkNews() {
 }
 
 // ---- gang / club panel (phone app 🏴)
+function invitePanel() {
+  const R = window.__ref; if (!R) return '<h2>🎟️ ชวนเพื่อน</h2><div class="sub">กำลังโหลด…</div>';
+  const link = location.origin + '/?ref=' + R.code;
+  return `<h2>🎟️ ชวนเพื่อนมาเล่น</h2>
+    <div class="jobbox">โค้ดของคุณ<div style="font:800 30px/1.3 monospace;letter-spacing:5px;color:var(--acc);margin:4px 0">${R.code}</div>
+      <div class="grid2">${B('📤 แชร์ลิงก์', { fn: 'refShare' }, 'primary')}${B('📋 คัดลอกโค้ด', { fn: 'refCopy' })}</div></div>
+    <div class="sub">เพื่อนที่เข้าเกมครั้งแรกผ่านลิงก์ หรือกรอกโค้ดนี้ภายใน 3 วันแรก<br>🥚 เพื่อนได้ <b>ไข่สัตว์เลี้ยงปริศนา 1 ใบ</b><br>🎁 เมื่อเพื่อนเล่นครบ <b>${R.need || 30} นาที</b> คุณได้ <b>ไข่สัตว์เลี้ยงสุ่ม 1 ใบ + 💎${R.gems}</b> (กดรับที่จดหมาย ✉️)<br>ชวนมาแล้ว <b>${R.n}</b> คน · ได้รางวัลแล้ว <b>${Math.min(R.paid || 0, R.max || 20)}/${R.max || 20}</b> คน</div>
+    ${R.canUse ? `<div class="secT">มีโค้ดของเพื่อน?</div><div class="rowf"><input id="refIn" maxlength="8" placeholder="กรอกโค้ด 6 ตัว" style="text-transform:uppercase">${B('ใช้โค้ด', { fn: 'refUse' }, 'good')}</div>` : R.by ? '<div class="sub">✅ คุณใช้โค้ดเพื่อนไปแล้ว</div>' : ''}
+    <small style="opacity:.7;word-break:break-all">${esc(link)}</small>`;
+}
 function ideasPanel(p) {
   const I = window.__ideas, ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'เมื่อกี้' : m < 60 ? m + ' นาที' : m < 1440 ? Math.floor(m / 60) + ' ชม.' : Math.floor(m / 1440) + ' วัน'; };
   const posts = !I ? '<div class="sub">กำลังโหลด…</div>' : I.list.map(i => `<div class="item" style="display:block">
@@ -4058,14 +4095,14 @@ function renderPanel(p) {
       const match = id => { const it = G.items[id]; return (cat === 'all' || it.kind === cat) && (!q || it.name.toLowerCase().includes(q) || id.includes(q)); };
       let body = '';
       if (tab === 'buy') {
-        body = Object.entries(G.items).filter(([id, it]) => it.base < 1000 && !it.menu && match(id)).map(([id]) => {
+        body = Object.entries(G.items).filter(([id, it]) => it.base < 1000 && !it.menu && !it.egg && match(id) && ((mk[id]?.n || 0) > 0 || q)).map(([id]) => {
           const m2 = { ...(mk[id] || {}) };
           const own = (me.listings || []).filter(L => L.item === id).reduce((t, L) => t + L.qty, 0);
           const n = Math.max(0, (m2.n || 0) - own);
           const pl = n ? `<b style="color:var(--ok)">ผู้เล่น ${money(m2.best)}</b> (${n} ชิ้น)` : '<span style="opacity:.6">ไม่มีผู้เล่นวางขาย</span>';
-          return itemRow(id, `<div class="col2">${B(n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}${(G.items[id].rar || 0) >= 3 ? '' : B(`NPC ${money(m2.sell || 0)}`, { t: 'act', st, a: 'npcbuy', item: id, qty: 1 })}</div>`, `${pl}${(G.items[id].rar || 0) >= 3 ? ' · ปลาหายาก ร้าน NPC ไม่มีขาย' : ` · ร้าน NPC ${money(m2.sell || 0)}`}`);
+          return itemRow(id, `${B(n ? `ซื้อ ${money(m2.best)}` : 'ไม่มีของ', { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', !n)}`, `${pl}${(G.items[id].rar || 0) >= 3 ? ' · ปลาหายาก ร้าน NPC ไม่มีขาย' : ` · ร้าน NPC ${money(m2.sell || 0)}`}`);
         }).join('');
-        body = `<div class="sub">ซื้อจากผู้เล่นถูกที่สุดก่อนเสมอ · ร้าน NPC มีของตลอดแต่<b>แพงมาก</b></div>${search}${cats}<div class="list">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
+        body = `<div class="sub">ซื้อจากผู้เล่นที่วางขาย (ถูกที่สุดก่อนเสมอ) · ร้าน NPC เลิกขายแล้ว · สั่งให้ไรเดอร์มาส่งได้ในแอพ 📱 เดลิเวอรี</div>${search}${cats}<div class="list">${body || '<div class="sub">ไม่พบสินค้า</div>'}</div>`;
       } else if (tab === 'sell') {
         const inv = Object.entries(me.inv).filter(([id, q]) => q > 0 && match(id));
         body = inv.map(([id, q]) => {
@@ -4078,7 +4115,8 @@ function renderPanel(p) {
         body = (me.listings || []).map(L => itemRow(L.item, B('เก็บคืน', { t: 'act', st, a: 'unlist', id: L.id }, 'warn'), `${L.qty} ชิ้น · ${money(L.price)}/ชิ้น`)).join('') || '<div class="sub">ยังไม่ได้วางขายอะไร</div>';
         body = `<div class="list">${body}</div>`;
       }
-      return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')}</div>${tabs}${body}`;
+      const pick = (me.jobs || []).some(j => j.mine && j.state === 'taken' && j.src === 'market') ? `<div class="jobbox ok">🛵 มีของต้องรับไปส่ง ${B('📦 รับของจากตลาด', { t: 'act', st, a: 'pickup' }, 'primary')}</div>` : '';
+      return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')} · ของที่วางขายครบ 2 ชั่วโมงแล้วยังไม่มีคนซื้อ ตลาดจะรับซื้อให้ในราคาตลาด</div>${pick}${tabs}${body}`;
     }
     case 'pshop': {
       const rows = (G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
@@ -4249,7 +4287,7 @@ function renderPanel(p) {
         ${mine.length ? '' : '<div class="jobbox">ยังไม่มีสัตว์เลี้ยง · ไปรับเลี้ยงที่ร้านสัตว์เลี้ยง 🐾 (ถนนเหนือ) ได้เลย</div>'}`;
     }
     case 'bag': {
-      const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
+      const rows = Object.entries(me.inv).map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.egg ? B('🐣 เปิดไข่', { t: 'use', item: id }, 'primary') : it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', it.egg ? `x${q} · ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)` : `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
       const rod = G.rods[me.rodEq] ? `${G.rods[me.rodEq].icon} ${G.rods[me.rodEq].name} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
@@ -4478,7 +4516,7 @@ function renderPanel(p) {
     }
     case 'mail': {
       if (!p.read) { p.read = 1; if ((me.mailN || 0) > 0) send({ t: 'mailread' }); }
-      const rows = mailList.map(x => `<div class="mailItem ${x.read ? '' : 'new'}"><small>${x.read ? '' : '🆕 '}จาก <b>${esc(x.from)}</b> · ${new Date(x.t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</small><p>${esc(x.text)}</p>
+      const rows = mailList.map(x => `<div class="mailItem ${x.read ? '' : 'new'}"><small>${x.read ? '' : '🆕 '}จาก <b>${esc(x.from)}</b> · ${new Date(x.t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</small><p>${esc(x.text)}</p>${x.gift ? (x.got ? '<div class="sub">✅ รับของขวัญแล้ว</div>' : B(`🎁 รับของขวัญ${x.gift.eggs ? ` 🥚x${x.gift.eggs}` : ''}${x.gift.gems ? ` 💎${x.gift.gems}` : ''}`, { t: 'mailclaim', id: x.id }, 'primary')) : ''}
         <div class="rowf" style="margin-top:4px">${B('↩️ ตอบกลับ', { fn: 'mailReply', to: x.from })}${B('🗑️', { t: 'maildel', id: x.id }, 'warn')}</div></div>`).join('');
       const names = [...new Set([...(me.friends || []).map(f => f.n), ...[...P.values()].filter(x => !x.npc && x.id !== myId).map(x => x.name)])];
       return `<h2>📬 กล่องจดหมาย</h2><div class="sub">ส่งถึงผู้เล่นคนไหนก็ได้ด้วยชื่อตัวละคร แม้เขาจะออฟไลน์ เก็บได้ 50 ฉบับล่าสุด</div>
@@ -4550,6 +4588,7 @@ function renderPanel(p) {
     case 'gang': return gangPanel(p);
     case 'mayor': return mayorPanel();
     case 'ideas': return ideasPanel(p);
+    case 'invite': return invitePanel();
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => (b.fav || 0) - (a.fav || 0) || b.on - a.on);
       const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', `${f.fav ? '⭐ ' : ''}${esc(f.n)}`, f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? `<div class="col2">${B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call)}${f.home === 1 ? B('🏡 ไปเที่ยวบ้าน', { t: 'visit', p: f.p }) : f.home === 2 ? '<small>มีบ้าน · เขายังไม่ได้บันทึกเบอร์คุณ</small>' : ''}</div>` : '')).join('');
@@ -4659,10 +4698,10 @@ function riderJobs() {
     const where = j.npc ? `${AREA[j.area]?.name || ''}` : 'ลูกค้าผู้เล่น (ตำแหน่งสด)';
     let btn = '';
     if (st === 'open') btn = B(`รับออเดอร์ ⚡${Math.ceil(5 * (G.energyMul || 1))}`, { t: 'order_take', id: j.id }, 'good');
-    else if (st === 'taken') btn = `<div class="col2">${B('📍 ไปร้าน', { fn: 'guide', key: 'restaurant' }, 'good')}${B('คืน', { t: 'order_drop', id: j.id })}</div>`;
+    else if (st === 'taken') btn = `<div class="col2">${j.src === 'market' ? B('📍 ไปตลาด', { fn: 'guide', key: 'market' }, 'good') : B('📍 ไปร้าน', { fn: 'guide', key: 'restaurant' }, 'good')}${B('คืน', { t: 'order_drop', id: j.id })}</div>`;
     else btn = j.npc ? B('📍 ไปส่ง', { fn: 'guidePt', x: j.dest.x, y: j.dest.y, area: j.area, label: `ส่งให้ ${j.cust}` }, 'primary') : B('📍 ไปส่ง', { fn: 'guide', key: 'p' + j.custId }, 'primary');
-    const state = st === 'open' ? '🆕 รอไรเดอร์' : st === 'taken' ? '🏃 ไปรับที่ร้าน' : '🥡 ไปส่งลูกค้า';
-    return itemRowRaw(it.icon, `${esc(it.name)} → ${esc(j.cust)}`, `${state} · ค่าส่ง <b style="color:var(--acc)">${money(j.fee)}</b>${j.tip ? ` + ทิป ${money(j.tip)}` : ''} · ${where}`, btn);
+    const state = st === 'open' ? '🆕 รอไรเดอร์' : st === 'taken' ? (j.src === 'market' ? '🏃 ไปรับที่ตลาดกลาง' : '🏃 ไปรับที่ร้าน') : j.src === 'market' ? '📦 ไปส่งลูกค้า' : '🥡 ไปส่งลูกค้า';
+    return itemRowRaw(it.icon, `${j.src === 'market' ? '🏪 ' : ''}${esc(it.name)}${j.qty > 1 ? ' x' + j.qty : ''} → ${esc(j.cust)}`, `${state} · ค่าส่ง <b style="color:var(--acc)">${money(j.fee)}</b>${j.tip ? ` + ทิป ${money(j.tip)}` : ''} · ${where}`, btn);
   }).join('')}</div>`;
 }
 // 📱 the phone: a pixel handset with a home screen of apps; each app opens on the screen, or the matching menu
@@ -4673,12 +4712,12 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
-const PH_TITLE = { taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
+const PH_TITLE = { mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
   const dt = me?.date, clock = hhmm(hourNow());
@@ -4716,10 +4755,19 @@ function phonePanel(p) {
   } else if (tab === 'food') {
     const open = isOpen('restaurant');
     const rows = Object.entries(G.items).filter(([, it]) => it.menu).map(([id, it]) => itemRow(id, B(`สั่ง ${money(it.base)}+ส่ง`, { fn: 'order', item: id }, 'good', !open), eatText(it.eat))).join('');
-    const mine = (me.myOrders || []).map(o => itemRowRaw(G.items[o.item].icon, esc(G.items[o.item].name), o.state === 'open' ? '⏳ รอไรเดอร์รับออเดอร์' : o.state === 'taken' ? `🏃 ${esc(o.rider)} กำลังไปรับที่ร้าน` : `🛵 ${esc(o.rider)} กำลังมาส่ง`, o.state === 'open' ? B('ยกเลิก', { t: 'order_cancel', id: o.id }, 'warn') : '')).join('');
+    const mine = (me.myOrders || []).filter(o => o.src !== 'market').map(o => itemRowRaw(G.items[o.item].icon, esc(G.items[o.item].name), o.state === 'open' ? '⏳ รอไรเดอร์รับออเดอร์' : o.state === 'taken' ? `🏃 ${esc(o.rider)} กำลังไปรับที่ร้าน` : `🛵 ${esc(o.rider)} กำลังมาส่ง`, o.state === 'open' ? B('ยกเลิก', { t: 'order_cancel', id: o.id }, 'warn') : '')).join('');
     body = `<div class="sub">${open ? 'ร้านอาหารเปิดอยู่' : '🔒 ร้านอาหารปิด (07:00–23:00)'} · ค่าส่งคิดตามระยะทาง · ไรเดอร์ผู้เล่นมาส่งถึงตัว (ถ้าไม่มีไรเดอร์ ร้านส่งเองแต่ช้า)</div>
       ${mine ? `<div class="sub"><b>ออเดอร์ของฉัน</b></div><div class="list">${mine}</div>` : ''}
       <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" inputmode="numeric" min="0" max="500" value="${p.tip || 0}" style="width:90px"> ฿</div><div class="list">${rows}</div>`;
+  } else if (tab === 'mkt') {
+    const mk = wd?.mk || {}, q = (p.mq || '').trim().toLowerCase();
+    const rows = Object.entries(G.items).filter(([id, it]) => (mk[id]?.n || 0) > 0 && !it.egg && (!q || it.name.toLowerCase().includes(q))).sort((a, b) => a[1].name.localeCompare(b[1].name, 'th'))
+      .map(([id]) => itemRow(id, `<div class="col2">${B(`x1 ${money(mk[id].best)}`, { fn: 'morder', item: id, qty: 1 }, 'good', me.money < mk[id].best)}${mk[id].n > 1 ? B('x5', { fn: 'morder', item: id, qty: 5 }) : ''}</div>`, `ผู้เล่นวางขาย ${mk[id].n} ชิ้น · ถูกสุด ${money(mk[id].best)}`)).join('');
+    const mine = (me.myOrders || []).filter(o => o.src === 'market').map(o => itemRowRaw(G.items[o.item].icon, `${esc(G.items[o.item].name)} x${o.qty}`, o.state === 'open' ? '⏳ รอไรเดอร์รับออเดอร์' : o.state === 'taken' ? `🏃 ${esc(o.rider)} กำลังไปรับที่ตลาด` : `🛵 ${esc(o.rider)} กำลังมาส่ง`, o.state === 'open' ? B('ยกเลิก', { t: 'order_cancel', id: o.id }, 'warn') : '')).join('');
+    body = `<div class="sub">🏪 สั่งของที่ผู้เล่นวางขายในตลาดกลาง ไรเดอร์ไปรับที่ตลาดแล้วมาส่งถึงตัว · จ่ายค่าของ + ค่าส่ง (ไม่มีใครรับใน 10 นาที ของจะส่งเข้ากระเป๋าให้เอง)</div>
+      ${mine ? `<div class="sub"><b>ออเดอร์ของฉัน</b></div><div class="list">${mine}</div>` : ''}
+      <input id="mqIn" placeholder="🔍 ค้นหาสินค้า" value="${esc(p.mq || '')}" autocomplete="off" oninput="this.dataset.v=this.value">
+      <div class="rowf" style="margin:8px 0">ทิปไรเดอร์ <input id="tipIn" type="number" inputmode="numeric" min="0" max="500" value="${p.tip || 0}" style="width:90px"> ฿</div><div class="list">${rows || '<div class="sub">ตอนนี้ยังไม่มีผู้เล่นวางขายของ</div>'}</div>`;
   } else if (tab === 'rider') body = riderJobs();
   else if (tab === 'bills') body = billsBox();
   else if (tab === 'fish') body = fishBook();
@@ -4730,7 +4778,7 @@ function phonePanel(p) {
   else if (tab === 'wx') { const ev = wd?.ev, h = hourNow(); body = `<div class="phWx"><div class="big">${ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️'}</div><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small><div class="jobbox">${ev ? esc(ev.text) : 'วันนี้อากาศปกติ ไม่มีเหตุการณ์พิเศษ'}</div></div>`; }
   else if (tab === 'music') body = `<div class="phWx"><div class="big">🎵</div><b>${(h => h >= 6 && h < 19 ? 'เพลงกลางวัน' : 'เพลงกลางคืน')(hourNow())}</b><small>เพลงเปลี่ยนเองตามเวลาในเกม</small></div><div class="grid2">${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🔇 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'primary' : '')}${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'primary' : '')}</div>`;
   const sub = tab === 'contacts' || tab === 'call' ? `<div class="tabs">${B('📇 รายชื่อ', { fn: 'qtab', set: { tab: 'contacts' } }, tab === 'contacts' ? 'primary' : '')}${B(call ? '📞 กำลังคุย' : '📞 สาย', { fn: 'qtab', set: { tab: 'call' } }, tab === 'call' ? 'primary' : '')}</div>`
-    : (tab === 'food' || tab === 'rider') && job('rider') ? `<div class="tabs">${B('🍔 สั่งอาหาร', { fn: 'qtab', set: { tab: 'food' } }, tab === 'food' ? 'primary' : '')}${B('🛵 งานไรเดอร์', { fn: 'qtab', set: { tab: 'rider' } }, tab === 'rider' ? 'primary' : '')}</div>` : '';
+    : tab === 'food' || tab === 'rider' || tab === 'mkt' ? `<div class="tabs">${B('🍔 อาหาร', { fn: 'qtab', set: { tab: 'food' } }, tab === 'food' ? 'primary' : '')}${B('🏪 ของจากตลาด', { fn: 'qtab', set: { tab: 'mkt' } }, tab === 'mkt' ? 'primary' : '')}${job('rider') ? B('🛵 งานไรเดอร์', { fn: 'qtab', set: { tab: 'rider' } }, tab === 'rider' ? 'primary' : '') : ''}</div>` : '';
   return `<div class="phone"><div class="phScr">${status}<div class="phHead"><button data-m='{"fn":"qtab","set":{"tab":"home"}}'>‹</button><b>${PH_TITLE[tab] || ''}</b></div><div class="phBody">${sub}${body}</div><button class="phBar" data-m='{"fn":"qtab","set":{"tab":"home"}}' title="หน้าหลัก"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
 }
 
