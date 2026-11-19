@@ -3281,7 +3281,7 @@ let panelOpenT = 0;
 function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
-  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); refreshPanel(true);
+  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); $('#panel').classList.toggle('soc', !!p.soc); refreshPanel(true);
   if (p.kind === 'chat' && !TOUCH_UI) setTimeout(() => $('#chatIn')?.focus(), 50);   // phones: no keyboard until they tap the box (it would push the sheet up)
 }
 function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
@@ -3296,6 +3296,7 @@ function refreshPanel(force) {
   if (!panel || !me) return;
   if (!force && performance.now() < panelTouchT) return;
   let html = renderPanel(panel);
+  if (panel.soc) html = socHead(panel.kind) + html.replace(/<h2>[\s\S]*?<\/h2>/, '');
   const stf = panel.st && STAFF_AT[panel.st];
   if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.id}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
   if (!force && html === panelSig) return;
@@ -3320,6 +3321,12 @@ function zoomPic(src) {   // a player's photo, big
   document.querySelector('.howTo')?.remove();
   const d = document.createElement('div'); d.className = 'howTo'; d.innerHTML = `<div class="howCard" style="text-align:center"><img src="${src}" alt="" style="display:block;width:min(78vw,420px);max-height:62vh;object-fit:contain;border-radius:14px;margin:0 auto 10px;background:#e9d4ad"><button type="button" class="primary">ปิด</button></div>`;
   d.onclick = () => d.remove(); document.body.appendChild(d);
+}
+// LifeBook: the town's blue social app — ideas (and bug reports), friends and jobs in one place
+function socHead(k) {
+  const t = (l, kk, on) => `<button class="${on ? 'on' : ''}" data-m='{"fn":"social","k":"${kk}"}'>${l}</button>`;
+  const sub = k === 'ideas' || k === 'bug' ? `<div class="socSub">${t('💡 ไอเดีย', 'ideas', k === 'ideas')}${t('🐞 แจ้งบัค', 'bug', k === 'bug')}</div>` : '';
+  return `<div class="socHead"><b>📘 LifeBook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('💡 ไอเดีย', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 งาน', 'career', k === 'career')}</div>${sub}`;
 }
 function bindPanel(root) {
   bindStocks(root); bindWall(root);
@@ -3367,6 +3374,12 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  social(m) {
+    const k = m.k || 'ideas';
+    if (k === 'ideas') send({ t: 'idea', op: 'list', sort: panel?.sort || 'new' });
+    const next = { kind: k, soc: 1, ...(k === 'ideas' ? { sort: panel?.soc ? panel.sort || 'new' : 'new' } : {}) };
+    if (panel?.soc) { for (const x of Object.keys(panel)) delete panel[x]; Object.assign(panel, next); panelSig = ''; refreshPanel(true); } else openPanel(next);
+  },
   wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
   morder(m, root) { const tip = Math.floor(+root.querySelector('#tipIn')?.value || 0); panel.tip = tip; send({ t: 'morder', item: m.item, qty: m.qty, tip }); },
   openInvite() { send({ t: 'refcode' }); openPanel({ kind: 'invite' }); },
@@ -4190,6 +4203,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-20b', d: '20 พ.ย. (รอบ 61)', items: [
     '🖼️ <b>วอลเปเปอร์มือถือ</b> ใส่รูปของตัวเองได้ ปรับซูม เลื่อนซ้าย-ขวา ขึ้น-ลง และความมืดได้ หรือเลือกสีพื้นฐาน (แอปวอลเปเปอร์ในมือถือ)',
+    '📱 จัดแอปในมือถือใหม่เป็นหมวด: ติดต่อ · เงินทอง · ชีวิตประจำวัน · รางวัล · อื่นๆ หาแอปง่ายขึ้น',
+    '📘 <b>LifeBook</b> แอปโซเชียลสีฟ้า รวมไอเดีย (และแจ้งบัค) เพื่อน และงาน ไว้ในแอปเดียว',
     '😀 ปุ่มอิโมจิกลับมาแล้ว อยู่เหนือปุ่มวิ่ง',
     '📊 แถบสถานะดูง่ายขึ้น: ไม่มีตัวเลข หลอดอยู่ชิดชื่อ กรอบกว้างขึ้น',
   ] },
@@ -5409,14 +5424,17 @@ function bindWall(root) {
 }
 const PH_APPS = [
   ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
-  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], ['เพื่อน', { fn: 'open', kind: 'friends' }, 7],
+  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], 
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
-  ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
-  ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
+const PH_MORE = [['LifeBook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+  ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
+// the home screen, grouped so the everyday apps come first
+const PH_GROUPS = [['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'LifeBook', 'แก๊ง']], ['เงินทอง', ['บิล', 'การเงิน', 'หุ้น', 'ลอตเตอรี่']],
+  ['ชีวิตประจำวัน', ['เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา', 'เลือกตั้ง']], ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
+  ['อื่นๆ', ['เติมเงิน', 'อัปเดต', 'บทช่วยสอน', 'วอลเปเปอร์', 'ตั้งค่า', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
 const PH_TITLE = { wall: 'วอลเปเปอร์', mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
@@ -5425,9 +5443,13 @@ function phonePanel(p) {
   const status = `<div class="phStat"><b>${clock}</b><span>📶 🔋</span></div>`;
   if (tab === 'home') {
     const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
-    const apps = PH_APPS.map(([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`).join('')
-      + PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay)).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
-    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
+    const app = ([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`;
+    const emApp = ([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`;
+    const all = {}; for (const a of PH_APPS) all[a[0]] = app(a);
+    for (const a of PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay))) all[a[0]] = emApp(a);
+    const used = new Set(), sec = PH_GROUPS.map(([t, names]) => { const h = names.filter(n => all[n]).map(n => (used.add(n), all[n])).join(''); return h ? `<div class="phSec">${t}</div><div class="phApps">${h}</div>` : ''; }).join('');
+    const rest = Object.keys(all).filter(n => !used.has(n)).map(n => all[n]).join('');   // anything not listed in a group still shows, at the end
+    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phList">${sec}${rest ? `<div class="phApps">${rest}</div>` : ''}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
   if (tab === 'contacts') {
