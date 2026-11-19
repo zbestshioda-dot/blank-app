@@ -980,7 +980,7 @@ addEventListener('pointerup', e => { if (joy && joy.id === e.pointerId) { joy = 
 let camLift = 0;
 const camRide = { x: 0, y: 0 };
 function camera() {
-  const m = P.get(myId); let x = m ? m.rx + m.ox : 50, y = m ? m.ry + m.oy : 36;
+  const m = P.get(myId); let x = m ? (camS.on ? camS.x : m.rx + m.ox) : 50, y = m ? (camS.on ? camS.y : m.ry + m.oy) : 36;
   if (m?.pose === 'fun' && m.fn) { const fo = funPos(m); if (fo) { camRide.x += (fo.x - camRide.x) * .08; camRide.y += (fo.y - 1 - camRide.y) * .08; x = camRide.x; y = camRide.y; } } else if (m) { camRide.x = x; camRide.y = y; }   // on a ride the view follows you, gently
   if (window.__camAt) { x = window.__camAt[0]; y = window.__camAt[1]; return { x: x * TS - VW / 2, y: y * TS - VH / 2 }; }   // automated screenshots only
   const target = panel && !trade && !(VW > VH && VH <= 520) ? VH * 0.24 : 0;   // landscape popups sit in the middle, no lift
@@ -1171,13 +1171,16 @@ function onAction() {
 let stuckT = 0, unstickAt = 0, downHintAt = 0;
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
-let frameT = 0;
+let frameT = 0, FDT = 1 / 60, liveT = 0;
+const camS = { x: 0, y: 0, on: false };
 function frame(t) {
   requestAnimationFrame(frame);
-  if (ECO && t - frameT < 30) return; frameT = t;
+  // battery saver: full 60 fps while you walk, touch or anything moves near you; 30 fps only when standing idle
+  const idle = performance.now() - Math.max(lastInput, liveT) > 1500 && !joy;
+  if (ECO && idle && t - frameT < 30) return; frameT = t;
   dlgTick();
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
-  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const dt = Math.min(0.05, (t - last) / 1000); last = t; FDT = dt;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   if (RUN && !RUN.over && !document.getElementById('runWin')?.classList.contains('hidden')) return;   // the trash run covers the screen: don't draw the town under it (phones lagged)
   const m = P.get(myId);
@@ -1241,12 +1244,15 @@ function frame(t) {
     // walking down onto the door mat takes you outside, no button needed
     if (dy > .3 && near?.type === 'exit' && Math.hypot(near.x - m.x, near.y - m.y) < Math.max(.7, near.r * .6) && performance.now() > actCd) { actCd = performance.now() + 1500; autoPath = null; send({ t: 'exit' }); }
     m.rx = m.x; m.ry = m.y;
+    if (meMoving || autoPath || me.pass || m.pose === 'fun') liveT = performance.now();
+    // smooth camera: eases after you instead of being glued to every step; snaps on teleports
+    { const tx = m.rx + m.ox, ty = m.ry + m.oy; if (!camS.on || Math.hypot(tx - camS.x, ty - camS.y) > 3) { camS.x = tx; camS.y = ty; camS.on = true; } else { const e = 1 - Math.exp(-dt * 9); camS.x += (tx - camS.x) * e; camS.y += (ty - camS.y) * e; } }
     m.ox *= 0.8; m.oy *= 0.8; if (Math.abs(m.ox) < .002) m.ox = 0; if (Math.abs(m.oy) < .002) m.oy = 0;
     sendT += dt;
     const sig = m.x.toFixed(2) + ',' + m.y.toFixed(2);
     if (sendT > 0.066 && sig !== lastSent) { sendT = 0; lastSent = sig; send({ t: 'p', x: +m.x.toFixed(2), y: +m.y.toFixed(2), f: m.f, fx: fixId }); }
   }
-  for (const p of P.values()) if (p.id !== myId) { const k = Math.min(1, dt * 12); p.rx += (p.x - p.rx) * k; p.ry += (p.y - p.ry) * k; }
+  { const k = 1 - Math.exp(-dt * 10); for (const p of P.values()) if (p.id !== myId) { const ddx = p.x - p.rx, ddy = p.y - p.ry; if (Math.abs(ddx) + Math.abs(ddy) > 6) { p.rx = p.x; p.ry = p.y; } else { p.rx += ddx * k; p.ry += ddy * k; if (Math.abs(ddx) + Math.abs(ddy) > .02) liveT = performance.now(); } } }
   stepPets(dt); stepFight(dt);
 
   near = findNear();
@@ -1359,7 +1365,7 @@ function draw(t) {
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
     else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
-    else if (k === 2) spr(e[2], e[0] + .5, e[1] + 1.05, X, Y);
+    else if (k === 2) { const tr = e, sw = Math.sin(t / 1300 + tr[0] * .7 + tr[1] * .4) * .022 + Math.sin(t / 470 + tr[0]) * .006, bx = (tr[0] + .5) * TS + X, byy = (tr[1] + 1.05) * TS + Y; ctx.save(); ctx.translate(bx, byy); ctx.transform(1, 0, -sw, 1, 0, 0); ctx.translate(-bx, -byy); spr(tr[2], tr[0] + .5, tr[1] + 1.05, X, Y); ctx.restore(); }   // trees sway in the breeze
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
       else if (e[3] === 'ghost') { ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; spr(e[0], e[1], e[2], X, Y); ctx.globalAlpha = 1; ctx.strokeStyle = '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
@@ -2062,7 +2068,7 @@ function drawPlayer(p, X, Y, t) {
   if (sitting || lying) dir = 'down';
   if (fo?.back) dir = 'up';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
-  p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) : 0);
+  p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) * FDT * 60 : 0);
   const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
   const k = TS * 1.55 / CH_ATLAS.h * (p.small || 1), H = CH_ATLAS.h * k;
@@ -2083,7 +2089,7 @@ function drawPlayer(p, X, Y, t) {
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
   else if (fo?.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, p, px, py + Math.sin(t / 380 + p.id) * TS * .05, k, 'front', 0); }   // swimming: only head and shoulders above the water
   else if (sitting) drawCharTo(ctx, p, px, py, k, 'front', 0, false, true);   // seated: whole body, legs folded
-  else drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left');
+  else { if (!moving) { const br = 1 + Math.sin(now0 / 650 + ((+p.id || 0) % 97)) * .012; ctx.translate(px, py); ctx.scale(2 - br, br); ctx.translate(-px, -py); } drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left'); }   // standing still: a soft breath
   ctx.restore();
   if (fo?.swim) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py - H * .42, TS * .45 + Math.sin(t / 300) * 2, TS * .13, 0, 0, 7); ctx.stroke(); swimFx(p.id, fo.x, fo.y - .42 * H / TS, t); }
   if (fo) drawSeatFront(fk, px, py + (fk === 'carousel' ? 0 : TS * .1), fk === 'coaster' ? '#ffd45e' : fcol, fo);
@@ -2804,7 +2810,7 @@ function drawPlayerPixel(p, X, Y, t) {
   let dir = Math.abs(cy) > Math.abs(cx) ? (cy > 0 ? 'down' : 'up') : (cx > 0 ? 'right' : 'left');
   if (sitting || lying) dir = 'down';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
-  p.walk = (p.walk || 0) + (moving ? .25 : 0);
+  p.walk = (p.walk || 0) + (moving ? .25 * FDT * 60 : 0);
   const sw = moving ? Math.sin(p.walk) : 0, bob = moving ? Math.abs(Math.cos(p.walk)) * u * .8 : 0;
   let px = px0, py = py0;
   ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(px, py, u * (lying ? 8 : 5.5), u * 2, 0, 0, 7); ctx.fill();
@@ -3004,7 +3010,7 @@ const FN = {
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
   fs(m) { closePanel(); screenMode(m.mode); },
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
-  eco() { ECO = !ECO; try { localStorage.setItem('lt_eco', ECO ? '1' : '0'); } catch { } resize(); refreshPanel(true); toast(ECO ? 'เปิดโหมดประหยัดแบต: ลื่นน้อยลงนิดหน่อย แต่เครื่องเย็นและแบตอึดขึ้น' : 'ปิดโหมดประหยัดแบต: ภาพเต็ม 60 เฟรม', '🔋'); },
+  eco() { ECO = !ECO; try { localStorage.setItem('lt_eco', ECO ? '1' : '0'); } catch { } resize(); refreshPanel(true); toast(ECO ? 'เปิดโหมดประหยัดแบต: เล่นยังลื่น ยืนเฉยๆ จะพักเครื่องให้เย็น' : 'ปิดโหมดประหยัดแบต: ภาพเต็ม 60 เฟรม', '🔋'); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
   addContact(m, root) { const ph = String(m.phone || root.querySelector('#phIn').value).replace(/\D/g, ''); if (G.taxi && ph === G.taxi.phone) { panel.tab = 'taxi'; return refreshPanel(true); } send({ t: 'contact_add', phone: ph }); },
@@ -4415,7 +4421,7 @@ function renderPanel(p) {
     case 'settings': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⚙️ ตั้งค่า</h2>
-        <div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = 30 เฟรม ภาพเบาลง เครื่องไม่ร้อน (เปิดอยู่แล้วบนมือถือ)</div>
+        <div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = เดินลื่น 60 เฟรม แต่ตอนยืนเฉยๆ ลดเหลือ 30 ให้เครื่องเย็น (เปิดอยู่แล้วบนมือถือ)</div>
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}
