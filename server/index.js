@@ -169,6 +169,7 @@ function enterRoom(a, m) {
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 1.2) return toast(a, 'เดินไปที่ประตูก่อน', '🚪', false);
   const master = isAdmin(a) && a.god?.doors;              // god mode: every door opens
   if (s.renov && !master) return toast(a, `${s.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
+  if (znAlive(a) || zn?.ph === 'warn') return toast(a, 'ประตูถูกปิดตาย! ข้างในมีซอมบี้ อยู่นอกอาคารแล้วหนีให้รอด', '🧟', false);
   const riderIn = s.bld === 'restaurant' && [...orders.values()].some(o => o.rider === a && o.state === 'taken');   // a rider with food to collect may slip in the back door
   if (s.house === undefined && !buildingOpen(s.bld) && !master && !riderIn) {
     const o = D.HOURS[s.bld];
@@ -597,6 +598,106 @@ function lottoTick() {
 }
 setInterval(() => { try { lottoTick(); } catch (e) { console.error('lottoTick', e); } }, 60e3).unref?.();
 setTimeout(() => { try { lottoTick(); } catch (e) { console.error('lottoTick', e); } }, 5000);
+// ------------------------------------------------------------------ ZOMBIE NIGHT: every 13th (Bangkok) at 20:00, the dead rise
+// 60s warning to get out of buildings -> anyone still inside is overrun (dead, back at the square); zombies come in waves
+// wherever living players are and chase them; survive to the end = a reward by mail. Buildings stay unsafe (doors sealed) all wave.
+const ZN = { day: 13, hour: 20, warn: 60e3, dur: 5 * 60e3, waveEvery: 70e3, cap: 60,
+  prize: { money: 5000, gems: 5 },
+  kinds: { walk: { speed: 1.6, r: .7, name: 'ซอมบี้' }, girl: { speed: 1.8, r: .7, name: 'ซอมบี้สาว' }, run: { speed: 3.2, r: .7, name: 'ซอมบี้วิ่ง' }, brute: { speed: 1.3, r: 1.05, name: 'ซอมบี้ยักษ์' } } };
+let zn = null, znDone = '', znSeq = 0, znAnnounced = '';
+const znAlive = a => zn?.ph === 'on' && zn.alive.has(a.id);
+const zombies = () => npcs.filter(n => n.zb);
+function znState(a) {
+  if (!zn) return { t: 'zn', ph: 'off' };
+  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '' };
+}
+function znSendAll() { for (const o of online.values()) send(o, znState(o)); }
+function znStart(t, test) {
+  zn = { ph: 'warn', t0: t + (test ? 15e3 : ZN.warn), alive: new Set(), dead: new Set(), wave: 0, test };
+  if (!test) { znDone = dayKey(); dirty = true; }
+  feed('🧟 คืนปล่อยผี! ซอมบี้กำลังบุกเมือง ออกจากอาคารด่วน!');
+  for (const o of online.values()) toast(o, `🧟 ซอมบี้กำลังบุกเมือง! ออกจากอาคารภายใน ${Math.round((zn.t0 - t) / 1000)} วินาที คนที่อยู่ในอาคารจะโดนรุมกิน`, '☣️', false);
+  znSendAll();
+}
+function znKill(a, why) {
+  if (!znAlive(a)) return;
+  zn.alive.delete(a.id); zn.dead.add(a.id);
+  if (!a.down) { if (a.fun) rideOff(a); const s = ST.square; const p = standNear('town', s.x + rnd(-2, 2), s.y + rnd(1, 3)) || [D.SPAWN.x, D.SPAWN.y]; teleport(a, p[0], p[1]); }
+  send(a, { t: 'zdie', why });
+  feed(`🧟 ${a.name} ${why === 'in' ? 'โดนซอมบี้รุมในอาคาร' : 'โดนซอมบี้กัด'} · เหลือผู้รอด ${zn.alive.size} คน`);
+  znSendAll();
+}
+function znSpawn(t) {
+  zn.wave++; const pts = [], last = t + ZN.waveEvery >= zn.end;
+  const areas = new Map();
+  for (const o of online.values()) if (znAlive(o)) { const id = areaId(o); if (D.AREAS.find(r => r.id === id)?.kind === 'map') (areas.get(id) || areas.set(id, []).get(id)).push(o); }
+  for (const [area, ps] of areas) {
+    const n = Math.min(14, 2 + zn.wave * 2 + ps.length), tiles = walkableIn(area);
+    for (let i = 0; i < n && zombies().length < ZN.cap; i++) {
+      let p = null;
+      for (let k = 0; k < 30 && !p; k++) { const [x, y] = pick(tiles), d = Math.min(...ps.map(o => Math.hypot(o.x - x - .5, o.y - y - .5))); if (d > 9 && d < 26) p = [x + .5, y + .5]; }
+      if (!p) { const [x, y] = pick(tiles); if (Math.min(...ps.map(o => Math.hypot(o.x - x - .5, o.y - y - .5))) > 6) p = [x + .5, y + .5]; }
+      if (!p) continue;
+      const r = Math.random(), kind = last && i < 2 ? 'brute' : zn.wave >= 2 && r < .25 ? 'run' : r < .6 ? 'walk' : 'girl', K = ZN.kinds[kind];
+      const z = { id: -(9000 + (znSeq++ % 900)), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1.2, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {},
+        next: () => znGoal(z), stay: () => .15 };
+      npcs.push(z); pts.push([area, +p[0].toFixed(1), +p[1].toFixed(1)]);
+    }
+  }
+  npcRosterDirty = true;
+  if (pts.length) broadcast({ t: 'zspawn', p: pts, wave: zn.wave });
+  for (const o of online.values()) if (znAlive(o)) toast(o, `🧟 ซอมบี้ระลอก ${zn.wave}${last ? ' (ระลอกสุดท้าย! ซอมบี้ยักษ์มาแล้ว)' : ''} โผล่มาแล้ว วิ่งหนีให้รอด!`, '🧟', false);
+}
+// who a zombie goes for: the nearest living player in its area, else it shuffles about
+function znGoal(z) {
+  let best = null, bd = 1e9;
+  for (const o of online.values()) if (znAlive(o) && areaId(o) === z.area) { const d = Math.hypot(o.x - z.x, o.y - z.y); if (d < bd) { bd = d; best = o; } }
+  z.tgt = best;
+  if (best) return [best.x, best.y];
+  const [x, y] = pick(walkableIn(z.area)); return [x + .5, y + .5];
+}
+function znEnd(t) {
+  const alive = [...zn.alive].map(id => online.get(id)).filter(Boolean);
+  for (const a of alive) { sysMail(a, `📜 จดหมายผู้รอดชีวิต\n\nถึง ${a.name}\n\nคืนนี้เมืองของเราเผชิญกับฝูงซอมบี้ แต่คุณเอาตัวรอดมาได้จนฟ้าสาง! ความกล้าหาญและไหวพริบของคุณทำให้ทุกคนมีความหวัง\n\nทางเมืองขอมอบรางวัลผู้รอดชีวิตเป็นของขวัญ แล้วเจอกันใหม่คืนวันที่ 13 เดือนหน้า... ถ้ากล้า 🧟`, { ...ZN.prize }); stat(a, 'zsurvive'); joy(a, 10); }
+  for (const z of zombies()) npcs.splice(npcs.indexOf(z), 1);
+  npcRosterDirty = true;
+  feed(alive.length ? `🌅 ฟ้าสางแล้ว ซอมบี้หายไปหมด · ผู้รอดชีวิต ${alive.length} คน: ${alive.slice(0, 8).map(a => a.name).join(', ')}${alive.length > 8 ? ' ...' : ''}` : '🌅 ฟ้าสางแล้ว ซอมบี้หายไปหมด · คืนนี้ไม่มีใครรอดเลย!');
+  const was = zn; zn = null;
+  for (const o of online.values()) { send(o, { t: 'zn', ph: 'end', won: was.alive.has(o.id) ? 1 : 0, n: alive.length }); }
+}
+function znTick() {
+  const t = now(), bk = new Date(t + 7 * 3600e3), day = dayKey();
+  if (!zn && bk.getUTCDate() === ZN.day && znDone !== day) {
+    const h = bk.getUTCHours() + bk.getUTCMinutes() / 60;
+    if (h >= ZN.hour - 1 && h < ZN.hour && znAnnounced !== day + (h >= ZN.hour - .5 ? 'b' : 'a')) {
+      znAnnounced = day + (h >= ZN.hour - .5 ? 'b' : 'a');
+      feed(`🌕 คืนนี้วันที่ 13 คืนปล่อยผี! ซอมบี้จะบุกเมืองเวลา ${ZN.hour}:00 น. เตรียมตัวให้พร้อม`);
+      for (const o of online.values()) toast(o, `🌕 คืนนี้ ${ZN.hour}:00 น. ซอมบี้จะบุกเมือง! อยู่นอกอาคารแล้วเอาตัวรอดให้ได้ รับรางวัลผู้รอดชีวิต`, '🧟');
+    }
+    if (h >= ZN.hour && h < ZN.hour + .5) znStart(t);
+  }
+  if (!zn) return;
+  if (zn.ph === 'warn' && t >= zn.t0) {
+    zn.ph = 'on'; zn.end = t + (zn.test ? 150e3 : ZN.dur); zn.next = t;
+    for (const o of online.values()) if (!hidden(o) && o.login) zn.alive.add(o.id);
+    for (const o of online.values()) if (znAlive(o) && (D.areaAt(o.x, o.y)?.kind === 'room' || o.down)) znKill(o, 'in');
+    znSendAll();
+  }
+  if (zn.ph !== 'on') return;
+  if (!zn.alive.size && !zn.allDead) zn.allDead = t;
+  if (t >= zn.end || zn.allDead && t - zn.allDead > 8000) return znEnd(t);
+  if (t >= zn.next && t < zn.end - 25e3) { zn.next = t + (zn.test ? 40e3 : ZN.waveEvery); znSpawn(t); }
+  for (const o of online.values()) if (znAlive(o) && (D.areaAt(o.x, o.y)?.kind === 'room' || o.down)) znKill(o, 'in');
+  for (const z of zombies()) {
+    if (z.wait > 0) continue;
+    const tg = z.tgt;
+    if (tg && znAlive(tg) && areaId(tg) === z.area && Math.hypot(tg.x - z.x, tg.y - z.y) < ZN.kinds[z.zb].r) { znKill(tg, 'bite'); z.wait = 1.5; z.path = []; continue; }
+    if (t > z.zt) { z.zt = t + 700 + Math.random() * 300; z.path = []; }   // re-aim at a moving target
+    else if (tg && Math.hypot(tg.x - z.x, tg.y - z.y) < 1.6) z.path = [[tg.x, tg.y]];
+  }
+  if (t % 5000 < 250) znSendAll();
+}
+setInterval(() => { try { if (online.size || zn) znTick(); } catch (e) { console.error('znTick', e); } }, 250).unref?.();
 // ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
 let ideas = [], ideaSeq = 1;
 function ideaView(a, sort) {
@@ -892,7 +993,7 @@ const SAVE_KEYS = ['koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lott
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -969,7 +1070,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -3275,7 +3376,7 @@ function npcTick(dt, ps) {
   }
 }
 const npcVisible = n => !n.worker || n.on;
-const npcInfo = n => n.bot ? botPub(n) : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
+const npcInfo = n => n.bot ? botPub(n) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
 // what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
 function outfitOf(a) {
@@ -3526,6 +3627,7 @@ function detach(a) {
   for (const [id, r] of reqs) if (r.from === a || r.to === a) reqs.delete(id);
   for (const o of [...orders.values()]) { if (o.cust === a && o.state === 'open') cancelOrder(o, 'ลูกค้าออฟไลน์'); else if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; } }
   standUp(a);
+  if (zn?.alive?.delete(a.id)) zn.dead.add(a.id);   // logging off mid-wave does not count as surviving
   online.delete(a.id);
   a.ws = null; a.cast = null; a.sd = true; a.afk = false; dirty = true;
   sendRoster();
@@ -3900,6 +4002,7 @@ function bugReport(a, m) {
 function godAct(a, m) {
   if (!isAdmin(a)) return;
   a.god = a.god || {};
+  if (m.op === 'zombie') { if (zn) { for (const z of zombies()) npcs.splice(npcs.indexOf(z), 1); zn = null; npcRosterDirty = true; znSendAll(); return toast(a, 'หยุดคืนปล่อยผีแล้ว', '🧟'); } znDone = ''; return znStart(now(), true); }
   if (m.op === 'nocd') { a.god.nocd = !a.god.nocd; if (a.god.nocd) a.cd = {}; toast(a, a.god.nocd ? 'God mode: ไม่มีคูลดาวน์' : 'ปิด: ไม่มีคูลดาวน์', '⚡'); }
   else if (m.op === 'lock') { a.god.lock = !a.god.lock; toast(a, a.god.lock ? 'God mode: ล็อกสเตตัสเต็ม (ไม่ป่วย/ไม่หมดสติ)' : 'ปิด: ล็อกสเตตัส', '🛡️'); }
   else if (m.op === 'fill') {

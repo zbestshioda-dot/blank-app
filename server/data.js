@@ -1420,6 +1420,8 @@ const LUX_TITLES = [
   { id: 'lux4', title: 'ราชันย์เงินตรา', r: 7, price: 100000000 },
 ];
 const ACHIEVEMENTS = [
+  { id: 'zsurv1', r: 3, c: null, stat: 'zsurvive', n: 1, title: 'ผู้รอดชีวิต', desc: 'รอดจากคืนปล่อยผีได้ 1 ครั้ง' },
+  { id: 'zsurv5', r: 5, c: null, stat: 'zsurvive', n: 5, title: 'นักล่าซอมบี้', desc: 'รอดจากคืนปล่อยผีได้ 5 ครั้ง' },
   { id: 'egg_legend', r: 7, c: null, stat: 'legendfish', n: 1, title: 'ผู้พิชิตตำนาน', desc: 'ตกปลาในตำนานได้', secret: 1 },
   { id: 'egg_explore', r: 4, c: null, stat: 'secrets', n: 1, title: 'นักสำรวจ', desc: 'เจอที่ลับในเมือง', secret: 1 },
   { id: 'egg_explore5', r: 5, c: null, stat: 'secrets', n: 5, title: 'นักสำรวจตัวจริง', desc: 'เจอที่ลับครบทั้ง 5 จุด', secret: 1 },
