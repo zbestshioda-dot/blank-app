@@ -771,14 +771,14 @@ const ICU = { pay: [55, 62, 70, 80, 90, 104, 120], next: 75000, energy: 6,
 // lost-dog cases for police: find the dog before the time runs out; pay = base + perMin x the minutes the search took (x a speed bonus when found early)
 // job mini-games, played on the client and paid by the server: score is capped by max and by how long the game ran (rate per second)
 const JOBGAMES = {
-  spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 40, min: 10, max: 5, per: 15, rate: .5 },
-  shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 40, min: 20, max: 30, per: 2.6, rate: 1.6 },
-  cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 25, min: 20, max: 10, per: 7, rate: .4 },
-  slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 30, min: 10, max: 70, per: 3, rate: 2.5 },   // anyone, at the big kitchen
+  spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 40, min: 10, max: 5, per: 8, rate: .5 },
+  shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 40, min: 20, max: 30, per: 1.4, rate: 1.6 },
+  cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 25, min: 20, max: 10, per: 5.5, rate: .4 },
+  slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 30, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
-const THIEFQ = { energy: 6, next: 50000, base: 160, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
-const DOGQ = { next: 45000, energy: 5, base: 100, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
+const THIEFQ = { energy: 6, next: 50000, base: 110, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
+const DOGQ = { next: 45000, energy: 5, base: 70, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
   dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],
   names: ['โมจิ', 'ถุงเงิน', 'ทองดี', 'บราวนี่', 'ข้าวปั้น', 'ลัคกี้', 'มะลิ', 'ซุปเปอร์', 'โบว์', 'หมูกรอบ', 'ลาเต้', 'ขาวจั๊วะ'],
   owners: ['คุณยายบุญมี', 'น้องปิ่น', 'ลุงสมชาย', 'ป้าแดง', 'คุณหมอใจดี', 'เด็กชายต้น', 'พี่ติ๊ก', 'ครูสมศรี'] };
@@ -916,7 +916,7 @@ const ITEMS = {
   parkplush: { name: 'ตุ๊กตาของฝากสวนสนุก', icon: '🧸', kind: 'goods', base: 250 },
   icecream: { name: 'ไอศกรีมแท่ง', icon: '🍦', kind: 'goods', base: 25, eat: { hunger: 6, happy: 4 } },
   snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
-  drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 150, eat: { energy: 25 }, wholesale: 105, stock: 12, refill: 25 },
+  drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 400, eat: { energy: 20 }, keepEnergy: 1, dayMax: 3, wholesale: 280, stock: 12, refill: 25 },   // the one drink that still gives energy: pricey, 3 a day
   med_fever:  { name: 'ยาลดไข้', icon: '💊', kind: 'goods', pharmacy: true, base: 300, cures: ['cold'], eat: { health: 5 } },
   med_flu:    { name: 'ยาต้านไวรัส', icon: '🧪', kind: 'goods', pharmacy: true, base: 900, cures: ['flu'], eat: { health: 5 } },
   med_ors:    { name: 'ผงเกลือแร่ + ยาฆ่าเชื้อ', icon: '🧂', kind: 'goods', pharmacy: true, base: 250, cures: ['poison'], eat: { health: 5 } },
@@ -1411,6 +1411,13 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   chakri:    { name: 'ชุดไทยจักรี', how: 'ซื้อที่ร้านแฟชั่น', price: 888888, g: 'f' },
   angel:     { name: 'ชุดเทวดา', nf: 'ชุดนางฟ้า', how: 'ซื้อที่ร้านแฟชั่น (💎 เพชร)', gems: 200 },
   santa:     { name: 'ชุดซานต้า', nf: 'ชุดซานต้าสาว', how: 'ของขวัญปีใหม่ 2570 จากเมือง (ไม่มีขาย)' } };
+// prestige titles bought with money (a money sink for the rich): not achievements, never counted in the achievement total
+const LUX_TITLES = [
+  { id: 'lux1', title: 'คนมีอันจะกิน', r: 4, price: 1000000 },
+  { id: 'lux2', title: 'พ่อเลี้ยงใหญ่', r: 5, price: 5000000 },
+  { id: 'lux3', title: 'เจ้าสัวแห่งเมือง', r: 5, price: 20000000 },
+  { id: 'lux4', title: 'ราชันย์เงินตรา', r: 7, price: 100000000 },
+];
 const ACHIEVEMENTS = [
   { id: 'egg_legend', r: 7, c: null, stat: 'legendfish', n: 1, title: 'ผู้พิชิตตำนาน', desc: 'ตกปลาในตำนานได้', secret: 1 },
   { id: 'egg_explore', r: 4, c: null, stat: 'secrets', n: 1, title: 'นักสำรวจ', desc: 'เจอที่ลับในเมือง', secret: 1 },
@@ -1493,9 +1500,9 @@ const FORTUNES = [
   'เที่ยงคืนเป็นเวลาของสิ่งแปลกประหลาด', 'คนที่เดินผ่านคุณไปเมื่อกี้ อาจไม่ใช่คนธรรมดา', 'อดทนอีกนิด สิ่งที่รอจะมาถึง', 'วันนี้ใครให้อะไร รับไว้ด้วยรอยยิ้ม',
 ];
 // food no longer gives energy (energy comes back by sleeping at home or at the amusement park)
-for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
+for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 module.exports = { POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
-  RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
+  RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
