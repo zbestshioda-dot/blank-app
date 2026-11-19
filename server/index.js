@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const { WebSocketServer } = require('ws');
 const D = require('./data');
 const store = require('./store');
@@ -3510,7 +3511,8 @@ function tick() {
 }
 
 // ------------------------------------------------------------------ http
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp4': 'video/mp4', '.jpg': 'image/jpeg' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
+const STATIC = new Map();
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
@@ -3530,10 +3532,22 @@ const server = http.createServer((req, res) => {
       fs.createReadStream(file, { start: a, end: b }).pipe(res);
     });
   }
+  // Static files are read once and kept in memory with an ETag (a phone that already has the file gets a tiny "304 not changed"
+  // instead of downloading it again), text is sent gzipped, and files asked for with ?v= never change, so phones keep them for a year.
+  // (Before this every visit downloaded the whole game again, ~11 MB.)
+  const send1 = f => {
+    const ext = path.extname(file), versioned = /[?&]v=/.test(req.url || ''), h = { 'Content-Type': MIME[ext] || 'application/octet-stream', ETag: f.etag, Vary: 'Accept-Encoding',
+      'Cache-Control': versioned ? 'public, max-age=31536000, immutable' : 'no-cache' };
+    if (req.headers['if-none-match'] === f.etag) { res.writeHead(304, h); return res.end(); }
+    const gz = f.gz && /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+    res.writeHead(200, { ...h, ...(gz ? { 'Content-Encoding': 'gzip' } : {}), 'Content-Length': (gz ? f.gz : f.buf).length });
+    res.end(req.method === 'HEAD' ? undefined : gz ? f.gz : f.buf);
+  };
+  const hit = STATIC.get(file); if (hit) return send1(hit);
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-    res.end(buf);
+    const text = /\.(html|js|css|json|svg|webmanifest)$/.test(file), f = { buf, etag: '"' + crypto.createHash('sha1').update(buf).digest('base64').slice(0, 16) + '"', gz: text ? zlib.gzipSync(buf, { level: 9 }) : null };
+    STATIC.set(file, f); send1(f);
   });
 });
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 32768 });
