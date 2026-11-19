@@ -3705,7 +3705,7 @@ function onMessage(ws, raw) {
     }
     case 'pic': {                           // profile photo from the phone's album (already shrunk to a small JPEG by the client)
       const d = String(m.data || '');
-      if (d && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d) || d.length > 24000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '🖼️', false);
+      if (d && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d) || d.length > 80000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '🖼️', false);
       if (!cd(a, 'pic', 8000)) return;
       a.pic = d || ''; markMe(a); sendRoster(); send(a, { t: 'mypic', pic: a.pic });
       return toast(a, d ? 'เปลี่ยนรูปโปรไฟล์แล้ว' : 'ลบรูปโปรไฟล์แล้ว', '🖼️');
@@ -3895,8 +3895,11 @@ function tick() {
       a.craving = null; a.utilOff = false;
     }
     // ---- energy, hunger, health
-    // energy only comes back properly in a bed or at the amusement park; sitting gives nothing extra (a slow trickle keeps nobody stuck)
-    const restMul = a.pose === 'bed' ? 2 : 0.27;
+    // energy comes back properly in a bed or at the amusement park; everyone gets a slow trickle
+    // sitting (bench, seat, the rest button) for 10s+ doubles the trickle, but only up to half a bar: a full bar still needs a bed or the park
+    const sitting = a.pose === 'seat' || a.pose === 'rest';
+    a.sitFor = sitting ? (a.sitFor || 0) + dt : 0;
+    const restMul = a.pose === 'bed' ? 2 : sitting && a.sitFor >= 10 && a.energy < 50 ? 0.56 : 0.27;
     if (a.pose === 'fun' && a.fun) {          // on a park ride: energy, health and happiness come back every second
       const R = D.RIDES[a.fun.k];
       if (!R || D.areaAt(a.x, a.y)?.id !== 'park') standUp(a);
@@ -4044,7 +4047,7 @@ const server = http.createServer((req, res) => {
     STATIC.set(file, f); send1(f);
   });
 });
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 32768 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 131072 });
 wss.on('connection', (ws, req) => {
   ws.ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   let count = 0, winStart = now();
