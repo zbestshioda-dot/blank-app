@@ -286,7 +286,29 @@ $('#createOk').onclick = () => {
   $('#createErr').textContent = ''; creds = { ...creds, create: 1, cname, gender, shirt: SHIRT_IDS[avatar] }; loginBusy(true); wantLogin = true; connect();
 };
 let busyT = 0;
+// ---- loading screen: shown from the moment you press "enter the city" until the town and the characters are ready to draw
+const LD = { on: false, t0: 0, shown: 0, tip: 0 };
+const LD_TIPS = ['💡 มือใหม่ซื้อเบ็ดกับน้าเล็กไปตกปลาขาย หาเงินง่ายที่สุด', '🛕 วัดอยู่บนสนามหญ้าใต้บ่อน้ำกลางเมือง ไหว้พระได้พรรายได้ +5%', '🎡 สวนสนุกเล่นเครื่องเล่นแล้วพลังงานกับความสุขเพิ่ม',
+  '🔪 ที่ครัวใหญ่มีเกมหั่นผักผลไม้ ใครก็เล่นหาเงินได้', '🏠 ซื้อบ้านที่สำนักงานอสังหาฯ แล้วชวนเพื่อนมาเที่ยวบ้าน', '🔋 เครื่องร้อน? เปิดโหมดประหยัดแบตที่ ⚙️ ตั้งค่า', '📱 กดค้างปุ่มใช้งาน = วิ่ง'];
+function loadScr(on) {
+  const el = $('#loadScr'); if (!el) return;
+  if (on) { if (LD.on) return; LD.on = true; LD.t0 = performance.now(); LD.shown = 0; el.classList.remove('hidden', 'out'); $('#ldTip').textContent = LD_TIPS[Math.floor(Math.random() * LD_TIPS.length)]; loadTick(); }
+  else if (LD.on) { LD.on = false; el.classList.add('out'); setTimeout(() => { if (!LD.on) el.classList.add('hidden'); }, 380); }
+}
+function loadTick() {
+  if (!LD.on) return;
+  const steps = [['เชื่อมต่อเซิร์ฟเวอร์', ws && ws.readyState === 1, 1], ['เข้าสู่ระบบ', !!G, 1], ['โหลดภาพเมือง', !!atlasImg, 4], ['โหลดตัวละคร', !!chImg, 2], ['โหลดไอคอน', !!PXI.map, 1]];
+  const tot = steps.reduce((a, s) => a + s[2], 0), done = steps.reduce((a, s) => a + (s[1] ? s[2] : 0), 0), cur = steps.find(s => !s[1]);
+  const goal = done / tot, el = (performance.now() - LD.t0) / 1000, creep = cur ? Math.min(.9 * cur[2] / tot, el * .03) : 0;   // creep forward while waiting so it never looks stuck
+  LD.shown = Math.max(LD.shown, Math.min(.99, goal + creep)); if (!cur) LD.shown = 1;
+  $('#ldFill').style.width = (LD.shown * 100).toFixed(0) + '%'; $('#ldPct').textContent = Math.floor(LD.shown * 100) + '%';
+  $('#ldMsg').textContent = cur ? `กำลัง${cur[0]}...` : 'พร้อมแล้ว!';
+  if (el > 4 && Math.floor(el / 4) !== LD.tip) { LD.tip = Math.floor(el / 4); $('#ldTip').textContent = LD_TIPS[(LD.tip * 3) % LD_TIPS.length]; }
+  if (!cur && me) return setTimeout(() => loadScr(false), 250);
+  setTimeout(loadTick, 120);
+}
 function loginBusy(on) {
+  if (on) loadScr(true); else if (!G) loadScr(false);
   const b = $('#loginGo'), c = $('#createOk'); clearTimeout(busyT);
   b.disabled = c.disabled = !!on; b.classList.toggle('busy', !!on);
   b.firstElementChild.textContent = on ? '⏳ กำลังเข้าเมือง...' : '🚪 เข้าเมือง';
@@ -341,7 +363,7 @@ const promo = (() => {
   const label = () => { snd.textContent = v.muted ? '🔇' : '🔊'; $('#sndHint')?.classList.toggle('hidden', !v.muted); };
   if (lite) { v.removeAttribute('autoplay'); login.classList.add('posterOnly'); }
   else {
-    v.src = 'assets/ui/login_promo.mp4?v=2'; v.addEventListener('error', off); v.play().catch(() => { });
+    v.src = 'assets/ui/login_promo.mp4?v=3'; v.addEventListener('error', off); v.play().catch(() => { });
     v.addEventListener('playing', () => login.classList.add('vidOn'), { once: true });
   }
   snd.onclick = e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => { }); try { localStorage.setItem('lt_snd', v.muted ? '0' : '1'); } catch { } label(); };
@@ -724,7 +746,7 @@ window.BGM_EXT = true;
 const BGM = { vol: .42, buf: {}, src: {}, gain: {}, loading: {} };
 function bgmLoad(k, ac) {
   if (BGM.loading[k]) return; BGM.loading[k] = 1;
-  fetch(`assets/music/${k}.mp3?v=1`).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
+  fetch(`assets/music/${k}.mp3?v=2`).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
     const n = d.length, mono = ac.createBuffer(1, n, d.sampleRate), o = mono.getChannelData(0), L = d.getChannelData(0), R = d.numberOfChannels > 1 ? d.getChannelData(1) : L;
     for (let i = 0; i < n; i++) o[i] = (L[i] + R[i]) * .5;   // mono: half the memory on phones
     BGM.buf[k] = mono; BGM.loading[k] = 0;
@@ -1280,7 +1302,7 @@ function draw(t) {
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
     ents.push([-1e8, 14, { fx: 'koi' }], [-1e8, 14, { fx: 'lotus' }], [A.y + 12.75, 14, { fx: 'incense', x: A.x + 22, y: A.y + 12.7 }], [A.y + 14, 14, { fx: 'leaves' }]); }
   { const s = A?.id === 'town' && STN('gate_temple'), F = s?.facade;   // the temple complex: one strip per tile column, each sorted by the ground's front edge there
-    if (F && vis(F.cx, F.bv - 6, 16)) { if (WIMG) { const n = Math.ceil(F.w); for (let i = 0; i < n; i++) { const xm = F.x0 + i + .5, d = Math.min(1, Math.abs(xm - F.cx) / F.hw); ents.push([F.bv - F.lv * d + .05, 13, { s, i }]); } } else ents.push([s.y + 2.2, 13, { s }]); } }
+    if (F && vis(F.cx, F.bv - 6, 16)) { loadWat(); if (WIMG) { const n = Math.ceil(F.w); for (let i = 0; i < n; i++) { const xm = F.x0 + i + .5, d = Math.min(1, Math.abs(xm - F.cx) / F.hw); ents.push([F.bv - F.lv * d + .05, 13, { s, i }]); } } else ents.push([s.y + 2.2, 13, { s }]); } }
   for (const g of ['gate_park', 'gate_town_p']) { const s = A && STN(g); if (s && s.area === A.id && vis(s.x, s.y, 6)) ents.push([s.y + .7, 10, s]); }
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) {
     if (p.ps && P.get(p.ps)?.veh) continue;   // passengers are drawn with the bike / inside the car they ride in
@@ -2054,8 +2076,9 @@ const RIDE_COL = ['#ff7aa8', '#7ac8ff', '#ffd45e', '#8be08b', '#c79bff', '#ff9f5
 const rideBottom = s => s.cy + s.h / 2;
 // ---- painted ride pieces (public/assets/rides.*): the moving parts are separate images, turned and moved in code
 let RIMG = null, RJ = null;
-fetch('assets/rides.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { RJ = j; RIMG = im; }; im.src = 'assets/rides.webp?v=1'; }).catch(() => { });
-const RIDE_IMG = () => !!RIMG;
+let ridesAsked = false;   // the rides picture loads the first time something needs it (the park, or its gate in town), not at start
+function loadRides() { if (ridesAsked) return; ridesAsked = true; fetch('assets/rides.json?v=2').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { RJ = j; RIMG = im; }; im.src = 'assets/rides.webp?v=2'; }).catch(() => { ridesAsked = false; }); }
+const RIDE_IMG = () => { if (!RIMG) loadRides(); return !!RIMG; };
 // draw piece n with its anchor (ax, ay: 0..1 of the piece) at screen x, y, wT tiles wide; part: [y0, y1] slice (0..1) of the piece only
 function rdraw(n, x, y, wT, ax = .5, ay = 1, flip = false, rot = 0, part = null, src = null) {
   const r = RJ?.s[n]; if (!r) return;
@@ -2242,10 +2265,12 @@ function drawRideImg(s, X, Y, t, used) {
 }
 // ------------------------------------------------------------------ 🛕 the temple: painted sprites (assets/temple.webp), shapes as a fallback
 let WJ = null, WIMG = null;
-fetch('assets/temple.json?v=3').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { WJ = j; WIMG = im; }; im.src = 'assets/temple.webp?v=3'; }).catch(() => { });
+let watAsked = false;   // loaded the first time the temple (or its front in town) comes into view
+function loadWat() { if (watAsked) return; watAsked = true; fetch('assets/temple.json?v=3').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { WJ = j; WIMG = im; }; im.src = 'assets/temple.webp?v=3'; }).catch(() => { watAsked = false; }); }
 function wdraw(n, cx, by, wT, alpha = 1) { const r = WJ?.s[n]; if (!r) return false; const w = wT * TS, h = w * r[3] / r[2]; ctx.globalAlpha = alpha; ctx.drawImage(WIMG, r[0], r[1], r[2], r[3], cx - w / 2, by - h, w, h); ctx.globalAlpha = 1; return true; }
 const monkFr = {};
 function monkFrame(name) {   // the monk's own walk frames (same cell and feet point as the player sprites)
+  loadWat();
   if (!WIMG || !WJ.monk) return null; let c = monkFr[name]; if (c) return c;
   const r = WJ.s.monk, i = WJ.monk.indexOf(name); if (i < 0) return null;
   c = document.createElement('canvas'); c.width = 126; c.height = 96; c.getContext('2d').drawImage(WIMG, r[0] + i * 126, r[1], 126, 96, 0, 0, 126, 96);
@@ -2423,6 +2448,7 @@ function thaiRoof(cx, base, half, height, tiers = 3) {
   ctx.lineCap = 'butt';
 }
 function drawWat(s, X, Y, t) {
+  loadWat();
   const u = TS, x0 = (s.cx - s.w / 2) * u + X, y0 = (s.cy - s.h / 2) * u + Y, W = s.w * u, H = s.h * u, cx = x0 + W / 2, by = y0 + H;
   ctx.save();
   if (WIMG && WAT_SPR[s.k]) {
@@ -4511,8 +4537,8 @@ function sign(text, x, y, o = {}) {
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
-fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=1'; }).catch(() => { });
-fetch('assets/atlas.json?v=v5').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v5'; });
+fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=2'; }, 3500); }).catch(() => { });
+fetch('assets/atlas.json?v=v6').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v6'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;

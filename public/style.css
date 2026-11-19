@@ -998,7 +998,7 @@ body.hasEvent #topBar{top:146px!important}
 .pxi{display:inline-block;width:var(--pxs);height:var(--pxs);vertical-align:-.22em;background:url(assets/icons.webp?v=2) no-repeat;background-size:calc(var(--pxcols,16) * var(--pxs)) calc(var(--pxrows,12) * var(--pxs));font-style:normal;flex:none}
 
 /* profile frames over the profile photo; the special ones glow (each its own colours and motion) */
-.pfx{position:absolute;left:50%;top:50%;width:var(--fs);height:var(--fs);background:url(assets/frames.webp?v=1) no-repeat;background-size:calc(6 * var(--fs)) calc(6 * var(--fs));pointer-events:none;z-index:3}
+.pfx{position:absolute;left:50%;top:50%;width:var(--fs);height:var(--fs);background:url(assets/frames.webp?v=2) no-repeat;background-size:calc(6 * var(--fs)) calc(6 * var(--fs));pointer-events:none;z-index:3}
 .pfx.sp::before,.pfx.sp::after{content:'';position:absolute;inset:0;border-radius:50%;pointer-events:none}
 .pfx.sp::before{z-index:-1;background:conic-gradient(from 0deg,transparent 0 10%,var(--c1) 18%,transparent 30% 55%,var(--c2) 65%,transparent 78%);-webkit-mask:radial-gradient(circle,transparent 30%,#000 34% 46%,transparent 52%);mask:radial-gradient(circle,transparent 30%,#000 34% 46%,transparent 52%);filter:blur(3px);opacity:.9;animation:gSpin var(--sp,3s) linear infinite}
 .pfx.sp{animation:var(--an) var(--du,2s) ease-in-out infinite}
@@ -1216,3 +1216,30 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border
 .siamsi .ssNo b { font-size: 22px; color: #c0392b; }
 .siamsi .ssLuck { display: inline-block; color: #fff; border-radius: 99px; padding: 1px 12px; font-weight: 700; font-size: 13px; }
 .siamsi .ssText { margin-top: 6px; font-size: 13.5px; line-height: 1.45; background: #fff6dc; color: #5a3d10; border: 1px dashed #d4a93c; border-radius: 8px; padding: 6px 8px; }
+
+/* loading screen: from pressing "enter the city" until the town is drawn - the town picture, the badge with the game's name, a progress bar */
+#loadScr{position:fixed;inset:0;z-index:9000;overflow:hidden;background:#8fd0ff;font-family:'Mitr','Noto Sans Thai',sans-serif;transition:opacity .4s}
+#loadScr.hidden{display:none}#loadScr.out{opacity:0;pointer-events:none}
+.ldBg{position:absolute;inset:-3%;background:url(assets/ui/load_v.webp?v=1) center top/cover no-repeat;animation:ldPan 18s ease-in-out infinite alternate}
+@keyframes ldPan{from{transform:scale(1.02) translateY(0)}to{transform:scale(1.08) translateY(-1.5%)}}
+.ldLogo{--w:min(80vw,380px);position:absolute;left:50%;top:5vh;width:var(--w);transform:translateX(-50%);animation:ldPop .6s cubic-bezier(.2,1.6,.4,1) both;filter:drop-shadow(0 8px 14px rgba(60,30,0,.35))}
+.ldLogo img{display:block;width:100%;image-rendering:pixelated}
+@keyframes ldPop{from{transform:translateX(-50%) scale(.4);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+.ldName{position:absolute;left:12%;right:12%;top:55%;height:15%;display:flex;align-items:center;justify-content:center;font-size:calc(var(--w) * .074);font-weight:700;color:#fff;white-space:nowrap;
+  text-shadow:0 2px 0 #9b3b1c,2px 0 0 #9b3b1c,-2px 0 0 #9b3b1c,0 -2px 0 #9b3b1c,0 4px 6px rgba(0,0,0,.3)}
+#ldPct{position:absolute;left:30%;right:30%;top:33%;text-align:center;font-size:calc(var(--w) * .12);font-weight:800;color:#c0561c;text-shadow:0 2px 0 #fff3c4}
+.ldWalker{position:absolute;top:76%;font-size:calc(var(--w) * .07);animation:ldStroll 2.6s ease-in-out infinite alternate}
+@keyframes ldStroll{from{left:34%;transform:scaleX(-1)}49%{transform:scaleX(-1)}50%{transform:scaleX(1)}to{left:58%;transform:scaleX(1)}}
+.ldCard{position:absolute;left:50%;bottom:6vh;transform:translateX(-50%);width:min(88vw,460px);padding:14px 16px 12px;border-radius:18px;background:rgba(255,248,230,.92);border:3px solid #b8742a;box-shadow:0 6px 0 #7a4a1c,0 10px 24px rgba(0,0,0,.25);animation:ldUp .5s .15s ease-out both}
+@keyframes ldUp{from{transform:translate(-50%,30px);opacity:0}}
+.ldBar{height:20px;border-radius:12px;background:#e9d3a8;box-shadow:inset 0 2px 4px rgba(0,0,0,.2);overflow:hidden;border:2px solid #fff}
+.ldBar i{display:block;height:100%;width:0;border-radius:10px;background:linear-gradient(90deg,#ff8a3c,#ffd23a);transition:width .3s;position:relative;box-shadow:0 0 10px rgba(255,190,60,.8)}
+.ldBar i::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(255,255,255,.4) 0 8px,transparent 8px 16px);background-size:23px 23px;animation:ldStripe .7s linear infinite}
+@keyframes ldStripe{to{background-position:23px 0}}
+.ldRow{margin-top:8px;font-size:15px;color:#5a3412;font-weight:700;text-align:center}
+.ldTip{margin-top:8px;font-size:13px;line-height:1.5;color:#6b4a2a;text-align:center;min-height:20px}
+@media (min-aspect-ratio:1/1){
+  .ldBg{background-image:url(assets/ui/load_h.webp?v=1);background-position:center}
+  .ldLogo{--w:min(36vw,330px,52vh);top:3vh}
+  .ldCard{bottom:7vh;width:min(56vw,520px)}
+}

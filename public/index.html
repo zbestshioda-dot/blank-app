@@ -25,6 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;600;800&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="preload" as="image" href="assets/ui/load_v.webp?v=1" media="(max-aspect-ratio: 1/1)"><link rel="preload" as="image" href="assets/ui/load_h.webp?v=1" media="(min-aspect-ratio: 1/1)"><link rel="preload" as="image" href="assets/ui/load_logo.webp?v=1">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -147,6 +148,15 @@
     <small class="hint">ย้อมผมที่ร้านทำผม เปลี่ยนชุดที่ร้านแฟชั่นได้ทีหลัง</small>
     <div id="createErr" style="color:var(--bad);min-height:16px;font-size:13px"></div>
     <div class="rowf"><button type="button" id="createBack" style="flex:1">← กลับ</button><button type="button" class="primary" id="createOk" style="flex:2">✨ เข้าเมือง!</button></div>
+  </div>
+</div>
+<div id="loadScr" class="hidden">
+  <div class="ldBg"></div>
+  <div class="ldLogo"><img src="assets/ui/load_logo.webp?v=1" alt=""><b id="ldPct">0%</b><div class="ldName">เมืองชีวิตนี้เลือกได้</div><span class="ldWalker">🚶</span></div>
+  <div class="ldCard">
+    <div class="ldBar"><i id="ldFill"></i></div>
+    <div class="ldRow"><span id="ldMsg">กำลังเชื่อมต่อ...</span></div>
+    <div class="ldTip" id="ldTip"></div>
   </div>
 </div>
 <script src="fx.js"></script>
