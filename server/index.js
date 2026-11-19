@@ -395,7 +395,7 @@ function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + '
 const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -2757,7 +2757,7 @@ function meView(a) {
   return {
     t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -2805,6 +2805,13 @@ function marketView() {
 const byName = n => { n = String(n || '').toLowerCase(); for (const a of accounts.values()) if (a.name.toLowerCase() === n) return a; return null; };
 // 🔑 Google sign-in: the browser gets an ID token from Google; we ask Google whether it is genuine and meant for us
 const GOOGLE_ID = process.env.GOOGLE_CLIENT_ID || '';
+// 💰 Google AdSense (H5 Games Ads). Off until the owner sets the Fly secret ADSENSE_CLIENT=ca-pub-XXXXXXXXXXXXXXXX; ADSENSE_TEST=1 shows Google's test ads only.
+const ADS_CLIENT = /^ca-pub-\d{10,20}$/.test(process.env.ADSENSE_CLIENT || '') ? process.env.ADSENSE_CLIENT : '', ADS_TEST = process.env.ADSENSE_TEST === '1';
+// two switches: ADSENSE_CLIENT alone = the AdSense code on the page + ads.txt, so Google can check and approve the site;
+// ADSENSE_GAME=1 as well = the ads inside the game (rewarded app on the phone, full-screen between places), once H5 Games Ads is approved
+const ADS_GAME = !!ADS_CLIENT && process.env.ADSENSE_GAME === '1';
+const ADS_HEAD = ADS_CLIENT ? `<meta name="google-adsense-account" content="${ADS_CLIENT}"><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS_CLIENT}" crossorigin="anonymous"${ADS_GAME ? ' data-ad-frequency-hint="360s"' : ''}${ADS_TEST ? ' data-adbreak-test="on"' : ''}></script>` : '';
+const ADS = { daily: 5, gems: 2, energy: 20, gap: 40000 };   // a rewarded ad: 💎2 + energy, at most 5 a day, 40 s apart
 async function googleCheck(cred) {
   if (!GOOGLE_ID || typeof cred !== 'string' || cred.length > 4096) return null;
   try {
@@ -2887,7 +2894,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -3146,6 +3153,15 @@ function onMessage(ws, raw) {
     case 'donate': return donate(a, m);
 
     case 'jg': return jobGame(a, m);
+    case 'adreward': {                       // the player chose to watch a rewarded ad and watched it to the end
+      if (!ADS_GAME) return;
+      const day = new Date(now() + 7 * 3600e3).toISOString().slice(0, 10);
+      if (a.adDay !== day) { a.adDay = day; a.adN = 0; }
+      if (a.adN >= ADS.daily) return toast(a, `วันนี้รับรางวัลจากโฆษณาครบ ${ADS.daily} ครั้งแล้ว พรุ่งนี้มาใหม่นะ`, '🎁', false);
+      if (!cd(a, 'adrw', ADS.gap)) return;
+      a.adN++; a.gems = (a.gems || 0) + ADS.gems; a.energy = Math.min(100, a.energy + ADS.energy); markMe(a); stat(a, 'adsWatched');
+      return toast(a, `🎁 ขอบคุณที่ดูโฆษณา! ได้ 💎${ADS.gems} และพลังงาน +${ADS.energy} (วันนี้ ${a.adN}/${ADS.daily})`, '🎁');
+    }
     case 'alms_give': {                     // put food in a monk's bowl
       const o = nearPlayer(a, m.to, 5), id = String(m.item || ''), it = D.ITEMS[id];
       if (!o || o.career !== 'monk') return toast(a, 'เดินเข้าไปใกล้พระก่อน', '🙏', false);
@@ -3516,6 +3532,7 @@ const STATIC = new Map();
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
+  if (url === '/ads.txt') { res.writeHead(ADS_CLIENT ? 200 : 404, { 'Content-Type': 'text/plain' }); return res.end(ADS_CLIENT ? `google.com, ${ADS_CLIENT.replace('ca-', '')}, DIRECT, f08c47fec0942fa0\n` : ''); }   // AdSense checks this file
   if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
   if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town
   const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
@@ -3546,6 +3563,7 @@ const server = http.createServer((req, res) => {
   const hit = STATIC.get(file); if (hit) return send1(hit);
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
+    if (ADS_HEAD && path.basename(file) === 'index.html') buf = Buffer.from(buf.toString('utf8').replace('</head>', ADS_HEAD + '</head>'));   // AdSense code in the page head (site check)
     const text = /\.(html|js|css|json|svg|webmanifest)$/.test(file), f = { buf, etag: '"' + crypto.createHash('sha1').update(buf).digest('base64').slice(0, 16) + '"', gz: text ? zlib.gzipSync(buf, { level: 9 }) : null };
     STATIC.set(file, f); send1(f);
   });
