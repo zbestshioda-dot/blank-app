@@ -3393,6 +3393,7 @@ const FN = {
   },
   payCheck(m) { send({ t: 'pay', op: 'check', ref: m.ref }); },
   openPayAdmin() { payAdm = null; send({ t: 'god', op: 'payorders' }); openPanel({ kind: 'payadmin' }); },
+  payVoid(m) { if (confirm(m.paid ? `ดึงของจากรายการ ${m.ref} คืน?\nใช้กับรายการทดสอบ/ที่คืนเงินแล้วเท่านั้น ผู้เล่นจะได้จดหมายแจ้ง` : `ยกเลิกรายการ ${m.ref}?`)) send({ t: 'god', op: 'payvoid', ref: m.ref }); },
   payOk(m) { if (confirm(`เติมเพชรให้รายการ ${m.ref} ด้วยมือ?\nทำเฉพาะเมื่อเช็กในหน้า Stripe แล้วว่าได้รับเงินจริง`)) send({ t: 'god', op: 'payok', ref: m.ref }); },
   payRecheck(m) { send({ t: 'god', op: 'paycheck', ref: m.ref }); },
   openLedger() { ledgerRes = null; send({ t: 'ledger' }); openPanel({ kind: 'ledger' }); },
@@ -3797,7 +3798,7 @@ function frameHtml(id, sz, fit = true) {
 let godFindRes = null, ledgerRes = null, payRes = null, payAdm = null, payBackRef = '';
 const paySel = { pack: 'p100', m: 'mbank' };
 try { const q = new URLSearchParams(location.search); if (q.get('paid')) payBackRef = q.get('paid').replace(/\D/g, '').slice(0, 20); if (q.get('paid') || q.get('paycancel')) history.replaceState(null, '', location.pathname); } catch { }
-const PAY_ST = { new: ['⏳ รอชำระ', 'var(--muted,#999)'], paid: ['✅ สำเร็จ', 'var(--good)'], review: ['🔎 รอตรวจสอบ', '#e0913a'], exp: ['หมดอายุ', '#999'] };
+const PAY_ST = { new: ['⏳ รอชำระ', 'var(--muted,#999)'], paid: ['✅ สำเร็จ', 'var(--good)'], review: ['🔎 รอตรวจสอบ', '#e0913a'], exp: ['หมดอายุ', '#999'], void: ['↩️ ยกเลิกแล้ว', '#c9302c'] };
 // ✨ live previews of the paid items: the sparkly supporter title over your own character, and you in the angel / fairy outfit
 let ppRaf = 0;
 function paintPayPrev(c, t) {
@@ -3876,8 +3877,8 @@ function payAdminHtml() {
   const R = payAdm, back = B('‹ กลับ', { fn: 'open', kind: 'god' }) + ' ';
   if (!R) return `<h2>${back}💎 รายการเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   const rows = R.list.map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
-    return `<div class="item" style="display:block"><div class="nm"><b>${esc(o.n || o.l)}</b> <span class="tag">${esc(o.l)}</span> · 💎${o.gems}${o.bonus ? '+' + o.bonus : ''} · <b>฿${o.thb}</b> <b style="color:${st[1]}">${st[0]}</b><small>#${o.ref} · ${esc(o.m)} · ${new Date(o.t).toLocaleString('th-TH')}${o.back ? ' · แจ้งล่าสุด ' + esc(o.back) : ''}${o.by ? ' · โดย ' + esc(o.by) : ''}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div>
-      ${o.st !== 'paid' ? `<div class="grid2">${B('🔄 ตรวจกับ Stripe', { fn: 'payRecheck', ref: o.ref })}${B('✅ เติมให้ด้วยมือ', { fn: 'payOk', ref: o.ref }, 'warn')}</div>` : ''}</div>`; }).join('');
+    return `<div class="item" style="display:block"><div class="nm"><b>${esc(o.n || o.l)}</b> <span class="tag">${esc(o.l)}</span> · 💎${o.gems}${o.bonus ? '+' + o.bonus : ''} · <b>฿${o.thb}</b> ${o.sb ? '<span class="tag">🧪 ทดสอบ</span> ' : ''}<b style="color:${st[1]}">${st[0]}</b><small>#${o.ref} · ${esc(o.m)} · ${new Date(o.t).toLocaleString('th-TH')}${o.back ? ' · แจ้งล่าสุด ' + esc(o.back) : ''}${o.by ? ' · โดย ' + esc(o.by) : ''}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div>
+      ${o.st === 'paid' ? `<div class="grid2">${B('↩️ ดึงของคืน', { fn: 'payVoid', ref: o.ref, paid: 1 }, 'warn')}</div>` : o.st !== 'void' ? `<div class="grid2">${B('🔄 ตรวจกับ Stripe', { fn: 'payRecheck', ref: o.ref })}${B('✅ เติมให้ด้วยมือ', { fn: 'payOk', ref: o.ref }, 'warn')}${B('🗑️ ยกเลิกรายการ', { fn: 'payVoid', ref: o.ref })}</div>` : ''}</div>`; }).join('');
   return `<h2>${back}💎 รายการเติมเงิน</h2>
     <div class="sub">${R.on ? (R.sb ? '🧪 โหมดทดสอบ (sk_test)' : '🟢 รับเงินจริง') : '🔴 ยังไม่ได้ตั้งค่า STRIPE_SECRET_KEY'} · Webhook: <code>${esc(R.base || '-')}/pay/stripe/hook</code> ${R.hook ? '✅' : '(ยังไม่ได้ตั้ง STRIPE_WEBHOOK_SECRET)'}</div>
     <div class="grid2"><div class="item"><div class="nm">วันนี้<small style="color:var(--good)">฿${R.today.toLocaleString()} (${R.todayN} รายการ)</small></div></div><div class="item"><div class="nm">รวมทั้งหมด<small style="color:var(--good)">฿${R.total.toLocaleString()} (${R.n} รายการ)</small></div></div></div>
