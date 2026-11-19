@@ -11,6 +11,7 @@ const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, 
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
 const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 70, h: 37 };   // added later, in the free space under the farm (nothing older moves)
+const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
 const W = YX0 + 4 * 34, H = 90;                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
@@ -108,7 +109,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // south-west lane: services and trade (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'โรงประมูล (คลังสินค้า)', icon: '🔨', st: 'warehouse' });
   B('restaurant', 'b_cafe2', 20, 30, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' });
-  B('kitchen', 'b_kitchen', 13, 45, { label: 'ครัวใหญ่ (เชฟ)', icon: '🍳', st: 'kitchen' });
+  B('kitchen', 'b_kitchen', 13, 45, { label: 'ครัวใหญ่', icon: '🍳', st: 'kitchen' });
   B('rider', 'b_rider2', 20, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
   B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
   B('fishstall', 'b_fishstall', 24, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
@@ -502,11 +503,6 @@ for (const b of [0, 1, 2].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === 
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
   // the rider hub's waiting bench seats two side by side
   if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
-  if (kind === 'kitchen') {             // cooking battle: work stations around the kitchen (the counter at the top is where dishes are served)
-    for (const [id, type, label, icon, dx, dy] of [['k_pantry', 'kpantry', 'ตู้วัตถุดิบ', '🧺', 12.3, 7.3], ['k_grill', 'kgrill', 'เตาย่าง', '🔥', 2.4, 3.6], ['k_pot', 'kpot', 'หม้อต้ม', '🍲', 4.6, 3.6],
-      ['k_board', 'kboard', 'เขียงสับ', '🔪', 10.3, 3.6], ['k_pan', 'kpan', 'กระทะผัด', '🍳', 6.0, 7.2], ['k_plate', 'kplate', 'โต๊ะจัดจาน', '🍽️', 10.5, 7.6]])
-      STATIONS.push({ id, type, label, icon, room: room.id, x: rx + dx, y: ry + dy, r: 1.1 });
-  }
   if (kind === 'hospital') {
     s.x = rx + 3.5;
     [[8.5, 3.6], [11, 3.6], [13.5, 3.6], [8.5, 7.4], [11, 7.4], [13.5, 7.4]].forEach(([dx, dy], i) => {
@@ -635,7 +631,83 @@ const RIDES = {
   prop('signpost', 52.7, 86.6);
   GATES.park_in = { x: X + 5, y: Y + 18.5 }; GATES.town_from_park = { x: 50, y: 85.4 };
 }
-const AREAS = [TOWN, FARM, HOUSING, PARK, ...ROOMS, ...YARDS];
+// ================================================================= THE TEMPLE: a walled ground of sand and lawns - the ordination
+// hall (โบสถ์) with a stone courtyard, a golden chedi, an open sala by a bodhi tree, a lotus pond, the temple shop and the bell tower.
+// Buildings are solid footprints ('o'); the client paints them (station type 'wat', k = which building).
+{
+  const X = TEMPLE.x, Y = TEMPLE.y, T = TEMPLE;
+  const tree = (x, y, k) => { set(x, y, 'T'); TREES.push([x, y, k]); };
+  rect(T.x, T.y, T.w, T.h, 's');
+  rect(X + 1, Y + 1, 12, 13, '.'); rect(X + 29, Y + 1, 14, 11, '.'); rect(X + 1, Y + 27, 13, 4, '.'); rect(X + 36, Y + 20, 7, 11, '.');   // lawns in the corners
+  for (let x = T.x; x < T.x + T.w; x++) { set(x, T.y, 'o'); set(x, T.y + T.h - 1, 'o'); }   // the white temple wall
+  for (let y = T.y; y < T.y + T.h; y++) { set(T.x, y, 'o'); set(T.x + T.w - 1, y, 'o'); }
+  set(T.x, Y + 16, 's'); set(T.x, Y + 17, 's');                                                   // the way in (west)
+  rect(X + 1, Y + 16, 35, 2, 'c');                                                                // the main walk, gate -> bell tower
+  rect(X + 14, Y + 12, 16, 4, 'c');                                                               // the courtyard before the hall
+  rect(X + 30, Y + 10, 2, 6, 'c'); rect(X + 32, Y + 10, 3, 1, 'c');                              // up to the chedi
+  rect(X + 8, Y + 18, 2, 2, 'c'); rect(X + 31, Y + 18, 2, 6, 'c'); rect(X + 29, Y + 24, 6, 2, 'c'); // down to the sala and the shop
+  rect(X + 15, Y + 18, 13, 1, 'c'); rect(X + 15, Y + 19, 1, 9, 'c'); rect(X + 27, Y + 19, 1, 9, 'c'); rect(X + 15, Y + 28, 13, 1, 'c');   // a walk round the pond
+  rect(X + 17, Y + 20, 9, 7, 'w');                                                                // the lotus pond
+  const wat = (k, label, icon, x0, y0, w, h, solid = true, extra = {}) => {
+    if (solid) rect(x0, y0, w, h, 'o');
+    STATIONS.push({ id: 'wat_' + k, type: 'wat', k, label, icon, x: -99, y: -99, r: 0, area: 'temple', cx: x0 + w / 2, cy: y0 + h / 2, w, h, deco: 1, ...extra });
+  };
+  wat('bot', 'โบสถ์', '🛕', X + 18, Y + 5, 8, 7);
+  wat('chedi', 'เจดีย์', '🛕', X + 32, Y + 4, 6, 6);
+  wat('bell', 'หอระฆัง', '🔔', X + 36, Y + 14, 3, 3);
+  wat('shop', 'ร้านของวัด', '🪔', X + 29, Y + 21, 6, 3);
+  // the open sala: a wooden floor you walk onto, posts at the corners, benches inside
+  rect(X + 3, Y + 20, 10, 6, 'k'); for (const [dx, dy] of [[0, 0], [9, 0], [0, 5], [9, 5]]) set(X + 3 + dx, Y + 20 + dy, 'o');
+  STATIONS.push({ id: 'wat_sala', type: 'wat', k: 'sala', label: 'ศาลาการเปรียญ', icon: '🪑', x: -99, y: -99, r: 0, area: 'temple', cx: X + 8, cy: Y + 23, w: 10, h: 6, deco: 1 });
+  for (const [dx, dy] of [[2.5, 2.2], [6.5, 2.2], [2.5, 4.4], [6.5, 4.4]]) STATIONS.push({ id: `seat_t${dx}_${dy}`, type: 'seat', label: 'นั่งพักที่ศาลา', icon: '🪑', x: X + 3 + dx, y: Y + 20 + dy, r: 1, area: 'temple', sala: 1 });
+  // things to do
+  STATIONS.push({ id: 'wat_pray', type: 'wpray', label: 'ไหว้พระขอพร', icon: '🙏', x: X + 22, y: Y + 13.1, r: 1.5, area: 'temple' });
+  STATIONS.push({ id: 'wat_siamsi', type: 'siamsi', label: 'เสี่ยงเซียมซี', icon: '🎋', x: X + 26.5, y: Y + 13.1, r: 1.3, area: 'temple' });
+  STATIONS.push({ id: 'wat_ring', type: 'wbell', label: 'ตีระฆัง', icon: '🔔', x: X + 37.5, y: Y + 17.7, r: 1.4, area: 'temple' });
+  STATIONS.push({ id: 'tshop', type: 'tshop', label: 'ร้านของวัด', icon: '🪔', x: X + 32, y: Y + 24.7, r: 1.6, area: 'temple' });   // the counter faces south
+  for (const [x, y] of [[X + 16, Y + 19.9], [X + 26, Y + 19.9], [X + 16, Y + 27.9], [X + 26, Y + 27.9]]) STATIONS.push({ id: `seat_tp${x}_${y}`, type: 'seat', label: 'นั่งชมบ่อบัว', icon: '🪷', x, y, r: .9, area: 'temple' });
+  // the bodhi tree with a stone bench ring, shade trees along the wall, lanterns along the walks, flowers before the hall
+  tree(X + 7, Y + 8, 'tree_twin'); prop('o_hedgering', X + 7.5, Y + 10.9, false);
+  for (const [x, y] of [[X + 5, Y + 11.9], [X + 10, Y + 11.9]]) prop('o_stonebench', x, y);
+  for (const [x, y, k] of [[X + 2, Y + 2, 'tree_oak'], [X + 11, Y + 2, 'tree_white'], [X + 2, Y + 6, 'tree_pink'], [X + 2, Y + 12, 'tree_oak'], [X + 41, Y + 2, 'tree_oak'], [X + 41, Y + 7, 'tree_white'], [X + 30, Y + 2, 'tree_pink'],
+    [X + 2, Y + 28, 'tree_pink2'], [X + 12, Y + 29, 'tree_oak'], [X + 41, Y + 22, 'tree_oak'], [X + 41, Y + 28, 'tree_pink'], [X + 37, Y + 28, 'tree_white'], [X + 14, Y + 2, 'pine2'], [X + 28, Y + 2, 'pine2']]) tree(x, y, k);
+  for (const x of [X + 4, X + 12, X + 33]) prop('o_lantern', x, Y + 15.9); for (const x of [X + 4, X + 12]) prop('o_lantern', x, Y + 18.95);
+  for (const [x, y] of [[X + 14, Y + 18.9], [X + 28.6, Y + 18.9], [X + 14, Y + 28.9], [X + 28.6, Y + 28.9]]) prop('o_lantern', x, y);
+  for (const x of [X + 15, X + 28.5]) prop('o_potflower', x, Y + 12.9);
+  for (const [x, y, k] of [[X + 16, Y + 6, 'tree_white'], [X + 27, Y + 6, 'tree_white']]) tree(x, y, k);
+  for (const [x, y] of [[X + 16.5, Y + 10.9], [X + 27.5, Y + 10.9]]) prop('bush2', x, y);
+  for (const x of [X + 17.5, X + 26.5]) prop('flowerbed', x, Y + 12.4, false);
+  for (const [x, y] of [[X + 31, Y + 9.9], [X + 38.6, Y + 9.9]]) prop('x_bonsai', x, y);
+  for (const [x, y] of [[X + 36, Y + 13.4], [X + 40, Y + 13.4], [X + 6, Y + 2.9], [X + 9, Y + 2.9], [X + 37, Y + 25], [X + 39, Y + 25]]) prop('bush', x, y);
+  for (const [x, y] of [[X + 3, Y + 14.9], [X + 11, Y + 14.9], [X + 21, Y + 29.9], [X + 38, Y + 19.9]]) prop('o_flowerbed', x, y, false);
+  for (const [x, y] of [[X + 30, Y + 26.9], [X + 34, Y + 26.9]]) prop('x_orchids', x, y);
+  STATIONS.push({ id: 'gate_town_t', type: 'gate', to: 'town_from_temple', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 1.6, y: Y + 17, r: 1.6, area: 'temple' });
+  // the way in from town: the temple complex (painted, seen from above) on the open lawn south of the town pond. It stands on a
+  // diamond of ground; tiles inside it are solid, and the client draws it in strips so people in front of an edge stand in front.
+  const F = { cx: 74, bv: 72, hw: 8.92, lv: 5.19, x0: 64.66, by: 72.18, w: 18.39 };   // bottom vertex, half width, side-vertex rise; picture left/bottom/width
+  for (let y = 56; y <= 71; y++) for (let x = 62; x <= 86; x++) { const c = get(x, y); if (c === 'T' || c === 'o') set(x, y, '.'); }
+  for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (q.x >= 62 && q.x < 87 && q.y >= 56.5 && q.y < 72.5 && !(q.s === 'pond')) PROPS.splice(i, 1); }
+  for (let i = TREES.length - 1; i >= 0; i--) { const q = TREES[i]; if (q[0] >= 62 && q[0] <= 86 && q[1] >= 56 && q[1] <= 71) TREES.splice(i, 1); }
+  for (let y = 60; y <= 72; y++) for (let x = 64; x <= 84; x++) { const dx = Math.abs(x + .5 - F.cx) / F.hw, dy = Math.abs(y + .5 - (F.bv - F.lv)) / F.lv; if (dx + dy <= .92) set(x, y, 'o'); }
+  rect(73, 72, 3, 4, 'c'); rect(71, 72, 7, 1, 'c');                            // the stone walk from the road up to the steps
+  prop('o_lantern', 72.4, 74.95); prop('o_lantern', 75.6, 74.95); prop('signpost', 76.6, 75.9, false);
+  STATIONS.push({ id: 'gate_temple', type: 'gate', to: 'temple_in', label: 'เข้าวัด', icon: '🛕', x: 74, y: 72.8, r: 1.9, area: 'town', facade: F });
+  GATES.temple_in = { x: X + 3.5, y: Y + 17 }; GATES.town_from_temple = { x: 74, y: 73.8 };
+}
+// ================================================================= the park, dressed up: a food court on the south lawn, café tables,
+// flowerbeds along the main walk and more blossom trees (added after everything else, so nothing older moves)
+{
+  const X = PARK.x, free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !STATIONS.some(q => q.area === 'park' && Math.hypot((q.cx ?? q.x) - x, (q.cy ?? q.y) - y) < (q.w ? q.w / 2 + 1.5 : 1.5));
+  const put = (sp, x, y, solid = true) => { if (free(x, y)) prop(sp, x, y, solid); };
+  for (const [sp, c, y] of [['foodtruck', 39, 85.4], ['cartstall', 45, 85.4], ['icecream', 51, 85.4], ['kiosk', 57, 85.4], ['cartstall', 63, 85.4]]) put(sp, X + c, y);
+  for (const [c, y] of [[41.5, 83], [47.5, 83], [53.5, 83], [59.5, 83]]) { put('x_cafeset', X + c, y); }
+  for (const [c, y] of [[42, 81.3], [54, 81.3], [62, 81.3]]) put('o_parasol', X + c, y, false);
+  for (let c = 3; c < 68; c += 4) { if ([16, 17, 33, 34, 35, 36, 44, 45, 59, 60].some(k => Math.abs(k - c) < 2)) continue; put(c % 8 === 3 ? 'o_tulips' : 'o_flowerbed', X + c + .5, 68.9, false); put(c % 8 === 3 ? 'o_flowerbed' : 'o_tulips', X + c + .5, 72.95, false); }
+  for (const [sp, c, y] of [['tree_pink', 4, 55], ['tree_pink2', 10, 55], ['tree_white', 22, 55], ['tree_pink', 28, 54.5], ['tree_pink', 40, 55], ['tree_white', 50, 54.5], ['tree_pink2', 64, 55],
+    ['tree_pink', 3, 74.5], ['tree_white', 27, 74.5], ['tree_pink2', 30, 85], ['tree_pink', 2, 86], ['tree_white', 66, 80]]) put(sp, X + c, y);
+  for (const [sp, c, y] of [['o_lampball', 31, 68.9], ['o_lampball', 38, 68.9], ['o_lampball', 31, 72.95], ['o_lampball', 38, 72.95], ['o_potflower', 32.2, 68.6], ['o_potflower', 37, 68.6]]) put(sp, X + c, y, false);
+}
+const AREAS = [TOWN, FARM, HOUSING, PARK, TEMPLE, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
 for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;
@@ -680,9 +752,11 @@ const STOCKS = [
 ];
 const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeMin: 5, keep: 240 };
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
+const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', 'namlamyai', 'water'], markup: 1 };
+const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
-  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
@@ -697,7 +771,7 @@ const JOBGAMES = {
   spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 40, min: 10, max: 5, per: 15, rate: .5 },
   shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 40, min: 20, max: 30, per: 2.6, rate: 1.6 },
   cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 25, min: 20, max: 10, per: 7, rate: .4 },
-  run:   { career: 'chef', name: 'เชฟวิ่งเก็บผัก', icon: '🥬', energy: 6, cd: 35, min: 8, max: 40, per: 4, rate: 1.6 },
+  slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 30, min: 10, max: 70, per: 3, rate: 2.5 },   // anyone, at the big kitchen
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
 const THIEFQ = { energy: 6, next: 50000, base: 160, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
@@ -820,6 +894,12 @@ const ITEMS = {
   shabu:   { name: 'ชุดชาบู', icon: '🍲', kind: 'meal', base: 320, eat: { hunger: 70, energy: 10 }, menu: 1 },
 
   // convenience-store goods (sold only at the 24-hour store)
+  offering: { name: 'ชุดธูปเทียนดอกไม้', icon: '🪷', kind: 'goods', base: 20 },
+  malai:  { name: 'พวงมาลัยดอกมะลิ', icon: '🌼', kind: 'goods', base: 30 },
+  khaotom: { name: 'ข้าวต้มมัด', icon: '🍙', kind: 'goods', base: 25, eat: { hunger: 20 } },
+  kanomthai: { name: 'ขนมไทย', icon: '🍡', kind: 'goods', base: 18, eat: { hunger: 8, happy: 3 } },
+  amulet: { name: 'ผ้ายันต์นำโชค', icon: '🧧', kind: 'goods', base: 199 },
+  namlamyai: { name: 'น้ำลำไยเย็น', icon: '🍯', kind: 'goods', base: 15, eat: { energy: 6, hunger: 3, happy: 1 } },
   water:  { name: 'น้ำดื่ม', icon: '💧', kind: 'goods', base: 12, eat: { energy: 3, hunger: 2 } },
   bread:  { name: 'ขนมปังไส้หมูหยอง', icon: '🥐', kind: 'goods', base: 30, eat: { hunger: 18 } },
   coffee: { name: 'กาแฟกระป๋อง', icon: '☕', kind: 'goods', base: 35, eat: { energy: 12 } },
@@ -952,10 +1032,10 @@ const CAREERS = {
   office:   { name: 'พนักงานบริษัท', icon: '👔', where: 'office', need: ['degree'], desc: 'เข้างาน 08:00–17:00 (โอทีต่อได้ถึง 21:00 ค่าส่ง x1.25) รับซองเอกสารที่บริษัทไปส่งตามอาคารทั่วเมือง ได้เงินทุกครั้งที่ส่งถึง ยิ่งไกลยิ่งได้มาก มาสายโดนหักเงินและอาจถูกเลิกจ้าง' },
   farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ประมูลสินค้าที่โรงประมูล (คลังสินค้าเดิม) แข่งกับคู่แข่ง เดาราคาให้แม่น ชนะต่ำกว่ามูลค่าจริง = กำไร สูงกว่า = ขาดทุน · ของในกระเป๋ายังวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
-  chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: ['cooking'], desc: 'ซื้อวัตถุดิบจากชาวไร่ชาวประมง ปรุงอาหารขายได้แพงกว่าหลายเท่า' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง' },
   beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'สมัครได้ถ้ามีเงิน (สด+ฝาก) ไม่เกิน ฿2,000 · วิ่งเก็บขยะที่ถังขยะ (หลบสิ่งกีดขวางไปเรื่อยๆ จนกว่าจะชน) หรือนั่งขอทาน (🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ' },
+  monk:     { name: 'พระ', icon: '🙏', where: 'wat_pray', need: [], desc: 'บวชเป็นพระที่วัด · เช้า 05:00–10:00 ออกบิณฑบาตรอบเมือง ได้อาหารและปัจจัย · ฉันอาหารได้ถึงเที่ยงวันเท่านั้น · หิวช้ากว่าคนทั่วไป' },
   cashier:  { name: 'พนักงานซูเปอร์มาร์เก็ต', icon: '🧾', where: 'cstore', need: [], desc: 'ยืนแคชเชียร์ที่ร้านสะดวกซื้อ/ซูเปอร์มาร์เก็ตสาขาไหนก็ได้ คิดเงินและทอนเงินลูกค้าให้ถูก ยิ่งถูกยิ่งได้มาก' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
@@ -966,7 +1046,7 @@ const LICENSES = {
   policeExam: { name: 'ผลสอบนายสิบตำรวจ', icon: '👮', price: 1000, need: 'hs', where: 'school', test: true },
   cooking:  { name: 'ใบรับรองเชฟ', icon: '📜', price: 1800, where: 'school' },
   medicine: { name: 'ใบประกอบวิชาชีพเวชกรรม', icon: '⚕️', price: 15000, need: 'degree', where: 'school' },
-  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 1200, where: 'school', test: true, renew: 600 },
+  driving:  { name: 'ใบขับขี่', icon: '🪪', price: 1200, where: 'dealer', test: true, renew: 600 },
 };
 const DRIVING_TEST = [
   { q: 'สัญญาณไฟสีเหลือง หมายถึงอะไร', a: ['เร่งความเร็วผ่านไป', 'เตรียมหยุดรถ', 'จอดรถได้ทันที'], ok: 1 },
@@ -1034,7 +1114,6 @@ const TOOLS = {
   office:   { name: 'ชุดสูทหรู', icon: '👔', fx: ['ค่าแรง +10%', 'ค่าแรง +20%', 'ค่าแรง +30%'] },
   farmer:   { name: 'จอบ & ปุ๋ย', icon: '🧪', fx: ['ผลผลิต +1, โตเร็วขึ้น 15%', 'ผลผลิต +2, โตเร็วขึ้น 30%', 'ผลผลิต +3, โตเร็วขึ้น 45%'] },
   merchant: { name: 'รถเข็นสินค้า', icon: '🛒', fx: ['ผู้ประเมินแม่นขึ้น (±22%)', 'ผู้ประเมินแม่นขึ้น (±15%)', 'ผู้ประเมินแม่นขึ้น (±9%)'] },
-  chef:     { name: 'ชุดมีดเชฟ', icon: '🔪', fx: ['โอกาสได้อาหารเพิ่ม 20%', 'โอกาสได้อาหารเพิ่ม 40%', 'โอกาสได้อาหารเพิ่ม 60%'] },
   doctor:   { name: 'เครื่องมือแพทย์', icon: '🩺', fx: ['ค่ารักษา +15%', 'ค่ารักษา +30%', 'ค่ารักษา +50%'] },
   police:   { name: 'วิทยุสื่อสาร', icon: '📻', fx: ['ค่าตอบแทน +15%', 'ค่าตอบแทน +30%', 'ค่าตอบแทน +50%'] },
   beggar:   { name: 'ป้ายกระดาษซึ้งๆ', icon: '🪧', fx: ['คนให้เงินบ่อยขึ้น 15%', 'คนให้เงินบ่อยขึ้น 30%', 'คนให้เงินบ่อยขึ้น 50%'] },
@@ -1390,7 +1469,7 @@ const FORTUNES = [
   'โชคดีจะมาตอนที่คุณไม่ทันตั้งตัว', 'วันนี้เหมาะกับการโทรหาเพื่อนเก่า', 'น้ำพุบอกว่า... ขอเหรียญอีกสักเหรียญ', 'ดวงความรักสดใส ยิ้มเยอะๆ นะ',
   'เที่ยงคืนเป็นเวลาของสิ่งแปลกประหลาด', 'คนที่เดินผ่านคุณไปเมื่อกี้ อาจไม่ใช่คนธรรมดา', 'อดทนอีกนิด สิ่งที่รอจะมาถึง', 'วันนี้ใครให้อะไร รับไว้ด้วยรอยยิ้ม',
 ];
-module.exports = { EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
