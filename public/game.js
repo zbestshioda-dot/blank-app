@@ -2217,8 +2217,29 @@ function drawZTint(t) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
 }
 const zIcon = (i, sz) => `<i class="zic" style="width:${sz}px;height:${sz}px;background-size:${sz * 9}px ${sz}px;background-position:-${i * sz}px 0"></i>`;
+let ZWIN = { ids: new Set(), until: 0 }, znListOpen = true;
+function znList() {   // a small, tap-to-fold survivor list on the left edge: never in the way of running
+  let el = $('#znList');
+  if (ZN.ph !== 'on' || !ZN.names) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'znList'; document.body.appendChild(el); el.onclick = () => { znListOpen = !znListOpen; FX.play('click'); el.dataset.k = ''; znList(); }; }
+  const ns = ZN.names, myName = me?.name, k = `${znListOpen}|${ZN.alive}|${ns.join(',')}`;
+  if (el.dataset.k === k) return; el.dataset.k = k;
+  const show = ns.slice(0, 8), more = ZN.alive - show.length;
+  el.classList.toggle('shut', !znListOpen);
+  el.innerHTML = `<b>🧍 ผู้รอด ${ZN.alive} ${znListOpen ? '▾' : '▸'}</b>` + (znListOpen ? show.map(n => `<span class="${n === myName ? 'me' : ''}">${esc(n)}</span>`).join('') + (more > 0 ? `<i>+อีก ${more} คน</i>` : '') : '');
+}
+function znWinner(m) {   // big floating winner announcement, no taps needed, fades on its own
+  ZWIN = { ids: new Set(m.ids || []), until: performance.now() + 180e3 };
+  document.querySelectorAll('.znWin').forEach(e => e.remove());
+  const d = document.createElement('div'); d.className = 'znWin';
+  const ns = m.names || [], more = (m.n || 0) - ns.slice(0, 10).length;
+  d.innerHTML = m.n ? `<div class="t">🏆 ผู้รอดชีวิตคืนนี้ 🏆</div><div class="n">${ns.slice(0, 10).map(n => `<span>${esc(n)}</span>`).join('')}${more > 0 ? `<span>+อีก ${more} คน</span>` : ''}</div>${m.won ? '<div class="y">คุณคือหนึ่งในผู้รอด! รางวัลอยู่ในกล่องจดหมาย ✉️</div>' : ''}`
+    : `<div class="t">🌅 ฟ้าสางแล้ว</div><div class="y">คืนนี้ไม่มีใครรอดเลย... เดือนหน้าแก้มือนะ</div>`;
+  document.body.appendChild(d); setTimeout(() => d.remove(), 8200);
+}
 function znHud() {
   const el = $('#znBar'); if (!el) return;
+  znList();
   if (ZN.ph !== 'warn' && ZN.ph !== 'on') { el.classList.add('hidden'); return; }
   const left = Math.max(0, Math.ceil(((ZN.endT || 0) - performance.now()) / 1000)), mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   let title, sub;
@@ -2238,7 +2259,7 @@ function znMsg(m) {
     const was = ZN.ph;
     if (m.ph === 'end') {
       ZN = { ph: 'off' }; znHud(); FX.play(m.won ? 'levelup' : 'chime');
-      znCard(`${zIcon(m.won ? 8 : 2, 40)}<b>${m.won ? 'คุณรอดชีวิต!' : 'ฟ้าสางแล้ว'}</b><p>${m.won ? 'รางวัลผู้รอดชีวิตส่งไปที่กล่องจดหมาย ✉️ แล้ว' : `คืนนี้มีผู้รอด ${m.n} คน · เดือนหน้าลองใหม่นะ`}</p>`, m.won ? 'win' : '', 5000);
+      znWinner(m);
       return;
     }
     ZN = { ...m, endT: performance.now() + Math.max(0, m.end - (Date.now() + clockOff)) };
@@ -3021,6 +3042,10 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
     else if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
     else ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d';
     ctx.fillText(`«${p.title}»`, px, ty);
+  }
+  if (ZWIN.ids.has(p.id) && t < ZWIN.until && !p.npc) {   // zombie-night survivors wear a gold tag for a while
+    const zFs = Math.max(10, Math.round(TS * .22)), zh = zFs * 1.3, zy = yTop - GAP - zh / 2 + Math.sin(t / 260) * 1.5;
+    sign('🏆 ผู้รอดชีวิต', px, zy, { size: zFs, h: zh, bg: 'rgba(255,196,40,.95)', color: '#3a2400' }); yTop = zy - zh / 2;
   }
   if (p.emo && performance.now() < p.emoT) {
     const k = 1 - (p.emoT - performance.now()) / 4200, by = yTop - TS * .42 - Math.sin(Math.min(1, k * 4) * Math.PI / 2) * TS * .25;
@@ -3966,6 +3991,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19o', d: '19 พ.ย. (รอบ 58)', items: [
+    '⚡ ทำงาน/เควสใช้พลังงานน้อยลงราว 30% ทุกอาชีพ',
+    '⏱️ คูลดาวน์เควสอาชีพสั้นลง: ภารกิจ ICU, ตามจับโจร, ตามหาหมา, ภารกิจหมอ และมินิเกมอาชีพ',
+    '🌟 ผู้สมัครนายกได้ชื่อเสียงฟรีจากการทำดีให้เมือง (เก็บขยะ ให้ทาน ทำบุญ รักษาคนไข้ ส่งของ ตั้งใจเรียน รอดคืนปล่อยผี) สูงสุด 6/วัน',
+    '🧟 คืนปล่อยผี: มีรายชื่อผู้รอดเล็กๆ ขอบซ้าย (แตะเพื่อพับ) และประกาศผู้รอดชีวิตตัวใหญ่กลางจอ ผู้รอดได้ป้าย 🏆 เหนือหัว 3 นาที',
+  ] },
   { v: '2026-11-19n', d: '19 พ.ย. (รอบ 57)', items: [
     '🎡 <b>สวนสนุกโฉมใหม่ กะทัดรัด</b> เครื่องเล่นทุกอย่างอยู่ใกล้กัน เดินไม่กี่ก้าว · มี<b>ถนนร้านค้า</b> ด้านใต้: 🏪 มินิมาร์ท 24 ชม., ร้านขนม & ของฝาก, ฟู้ดทรัค, รถไอศกรีม, คาเฟ่ และตู้กดน้ำ',
   ] },
@@ -4372,7 +4403,7 @@ function mayorPanel() {
       ${B(M.annDone ? '📢 วันนี้ประกาศแล้ว' : '📢 ประกาศ', { fn: 'mayor', op: 'ann' }, 'primary', !!M.annDone)}`;
   }
   const care = c && c.pol === 'care' ? `<div class="secT">🎁 เบี้ยเมือง</div>${B(M.claimed ? '✅ รับแล้ววันนี้' : `🎁 รับเบี้ยเมือง ${money(K.care)}`, { fn: 'mayor', op: 'claim' }, 'good', !!M.claimed)}` : '';
-  const runBox = M.run ? `<div class="item"><div class="nm">🗳️ คุณเป็นผู้สมัคร · ชื่อเสียง ${M.run.rep}<small>หาเสียงได้อีก ${M.run.left} ครั้งวันนี้ · ครั้งละ ${money(K.camp)} (ชื่อเสียง +1 = 1 คะแนนเสียง/10)</small></div>${B('📣 หาเสียง ' + money(K.camp), { fn: 'mayor', op: 'camp' }, 'good', !M.run.left)}</div>`
+  const runBox = M.run ? `<div class="item"><div class="nm">🗳️ คุณเป็นผู้สมัคร · ชื่อเสียง ${M.run.rep}<small>หาเสียงได้อีก ${M.run.left} ครั้งวันนี้ · ครั้งละ ${money(K.camp)}<br>🌟 ชื่อเสียงฟรีจากทำดีให้เมือง วันนี้ ${M.run.act || 0}/${M.run.actMax || 6}: เก็บขยะ · ให้ทาน · ทำบุญ · รักษา/ช่วยชีวิตคนไข้ · ส่งของ · ตั้งใจเรียน · รอดคืนปล่อยผี (+3)</small></div>${B('📣 หาเสียง ' + money(K.camp), { fn: 'mayor', op: 'camp' }, 'good', !M.run.left)}</div>`
     : `${B('🗳️ ลงสมัคร ' + money(K.fee), { fn: 'mayor', op: 'run' }, 'primary', M.lv < K.minLv || me.money < K.fee)}<div class="sub">ต้องเลเวล ${K.minLv}+ (คุณ Lv.${M.lv}) · เป็นนายกติดกันได้ไม่เกิน ${K.maxTerms} วาระ</div>`;
   const rows = M.cands.map((r, i) => `<div class="item"><div class="nm">${i === 0 ? '🥇' : '#' + (i + 1)} ${esc(r.n)}<small>${r.v} คะแนนเสียง · ชื่อเสียง ${r.rep} · คะแนนรวม ${r.s}</small></div>${M.voted === r.l ? '<small>✅ คุณโหวตให้</small>' : B('🗳️ โหวต', { fn: 'mayor', op: 'vote', l: r.l, n: r.n }, 'good', !!M.voted || M.lv < K.voteLv || r.l === M.my)}</div>`).join('') || '<div class="sub">ยังไม่มีผู้สมัครในรอบนี้ มาเป็นคนแรกสิ!</div>';
   return `<h2>🏛️ เลือกตั้งนายกเมือง</h2>${cur}${mine}${care}

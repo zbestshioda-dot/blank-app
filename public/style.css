@@ -1342,3 +1342,15 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
   repeating-linear-gradient(to bottom,var(--d) 0 2px,transparent 2px 12px),repeating-linear-gradient(90deg,var(--d) 0 2px,var(--c) 2px 24px)}
 .wallSw.plank{background:linear-gradient(to bottom,transparent 0 62%,var(--e) 62% 88%,var(--d) 88%),repeating-linear-gradient(90deg,var(--d) 0 2px,var(--c) 2px 16px)}
 .wallSw.damask{background:linear-gradient(to bottom,transparent 0 62%,var(--e) 62% 88%,var(--d) 88%),radial-gradient(circle,rgba(255,255,255,.45) 2px,transparent 3px) 0 0/14px 14px,var(--c)}
+/* zombie night: survivor list (left edge, tap to fold) + floating winner announcement */
+#znList{position:fixed;left:6px;top:calc(env(safe-area-inset-top) + 330px);z-index:7;max-width:132px;padding:4px 7px;border-radius:9px;background:rgba(6,20,10,.55);border:1px solid rgba(111,220,111,.5);color:#eaffea;font-size:11px;line-height:1.35;cursor:pointer}
+#znList b{display:block;font-size:11.5px;white-space:nowrap}
+#znList span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9}
+#znList span.me{color:#ffd34d;font-weight:700;opacity:1}
+#znList i{display:block;font-style:normal;opacity:.7}
+#znList.shut{background:rgba(6,20,10,.4)}
+.znWin{position:fixed;left:50%;top:34%;transform:translateX(-50%);z-index:300;pointer-events:none;text-align:center;width:min(92vw,520px);padding:12px 10px 14px;border-radius:18px;background:radial-gradient(ellipse at center,rgba(20,12,0,.72),rgba(20,12,0,.45) 70%,rgba(20,12,0,0));animation:znWinF 8.2s ease-out forwards}
+.znWin .t{font-size:clamp(26px,8vw,44px);font-weight:900;color:#ffe066;text-shadow:2px 2px 0 #4a2800,-2px 2px 0 #4a2800,2px -2px 0 #4a2800,-2px -2px 0 #4a2800,0 4px 0 #4a2800,0 0 22px rgba(255,190,30,.9);letter-spacing:.5px}
+.znWin .n{margin-top:6px;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;font-size:clamp(16px,4.6vw,22px);font-weight:800;color:#fff;text-shadow:0 2px 0 #000,0 0 10px rgba(0,0,0,.8)}
+.znWin .y{margin-top:6px;font-size:clamp(13px,3.8vw,17px);font-weight:700;color:#bfffbf;text-shadow:0 2px 0 #000}
+@keyframes znWinF{0%{opacity:0;transform:translate(-50%,30px) scale(.7)}8%{opacity:1;transform:translate(-50%,0) scale(1.08)}14%{transform:translate(-50%,0) scale(1)}80%{opacity:1;transform:translate(-50%,-14px)}100%{opacity:0;transform:translate(-50%,-50px)}}
