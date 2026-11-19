@@ -744,7 +744,17 @@ function mayorOp(a, m) {
 const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
-const furnOf = a => [...(a.furniture || []), ...(a.keep || [])];
+const furnOf = a => [...(a.hown ? ['sbed'] : []), ...(a.furniture || []), ...(a.keep || [])];   // sbed: the bed every home comes with (movable, cannot be stored)
+const inOwnHome = a => { const r = D.areaAt(a.x, a.y); return !!r && r.house !== undefined && r.house === a.house && (r.rk === 'house' || r.yard); };
+// the sleep spot follows the owner's bed when they move it
+function syncBed(a) {
+  const i = a.house; if (!(i >= 0)) return; const s = ST['hbed' + i]; if (!s) return;
+  const room = D.ROOMS.find(r => r.id === s.room); if (!room) return;
+  const p = a.fpos?.sbed, fl = p?.[0] || 1;
+  if (fl !== 1) return;   // only the ground floor carries the sleep spot
+  const x = p ? p[1] : 3.4, y = p ? p[2] : 3.3;
+  s.x = room.x + x; s.y = room.y + y + .4;
+}
 const fbase = k => String(k).split('#')[0];   // partition pieces can be owned many times: wdoor, wdoor#2, wdoor#3 ...
 const FURN_MULTI_MAX = 40;
 const YARD_FL = 9;                                   // fpos floor number that means "out in the yard"
@@ -875,7 +885,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -1235,12 +1245,16 @@ function knockOut(a) {
     const here = D.areaAt(a.x, a.y);
     if (here && here.kind === 'map') { const ev = { t: 'amb', id: a.id, x: +a.x.toFixed(2), y: +a.y.toFixed(2), area: here.id }; for (const o of online.values()) if (o !== a && areaId(o) === here.id) send(o, ev); }
     const docsOn = [...online.values()].some(o => o.career === 'doctor' && o !== a && !o.down);
-    a.down = { kind: 'hosp', t: now(), until: now() + (docsOn ? 60000 : 25000), free: newbie(a) || a.money < 500 };
+    // the first knock-out of the day waits the normal time; from the second one it is 10s, then +5s each time, up to 30s
+    const kd = dayKey(); a.koDay = a.koDay?.d === kd ? a.koDay : { d: kd, n: 0 }; a.koDay.n++; a.sd = true;
+    const wait = a.koDay.n <= 1 ? (docsOn ? 60000 : 25000) : Math.min(30000, 10000 + (a.koDay.n - 2) * 5000);
+    a.down = { kind: 'hosp', t: now(), until: now() + wait, free: newbie(a) || a.money < 500 };
     let i = beds.findIndex(b => !b);
     if (i < 0) i = beds.findIndex(b => b && b.npc);
     if (i >= 0) { beds[i] = a; a.bed = i; const s = ST['bed' + i]; place(a, s.x, s.y, true); }
     else { const r = ROOM.r_hospital; place(a, r.x + 5, r.y + 6, true); }
     const docs = [...online.values()].filter(o => o.career === 'doctor' && o !== a && !o.down);
+    if (a.koDay.n > 1) toast(a, `คุณหมดสติ! รถพยาบาลพามาส่งโรงพยาบาล เจ้าหน้าที่จะช่วยให้ฟื้นใน ${Math.round(wait / 1000)} วินาที`, '🚑', false); else
     toast(a, `คุณหมดสติ! รถพยาบาลพามาส่งเตียงโรงพยาบาล${docs.length ? ` รอหมอช่วย (หมอออนไลน์ ${docs.length} คน) ถ้าไม่มีใครช่วย เจ้าหน้าที่จะช่วยใน 2 นาที` : ' ไม่มีหมอออนไลน์ เจ้าหน้าที่จะช่วยให้ฟื้นใน 1 นาที (ค่ารักษาแพง)'}`, '🚑', false);
     joy(a, -15);
     feed(`🚑 ${a.name} หมดสติถูกส่งโรงพยาบาล`);
@@ -1476,6 +1490,7 @@ function eggMayor(a, bn) {
   const bs = mayorPool().filter(n => n.id !== bn.id); if (bs.length) mayorBot = pick(bs).id;   // the mayor slips away into someone else
 }
 function act(a, m) {
+  if (/^hbed\d+$/.test(m.st || '')) { const o = houses[ST[m.st]?.idx]; if (o) syncBed(o); }   // the bed may have been moved
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
   if (!s && m.st === 'water') { if (a.cast) { a.cast = null; markMe(a); } return toast(a, 'ต้องยืนติดริมน้ำก่อนถึงจะตกปลาได้', '🎣', false); }
   if (!s) return;
@@ -1500,7 +1515,7 @@ function act(a, m) {
       if (a.fun?.k === s.k) return toast(a, `คุณเล่น${R.name}อยู่แล้ว เดินออกเพื่อลง`, 'ℹ️', false);
       const riders = [...online.values()].filter(o => o !== a && o.fun?.k === s.k);
       if (riders.length >= R.cap) return toast(a, `${R.name}เต็มแล้ว (${R.cap} คน) รอคิวสักครู่`, '⏳', false);
-      if (!pay(a, R.price)) return;
+      if (R.price && !pay(a, R.price)) return;   // the park is free now
       const used = new Set(riders.map(o => o.fun.slot)); let slot = 0; while (used.has(slot)) slot++;
       standUp(a); a.cast = null; a.pose = 'fun'; a.fun = { k: s.k, slot, until: now() + R.mins * 60000 };
       if (s.k === 'bumper') place(a, s.cx - 3 + (slot % 4) * 2, s.cy + .3, true); else if (s.k === 'pool') place(a, s.cx - 5 + (slot % 5) * 2.5, s.cy - .6 + Math.floor(slot / 5) * 2.4, true); else place(a, s.x, s.y);   // bumper cars: you drive it yourself inside the arena
@@ -3436,7 +3451,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -3572,6 +3587,14 @@ function onMessage(ws, raw) {
         broadcast({ t: 'announce', text: announceText }); bugsDirty = true; dirty = true;   // kept across restarts
         return toast(a, announceText ? 'ตั้งประกาศแถบด้านบนให้ทุกคนแล้ว' : 'กลับไปใช้ประกาศ CBT เดิมแล้ว', '📢');
       }
+      if (m.ch === 'gang') {                  // gang chat: only members read it (orange), kept per gang
+        const g = gangOf(a); if (!g) return toast(a, 'คุณยังไม่มีแก๊ง เข้าร่วมหรือตั้งแก๊งได้ในแอป 🏴', '🏴', false);
+        if (!cd(a, 'gchat', 1200)) return;
+        const gm = { t: 'chat', g: 1, gn: g.name, id: a.id, name: a.name, c: a.career, text, ts: now() };
+        g.chat = [...(g.chat || []), gm].slice(-30); gdirty();
+        for (const o of online.values()) if (o.gang === g.id && g.mem[lk(o)]) send(o, gm);
+        return quest(a, 'chat');
+      }
       if (m.ch === 'world') {                 // town-wide chat: everyone reads it in the chat box, no bubble over the head
         if (!cd(a, 'wchat', 3000)) return;
         const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };
@@ -3704,6 +3727,12 @@ function onMessage(ws, raw) {
       }
       return;
     }
+    case 'questquit': {   // the ✕ on the quest chip: drop a lost-dog / thief case from anywhere
+      if (!a.dogq || !cd(a, 'qquit', 800, true)) return;
+      const th = a.dogq.kind === 'thief'; if (th) a.thiefNext = now() + D.THIEFQ.next; else a.dogNext = now() + D.DOGQ.next;
+      a.dogq = null; markMe(a); return toast(a, th ? 'ยกเลิกเคสจับโจรแล้ว' : 'ยกเลิกเคสหมาหายแล้ว', 'ℹ️', false);
+    }
+    case 'decor': { a.decor = m.on && inOwnHome(a) ? 1 : 0; return; }
     case 'mission': return misAct(a, m);
     case 'rb': return rbAct(a, m);
     case 'rbseek': { if (a.career !== 'rider' && !allJobs(a)) return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
@@ -3764,7 +3793,7 @@ function onMessage(ws, raw) {
         if (!fd?.multi || !a.furniture.includes(k)) return;
         a.furniture = a.furniture.filter(x => x !== k); delete a.fpos[k]; if (a.ycrops) delete a.ycrops[k]; credit(a, Math.round(fd.price / 2));
         toast(a, `ขาย${fd.name}คืน ได้ ${money(Math.round(fd.price / 2))}`, '♻️');
-      } else if (m.store) { a.fpos[k] = [0]; if (fd?.tile) { if (a.ycrops) delete a.ycrops[k]; } else toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
+      } else if (m.store) { if (k === 'sbed') return toast(a, 'เตียงประจำบ้านเก็บเข้าคลังไม่ได้ ย้ายตำแหน่งได้อย่างเดียว', '🛏️', false); a.fpos[k] = [0]; if (fd?.tile) { if (a.ycrops) delete a.ycrops[k]; } else toast(a, `เก็บ${fd?.name || ''}เข้าคลังแล้ว`, '📦'); }
       else {
         const fl = Math.round(+m.fl) || 1, x = +m.x, y = +m.y;
         if (fl === YARD_FL) {                 // out in the yard: only on ground that has been unlocked
@@ -3777,7 +3806,9 @@ function onMessage(ws, raw) {
           }
           if (!yardOpen(a, D.yardZone(x, y))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
         } else if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
-        a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20];
+        if (k === 'sbed' && fl !== 1) return toast(a, 'เตียงประจำบ้านวางได้เฉพาะชั้น 1', '🛏️', false);
+        a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20, m.flip ? 1 : 0];
+        if (k === 'sbed') syncBed(a);
       }
       markMe(a); wdAt = 0; return;
     }
@@ -3995,6 +4026,7 @@ function tick() {
       a.craving = null; a.utilOff = false;
     }
     // ---- energy, hunger, health
+    const frozen = a.decor && inOwnHome(a) ? [a.energy, a.hunger, a.health, a.happy] : (a.decor = 0, null);   // arranging the home: stats hold still
     // energy comes back properly in a bed or at the amusement park; everyone gets a slow trickle
     // sitting (bench, seat, the rest button) for 10s+ doubles the trickle, but only up to half a bar: a full bar still needs a bed or the park
     const sitting = a.pose === 'seat' || a.pose === 'rest';
@@ -4003,7 +4035,7 @@ function tick() {
     if (a.pose === 'fun' && a.fun) {          // on a park ride: energy, health and happiness come back every second
       const R = D.RIDES[a.fun.k];
       if (!R || D.areaAt(a.x, a.y)?.id !== 'park') standUp(a);
-      else if (t > a.fun.until) { rideOff(a); markMe(a); toast(a, `หมดเวลา${R.name}แล้ว ซื้อตั๋วใหม่เพื่อเล่นต่อได้เลย`, R.icon); }
+      else if (t > a.fun.until) { rideOff(a); markMe(a); toast(a, `หมดเวลา${R.name}แล้ว กดเล่นใหม่ได้เลย (ฟรี) เพื่อเล่นต่อได้เลย`, R.icon); }
       else { a.energy = Math.min(100, a.energy + R.gain.energy * dt); if (!a.down) a.health = Math.min(100, a.health + R.gain.health * dt); a.happy = Math.min(100, (a.happy ?? 80) + R.gain.happy * dt); }
     }
     if (a.pose !== 'chair' && a.pose !== 'study') a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt);
@@ -4020,6 +4052,7 @@ function tick() {
     if (a.pose === 'rest' || a.pose === 'bed') { a.awake = Math.max(0, (a.awake || 0) - 4 * dt); if (a.awake === 0 && (a.dz || []).some(d => d === 'insomnia' || d === 'exhaust') && a.pose === 'rest') sleepWell(a); }
     else a.awake = (a.awake || 0) + dt;
     if (slow) moodTick(a, t, indoors);
+    if (frozen) { a.energy = Math.max(a.energy, frozen[0]); a.hunger = Math.max(a.hunger, frozen[1]); a.health = Math.max(a.health, frozen[2]); a.happy = Math.max(a.happy ?? 0, frozen[3] ?? 0); }
     if (slow && !isAdmin(a)) {               // beggars: out of poverty past ฿2,000
       if (a.career === 'beggar' && a.money + (a.bank || 0) > 2000) { a.career = 'none'; a.pose === 'beg' && standUp(a); markMe(a); sendRoster(); toast(a, '🎉 มีเงินเกิน ฿2,000 แล้ว! พ้นจากการเป็นขอทาน ไปสมัครงานใหม่ได้เลย', '🎉'); feed(`🎉 ${a.name} พ้นจากการเป็นขอทานแล้ว!`); }
     }

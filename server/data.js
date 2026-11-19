@@ -446,7 +446,7 @@ const LAYOUT = {
     ['x_sofa2', 4.6, 8.9], ['f_plant', 12.8, 8.8], ['i_poster', 5, 1.05, false], ['i_poster', 9.6, 1.05, false], ['x_magrack', 9.4, 8.9]],
   // a small home: bedroom (top left), living room (middle), bathroom (top right), kitchen (bottom left); bought furniture fills its own spots (client FURN_POS)
   // a new home comes empty: only the bed (plus windows and the doormat) — everything else is bought and placed by the owner
-  house: [['f_bed_blue', 3.4, 3.3], ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false], ['f_welcome', 7, 9.25]],
+  house: [['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false], ['f_welcome', 7, 9.25]],
 };
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
@@ -581,12 +581,12 @@ const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house ===
 const POOL = {};   // the park pool's water (filled in below): swimmers move freely inside it, nobody else (and no vehicle) can enter
 const ENERGY_MUL = 1.3;   // every energy cost (jobs, quests, fishing...) x this
 const RIDES = {
-  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 60, mins: 3, cap: 6, gain: { energy: 2.0, health: 0.8, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
-  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 90, mins: 4, cap: 8, gain: { energy: 1.8, health: 1.2, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
-  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 120, mins: 2, cap: 6, gain: { energy: 1.2, health: 0.4, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
-  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 80, mins: 4, cap: 10, gain: { energy: 2.4, health: 2.2, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
-  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 70, mins: 2, cap: 4, gain: { energy: 1.2, health: 0.4, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
-  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 40, mins: 2, cap: 3, gain: { energy: 1.0, health: 0.4, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
+  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 0, mins: 3, cap: 6, gain: { energy: 2.0, health: 0.8, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
+  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 0, mins: 4, cap: 8, gain: { energy: 1.8, health: 1.2, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
+  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 0, mins: 2, cap: 6, gain: { energy: 1.2, health: 0.4, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
+  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 0, mins: 4, cap: 10, gain: { energy: 2.4, health: 2.2, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
+  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 0, mins: 2, cap: 4, gain: { energy: 1.2, health: 0.4, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
+  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 0, mins: 2, cap: 3, gain: { energy: 1.0, health: 0.4, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
 };
 {
   const X = PARK.x, Y = PARK.y, P = PARK;
@@ -1140,6 +1140,7 @@ const FURNITURE = {
   sofa:   { name: 'โซฟา', icon: '🛋️', price: 3000,  comfort: 1 },
   tv:     { name: 'ทีวีจอใหญ่', icon: '📺', price: 6000,  comfort: 2 },
   bed:    { name: 'เตียงนุ่ม', icon: '🛏️', price: 8000,  comfort: 2 },
+  sbed:   { name: 'เตียงประจำบ้าน', icon: '🛏️', price: 0, comfort: 0, cat: 'starter', spr: 'f_bed_blue', solid: 1 },   // every home has one; it can be moved, never sold or stored
   aqua:   { name: 'ตู้ปลา', icon: '🐠', price: 12000, comfort: 3 },
   art:    { name: 'ภาพวาด', icon: '🖼️', price: 18000, comfort: 3 },
   piano:  { name: 'เปียโน', icon: '🎹', price: 25000, comfort: 4 },
