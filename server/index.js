@@ -283,14 +283,55 @@ function exitRoom(a) {
 }
 
 // ------------------------------------------------------------------ money
+// ---- money history: every change of a player's cash is written to a.ledger [time, amount, what, balance after], newest last.
+// Explicit entries come from ledAdd; anything else is caught by ledSweep (after each message, and every tick) and named after
+// what the player was doing (a.ledCtx) so nothing goes missing.
+const LED_MAX = 200;
+const LED_T = { god: '👑 แอดมิน', chat: 'แชท', trade_confirm: 'แลกของกับผู้เล่น', stock: 'ซื้อขายหุ้น', bankop: 'ธนาคาร', lotto: 'ลอตเตอรี่', luxbuy: 'ซื้อฉายาเศรษฐี', frame: 'กรอบรูป', wear: 'ชุด',
+  use: 'ใช้ของ', ride: 'ซื้อ/ใช้ยานพาหนะ', p: 'เดินทาง', taxi: 'แท็กซี่', order: 'สั่งอาหาร', morder: 'สั่งของจากตลาด', donate: 'บริจาค', alms_give: 'ใส่บาตร', beg: 'ขอทาน',
+  gang: 'แก๊ง', hplace: 'แต่งบ้าน', hstyle: 'แต่งบ้าน', decor: 'แต่งบ้าน', yfarm: 'สวนผัก', mailclaim: 'รับของจากจดหมาย', achclaim: 'รางวัลความสำเร็จ', mission: 'ภารกิจ',
+  minigame: 'มินิเกม', jg: 'มินิเกม', paybills: 'ค่าน้ำค่าไฟ', rod: 'เบ็ดตกปลา', quest_reroll: 'เควสต์', quizans: 'ควิซในห้องเรียน', mayor: 'เลือกตั้งนายก', rest: 'พักผ่อน',
+  work: 'ทำงาน', collect: 'เก็บเงิน', look: 'ชุด/หน้าตา', reset: 'รีเซ็ตตัวละคร', escort: 'คุ้มกัน', chase: 'ไล่จับ', refcode: 'ชวนเพื่อน', adreward: 'ดูโฆษณา', visit: 'เยี่ยมบ้าน',
+  npctalk: 'คุยกับชาวเมือง', go: 'เดินทาง', rename: 'บัตรเปลี่ยนชื่อ', gift: 'ของขวัญ', run: 'วิ่ง', title: 'ฉายา', req_ans: 'คำขอจากผู้เล่น', enter: 'เข้าอาคาร', exit: 'ออกจากอาคาร' };
+const LED_A = { buy: 'ซื้อ', sell: 'ขาย', cook: 'รับออเดอร์อาหาร', serve: 'เสิร์ฟอาหาร', heal: 'รักษา', treat: 'รักษา', start: 'เริ่มงาน', go: 'เดินทาง', rent: 'เช่า', pay: 'จ่าย' };
+function ledLabel(a, m) {
+  if (m.t === 'act') { const s0 = m.st === 'water' ? { icon: '🎣', label: 'ตกปลา' } : ST[m.st]; if (s0) return `${s0.icon || ''} ${s0.label || s0.type}${LED_A[m.a] ? ' · ' + LED_A[m.a] : ''}`.trim(); }
+  return LED_T[m.t] || m.t;
+}
+function ledPush(a, d, what, bal) {
+  if (!d) return;
+  const L = a.ledger || (a.ledger = []), t = now(), last = L[L.length - 1];
+  if (last && last[2] === what && Math.sign(last[1]) === Math.sign(d) && t - last[0] < 90e3) { last[1] += d; last[3] = bal; last[0] = t; }   // merge a run of the same thing
+  else { L.push([t, d, what, bal]); if (L.length > LED_MAX) L.splice(0, L.length - LED_MAX); }
+  a.sd = true;
+}
+function ledSweep(a, what) {
+  if (!isFinite(a.money)) return;
+  if (a.ledBal == null || !isFinite(a.ledBal)) { a.ledBal = a.money; return; }
+  const d = Math.round(a.money - a.ledBal); if (d) ledPush(a, d, what || a.ledCtx || 'อื่นๆ', a.money); a.ledBal = a.money;
+}
+function ledAdd(a, d, what) {   // call right after changing a.money by d
+  if (!isFinite(a.money)) return;
+  if (a.ledBal == null) a.ledBal = a.money - d;
+  const res = Math.round(a.money - d - a.ledBal); if (res) ledPush(a, res, a.ledCtx || 'อื่นๆ', a.money - d);
+  ledPush(a, Math.round(d), what, a.money); a.ledBal = a.money;
+}
 function earn(a, amount) {
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
   if (amount > 0 && mayor?.pol === 'tax') amount *= 1 + MAYOR.tax;   // the mayor's low-tax policy
   if (amount > 0 && a.gang) { const g0 = gangOf(a); if (g0) amount *= 1 + GANG.lv[g0.lvl - 1].inc; }   // a bigger gang house pays its members a little extra
-  amount = Math.round(amount); if (amount > 0) amount -= taxOf(a, amount); a.money += amount; a.earned += amount; markMe(a);
+  ledSweep(a);
+  amount = Math.round(amount); const tx = amount > 0 ? taxOf(a, amount) : 0; amount -= tx; a.money += amount; a.earned += amount; markMe(a);
+  ledPush(a, amount + tx, a.ledCtx || 'รายได้', a.money + tx); ledPush(a, -tx, '🧾 ภาษีรายได้', a.money); a.ledBal = a.money;
+  let rp = 0;
   if (amount > 0) {
     quest(a, 'earn', amount); gangPts(a, amount);
-    if (a.loan > 0) { const r = Math.min(a.loan, Math.ceil(amount * D.BANK.repayShare)); a.money -= r; a.loan -= r; }   // loans auto-repay from income
+    if (a.loan > 0) { rp = Math.min(a.loan, Math.ceil(amount * D.BANK.repayShare)); a.money -= rp; a.loan -= rp; ledAdd(a, -rp, '🏦 ผ่อนเงินกู้อัตโนมัติ'); }   // loans auto-repay from income
+  }
+  a.lastDed = { tax: tx, loan: rp, net: amount - rp };
+  if (tx + rp > 0) {   // say where the missing money went (batched so small earnings don't spam)
+    const p = a.dedPend || (a.dedPend = { tax: 0, loan: 0 }); p.tax += tx; p.loan += rp;
+    if (cd(a, 'dedT', 8000, true)) { toast(a, `หัก${p.tax ? `ภาษี ${money(p.tax)}` : ''}${p.tax && p.loan ? ' · ' : ''}${p.loan ? `ผ่อนเงินกู้อัตโนมัติ ${money(p.loan)}` : ''}`, '🧾', false); a.dedPend = null; }
   }
   return amount;
 }
@@ -322,7 +363,7 @@ function fuel(a, d) {
   if (a.fuelDue < 5) return;
   const c = Math.floor(a.fuelDue);
   if (a.money < c) { a.fuelDue = 0; a.ride = ''; a.mvb = moveCap(a); markMe(a); sendRoster(); return toast(a, 'เงินไม่พอเติมน้ำมัน ⛽ ต้องลงเดินก่อน', '⛽', false); }
-  a.money -= c; a.fuelDue -= c; a.fuelDay = a.fuelDay?.d === dayKey() ? a.fuelDay : { d: dayKey(), c: 0 }; a.fuelDay.c += c; markMe(a);
+  a.money -= c; ledAdd(a, -c, '⛽ ค่าน้ำมัน'); a.fuelDue -= c; a.fuelDay = a.fuelDay?.d === dayKey() ? a.fuelDay : { d: dayKey(), c: 0 }; a.fuelDay.c += c; markMe(a);
 }
 // income tax by the real (Bangkok) day: the first ฿20,000 is free, then 10%, and 20% above ฿60,000
 const TAX = [[30000, 0], [100000, .05], [Infinity, .1]];   // lowered: ฿30k free, then 5%, 10% above ฿100k
@@ -668,6 +709,15 @@ function znStart(t, test) {
   for (const o of online.values()) toast(o, `🧟 ซอมบี้กำลังบุกเมือง! ออกจากอาคารภายใน ${Math.round((zn.t0 - t) / 1000)} วินาที คนที่อยู่ในอาคารจะโดนรุมกิน`, '☣️', false);
   znSendAll();
 }
+// zombie night is fought in town: the park, the housing estate (and its yards) and the temple are closed
+const ZN_NOGO = id => id === 'park' || id === 'housing' || id === 'temple' || /^yard\d+$/.test(id);
+const ZN_BACK = { park: 'town_from_park', housing: 'town_from_housing', temple: 'town_from_temple' };
+function znEvict(a) {
+  const id = areaId(a); if (!ZN_NOGO(id)) return;
+  if (a.fun) rideOff(a);
+  const g = D.GATES[ZN_BACK[id] || 'town_from_housing'] || D.SPAWN; teleport(a, g.x, g.y);
+  toast(a, '🧟 คืนปล่อยผี: พาคุณกลับเข้าเมืองแล้ว สวนสนุก หมู่บ้านจัดสรร และวัด ปิดชั่วคราว', '🚧', false);
+}
 function znKill(a, why) {
   if (!znAlive(a)) return;
   zn.alive.delete(a.id); zn.dead.add(a.id);
@@ -737,6 +787,7 @@ function znTick() {
   if (t >= zn.end || zn.allDead && t - zn.allDead > 8000) return znEnd(t);
   if (t >= zn.next && t < zn.end - 25e3) { zn.next = t + (zn.test ? 40e3 : ZN.waveEvery); znSpawn(t); }
   for (const o of online.values()) if (znAlive(o) && (D.areaAt(o.x, o.y)?.kind === 'room' || o.down)) znKill(o, 'in');
+  for (const o of online.values()) if (znAlive(o)) znEvict(o);
   for (const z of zombies()) {
     if (z.wait > 0) continue;
     const tg = z.tgt;
@@ -928,7 +979,9 @@ function accrue(a) {
   if (a.loan > 0 && days > 0) a.loan += a.loan * (Math.pow(1 + D.BANK.loanRate, days) - 1);
 }
 function quest(a, type, n = 1) {
-  for (const e of Q.progress(a, type, n)) {
+  ledSweep(a);
+  const evs = Q.progress(a, type, n); ledSweep(a, '📜 รางวัลเควสต์');
+  for (const e of evs) {
     send(a, { t: 'quest', ...e });
     if (e.kind === 'all') feed(`📜 ${a.name} ทำเควสต์ประจำวันครบทั้ง 3 ข้อ! (ติดต่อกัน ${e.streak} วัน)`);
     if (e.kind === 'wall') { feed(`🗓️ ${a.name} ทำเควสต์รายสัปดาห์ครบทั้งหมด!`); stat(a, 'weekAll'); }
@@ -1035,7 +1088,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -1680,6 +1733,7 @@ function act(a, m) {
     case 'gate.go': {
       const g = D.GATES[s.to]; if (!g) return;
       if (s.renov && !(isAdmin(a) && a.god?.doors)) return toast(a, 'ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
+      if (zn && ['park_in', 'housing_in', 'temple_in'].includes(s.to)) return toast(a, '🧟 คืนปล่อยผี: สวนสนุก หมู่บ้านจัดสรร และวัด ปิดชั่วคราว เอาตัวรอดในเมืองให้ได้!', '🚧', false);
       if (!cd(a, 'door', 1200, true)) return;
       return teleport(a, g.x, g.y);
     }
@@ -1861,7 +1915,6 @@ function act(a, m) {
       return toast(a, `รับอาหาร ${mine.length} ออเดอร์แล้ว! ไปส่งให้ลูกค้า (ดูทางในแอพ)`, '🥡');
     }
     case 'kitchen.cook': {                  // start a cooking battle: the ingredients come out of your bag onto the counter
-      if (!need(a, 'chef')) return;
       if (a.cook) return toast(a, 'กำลังทำออเดอร์อยู่ ทำให้เสร็จก่อนนะ', '🍳', false);
       const r = D.RECIPES.find(x => x.id === m.rid); if (!r) return;
       for (const [k, q] of Object.entries(r.in)) if ((a.inv[k] || 0) < q) return toast(a, 'วัตถุดิบไม่พอ', '🥬', false);
@@ -1884,8 +1937,7 @@ function act(a, m) {
       return toast(a, `🛎️ เสิร์ฟ ${it.icon}${it.name} สำเร็จ! เหลือเวลา ${Math.round(left * 100)}%${extra ? ' · ทำไว ได้เพิ่มอีก 1 จาน!' : ''}${tip ? ` · ทิป ${money(tip)}` : ''}`, '🍳');
     }
     case 'kpantry.use': case 'kboard.use': case 'kpan.use': case 'kpot.use': case 'kgrill.use': case 'kplate.use': return cookUse(a, s);
-    case 'kitchen.buy': {
-      if (!need(a, 'chef')) return;
+    case 'kitchen.buy': {                   // anyone can cook now (the chef career is closed)
       const id = m.item, it = D.ITEMS[id];
       if (!it || !D.RECIPES.some(r => id in r.in)) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), cost = Math.ceil(D.ITEMS[id].base * 1.3) * q;
@@ -2910,7 +2962,8 @@ function misNext(a) {
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
   const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((110 + 80 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
   a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else a.misNext = t + 30000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
-  toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🏅');
+  const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
+  toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(pay)}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
 }
 const FX0 = (a, kind) => send(a, { t: 'mfx', kind });
 function misTick(a, t, dt) {
@@ -3629,7 +3682,7 @@ function login(ws, m, pre) {
     setTimeout(() => a.ws === ws && toast(a, `ไร่ชานเมืองปิดแล้ว คืนค่าสวนของคุณเต็มจำนวน ${money(back)} 💰`, '🌾'), 6000);
   }
   const daily = dailyLogin(a);
-  a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
+  ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
   if (D.areaAt(a.x, a.y)?.id === 'farm' && !isAdmin(a)) { const g = D.GATES.town_from_farm; a.x = g.x; a.y = g.y; }   // the farm is closed for renovation: back to the town gate
@@ -3718,7 +3771,7 @@ function detach(a) {
   for (const o of [...orders.values()]) { if (o.cust === a && o.state === 'open') cancelOrder(o, 'ลูกค้าออฟไลน์'); else if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; } }
   standUp(a);
   if (zn?.alive?.delete(a.id)) zn.dead.add(a.id);   // logging off mid-wave does not count as surviving
-  online.delete(a.id);
+  online.delete(a.id); a.lastOff = now();
   a.ws = null; a.cast = null; a.sd = true; a.afk = false; dirty = true;
   sendRoster();
 }
@@ -3765,12 +3818,18 @@ function pathClear(x0, y0, x1, y1) {
 }
 
 function onMessage(ws, raw) {
+  const a = ws.acct; if (a && a.ws === ws) ledSweep(a, 'อื่นๆ');
+  onMessage0(ws, raw);
+  const b = ws.acct; if (b && b.ledCtx) { ledSweep(b); b.ledCtx = null; }
+}
+function onMessage0(ws, raw) {
   let m; try { m = JSON.parse(raw); } catch { return; }
   if (!m || typeof m !== 'object') return;
   const a = ws.acct;
   if (m.t === 'login') { if (!a) login(ws, m); return; }
   if (!a || a.ws !== ws) return;
   godTop(a);
+  a.ledCtx = ledLabel(a, m);
   switch (m.t) {
     case 'p': return move(a, m);
     case 'chat': {                          // local chat: only people near you see it (bubble over your head)
@@ -3805,6 +3864,19 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'ledger': { ledSweep(a); return send(a, { t: 'ledger', list: (a.ledger || []).slice(-150) }); }
+    case 'rename': {                        // the name-change card: 💎10
+      if (!cd(a, 'rename', 5000)) return;
+      const nm = String(m.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim();
+      if (nm.length < 2 || nm.length > 16) return toast(a, 'ชื่อต้องยาว 2–16 ตัวอักษร', '✏️', false);
+      if (nm === a.name) return toast(a, 'ชื่อนี้คือชื่อเดิมของคุณ', '✏️', false);
+      if ([...accounts.values()].some(o => o !== a && String(o.name).toLowerCase() === nm.toLowerCase()) || ghosts?.some?.(g => String(g.name).toLowerCase() === nm.toLowerCase())) return toast(a, 'ชื่อนี้มีคนใช้แล้ว', '✏️', false);
+      const cost = 10; if (!godInf(a) && (a.gems || 0) < cost) return toast(a, `เพชรไม่พอ บัตรเปลี่ยนชื่อใช้ 💎${cost} (มี 💎${a.gems || 0})`, '💎', false);
+      if (!godInf(a)) a.gems -= cost;
+      const old = a.name; a.name = nm; a.sd = true; dirty = true; markMe(a); sendRoster();
+      feed(`✏️ ${old} เปลี่ยนชื่อเป็น ${nm}`);
+      return toast(a, `เปลี่ยนชื่อเป็น "${nm}" แล้ว · ใช้ 💎${cost}`, '✏️');
+    }
     case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband'].includes(m.op)) sendRoster(); return; }
     case 'visit': { if (a.down) return; const o = byPhone.get(String(m.p || '')); if (!o || !o.ws || !o.hown || hidden(o)) return toast(a, 'เพื่อนคนนี้ไม่ได้ออนไลน์อยู่ หรือยังไม่มีบ้าน', '🏡', false); return goHome(a, o); }
     case 'morder': { if (!cd(a, 'morder', 1500, true)) return; return placeMarketOrder(a, m); }
@@ -4119,6 +4191,25 @@ function bugReport(a, m) {
 function godAct(a, m) {
   if (!isAdmin(a)) return;
   a.god = a.god || {};
+  if (m.op === 'find') {                    // look a player up by login ID, display name or phone number
+    const q = String(m.q || '').trim().toLowerCase(); if (q.length < 2) return toast(a, 'พิมพ์อย่างน้อย 2 ตัวอักษร', '🔎', false);
+    const hits = [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
+      .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
+    return send(a, { t: 'godfind', q, list: hits.map(x => ({ login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
+      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0 })) });
+  }
+  if (m.op === 'ledger') {                  // a player's money history (support)
+    const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
+    if (x.ws) ledSweep(x);
+    return send(a, { t: 'ledger', who: `${x.name} (${x.login})`, money: x.money, list: (x.ledger || []).slice(-150) });
+  }
+  if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
+    const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
+    if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
+    if (!/^\d{4,8}$/.test(pin)) return toast(a, 'PIN ใหม่ต้องเป็นตัวเลข 4–8 หลัก', '🔒', false);
+    x.hash = hashPin(pin, x.salt); x.sd = true; dirty = true;
+    return toast(a, `ตั้ง PIN ใหม่ให้ ${x.login} แล้ว แจ้งผู้เล่นให้เปลี่ยนเองอีกครั้งหลังเข้าเกม`, '🔑');
+  }
   if (m.op === 'zombie') { if (zn) { for (const z of zombies()) npcs.splice(npcs.indexOf(z), 1); zn = null; npcRosterDirty = true; znSendAll(); return toast(a, 'หยุดคืนปล่อยผีแล้ว', '🧟'); } znDone = ''; return znStart(now(), true); }
   if (m.op === 'nocd') { a.god.nocd = !a.god.nocd; if (a.god.nocd) a.cd = {}; toast(a, a.god.nocd ? 'God mode: ไม่มีคูลดาวน์' : 'ปิด: ไม่มีคูลดาวน์', '⚡'); }
   else if (m.op === 'lock') { a.god.lock = !a.god.lock; toast(a, a.god.lock ? 'God mode: ล็อกสเตตัสเต็ม (ไม่ป่วย/ไม่หมดสติ)' : 'ปิด: ล็อกสเตตัส', '🛡️'); }
@@ -4199,6 +4290,7 @@ function resetChar(a, m) {
 let lastTick = now(), wdAt = 0, saveAt = 0, slowAt = 0, marketAt = 0, lastHour = hourNow();
 function tick() {
   stockTick(); passTick();
+  for (const a of online.values()) ledSweep(a, 'อื่นๆ');
   { let ch = false; for (const a of online.values()) { const v = castPub(a); if (v !== (a._fc || 0)) { a._fc = v; ch = true; } } if (ch) sendRoster(); }
   const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;
   const h = hourNow();

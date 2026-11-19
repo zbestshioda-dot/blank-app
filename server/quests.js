@@ -6,7 +6,7 @@ const DEFS = {
   harvest: { cat: 'career', career: 'farmer',   text: 'เก็บเกี่ยวผลผลิต {n} ครั้ง', n: [3, 6], per: 60 },
   fish:    { cat: 'general', text: 'ตกปลาให้ได้ {n} ตัว', n: [4, 8], per: 25 },
   buy:     { cat: 'career', career: 'merchant', text: 'ซื้อสินค้าจากคลัง {n} ชิ้น', n: [10, 20], per: 12 },
-  cook:    { cat: 'career', career: 'chef',     text: 'ปรุงอาหาร {n} จาน', n: [3, 6], per: 60 },
+  cook:    { cat: 'social', text: 'ทำอาหารที่ครัวใหญ่ {n} จาน', n: [1, 2], per: 120 },
   treat:   { cat: 'career', career: 'doctor',   text: 'รักษาคนไข้หาย {n} คน', n: [2, 4], per: 120 },
   deliver: { cat: 'career', career: 'rider',    text: 'ส่งอาหารสำเร็จ {n} ออเดอร์', n: [3, 6], per: 60 },
   // social / daily life
@@ -110,7 +110,7 @@ const WDEFS = {
   work:    { cat: 'career', career: 'office',   text: 'นั่งทำงานที่บริษัท {n} ชั่วโมง', n: [25, 35], per: 90 },
   harvest: { cat: 'career', career: 'farmer',   text: 'เก็บเกี่ยวผลผลิต {n} ครั้ง', n: [20, 30], per: 110 },
   buy:     { cat: 'career', career: 'merchant', text: 'ซื้อสินค้าจากคลัง {n} ชิ้น', n: [80, 120], per: 25 },
-  cook:    { cat: 'career', career: 'chef',     text: 'ปรุงอาหาร {n} จาน', n: [20, 30], per: 110 },
+  cook:    { cat: 'life', text: 'ทำอาหารที่ครัวใหญ่ {n} จาน', n: [5, 10], per: 120 },
   treat:   { cat: 'career', career: 'doctor',   text: 'รักษาคนไข้หาย {n} คน', n: [10, 15], per: 220 },
   deliver: { cat: 'career', career: 'rider',    text: 'ส่งอาหารสำเร็จ {n} ออเดอร์', n: [20, 30], per: 110 },
   earn:    { cat: 'money', text: 'หาเงินให้ได้ ฿{n}', n: [8000, 15000], step: 500, per: 0.25 },
@@ -130,7 +130,21 @@ function wmake(type) {
 }
 function wensure(a) {
   const wk = weekKey();
-  if (a.wquests && a.wquests.week === wk && a.wquests.list.every(x => WDEFS[x.type])) return false;
+  if (a.wquests && a.wquests.week === wk && a.wquests.list.every(x => WDEFS[x.type])) {
+    // repair old quests: a career goal for a career the player no longer has becomes their current one (or "earn"),
+    // and goals left over from an older, bigger range (e.g. the chef's 26 dishes) shrink to today's maximum
+    let fixed = false;
+    a.wquests.list.forEach((x, i) => {
+      if (x.done) return;
+      const d = WDEFS[x.type];
+      if (d.career && d.career !== a.career) {
+        const ct = Object.keys(WDEFS).find(k => WDEFS[k].career === a.career && !a.wquests.list.some(y => y.type === k));
+        a.wquests.list[i] = wmake(ct || (a.wquests.list.some(y => y.type === 'earn') ? 'sell' : 'earn')); fixed = true; return;
+      }
+      if (!d.step && x.n > d.n[1]) { x.n = d.n[1]; if (x.p >= x.n) x.p = x.n - 1; fixed = true; }
+    });
+    return fixed;
+  }
   const ct = Object.keys(WDEFS).find(k => WDEFS[k].career === a.career);
   a.wquests = { week: wk, list: [wmake('dailyall'), wmake(ct || 'earn'), wmake(pick(Object.keys(WDEFS).filter(k => WDEFS[k].cat === 'life')))], bonus: false };
   return true;

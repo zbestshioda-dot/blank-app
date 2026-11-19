@@ -516,6 +516,11 @@ for (const b of [0, 1, 2, 3].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) =
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
   // the rider hub's waiting bench seats two side by side
   if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
+  if (kind === 'kitchen') {             // cooking: work stations around the kitchen (anyone can cook; the counter at the top takes orders)
+    for (const [id, type, label, icon, dx, dy] of [['k_pantry', 'kpantry', 'ตู้วัตถุดิบ', '🧺', 12.3, 7.3], ['k_grill', 'kgrill', 'เตาย่าง', '🔥', 2.4, 3.6], ['k_pot', 'kpot', 'หม้อต้ม', '🍲', 4.6, 3.6],
+      ['k_board', 'kboard', 'เขียงสับ', '🔪', 10.3, 3.6], ['k_pan', 'kpan', 'กระทะผัด', '🍳', 6.0, 7.2], ['k_plate', 'kplate', 'โต๊ะจัดจาน', '🍽️', 10.5, 7.6]])
+      STATIONS.push({ id, type, label, icon, room: room.id, x: rx + dx, y: ry + dy, r: 1.1 });
+  }
   if (kind === 'hospital') {
     s.x = rx + 3.5;
     [[8.5, 3.6], [11, 3.6], [13.5, 3.6], [8.5, 7.4], [11, 7.4], [13.5, 7.4]].forEach(([dx, dy], i) => {
