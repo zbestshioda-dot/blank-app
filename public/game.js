@@ -468,6 +468,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       if (tutPending) setTimeout(() => me && showTut(0), 400);
       else setTimeout(() => me && checkNews(), 900);
+      if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
       const prev = me; me = m; if (!prev || prev.frame !== m.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
@@ -547,6 +548,9 @@ function handle(m) {
       break;
     }
     case 'ledger': ledgerRes = m; if (panel?.kind === 'ledger') refreshPanel(true); break;
+    case 'pay': payRes = m; if (panel?.kind === 'topup') refreshPanel(true); break;
+    case 'payadmin': payAdm = m; if (panel?.kind === 'payadmin') refreshPanel(true); break;
+    case 'payredir': toast('กำลังไปหน้าชำระเงิน…', '💳'); setTimeout(() => { location.href = m.url; }, 300); break;
     case 'godfind': godFindRes = m; if (panel?.kind === 'god') refreshPanel(true); break;
     case 'quiz': {                                  // classroom pop quiz
       document.querySelectorAll('.req.quiz').forEach(e => e.remove()); if (m.end) break;
@@ -3038,7 +3042,21 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.title) {
     ctx.font = `800 ${tFs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, ty);
     // title colour = rarity; legendary titles (and the mayor's) shimmer
-    if (p.tr === 7 && !p.adm) { const w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), h0 = (t / 12) % 360; for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(h0 + k * 60) % 360},95%,66%)`); ctx.fillStyle = g; }
+    if (p.tr === 8 && !p.adm) {   // 💖 supporter title: pink-gold-cyan shimmer that sweeps across, with twinkling stars around it
+      const w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 900) % 1.4 - .2;
+      g.addColorStop(0, '#ff7ad9'); g.addColorStop(.35, '#ffd86b'); g.addColorStop(.7, '#7fe8ff'); g.addColorStop(1, '#c58bff');
+      ctx.fillStyle = g; ctx.fillText(`«${p.title}»`, px, ty);
+      const g2 = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), c = 'rgba(255,255,255,0)';
+      g2.addColorStop(0, c); g2.addColorStop(Math.max(0, Math.min(1, sh - .08)), c); g2.addColorStop(Math.max(0, Math.min(1, sh)), 'rgba(255,255,255,.95)'); g2.addColorStop(Math.max(0, Math.min(1, sh + .08)), c); g2.addColorStop(1, c);
+      ctx.fillStyle = g2;
+      for (let k = 0; k < 5; k++) {   // little four-point stars blinking on and off around the title
+        const ph = (t / 700 + k * .37) % 1, a = Math.sin(ph * Math.PI), sx = px + (((k * 53) % 100) / 100 - .5) * (w + 14), sy = ty + ((k % 2) ? -1 : 1) * tFs * .55, r = 1.5 + a * 3;
+        ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = k % 2 ? '#fff6b0' : '#ffd6f6'; ctx.beginPath();
+        ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r * .3, sy - r * .3); ctx.lineTo(sx + r, sy); ctx.lineTo(sx + r * .3, sy + r * .3); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r * .3, sy + r * .3); ctx.lineTo(sx - r, sy); ctx.lineTo(sx - r * .3, sy - r * .3); ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+      ctx.fillStyle = g2;
+    }
+    else if (p.tr === 7 && !p.adm) { const w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), h0 = (t / 12) % 360; for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(h0 + k * 60) % 360},95%,66%)`); ctx.fillStyle = g; }
     else if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
     else ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d';
     ctx.fillText(`«${p.title}»`, px, ty);
@@ -3360,6 +3378,20 @@ const FN = {
   },
   god(m) { send({ t: 'god', op: m.op }); },
   godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0) && m.op !== 'setmoney') return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: m.op || 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
+  openTopup() { payRes = null; send({ t: 'pay', op: 'view' }); openPanel({ kind: 'topup' }); },
+  payPack(m) { paySel.pack = m.id; refreshPanel(true); },
+  payMethod(m) { paySel.m = m.id; refreshPanel(true); },
+  payBuy(m, root) {
+    const tel = root.querySelector('#payTel')?.value || '', bank = root.querySelector('#payBank')?.value || '';
+    if (!root.querySelector('#payOk')?.checked) return toast('ติ๊กยืนยันก่อนชำระเงิน', '☑️');
+    if (payRes?.sb) toast('โหมดทดสอบ (Sandbox) ไม่ได้ตัดเงินจริง', '🧪');
+    try { localStorage.setItem('lt_paytel', tel); } catch { }
+    send({ t: 'pay', op: 'buy', pack: paySel.pack, m: paySel.m, tel, bank });
+  },
+  payCheck(m) { send({ t: 'pay', op: 'check', ref: m.ref }); },
+  openPayAdmin() { payAdm = null; send({ t: 'god', op: 'payorders' }); openPanel({ kind: 'payadmin' }); },
+  payOk(m) { if (confirm(`เติมเพชรให้รายการ ${m.ref} ด้วยมือ?\nทำเฉพาะเมื่อเช็กในหน้า Stripe แล้วว่าได้รับเงินจริง`)) send({ t: 'god', op: 'payok', ref: m.ref }); },
+  payRecheck(m) { send({ t: 'god', op: 'paycheck', ref: m.ref }); },
   openLedger() { ledgerRes = null; send({ t: 'ledger' }); openPanel({ kind: 'ledger' }); },
   godLedger(m) { ledgerRes = null; send({ t: 'god', op: 'ledger', login: m.login }); openPanel({ kind: 'ledger', admin: 1 }); },
   rename() {
@@ -3759,7 +3791,55 @@ function frameHtml(id, sz, fit = true) {
   if (fit && FRAMES_AT.hr?.[id]) { sz = Math.round(sz * 1.18); ps = Math.max(80, Math.min(100, Math.round(2 * FRAMES_AT.hr[id] * sz / (sz0 / 1.62) * 1.06 * 50) * 2)); }
   return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz0}" data-ps="${ps}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
 }
-let godFindRes = null, ledgerRes = null;
+let godFindRes = null, ledgerRes = null, payRes = null, payAdm = null, payBackRef = '';
+const paySel = { pack: 'p100', m: 'mbank' };
+try { const q = new URLSearchParams(location.search); if (q.get('paid')) payBackRef = q.get('paid').replace(/\D/g, '').slice(0, 20); if (q.get('paid') || q.get('paycancel')) history.replaceState(null, '', location.pathname); } catch { }
+const PAY_ST = { new: ['⏳ รอชำระ', 'var(--muted,#999)'], paid: ['✅ สำเร็จ', 'var(--good)'], review: ['🔎 รอตรวจสอบ', '#e0913a'], exp: ['หมดอายุ', '#999'] };
+function topupHtml() {
+  const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
+  if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า STRIPE_SECRET_KEY ใน Fly.io ก่อน' : ''}</div>`;
+  const avail = p => !(p.kind === 'outfit' && R.hasAngel);
+  if (!R.packs.find(p => p.id === paySel.pack && avail(p))) paySel.pack = (R.packs.find(p => p.id === 'p100') || R.packs[0]).id;
+  const pk = R.packs.find(p => p.id === paySel.pack);
+  if (!R.methods[paySel.m]) paySel.m = Object.keys(R.methods)[0];
+  const ofn = G.outfitDefs?.angel ? (me.gender === 'f' && G.outfitDefs.angel.nf ? G.outfitDefs.angel.nf : G.outfitDefs.angel.name) : 'ชุดเทวดา';
+  const vipLeft = R.vipT > Date.now() + clockOff ? Math.ceil((R.vipT - Date.now() - clockOff) / 86400e3) : 0;
+  const card = p => { const on = p.id === paySel.pack, ok = avail(p), bon = !p.kind && R.first ? Math.round(p.gems * R.bonus) : 0;
+    const head = p.kind === 'title' ? `<b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
+      : p.kind === 'outfit' ? `<b style="font-size:15px">😇 ${esc(ofn)}</b><small>${ok ? 'ชุดพิเศษ + ออร่า · ไม่มีขายในร้าน' : '✅ คุณมีชุดนี้แล้ว'}</small>`
+      : `<b style="font-size:18px">💎${p.gems}</b>${bon ? `<small style="color:var(--good)">+${bon} โบนัส</small>` : ''}`;
+    return `<button class="item" ${ok ? '' : 'disabled'} style="display:block;text-align:center;${on ? 'border:3px solid #2fa34a;background:#e4ffd6;box-shadow:0 0 0 2px #2fa34a' : ''}" data-m='${JSON.stringify({ fn: 'payPack', id: p.id })}'>${on ? '<small style="color:#2fa34a;font-weight:800">✓ เลือกอยู่</small>' : ''}${head}<div style="font-weight:800">฿${p.thb}</div>${p.tag && !p.kind ? `<small class="tag">${p.tag}</small>` : ''}</button>`; };
+  const special = R.packs.filter(p => p.kind), gems = R.packs.filter(p => !p.kind);
+  const meths = Object.keys(R.methods).length > 1 ? `<div class="secT">ช่องทางชำระเงิน</div><div class="grid2">${Object.entries(R.methods).map(([k, v]) => B(v.n, { fn: 'payMethod', id: k }, k === paySel.m ? 'good' : '')).join('')}</div>` : '';
+  let tel = ''; try { tel = localStorage.getItem('lt_paytel') || ''; } catch { }
+  const extra = paySel.m === 'truemoney' ? `<div class="rowf"><input id="payTel" inputmode="numeric" maxlength="10" placeholder="เบอร์ TrueMoney 10 หลัก" value="${esc(tel)}"></div>`
+    : paySel.m === 'mbank' ? `<div class="secT">🏦 จ่ายผ่านแอปธนาคาร</div><div class="rowf"><select id="payBank">${Object.entries(R.banks).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>` : '';
+  const what = o => o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`;
+  const my = (R.my || []).map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
+    return `<div class="item"><div class="nm">${what(o)} · ฿${o.thb}<small>${new Date(o.t).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · #${o.ref}</small></div><b style="color:${st[1]};white-space:nowrap">${st[0]}</b>${o.st === 'new' || o.st === 'review' ? B('🔄 ตรวจ', { fn: 'payCheck', ref: o.ref }) : ''}</div>`; }).join('');
+  const got = pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first ? Math.round(pk.gems * R.bonus) : 0));
+  return `<h2>💎 ร้านเติมเงิน</h2>${R.sb ? '<div class="jobbox">🧪 โหมดทดสอบ (Sandbox) ไม่ตัดเงินจริง</div>' : ''}
+    <div class="sub">คุณมี 💎${(me?.gems || 0).toLocaleString()}${R.first ? ' · 🎉 เติมเพชรครั้งแรกรับโบนัส +' + Math.round(R.bonus * 100) + '%' : ''}</div>
+    <div class="secT">✨ ของพิเศษ</div><div class="grid2">${special.map(card).join('')}</div>
+    <div class="secT">💎 เพชร</div><div class="grid2">${gems.map(card).join('')}</div>
+    ${meths}${extra}<div class="sub" style="margin-top:6px">💳 จ่ายด้วยบัตรเครดิต/เดบิต หรือ PromptPay บนหน้าชำระเงินของ Stripe</div>
+    <label class="sub" style="display:flex;gap:6px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="payOk" style="width:auto"> <span>ฉันอายุ 18 ปีขึ้นไป หรือได้รับอนุญาตจากผู้ปกครองแล้ว และเข้าใจว่าของที่ซื้อเป็นไอเทมในเกม ไม่สามารถแลกคืนเป็นเงินได้</span></label>
+    ${B(`💳 ชำระ ฿${pk.thb} รับ ${got}`, { fn: 'payBuy' }, 'primary big')}
+    <small style="opacity:.75">ชำระผ่าน Stripe · ของเข้าอัตโนมัติหลังจ่ายสำเร็จ (ปกติไม่เกิน 1–2 นาที) · มีปัญหาแจ้งแอดมินพร้อมเลขรายการ</small>
+    ${my ? `<div class="secT">รายการของฉัน</div><div class="list">${my}</div>` : ''}`;
+}
+function payAdminHtml() {
+  const R = payAdm, back = B('‹ กลับ', { fn: 'open', kind: 'god' }) + ' ';
+  if (!R) return `<h2>${back}💎 รายการเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
+  const rows = R.list.map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
+    return `<div class="item" style="display:block"><div class="nm"><b>${esc(o.n || o.l)}</b> <span class="tag">${esc(o.l)}</span> · 💎${o.gems}${o.bonus ? '+' + o.bonus : ''} · <b>฿${o.thb}</b> <b style="color:${st[1]}">${st[0]}</b><small>#${o.ref} · ${esc(o.m)} · ${new Date(o.t).toLocaleString('th-TH')}${o.back ? ' · แจ้งล่าสุด ' + esc(o.back) : ''}${o.by ? ' · โดย ' + esc(o.by) : ''}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div>
+      ${o.st !== 'paid' ? `<div class="grid2">${B('🔄 ตรวจกับ Stripe', { fn: 'payRecheck', ref: o.ref })}${B('✅ เติมให้ด้วยมือ', { fn: 'payOk', ref: o.ref }, 'warn')}</div>` : ''}</div>`; }).join('');
+  return `<h2>${back}💎 รายการเติมเงิน</h2>
+    <div class="sub">${R.on ? (R.sb ? '🧪 โหมดทดสอบ (sk_test)' : '🟢 รับเงินจริง') : '🔴 ยังไม่ได้ตั้งค่า STRIPE_SECRET_KEY'} · Webhook: <code>${esc(R.base || '-')}/pay/stripe/hook</code> ${R.hook ? '✅' : '(ยังไม่ได้ตั้ง STRIPE_WEBHOOK_SECRET)'}</div>
+    <div class="grid2"><div class="item"><div class="nm">วันนี้<small style="color:var(--good)">฿${R.today.toLocaleString()} (${R.todayN} รายการ)</small></div></div><div class="item"><div class="nm">รวมทั้งหมด<small style="color:var(--good)">฿${R.total.toLocaleString()} (${R.n} รายการ)</small></div></div></div>
+    ${R.review ? `<div class="jobbox">🔎 รอตรวจสอบ ${R.review} รายการ: เช็กยอดในหน้า Stripe ก่อนกดเติมด้วยมือ</div>` : ''}
+    <div class="list">${rows || '<div class="sub">ยังไม่มีรายการ</div>'}</div>`;
+}
 function ledgerHtml(p) {
   const back = p.admin ? B('‹ กลับ', { fn: 'open', kind: 'god' }) + ' ' : '';
   if (!ledgerRes) return `<h2>${back}💸 ประวัติการเงิน</h2><div class="sub">กำลังโหลด…</div>`;
@@ -3802,8 +3882,8 @@ function frameRows() {
   const sec = (t, list) => `<div class="secT">${t}</div><div class="frmGrid">${list.map(card).join('')}</div>`;
   return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · สายรุ้งกับนีออนวางขายแล้ว)', G.frameDefs.slice(24));
 }
-const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ', 'ในตำนาน'];
-const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d', '#ff6bd6'];
+const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ', 'ในตำนาน', 'ผู้สนับสนุน'];
+const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d', '#ff6bd6', '#ff9be6'];
 const titleHtml = (t, r) => t ? `<span class="ttl rar${r || 1}">«${esc(t)}»</span>` : '';
 // shrink a photo from the album to a small square JPEG before it is sent (kept under ~20 KB)
 function pickPhoto() {
@@ -4944,11 +5024,14 @@ function renderPanel(p) {
     case 'rewards': return rewardsPanel();
     case 'ach':
     case 'ledger': return ledgerHtml(p);
+    case 'topup': return topupHtml();
+    case 'payadmin': return me.admin ? payAdminHtml() : '';
     case 'profile': {
-      const ti = G.ach.find(x => x.id === me.title) || (G.lux || []).find(x => x.id === me.title), got = (me.ach || []).length;
+      const ti = G.ach.find(x => x.id === me.title) || (G.lux || []).find(x => x.id === me.title) || (me.title === 'vip' && me.vipT > Date.now() + clockOff ? G.payTitle : null), got = (me.ach || []).length;
       // changing the title or the frame opens its own page with a back button
       if (p.titles) return `<h2>${B('‹ กลับ', { fn: 'titles' })} 🏅 เปลี่ยนฉายา</h2><div class="sub">สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
-        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="secT">👑 ฉายาเศรษฐี (ซื้อด้วยเงิน)</div><div class="list">${(G.lux || []).map(T => { const has = (me.luxT || []).includes(T.id), on = me.title === T.id;
+        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div>${(() => { const T = G.payTitle; if (!T) return ''; const has = me.vipT > Date.now() + clockOff, on = me.title === T.id; const left = has ? Math.ceil((me.vipT - Date.now() - clockOff) / 86400e3) : 0;
+          return `<div class="secT">💖 ฉายาผู้สนับสนุน</div><div class="list"><div class="item ${has ? 'done' : ''}"><div class="em">💖</div><div class="nm">${titleHtml(T.title, T.r)}<span class="rtag r8">${RAR[8]}</span><small>${has ? `เหลืออีก ${left} วัน` : 'ได้จากแพ็กเติมเงิน ฿49 (30 วัน)'}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้', { t: 'title', id: on ? '' : T.id }, on ? 'primary' : 'good') : G.pay ? B('ดูแพ็ก', { fn: 'openTopup' }) : ''}</div></div>`; })()}<div class="secT">👑 ฉายาเศรษฐี (ซื้อด้วยเงิน)</div><div class="list">${(G.lux || []).map(T => { const has = (me.luxT || []).includes(T.id), on = me.title === T.id;
           return `<div class="item ${has ? 'done' : ''}"><div class="em">👑</div><div class="nm">${titleHtml(T.title, T.r)}<span class="rtag r${T.r}">${RAR[T.r] || ''}</span><small>${has ? 'เป็นเจ้าของแล้ว' : money(T.price)}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้', { t: 'title', id: on ? '' : T.id }, on ? 'primary' : 'good') : B(`ซื้อ ${money(T.price)}`, { t: 'luxbuy', id: T.id }, '', me.money < T.price)}</div>`; }).join('')}</div>
         <div class="list">${achRows()}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'titles' })}`;
       if (p.frames) return `<h2>${B('‹ กลับ', { fn: 'frames' })} 🖼️ กรอบรูป</h2>${frameRows()}${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'frames' })}`;
@@ -5057,6 +5140,7 @@ function renderPanel(p) {
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
         <div class="setRow"><span><b>♾️ เงิน/เพชรไม่จำกัด</b><small>เปิดอยู่ = ซื้อได้ทุกอย่าง ปิด = กลับไปใช้เงินจริงของคุณ</small></span>${B(me.monInf ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'inf' }, me.monInf ? 'good' : '')}</div>
         <div class="secT">💰 ปรับเงินตัวเอง${me.monInf ? ' <small>(ปิดเงินไม่จำกัดก่อนจึงลด/ตั้งได้)</small>' : ''}</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="0" placeholder="จำนวนเงิน เช่น 1000000"></div><div class="grid2">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}${B('➖ ลด', { fn: 'godMoney', op: 'submoney' }, '', !!me.monInf)}${B('🎯 ตั้งเป็นจำนวนนี้', { fn: 'godMoney', op: 'setmoney' }, '', !!me.monInf)}</div>
+        <div class="secT">💎 เติมเงินจริง</div>${B('💎 ดูรายการเติมเงิน / ยอดขาย', { fn: 'openPayAdmin' }, 'primary')}
         <div class="secT">🔎 ค้นหาผู้เล่น</div><div class="rowf"><input id="godFind" maxlength="20" placeholder="ไอดี / ชื่อในเกม / เบอร์">${B('ค้นหา', { fn: 'godFind' }, 'primary')}</div>${godFindHtml()}
         <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
@@ -5161,7 +5245,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
@@ -5174,7 +5258,7 @@ function phonePanel(p) {
   if (tab === 'home') {
     const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
     const apps = PH_APPS.map(([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`).join('')
-      + PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads)).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
+      + PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay)).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
     return `<div class="phone"><div class="phScr home">${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
