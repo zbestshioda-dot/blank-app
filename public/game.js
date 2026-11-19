@@ -457,7 +457,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '' });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', gg: p.gg || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -498,6 +498,7 @@ function handle(m) {
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
@@ -2785,6 +2786,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
+  if (p.gg && !p.npc) { const lt = /e8c83a|e8913a/.test(p.gg[2]); sign(`${p.gg[0]} ${p.gg[1]}`, px, top + TS * .12 + (p.afk ? TS * .26 : 0), { size: TS * .2, bg: p.gg[2], color: lt ? '#2a1a05' : '#fff' }); }   // gang tag under the name
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
   if (p.title) {
     ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58);
@@ -3013,6 +3015,17 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  openGang() { send({ t: 'gang', op: 'list' }); openPanel({ kind: 'gang' }); },
+  gangTab(m) { panel.gtab = m.tab; if (m.tab === 'rank' || m.tab === 'list') send({ t: 'gang', op: 'list' }); refreshPanel(true); },
+  gset(m, root) { panel.gnm = root.querySelector('#gName')?.value ?? panel.gnm; Object.assign(panel, m.set); refreshPanel(true); },
+  gang(m, root) {
+    const SURE = { leave: 'ออกจากแก๊งนี้?', disband: 'ยุบแก๊ง? สมาชิกทุกคนจะออก คลังแก๊งคืนให้หัวหน้า', kick: 'ไล่คนนี้ออกจากแก๊ง?', boss: 'ส่งต่อตำแหน่งหัวหน้าให้คนนี้? คุณจะเป็นรองหัวหน้า' };
+    if (SURE[m.op] && !confirm(SURE[m.op])) return;
+    if (m.op === 'create') return send({ t: 'gang', op: 'create', name: root.querySelector('#gName')?.value ?? panel.gnm ?? '', icon: panel.gic, color: panel.gco });
+    if (m.op === 'donate') return send({ t: 'gang', op: 'donate', amt: +root.querySelector('#gAmt')?.value || 0 });
+    send({ t: 'gang', op: m.op, l: m.l, id: m.id });
+    if (m.op === 'req' || m.op === 'create') setTimeout(() => send({ t: 'gang', op: 'list' }), 400);
+  },
   delContact(m) { popup(`ลบ <b>${esc(m.n)}</b> ออกจากรายชื่อ?`, [['🗑️ ลบ', 'warn', () => send({ t: 'contact_del', phone: m.phone })], ['ยกเลิก', '', () => { }]], 10000); },
   phMap() { closePanel(); mapZoom = 1; openMap(); },
   phClose() { closePanel(); },
@@ -3877,6 +3890,50 @@ function checkNews() {
   try { localStorage.setItem('lt_news', NEWS[0].v); } catch { }
   if (!panel) openPanel({ kind: 'news' });
 }
+
+// ---- gang / club panel (phone app 🏴)
+function gangPanel(p) {
+  const g = me.gang, gt = p.gtab || (g ? 'hq' : 'list'), GL = window.__gangs || { list: [], icons: ['🐉'], colors: ['#e0584a'], create: 20000 };
+  const bar = (v, mx, col = 'var(--ok)') => `<div style="height:10px;border-radius:6px;background:rgba(0,0,0,.18);overflow:hidden;margin:4px 0"><i style="display:block;height:100%;width:${Math.min(100, mx ? v / mx * 100 : 0)}%;background:${col}"></i></div>`;
+  const RL = { boss: '👑 หัวหน้า', vice: '⭐ รองหัวหน้า', mem: 'สมาชิก' };
+  const tabs = (g ? [['hq', '🏠 บ้านแก๊ง'], ['mem', '👥 สมาชิก'], ...(g.role !== 'mem' ? [['req', '📨 คำขอ' + (g.req.length ? ` (${g.req.length})` : '')]] : []), ['rank', '🏆 อันดับ']] : [['list', '🏴 แก๊งทั้งหมด'], ['new', '➕ ตั้งแก๊ง']])
+    .map(([k, l]) => B(l, { fn: 'gangTab', tab: k }, gt === k ? 'primary' : '')).join('');
+  const rows = GL.list.map(r => `<div class="item"><div class="nm"><span style="color:${r.color}">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : '#' + r.rank}</span> ${r.icon} ${esc(r.name)}<small>${r.ln} · ${r.n}/${r.cap} คน · หัวหน้า ${esc(r.boss)} · สัปดาห์นี้ ${r.wpts.toLocaleString()} แต้ม</small></div>${!g ? (r.asked ? '<small>รอตอบรับ…</small>' : r.n >= r.cap ? '<small>เต็ม</small>' : B('📨 ขอเข้า', { fn: 'gang', op: 'req', id: r.id }, 'good')) : g.id === r.id ? '<small>แก๊งของคุณ</small>' : ''}</div>`).join('') || '<div class="sub">ยังไม่มีแก๊งในเมือง ตั้งแก๊งแรกได้เลย!</div>';
+  let body = '';
+  if (!g && gt === 'new') {
+    const ic = p.gic || GL.icons[0], co = p.gco || GL.colors[0], nm = p.gnm || '';
+    body = `<div class="sub">ตั้งแก๊งใช้เงิน <b>${money(GL.create)}</b> · รับสมาชิกได้ 10 คน อัปเกรดบ้านแก๊งได้ถึง 30 คน · เงินสดของคุณ ${money(me.money)}</div>
+      <div class="rowf" style="margin-top:8px"><input id="gName" maxlength="14" placeholder="ชื่อแก๊ง (2-14 ตัวอักษร)" value="${esc(nm)}"></div>
+      <div class="secT">ตราประจำแก๊ง</div><div class="grid2">${GL.icons.map(i => B(i, { fn: 'gset', set: { gic: i } }, i === ic ? 'primary' : '')).join('')}</div>
+      <div class="secT">สีแก๊ง</div><div class="grid2">${GL.colors.map(c => `<button class="${c === co ? 'primary' : ''}" data-m="${esc(JSON.stringify({ fn: 'gset', set: { gco: c } }))}" style="background:${c};min-height:34px">${c === co ? '✔' : ''}</button>`).join('')}</div>
+      <div class="item"><div class="nm"><span style="background:${co};color:#fff;padding:2px 8px;border-radius:8px">${ic} ${esc(nm || 'ชื่อแก๊ง')}</span><small>ตัวอย่างป้ายที่จะขึ้นใต้ชื่อคุณ</small></div></div>
+      ${B('🏴 ตั้งแก๊ง ' + money(GL.create), { fn: 'gang', op: 'create' }, 'primary', me.money < GL.create)}`;
+  } else if (!g) {
+    body = `<div class="sub">ยังไม่มีแก๊ง · เข้าแก๊งเพื่อสะสมแต้มด้วยกัน ทำภารกิจประจำวัน และมีบ้านแก๊งไว้พักฟื้น</div>${rows}`;
+  } else if (gt === 'hq') {
+    const N = g.next, pc = Math.round(g.inc * 100);
+    body = `<div class="item"><div class="nm">🎯 ภารกิจแก๊งวันนี้<small>ทำแต้มรวมให้ถึง ${g.msn.goal.toLocaleString()} (${g.msn.prog.toLocaleString()} แล้ว) · สำเร็จทุกคนได้ ${money(g.msn.pay)} ${g.msn.done ? '· ✅ สำเร็จแล้ว' : ''}</small>${bar(g.msn.prog, g.msn.goal, g.msn.done ? 'var(--ok)' : 'var(--acc)')}</div></div>
+      <div class="grid2"><div class="item"><div class="nm">💰 คลังแก๊ง<small><b style="color:var(--acc);font-size:16px">${money(g.bank)}</b></small></div></div><div class="item"><div class="nm">⭐ แต้มรวม<small><b style="font-size:16px">${g.pts.toLocaleString()}</b> · สัปดาห์นี้ ${g.wpts.toLocaleString()} · ของฉัน ${g.mine.toLocaleString()}</small></div></div></div>
+      <div class="sub">แต้มมาจากรายได้ของสมาชิกทุกคน (สูงสุด 300 แต้ม/วัน/คน) และจากการบริจาค · แก๊งอันดับ #${g.rank} ของสัปดาห์นี้</div>
+      <div class="secT">🏠 ${g.ln} (Lv.${g.lvl})</div>
+      <div class="sub">สิทธิพิเศษ: ${pc ? `รายได้ +${pc}% · ` : ''}พักฟื้นได้ +${g.rest} พลังงานทุก 30 นาที · รับสมาชิกได้ ${g.cap} คน</div>
+      ${B(g.restLeft ? `🛋️ พักได้อีก ${Math.ceil(g.restLeft / 60)} นาที` : `🛋️ พักที่บ้านแก๊ง +${g.rest}⚡`, { fn: 'gang', op: 'rest' }, 'good', !!g.restLeft)}
+      <div class="rowf" style="margin-top:10px"><input id="gAmt" type="number" min="100" value="1000" inputmode="numeric"></div>
+      ${B('💰 บริจาคเข้าคลังแก๊ง', { fn: 'gang', op: 'donate' }, 'primary')}
+      ${N ? `<div class="item" style="margin-top:10px"><div class="nm">⬆️ อัปเกรดเป็น ${N.n}<small>ใช้เงินคลัง ${money(N.cost)} ${g.bank >= N.cost ? '✅' : '❌'} · แต้มรวม ${N.pts.toLocaleString()} ${g.pts >= N.pts ? '✅' : '❌'} · รับได้ ${N.cap} คน${N.inc ? ` · รายได้ +${Math.round(N.inc * 100)}%` : ''} · พัก +${N.rest}</small></div>${B('อัปเกรด', { fn: 'gang', op: 'upgrade' }, g.role === 'boss' ? 'good' : '', g.role !== 'boss')}</div>` : '<div class="sub">🏆 บ้านแก๊งอัปเกรดสูงสุดแล้ว</div>'}
+      <div class="grid2" style="margin-top:14px">${B('🚪 ออกจากแก๊ง', { fn: 'gang', op: 'leave' })}${g.role === 'boss' ? B('💥 ยุบแก๊ง', { fn: 'gang', op: 'disband' }) : ''}</div>`;
+  } else if (gt === 'mem') {
+    body = g.mem.map(m => { const me0 = m.l === g.my, act = [];
+      if (g.role !== 'mem' && m.r !== 'boss' && !me0 && !(m.r === 'vice' && g.role !== 'boss')) act.push(B('ไล่ออก', { fn: 'gang', op: 'kick', l: m.l }));
+      if (g.role === 'boss' && m.r !== 'boss') act.push(B(m.r === 'vice' ? 'ปลดรอง' : '⭐ ตั้งรอง', { fn: 'gang', op: 'vice', l: m.l }), B('👑 ส่งต่อหัวหน้า', { fn: 'gang', op: 'boss', l: m.l }));
+      return `<div class="item"><div class="nm">${m.on ? '🟢' : '⚪'} ${esc(m.n)}<small>${RL[m.r]} · สัปดาห์นี้ ${m.p.toLocaleString()} แต้ม</small></div>${act.length ? `<div class="grid2">${act.join('')}</div>` : ''}</div>`; }).join('');
+  } else if (gt === 'req') {
+    body = g.req.length ? g.req.map(r => `<div class="item"><div class="nm">📨 ${esc(r.n)}<small>ขอเข้าแก๊ง</small></div><div class="grid2">${B('✅ รับ', { fn: 'gang', op: 'accept', l: r.l }, 'good')}${B('ปฏิเสธ', { fn: 'gang', op: 'deny', l: r.l })}</div></div>`).join('') : '<div class="sub">ยังไม่มีคนขอเข้า</div>';
+  } else {
+    body = `<div class="sub">อันดับรายสัปดาห์ (รีเซ็ตทุกวันจันทร์) · แก๊งที่ 1 ได้ชื่อขึ้นป้ายเด่นตลอดสัปดาห์</div>${rows}`;
+  }
+  return `<h2>${g ? `<span style="color:${g.color}">${g.icon} ${esc(g.name)}</span>` : '🏴 แก๊ง / ชมรม'}</h2><div class="tabs">${tabs}</div>${body}`;
+}
 function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
@@ -4393,6 +4450,7 @@ function renderPanel(p) {
         ${o.c === 'monk' ? `<div class="jobbox">🙏 ใส่บาตรพระ · เลือกอาหารในกระเป๋า ได้บุญ ความสุขเพิ่ม และได้รับพร 10 นาที<div class="rowf" style="margin-top:6px;flex-wrap:wrap;gap:4px">${Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id]?.eat?.hunger > 0).slice(0, 6).map(([id]) => B(`${G.items[id].icon} ${G.items[id].name}`, { t: 'alms_give', to: o.id, item: id }, 'good', far)).join('') || '<small>ไม่มีอาหารในกระเป๋า · ซื้อข้าวต้มมัด/ขนมไทยที่ร้านค้าวัดได้</small>'}</div></div>` : ''}
         ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}`;
     }
+    case 'gang': return gangPanel(p);
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => (b.fav || 0) - (a.fav || 0) || b.on - a.on);
       const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', `${f.fav ? '⭐ ' : ''}${esc(f.n)}`, f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call) : '')).join('');
@@ -4515,7 +4573,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
