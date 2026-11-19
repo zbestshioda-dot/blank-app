@@ -2788,10 +2788,15 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.adm) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
-  const GT = p.gg && !p.npc, ty = top - TS * (GT ? .74 : .58);
-  if (GT) { const lt = /e8c83a|e8913a/.test(p.gg[2]); sign(`${p.gg[0]} ${p.gg[1]}`, px, top - TS * .5, { size: TS * .15, bg: p.gg[2], color: lt ? '#2a1a05' : '#fff' }); }   // small gang tag between the title and the name   // with a gang tag the title moves up one line
+  // stack the labels from their real pixel sizes so they never overlap: name → gang tag → title, 3px apart
+  const nY = top - TS * .22, nFs = Math.max(10, Math.round(TS * (p.adm ? .29 : .27))), GAP = 3;
+  let yTop = nY - nFs * (p.adm ? .8 : .775);
+  const GT = p.gg && !p.npc;
+  if (GT) { const gFs = Math.max(10, Math.round(TS * .22)), gh = gFs * 1.3, gy = yTop - GAP - gh / 2, lt = /e8c83a|e8913a/.test(p.gg[2]); sign(`${p.gg[0]} ${p.gg[1]}`, px, gy, { size: gFs, h: gh, bg: p.gg[2], color: lt ? '#2a1a05' : '#fff' }); yTop = gy - gh / 2; }
+  const tFs = Math.max(10, Math.round(TS * .22)), ty = yTop - GAP - tFs * .6;
+  if (p.title) yTop = ty - tFs * .6;
   if (p.title) {
-    ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, ty);
+    ctx.font = `800 ${tFs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, ty);
     // title colour = rarity; legendary titles (and the mayor's) shimmer
     if (p.tr === 7 && !p.adm) { const w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), h0 = (t / 12) % 360; for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(h0 + k * 60) % 360},95%,66%)`); ctx.fillStyle = g; }
     else if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
@@ -2799,13 +2804,13 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
     ctx.fillText(`«${p.title}»`, px, ty);
   }
   if (p.emo && performance.now() < p.emoT) {
-    const k = 1 - (p.emoT - performance.now()) / 4200, by = top - TS * (p.title ? 1.25 : 1.0) - Math.sin(Math.min(1, k * 4) * Math.PI / 2) * TS * .25;
+    const k = 1 - (p.emoT - performance.now()) / 4200, by = yTop - TS * .42 - Math.sin(Math.min(1, k * 4) * Math.PI / 2) * TS * .25;
     ctx.font = `${Math.round(TS * .75)}px serif`; ctx.fillText(p.emo, px, by - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2);
   }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
-    const w = textW(txt) + 16, by = top - TS * (p.title ? 1.12 : .86), bh = TS * .5;
+    const w = textW(txt) + 16, bh = TS * .5, by = yTop - GAP - 7 - bh / 2;
     ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
     ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + 1);
@@ -4677,7 +4682,7 @@ function shade(hex, f) {
 function sign(text, x, y, o = {}) {
   const fs = Math.max(10, Math.round(o.size || TS * .36));
   ctx.font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const w = textW(text) + fs * .9, h = fs * 1.55;
+  const w = textW(text) + fs * .9, h = o.h || fs * 1.55;
   ctx.fillStyle = o.bg || 'rgba(58,36,20,.88)';
   ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
   if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 2; ctx.stroke(); }
