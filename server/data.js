@@ -10,7 +10,7 @@ const SPR = name => { const s = ATLAS.sprites[name]; return { w: s[2] / ATLAS.ti
 const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, y: 0, w: 110, h: 90 };
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
-const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 52, h: 32 };   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
+const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 40, h: 28 };   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
@@ -614,47 +614,55 @@ const RIDES = {
   rect(P.x, P.y, P.w, P.h, '.');
   for (let x = P.x; x < P.x + P.w; x++) { set(x, P.y, 'T'); set(x, P.y + P.h - 1, 'T'); }
   for (let y = P.y; y < P.y + P.h; y++) { set(P.x, y, 'T'); set(P.x + P.w - 1, y, 'T'); }
-  rect(X + 1, Y + 14, 50, 3, 'k');                                   // the main promenade (west gate to east)
-  rect(X + 24, Y + 2, 3, 28, 'k');                                   // and the cross walk (north to south)
+  // compact layout (40 x 28): rides on both sides of one promenade, a shopping street along the south with a minimart,
+  // and two short walks joining them, so everything is a few steps apart
+  rect(X + 1, Y + 10, 38, 3, 'k');                                   // the promenade (west gate to east)
+  rect(X + 15, Y + 13, 2, 9, 'k'); rect(X + 27, Y + 13, 2, 9, 'k');   // walks down to the shopping street
+  rect(X + 1, Y + 22, 38, 2, 'k');                                   // the shopping street
   const ride = (k, cx, cy, w, h, solid = true) => {
     const R = RIDES[k], x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
     if (solid) rect(x0, y0, w, h, 'o');
     const sy = y0 + h + .6;
-    rect(Math.floor(cx) - 1, y0 + h, 2, Math.max(0, Y + 14 - (y0 + h)), 'k');   // a short path from the ride to the promenade (north side)
+    rect(Math.floor(cx) - 1, y0 + h, 2, Math.max(0, Y + 10 - (y0 + h)), 'k');   // a short path from the ride to the promenade (north side)
     STATIONS.push({ id: 'ride_' + k, type: 'ride', k, label: R.name, icon: R.icon, x: cx, y: sy, r: 1.8, area: 'park', cx, cy, w, h });
   };
-  ride('carousel', X + 11, Y + 8, 8, 6);
-  ride('ferris', X + 32, Y + 7, 8, 8);
-  ride('coaster', X + 44, Y + 8, 12, 6);
+  ride('carousel', X + 7, Y + 5, 8, 6);
+  ride('ferris', X + 18, Y + 5, 8, 8);
+  ride('coaster', X + 32, Y + 5, 12, 6);
   // south side: rides open toward the promenade, so their stations sit on their north edge
   const rideS = (k, cx, cy, w, h, solid = true) => {
     const R = RIDES[k], x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
     if (solid) rect(x0, y0, w, h, 'o');
-    rect(Math.floor(cx) - 1, Y + 17, 2, Math.max(0, y0 - (Y + 17)), 'k');
+    rect(Math.floor(cx) - 1, Y + 13, 2, Math.max(0, y0 - (Y + 13)), 'k');
     STATIONS.push({ id: 'ride_' + k, type: 'ride', k, label: R.name, icon: R.icon, x: cx, y: y0 - .4, r: 1.8, area: 'park', cx, cy, w, h, top: 1 });
   };
   // the pool: a tiled deck round the water; swimmers move about freely in the water (it is not walkable on foot)
-  rect(X + 3, Y + 19, 18, 10, 'k'); rect(X + 4, Y + 20, 16, 8, 'w'); rect(X + 11, Y + 17, 2, 2, 'k');
-  POOL.x0 = X + 4; POOL.y0 = Y + 20; POOL.x1 = X + 20; POOL.y1 = Y + 28;
-  STATIONS.push({ id: 'ride_pool', type: 'ride', k: 'pool', label: RIDES.pool.name, icon: RIDES.pool.icon, x: X + 12, y: Y + 18.6, r: 2, area: 'park', cx: X + 12, cy: Y + 24, w: 16, h: 8, top: 1, swim: 1 });
-  rideS('bumper', X + 34, Y + 22, 10, 6, false);
-  { const x0 = X + 29, y0 = Y + 19; rect(x0, y0, 10, 6, 'k'); for (let i = 0; i < 10; i++) { set(x0 + i, y0, 'o'); set(x0 + i, y0 + 5, 'o'); } for (let j = 0; j < 6; j++) { set(x0, y0 + j, 'o'); set(x0 + 9, y0 + j, 'o'); } }   // the bumper car floor: you drive around inside its rubber wall
-  rideS('shooting', X + 45, Y + 20, 8, 4);
-  // the snack bar & souvenir kiosk (a real shop) on the south lawn by the food trucks
-  rect(X + 27, Y + 26, 22, 2, 'k');
-  STATIONS.push({ id: 'pshop', type: 'pshop', label: 'ร้านขนม & ของฝากสวนสนุก', icon: '🍿', x: X + 45, y: Y + 26.9, r: 1.8, area: 'park' });
-  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 15.5, r: 1.6, area: 'park' });
-  prop('signpost', X + 4.2, Y + 13.9);
-  for (const [x, y] of [[X + 7, Y + 18], [X + 18, Y + 13.4], [X + 29, Y + 13.4], [X + 40, Y + 18], [X + 48, Y + 13.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x + '_' + y, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y - .25, r: 1.1, area: 'park' }); }
-  for (const [x, y] of [[X + 8, Y + 13.9], [X + 22, Y + 13.9], [X + 28, Y + 13.9], [X + 40, Y + 13.9], [X + 22, Y + 18.4], [X + 28, Y + 18.4], [X + 47, Y + 18.2]]) prop('o_lampball', x, y);
-  for (let y = P.y; y < P.y + P.h; y++) for (let x = P.x; x < P.x + P.w; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
+  rect(X + 2, Y + 14, 13, 8, 'k'); rect(X + 3, Y + 15, 11, 6, 'w'); rect(X + 8, Y + 13, 2, 1, 'k');
+  POOL.x0 = X + 3; POOL.y0 = Y + 15; POOL.x1 = X + 14; POOL.y1 = Y + 21;
+  STATIONS.push({ id: 'ride_pool', type: 'ride', k: 'pool', label: RIDES.pool.name, icon: RIDES.pool.icon, x: X + 8.5, y: Y + 13.6, r: 2, area: 'park', cx: X + 8.5, cy: Y + 18, w: 11, h: 6, top: 1, swim: 1 });
+  rideS('bumper', X + 22, Y + 17, 10, 6, false);
+  { const x0 = X + 17, y0 = Y + 14; rect(x0, y0, 10, 6, 'k'); for (let i = 0; i < 10; i++) { set(x0 + i, y0, 'o'); set(x0 + i, y0 + 5, 'o'); } for (let j = 0; j < 6; j++) { set(x0, y0 + j, 'o'); set(x0 + 9, y0 + j, 'o'); } }   // the bumper car floor
+  rideS('shooting', X + 33, Y + 18, 8, 4);
+  // the shopping street: a minimart, the snack & souvenir kiosk, food trucks and drinks
+  const shop = (sp, cx, w, sc) => { PROPS.push({ s: sp, x: X + cx, y: Y + 26.8, sc }); rect(Math.round(X + cx - w / 2), Y + 24, w, 3, 'o'); };
+  shop('b_cs1', 5, 4, .7);
+  STATIONS.push({ id: 'pmart', type: 'cstore', label: 'มินิมาร์ทสวนสนุก', icon: '🏪', x: X + 5, y: Y + 23.4, r: 1.8, area: 'park' });
+  shop('kiosk', 10.5, 2);
+  STATIONS.push({ id: 'pshop', type: 'pshop', label: 'ร้านขนม & ของฝากสวนสนุก', icon: '🍿', x: X + 10.5, y: Y + 23.4, r: 1.8, area: 'park' });
+  shop('foodtruck', 15, 3); shop('icecream', 20, 3, .8); shop('cartstall', 24.5, 2); shop('b_cafe2', 31, 4, .55);
+  for (const c of [35.4, 36.6]) prop('x_vending', X + c, Y + 24.6);
+  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 11.5, r: 1.6, area: 'park' });
+  prop('signpost', X + 4.2, Y + 9.9);
+  for (const [x, y] of [[X + 12, Y + 9.4], [X + 24, Y + 9.4], [X + 24, Y + 13.4], [X + 37, Y + 13.4], [X + 6, Y + 21.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x + '_' + y, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y + .2, r: .7, area: 'park' }); }
+  for (const [x, y] of [[X + 6, Y + 9.9], [X + 14.5, Y + 9.9], [X + 26, Y + 9.9], [X + 38, Y + 9.9], [X + 14.4, Y + 14.2], [X + 29.6, Y + 14.2], [X + 1.6, Y + 22.3], [X + 38, Y + 22.3]]) prop('o_lampball', x, y);
+  for (let y = P.y; y < P.y + P.h - 1; y++) for (let x = P.x; x < P.x + P.w; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
   // the way in from town: an arch at the south edge, where the main road leaves town (like the farm and the housing estate)
   STATIONS.push({ id: 'gate_park', type: 'gate', to: 'park_in', label: 'ไปสวนสนุก', icon: '🎡', x: 54, y: 55.3, r: 1.8, area: 'town' });   // the amusement park's arch now stands just off the south avenue, a short walk from the square
   for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][0] >= 50 && TREES[i][0] <= 58 && TREES[i][1] >= 52 && TREES[i][1] <= 61) { set(TREES[i][0], TREES[i][1], '.'); TREES.splice(i, 1); }   // clear the ground in front of the arch
   for (let i = PROPS.length - 1; i >= 0; i--) if (PROPS[i].s === 'o_topiary' && PROPS[i].x === 56.4 && PROPS[i].y === 54) { set(56, 53, '.'); PROPS.splice(i, 1); }
   rect(51, 55, 6, 2, 'c');                                                            // cobblestone from the avenue to the arch
   rect(49, 76, 2, 14, '='); for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][1] >= 88 && TREES[i][0] >= 47 && TREES[i][0] <= 52) TREES.splice(i, 1);   // a gap in the tree line for the road
-  GATES.park_in = { x: X + 5, y: Y + 15.5 }; GATES.town_from_park = { x: 54, y: 57.4 };
+  GATES.park_in = { x: X + 5, y: Y + 11.5 }; GATES.town_from_park = { x: 54, y: 57.4 };
 }
 // ================================================================= THE TEMPLE: a walled ground of sand and lawns - the ordination
 // hall (โบสถ์) with a stone courtyard, a golden chedi, an open sala by a bodhi tree, a lotus pond, the temple shop and the bell tower.
@@ -724,13 +732,11 @@ const RIDES = {
 {
   const X = PARK.x, Y = PARK.y, free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !PROPS.some(q => Math.hypot(q.x - x, q.y - y) < 1.3) && !STATIONS.some(q => q.area === 'park' && Math.hypot((q.cx ?? q.x) - x, (q.cy ?? q.y) - y) < (q.w ? q.w / 2 + 1.5 : 1.5));
   const put = (sp, x, y, solid = true) => { if (free(x, y)) prop(sp, x, y, solid); };
-  for (const [sp, c] of [['foodtruck', 29.5], ['cartstall', 34.5], ['icecream', 39.5], ['kiosk', 45]]) prop(sp, X + c, Y + 29.4);    // food trucks + the snack kiosk along the south fence
-  for (const c of [31.5, 37, 42.5]) put('x_cafeset', X + c, Y + 25.2);
-  for (const c of [34, 48]) put('o_parasol', X + c, Y + 25, false);
-  for (let c = 2; c < 50; c += 3) { if (Math.abs(c - 25) < 3 || Math.abs(c - 11) < 2 || Math.abs(c - 33) < 2 || Math.abs(c - 45) < 2) continue; put(c % 6 === 2 ? 'o_tulips' : 'o_flowerbed', X + c + .5, Y + 13.9, false); put(c % 6 === 2 ? 'o_flowerbed' : 'o_tulips', X + c + .5, Y + 17.95, false); }
-  for (const [sp, c, r] of [['tree_pink', 3, 3], ['tree_pink2', 18, 3], ['tree_white', 21, 9], ['tree_pink', 3, 10], ['tree_white', 39, 3], ['tree_pink2', 28, 3],
-    ['tree_pink', 22, 28], ['tree_white', 2, 29.5], ['tree_pink2', 50, 23]]) put(sp, X + c, Y + r);
-  for (const [sp, c, r] of [['o_potflower', 23, 13.6], ['o_potflower', 27.5, 13.6], ['bush', 21, 21], ['bush', 21, 25], ['o_flowerbed', 14, 29.9], ['o_tulips', 7, 29.9]]) put(sp, X + c, Y + r, false);
+  for (const c of [30.5, 37.2]) put('x_cafeset', X + c, Y + 15.4);                     // café tables on the lawn by the shooting gallery
+  for (const c of [32.2, 35.5]) put('o_parasol', X + c, Y + 15.2, false);
+  for (let c = 2; c < 38; c += 3) { if (Math.abs(c - 7) < 2 || Math.abs(c - 18) < 2 || Math.abs(c - 32) < 2) continue; put(c % 6 === 2 ? 'o_tulips' : 'o_flowerbed', X + c + .5, Y + 9.9, false); }
+  for (const [sp, c, r] of [['tree_pink', 12.5, 2], ['tree_white', 24, 2], ['tree_pink2', 24, 6.5], ['tree_pink', 38, 9], ['tree_pink2', 38, 20.5]]) put(sp, X + c, Y + r);
+  for (const [sp, c, r] of [['o_potflower', 14.4, 13.6], ['o_potflower', 29, 13.6], ['bush', 20, 21], ['bush', 24, 21], ['o_flowerbed', 1.6, 15], ['o_tulips', 1.6, 18]]) put(sp, X + c, Y + r, false);
 }
 const AREAS = [TOWN, FARM, HOUSING, PARK, TEMPLE, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
