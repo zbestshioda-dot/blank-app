@@ -18,6 +18,9 @@ const TICK = 100;
 // "no cooldowns" / "locked full stats" and top up money. Extra admins via ADMINS=a,b
 const ADMINS = new Set(['james2324', ...String(process.env.ADMINS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean)]);
 const isAdmin = a => !!a && ADMINS.has(String(a.login || a.name).toLowerCase());
+const godInf = a => isAdmin(a) && a.god?.inf !== false;   // admins: unlimited money + gems unless switched off
+const INF_MONEY = 1e9;
+function godTop(a) { if (!godInf(a)) return; a.god = a.god || {}; if (a.god.real === undefined) { a.god.real = Math.min(a.money, INF_MONEY - 1); a.god.realG = a.gems || 0; } if (a.money < INF_MONEY) a.money = INF_MONEY; if ((a.gems || 0) < 1e6) a.gems = 1e6; }   // the real wallet is kept aside for when it is switched off
 const godLock = a => isAdmin(a) && !!a.god?.lock;          // god mode: stats locked full, never sick / knocked out / jailed
 const godNoCd = a => isAdmin(a) && !!a.god?.nocd;          // god mode: every cooldown skipped
 const ADMIN_NAME = 'อนุทิน', ADMIN_TITLE = 'นายกเทศมนตรี';
@@ -142,7 +145,8 @@ function standUp(a) {
   if (a.desk >= 0) { if (desks[a.desk] === a) desks[a.desk] = null; a.desk = -1; }
   if (a.bed >= 0) { if (beds[a.bed] === a) beds[a.bed] = null; a.bed = -1; wdAt = 0; }
   if (a.pose) { a.pose = null; a.seat = null; }
-  a.fun = null;
+  const wasSwim = a.fun?.k === 'pool'; a.fun = null;
+  if (wasSwim && D.POOL.x0 && nearPool(a.x, a.y)) { const s = D.STATIONS.find(x => x.id === 'ride_pool'); if (s) place(a, s.x, s.y, true); }   // out of the water onto the deck
   sendRoster();
 }
 function place(a, x, y, tp) {
@@ -151,7 +155,10 @@ function place(a, x, y, tp) {
   send(a, { t: 'fix', x, y, tp: tp ? 1 : 0, fx: a.fixId });
 }
 // off a park ride; out of the bumper car arena too (its wall is closed)
-function rideOff(a) { const k = a.fun?.k; standUp(a); if (k === 'bumper') { const s = D.STATIONS.find(x => x.id === 'ride_bumper'); if (s) place(a, s.x, s.y, true); } }
+function rideOff(a) { const k = a.fun?.k; standUp(a); if (k === 'bumper' || k === 'pool') { const s = D.STATIONS.find(x => x.id === 'ride_' + k); if (s) place(a, s.x, s.y, true); } }
+// the pool: swimmers stay inside the water; everyone else (on foot or in a vehicle) stays out of it
+const inPoolWater = (x, y) => { const P = D.POOL; return x > P.x0 + .4 && x < P.x1 - .4 && y > P.y0 + .7 && y < P.y1 - .1; };
+const nearPool = (x, y) => { const P = D.POOL; return x > P.x0 - .35 && x < P.x1 + .35 && y > P.y0 - .1 && y < P.y1 + .45; };
 function teleport(a, x, y) { a.cast = null; standUp(a); place(a, x, y, true); markMe(a); }
 function buildingOpen(bid, h = hourNow()) { return D.isOpen(bid, h); }
 function enterRoom(a, m) {
@@ -408,6 +415,50 @@ function gangOp(a, m) {
   }
 }
 
+
+
+// ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
+let ideas = [], ideaSeq = 1;
+function ideaView(a, sort) {
+  const me = lk(a), L = [...ideas].sort(sort === 'top' ? (x, y) => Object.keys(y.lk).length - Object.keys(x.lk).length || y.t - x.t : (x, y) => y.t - x.t).slice(0, 60);
+  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, cm: i.cm.slice(-30) })) });
+}
+function ideaOp(a, m) {
+  const me = lk(a), i = ideas.find(x => x.id === +m.id);
+  if (m.op === 'post') {
+    const text = cleanText(m.text, 300); if (text.length < 5) return toast(a, 'เขียนไอเดียอย่างน้อย 5 ตัวอักษร', '💡', false);
+    const d = dayKey(); if (!a.idd || a.idd.d !== d) a.idd = { d, n: 0 };
+    if (a.idd.n >= 3 && !isAdmin(a)) return toast(a, 'วันนี้โพสต์ไอเดียครบ 3 โพสต์แล้ว พรุ่งนี้มาใหม่นะ', '💡', false);
+    a.idd.n++; a.sd = true; ideas.push({ id: ideaSeq++, l: me, n: a.name, text, t: now(), lk: {}, cm: [] }); if (ideas.length > 300) ideas.shift();
+    toast(a, 'โพสต์ไอเดียแล้ว ขอบคุณที่ช่วยออกแบบเมือง! 💡', '💡');
+    for (const o of online.values()) if (isAdmin(o) && o !== a) toast(o, `💡 ไอเดียใหม่จาก ${a.name}`, '💡');
+  } else if (!i) return ideaView(a, m.sort);
+  else if (m.op === 'like') { if (i.lk[me]) delete i.lk[me]; else i.lk[me] = 1; }
+  else if (m.op === 'cm') {
+    const text = cleanText(m.text, 150); if (text.length < 1) return;
+    if (!cd(a, 'ideacm', 5000)) return;
+    i.cm.push({ n: a.name, text, t: now(), a: isAdmin(a) ? 1 : 0 }); if (i.cm.length > 60) i.cm.shift();
+    const o = accounts.get(i.l); if (o?.ws && o !== a) toast(o, `💬 ${a.name} คอมเมนต์ไอเดียของคุณ`, '💡');
+  } else if (m.op === 'del') { if (i.l !== me && !isAdmin(a)) return; ideas = ideas.filter(x => x !== i); }
+  gdirty(); ideaView(a, m.sort);
+}
+// ------------------------------------------------------------------ leaderboard rivals
+// Phantom rich folk who only exist on the leaderboard. Each one shadows a real player's rank and keeps
+// creeping up to sit a few percent above them, so there is always someone to beat (and to overtake again).
+let ghosts = [];
+const GHOST = [['เสี่ยต่อ', 'merchant', 0, .035], ['คุณนายเพ็ญ', 'doctor', 1, .05], ['ลุงสมบัติ', 'farmer', 2, .03], ['เจ๊หงส์', 'merchant', 4, .06], ['พี่บิ๊กไรเดอร์', 'rider', 6, .04], ['หมอโอ๊ต', 'doctor', 9, .05]];
+function ghostTick() {
+  const R = [...accounts.values()].filter(a => !isAdmin(a)).map(a => worth(a)).sort((x, y) => y - x);
+  const want = g => R[g.k] !== undefined ? R[g.k] * (1 + g.m) : (R[R.length - 1] ?? 20000) * (.92 - g.k * .04);   // few players: the extra rivals sit below everyone
+  if (ghosts.length !== GHOST.length) ghosts = GHOST.map(([n, c, k, m], i) => ({ n, c, k, m, w: ghosts[i]?.w || Math.max(3000, want({ k, m })) }));
+  for (const g of ghosts) {
+    const tgt = Math.max(3000, want(g));
+    g.w += g.w < tgt ? (tgt - g.w) * .12 : -(g.w - tgt) * .02;   // catch up fast, fall back slowly
+  }
+  gdirty();
+}
+setInterval(() => { try { ghostTick(); } catch (e) { console.error('ghostTick', e); } }, 5 * 60e3).unref?.();
+setTimeout(() => { try { ghostTick(); } catch { } }, 4000);
 // ------------------------------------------------------------------ city mayor (elected)
 // Every 4 weeks the town votes. Candidates pay to run and can campaign (reputation); one vote per player per cycle.
 // The winner serves the next cycle: a title, a daily salary, one city policy and a daily announcement. Two terms in a row at most.
@@ -539,7 +590,7 @@ function tradePrices(a) {
 }
 function spend(a, e) {
   e = Math.ceil(e * D.ENERGY_MUL);   // work and quests tire you more: the amusement park is where you get it back
-  if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) กินอาหารหรือนั่งพักก่อน`, '😴', false); return false; }
+  if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) ไปเล่นสวนสนุก 🎡 หรือนอนพักที่เตียงในบ้าน 🛏️`, '😴', false); return false; }
   a.energy -= e;
   a.hunger = Math.max(0, a.hunger - e * 0.12);
   if (a.energy < 20) infect(a, 'exhaust', 0.1);
@@ -617,14 +668,15 @@ function worth(a) {
 
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
-const SAVE_KEYS = ['gang', 'gpd', 'mpd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const PET_LEASH = 800;
+const SAVE_KEYS = ['pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -700,7 +752,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -1222,15 +1274,15 @@ function act(a, m) {
       if (!pay(a, R.price)) return;
       const used = new Set(riders.map(o => o.fun.slot)); let slot = 0; while (used.has(slot)) slot++;
       standUp(a); a.cast = null; a.pose = 'fun'; a.fun = { k: s.k, slot, until: now() + R.mins * 60000 };
-      if (s.k === 'bumper') place(a, s.cx - 3 + (slot % 4) * 2, s.cy + .3, true); else place(a, s.x, s.y);   // bumper cars: you drive it yourself inside the arena
+      if (s.k === 'bumper') place(a, s.cx - 3 + (slot % 4) * 2, s.cy + .3, true); else if (s.k === 'pool') place(a, s.cx - 5 + (slot % 5) * 2.5, s.cy - .6 + Math.floor(slot / 5) * 2.4, true); else place(a, s.x, s.y);   // bumper cars: you drive it yourself inside the arena
       markMe(a); sendRoster(); joy(a, 2); stat(a, 'rides');
       return toast(a, s.k === 'bumper' ? `🚗 ขึ้นรถบั๊มพ์แล้ว! ขับไปชนคนอื่นได้เลย ได้พลังงาน เลือด และความสุขทุกวินาที (${R.mins} นาที) · กดปุ่ม "ลงจากรถ" เพื่อออก` : `${R.icon} ขึ้น${R.name}แล้ว! ได้พลังงาน เลือด และความสุขทุกวินาที (${R.mins} นาที) · เดินออกเพื่อลง`, R.icon);
     }
     case 'ride.stop': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'seat.sit': {
       for (const o of online.values()) if (o !== a && o.seat === s.id) return toast(a, 'ที่นั่งนี้มีคนนั่งแล้ว', '🪑', false);
-      standUp(a); a.pose = 'seat'; a.seat = s.id; place(a, s.x, s.y); quest(a, 'sit'); sendRoster(); joy(a, 3);
-      return toast(a, 'นั่งพักที่โต๊ะ พลังงานฟื้นเร็วขึ้น คุยกับคนรอบๆ ได้ (เดินเพื่อลุก)', '🪑');
+      standUp(a); a.pose = 'seat'; a.seat = s.id; place(a, s.x, s.y); quest(a, 'sit'); sendRoster(); if (cd(a, 'sitjoy', 10 * 60e3, true)) joy(a, 3);   // once per 10 min: sitting up and down no longer farms happiness
+      return toast(a, 'นั่งเล่นที่โต๊ะ คุยกับคนรอบๆ ได้ (เดินเพื่อลุก) · อยากได้พลังงานคืนไปสวนสนุกหรือนอนที่เตียงในบ้าน', '🪑');
     }
     case 'bank.bills': return payBills(a);
     case 'fashion.buy': case 'barber.buy': {
@@ -1356,7 +1408,7 @@ function act(a, m) {
       if (monkFast(a)) return;
       if (!cd(a, 'eat', 4000)) return;
       if (!pay(a, it.base)) { a.cd.eat = 0; return; }
-      a.hunger = Math.min(100, a.hunger + it.eat.hunger); a.energy = Math.min(100, a.energy + (it.eat.energy || 0));
+      a.hunger = Math.min(100, a.hunger + it.eat.hunger);
       if (it.base < 100) infect(a, 'poison', 0.03);
       ate(a, m.item);
       markMe(a); quest(a, 'eat');
@@ -1581,6 +1633,12 @@ function act(a, m) {
       a.pets.push(m.id); a.pet = m.id; markMe(a); joy(a, 6 + P.rar * 3); sendRoster();
       return toast(a, `${P.icon} รับ${P.name}มาเลี้ยงแล้ว! มันเดินตามคุณไปทุกที่ — แตะที่ตัวมันเพื่อเล่นด้วย`, '🐾');
     }
+    case 'petshop.leash': {                                // a leash: walk your pet on a lead (switch it on / off in the 🐾 app)
+      if (a.leash) return toast(a, 'คุณมีสายจูงแล้ว เปิด/ปิดได้ในแอพ 🐾 สัตว์เลี้ยง', 'ℹ️', false);
+      if (!pay(a, PET_LEASH)) return;
+      a.leash = 1; a.leashOn = 1; markMe(a); sendRoster();
+      return toast(a, '🦮 ซื้อสายจูงแล้ว! ใส่ให้สัตว์เลี้ยงเรียบร้อย (ถอดได้ในแอพ 🐾)', '🦮');
+    }
     case 'fishclub.rod': case 'staff.rod': {                 // buy a rod (it goes into the bag and into your hand)
       const id = D.RODS[m.rod] ? m.rod : 'bamboo', r = D.RODS[id];
       a.rods = a.rods || [];
@@ -1724,6 +1782,13 @@ function act(a, m) {
       if (cd(a, 'bellJoy', 60000, true)) { joy(a, 2); markMe(a); }
       return;
     }
+    case 'pshop.buy': {
+      const id = m.item, it = D.ITEMS[id]; if (!it || !D.PSHOP.items.includes(id)) return;
+      const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = Math.ceil(it.base * D.PSHOP.markup);
+      if (!pay(a, unit * q)) return;
+      addItem(a, id, q); markMe(a); quest(a, 'buy', q); joy(a, 1);
+      return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ${money(unit * q)} · ใส่กระเป๋าแล้ว (กดใช้ในกระเป๋า 🎒)`, it.icon);
+    }
     case 'tshop.buy': {
       const id = m.item, it = D.ITEMS[id]; if (!it || !D.TSHOP.items.includes(id)) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = Math.ceil(it.base * D.TSHOP.markup);
@@ -1792,6 +1857,7 @@ function act(a, m) {
     case 'dealer.buy': case 'dealer.sell': {   // the car showroom
       const v = D.VEHICLES[m.v]; if (!v) return;
       const own = (a.vehicles || []).includes(m.v);
+      if (v.hidden && !own) return toast(a, 'รุ่นนี้เลิกขายแล้ว', '🚗', false);
       if (m.a === 'sell') {
         if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false);
         if (m.v === 'police' && a.policeCar) return toast(a, 'รถสายตรวจเป็นของสถานีตำรวจ (ยืมใช้) ขายไม่ได้', '🚓', false);
@@ -2957,7 +3023,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a), gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -2982,19 +3048,19 @@ function meView(a) {
   return {
     t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
-    office: a.office ? { strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
+    office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
     cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
     dogq: a.dogq ? { kind: a.dogq.kind || 'dog', stole: a.dogq.stole, dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0, thiefNext: a.thiefNext || 0, jgNext: a.jgNext || {},
     icu: null, icuNext: a.icuNext || 0,
-    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
+    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], title: a.title || '', myOrders, jobs,
@@ -3003,7 +3069,8 @@ function meView(a) {
 }
 function worldView() {
   const t = now();
-  const lb = [...accounts.values()].map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
+  const lb = [...accounts.values()].filter(a => !isAdmin(a)).map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
+    .concat(ghosts.map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: '' })))
     .sort((x, y) => y.w - x.w).slice(0, 10);
   return {
     t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
@@ -3119,7 +3186,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -3213,9 +3280,10 @@ function move(a, m) {
   // sends a burst of moves is not pulled back to where it was
   a.mvb = Math.min(moveCap(a), (a.mvb ?? moveCap(a)) + SPEED * speedOf(a) * Math.max(runMul(a), a.runT > t - 1500 ? D.RUN.mul : 1) * 1.35 * dt);
   const d = Math.hypot(x - a.x, y - a.y);
-  if (d > a.mvb + 0.05 || !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y))) return place(a, a.x, a.y);
+  const swim = a.pose === 'fun' && a.fun?.k === 'pool';
+  if (d > a.mvb + 0.05 || (swim ? !inPoolWater(x, y) : !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && !nearPool(a.x, a.y))) return place(a, a.x, a.y);
   a.mvb -= d;
-  if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper') standUp(a);   // (bumper cars are driven: moving keeps you on)
+  if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper' && !swim) standUp(a);   // (bumper cars are driven, swimmers swim: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
   if (a.run && !godLock(a) && !riding(a)) {               // running burns energy; too tired = back to walking
     a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); a.runT = t;
@@ -3244,6 +3312,7 @@ function onMessage(ws, raw) {
   const a = ws.acct;
   if (m.t === 'login') { if (!a) login(ws, m); return; }
   if (!a || a.ws !== ws) return;
+  godTop(a);
   switch (m.t) {
     case 'p': return move(a, m);
     case 'chat': {                          // local chat: only people near you see it (bubble over your head)
@@ -3271,6 +3340,8 @@ function onMessage(ws, raw) {
     }
     case 'act': return act(a, m);
     case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband'].includes(m.op)) sendRoster(); return; }
+    case 'visit': { if (a.down) return; const o = byPhone.get(String(m.p || '')); if (!o || !o.ws || !o.hown || hidden(o)) return toast(a, 'เพื่อนคนนี้ไม่ได้ออนไลน์อยู่ หรือยังไม่มีบ้าน', '🏡', false); return goHome(a, o); }
+    case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
@@ -3297,6 +3368,13 @@ function onMessage(ws, raw) {
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
     case 'use': return useItem(a, m.item);
+    case 'pet.leash': { if (!a.leash) return toast(a, 'ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง', '🦮', false); a.leashOn = a.leashOn ? 0 : 1; markMe(a); sendRoster(); return toast(a, a.leashOn ? 'ใส่สายจูงแล้ว' : 'ถอดสายจูงแล้ว', '🦮'); }
+    case 'pet.name': {
+      if (!(a.pets || []).includes(m.id)) return;
+      const nm = cleanText(m.name, 12); if (nm && impersonates(nm)) return toast(a, 'ชื่อนี้ใช้ไม่ได้', '🐾', false);
+      a.pnames = { ...(a.pnames || {}) }; if (nm) a.pnames[m.id] = nm; else delete a.pnames[m.id];
+      markMe(a); sendRoster(); return toast(a, nm ? `ตั้งชื่อว่า "${nm}" แล้ว` : 'ลบชื่อแล้ว', '🐾');
+    }
     case 'pet.call': {                                     // bring one out (or put it away with an empty id)
       if (m.id && !(a.pets || []).includes(m.id)) return;
       a.pet = m.id || ''; markMe(a); sendRoster();
@@ -3310,7 +3388,7 @@ function onMessage(ws, raw) {
       if (a.down) return;
       if (m.on === false) { if (a.pose === 'rest') { a.pose = null; sendRoster(); markMe(a); } return; }
       standUp(a); a.pose = 'rest'; markMe(a); sendRoster();
-      return toast(a, 'นั่งพักหลับตา... พลังงานฟื้นเร็วขึ้น 3 เท่า และเลือดค่อยๆ ฟื้น (ถ้าไม่หิว) · เดินเพื่อลุก', '😌');
+      return toast(a, 'นั่งพักหลับตา ช่วยแก้ง่วง · อยากได้พลังงานและเลือดคืน ไปเล่นสวนสนุก 🎡 หรือนอนที่เตียงในบ้าน 🛏️ · เดินเพื่อลุก', '😌');
     }
     case 'beg': {                           // beggars can sit down anywhere
       if (a.down || !need(a, 'beggar')) return;
@@ -3537,6 +3615,14 @@ function godAct(a, m) {
     toast(a, 'สเตตัสเต็มแล้ว', '💯');
   } else if (m.op === 'cloak') { a.god.cloak = !a.god.cloak; markMe(a); sendRoster(); toast(a, a.god.cloak ? 'สวมชุดคลุมแอดมิน + ออร่า' : 'ถอดชุดคลุมแอดมิน', '🌑'); }
   else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
+  else if (m.op === 'inf') {
+    a.god.inf = a.god.inf === false;
+    if (a.god.inf) { a.god.real = Math.min(a.money, INF_MONEY - 1); a.god.realG = a.gems || 0; godTop(a); }
+    else { a.money = a.god.real ?? 0; a.gems = a.god.realG ?? 0; }
+    toast(a, a.god.inf ? 'เปิดเงิน/เพชรไม่จำกัด' : 'ปิดเงินไม่จำกัด กลับไปใช้เงินจริง', '💰');
+  }
+  else if (m.op === 'submoney') { if (godInf(a)) return toast(a, 'ปิดเงินไม่จำกัดก่อน จึงลดเงินได้', '💰', false); const v = Math.floor(+m.v); if (!Number.isSafeInteger(v) || v <= 0) return toast(a, 'ใส่จำนวนเงินให้ถูกต้อง', '💰', false); a.money = Math.max(0, a.money - v); toast(a, `ลดเงิน ${money(v)} แล้ว`, '💰'); }
+  else if (m.op === 'setmoney') { if (godInf(a)) return toast(a, 'ปิดเงินไม่จำกัดก่อน', '💰', false); const v = Math.floor(+m.v); if (!Number.isSafeInteger(v) || v < 0) return toast(a, 'ใส่จำนวนเงินให้ถูกต้อง', '💰', false); a.money = v; toast(a, `ตั้งเงินเป็น ${money(v)} แล้ว`, '💰'); }
   else if (m.op === 'addmoney') { const v = Math.floor(+m.v); if (!Number.isSafeInteger(v) || v <= 0 || a.money + v > Number.MAX_SAFE_INTEGER) return toast(a, 'ใส่จำนวนเงินให้ถูกต้อง', '💰', false); a.money += v; toast(a, `เพิ่มเงิน ${money(v)} แล้ว`, '💰'); }
   else if (m.op === 'alljobs') { a.god.alljobs = a.god.alljobs === false; ordersChanged(); toast(a, a.god.alljobs === false ? 'ปิดแล้ว: ทำได้เฉพาะงานของอาชีพตัวเอง' : 'เปิดแล้ว: ทำงานได้ทุกอาชีพ', '💼'); }
   else if (m.op === 'notitle') { a.god.notitle = !a.god.notitle; sendRoster(); toast(a, a.god.notitle ? 'ซ่อนฉายานายกเทศมนตรีแล้ว (ใช้ฉายาของตัวเองแทน)' : 'แสดงฉายานายกเทศมนตรีแล้ว', '🏅'); }
@@ -3646,7 +3732,8 @@ function tick() {
       a.craving = null; a.utilOff = false;
     }
     // ---- energy, hunger, health
-    const restMul = a.pose === 'rest' ? 3 : a.pose === 'seat' ? 2 : a.pose === 'bed' ? 2 : 1;
+    // energy only comes back properly in a bed or at the amusement park; sitting gives nothing extra (a slow trickle keeps nobody stuck)
+    const restMul = a.pose === 'bed' ? 2 : 0.27;
     if (a.pose === 'fun' && a.fun) {          // on a park ride: energy, health and happiness come back every second
       const R = D.RIDES[a.fun.k];
       if (!R || D.areaAt(a.x, a.y)?.id !== 'park') standUp(a);
@@ -3660,7 +3747,6 @@ function tick() {
       if (a.hunger <= 0) a.health -= 0.25 * dt;
       else if (a.hunger > 60 && a.health < 100 && !(a.dz || []).length) a.health = Math.min(100, a.health + 0.05 * dt);
       // sitting down to rest heals (slowly while sick, not at all while starving)
-      if ((a.pose === 'rest' || a.pose === 'seat') && a.hunger > 25 && a.health < 100) a.health = Math.min(100, a.health + ((a.dz || []).length ? 0.1 : 0.5) * dt);
       for (const d of a.dz || []) a.health -= (DZ[d].drain || 0) * (flu && (d === 'flu' || d === 'cold') ? 2.5 : 1) * dt;
       a.health = Math.max(0, a.health);
     }

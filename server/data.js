@@ -10,7 +10,7 @@ const SPR = name => { const s = ATLAS.sprites[name]; return { w: s[2] / ATLAS.ti
 const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, y: 0, w: 110, h: 90 };
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
-const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 70, h: 37 };   // added later, in the free space under the farm (nothing older moves)
+const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 52, h: 32 };   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
@@ -445,11 +445,8 @@ const LAYOUT = {
     ['x_barstool', 1.4, 4.4], ['x_barstool', 3.0, 4.4], ['x_barstool', 4.6, 4.4], ['x_sink', 11.4, 5.6], ['x_dryer', 12.6, 7.6], ['x_fan', 9.6, 7.8], ['x_bonsai', 1.4, 8.8],
     ['x_sofa2', 4.6, 8.9], ['f_plant', 12.8, 8.8], ['i_poster', 5, 1.05, false], ['i_poster', 9.6, 1.05, false], ['x_magrack', 9.4, 8.9]],
   // a small home: bedroom (top left), living room (middle), bathroom (top right), kitchen (bottom left); bought furniture fills its own spots (client FURN_POS)
-  house: [['f_wardrobe', 1.4, 2.9], ['f_bed_blue', 3.4, 3.3], ['i_teddy', 3.9, 2.7, false], ['f_drawer', 5.1, 2.5], ['i_books', 5.1, 1.55, false], ['i_painting', 3.4, 1.05, false],
-    ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false],
-    ['f_sink', 10.0, 2.6], ['f_toilet', 11.1, 2.6], ['f_shower', 12.3, 2.7],
-    ['f_rug_red', 8, 6.0], ['f_armchair', 5.6, 5.8],
-    ['f_fridge', 1.2, 8.7], ['f_counter_micro', 2.95, 8.7], ['f_stove', 4.75, 8.7], ['f_welcome', 7, 9.25]],
+  // a new home comes empty: only the bed (plus windows and the doormat) — everything else is bought and placed by the owner
+  house: [['f_bed_blue', 3.4, 3.3], ['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false], ['f_welcome', 7, 9.25]],
 };
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
@@ -581,55 +578,60 @@ const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house ===
 // gives back energy, health and happiness. A ticket buys a few minutes; walking away gets you off.
 // k: ride, cx/cy: centre of its footprint, w/h: footprint (solid), cap: riders at once, price: ticket, mins: ticket length,
 // gain: per second while riding
+const POOL = {};   // the park pool's water (filled in below): swimmers move freely inside it, nobody else (and no vehicle) can enter
 const ENERGY_MUL = 1.3;   // every energy cost (jobs, quests, fishing...) x this
 const RIDES = {
-  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 60, mins: 3, cap: 6, gain: { energy: .5, health: .2, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
-  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 90, mins: 4, cap: 8, gain: { energy: .45, health: .3, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
-  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 120, mins: 2, cap: 6, gain: { energy: .3, health: .1, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
-  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 80, mins: 4, cap: 10, gain: { energy: .6, health: .55, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
-  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 70, mins: 2, cap: 4, gain: { energy: .3, health: .1, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
-  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 40, mins: 2, cap: 3, gain: { energy: .25, health: .1, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
+  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 60, mins: 3, cap: 6, gain: { energy: 0.8, health: 0.32, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
+  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 90, mins: 4, cap: 8, gain: { energy: 0.72, health: 0.48, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
+  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 120, mins: 2, cap: 6, gain: { energy: 0.48, health: 0.16, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
+  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 80, mins: 4, cap: 10, gain: { energy: 0.96, health: 0.88, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
+  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 70, mins: 2, cap: 4, gain: { energy: 0.48, health: 0.16, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
+  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 40, mins: 2, cap: 3, gain: { energy: 0.4, health: 0.16, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
 };
 {
   const X = PARK.x, Y = PARK.y, P = PARK;
   rect(P.x, P.y, P.w, P.h, '.');
   for (let x = P.x; x < P.x + P.w; x++) { set(x, P.y, 'T'); set(x, P.y + P.h - 1, 'T'); }
   for (let y = P.y; y < P.y + P.h; y++) { set(P.x, y, 'T'); set(P.x + P.w - 1, y, 'T'); }
-  rect(X + 1, Y + 17, 68, 3, 'k');                                   // the main promenade (west to east)
-  rect(X + 33, Y + 2, 4, 33, 'k');                                   // and the cross walk (north to south)
+  rect(X + 1, Y + 14, 50, 3, 'k');                                   // the main promenade (west gate to east)
+  rect(X + 24, Y + 2, 3, 28, 'k');                                   // and the cross walk (north to south)
   const ride = (k, cx, cy, w, h, solid = true) => {
     const R = RIDES[k], x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
     if (solid) rect(x0, y0, w, h, 'o');
     const sy = y0 + h + .6;
-    rect(Math.floor(cx) - 1, y0 + h, 2, Math.max(0, Y + 17 - (y0 + h)), 'k');   // a short path from the ride to the promenade (north side)
+    rect(Math.floor(cx) - 1, y0 + h, 2, Math.max(0, Y + 14 - (y0 + h)), 'k');   // a short path from the ride to the promenade (north side)
     STATIONS.push({ id: 'ride_' + k, type: 'ride', k, label: R.name, icon: R.icon, x: cx, y: sy, r: 1.8, area: 'park', cx, cy, w, h });
   };
-  ride('carousel', X + 17, Y + 9, 8, 6);
-  ride('ferris', X + 45, Y + 8, 8, 8);
-  ride('coaster', X + 60, Y + 9, 12, 6);
+  ride('carousel', X + 11, Y + 8, 8, 6);
+  ride('ferris', X + 32, Y + 7, 8, 8);
+  ride('coaster', X + 44, Y + 8, 12, 6);
   // south side: rides open toward the promenade, so their stations sit on their north edge
   const rideS = (k, cx, cy, w, h, solid = true) => {
     const R = RIDES[k], x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2);
     if (solid) rect(x0, y0, w, h, 'o');
-    rect(Math.floor(cx) - 1, Y + 20, 2, Math.max(0, y0 - (Y + 20)), 'k');
+    rect(Math.floor(cx) - 1, Y + 17, 2, Math.max(0, y0 - (Y + 17)), 'k');
     STATIONS.push({ id: 'ride_' + k, type: 'ride', k, label: R.name, icon: R.icon, x: cx, y: y0 - .4, r: 1.8, area: 'park', cx, cy, w, h, top: 1 });
   };
-  rect(X + 6, Y + 23, 18, 10, 'k'); rect(X + 7, Y + 24, 16, 8, 'w');   // the pool: tiled deck, water inside (the water is not walkable)
-  STATIONS.push({ id: 'ride_pool', type: 'ride', k: 'pool', label: RIDES.pool.name, icon: RIDES.pool.icon, x: X + 15, y: Y + 22.6, r: 2, area: 'park', cx: X + 15, cy: Y + 28, w: 16, h: 8, top: 1 });
-  rideS('bumper', X + 46, Y + 27, 10, 6, false);
-  { const x0 = X + 41, y0 = Y + 24; rect(x0, y0, 10, 6, 'k'); for (let i = 0; i < 10; i++) { set(x0 + i, y0, 'o'); set(x0 + i, y0 + 5, 'o'); } for (let j = 0; j < 6; j++) { set(x0, y0 + j, 'o'); set(x0 + 9, y0 + j, 'o'); } }   // the bumper car floor: you drive around inside its rubber wall
-  rideS('shooting', X + 60, Y + 26, 8, 4);
-  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 18.5, r: 1.6, area: 'park' });
-  prop('signpost', X + 4.2, Y + 16.9);
-  for (const [x, y] of [[X + 8, Y + 21], [X + 27, Y + 21], [X + 40, Y + 21], [X + 54, Y + 21], [X + 66, Y + 21]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y - .25, r: 1.1, area: 'park' }); }
-  for (const [x, y] of [[X + 10, Y + 16.9], [X + 30, Y + 16.9], [X + 40, Y + 16.9], [X + 62, Y + 16.9], [X + 30, Y + 21.4], [X + 40, Y + 21.4]]) prop('o_lampball', x, y);
-  for (const [x, y] of [[X + 26, Y + 6], [X + 28, Y + 12], [X + 4, Y + 6], [X + 5, Y + 12], [X + 67, Y + 30], [X + 28, Y + 30], [X + 30, Y + 34]]) prop('tree_pink', x, y);
+  // the pool: a tiled deck round the water; swimmers move about freely in the water (it is not walkable on foot)
+  rect(X + 3, Y + 19, 18, 10, 'k'); rect(X + 4, Y + 20, 16, 8, 'w'); rect(X + 11, Y + 17, 2, 2, 'k');
+  POOL.x0 = X + 4; POOL.y0 = Y + 20; POOL.x1 = X + 20; POOL.y1 = Y + 28;
+  STATIONS.push({ id: 'ride_pool', type: 'ride', k: 'pool', label: RIDES.pool.name, icon: RIDES.pool.icon, x: X + 12, y: Y + 18.6, r: 2, area: 'park', cx: X + 12, cy: Y + 24, w: 16, h: 8, top: 1, swim: 1 });
+  rideS('bumper', X + 34, Y + 22, 10, 6, false);
+  { const x0 = X + 29, y0 = Y + 19; rect(x0, y0, 10, 6, 'k'); for (let i = 0; i < 10; i++) { set(x0 + i, y0, 'o'); set(x0 + i, y0 + 5, 'o'); } for (let j = 0; j < 6; j++) { set(x0, y0 + j, 'o'); set(x0 + 9, y0 + j, 'o'); } }   // the bumper car floor: you drive around inside its rubber wall
+  rideS('shooting', X + 45, Y + 20, 8, 4);
+  // the snack bar & souvenir kiosk (a real shop) on the south lawn by the food trucks
+  rect(X + 27, Y + 26, 22, 2, 'k');
+  STATIONS.push({ id: 'pshop', type: 'pshop', label: 'ร้านขนม & ของฝากสวนสนุก', icon: '🍿', x: X + 45, y: Y + 26.9, r: 1.8, area: 'park' });
+  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 15.5, r: 1.6, area: 'park' });
+  prop('signpost', X + 4.2, Y + 13.9);
+  for (const [x, y] of [[X + 7, Y + 18], [X + 18, Y + 13.4], [X + 29, Y + 13.4], [X + 40, Y + 18], [X + 48, Y + 13.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x + '_' + y, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y - .25, r: 1.1, area: 'park' }); }
+  for (const [x, y] of [[X + 8, Y + 13.9], [X + 22, Y + 13.9], [X + 28, Y + 13.9], [X + 40, Y + 13.9], [X + 22, Y + 18.4], [X + 28, Y + 18.4], [X + 47, Y + 18.2]]) prop('o_lampball', x, y);
   for (let y = P.y; y < P.y + P.h; y++) for (let x = P.x; x < P.x + P.w; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
   // the way in from town: an arch at the south edge, where the main road leaves town (like the farm and the housing estate)
   STATIONS.push({ id: 'gate_park', type: 'gate', to: 'park_in', label: 'ไปสวนสนุก', icon: '🎡', x: 50, y: 87.2, r: 1.6, area: 'town' });
   rect(49, 76, 2, 14, '='); for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][1] >= 88 && TREES[i][0] >= 47 && TREES[i][0] <= 52) TREES.splice(i, 1);   // a gap in the tree line for the road
   prop('signpost', 52.7, 86.6);
-  GATES.park_in = { x: X + 5, y: Y + 18.5 }; GATES.town_from_park = { x: 50, y: 85.4 };
+  GATES.park_in = { x: X + 5, y: Y + 15.5 }; GATES.town_from_park = { x: 50, y: 85.4 };
 }
 // ================================================================= THE TEMPLE: a walled ground of sand and lawns - the ordination
 // hall (โบสถ์) with a stone courtyard, a golden chedi, an open sala by a bodhi tree, a lotus pond, the temple shop and the bell tower.
@@ -697,15 +699,15 @@ const RIDES = {
 // ================================================================= the park, dressed up: a food court on the south lawn, café tables,
 // flowerbeds along the main walk and more blossom trees (added after everything else, so nothing older moves)
 {
-  const X = PARK.x, free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !STATIONS.some(q => q.area === 'park' && Math.hypot((q.cx ?? q.x) - x, (q.cy ?? q.y) - y) < (q.w ? q.w / 2 + 1.5 : 1.5));
+  const X = PARK.x, Y = PARK.y, free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !PROPS.some(q => Math.hypot(q.x - x, q.y - y) < 1.3) && !STATIONS.some(q => q.area === 'park' && Math.hypot((q.cx ?? q.x) - x, (q.cy ?? q.y) - y) < (q.w ? q.w / 2 + 1.5 : 1.5));
   const put = (sp, x, y, solid = true) => { if (free(x, y)) prop(sp, x, y, solid); };
-  for (const [sp, c, y] of [['foodtruck', 39, 85.4], ['cartstall', 45, 85.4], ['icecream', 51, 85.4], ['kiosk', 57, 85.4], ['cartstall', 63, 85.4]]) put(sp, X + c, y);
-  for (const [c, y] of [[41.5, 83], [47.5, 83], [53.5, 83], [59.5, 83]]) { put('x_cafeset', X + c, y); }
-  for (const [c, y] of [[42, 81.3], [54, 81.3], [62, 81.3]]) put('o_parasol', X + c, y, false);
-  for (let c = 3; c < 68; c += 4) { if ([16, 17, 33, 34, 35, 36, 44, 45, 59, 60].some(k => Math.abs(k - c) < 2)) continue; put(c % 8 === 3 ? 'o_tulips' : 'o_flowerbed', X + c + .5, 68.9, false); put(c % 8 === 3 ? 'o_flowerbed' : 'o_tulips', X + c + .5, 72.95, false); }
-  for (const [sp, c, y] of [['tree_pink', 4, 55], ['tree_pink2', 10, 55], ['tree_white', 22, 55], ['tree_pink', 28, 54.5], ['tree_pink', 40, 55], ['tree_white', 50, 54.5], ['tree_pink2', 64, 55],
-    ['tree_pink', 3, 74.5], ['tree_white', 27, 74.5], ['tree_pink2', 30, 85], ['tree_pink', 2, 86], ['tree_white', 66, 80]]) put(sp, X + c, y);
-  for (const [sp, c, y] of [['o_lampball', 31, 68.9], ['o_lampball', 38, 68.9], ['o_lampball', 31, 72.95], ['o_lampball', 38, 72.95], ['o_potflower', 32.2, 68.6], ['o_potflower', 37, 68.6]]) put(sp, X + c, y, false);
+  for (const [sp, c] of [['foodtruck', 29.5], ['cartstall', 34.5], ['icecream', 39.5], ['kiosk', 45]]) prop(sp, X + c, Y + 29.4);    // food trucks + the snack kiosk along the south fence
+  for (const c of [31.5, 37, 42.5]) put('x_cafeset', X + c, Y + 25.2);
+  for (const c of [34, 48]) put('o_parasol', X + c, Y + 25, false);
+  for (let c = 2; c < 50; c += 3) { if (Math.abs(c - 25) < 3 || Math.abs(c - 11) < 2 || Math.abs(c - 33) < 2 || Math.abs(c - 45) < 2) continue; put(c % 6 === 2 ? 'o_tulips' : 'o_flowerbed', X + c + .5, Y + 13.9, false); put(c % 6 === 2 ? 'o_flowerbed' : 'o_tulips', X + c + .5, Y + 17.95, false); }
+  for (const [sp, c, r] of [['tree_pink', 3, 3], ['tree_pink2', 18, 3], ['tree_white', 21, 9], ['tree_pink', 3, 10], ['tree_white', 39, 3], ['tree_pink2', 28, 3],
+    ['tree_pink', 22, 28], ['tree_white', 2, 29.5], ['tree_pink2', 50, 23]]) put(sp, X + c, Y + r);
+  for (const [sp, c, r] of [['o_potflower', 23, 13.6], ['o_potflower', 27.5, 13.6], ['bush', 21, 21], ['bush', 21, 25], ['o_flowerbed', 14, 29.9], ['o_tulips', 7, 29.9]]) put(sp, X + c, Y + r, false);
 }
 const AREAS = [TOWN, FARM, HOUSING, PARK, TEMPLE, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
@@ -752,6 +754,7 @@ const STOCKS = [
 ];
 const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeMin: 5, keep: 240 };
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
+const PSHOP = { items: ['popcorn', 'cottoncandy', 'icecream', 'soda', 'hotdog', 'balloon', 'parkplush'], markup: 1 };   // the amusement park's snack bar & souvenirs
 const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', 'namlamyai', 'water'], markup: 1 };
 const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
@@ -904,6 +907,12 @@ const ITEMS = {
   bread:  { name: 'ขนมปังไส้หมูหยอง', icon: '🥐', kind: 'goods', base: 30, eat: { hunger: 18 } },
   coffee: { name: 'กาแฟกระป๋อง', icon: '☕', kind: 'goods', base: 35, eat: { energy: 12 } },
   bento:  { name: 'ข้าวกล่องเวฟ', icon: '🍱', kind: 'goods', base: 55, eat: { hunger: 32, energy: 4 } },
+  popcorn: { name: 'ป๊อปคอร์นคาราเมล', icon: '🍿', kind: 'goods', base: 45, eat: { hunger: 8, happy: 5 } },
+  cottoncandy: { name: 'สายไหมสีชมพู', icon: '🍭', kind: 'goods', base: 35, eat: { hunger: 3, happy: 7 } },
+  soda: { name: 'น้ำอัดลมเย็นเจี๊ยบ', icon: '🥤', kind: 'goods', base: 25, eat: { hunger: 2, happy: 3 } },
+  hotdog: { name: 'ฮอตดอกจัมโบ้', icon: '🌭', kind: 'goods', base: 60, eat: { hunger: 22, happy: 2 } },
+  balloon: { name: 'ลูกโป่งสวนสนุก', icon: '🎈', kind: 'goods', base: 50, eat: { happy: 10 } },
+  parkplush: { name: 'ตุ๊กตาของฝากสวนสนุก', icon: '🧸', kind: 'goods', base: 250 },
   icecream: { name: 'ไอศกรีมแท่ง', icon: '🍦', kind: 'goods', base: 25, eat: { hunger: 6, happy: 4 } },
   snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
   drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 150, eat: { energy: 25 }, wholesale: 105, stock: 12, refill: 25 },
@@ -1106,7 +1115,7 @@ const VEHICLES = {   // bought at the car showroom; ride outdoors (🛵 button) 
   jag:     { name: 'โรดสเตอร์เขียวมรกต', icon: '🚗', gem: 500, speed: 2.2, kind: 'car', license: 'driving', aura: '#3fe08a' },
   spider:  { name: 'สไปเดอร์ขาวทองคำ', icon: '🏎️', gem: 650, speed: 2.3, kind: 'car', license: 'driving', aura: '#ffd34d' },
   heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', gem: 1500, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
-  heli2:   { name: 'เฮลิคอปเตอร์กู้ภัยแดง', icon: '🚁', gem: 2000, speed: 2.6, kind: 'heli', license: 'driving', aura: '#ff6a8a', fly: 1 },
+  heli2:   { name: 'เฮลิคอปเตอร์กู้ภัยแดง', icon: '🚁', gem: 2000, speed: 2.6, kind: 'heli', license: 'driving', aura: '#ff6a8a', fly: 1, hidden: 1 },   // no longer sold (owners keep it)
   police:  { name: 'รถสายตรวจ', icon: '🚓', price: 150000, speed: 1.9, kind: 'car', license: 'driving', job: 'police' },
 };
 const TOOL_PRICES = [4000, 15000, 50000];
@@ -1469,7 +1478,9 @@ const FORTUNES = [
   'โชคดีจะมาตอนที่คุณไม่ทันตั้งตัว', 'วันนี้เหมาะกับการโทรหาเพื่อนเก่า', 'น้ำพุบอกว่า... ขอเหรียญอีกสักเหรียญ', 'ดวงความรักสดใส ยิ้มเยอะๆ นะ',
   'เที่ยงคืนเป็นเวลาของสิ่งแปลกประหลาด', 'คนที่เดินผ่านคุณไปเมื่อกี้ อาจไม่ใช่คนธรรมดา', 'อดทนอีกนิด สิ่งที่รอจะมาถึง', 'วันนี้ใครให้อะไร รับไว้ด้วยรอยยิ้ม',
 ];
-module.exports = { TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+// food no longer gives energy (energy comes back by sleeping at home or at the amusement park)
+for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
+module.exports = { POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
