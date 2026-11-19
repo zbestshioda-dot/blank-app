@@ -1044,6 +1044,7 @@ function cd(a, key, ms, quiet) {
   if ((a.cd[key] || 0) > t) { if (!quiet) toast(a, `รออีก ${Math.ceil((a.cd[key] - t) / 1000)} วินาที`, '⏳', false); return false; }
   a.cd[key] = t + ms; return true;
 }
+const hasUmb = a => (a.inv?.umbrella || 0) > 0;   // ☂️ an umbrella in the bag keeps you dry in the rain
 function addItem(a, id, n) { a.inv[id] = (a.inv[id] || 0) + n; if (a.inv[id] <= 0) delete a.inv[id]; }
 function need(a, career) {
   if (allJobs(a)) return true;                       // admins can do every job's work (switchable)
@@ -1193,7 +1194,7 @@ async function save(force) {
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
   const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
-    await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
+    await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
   } catch (e) { dirty = true; if (wroteBugs) bugsDirty = true; console.error('save failed:', e.message); }
   saving = false;
@@ -1851,6 +1852,7 @@ function act(a, m) {
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = Math.ceil(it.base * D.CSTORE.markup);
       if (!pay(a, unit * q)) return;
       addItem(a, id, q); markMe(a); quest(a, 'buy', q);
+      if (it.umb) { sendRoster(); return toast(a, `ซื้อ ☂️ร่มกันฝนแล้ว ${money(unit * q)} · เก็บไว้ในกระเป๋า ฝนตกตอนอยู่ข้างนอกจะกางให้เอง ไม่เปียก ไม่เป็นหวัด`, '☂️'); }
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ${money(unit * q)} · ขอบคุณที่ใช้บริการ 🙏`, '🏪');
     }
     case 'market.npcbuy': return toast(a, 'ร้าน NPC ที่ตลาดกลางเลิกขายแล้ว · ซื้อจากผู้เล่นได้ หรือสั่งให้ไรเดอร์ไปรับมาส่งในแอพ 📱 เดลิเวอรี', '🏪', false);
@@ -2233,7 +2235,7 @@ function act(a, m) {
       const f = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer'));
       g.crops[s.n] = [m.crop, now() + c.grow * 1000 * f, false];
       markMe(a); wdAt = 0;
-      if (ev('rain')) infect(a, 'cold', 0.02);
+      if (ev('rain') && !hasUmb(a)) infect(a, 'cold', 0.02);
       return toast(a, `ปลูก${D.ITEMS[m.crop].name}แล้ว`, '🌱');
     }
     case 'gplot.harvest': {
@@ -3132,7 +3134,7 @@ function giveCatch(a, id) {
     }
   }
   infect(a, 'injury', 0.02);
-  if (ev('rain')) infect(a, 'cold', 0.03);
+  if (ev('rain') && !hasUmb(a)) infect(a, 'cold', 0.03);
   if (!id) { markMe(a); return toast(a, 'ได้ขยะ 🥫 ... ไม่มีราคา', '🥫', false); }
   addItem(a, id, 1); markMe(a); quest(a, 'fish'); stat(a, 'fish');
   if (id === 'shark') stat(a, 'shark'); if (id === 'chest') stat(a, 'chest'); if (id === 'goldenfish') stat(a, 'goldenfish');
@@ -3495,7 +3497,23 @@ function npcDoctor(n) {
   toast(pt, `${n.name} รักษา${DZ[d].name}ให้แล้ว ค่ารักษา ${money(fee)} (หมอผู้เล่นถูกกว่า)`, '🩺');
   if (!(pt.dz || []).length) standUp(pt);
 }
+// ☂️ the umbrella man: when it starts raining he strolls in from the north road to the fountain and sells umbrellas;
+// when the rain stops he walks back out and leaves
+const UMB = { price: 250, from: [50, 21.5], at: [50, 31.1] };
+function umbNpc() { return npcs.find(n => n.umb); }
+function umbTick() {
+  let n = umbNpc();
+  if (ev('rain') && !n) {
+    n = { id: -950, umb: 1, name: 'ลุงชัย (ขายร่ม)', area: 'town', x: UMB.from[0], y: UMB.from[1], f: 6, path: [], wait: 0, g: 'm', speed: .75,
+      look: { hair: 'silver', shirt: 'blue', pants: 'brown' } };
+    n.next = () => ev('rain') ? (Math.hypot(n.x - UMB.at[0], n.y - UMB.at[1]) < .3 ? null : UMB.at) : (Math.hypot(n.x - UMB.from[0], n.y - UMB.from[1]) < .3 ? null : UMB.from);
+    n.stay = () => 3;
+    npcs.push(n); npcRosterDirty = true;
+    feed('☂️ ลุงชัยถือร่มเดินมาขายที่จัตุรัสแล้ว! ฝนตกแบบนี้ซื้อร่มไว้สักคันไหม');
+  } else if (n && !ev('rain') && !n.path.length && Math.hypot(n.x - UMB.from[0], n.y - UMB.from[1]) < .4) { npcs.splice(npcs.indexOf(n), 1); npcRosterDirty = true; }
+}
 function npcTick(dt, ps) {
+  umbTick();
   for (const n of npcs) {
     if (n.worker) {
       const on = workerOn(n);
@@ -3527,7 +3545,7 @@ function npcTick(dt, ps) {
   }
 }
 const npcVisible = n => !n.worker || n.on;
-const npcInfo = n => n.bot ? botPub(n) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
+const npcInfo = n => n.bot ? botPub(n) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, ...(n.umb ? { um: 1, umb: UMB.price } : {}), name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
 // what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
 function outfitOf(a) {
@@ -3540,7 +3558,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -3557,6 +3575,15 @@ function jobView(a) {
   const c = a.career; if (!c || c === 'none') return null;
   if (c === 'office') { const x = a.xp.office || 0; return { L: lvl(a), cur: x % 3, need: 3, gain: 100, pay: 0 }; }
   const j = jobXp(a.xp[c] || 0); return { L: j.L, cur: +j.cur.toFixed(2), need: j.need, gain: Math.round(xpGain(j.L) * 100), pay: Math.round((jobPay(a) - 1) * 100), max: j.L >= JOB_MAX ? 1 : 0 };
+}
+// your own state: whole on login, then only the fields that changed (it was the whole thing every 2 s and on every action)
+function meSend(a, full) {
+  const v = meView(a);
+  if (full || !a.meSent) { a.meSent = {}; for (const k in v) a.meSent[k] = JSON.stringify(v[k]); return send(a, v); }
+  const out = { t: 'me', d: 1 }; let n = 0;
+  for (const k in v) { if (k === 't') continue; const s = JSON.stringify(v[k]); if (s !== a.meSent[k]) { a.meSent[k] = s; out[k] = v[k] === undefined ? null : v[k]; n++; } }
+  for (const k in a.meSent) if (!(k in v)) { delete a.meSent[k]; out[k] = null; n++; }
+  if (n) send(a, out);
 }
 function meView(a) {
   const isRider = a.career === 'rider' || allJobs(a);
@@ -3584,11 +3611,25 @@ function meView(a) {
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
   };
 }
+// the world snapshot goes out whole only on login; after that everyone gets just the parts that changed
+// (it used to be the whole thing, houses and furniture included, every second: lots of data and a hitch on phones)
+// market prices drift a baht at a time every second: those go out every 15 s; new or sold listings (best price / count) at once
+const wdSent = {}; let wdBeat = 0, lbCache = null, lbAt = 0, mkAt = 0;
+function wdDelta(t) {
+  const v = worldView(), out = { t: 'wd', d: 1, now: v.now }; let n = 0;
+  for (const k in v) {
+    if (k === 't' || k === 'now') continue;
+    if (k === 'mk') { const L = JSON.stringify(Object.entries(v.mk).map(([i, x]) => x.n ? [i, x.best, x.n] : 0).filter(Boolean)); if (t > mkAt || L !== wdSent.mkL) { mkAt = t + 15000; wdSent.mkL = L; out.mk = v.mk; n++; } continue; }
+    const s = JSON.stringify(v[k]);
+    if (s !== wdSent[k]) { wdSent[k] = s; out[k] = v[k]; if (k !== 'on') n++; }
+  }
+  if (n || t > wdBeat) { wdBeat = t + 10000; broadcast(out); }
+}
 function worldView() {
   const t = now();
-  const lb = [...accounts.values()].filter(a => !isAdmin(a)).map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
+  const lb = lbAt > t && lbCache ? lbCache : (lbAt = t + 15000, lbCache = [...accounts.values()].filter(a => !isAdmin(a)).map(a => ({ name: a.name, av: a.avatar, c: a.career, w: Math.round(worth(a)), on: !!a.ws && !hidden(a), ti: titleOf(a) }))
     .concat((ghostLook(), ghosts).map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: ghostTi(g) })))
-    .sort((x, y) => y.w - x.w).slice(0, 10);
+    .sort((x, y) => y.w - x.w).slice(0, 10));
   return {
     t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
@@ -3718,7 +3759,7 @@ function login(ws, m, pre) {
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
-  send(a, meView(a)); send(a, worldView());
+  meSend(a, true); send(a, worldView());
   send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
@@ -3909,6 +3950,14 @@ function onMessage0(ws, raw) {
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
+    case 'umbbuy': {                         // buying from the umbrella man (only while he is in the square)
+      const n = umbNpc(); if (!n || areaId(a) !== n.area || dist(a, n) > 3.5) return toast(a, 'เดินเข้าไปใกล้ลุงชัยอีกนิด', '☂️', false);
+      if (!ev('rain')) return toast(a, 'ลุงชัยเก็บร้านแล้ว รอฝนตกครั้งหน้านะ', '☂️', false);
+      if (hasUmb(a)) return toast(a, 'มีร่มอยู่ในกระเป๋าแล้ว ใช้ได้ตลอด ไม่ต้องซื้อเพิ่ม', '☂️', false);
+      if (!pay(a, UMB.price)) return;
+      addItem(a, 'umbrella', 1); markMe(a); sendRoster();
+      return toast(a, `ซื้อ ☂️ร่มกันฝน ${money(UMB.price)} · กางให้เองตอนฝนตกข้างนอก ไม่เปียก ไม่เป็นหวัด`, '☂️');
+    }
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
@@ -4252,6 +4301,11 @@ function godAct(a, m) {
     x.hash = hashPin(pin, x.salt); x.sd = true; dirty = true;
     return toast(a, `ตั้ง PIN ใหม่ให้ ${x.login} แล้ว แจ้งผู้เล่นให้เปลี่ยนเองอีกครั้งหลังเข้าเกม`, '🔑');
   }
+  if (m.op === 'rain') {                    // start / stop a rain spell (testing umbrellas and crops)
+    if (ev('rain')) { event.until = 0; return toast(a, 'หยุดฝนแล้ว', '🌤️'); }
+    const e = D.EVENTS.find(x => x.id === 'rain'); if (!e) return;
+    event = { ...e, until: now() + 240e3 }; nextEventAt = event.until + 150e3; feed(e.text); wdAt = 0; return toast(a, 'ฝนตก 4 นาที', '🌧️');
+  }
   if (m.op === 'zombie') { if (zn) { for (const z of zombies()) npcs.splice(npcs.indexOf(z), 1); zn = null; npcRosterDirty = true; znSendAll(); return toast(a, 'หยุดคืนปล่อยผีแล้ว', '🧟'); } znDone = ''; return znStart(now(), true); }
   if (m.op === 'nocd') { a.god.nocd = !a.god.nocd; if (a.god.nocd) a.cd = {}; toast(a, a.god.nocd ? 'God mode: ไม่มีคูลดาวน์' : 'ปิด: ไม่มีคูลดาวน์', '⚡'); }
   else if (m.op === 'lock') { a.god.lock = !a.god.lock; toast(a, a.god.lock ? 'God mode: ล็อกสเตตัสเต็ม (ไม่ป่วย/ไม่หมดสติ)' : 'ปิด: ล็อกสเตตัส', '🛡️'); }
@@ -4414,7 +4468,7 @@ function tick() {
     if (slow && !a.down) {
       // ---- ways to get sick (often enough that doctors have work)
       if (a.awake > 40 * 60) infect(a, 'insomnia', 0.01);
-      if (ev('rain') && !indoors) {
+      if (ev('rain') && !indoors && !hasUmb(a)) {
         a.wet = (a.wet || 0) + 1;
         if (a.wet === 30 && !(a.dz || []).includes('cold')) toast(a, 'ฝนตก ตัวเริ่มเปียกแล้ว! รีบหลบเข้าที่ร่มก่อนจะเป็นหวัด', '🌧️', false);
         if (a.wet > 40) infect(a, 'cold', 0.005);
@@ -4461,7 +4515,7 @@ function tick() {
     }
     if (a.trade && (dist(a.trade.a, a.trade.b) > 8 || areaId(a.trade.a) !== areaId(a.trade.b))) tradeClose(a.trade, 'อยู่ไกลกันเกินไป ยกเลิกการแลกเปลี่ยน');
     if (godLock(a)) a.energy = a.hunger = a.health = a.happy = 100;
-    if (a.meDirty || t % 2000 < TICK) { a.meDirty = false; send(a, meView(a)); }
+    if (a.meDirty || t % 2000 < TICK) { a.meDirty = false; meSend(a); }
   }
   if (slow) {
     // garden: tell owners their crops are ready
@@ -4498,7 +4552,7 @@ function tick() {
     else { const pub = JSON.stringify({ t: 'ps', p: ps.filter(q => !hid.has(q[0])) }); for (const o of online.values()) if (o.ws.readyState === 1) o.ws.send(hid.has(o.id) ? JSON.stringify({ t: 'ps', p: ps.filter(q => !hid.has(q[0]) || q[0] === o.id) }) : pub); }
   }
 
-  if (t > wdAt) { wdAt = t + 1000; broadcast(worldView()); }
+  if (t > wdAt) { wdAt = t + 1000; wdDelta(t); }
   if (t > saveAt) { saveAt = t + 15000; save(); }
 }
 

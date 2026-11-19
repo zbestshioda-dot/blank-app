@@ -38,7 +38,7 @@ async function save(records, all) {
     return;
   }
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(FILE + '.tmp', JSON.stringify(all));
+  fs.writeFileSync(FILE + '.tmp', JSON.stringify(typeof all === 'function' ? all() : all));
   fs.renameSync(FILE + '.tmp', FILE);
 }
 
