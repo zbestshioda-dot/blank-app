@@ -155,7 +155,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   for (const [id, x, y, s] of [['seatb43.6', 44.6, 29.95, 'o_bench'], ['seatbNE', 55.4, 29.95, 'o_bench'], ['seatbSW', 44.6, 35.95, 'o_stonebench'], ['seatbSE', 55.4, 35.95, 'o_stonebench']]) {
     prop(s, x, y, false); STATIONS.push({ id, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x, y: y - .25, r: 1.1, area: 'town' });
   }
-  prop('o_lplanter', 47.4, 31.4); prop('o_lplanter', 52.6, 31.4);
+  prop('o_lplanter', 47.4, 31.4, false); prop('o_lplanter', 52.6, 31.4, false);   // walk-through: players kept getting stuck on them
   prop('o_drinkfount', 57.4, 30.95); prop('o_bin_green', 42.6, 34.95);
   prop('o_noticeboard', 47.9, 25.6);
   STATIONS.push({ id: 'square', type: 'square', label: 'ศาลาประชาคม', icon: '📋', x: 47.9, y: 26.4, r: 1.4, area: 'town' });
