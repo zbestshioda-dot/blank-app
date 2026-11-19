@@ -73,6 +73,11 @@ window.FX = (() => {
     },
     levelup() { [N.C5, N.E5, N.G5, N.C6].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.18, at: i * 0.09 })); tone(N.E6, 0.6, { vol: 0.1, at: 0.36 }); },
     chime() { [N.G5, N.C6, N.E6].forEach((f, i) => tone(f, 0.7, { vol: 0.14, at: i * 0.08, attack: 0.01 })); },
+    bell() {   // big temple bell: low gong with slow-beating partials and a long tail
+      [[98, .3], [196.5, .16], [262, .1], [331, .07], [494, .04]].forEach(([f, v]) => { tone(f, 4.2, { vol: v, attack: 0.004 }); tone(f * 1.006, 3.6, { vol: v * .5, attack: 0.004 }); });
+      noise(0.08, { filter: 'lowpass', freq: 900, vol: 0.18 });
+    },
+    pray() { [N.C5, N.G5].forEach((f, i) => tone(f, 1.6, { vol: 0.1, at: i * 0.25, attack: 0.05 })); },
     ding() { tone(N.C6, 0.25, { vol: 0.18 }); tone(N.E6, 0.45, { vol: 0.16, at: 0.12 }); },
     bite() { for (let i = 0; i < 3; i++) tone(N.A5, 0.07, { type: 'square', vol: 0.12, at: i * 0.1 }); noise(0.3, { filter: 'lowpass', freq: 1500, sweep: 300, vol: 0.25, at: 0.05 }); },
     splash() { noise(0.45, { filter: 'lowpass', freq: 2500, sweep: 250, vol: 0.3 }); tone(300, 0.15, { vol: 0.08, slide: 120 }); },

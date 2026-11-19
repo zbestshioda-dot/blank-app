@@ -31,7 +31,7 @@ function pxIconize(root) {
   for (let n = w.nextNode(); n; n = w.nextNode()) list.push(n);
   list.forEach(doNode);
 }
-fetch('assets/icons.json?v=1').then(r => r.json()).then(j => {
+fetch('assets/icons.json?v=2').then(r => r.json()).then(j => {
   PXI.map = {}; for (const [k, v] of Object.entries(j.map)) PXI.map[k.replace(/️/g, '')] = v;
   PXI.cols = j.cols; PXI.rows = j.rows;
   document.documentElement.style.setProperty('--pxrows', j.rows); document.documentElement.style.setProperty('--pxcols', j.cols);
@@ -106,7 +106,7 @@ fetch('assets/pchar.json?v=a1').then(r => r.json()).then(j => { const im = new I
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
 // starter colours are known before login (the creator screen); everything else comes from the server
 const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
-const lookColor = (cat, id) => G?.looks?.[cat]?.[id]?.color || STARTER_COLORS[cat][id] || STARTER_COLORS[cat][Object.keys(STARTER_COLORS[cat])[0]];
+const lookColor = (cat, id) => typeof id === 'string' && id[0] === '#' ? id : G?.looks?.[cat]?.[id]?.color || STARTER_COLORS[cat][id] || STARTER_COLORS[cat][Object.keys(STARTER_COLORS[cat])[0]];
 // one tinted frame, cached per (frame, colours)
 function charFrame(frame, lk) {
   const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
@@ -229,14 +229,15 @@ function dyeFrame(fr, dye) {
   }
   g.putImageData(d, 0, 0); DYE.set(fr, c); return c;
 }
+const MONK_LOOK = { shirt: '#f0a03a', pants: '#e08a26', hair: '#d9a77c' };
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
-  const lk = { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;
+  const lk = p.of === 'monk' ? MONK_LOOK : { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;   // 🙏 monks: saffron robe, shaved head
   const fr0 = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined
     ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
-  const fr = p.dye ? dyeFrame(fr0, p.dye) : fr0;
+  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), fr = fm || (p.dye ? dyeFrame(fr0, p.dye) : fr0);
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -369,6 +370,9 @@ function connect() {
   };
 }
 function sendLogin() { send({ t: 'login', ...creds }); }
+// a socket that stopped talking while the game is on screen (the phone switched networks): the world froze for players. The server
+// sends the world every second, so 8 quiet seconds means the line is dead: drop it and reconnect.
+setInterval(() => { if (G && wantLogin && !document.hidden && ws && ws.readyState === 1 && lastMsgT && Date.now() - lastMsgT > 8000) { lastMsgT = Date.now(); try { ws.close(); } catch { } } }, 2000);
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 let fixId = 0;                          // the server's last position correction we have applied
 const doAct = (st, a, extra = {}) => send({ t: 'act', st, a, ...extra });
@@ -430,6 +434,13 @@ function handle(m) {
       break;
     }
     case 'toast': toast(m.msg, m.icon, m.ok); toastSfx(m); break;
+    case 'tfx':   // temple effects
+      if (m.kind === 'bell') { bellT = performance.now(); FX.play('bell'); FX.ring(m.x, m.y, '#ffd34d', 1400, 1.6); if (navigator.vibrate) navigator.vibrate(30); }
+      else if (m.kind === 'pray') { FX.play('pray'); const p0 = P.get(myId); if (p0) { FX.float(p0.x, p0.y - 1.6, '✨', '#ffe9a0', .6); FX.burst(p0.x, p0.y - 1, '#ffd34d', 14); } }
+      else if (m.kind === 'alms') { FX.play('chime'); FX.burst(m.x, m.y - .8, '#ffd34d', 18); FX.float(m.x, m.y - 1.4, '🙏', '#ffe9a0', .6); }
+      if (panel?.kind === 'wpray') refreshPanel(true);
+      break;
+    case 'siamsi': FX.play('chime'); siamsiPop(m); break;
     case 'catch': catchPop(m.item, m.first); break;
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
@@ -576,6 +587,10 @@ function drawHeads(X, Y) {
     ctx.fillStyle = '#3a2410'; lines.forEach((l, k) => ctx.fillText(l, cx, y + 4 + lh * (k + .5)));
   }
   ctx.restore();
+}
+function siamsiPop(m) {   // fortune sticks: a shaking cylinder, then the stick number and its slip
+  const c = { 'ดีมาก': '#2f9e44', 'ดี': '#3b8ed0', 'ปานกลาง': '#c9851a' }[m.luck] || '#555';
+  popup(`<div class="siamsi"><div class="ssTube">🥢</div><div class="ssNo">เซียมซีใบที่ <b>${m.n}</b></div><div class="ssLuck" style="background:${c}">${esc(m.luck)}</div><div class="ssText">${esc(m.text)}</div></div>`, [['🙏 สาธุ', 'good', () => { }]], 30000);
 }
 function popup(html, buttons, ms = 20000) {
   const d = document.createElement('div'); d.className = 'req';
@@ -868,10 +883,12 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
 let TS = 40, VW = 0, VH = 0, DPR = 1;
+// battery saver (on by default on phones): 30 frames a second, a lighter canvas, no cast shadows, a slower minimap. Phones ran hot at 60 fps.
+let ECO = TOUCH_UI; try { const v = localStorage.getItem('lt_eco'); if (v !== null) ECO = v === '1'; } catch { }
 // the mouse wheel zooms the town in and out (computers); kept between visits
 let zoomMul = 1; try { zoomMul = clamp(+localStorage.getItem('lt_zoom') || 1, .7, 1.6); } catch { }
 function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
+  DPR = Math.min(ECO ? 1.5 : 2, window.devicePixelRatio || 1);
   VW = innerWidth; VH = innerHeight;
   cv.width = VW * DPR; cv.height = VH * DPR;
   TS = Math.round(clamp(Math.min(VW, VH) / 9.5, 34, 54) * zoomMul);   // whole pixels: tile seams stay put while scrolling
@@ -1068,6 +1085,8 @@ function onAction() {
   if (near.type === 'gate') { if (t < actCd) return; actCd = t + 1300; return doAct(near.id, 'go'); }
   if (near.type === 'deliver') return send({ t: 'order_deliver', id: near.oid });
   if (near.type === 'seat') return doAct(near.id, 'sit');
+  if (near.type === 'wbell') { if (t < actCd) return; actCd = t + 600; bellT = performance.now(); return doAct(near.id, 'ring'); }
+  if (near.type === 'siamsi') { if (t < actCd) return; actCd = t + 1500; return doAct(near.id, 'shake'); }
   if (near.type === 'trash' && job('beggar')) { if (t < actCd) return; actCd = t + 1500; return doAct(near.id, 'run'); }
   if (near.type === 'trash') return toast('ถังขยะ · ขอทานวิ่งเก็บขยะเริ่มจากตรงนี้', '🗑️', false);
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
@@ -1099,8 +1118,11 @@ function onAction() {
 let stuckT = 0, unstickAt = 0, downHintAt = 0;
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
+let frameT = 0;
 function frame(t) {
-  requestAnimationFrame(frame); dlgTick();
+  requestAnimationFrame(frame);
+  if (ECO && t - frameT < 30) return; frameT = t;
+  dlgTick();
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
@@ -1252,7 +1274,13 @@ function draw(t) {
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'park') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
+  if (A?.id === 'park' || A?.id === 'temple') crowdEnts(A, ents, vis);
   if (A?.id === 'park' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
+  if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
+    { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
+    ents.push([-1e8, 14, { fx: 'koi' }], [-1e8, 14, { fx: 'lotus' }], [A.y + 12.75, 14, { fx: 'incense', x: A.x + 22, y: A.y + 12.7 }], [A.y + 14, 14, { fx: 'leaves' }]); }
+  { const s = A?.id === 'town' && STN('gate_temple'), F = s?.facade;   // the temple complex: one strip per tile column, each sorted by the ground's front edge there
+    if (F && vis(F.cx, F.bv - 6, 16)) { if (WIMG) { const n = Math.ceil(F.w); for (let i = 0; i < n; i++) { const xm = F.x0 + i + .5, d = Math.min(1, Math.abs(xm - F.cx) / F.hw); ents.push([F.bv - F.lv * d + .05, 13, { s, i }]); } } else ents.push([s.y + 2.2, 13, { s }]); } }
   for (const g of ['gate_park', 'gate_town_p']) { const s = A && STN(g); if (s && s.area === A.id && vis(s.x, s.y, 6)) ents.push([s.y + .7, 10, s]); }
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) {
     if (p.ps && P.get(p.ps)?.veh) continue;   // passengers are drawn with the bike / inside the car they ride in
@@ -1263,6 +1291,7 @@ function draw(t) {
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   { const q = thiefNpc(); if (q && vis(q.rx, q.ry, 3)) ents.push([q.ry + .3, 4, q]); }
   misEnts(ents, vis);
+  if (me?.alms) me.alms.pts.forEach((q, i) => { if (!me.alms.got[i] && vis(q[0], q[1], 4)) ents.push([q[1] + .2, 7, { k: 'beacon', x: q[0], y: q[1] }]); });   // 🙏 alms stops
   rivalEnts(ents, vis);
   if (me?.cook && myRoom?.rk === 'kitchen') ents.push([1e8, 7, { k: 'cook' }]);
   if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
@@ -1273,7 +1302,7 @@ function draw(t) {
   if (A?.id === 'town') { stepTraffic(); for (const c of traffic) if (vis(c.x, c.y, 4)) ents.push([c.y + halfY(c), 5, c]); }
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
-  if (!myRoom) drawCastShadows(ents, X, Y, night);
+  if (!myRoom && !ECO) drawCastShadows(ents, X, Y, night);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
     else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
@@ -1289,6 +1318,10 @@ function draw(t) {
     else if (k === 8) drawRideThing(e, X, Y, t);
     else if (k === 9) { const b2 = rideBottom(e), H0 = rH('car_base', RG.car.w); rdraw('car_roof', e.cx * TS + X, (b2 - H0 + .45) * TS + Y, RG.car.roofW, .5, .93, false, Math.sin(t / 900) * .012); }
     else if (k === 10) drawParkGate(e.x, e.y + .7, X, Y);
+    else if (k === 11) drawWat(e, X, Y, t);
+    else if (k === 12) drawWatWall(e, X, Y);
+    else if (k === 13) drawWatTownGate(e, X, Y);
+    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
     else drawPlayer(e, X, Y, t);
   }
   if (A?.yard) drawYardLocks(A, X, Y, t);
@@ -1334,7 +1367,7 @@ function draw(t) {
   // short fade through black when you go through a door or a gate
   const fp = (performance.now() - fadeT) / 350;
   if (fp < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fp})`; ctx.fillRect(0, 0, VW, VH); }
-  drawMini();
+  if (!ECO || t - (window.__miniT || 0) > 250) { window.__miniT = t; drawMini(); }
 }
 // home yard: locked zones lie under a hazy overgrown fog with a lock and the price of the next unlock
 function drawYardLocks(A, X, Y, t) {
@@ -1706,7 +1739,7 @@ function rbResult(m) {
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
-const MIS_CAREERS = ['office', 'farmer', 'merchant', 'chef', 'doctor', 'police', 'beggar', 'rider'];
+const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider'];
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
@@ -1979,7 +2012,7 @@ function drawPlayer(p, X, Y, t) {
   p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) : 0);
   const frame = moving ? Math.floor(p.walk / 1.4) % 4 : 0, bob = 0;   // the step frames already move; an extra bounce made the sprite shake
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
-  const k = TS * 1.55 / CH_ATLAS.h, H = CH_ATLAS.h * k;
+  const k = TS * 1.55 / CH_ATLAS.h * (p.small || 1), H = CH_ATLAS.h * k;
   let px = px0, py = py0;
   const RV = p.veh && !lying && !sitting && G.shop?.vehicles?.[p.veh] && !roomOf(p.x, p.y) ? G.shop.vehicles[p.veh] : null;
   if (!fo?.high && !fo?.swim) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : RV ? (RV.kind !== 'moto' ? (view === 'side' ? 1.2 : .75) : view === 'side' ? .8 : .4) : .32), TS * .11, 0, 0, 7); ctx.fill(); }
@@ -2207,6 +2240,279 @@ function drawRideImg(s, X, Y, t, used) {
   }
   return false;
 }
+// ------------------------------------------------------------------ 🛕 the temple: painted sprites (assets/temple.webp), shapes as a fallback
+let WJ = null, WIMG = null;
+fetch('assets/temple.json?v=3').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { WJ = j; WIMG = im; }; im.src = 'assets/temple.webp?v=3'; }).catch(() => { });
+function wdraw(n, cx, by, wT, alpha = 1) { const r = WJ?.s[n]; if (!r) return false; const w = wT * TS, h = w * r[3] / r[2]; ctx.globalAlpha = alpha; ctx.drawImage(WIMG, r[0], r[1], r[2], r[3], cx - w / 2, by - h, w, h); ctx.globalAlpha = 1; return true; }
+const monkFr = {};
+function monkFrame(name) {   // the monk's own walk frames (same cell and feet point as the player sprites)
+  if (!WIMG || !WJ.monk) return null; let c = monkFr[name]; if (c) return c;
+  const r = WJ.s.monk, i = WJ.monk.indexOf(name); if (i < 0) return null;
+  c = document.createElement('canvas'); c.width = 126; c.height = 96; c.getContext('2d').drawImage(WIMG, r[0] + i * 126, r[1], 126, 96, 0, 0, 126, 96);
+  return monkFr[name] = c;
+}
+const WAT_SPR = { bot: [7.6, .15], chedi: [7.4, .7], sala: [11.6, 1.1], shop: [7.6, .8], bell: [4.4, .6] };   // drawn width (tiles), bottom below the footprint
+// life in the temple: monks walking their rounds, lotus on the pond, incense smoke before the hall, bodhi leaves drifting down
+const WATM = [];
+function watMonks(A, dt) {
+  if (!WATM.length) {
+    const X = A.x, Y = A.y, mk = (i, name, path) => ({ id: 'watm' + i, staff: 1, career: 'monk', c: 'monk', of: 'monk', g: 'm', lk: {}, name, short: name, x: path[0][0], y: path[0][1], rx: path[0][0], ry: path[0][1], f: 6, dz: [], path, i: 1, wait: 0 });
+    WATM.push(mk(1, 'พระมหาสมชาย', [[X + 15.5, Y + 18.5], [X + 27.5, Y + 18.5], [X + 27.5, Y + 28.5], [X + 15.5, Y + 28.5]]),
+      mk(2, 'พระใบฎีกาเอก', [[X + 6, Y + 16.9], [X + 21, Y + 16.9], [X + 21, Y + 14.2], [X + 30.6, Y + 14.2], [X + 30.6, Y + 10.6], [X + 30.6, Y + 16.9], [X + 9, Y + 16.9], [X + 9, Y + 19.4], [X + 9, Y + 16.9]]),
+      mk(3, 'สามเณรน้อย', [[X + 5, Y + 13], [X + 10, Y + 13], [X + 10, Y + 15], [X + 4, Y + 15]]));
+  }
+  for (const m of WATM) {
+    if (m.wait > 0) m.wait -= dt;
+    else { const [tx, ty] = m.path[m.i], dx = tx - m.x, dy = ty - m.y, d = Math.hypot(dx, dy);
+      if (d < .05) { m.i = (m.i + 1) % m.path.length; if (Math.random() < .35) m.wait = 2 + Math.random() * 5; }
+      else { const st = Math.min(d, (m.id === 'watm3' ? .8 : 1.1) * dt); m.x += dx / d * st; m.y += dy / d * st; m.f = Math.round((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4)) % 8; } }
+    m.rx += (m.x - m.rx) * .3; m.ry += (m.y - m.ry) * .3;
+  }
+}
+function drawWatFx(e, X, Y, t) {
+  const u = TS, A = AREA.temple, T = t / 1000;
+  if (e.fx === 'koi') {            // koi gliding round under the surface
+    for (let i = 0; i < 5; i++) { const a = T * (.25 + i * .04) + i * 1.3, x = A.x + 21.5 + Math.cos(a) * (2.6 + i * .3), y = A.y + 23.5 + Math.sin(a) * (1.8 + (i % 2) * .6), dir = a + Math.PI / 2;
+      ctx.save(); ctx.translate(x * u + X, y * u + Y); ctx.rotate(dir); ctx.globalAlpha = .75; ctx.fillStyle = i % 2 ? '#ff8a3a' : '#fff4ea';
+      ctx.beginPath(); ctx.ellipse(0, 0, u * .26, u * .09, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(-u * .22, 0); ctx.lineTo(-u * .38, -u * .08 * Math.sin(T * 6 + i)); ctx.lineTo(-u * .38, u * .08); ctx.fill();
+      if (i % 2 === 0) { ctx.fillStyle = '#ff6a2a'; ctx.beginPath(); ctx.arc(u * .06, 0, u * .05, 0, 7); ctx.fill(); } ctx.restore(); }
+    ctx.globalAlpha = 1; return;
+  }
+  if (e.fx === 'lotus') {          // pads and flowers on the pond, bobbing a little
+    for (let i = 0; i < 22; i++) {
+      const x = A.x + 17.4 + ((i * 37) % 83) / 83 * 8.2, y = A.y + 20.4 + ((i * 53) % 61) / 61 * 6.2, bob = Math.sin(T * 1.3 + i) * u * .03;
+      const px = x * u + X, py = y * u + Y + bob, r = u * (.28 + (i % 3) * .06);
+      ctx.fillStyle = i % 4 ? '#3f8f4a' : '#4ea65a'; ctx.beginPath(); ctx.ellipse(px, py, r, r * .55, 0, .35, Math.PI * 2 - .05); ctx.lineTo(px, py); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,60,25,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      if (i % 3 === 0) { const fy = py - u * .12; for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k - 2) * .45; ctx.fillStyle = k % 2 ? '#f6b6cf' : '#ee8fb4'; ctx.beginPath(); ctx.ellipse(px + Math.cos(a) * u * .1, fy + Math.sin(a) * u * .1, u * .07, u * .15, a + Math.PI / 2, 0, 7); ctx.fill(); } ctx.fillStyle = '#ffe07a'; ctx.beginPath(); ctx.arc(px, fy, u * .045, 0, 7); ctx.fill(); }
+    }
+  } else if (e.fx === 'incense') { // a golden urn with incense sticks, smoke curling up
+    const px = e.x * u + X, py = e.y * u + Y;
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(px, py, u * .45, u * .14, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = WAT.gold2; ctx.fillRect(px - u * .1, py - u * .3, u * .2, u * .3);
+    ctx.fillStyle = WAT.gold; ctx.beginPath(); ctx.moveTo(px - u * .42, py - u * .62); ctx.quadraticCurveTo(px - u * .4, py - u * .25, px, py - u * .22); ctx.quadraticCurveTo(px + u * .4, py - u * .25, px + u * .42, py - u * .62); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c8962a'; ctx.beginPath(); ctx.ellipse(px, py - u * .62, u * .42, u * .1, 0, 0, 7); ctx.fill();
+    for (let k = -2; k <= 2; k++) { ctx.fillStyle = '#b8322a'; ctx.fillRect(px + k * u * .08 - 1, py - u * 1.05, 2, u * .45); ctx.fillStyle = '#ffb347'; ctx.fillRect(px + k * u * .08 - 1.5, py - u * 1.08, 3, 3); }
+    for (let k = 0; k < 7; k++) { const ph = ((T * .35 + k / 7) % 1), sx = px + Math.sin(T * 1.7 + k * 1.9) * u * .25 * ph, sy = py - u * 1.1 - ph * u * 2.4;
+      ctx.fillStyle = `rgba(235,235,240,${.38 * (1 - ph)})`; ctx.beginPath(); ctx.arc(sx, sy, u * (.08 + ph * .28), 0, 7); ctx.fill(); }
+  } else if (e.fx === 'leaves') {  // bodhi leaves drifting down
+    for (let k = 0; k < 6; k++) { const ph = (T * .12 + k / 6) % 1, x = A.x + 7.5 + Math.sin(k * 2.3) * 2.2 + Math.sin(T * .9 + k) * .6 + ph * 1.2, y = A.y + 6 + ph * 5.5;
+      ctx.save(); ctx.translate(x * u + X, y * u + Y); ctx.rotate(Math.sin(T * 2 + k) * 1.2); ctx.globalAlpha = Math.min(1, (1 - ph) * 3);
+      ctx.fillStyle = k % 2 ? '#7fb24a' : '#c9a33e'; ctx.beginPath(); ctx.moveTo(0, -u * .12); ctx.quadraticCurveTo(u * .1, 0, 0, u * .12); ctx.quadraticCurveTo(-u * .1, 0, 0, -u * .12); ctx.fill(); ctx.restore(); }
+  }
+}
+// ---- passers-by: families wandering the park, visitors at the temple (drawn on every phone the same way, no server needed)
+const CROWD = {}, LOOKC = { shirt: ['white', 'blue', 'green', 'red', 'yellow', 'pink', 'purple', 'black'], pants: ['gray', 'blue', 'black', 'brown'], hair: ['brown', 'black'] };
+const BALLOON = ['#ff5a6e', '#ffd23a', '#4fb3ff', '#7ee07a', '#c88cff', '#ff9a3c'];
+function crowdMake(A) {
+  const X = A.x, Y = A.y; let seed = A.id === 'park' ? 7331 : 9127; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647, pk = a => a[Math.floor(r() * a.length)];
+  const L = [], person = (i, route, o = {}) => {
+    const lk = { hair: pk(LOOKC.hair), shirt: pk(LOOKC.shirt), pants: pk(LOOKC.pants) }, j = Math.floor(r() * route.length), lane = (r() - .5) * .7;
+    const pts = route.map(([x, y]) => [x + lane, y + lane * .4]);
+    L.push({ id: 'crowd' + A.id + i, crowd: 1, npc: 1, staff: 1, c: '', of: '', g: r() < .5 ? 'f' : 'm', lk, name: '', dz: [], x: pts[j][0], y: pts[j][1], rx: pts[j][0], ry: pts[j][1], f: 6, path: pts, i: (j + 1) % pts.length, wait: r() * 3, sp: .8 + r() * .5, ...o });
+  };
+  if (A.id === 'park') {
+    const P0 = (c, y) => [X + c, y];   // park walks: columns from the park's left edge, rows as map rows
+    const R = [
+      [P0(3, 70), P0(34.5, 70), P0(34.5, 55), P0(34.5, 70), P0(67, 70), P0(34.5, 70), P0(34.5, 86), P0(34.5, 70)],
+      [P0(8, 70.6), P0(16.5, 70.6), P0(16.5, 64.6), P0(16.5, 70.6), P0(44.5, 70.6), P0(44.5, 64.6), P0(44.5, 70.6), P0(60.5, 70.6), P0(60.5, 64.6), P0(60.5, 74.6), P0(60.5, 70.6)],
+      [P0(34.5, 70.4), P0(44.5, 70.4), P0(44.5, 75), P0(44.5, 70.4), P0(60.5, 70.4), P0(60.5, 75), P0(60.5, 70.4), P0(34.5, 70.4), P0(34.5, 84), P0(34.5, 70.4)],
+      [P0(2, 69.6), P0(25, 69.6), P0(34.4, 69.6), P0(34.4, 58), P0(34.4, 69.6), P0(2, 69.6)]];
+    for (let i = 0; i < 16; i++) { const kid = i % 3 === 1; person(i, R[i % R.length], kid ? { small: .72, balloon: pk(BALLOON) } : r() < .2 ? { balloon: pk(BALLOON) } : {}); }
+    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 31.6, y: 68.6, rx: X + 31.6, ry: 68.6, f: 6, path: null, seller: 1 });
+  } else {
+    const P0 = (c, rw) => [X + c, Y + rw];
+    const R = [[P0(2, 16.9), P0(21.4, 16.9), P0(21.4, 13.8), P0(21.4, 16.9), P0(30.6, 16.9), P0(30.6, 11), P0(30.6, 16.9), P0(2, 16.9)],
+      [P0(15.5, 18.5), P0(27.5, 18.5), P0(27.5, 28.5), P0(15.5, 28.5)],
+      [P0(2, 17.2), P0(9, 17.2), P0(9, 19.6), P0(9, 17.2), P0(32, 17.2), P0(32, 19.5), P0(35, 25.6), P0(32, 19.5), P0(32, 17.2)]];
+    for (let i = 0; i < 7; i++) person(i, R[i % R.length], i === 3 ? { small: .72 } : {});
+    WATB.length = 0; for (let i = 0; i < 9; i++) WATB.push({ hx: X + 17 + r() * 11, hy: Y + 13.6 + r() * 2, x: 0, y: 0, z: 0, fly: 0, ph: r() * 7 });
+    for (const b of WATB) { b.x = b.hx; b.y = b.hy; }
+  }
+  return CROWD[A.id] = L;
+}
+const WATB = [];   // temple pigeons
+function crowdEnts(A, ents, vis) {
+  const L = CROWD[A.id] || crowdMake(A), now0 = performance.now(), dt = Math.min(.1, (now0 - (CROWD['t' + A.id] || now0)) / 1000); CROWD['t' + A.id] = now0;
+  for (const m of L) {
+    if (m.path) {
+      if (m.wait > 0) m.wait -= dt;
+      else { const [tx, ty] = m.path[m.i], dx = tx - m.x, dy = ty - m.y, d = Math.hypot(dx, dy);
+        if (d < .05) { m.i = (m.i + 1) % m.path.length; if (Math.random() < .3) m.wait = 1.5 + Math.random() * 4; }
+        else { const st = Math.min(d, m.sp * dt); m.x += dx / d * st; m.y += dy / d * st; m.f = Math.round((Math.atan2(dy, dx) + Math.PI) / (Math.PI / 4)) % 8; } }
+      m.rx += (m.x - m.rx) * .3; m.ry += (m.y - m.ry) * .3;
+    }
+    if (!vis(m.rx, m.ry, 3)) continue;
+    ents.push([m.ry + .3, 4, m]);
+    if (m.balloon || m.seller) ents.push([m.ry + .31, 14, { fx: 'balloon', m }]);
+  }
+  if (A.id === 'park') ents.push([69.2, 14, { fx: 'bunting', y: 69.2 }], [72.2, 14, { fx: 'bunting', y: 72.2 }], [1e5, 14, { fx: 'bubbles', x: A.x + 16.5, y: 63.6 }]);
+  if (A.id === 'temple') { const me0 = P.get(myId);
+    for (const b of WATB) {   // pigeons peck about the courtyard and take off when someone walks up
+      const near = me0 && Math.hypot(me0.rx - b.x, me0.ry - b.y) < 1.8 || L.some(m => Math.hypot(m.rx - b.x, m.ry - b.y) < .9);
+      if (near && !b.fly) { b.fly = 1; b.vx = (Math.random() - .5) * 6; b.vy = -2 - Math.random() * 2; FX.play('pop'); }
+      if (b.fly === 1) { b.x += b.vx * dt; b.y += b.vy * dt * .4; b.z += 3.2 * dt; if (b.z > 4) { b.fly = 2; b.back = now0 + 6000 + Math.random() * 6000; } }
+      else if (b.fly === 2) { if (now0 > b.back) { b.fly = 3; b.x = b.hx + (Math.random() - .5) * 6; b.y = b.hy - 3; } }
+      else if (b.fly === 3) { b.x += (b.hx - b.x) * dt * 1.2; b.y += (b.hy - b.y) * dt * 1.2; b.z = Math.max(0, b.z - 2.2 * dt); if (b.z <= 0 && Math.hypot(b.x - b.hx, b.y - b.hy) < .3) b.fly = 0; }
+      if (b.fly !== 2 && vis(b.x, b.y, 2)) ents.push([b.y + .1, 14, { fx: 'pigeon', b }]);
+    }
+    ents.push([1e5, 14, { fx: 'butterflies' }]);
+  }
+}
+function drawCrowdFx(e, X, Y, t) {
+  const u = TS, T = t / 1000;
+  if (e.fx === 'balloon') {   // a balloon on a string (the seller holds a whole bunch)
+    const m = e.m, hx = m.rx * u + X + u * .22 * (m.small || 1), hy = (m.ry + .32) * u + Y - u * .78 * (m.small || 1);
+    const list = m.seller ? BALLOON.map((c, i) => [c, (i - 2.5) * .26, 1.5 + (i % 2) * .3]) : [[m.balloon, .05, 1.25]];
+    for (const [col, ox, hgt] of list) {
+      const bx = hx + ox * u + Math.sin(T * 1.6 + ox * 5 + m.rx) * u * .08, by = hy - hgt * u;
+      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo((hx + bx) / 2 + u * .06, (hy + by) / 2, bx, by + u * .22); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(bx, by, u * .2, u * .25, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(bx - u * .07, by - u * .09, u * .05, u * .08, -.5, 0, 7); ctx.fill();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(bx - u * .04, by + u * .27); ctx.lineTo(bx + u * .04, by + u * .27); ctx.lineTo(bx, by + u * .22); ctx.fill();
+    }
+  } else if (e.fx === 'bunting') {   // festival flags strung along the main walk, little bulbs glowing at night
+    const A = AREA.park, y = e.y, h0 = 2.3, dark = Math.max(0, Math.min(1, (Math.abs(hourNow() - 12.5) - 5.2) / 1.2));
+    for (let x0 = A.x + 2; x0 < A.x + A.w - 3; x0 += 6) {
+      const x1 = x0 + 6, P = k => [(x0 + (x1 - x0) * k) * u + X, (y - h0 + Math.sin(k * Math.PI) * .55) * u + Y];
+      ctx.fillStyle = '#7a5a3a'; ctx.fillRect(x0 * u + X - u * .05, (y - h0) * u + Y, u * .1, h0 * u);
+      ctx.strokeStyle = 'rgba(60,40,30,.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (let k = 0; k <= 1.001; k += .1) { const [px, py] = P(k); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke();
+      for (let k = .06, i = 0; k < 1; k += .11, i++) { const [px, py] = P(k), fl = Math.sin(T * 3 + k * 9 + x0) * u * .04;
+        ctx.fillStyle = BALLOON[(i + x0) % BALLOON.length]; ctx.beginPath(); ctx.moveTo(px - u * .13, py); ctx.lineTo(px + u * .13, py); ctx.lineTo(px + fl, py + u * .32); ctx.fill();
+        if (dark > 0) { ctx.fillStyle = `rgba(255,236,150,${.9 * dark})`; ctx.beginPath(); ctx.arc(px + u * .2, py + u * .02, u * .05, 0, 7); ctx.fill(); ctx.fillStyle = `rgba(255,220,120,${.18 * dark})`; ctx.beginPath(); ctx.arc(px + u * .2, py, u * .22, 0, 7); ctx.fill(); } }
+    }
+  } else if (e.fx === 'bubbles') {   // a bubble machine by the carousel
+    for (let k = 0; k < 9; k++) { const ph = (T * .18 + k / 9) % 1, x = e.x + Math.sin(T * .8 + k * 2.1) * 1.4 + ph * 2.2, y = e.y - ph * 4.5, r = u * (.08 + (k % 3) * .04);
+      ctx.globalAlpha = Math.min(1, (1 - ph) * 2.5) * .8; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x * u + X, y * u + Y, r, 0, 7); ctx.stroke();
+      ctx.fillStyle = `hsla(${(k * 40 + T * 60) % 360},90%,75%,.25)`; ctx.fill(); ctx.globalAlpha = 1; }
+  } else if (e.fx === 'pigeon') {
+    const b = e.b, px = b.x * u + X, py = b.y * u + Y, flying = b.fly === 1 || b.fly === 3, z = b.z * u;
+    ctx.save(); ctx.translate(px, py); ctx.scale(1.8, 1.8); ctx.translate(-px, -py);
+    if (!flying || b.z < .3) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(px, py, u * .14, u * .05, 0, 0, 7); ctx.fill(); }
+    const peck = !flying && Math.sin(T * 3 + b.ph) > .6 ? u * .05 : 0, wing = flying ? Math.sin(T * 30 + b.ph) * u * .14 : 0;
+    ctx.fillStyle = '#8d93a0'; ctx.beginPath(); ctx.ellipse(px, py - u * .1 - z, u * .13, u * .08, 0, 0, 7); ctx.fill();
+    if (flying) { ctx.fillStyle = '#a7adb9'; ctx.beginPath(); ctx.moveTo(px - u * .02, py - u * .12 - z); ctx.lineTo(px - u * .2, py - u * .16 - z - wing); ctx.lineTo(px + u * .05, py - u * .1 - z); ctx.fill(); ctx.beginPath(); ctx.moveTo(px + u * .02, py - u * .12 - z); ctx.lineTo(px + u * .2, py - u * .16 - z + wing); ctx.lineTo(px - u * .05, py - u * .1 - z); ctx.fill(); }
+    ctx.fillStyle = '#6f7685'; ctx.beginPath(); ctx.arc(px + u * .1, py - u * .17 - z + peck, u * .055, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e8a33a'; ctx.fillRect(px + u * .14, py - u * .17 - z + peck, u * .04, u * .02); ctx.restore();
+  } else if (e.fx === 'butterflies') {
+    const A = AREA.temple;
+    for (let k = 0; k < 5; k++) { const cx = A.x + [17.5, 26.5, 3, 11, 38][k], cy = A.y + [12, 12, 14.5, 14.5, 19.5][k], x = cx + Math.sin(T * .7 + k * 3) * 1.2, y = cy - 1 + Math.sin(T * 1.1 + k) * .5, fl = Math.abs(Math.sin(T * 14 + k)) * u * .1;
+      const px = x * u + X, py = y * u + Y; ctx.fillStyle = ['#ffd23a', '#ff8ec3', '#ffffff', '#8fd3ff', '#ffb347'][k];
+      ctx.beginPath(); ctx.ellipse(px - fl * .6, py, fl, u * .07, -.4, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(px + fl * .6, py, fl, u * .07, .4, 0, 7); ctx.fill(); }
+  }
+}
+// the bell rings by itself at dawn and at dusk while you are in the temple
+{ let lastH = -1; setInterval(() => { if (!G || !me) return; const h = Math.floor(hourNow()), m = P.get(myId); if (lastH >= 0 && h !== lastH && (h === 6 || h === 18) && m && areaOf(m.x, m.y)?.id === 'temple') { bellT = performance.now(); FX.play('bell'); } lastH = h; }, 1000); }
+const WAT = { red: '#b8322a', red2: '#8e241e', green: '#2f7d4f', gold: '#e3b23c', gold2: '#b88516', white: '#f6f0e2', shade: '#d9cfba', wood: '#8a5a2b', wood2: '#6b421d' };
+let bellT = 0;
+function poly(pts, fill, stroke, lw = 2) { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+// a Thai gable roof seen from the front: stacked tiers, gold gable panel, chofa horns on top and naga tails at the eaves
+function thaiRoof(cx, base, half, height, tiers = 3) {
+  const u = TS;
+  for (let i = tiers - 1; i >= 0; i--) {
+    const hw = half * (1 - i * .16), b = base - i * height * .14, top = base - height - i * height * .05;
+    poly([[cx - hw, b], [cx, top], [cx + hw, b]], i % 2 ? WAT.green : WAT.red, WAT.gold, Math.max(2, u * .08));
+    poly([[cx - hw * .82, b - u * .12], [cx, top + height * .14], [cx + hw * .82, b - u * .12]], null, i % 2 ? '#4fa06e' : '#d9493c', Math.max(1, u * .05));
+  }
+  const top = base - height;
+  poly([[cx - half * .42, base - height * .18], [cx, top + height * .3], [cx + half * .42, base - height * .18]], WAT.gold, WAT.gold2, 2);   // the gable panel
+  ctx.fillStyle = WAT.gold2; ctx.beginPath(); ctx.arc(cx, base - height * .38, Math.max(3, half * .08), 0, 7); ctx.fill();
+  ctx.strokeStyle = WAT.gold; ctx.lineWidth = Math.max(2, u * .12); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx, top + u * .1); ctx.quadraticCurveTo(cx + u * .1, top - u * .7, cx + u * .45, top - u * .55); ctx.stroke();   // chofa
+  for (const sd of [-1, 1]) { const ex = cx + sd * half, ey = base; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.quadraticCurveTo(ex + sd * u * .35, ey - u * .1, ex + sd * u * .3, ey - u * .55); ctx.stroke(); }   // naga tails
+  ctx.lineCap = 'butt';
+}
+function drawWat(s, X, Y, t) {
+  const u = TS, x0 = (s.cx - s.w / 2) * u + X, y0 = (s.cy - s.h / 2) * u + Y, W = s.w * u, H = s.h * u, cx = x0 + W / 2, by = y0 + H;
+  ctx.save();
+  if (WIMG && WAT_SPR[s.k]) {
+    const [wT, dy] = WAT_SPR[s.k], sw = s.k === 'bell' ? Math.max(0, 1 - (performance.now() - bellT) / 1600) : 0;
+    ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(cx + u * .2, by + dy * u - u * .25, wT * u * .42, u * .55, 0, 0, 7); ctx.fill();
+    wdraw(s.k, cx + Math.sin(performance.now() / 45) * sw * u * .06, by + dy * u, wT);
+    ctx.restore(); return;
+  }
+  if (s.k === 'bot') {                       // the ordination hall
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x0 + u * .3, by - u * .1, W, u * .4);
+    ctx.fillStyle = WAT.white; ctx.fillRect(x0, by - u * .9, W, u * .9); ctx.fillStyle = WAT.shade; ctx.fillRect(x0, by - u * .2, W, u * .2);   // platform
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = i % 2 ? WAT.shade : '#ece4d2'; ctx.fillRect(cx - u * (1.4 - i * .2), by - u * (.3 + i * .3), u * (2.8 - i * .4), u * .3); }   // steps
+    const wl = x0 + u * .9, ww = W - u * 1.8, wt = by - u * 4.3;
+    ctx.fillStyle = WAT.white; ctx.fillRect(wl, wt, ww, u * 3.4); ctx.fillStyle = 'rgba(0,0,0,.06)'; ctx.fillRect(wl, wt, ww, u * .5);
+    for (let i = 0; i < 6; i++) { const px = wl + u * .1 + i * (ww - u * .5) / 5; ctx.fillStyle = '#efe6d2'; ctx.fillRect(px, wt + u * .2, u * .35, u * 3.2); ctx.fillStyle = WAT.gold; ctx.fillRect(px - u * .05, wt + u * .1, u * .45, u * .25); }   // columns
+    ctx.fillStyle = WAT.red2; ctx.fillRect(cx - u * .95, by - u * 3.4, u * 1.9, u * 2.5); ctx.fillStyle = WAT.gold; ctx.fillRect(cx - u * .8, by - u * 3.25, u * 1.6, u * 2.35);   // the gilded door
+    ctx.strokeStyle = WAT.gold2; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, by - u * 3.25); ctx.lineTo(cx, by - u * .9); ctx.stroke();
+    for (const sd of [-1, 1]) for (const k of [1.9, 3.6]) { const wx = cx + sd * u * k - u * .4; ctx.fillStyle = WAT.gold; ctx.fillRect(wx - u * .08, by - u * 3.1, u * .96, u * 1.5); ctx.fillStyle = WAT.red; ctx.fillRect(wx, by - u * 3, u * .8, u * 1.3); }
+    thaiRoof(cx, wt + u * .2, W / 2 + u * .2, u * 5.2, 3);
+  } else if (s.k === 'chedi') {              // a white bell-shaped chedi with a golden spire
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(cx + u * .3, by, W * .55, u * .5, 0, 0, 7); ctx.fill();
+    for (let i = 0; i < 4; i++) { const w = W * (1 - i * .14), h = u * .55; ctx.fillStyle = i % 2 ? WAT.shade : WAT.white; ctx.fillRect(cx - w / 2, by - h * (i + 1), w, h); ctx.fillStyle = WAT.gold; ctx.fillRect(cx - w / 2, by - h * (i + 1), w, u * .08); }
+    const db = by - u * 2.2, dr = W * .36;
+    ctx.fillStyle = WAT.white; ctx.beginPath(); ctx.moveTo(cx - dr, db); ctx.bezierCurveTo(cx - dr, db - dr * 1.6, cx + dr, db - dr * 1.6, cx + dr, db); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.07)'; ctx.beginPath(); ctx.moveTo(cx + dr * .2, db); ctx.bezierCurveTo(cx + dr * .3, db - dr * 1.4, cx + dr, db - dr * 1.3, cx + dr, db); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = WAT.gold; ctx.fillRect(cx - dr, db - u * .18, dr * 2, u * .18);
+    const sb = db - dr * 1.2; ctx.fillStyle = WAT.gold; ctx.fillRect(cx - u * .5, sb - u * .4, u, u * .45);
+    for (let i = 0; i < 7; i++) { const w = u * (.8 - i * .1); ctx.fillStyle = i % 2 ? WAT.gold2 : WAT.gold; ctx.fillRect(cx - w / 2, sb - u * (.4 + (i + 1) * .32), w, u * .32); }
+    poly([[cx - u * .1, sb - u * 2.6], [cx, sb - u * 4.6], [cx + u * .1, sb - u * 2.6]], WAT.gold);
+    const gl = .5 + Math.sin(t / 600) * .5; ctx.fillStyle = `rgba(255,240,180,${.25 * gl})`; ctx.beginPath(); ctx.arc(cx, sb - u * 4.5, u * .35, 0, 7); ctx.fill();
+  } else if (s.k === 'bell') {               // the bell tower; the bell swings for a moment when someone strikes it
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x0 + u * .2, by - u * .1, W, u * .35);
+    ctx.fillStyle = WAT.white; ctx.fillRect(x0, by - u * .7, W, u * .7);
+    for (const px of [x0 + u * .2, x0 + W - u * .55]) { ctx.fillStyle = WAT.red; ctx.fillRect(px, by - u * 3.8, u * .35, u * 3.1); }
+    ctx.fillStyle = WAT.wood; ctx.fillRect(x0 + u * .1, by - u * 3.9, W - u * .2, u * .25);
+    const sw = Math.max(0, 1 - (performance.now() - bellT) / 1600), ang = Math.sin((performance.now() - bellT) / 90) * .35 * sw;
+    ctx.save(); ctx.translate(cx, by - u * 3.65); ctx.rotate(ang);
+    ctx.fillStyle = WAT.gold2; ctx.fillRect(-u * .05, 0, u * .1, u * .3);
+    ctx.fillStyle = WAT.gold; ctx.beginPath(); ctx.moveTo(-u * .3, u * .3); ctx.quadraticCurveTo(-u * .35, u * 1.3, -u * .55, u * 1.4); ctx.lineTo(u * .55, u * 1.4); ctx.quadraticCurveTo(u * .35, u * 1.3, u * .3, u * .3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    thaiRoof(cx, by - u * 3.9, W / 2 + u * .4, u * 2.2, 2);
+  } else if (s.k === 'shop') {               // the temple shop: a little wooden stall
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x0 + u * .3, by - u * .1, W, u * .35);
+    ctx.fillStyle = WAT.wood2; ctx.fillRect(x0, by - u * 2.6, W, u * 2.6); ctx.fillStyle = WAT.wood; ctx.fillRect(x0, by - u * 1.2, W, u * 1.2);
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x0 + i * W / 6, by - u * 1.2, 2, u * 1.2); }
+    ctx.font = `${Math.round(u * .62)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ['🪷', '🌼', '🍙', '🍡', '🧋'].forEach((e, i) => ctx.fillText(e, x0 + u * .7 + i * (W - u * 1.4) / 4, by - u * 1.15));
+    for (const px of [x0 + u * .1, x0 + W - u * .35]) { ctx.fillStyle = WAT.red; ctx.fillRect(px, by - u * 3.6, u * .25, u * 3.6); }
+    poly([[x0 - u * .4, by - u * 3.2], [x0 + u * .6, by - u * 4.3], [x0 + W - u * .6, by - u * 4.3], [x0 + W + u * .4, by - u * 3.2]], WAT.red, WAT.gold, 2);
+    ctx.fillStyle = WAT.gold; ctx.fillRect(cx - u * 1.5, by - u * 4.1, u * 3, u * .6); ctx.fillStyle = WAT.red2; ctx.font = `700 ${Math.round(u * .38)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textBaseline = 'middle'; ctx.fillText('ร้านของวัด', cx, by - u * 3.8);
+  } else if (s.k === 'sala') {               // the open sala: red posts and a Thai roof over a wooden floor (see-through when you are under it)
+    const m = P.get(myId), under = m && m.rx > s.cx - s.w / 2 && m.rx < s.cx + s.w / 2 && m.ry > s.cy - s.h / 2 - .5 && m.ry < s.cy + s.h / 2;
+    for (const [px, py] of [[0, 0], [9, 0], [0, 5], [9, 5]]) { ctx.fillStyle = WAT.red; ctx.fillRect(x0 + px * u + u * .3, y0 + py * u - u * 2.4, u * .4, u * 3.1); }
+    ctx.globalAlpha = under ? .35 : 1;
+    const rt = y0 - u * 2.6;
+    poly([[x0 - u * .6, rt + u * 1.2], [x0 + u * 1.2, rt - u * 1.4], [x0 + W - u * 1.2, rt - u * 1.4], [x0 + W + u * .6, rt + u * 1.2]], WAT.red, WAT.gold, Math.max(2, u * .1));
+    poly([[x0 + u * .6, rt - u * .2], [x0 + u * 2, rt - u * 2.4], [x0 + W - u * 2, rt - u * 2.4], [x0 + W - u * .6, rt - u * .2]], WAT.green, WAT.gold, Math.max(2, u * .08));
+    ctx.strokeStyle = WAT.gold; ctx.lineWidth = Math.max(2, u * .1); ctx.lineCap = 'round';
+    for (const sd of [-1, 1]) { const ex = sd < 0 ? x0 - u * .6 : x0 + W + u * .6; ctx.beginPath(); ctx.moveTo(ex, rt + u * 1.2); ctx.quadraticCurveTo(ex + sd * u * .3, rt + u, ex + sd * u * .2, rt + u * .5); ctx.stroke(); }
+    ctx.lineCap = 'butt'; ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+// the white temple wall with a red cap and gold-tipped posts; a little Thai arch where the gate is
+function drawWatWall(side, X, Y) {
+  const T = AREA.temple; if (!T) return; const u = TS;
+  const seg = (x0, y0, x1, y1) => { const a = [x0 * u + X, y0 * u + Y], b = [x1 * u + X, y1 * u + Y];
+    if (y0 === y1) { ctx.fillStyle = WAT.white; ctx.fillRect(a[0], a[1] - u * .9, b[0] - a[0], u * 1.1); ctx.fillStyle = WAT.red; ctx.fillRect(a[0], a[1] - u * 1.05, b[0] - a[0], u * .22); ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(a[0], a[1] + u * .05, b[0] - a[0], u * .15);
+      for (let x = x0; x <= x1; x += 4) { const px = x * u + X; ctx.fillStyle = WAT.white; ctx.fillRect(px - u * .2, a[1] - u * 1.3, u * .4, u * 1.5); ctx.fillStyle = WAT.gold; ctx.beginPath(); ctx.arc(px, a[1] - u * 1.35, u * .14, 0, 7); ctx.fill(); } }
+    else { ctx.fillStyle = WAT.white; ctx.fillRect(a[0] - u * .2, a[1] - u * .9, u * .55, b[1] - a[1] + u * .9); ctx.fillStyle = WAT.red; ctx.fillRect(a[0] - u * .25, a[1] - u * .9, u * .65, b[1] - a[1]); ctx.fillStyle = WAT.white; ctx.fillRect(a[0] - u * .15, a[1] - u * .7, u * .45, b[1] - a[1]); } };
+  const L = T.x + .3, R = T.x + T.w - .7, top = T.y + .9, bot = T.y + T.h - .1;
+  if (side === 'top') { seg(T.x, top, T.x + T.w, top); seg(L, top, L, T.y + 16); seg(L, T.y + 18, L, bot); seg(R, top, R, bot);
+    const gx = (T.x + .5) * u + X, gy = (T.y + 18) * u + Y;                 // the arch over the gate
+    for (const dy of [-2.1, .1]) { ctx.fillStyle = WAT.white; ctx.fillRect(gx - u * .3, gy + dy * u - u * 1.8, u * .6, u * 1.9); }
+    poly([[gx - u * .7, gy - u * 3.8], [gx, gy - u * 5.4], [gx + u * .7, gy - u * 3.8]], WAT.red, WAT.gold, 2);
+  } else seg(T.x, bot, T.x + T.w, bot);
+}
+// the way in from town: a small Thai arch at the end of the south-west lane
+function drawWatTownGate(e, X, Y) {
+  const s = e.s, F = s.facade;
+  if (WIMG && F && e.i !== undefined) {
+    const r = WJ.s.entrance, k = r[2] / F.w, sx = r[0] + e.i * k, sw = Math.min(k, r[0] + r[2] - sx); if (sw <= 0) return;
+    const h = r[3] / k, x0 = Math.floor((F.x0 + e.i) * TS + X), x1 = Math.ceil((F.x0 + e.i + sw / k) * TS + X) + 1, y0 = (F.by - h) * TS + Y;
+    ctx.drawImage(WIMG, sx, r[1], sw, r[3], x0, y0, x1 - x0, h * TS); return;
+  }
+  const u = TS, gx = s.x * u + X, gy = (s.y + .9) * u + Y;
+  for (const dy of [-1.3, 1.3]) { ctx.fillStyle = WAT.white; ctx.fillRect(gx - u * .25, gy + dy * u - u * 2.6, u * .5, u * 2.6); ctx.fillStyle = WAT.gold; ctx.fillRect(gx - u * .3, gy + dy * u - u * 2.75, u * .6, u * .2); }
+  thaiRoof(gx, gy - u * 3.6, u * 1.9, u * 1.8, 2);
+  ctx.fillStyle = WAT.gold; ctx.fillRect(gx - u * 1.1, gy - u * 3.5, u * 2.2, u * .55); ctx.fillStyle = WAT.red2; ctx.font = `700 ${Math.round(u * .36)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛕 วัด', gx, gy - u * 3.22);
+}
 // the arch over the way in (town side and park side), with the park's name on its board
 function drawParkGate(x, y, X, Y) {
   if (!RIDE_IMG()) return;
@@ -2296,11 +2602,11 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   farmer:   { name: 'พี่ข้าวหอม (ประธานสหกรณ์)', short: 'พี่ข้าวหอม', g: 'f', lk: { hair: 'brown', shirt: 'red' }, hi: 'มาทำไร่ด้วยกันไหม ได้กินผักสดทุกวันเลยนะ', yes: 'ดูแลแปลงดีๆ นะ' },
   fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: 'มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: 'ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
   merchant: { name: 'เฮียชัย (เจ้าของโรงประมูล)', short: 'เฮียชัย', lk: { hair: 'brown' }, hi: 'มาประมูลของกันไหม ล็อตใหม่ขึ้นเวทีตลอด', yes: 'ซื้อถูกขายแพง จำไว้!' },
-  chef:     { name: 'เชฟหมี (หัวหน้าครัว)', short: 'เชฟหมี', lk: { hair: 'black' }, hi: 'อยากเป็นเชฟต้องมีใบรับรองนะ แล้วมาปรุงด้วยกัน', yes: 'วัตถุดิบดี อาหารก็อร่อย!' },
   doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะคะ', yes: 'อยู่ในโรงพยาบาลช่วงเวรได้เงินเดือนทุกชั่วโมงนะคะ' },
   rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', lk: { hair: 'black' }, hi: 'มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน', yes: 'ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
   police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: 'เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ', yes: 'ถ้ามีแจ้งเหตุ 191 รีบไปนะ' },
   cashier:  { name: 'พี่แนน (ผู้จัดการร้าน)', short: 'พี่แนน', g: 'f', lk: { hair: 'brown', shirt: 'green' }, hi: 'ร้านเรารับพนักงานแคชเชียร์อยู่นะ ไม่ต้องมีวุฒิ สนใจไหม?', yes: 'ถึงกะแล้ว! ไปยืนแคชเชียร์ คิดเงินทอนให้ถูกนะ' },
+  monk:     { name: 'หลวงพ่อเย็น (เจ้าอาวาส)', short: 'หลวงพ่อเย็น', lk: {}, hi: 'เจริญพร โยม · อยากบวชเรียนศึกษาธรรมไหม ชีวิตเรียบง่ายแต่อิ่มใจนะ', yes: 'ตื่นเช้าออกบิณฑบาต แล้วอย่าฉันหลังเที่ยงนะ' },
   beggar:   { name: 'ลุงจุก (ศาลาประชาคม)', short: 'ลุงจุก', lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: 'ไม่มีงานทำก็มาเป็นขอทานกับลุงได้นะ วิ่งเก็บขยะที่ถังขยะ หรือนั่งขอทานก็ได้ เก็บให้เกิน 2,000 บาทก็พ้นแล้ว', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะ' },
 };
 let STAFF = [], STAFF_AT = {};
@@ -2389,6 +2695,7 @@ function initNearBtns() {
 initNearBtns();
 $('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
+  if (p.crowd) return;   // passers-by in the park and the temple: no name tags
   if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .8 : .46); p.tagT = t; }
   const icon = p.red ? '🦹' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
@@ -2521,6 +2828,9 @@ function drawMini() {
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
   misMini(g, A, mapId);
+  if (me?.alms && mapId === 'town') { const b = (performance.now() / 350 | 0) % 2; me.alms.pts.forEach((q, i) => { if (me.alms.got[i]) return; const x = (q[0] - A.x) * 2, y = (q[1] - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); g.fillStyle = b ? '#ffb300' : '#ffd84d'; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); });
+  }
+  if (mapId === 'town') { const x = (74 - A.x) * 2, y = (67 - A.y) * 2, big = me?.alms?.got.every(Boolean); g.font = `${big ? 20 : 14}px serif`; g.textAlign = 'center'; g.fillText('🛕', x, y + 5); }
   if (me?.dogq?.kind === 'thief' && mapId === 'town') { const b = (performance.now() / 300 | 0) % 2, x0 = (me.dogq.x - A.x) * 2, y0 = (me.dogq.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x0, y0, 8, 0, 7); g.fill(); g.fillStyle = b ? '#ff2a2a' : '#a80000'; g.beginPath(); g.arc(x0, y0, 6, 0, 7); g.fill(); }
   if (me?.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc; g.strokeStyle = (performance.now() / 400 | 0) % 2 ? '#ffd23a' : '#ff9f1a'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((hx - A.x) * 2, (hy - A.y) * 2, hr * 2, 0, 7); g.stroke(); g.setLineDash([]); g.font = '16px serif'; g.textAlign = 'center'; g.fillText('🐕', (hx - A.x) * 2, (hy - A.y) * 2 + 6); }
   { const q = PETST.get(myId); if (q && mapOf(areaOf(q.x, q.y)?.id) === mapId) { const mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 4.5, 0, 7); g.fill(); g.fillStyle = '#ff7eb0'; g.beginPath(); g.arc(mx, my, 3, 0, 7); g.fill(); } }   // your pet: a pink dot
@@ -2637,6 +2947,7 @@ const FN = {
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
   fs(m) { closePanel(); screenMode(m.mode); },
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
+  eco() { ECO = !ECO; try { localStorage.setItem('lt_eco', ECO ? '1' : '0'); } catch { } resize(); refreshPanel(true); toast(ECO ? 'เปิดโหมดประหยัดแบต: ลื่นน้อยลงนิดหน่อย แต่เครื่องเย็นและแบตอึดขึ้น' : 'ปิดโหมดประหยัดแบต: ภาพเต็ม 60 เฟรม', '🔋'); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
   addContact(m, root) { const ph = String(m.phone || root.querySelector('#phIn').value).replace(/\D/g, ''); if (G.taxi && ph === G.taxi.phone) { panel.tab = 'taxi'; return refreshPanel(true); } send({ t: 'contact_add', phone: ph }); },
@@ -2707,7 +3018,7 @@ function buildCast() {
   const online = () => fetch('/api/status').then(r => r.json()).then(j => { for (const id of ['heroOnline', 'promoOnline']) { const e = document.getElementById(id); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; } }).catch(() => { });
   online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
 })();
-fetch('assets/portraits.json?v=2').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
+fetch('assets/portraits.json?v=3').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
 const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], i = FACES?.faces?.[alt || g?.f]; if (i === undefined) return ''; const n = Object.keys(FACES.faces).length;
   return `<i class="qface" style="width:${px}px;height:${px}px;background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>`; };
 function questPop(type, title, line, reward) {
@@ -2797,15 +3108,16 @@ function icuDraw() {
 // ------------------------------------------------------------------ dialog box (talking to people)
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
-const NPC_FACE = { staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
+const NPC_FACE = { staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_police: 'police_f', keep_school: 'elder_m',
   keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
+  staff_monk: [['วัดนี้สร้างมาตั้งแต่ก่อตั้งเมือง', 'ตีระฆังได้นะโยม เสียงดังกังวานไปทั้งวัด'], ['เขย่าเซียมซีหน้าโบสถ์ดูสิ', 'ใบละสิบบาท ทำบุญเข้าวัดด้วย'], ['ไหว้พระแล้วใจสงบ', 'ทำงานอะไรก็ราบรื่นขึ้น เจริญพร']],
   staff_office: [['บริษัทเราส่งเอกสารไปทั่วเมืองทุกวันเลยค่ะ', 'ยิ่งส่งไกล ค่าส่งยิ่งเยอะนะคะ', 'หลังห้าโมงเย็นยังทำโอทีได้ถึงสามทุ่ม ได้เงินเพิ่มอีกด้วย'], ['ใครอยากเข้ามาทำงานที่นี่ต้องจบปริญญาตรีก่อนนะคะ', 'ไปเรียนที่มหาวิทยาลัยได้ นั่งเรียนครบชั่วโมงก็ได้หนึ่งคาบ'], ['ช่วงนี้ดิฉันอยากได้เก้าอี้ทำงานตัวใหม่จัง', 'ตัวเก่านั่งแล้วปวดหลังมากเลยค่ะ 😅']],
   staff_fishing: [['ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', 'ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', 'ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วย'], ['สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['สมุดภาพปลาเปิดดูในมือถือได้นะ', 'ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย']],
   staff_chef: [['อาหารดีเริ่มที่วัตถุดิบดี', 'ปลาสดจากชาวประมง ผักจากชาวไร่ ทำอะไรก็อร่อย'], ['อยากเป็นเชฟต้องมีใบรับรองเชฟก่อนนะ', 'ซื้อได้ที่มหาวิทยาลัย'], ['ต้มยำหม้อนี้ใส่พริกไปสามกำมือ', 'ใครกินไม่ไหวไม่ใช่ความผิดฉันนะ 🌶️']],
-  staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่มหาวิทยาลัย'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
+  staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่โชว์รูมรถ'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
   staff_merchant: [['ที่นี่เป็นโรงประมูลแล้ว ล็อตขึ้นเวทีทีละล็อต', 'ยื่นซองเดาราคาแข่งกับเสี่ยเฮง เจ๊หมวย พวกนั้น'], ['ซื้อได้ต่ำกว่ามูลค่าจริงก็กำไร', 'แต่ถ้าใจร้อนเสนอสูงเกินก็ขาดทุนนะ'], ['ฟังผู้ประเมินไว้บ้าง', 'แต่สภาพของก็สำคัญ ของมีตำหนิราคาตกเยอะ']],
   staff_police: [['ตามหาหมาที่หายไปได้ที่นี่ ค่าตอบแทนดี', 'รับเคสได้ตลอด 24 ชม.'], ['อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', 'ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['เมืองนี้สงบสุขได้ เพราะทุกคนช่วยกันดูแล']],
   staff_doctor: [['ป่วยแล้วอย่าฝืน มาโรงพยาบาลนะ', 'บอกอาการให้ชัดๆ หมอจะได้รักษาถูก'], ['กินให้ครบ นอนให้พอ', 'ภูมิคุ้มกันจะดีขึ้นเอง']],
@@ -2883,7 +3195,7 @@ const talkedAt = {};
 const GUIDE_HI = ['สวัสดีจ้า มาใหม่ใช่ไหม? ถามพี่ได้ทุกเรื่องเลย', 'งงตรงไหน ถามพี่ฟ้าได้นะ', 'อยากรู้วิธีหาเงิน หางาน หรือที่เที่ยว ถามพี่ได้เลย'];
 const GUIDE_TOPICS = [
   ['💰 หาเงินยังไงดี', ['เริ่มง่ายสุดคือตกปลาจ้า ซื้อเบ็ด ฿150 ที่สมาคมประมงกับน้าเล็ก แล้วไปตกที่ท่าน้ำ', 'ได้ปลาแล้วเอาไปขายที่สมาคมประมง ปลาหายากราคาดีมาก', 'มีเงินแล้วไปเรียนที่มหาวิทยาลัย ได้ใบรับรองแล้วสมัครงานดีๆ ได้เงินมากขึ้น']],
-  ['💼 มีอาชีพอะไรบ้าง', ['พนักงานบริษัท · ชาวไร่ · พ่อค้า · เชฟ · หมอ · ไรเดอร์ · ตำรวจ · ขอทาน', 'แต่ละอาชีพต้องมีใบรับรองจากมหาวิทยาลัยก่อน แล้วไปสมัครกับเจ้าหน้าที่ที่ทำงานนั้น', 'เปลี่ยนงานบ่อยๆ ต้องรอคูลดาวน์นะ เลือกให้ดีล่ะ']],
+  ['💼 มีอาชีพอะไรบ้าง', ['พนักงานบริษัท · ชาวไร่ · พ่อค้า · หมอ · ไรเดอร์ · ตำรวจ · ขอทาน', 'แต่ละอาชีพต้องมีใบรับรองจากมหาวิทยาลัยก่อน แล้วไปสมัครกับเจ้าหน้าที่ที่ทำงานนั้น', 'เปลี่ยนงานบ่อยๆ ต้องรอคูลดาวน์นะ เลือกให้ดีล่ะ']],
   ['⚡ พลังงาน / อิ่ม / เลือด', ['ทำงาน ทำเควส ตกปลา ล้วนใช้พลังงาน ⚡ ถ้าหมดจะทำอะไรไม่ได้', 'กินข้าวที่ร้านอาหารหรือร้านสะดวกซื้อเพื่อให้อิ่ม นอนพักที่บ้านหรือนั่งม้านั่งก็ได้พลังคืน', 'ที่ฟื้นไวสุดคือสวนสนุก! เล่นเครื่องเล่นแล้วได้พลังงาน เลือด และความสุขทุกวินาที']],
   ['🎡 ที่เที่ยว / เดินทาง', ['สวนสนุกอยู่สุดถนนเส้นหลักด้านใต้ หมู่บ้านจัดสรรอยู่สุดถนนด้านเหนือ', 'ขี้เกียจเดิน? โทรเรียกแท็กซี่ 888-888 หรือกดแอพแท็กซี่ในมือถือ ไปส่งถึงหน้าประตู', 'มีเงินแล้วซื้อมอไซค์หรือรถที่โชว์รูมรถ ให้เพื่อนซ้อนท้ายได้ด้วยนะ']],
   ['📱 มือถือทำอะไรได้', ['มือถือมีทุกอย่าง: โทรหาเพื่อน แชท สั่งอาหาร ซื้อหุ้น จ่ายบิล ดูเควส', 'ขอเบอร์เพื่อนได้โดยแตะที่ตัวเพื่อนแล้วกด "ขอเบอร์"', 'เควสประจำวันทำครบได้รางวัลด้วยนะ ดูได้มุมซ้ายบน']],
@@ -3229,7 +3541,7 @@ function staffHint(career) {
 function applyBox(career, st) {
   const c = G.careers[career];
   if (me.career === career) return `<div class="jobbox ok">${c.icon} คุณทำงานเป็น<b>${c.name}</b>ที่นี่ · Lv.${me.lv}</div>`;
-  const miss = (c.need || []).filter(l => !licOk(l)).map(l => G.licenses[l].name + (licExp(l) ? ' (หมดอายุ ต่อที่มหาวิทยาลัย)' : ''));
+  const miss = (c.need || []).filter(l => !licOk(l)).map(l => G.licenses[l].name + (licExp(l) ? ' (หมดอายุ ต่อที่โชว์รูมรถ)' : ''));
   const wait = me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ เพิ่งเปลี่ยนงาน ต้องรออีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : '';
   return `<div class="jobbox"><b>📝 รับสมัคร ${c.icon} ${c.name}</b><div class="sub">${c.desc}</div>
     ${miss.length ? `<div class="sub" style="color:var(--bad)">ต้องมี: ${miss.join(', ')}</div>` : ''}${wait}
@@ -3240,6 +3552,30 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19c', d: '19 พ.ย. (รอบ 40)', items: [
+    '🛕 <b>ทางเข้าวัดใหม่!</b> วัดหลังใหญ่ตั้งอยู่บนสนามหญ้าใต้บ่อน้ำในเมือง (ทางเดินหินจากถนนเส้นล่าง) เดินเข้าบันไดกลางเพื่อเข้าวัด',
+    '🙏 วัดมีชีวิตขึ้น: ญาติโยมเดินไหว้พระ นกพิราบเดินจิกพื้นลาน (เดินเข้าใกล้แล้วบินหนี) ปลาคาร์ปว่ายในสระบัว ผีเสื้อบินรอบกระถางดอกไม้',
+    '🎡 สวนสนุกคึกคัก: ครอบครัวเดินเที่ยว เด็กๆ ถือลูกโป่ง คนขายลูกโป่ง ธงราวประดับ (กลางคืนไฟกระพริบ) ฟองสบู่ข้างม้าหมุน ลานอาหารมีรถขายอาหาร ไอศกรีม และโต๊ะนั่งกิน',
+    '🔪 <b>อาชีพเชฟปิดแล้ว</b> (ใครเป็นเชฟจะกลับมาว่างงาน เลือกอาชีพใหม่ได้) · ที่ครัวใหญ่มีเกมใหม่ <b>หั่นผักผลไม้</b> ใครก็เล่นได้ ปาดนิ้วฟันให้ขาด ฟันหลายลูกได้คอมโบ ระวังระเบิด 💣',
+    '🎣 ตกปลา: กรอสายเข้ามาจนสุดแล้วปลาขึ้นฝั่งเลย ไม่ต้องกดยกอีกรอบ',
+    '🪪 สอบใบขับขี่/ต่ออายุ ย้ายไปที่ <b>โชว์รูมรถ</b> แล้ว',
+    '👗 ร้านแฟชั่นขายเฉพาะชุดพิเศษ (เลิกขายเสื้อกับกางเกงแยกชิ้น)',
+    '🔋 มือถือร้อน/แบตหมดไว: เพิ่ม <b>โหมดประหยัดแบต</b> (เปิดเองบนมือถือ ปิดได้ที่ ⚙️ ตั้งค่า) · แก้อาการเกมค้างตอนเน็ตสะดุด: ต่อใหม่ให้เองภายในไม่กี่วินาที · เอาแอปเพลงออกจากมือถือในเกม',
+  ] },
+  { v: '2026-11-19b', d: '19 พ.ย. (รอบ 39)', items: [
+    '🛕 วัดโฉมใหม่! ทางเข้าวัดย้ายมาอยู่ริมทะเลสาบ ใต้ถนนฝั่งซ้ายของเมือง เป็นซุ้มวัดหลังใหญ่สีทองอร่าม เดินเข้าประตูกลางได้เลย',
+    '🏯 ในวัดวาดใหม่ทั้งหมด: พระอุโบสถ เจดีย์ทอง ศาลาไม้ หอระฆัง ร้านค้าวัด · มีสระบัว ต้นโพธิ์ใบไม้ร่วง กระถางธูปควันลอย และโคมไฟส่องทางตอนกลางคืน',
+    '🙏 มีพระกับสามเณรเดินอยู่ในวัด · ระฆังดังเองตอน 6 โมงเช้ากับ 6 โมงเย็น · นั่งชมสระบัวได้ที่มุมสระทั้ง 4 มุม',
+    '🧡 ผู้เล่นที่เป็นพระได้ชุดจีวรตัวใหม่ เดินได้ทุกทิศ · หลวงพ่อเย็นมีรูปของท่านแล้ว',
+    '🧧 ของใหม่ที่ร้านค้าวัด: ผ้ายันต์นำโชค พกติดตัวไว้ ไหว้พระแล้วได้พรนานขึ้น 2 เท่า',
+  ] },
+  { v: '2026-11-19a', d: '19 พ.ย. (รอบ 38)', items: [
+    '🛕 แผนที่ใหม่! <b>วัดเมืองชีวิต</b> ทางเข้าอยู่สุดขอบเมืองฝั่งซ้าย (ตรงกลาง) หรือนั่งแท็กซี่ไปก็ได้',
+    '🏯 ในวัดมีโบสถ์ เจดีย์ทององค์ใหญ่ ศาลาโล่งให้นั่งเล่น ลานดินทราย และร้านค้าวัด (ชุดธูปเทียน พวงมาลัย ข้าวต้มมัด ขนมไทย น้ำลำไย)',
+    '🙏 ไหว้พระในโบสถ์ ได้รับพร 20 นาที รายได้ทุกอย่าง +5% · เขย่าเซียมซีหน้าโบสถ์ · ตีระฆังได้ทุกคน เสียงดังทั้งวัด 🔔',
+    '🧡 อาชีพใหม่ <b>พระ</b> สมัครกับหลวงพ่อเย็นที่หน้าโบสถ์ · ตื่นเช้าออกบิณฑบาต 05:00–10:00 เดินรับบาตรตามจุดสีทองในเมืองแล้วกลับวัดรับปัจจัย',
+    '🍚 พระฉันอาหารได้แค่ช่วงเช้าถึงเที่ยง (ดื่มน้ำได้) แต่หิวช้ากว่าคนทั่วไป · ผู้เล่นใส่บาตรพระได้ กดที่ตัวพระแล้วเลือกอาหาร ได้บุญ+ได้พร',
+  ] },
   { v: '2026-11-18f', d: '18 พ.ย. (รอบ 37)', items: [
     '🏘️ ระบบบ้านใหม่! ทุกคนมีบ้านของตัวเองได้ ไม่จำกัด 12 หลังอีกต่อไป · ซื้อกับคุณจิ๋ม สำนักงานอสังหาฯ (ทางเข้าหมู่บ้าน)',
     '🏠 เลือกขนาดได้ 3 แบบ: บ้านเล็ก ฿20,000 · บ้านกลาง ฿65,000 (2 ชั้น) · บ้านใหญ่ ฿160,000 (3 ชั้น) และเลือกหน้าตาบ้านได้ 6 แบบ',
@@ -3518,6 +3854,25 @@ function renderPanel(p) {
       }
       return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')}</div>${tabs}${body}`;
     }
+    case 'tshop': {
+      const rows = (G.tshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.tshop.markup), e = it.eat || {};
+        return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
+          [id === 'offering' && 'ใช้ไหว้พระในโบสถ์', id === 'malai' && 'ของฝาก ขายต่อได้', id === 'amulet' && 'พกไว้ ไหว้พระแล้วได้พรนาน 2 เท่า', e.hunger && `อิ่ม +${e.hunger}`, e.energy && `พลัง +${e.energy}`, e.happy && `สุข +${e.happy}`, `มีอยู่ ${me.inv[id] || 0}`].filter(Boolean).join(' · ')); }).join('');
+      return `<h2>🪔 ร้านค้าวัด</h2><div class="sub">เปิดทุกวัน · ชุดไหว้พระ พวงมาลัย ขนมไทย ของใส่บาตร · ชุดธูปเทียนใช้ไหว้พระในโบสถ์แทนการจ่ายเงิน</div><div class="list">${rows}</div>`;
+    }
+    case 'wpray': {
+      const bl = (me.bless || 0) > Date.now() + clockOff ? `<div class="jobbox ok">✨ ได้รับพรอยู่ เหลืออีก ${Math.ceil((me.bless - Date.now() - clockOff) / 60000)} นาที · รายได้ทุกอย่าง +5%</div>` : '';
+      const h = hourNow(), A = me.alms;
+      let monk = '';
+      if (job('monk')) {
+        if (A) { const n = A.got.filter(Boolean).length; monk = `<div class="jobbox">🙏 <b>กำลังบิณฑบาต</b> รับบาตรแล้ว ${n}/${A.pts.length} จุด${n === A.pts.length ? ' · <b>ครบแล้ว! ยืนหน้าพระประธานแล้วจะได้ปัจจัยจากวัด</b>' : ' · ไปตามจุดสีทองบนแผนที่ในเมือง'}</div>`; }
+        else if (me.almsDay === dayNow()) monk = '<div class="jobbox ok">🙏 วันนี้บิณฑบาตแล้ว · พรุ่งนี้เช้าตื่นมาออกใหม่นะ</div>';
+        else monk = `<div class="jobbox">🌅 ออกบิณฑบาตได้ทุกเช้า 05:00–10:00 · ตอนนี้ ${h >= 5 && h < 10 ? '<b>ได้เวลาแล้ว!</b>' : 'ยังไม่ใช่เวลา'}</div>${B('🙏 ออกบิณฑบาต (⚡6)', { t: 'act', st, a: 'alms' }, 'primary big', !(h >= 5 && h < 10))}`;
+        monk += `<div class="sub">🍚 พระฉันได้แค่ 05:00–12:00 (งดฉันหลังเที่ยง ดื่มน้ำได้) · ตีระฆังในวัดได้ทุกเมื่อ</div>`;
+      }
+      return `<h2>🛕 พระอุโบสถ</h2><div class="sub">กราบพระประธาน ขอพรให้ทำงานรุ่ง · ใช้ชุดธูปเทียนดอกไม้จากร้านค้าวัด หรือจ่ายค่าธูปเทียนหน้าโบสถ์</div>${bl}${monk}
+        ${B(`🙏 ไหว้พระขอพร ${(me.inv.offering || 0) > 0 ? '(ใช้ชุดธูปเทียน 1 ชุด)' : money(G.templeq?.pray || 20)}`, { t: 'act', st, a: 'pray' }, 'good big')}${job('monk') ? '' : staffHint('monk')}`;
+    }
     case 'cstore': {
       const rows = (G.cstore?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.cstore.markup), e = it.eat || {};
         return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
@@ -3547,7 +3902,7 @@ function renderPanel(p) {
       return `<h2>🍜 ร้านอาหาร</h2><div class="sub">${hoursTxt('restaurant')} · <b>ซื้อตุนใส่กระเป๋า</b>ไว้กินทีหลังได้ (กดใช้ในกระเป๋า 🎒) · สั่งให้มาส่งได้ผ่านแอพในมือถือ 📱 · ของราคาถูกอาจทำให้🤢อาหารเป็นพิษ</div>${pick}<div class="list">${rows}</div>`;
     }
     case 'kitchen': {
-      if (true) return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · เชฟวิ่งไปตลาดเก็บผักสดมาเข้าครัว ได้ค่าแรงตามผักที่เก็บได้</div>${staffHint('chef')}${job('chef') ? jgBox('run', 'วิ่งเก็บผัก กระโดดข้ามน้องหมาน้องแมว') : '<div class="jobbox">เฉพาะ<b>เชฟ</b> · สมัครได้ที่นี่ (ต้องมีใบรับรองการทำอาหาร)</div>'}`;
+      if (true) return `<h2>🍳 ครัวใหญ่</h2><div class="sub">${hoursTxt('kitchen')} · ครัวรับคนช่วยหั่นผักผลไม้ ใครก็มาทำได้ ไม่ต้องสมัครงาน ได้ค่าแรงตามที่หั่นได้</div>${jgBox('slice', 'ผักผลไม้ลอยขึ้นมา ปาดนิ้วฟันให้ขาด ฟันทีเดียวหลายลูกได้คอมโบ ระวังระเบิด 💣')}`;
       const rows = G.recipes.map(r => {
         const out = G.items[r.id]; const ok = Object.entries(r.in).every(([i, q]) => (me.inv[i] || 0) >= q);
         const ing = Object.entries(r.in).map(([i, q]) => `${G.items[i].icon}${q} (มี ${me.inv[i] || 0})`).join(' + ');
@@ -3637,16 +3992,13 @@ function renderPanel(p) {
       };
       const pol = lic('policeExam') ? itemRowRaw('👮', L.policeExam.name, 'สอบผ่านแล้ว ✓', '<span class="tag">ผ่าน</span>')
         : itemRowRaw('👮', 'สอบนายสิบตำรวจ', `ค่าสมัครสอบ ${money(L.policeExam.price)} · ตอบ 3 ข้อ ต้องถูกทุกข้อ · ต้องจบ ม.6`, B('📝 สอบ', { t: 'act', st, a: 'ptest' }, 'good', !lic('hs')));
-      const dl = L.driving, exp = me.licExp?.driving || 0, leftD = Math.round((exp - Date.now() - clockOff) / G.dayMs * 10) / 10;
-      const drive = !lic('driving') ? itemRowRaw('🪪', 'สอบใบขับขี่', `ค่าสอบ ${money(dl.price)} · ตอบคำถามจราจร 3 ข้อ ต้องถูกทุกข้อ · ต้องต่ออายุทุกปีในเกม (${money(dl.renew)})`, B('📝 สอบ', { t: 'act', st, a: 'dtest' }, 'good'))
-        : itemRowRaw('🪪', `ใบขับขี่ ${licExp('driving') ? '<span class="tag" style="background:var(--bad)">หมดอายุ</span>' : ''}`, licExp('driving') ? 'หมดอายุแล้ว — ต่ออายุเพื่อทำงานไรเดอร์ต่อ' : `ใช้ได้อีก ${leftD} วันในเกม (1 ปี = 60 วันในเกม = 1 วันจริง)`, B(`ต่ออายุ ${money(dl.renew)}`, { t: 'act', st, a: 'renew' }, licExp('driving') ? 'primary' : '', !licExp('driving') && leftD > 15));
-      const degRow = course('hs', 'ปลดล็อกการเรียนปริญญาตรีและสอบตำรวจ') + course('degree', 'ปลดล็อกงานบริษัท และเรียนต่อแพทย์') + pol + drive;
-      const rows = ['cooking', 'medicine'].map(id => {
+      const degRow = course('hs', 'ปลดล็อกการเรียนปริญญาตรีและสอบตำรวจ') + course('degree', 'ปลดล็อกงานบริษัท และเรียนต่อแพทย์') + pol;
+      const rows = ['medicine'].map(id => {
         const l = L[id], has = lic(id), blocked = l.need && !lic(l.need);
         const c = Object.values(G.careers).find(c => (c.need || []).includes(id));
         return itemRowRaw(l.icon, l.name, `ปลดล็อกอาชีพ ${c.name}${l.need ? ` · ต้องจบ${L[l.need].name}ก่อน` : ''}`, has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(l.price), { t: 'act', st, a: 'learn', lic: id }, 'good', blocked));
       }).join('');
-      return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่/ต่ออายุได้ที่นี่</div><div class="list">${degRow}${rows}</div>`;
+      return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่ย้ายไปที่โชว์รูมรถแล้ว</div><div class="list">${degRow}${rows}</div>`;
     }
     case 'pets': case 'petshop': {
       const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => G.pets[a].price - G.pets[b].price);
@@ -3700,13 +4052,16 @@ function renderPanel(p) {
       return `<h2>🛠️ ร้านอุปกรณ์</h2><div class="sub">${hoursTxt('toolshop')} · อัปเกรดอุปกรณ์ให้หาเงินได้มากขึ้น · อัปได้ 3 ระดับ</div><div class="list">${rows}</div>`;
     }
     case 'dealer': {
+      const dl = G.licenses.driving, hasDL = (me.licenses || []).includes('driving'), exp = me.licExp?.driving || 0, leftD = Math.round((exp - Date.now() - clockOff) / G.dayMs * 10) / 10;
+      const drive = !hasDL ? itemRowRaw('🪪', 'สอบใบขับขี่', `ค่าสอบ ${money(dl.price)} · ตอบคำถามจราจร 3 ข้อ ต้องถูกทุกข้อ · ต้องต่ออายุทุกปีในเกม (${money(dl.renew)})`, B('📝 สอบ', { t: 'act', st, a: 'dtest' }, 'good'))
+        : itemRowRaw('🪪', `ใบขับขี่ ${licExp('driving') ? '<span class="tag" style="background:var(--bad)">หมดอายุ</span>' : ''}`, licExp('driving') ? 'หมดอายุแล้ว — ต่ออายุเพื่อทำงานไรเดอร์ต่อ' : `ใช้ได้อีก ${leftD} วันในเกม (1 ปี = 60 วันในเกม = 1 วันจริง)`, B(`ต่ออายุ ${money(dl.renew)}`, { t: 'act', st, a: 'renew' }, licExp('driving') ? 'primary' : '', !licExp('driving') && leftD > 15));
       const tab = ['car', 'gem'].includes(p.vtab) ? p.vtab : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
       const cards = Object.entries(G.shop.vehicles).filter(([, v]) => (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
         const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
         const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
         return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas class="vfit" data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
-      return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่มหาวิทยาลัย'}</div>
-        <div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${me.gemInf ? '∞ (แอดมิน)' : (me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
+      return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่นี่เลย'}</div>
+        <div class="list" style="margin-bottom:8px">${drive}</div><div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${me.gemInf ? '∞ (แอดมิน)' : (me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
     }
     case 'garage': {
       const rows = (me.vehicles || []).filter(k => G.shop.vehicles[k]).map(k => { const v = G.shop.vehicles[k], on = me.ride === k;
@@ -3822,9 +4177,8 @@ function renderPanel(p) {
         return `<div class="look ${on ? 'on' : ''}"><canvas data-look="${cat}:${id}" width="72" height="96"></canvas><small>${esc(it.name)}</small>${on ? '<span class="tag">ใส่อยู่</span>' : has ? B('ใส่', { t: 'wear', cat, id }, 'good') : B(money(it.price), { t: 'act', st, a: 'buy', cat, id }, '')}</div>`;
       }).join('')}</div>`;
       if (p.kind === 'barber') return `<h2>💈 ร้านทำผม</h2><div class="sub">${hoursTxt('barber')} · ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน มาย้อมสีผมได้ที่นี่ (ทำผมใหม่แล้วมีความสุขเพิ่ม) · สีที่เคยทำแล้วเปลี่ยนกลับได้ฟรี</div>${sec('hair', '💇 ย้อมสีผม')}`;
-      const ft = ['shirt', 'pants', 'outfit'].includes(p.ftab) ? p.ftab : 'shirt';
-      const ftabs = `<div class="tabs">${[['shirt', '👕 เสื้อ'], ['pants', '👖 กางเกง'], ['outfit', '👗 ชุด']].map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, ft === k ? 'primary' : '')).join('')}</div>`;
-      return `<h2>👕 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ของที่ซื้อแล้วเปลี่ยนกลับไปใส่ได้ฟรี · ย้อมผมที่ร้านทำผม 💈</div>${ftabs}
+      const ft = 'outfit';   // the shop sells whole outfits only (shirts and trousers are gone)
+      return `<h2>👗 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · ขายชุดพิเศษใส่ทั้งตัว แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ชุดที่ซื้อแล้วถอด/ใส่ได้ฟรีตลอด · ย้อมผมที่ร้านทำผม 💈</div>
         ${ft !== 'outfit' ? sec(ft, ft === 'shirt' ? '👕 เสื้อ' : '👖 กางเกง') : `
         <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([, o]) => o.price).map(([id, o]) => {
           const has = (me.outfits || []).includes(id), on = me.outfit === id;
@@ -3952,6 +4306,7 @@ function renderPanel(p) {
         <div class="grid2">${B('🤝 แลกเปลี่ยน', { fn: 'tradeReq', to: o.id }, 'primary', far)}${B(known ? '📇 มีเบอร์แล้ว' : '📱 ขอเบอร์', { t: 'req', kind: 'phone', to: o.id }, 'good', far || known)}</div>
         ${o.veh && G.shop.vehicles[o.veh] && G.shop.vehicles[o.veh].kind !== 'heli' && o.veh !== 'escoot' ? `<div class="jobbox">${G.shop.vehicles[o.veh].kind === 'moto' ? '🛵' : '🚗'} ${esc(o.name)} กำลังขี่${esc(G.shop.vehicles[o.veh].name)}${B(me.pass === o.id ? '🚶 ลงรถ' : G.shop.vehicles[o.veh].kind === 'moto' ? '🛵 ขอซ้อนท้าย' : '🚗 ขอขึ้นรถ', me.pass === o.id ? { t: 'hopoff' } : { t: 'req', kind: 'hop', to: o.id }, 'good', far && me.pass !== o.id)}</div>` : ''}
         ${job('doctor') ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
+        ${o.c === 'monk' ? `<div class="jobbox">🙏 ใส่บาตรพระ · เลือกอาหารในกระเป๋า ได้บุญ ความสุขเพิ่ม และได้รับพร 10 นาที<div class="rowf" style="margin-top:6px;flex-wrap:wrap;gap:4px">${Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id]?.eat?.hunger > 0).slice(0, 6).map(([id]) => B(`${G.items[id].icon} ${G.items[id].name}`, { t: 'alms_give', to: o.id, item: id }, 'good', far)).join('') || '<small>ไม่มีอาหารในกระเป๋า · ซื้อข้าวต้มมัด/ขนมไทยที่ร้านค้าวัดได้</small>'}</div></div>` : ''}
         ${o.c === 'beggar' ? `<div class="jobbox">🥣 ขอทาน · บริจาคแล้วอิ่มบุญ ความสุขเพิ่ม<div class="rowf" style="margin-top:6px"><input id="donIn" type="number" value="20" min="1" style="width:90px"> ${B('🙏 บริจาค', { fn: 'donate', to: o.id }, 'good', far)}</div></div>` : ''}`;
     }
     case 'friends': {
@@ -4003,6 +4358,7 @@ function renderPanel(p) {
     case 'settings': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⚙️ ตั้งค่า</h2>
+        <div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = 30 เฟรม ภาพเบาลง เครื่องไม่ร้อน (เปิดอยู่แล้วบนมือถือ)</div>
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}
@@ -4073,7 +4429,7 @@ const PH_APPS = [
   ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['แชท', { fn: 'open', kind: 'chat' }, 1], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
   ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], ['เพื่อน', { fn: 'open', kind: 'friends' }, 7],
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
-  ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13], ['เพลง', { fn: 'qtab', set: { tab: 'music' } }, 15]];
+  ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
 const PH_MORE = [['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
@@ -4104,8 +4460,8 @@ function phonePanel(p) {
     const T = G.taxi; if (!T) body = '<div class="sub">ยังไม่เปิดบริการ</div>';
     else {
       const AA = areaOf(me.x, me.y), ar = AA?.id || '', area = ar.startsWith('yard') ? 'housing' : ar, inRoom = !AA || AA.kind === 'room' || ar === 'farm';
-      const here = area === 'housing' ? { x: 50, y: 4 } : area === 'park' ? { x: 50, y: 87 } : { x: me.x, y: me.y };
-      const fee = d => { const t = d.id === 'housing' ? { x: 50, y: 4 } : d.id === 'park' ? { x: 50, y: 87 } : d; return Math.round(T.base + Math.hypot(here.x - t.x, here.y - t.y) * T.perTile + (area !== 'town' ? T.far : 0) + (d.id === 'park' || d.id === 'housing' ? T.far : 0)); };
+      const OUT = { housing: { x: 50, y: 4 }, park: { x: 50, y: 87 }, temple: { x: 74, y: 73.8 } }, here = OUT[area] || { x: me.x, y: me.y };
+      const fee = d => { const t = OUT[d.id] || d; return Math.round(T.base + Math.hypot(here.x - t.x, here.y - t.y) * T.perTile + (area !== 'town' ? T.far : 0) + (OUT[d.id] ? T.far : 0)); };
       const rows = T.dest.filter(d => Math.hypot(me.x - d.x, me.y - d.y) >= 3).map(d => [d, fee(d)]).sort((x, y) => x[1] - y[1])
         .map(([d, f]) => itemRowRaw(d.icon, esc(d.label), `ค่าโดยสาร <b style="color:var(--acc)">${money(f)}</b>`, B('🚕 ไป', { fn: 'taxiGo', dest: d.id }, 'good', inRoom || me.money < f))).join('');
       body = `<div class="jobbox">🚕 <b>แท็กซี่เมืองชีวิต</b> · โทร <b style="letter-spacing:1px">${T.phone.replace(/(\d{3})(\d{3})/, '$1-$2')}</b><div class="sub">${inRoom ? '🚪 ออกไปรอริมถนนข้างนอกก่อน แล้วค่อยเรียกรถ' : 'เลือกปลายทาง แท็กซี่จะมารับถึงที่แล้วพาไปส่งหน้าประตู · ยิ่งไกลยิ่งแพง'}</div></div><div class="list">${rows}</div>`;
@@ -4620,12 +4976,12 @@ function drawLights(X, Y, dark) {
 }
 
 // ------------------------------------------------------------------ navigation across maps
-const GATE_TO = { farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
+const GATE_TO = { temple_in: 'temple', town_from_temple: 'town', farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
 function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
-const CAREER_TARGET = { cashier: 'cstore', police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', chef: 'kitchen', doctor: 'hospital', rider: 'rider' };
+const CAREER_TARGET = { monk: 'wat_pray', cashier: 'cstore', police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', doctor: 'hospital', rider: 'rider' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
 function setGuide(key, quiet, auto) {
   const g = targetOf(key); if (!g) return;
@@ -4988,7 +5344,7 @@ function dzInfo(id) {
   if (id === '_bills') return openPanel({ kind: 'phone', tab: 'bills' });
   if (id === '_study') return toast('กำลังนั่งเรียน นั่งครบ 1 ชั่วโมงในเกมได้ 1 คาบ (เดินเพื่อลุก)', '📖');
   if (id === '_duty') return toast(`เข้าเวรอยู่ในโรงพยาบาล ได้เงินเดือนทุกชั่วโมงจนถึง ${hhmm(G.doctor.end)} (ออกจากโรงพยาบาล = หยุดนับ)`, '🩺');
-  if (id === '_lic') return toast('ใบขับขี่หมดอายุ ต่ออายุได้ที่มหาวิทยาลัย', '🪪', false);
+  if (id === '_lic') return toast('ใบขับขี่หมดอายุ ต่ออายุได้ที่โชว์รูมรถ', '🪪', false);
   if (id === '_hungry') return toast('หิวมาก หิวนานๆ เลือดจะลด ถ้าหมดหลอดจะล้มนอนเป็นผัก รีบหาอะไรกิน', '🍗', false);
   const d = G.diseases[id];
   toast(`${d.name}: ${d.sym.join(', ')} · สาเหตุ: ${d.cause} · ${d.self}`, d.icon, false);
@@ -4998,7 +5354,7 @@ function dzInfo(id) {
 // Everything happens in the world on the big button. Wait: the float bobs, small nibbles dip it (striking then scares
 // the fish). Bite: the float is yanked under - strike now. Fight: hold = reel in, let go = give line. A running fish
 // pulls hard: keep reeling and the line snaps; give it line for too long and it runs off; leave the line slack and the
-// hook slips. A tired fish comes in; at the bank it thrashes and breaks the surface - lift exactly then.
+// hook slips. A tired fish reeled all the way in is landed on the bank at once.
 let fishBiteT = 0, FG = null, reelHold = false, nibble = { at: 0, t: 0 };
 function strike() {
   if (!me?.cast || !waterNear) return;
@@ -5051,7 +5407,7 @@ function stepFight(dt) {
     if (FG.slack > 8) return fightEnd(false, 'slack');
     if (FG.dist <= .12) {
       if (el < (FG.min || 0) + 400) FG.dist = .13;              // (the server wants a little fight first)
-      else { FG.mode = 'land'; FG.dist = .1; FG.surf = now0 + 500 + r() * 600; FG.surfEnd = FG.surf + FG.land; FG.landT = now0; }
+      else return fightEnd(true);                            // reeled all the way in: the fish comes straight up onto the bank
     }
   } else {                                                   // at the bank: it thrashes and breaks the surface now and then
     FG.ten = .55 + Math.sin(now0 / 90) * .12;
@@ -5301,7 +5657,7 @@ FN.jgClose = () => { jgStop(true); mgClose(); };
 function jgOpen(k, seed) {
   mgStop(); jgStop(false); $('#mg').classList.remove('hidden'); FX.play('notice');
   const g = JG.cur = { k, score: 0, r: jgRng(seed), t0: performance.now() };
-  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, run: jgRun })[k]?.(g);
+  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, slice: jgSlice })[k]?.(g);
 }
 const jgPick = (g, a) => a[Math.floor(g.r() * a.length)];
 
@@ -5383,42 +5739,80 @@ function jgCash(g) {
   jgClock(g, 60); next();
 }
 
-// 🥬 the chef's run: run along the market street, jump over the pets, grab the vegetables (tap / space to jump)
-function jgRun(g) {
-  $('#mgBody').innerHTML = jgHead(g) + `<div class="sub">แตะจอ (หรือกด Space) เพื่อกระโดด · ข้ามสัตว์เลี้ยง 🐶 · เก็บผัก 🥕 ให้ได้มากที่สุด · ชน = จบ</div><canvas id="jgC" class="jgCan" width="420" height="230"></canvas>`;
-  const c = $('#jgC'), x = c.getContext('2d'), GY = 196, me0 = { of: 'chef', g: me.gender, lk: me.look || {} };
-  const PETS = ['🐶', '🐱', '🐰', '🐔', '🐷', '🐢'], VEG = ['🥕', '🥬', '🍅', '🌽', '🥦', '🍆'];
-  const R = { y: 0, vy: 0, sp: 190, dist: 0, obs: [], veg: [], nextO: 1.2, nextV: .6, step: 0, dead: false };
-  let last = performance.now();
-  const jump = e => { if (e) e.preventDefault(); if (R.y === 0 && !R.dead) { R.vy = 560; FX.play('pop'); } };
-  const key = e => { if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); jump(); } };
-  c.addEventListener('pointerdown', jump); addEventListener('keydown', key, true);
-  g.off = () => { c.removeEventListener('pointerdown', jump); removeEventListener('keydown', key, true); };
-  const loop = now => {
-    if (JG.cur !== g) return;
-    const dt = Math.min(.04, (now - last) / 1000); last = now;
-    R.sp = Math.min(420, R.sp + 7 * dt); R.dist += R.sp * dt; R.step += R.sp * dt / 40;
-    R.vy -= 1500 * dt; R.y = Math.max(0, R.y + R.vy * dt); if (R.y === 0) R.vy = 0;
-    if ((R.nextO -= dt) <= 0) { R.obs.push({ x: 440, e: jgPick(g, PETS) }); R.nextO = Math.max(.65, 1.5 - R.sp / 600) + g.r() * 1.1; }
-    if ((R.nextV -= dt) <= 0) { R.veg.push({ x: 440, h: 10 + g.r() * 95, e: jgPick(g, VEG) }); R.nextV = .45 + g.r() * .8; }
-    const px = 70, py = GY - R.y;
-    for (const o of R.obs) { o.x -= R.sp * dt; if (!o.hit && Math.abs(o.x - px) < 20 && R.y < 26) { o.hit = 1; R.dead = true; } }
-    for (const v of R.veg) { v.x -= R.sp * dt; if (!v.got && Math.abs(v.x - px) < 24 && Math.abs((GY - v.h - 14) - (py - 30)) < 34) { v.got = 1; g.score++; jgScore(g); FX.play('coin'); } }
-    R.obs = R.obs.filter(o => o.x > -30); R.veg = R.veg.filter(v => v.x > -30 && !v.got);
-    // street
-    const sky = x.createLinearGradient(0, 0, 0, GY); sky.addColorStop(0, '#9fd6ff'); sky.addColorStop(1, '#e8f6ff'); x.fillStyle = sky; x.fillRect(0, 0, 420, 230);
-    x.fillStyle = '#f4c48a'; for (let i = 0; i < 6; i++) { const bx = ((i * 90 - R.dist * .3) % 540 + 540) % 540 - 60; x.fillRect(bx, GY - 70, 70, 70); x.fillStyle = '#e05a4a'; x.fillRect(bx - 5, GY - 80, 80, 12); x.fillStyle = '#f4c48a'; }
-    x.fillStyle = '#8a8f99'; x.fillRect(0, GY, 420, 34); x.fillStyle = '#c9ccd2'; for (let i = 0; i < 9; i++) x.fillRect(((i * 60 - R.dist) % 540 + 540) % 540 - 60, GY + 14, 30, 4);
-    x.font = '28px serif'; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
-    for (const v of R.veg) x.fillText(v.e, v.x, GY - v.h);
-    for (const o of R.obs) { x.save(); x.translate(o.x, GY + 2); x.scale(-1, 1); x.fillText(o.e, 0, 0); x.restore(); }
-    if (chImg) drawCharTo(x, me0, px, py, 64 / CH_ATLAS.h, 'side', R.y > 0 ? 1 : Math.floor(R.step) % 4, false);
-    else { x.fillText('🧑‍🍳', px, py); }
-    if (R.dead) { g.endWhy = 'ชนน้องหมาน้องแมวเข้าแล้ว! 🐾'; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(120); return jgFinish(g); }
-    if (g.score >= 40) { g.endWhy = 'เก็บผักเต็มตะกร้าแล้ว!'; return jgFinish(g); }
-    g.raf = requestAnimationFrame(loop);
+// 🔪 slice the fruit and vegetables: they are thrown up from below, swipe across them; never cut a bomb
+function jgSlice(g) {
+  $('#mgBody').innerHTML = jgHead(g) + `<div class="sub">ปาดนิ้วผ่านผักผลไม้ให้ขาด (+1) · ฟันทีเดียว 3 ลูกขึ้นไป = คอมโบ! · ห้ามฟันระเบิด 💣 (-5 และเสียเวลา)</div><canvas id="jgC" class="jgCan" width="400" height="440" style="touch-action:none"></canvas>`;
+  const c = $('#jgC'), x = c.getContext('2d'), W = 400, H = 440, F = [], parts = [], trail = [], pops = [], stains = [];
+  const KINDS = [['🍉', '#e8435a'], ['🍍', '#f5c542'], ['🍎', '#e33b2e'], ['🍊', '#f59a23'], ['🥕', '#f08a24'], ['🥦', '#5fae3a'], ['🍆', '#8a4fb3'], ['🥒', '#6dbb45'], ['🍅', '#e2452f'], ['🍌', '#f2d64b'], ['🥥', '#efe9de'], ['🍋', '#f4e04d'], ['🍇', '#7b4bb0'], ['🌽', '#f2c94c'], ['🍑', '#f7a07a'], ['🥭', '#f6b73c']];
+  const SPR = {}, sprite = e => { if (SPR[e]) return SPR[e]; const s = document.createElement('canvas'); s.width = s.height = 80; const q = s.getContext('2d'); q.font = '60px serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText(e, 40, 44); return SPR[e] = s; };
+  let next = 0, last = performance.now(), down = false, swipeN = 0, shake = 0;
+  const t0 = performance.now();
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; };
+  const segHit = (ax, ay, bx, by, px, py, r) => { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)); return Math.hypot(ax + dx * t - px, ay + dy * t - py) < r; };
+  const cut = (ax, ay, bx, by) => {
+    if (JG.cur !== g || Math.hypot(bx - ax, by - ay) < 4) return;
+    for (let i = F.length - 1; i >= 0; i--) {
+      const f = F[i]; if (!segHit(ax, ay, bx, by, f.x, f.y, f.r)) continue;
+      F.splice(i, 1); const ang = Math.atan2(by - ay, bx - ax), now0 = performance.now();
+      if (f.bomb) {
+        g.score = Math.max(0, g.score - 5); g.end -= 3000; shake = 1; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(150);
+        pops.push([f.x, f.y, '💥 -5', '#ff5a4a', now0]); for (let k = 0; k < 30; k++) { const a = Math.random() * 7, v = 80 + Math.random() * 260; parts.push({ juice: k % 2 ? '#ffb347' : '#555', x: f.x, y: f.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: .7, r: 3 + Math.random() * 4 }); }
+        jgScore(g); continue;
+      }
+      g.score++; swipeN++; FX.play('chop'); if (navigator.vibrate) navigator.vibrate(15);
+      for (const sd of [-1, 1]) parts.push({ half: sd, e: f.e, x: f.x, y: f.y, vx: f.vx + Math.cos(ang + Math.PI / 2) * sd * 80, vy: Math.min(f.vy, 0) * .3 + Math.sin(ang + Math.PI / 2) * sd * 80 - 40, rot: 0, vr: sd * 3, ang, life: 1.6 });
+      for (let k = 0; k < 16; k++) { const a = Math.random() * 7, v = 50 + Math.random() * 170; parts.push({ juice: f.col, x: f.x, y: f.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, life: .45 + Math.random() * .4, r: 2 + Math.random() * 3.5 }); }
+      stains.push([f.x, f.y, f.col, now0, Math.random() * 7]); if (stains.length > 14) stains.shift();
+      if (swipeN === 3) { g.score += 2; pops.push([f.x, f.y - 34, 'คอมโบ! +2', '#ffe14d', now0]); FX.play('coin'); }
+      else if (swipeN > 3) { g.score++; pops.push([f.x, f.y - 34, `คอมโบ x${swipeN}! +1`, '#ffe14d', now0]); }
+      else pops.push([f.x, f.y, '+1', '#ffffff', now0]);
+      jgScore(g);
+    }
   };
-  jgClock(g, 75, gg => { gg.endWhy = 'หมดเวลา วิ่งได้ไกลมาก!'; jgFinish(gg); }); g.raf = requestAnimationFrame(loop);
+  const pd = e => { e.preventDefault(); c.setPointerCapture?.(e.pointerId); down = true; swipeN = 0; trail.length = 0; trail.push([...pos(e), performance.now()]); };
+  const pm = e => { if (!down) return; e.preventDefault(); const p = pos(e), q = trail[trail.length - 1]; if (q) cut(q[0], q[1], p[0], p[1]); trail.push([...p, performance.now()]); if (trail.length > 24) trail.shift(); };
+  const pu = () => { down = false; };
+  c.addEventListener('pointerdown', pd); c.addEventListener('pointermove', pm); c.addEventListener('pointerup', pu); c.addEventListener('pointercancel', pu);
+  g.off = () => { c.removeEventListener('pointerdown', pd); c.removeEventListener('pointermove', pm); c.removeEventListener('pointerup', pu); c.removeEventListener('pointercancel', pu); };
+  const throwWave = () => {
+    const el = (performance.now() - t0) / 1000, n = 1 + Math.floor(g.r() * (el > 12 ? 4 : 3));
+    for (let i = 0; i < n; i++) {
+      const bomb = el > 4 && g.r() < .13, k = jgPick(g, KINDS), x0 = 50 + g.r() * (W - 100);
+      F.push({ e: bomb ? '💣' : k[0], col: k[1], bomb, x: x0, y: H + 30, vx: (W / 2 - x0) * (.25 + g.r() * .5) + (g.r() - .5) * 60, vy: -(560 + g.r() * 120), r: 26, rot: 0, vr: (g.r() - .5) * 5 });
+    }
+    FX.play('whoosh');
+  };
+  const draw = now0 => {
+    if (JG.cur !== g) return;
+    g.raf = requestAnimationFrame(draw);
+    const dt = Math.min(.05, (now0 - last) / 1000); last = now0;
+    if (now0 > next) { throwWave(); next = now0 + 900 + g.r() * 700 - Math.min(400, (now0 - t0) / 60); }
+    for (let i = F.length - 1; i >= 0; i--) { const f = F[i]; f.vy += 620 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt; if (f.y > H + 60 && f.vy > 0) F.splice(i, 1); }
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.vy += 620 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.vr) p.rot += p.vr * dt; if (p.life <= 0 || p.y > H + 80) parts.splice(i, 1); }
+    x.save();
+    if (shake > 0) { x.translate((Math.random() - .5) * 10 * shake, (Math.random() - .5) * 10 * shake); shake = Math.max(0, shake - dt * 2.5); }
+    // the chopping board
+    const bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#c98f55'); bg.addColorStop(1, '#a8703b'); x.fillStyle = bg; x.fillRect(-10, -10, W + 20, H + 20);
+    x.strokeStyle = 'rgba(90,50,20,.22)'; x.lineWidth = 2; for (let yy = 18; yy < H; yy += 34) { x.beginPath(); x.moveTo(0, yy); x.bezierCurveTo(W * .3, yy + 6, W * .7, yy - 6, W, yy + 3); x.stroke(); }
+    for (const [sx, sy, col, st, a] of stains) { const al = Math.max(0, 1 - (now0 - st) / 6000); if (!al) continue; x.globalAlpha = al * .35; x.fillStyle = col; x.beginPath(); x.ellipse(sx, sy, 26, 15, a, 0, 7); x.fill(); x.globalAlpha = 1; }
+    for (const f of F) {
+      x.save(); x.translate(f.x, f.y); x.rotate(f.rot); x.drawImage(sprite(f.e), -38, -40, 76, 76);
+      if (f.bomb) { const fl = (now0 / 70 | 0) % 2; x.fillStyle = fl ? '#ffe14d' : '#ff7a1a'; x.beginPath(); x.arc(17, -27, 5 + fl * 2, 0, 7); x.fill(); }
+      x.restore();
+    }
+    for (const p of parts) {
+      if (p.half) { x.save(); x.translate(p.x, p.y); x.rotate(p.ang); x.beginPath(); x.rect(-50, p.half < 0 ? -50 : 0, 100, 50); x.clip(); x.rotate(-p.ang + p.rot); x.globalAlpha = Math.min(1, p.life * 2); x.drawImage(sprite(p.e), -38, -40, 76, 76); x.restore(); x.globalAlpha = 1; }
+      else { x.globalAlpha = Math.min(1, p.life * 2.5); x.fillStyle = p.juice; x.beginPath(); x.arc(p.x, p.y, p.r, 0, 7); x.fill(); x.globalAlpha = 1; }
+    }
+    // the blade's trail
+    const tr = trail.filter(q => now0 - q[2] < 140);
+    if (tr.length > 1) { for (const [w, col] of [[11, 'rgba(160,220,255,.35)'], [5, 'rgba(255,255,255,.95)']]) { x.strokeStyle = col; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = w; x.beginPath(); tr.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.stroke(); } }
+    for (let i = pops.length - 1; i >= 0; i--) { const [px, py, txt, col, st] = pops[i], k = (now0 - st) / 900; if (k > 1) { pops.splice(i, 1); continue; }
+      x.globalAlpha = 1 - k; x.font = "800 22px 'Mitr',sans-serif"; x.textAlign = 'center'; x.lineWidth = 4; x.strokeStyle = 'rgba(0,0,0,.6)'; x.strokeText(txt, px, py - k * 40); x.fillStyle = col; x.fillText(txt, px, py - k * 40); x.globalAlpha = 1; }
+    x.restore();
+  };
+  g.raf = requestAnimationFrame(draw);
+  jgClock(g, 40);
 }
 // the boxes that start them, shown in the police / store / kitchen panels
 function jgBox(k, note) {
