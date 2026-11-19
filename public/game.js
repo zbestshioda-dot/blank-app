@@ -1418,7 +1418,7 @@ function draw(t) {
   drawZDecals(X, Y, t, A);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
-    else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
+    else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y, e.sc || 1); }   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) { const tr = e, sw = Math.sin(t / 1300 + tr[0] * .7 + tr[1] * .4) * .022 + Math.sin(t / 470 + tr[0]) * .006, bx = (tr[0] + .5) * TS + X, byy = (tr[1] + 1.05) * TS + Y; ctx.save(); ctx.translate(bx, byy); ctx.transform(1, 0, -sw, 1, 0, 0); ctx.translate(-bx, -byy); spr(tr[2], tr[0] + .5, tr[1] + 1.05, X, Y); ctx.restore(); }   // trees sway in the breeze
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
@@ -2584,13 +2584,13 @@ function crowdMake(A) {
   };
   if (A.id === 'park') {
     const P0 = (c, y) => [X + c, y];   // park walks: columns from the park's left edge, rows as map rows
-    const R = [
-      [P0(3, 67), P0(25.5, 67), P0(25.5, 55), P0(25.5, 67), P0(49, 67), P0(25.5, 67), P0(25.5, 80), P0(25.5, 67)],
-      [P0(6, 67.6), P0(11, 67.6), P0(11, 64), P0(11, 67.6), P0(32, 67.6), P0(32, 64), P0(32, 67.6), P0(44, 67.6), P0(44, 64), P0(44, 67.6)],
-      [P0(25.5, 67.4), P0(34, 67.4), P0(34, 69.6), P0(34, 67.4), P0(45, 67.4), P0(45, 69.4), P0(45, 67.4), P0(25.5, 67.4), P0(25.5, 78.8), P0(40, 78.8), P0(25.5, 78.8), P0(25.5, 67.4)],
-      [P0(2, 66.6), P0(12, 66.6), P0(12, 69.8), P0(12, 66.6), P0(25.4, 66.6), P0(25.4, 56), P0(25.4, 66.6), P0(2, 66.6)]];
-    for (let i = 0; i < 16; i++) { const kid = i % 3 === 1; person(i, R[i % R.length], kid ? { small: .72, balloon: pk(BALLOON) } : r() < .2 ? { balloon: pk(BALLOON) } : {}); }
-    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 21, y: 68.6, rx: X + 21, ry: 68.6, f: 6, path: null, seller: 1 });
+    const R = [   // the compact park: promenade (row ~63.5), two walks (cols 16 / 28) and the shopping street (row ~75)
+      [P0(3, 63.5), P0(38, 63.5), P0(16, 63.5), P0(16, 75), P0(36, 75), P0(28, 75), P0(28, 63.5)],
+      [P0(6, 62.8), P0(7, 62.8), P0(7, 61), P0(7, 62.8), P0(18, 62.8), P0(18, 61.8), P0(18, 62.8), P0(32, 62.8), P0(32, 61), P0(32, 62.8)],
+      [P0(16, 64.2), P0(22, 64.2), P0(22, 65.6), P0(22, 64.2), P0(33, 64.2), P0(33, 65.6), P0(33, 64.2), P0(28, 64.2), P0(28, 75.2), P0(5, 75.2), P0(5, 75.6), P0(16, 75.2), P0(16, 64.2)],
+      [P0(2, 63.2), P0(9, 63.2), P0(9, 65.6), P0(9, 63.2), P0(38, 63.2), P0(2, 63.2)]];
+    for (let i = 0; i < 14; i++) { const kid = i % 3 === 1; person(i, R[i % R.length], kid ? { small: .72, balloon: pk(BALLOON) } : r() < .2 ? { balloon: pk(BALLOON) } : {}); }
+    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 12.5, y: 64.7, rx: X + 12.5, ry: 64.7, f: 6, path: null, seller: 1 });
   } else if (A.id === 'town') {
     // pavements run beside every main road: people stroll along them and stop to look around
     const seg = (x0, x1, y) => [[x0, y], [x1, y]], walks = [
@@ -2628,7 +2628,7 @@ function crowdEnts(A, ents, vis) {
     ents.push([m.ry + .3, 4, m]);
     if (m.balloon || m.seller) ents.push([m.ry + .31, 14, { fx: 'balloon', m }]);
   }
-  if (A.id === 'park') ents.push([66.2, 14, { fx: 'bunting', y: 66.2 }], [69.2, 14, { fx: 'bunting', y: 69.2 }], [1e5, 14, { fx: 'bubbles', x: A.x + 11, y: 63.6 }]);
+  if (A.id === 'park') ents.push([62.1, 14, { fx: 'bunting', y: 62.1 }], [65, 14, { fx: 'bunting', y: 65 }], [74.1, 14, { fx: 'bunting', y: 74.1 }], [1e5, 14, { fx: 'bubbles', x: A.x + 7, y: 60.6 }]);
   if (A.id === 'town') {   // town critters: pigeons in the square, cats and dogs on the pavements
     for (const c of TWNC) {
       if (c.wait > 0) c.wait -= dt; else { const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy); if (d < .1) { c.wait = 2 + Math.random() * 6; c.tx = c.x + (Math.random() - .5) * 8; c.ty = c.home; c.tx = clamp(c.tx, 8, 90); } else { const st = Math.min(d, (c.e === '🐈' ? .9 : 1.3) * dt); c.x += dx / d * st; c.y += dy / d * st; c.dir = dx < 0 ? -1 : 1; } }
@@ -3966,6 +3966,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19n', d: '19 พ.ย. (รอบ 57)', items: [
+    '🎡 <b>สวนสนุกโฉมใหม่ กะทัดรัด</b> เครื่องเล่นทุกอย่างอยู่ใกล้กัน เดินไม่กี่ก้าว · มี<b>ถนนร้านค้า</b> ด้านใต้: 🏪 มินิมาร์ท 24 ชม., ร้านขนม & ของฝาก, ฟู้ดทรัค, รถไอศกรีม, คาเฟ่ และตู้กดน้ำ',
+  ] },
   { v: '2026-11-19m', d: '19 พ.ย. (รอบ 56)', items: [
     '💸 <b>ประวัติการเงิน</b> แอพใหม่ในมือถือ ดูได้ว่าเงินเข้า-ออกจากอะไร รายรับ/รายจ่ายวันนี้ และจ่ายอะไรมากสุด',
     '✏️ <b>บัตรเปลี่ยนชื่อ 💎10</b> กด "แก้ไขชื่อ" ที่หน้าข้อมูลผู้เล่น',
