@@ -248,9 +248,10 @@ function exitRoom(a) {
 // ------------------------------------------------------------------ money
 function earn(a, amount) {
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
+  if (amount > 0 && a.gang) { const g0 = gangOf(a); if (g0) amount *= 1 + GANG.lv[g0.lvl - 1].inc; }   // a bigger gang house pays its members a little extra
   amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a);
   if (amount > 0) {
-    quest(a, 'earn', amount);
+    quest(a, 'earn', amount); gangPts(a, amount);
     if (a.loan > 0) { const r = Math.min(a.loan, Math.ceil(amount * D.BANK.repayShare)); a.money -= r; a.loan -= r; }   // loans auto-repay from income
   }
   return amount;
@@ -258,6 +259,152 @@ function earn(a, amount) {
 function credit(o, amount) {          // pay someone who may be offline
   amount = Math.round(amount); o.money += amount; o.earned += amount; o.sd = true; dirty = true;
   if (o.ws) { quest(o, 'earn', amount); markMe(o); }
+}
+
+// ------------------------------------------------------------------ gangs / clubs
+// A gang is a team: members' income earns gang points, a daily team mission pays everyone, the bank
+// funds a bigger gang house (more members, a bonus on income, a quick energy refill).
+const gangs = new Map();   // id -> gang; saved inside the __meta record
+let gangSeq = 1;
+const GANG = {
+  create: 20000, dayCap: 300, perPt: 40, msnPer: 150, msnPay: 800, msnBank: 500, restMs: 30 * 60e3,
+  icons: ['🐉', '🦅', '🌸', '⚡', '🔥', '🐯', '🐺', '🦈', '🌙', '👑'],
+  colors: ['#e0584a', '#e8913a', '#e8c83a', '#5cb85c', '#3aa6c9', '#5b6fd8', '#a65bd8', '#e86fa6'],
+  lv: [{ n: 'กระท่อม', cap: 10, inc: 0, rest: 30, cost: 0, pts: 0 }, { n: 'บ้านแก๊ง', cap: 15, inc: .02, rest: 50, cost: 30000, pts: 1000 },
+    { n: 'คลับเฮาส์', cap: 20, inc: .03, rest: 70, cost: 150000, pts: 6000 }, { n: 'คฤหาสน์', cap: 30, inc: .05, rest: 100, cost: 600000, pts: 25000 }],
+};
+const gdirty = () => { bugsDirty = true; dirty = true; };
+const weekKey = () => { const d = new Date(now() + 7 * 3600e3), day = (d.getUTCDay() + 6) % 7; return new Date(d.getTime() - day * 86400e3).toISOString().slice(0, 10); };
+const lk = a => String(a.login).toLowerCase();
+function gangOf(a) {
+  if (!a.gang) return null;
+  const g = gangs.get(a.gang);
+  if (!g || !g.mem[lk(a)]) { a.gang = ''; a.sd = true; return null; }   // the gang is gone or I was removed
+  return g;
+}
+function gangRoll(g) {                       // new week: weekly points restart; new day: a fresh team mission
+  const w = weekKey(); if (g.week !== w) { g.week = w; g.wpts = 0; for (const m of Object.values(g.mem)) m.p = 0; gdirty(); }
+  const d = dayKey(); if (!g.msn || g.msn.d !== d) { g.msn = { d, prog: 0, done: 0 }; gdirty(); }
+}
+const gangGoal = g => GANG.msnPer * Math.max(2, Object.keys(g.mem).length);
+function gangAdd(g, login, n) {
+  gangRoll(g); g.pts += n; g.wpts += n; const m = g.mem[login]; if (m) m.p = (m.p || 0) + n;
+  g.msn.prog += n;
+  if (!g.msn.done && g.msn.prog >= gangGoal(g)) {
+    g.msn.done = 1; g.bank += GANG.msnBank;
+    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (!o) continue; credit(o, GANG.msnPay); if (o.ws) toast(o, `🏴 ภารกิจแก๊งวันนี้สำเร็จ! ได้ ${GANG.msnPay} บาท`, '🎉'); }
+  }
+  gdirty();
+}
+function gangPts(a, amount) {
+  const g = gangOf(a); if (!g || amount <= 0) return;
+  const d = dayKey(); if (!a.gpd || a.gpd.d !== d) a.gpd = { d, p: 0 };
+  const n = Math.min(Math.max(1, Math.round(amount / GANG.perPt)), GANG.dayCap - a.gpd.p); if (n <= 0) return;
+  a.gpd.p += n; gangAdd(g, lk(a), n);
+}
+function gangView(a) {
+  const g = gangOf(a); if (!g) return null; gangRoll(g);
+  const L = GANG.lv[g.lvl - 1], N = GANG.lv[g.lvl], my = g.mem[lk(a)], role = my.r;
+  const rk = { boss: 0, vice: 1, mem: 2 };
+  const mem = Object.entries(g.mem).map(([l, v]) => { const o = accounts.get(l); return { l, n: o?.name || l, r: v.r, p: v.p || 0, on: o?.ws ? 1 : 0 }; }).sort((x, y) => rk[x.r] - rk[y.r] || y.p - x.p);
+  const rank = 1 + [...gangs.values()].filter(o => o.wpts > g.wpts).length;
+  return { my: lk(a), id: g.id, name: g.name, icon: g.icon, color: g.color, role, lvl: g.lvl, ln: L.n, cap: L.cap, pts: g.pts, wpts: g.wpts, bank: g.bank, inc: L.inc, rest: L.rest, restLeft: Math.max(0, Math.ceil(((a.cd?.gangrest || 0) - now()) / 1000)),
+    next: N ? { n: N.n, cost: N.cost, pts: N.pts, cap: N.cap, inc: N.inc, rest: N.rest } : null, mem, req: role === 'mem' ? [] : g.req, rank, msn: { goal: gangGoal(g), prog: g.msn.prog, done: g.msn.done, pay: GANG.msnPay }, mine: my.p || 0 };
+}
+function gangList(a) {
+  const list = [...gangs.values()].map(g => { gangRoll(g); return { id: g.id, name: g.name, icon: g.icon, color: g.color, n: Object.keys(g.mem).length, cap: GANG.lv[g.lvl - 1].cap, wpts: g.wpts, pts: g.pts, lvl: g.lvl, ln: GANG.lv[g.lvl - 1].n, boss: accounts.get(g.boss)?.name || '', asked: g.req.some(r => r.l === lk(a)) ? 1 : 0 }; })
+    .sort((x, y) => y.wpts - x.wpts || y.pts - x.pts).slice(0, 40).map((g, i) => ({ ...g, rank: i + 1 }));
+  send(a, { t: 'gangs', list, create: GANG.create, icons: GANG.icons, colors: GANG.colors });
+}
+function gangOp(a, m) {
+  const op = m.op, me = lk(a);
+  if (op === 'list') return gangList(a);
+  if (op === 'create') {
+    if (a.gang && gangOf(a)) return toast(a, 'คุณอยู่ในแก๊งอยู่แล้ว ต้องออกก่อน', '🏴', false);
+    const name = String(m.name || '').replace(/\s+/g, ' ').trim().slice(0, 14);
+    if (name.length < 2) return toast(a, 'ตั้งชื่อแก๊งอย่างน้อย 2 ตัวอักษร', '🏴', false);
+    if (impersonates(name) || [...gangs.values()].some(g => nameKey(g.name) === nameKey(name))) return toast(a, 'ชื่อนี้ใช้ไม่ได้หรือมีคนใช้แล้ว', '🏴', false);
+    if (a.money < GANG.create) return toast(a, `ตั้งแก๊งใช้เงิน ${GANG.create.toLocaleString()} บาท`, '💸', false);
+    const icon = GANG.icons.includes(m.icon) ? m.icon : GANG.icons[0], color = GANG.colors.includes(m.color) ? m.color : GANG.colors[0];
+    a.money -= GANG.create; const id = 'g' + gangSeq++;
+    gangs.set(id, { id, name, icon, color, boss: me, mem: { [me]: { r: 'boss', p: 0 } }, req: [], pts: 0, wpts: 0, bank: 0, lvl: 1, week: weekKey(), t: now(), msn: null });
+    a.gang = id; a.sd = true; gdirty(); markMe(a);
+    return toast(a, `ตั้งแก๊ง ${icon} ${name} แล้ว! ชวนเพื่อนมาเข้าร่วมได้เลย`, '🏴');
+  }
+  if (op === 'req') {
+    if (gangOf(a)) return toast(a, 'คุณอยู่ในแก๊งอยู่แล้ว', '🏴', false);
+    const g = gangs.get(m.id); if (!g) return toast(a, 'ไม่พบแก๊งนี้', '🏴', false);
+    if (Object.keys(g.mem).length >= GANG.lv[g.lvl - 1].cap) return toast(a, 'แก๊งนี้เต็มแล้ว', '🏴', false);
+    if (g.req.some(r => r.l === me)) return toast(a, 'ขอเข้าไปแล้ว รอหัวหน้าตอบรับ', '⏳', false);
+    if (g.req.length >= 20) return toast(a, 'มีคนขอเข้าเยอะอยู่ ลองใหม่ภายหลัง', '🏴', false);
+    g.req.push({ l: me, n: a.name, t: now() }); gdirty();
+    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (o?.ws && g.mem[l].r !== 'mem') { toast(o, `${a.name} ขอเข้าแก๊ง`, '🏴'); markMe(o); } }
+    gangList(a); return toast(a, `ส่งคำขอเข้า ${g.name} แล้ว`, '📨');
+  }
+  const g = gangOf(a); if (!g) return toast(a, 'คุณยังไม่มีแก๊ง', '🏴', false);
+  const role = g.mem[me].r, staff = role !== 'mem', tl = String(m.l || '').toLowerCase(), tm = g.mem[tl], to = accounts.get(tl);
+  if (op === 'accept' || op === 'deny') {
+    if (!staff) return toast(a, 'เฉพาะหัวหน้า/รองหัวหน้า', '🏴', false);
+    const i = g.req.findIndex(r => r.l === tl); if (i < 0) return;
+    g.req.splice(i, 1);
+    if (op === 'accept') {
+      if (!to || to.gang && gangOf(to)) { gdirty(); markMe(a); return toast(a, 'คนนี้เข้าแก๊งอื่นไปแล้ว', '🏴', false); }
+      if (Object.keys(g.mem).length >= GANG.lv[g.lvl - 1].cap) { g.req.unshift({ l: tl, n: to.name, t: now() }); return toast(a, 'แก๊งเต็มแล้ว อัปเกรดบ้านแก๊งเพื่อรับเพิ่ม', '🏴', false); }
+      g.mem[tl] = { r: 'mem', p: 0 }; to.gang = g.id; to.sd = true;
+      if (to.ws) { toast(to, `ยินดีด้วย! คุณเข้าแก๊ง ${g.icon} ${g.name} แล้ว`, '🏴'); markMe(to); }
+      toast(a, `รับ ${to.name} เข้าแก๊งแล้ว`, '✅');
+    }
+    gdirty(); return markMe(a);
+  }
+  if (op === 'leave') {
+    if (role === 'boss' && Object.keys(g.mem).length > 1) return toast(a, 'หัวหน้าต้องส่งต่อตำแหน่งให้คนอื่นก่อนออก', '🏴', false);
+    if (role === 'boss') { a.money += g.bank; gangs.delete(g.id); toast(a, `ยุบแก๊งแล้ว คืนเงินคลัง ${Math.round(g.bank).toLocaleString()} บาท`, '🏴'); }
+    else { delete g.mem[me]; toast(a, `ออกจากแก๊ง ${g.name} แล้ว`, '🏴'); }
+    a.gang = ''; a.sd = true; gdirty(); return markMe(a);
+  }
+  if (op === 'donate') {
+    const amt = Math.floor(+m.amt) || 0;
+    if (amt < 100) return toast(a, 'บริจาคขั้นต่ำ 100 บาท', '🏴', false);
+    if (a.money < amt) return toast(a, 'เงินสดไม่พอ', '💸', false);
+    a.money -= amt; g.bank += amt; gangAdd(g, me, Math.floor(amt / 50)); markMe(a);
+    return toast(a, `บริจาค ${amt.toLocaleString()} บาทเข้าคลังแก๊ง`, '💰');
+  }
+  if (op === 'rest') {
+    const L = GANG.lv[g.lvl - 1];
+    if (!cd(a, 'gangrest', GANG.restMs)) return;
+    a.energy = Math.min(100, a.energy + L.rest); markMe(a);
+    return toast(a, `พักที่${L.n}แก๊ง พลังงาน +${L.rest}`, '🛋️');
+  }
+  if (op === 'upgrade') {
+    if (role !== 'boss') return toast(a, 'เฉพาะหัวหน้าแก๊ง', '🏴', false);
+    const N = GANG.lv[g.lvl]; if (!N) return toast(a, 'บ้านแก๊งอัปเกรดสูงสุดแล้ว', '🏴', false);
+    if (g.bank < N.cost) return toast(a, `เงินคลังไม่พอ ต้องใช้ ${N.cost.toLocaleString()} บาท`, '💸', false);
+    if (g.pts < N.pts) return toast(a, `แต้มแก๊งไม่พอ ต้องมี ${N.pts.toLocaleString()} แต้ม`, '🏴', false);
+    g.bank -= N.cost; g.lvl++; gdirty();
+    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (o?.ws) { toast(o, `บ้านแก๊งอัปเป็น ${N.n}! 🎉`, '🏠'); markMe(o); } }
+    return;
+  }
+  if (op === 'disband') {
+    if (role !== 'boss') return toast(a, 'เฉพาะหัวหน้าแก๊ง', '🏴', false);
+    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (o) { o.gang = ''; o.sd = true; if (o.ws) { toast(o, `แก๊ง ${g.name} ถูกยุบ`, '🏴'); markMe(o); } } }
+    a.money += g.bank; gangs.delete(g.id); gdirty(); return markMe(a);
+  }
+  if (!tm || !to) return;
+  if (op === 'kick') {
+    if (!staff || tm.r === 'boss' || (tm.r === 'vice' && role !== 'boss')) return toast(a, 'ไม่มีสิทธิ์ไล่คนนี้ออก', '🏴', false);
+    delete g.mem[tl]; to.gang = ''; to.sd = true; gdirty();
+    if (to.ws) { toast(to, `คุณถูกให้ออกจากแก๊ง ${g.name}`, '🏴', false); markMe(to); }
+    return markMe(a);
+  }
+  if (op === 'vice') {
+    if (role !== 'boss' || tm.r === 'boss') return;
+    tm.r = tm.r === 'vice' ? 'mem' : 'vice'; gdirty(); if (to.ws) markMe(to); return markMe(a);
+  }
+  if (op === 'boss') {
+    if (role !== 'boss') return toast(a, 'เฉพาะหัวหน้าแก๊ง', '🏴', false);
+    tm.r = 'boss'; g.mem[me].r = 'vice'; g.boss = tl; gdirty();
+    if (to.ws) { toast(to, `คุณเป็นหัวหน้าแก๊ง ${g.name} แล้ว`, '👑'); markMe(to); } return markMe(a);
+  }
 }
 const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
@@ -392,14 +539,14 @@ function worth(a) {
 
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
-const SAVE_KEYS = ['v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['gang', 'gpd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -475,7 +622,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap, ann: announceText }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()] }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -2732,7 +2879,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a) };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', fc: castPub(a), gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -2755,7 +2902,7 @@ function meView(a) {
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
   const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
   return {
-    t: 'me', id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
+    t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, gems: a.gems || 0, gemInf: isAdmin(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
@@ -3045,6 +3192,7 @@ function onMessage(ws, raw) {
       return quest(a, 'chat');
     }
     case 'act': return act(a, m);
+    case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband'].includes(m.op)) sendRoster(); return; }
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
