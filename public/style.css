@@ -1372,3 +1372,18 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 #payBan .pbIt b{display:block;font-size:14px;margin-top:4px}#payBan .pbIt small{display:block;font-weight:700;color:#8a3aa8}
 #payBan .pbGo{width:100%;margin-top:10px}
 #payBan .pbNo{display:flex;gap:6px;align-items:center;justify-content:center;font-size:12px;margin-top:8px;opacity:.85}#payBan .pbNo input{width:auto}
+/* HUD: the job EXP line has no x/y numbers, and starts right of the name badge with a little air above */
+#card.v2 #jx em{display:none!important}
+#card.v2 #jx{margin:4px 0 0 22px}
+#card.v2 #jx label{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* HUD v2: no numbers on the stat bars, no crown before the name; the whole card sits in from the screen edge (room for the
+   name badge, which is wider than the portrait) and is a little narrower, with a gap between the portrait and the bars */
+#card.v2 .bar em{display:none!important}
+#card.admin #meName::before,#card.v2.admin .pfp #meName::before{content:none!important}
+#card.v2{left:calc(26px + env(safe-area-inset-left))!important;width:min(236px,calc(100vw - 160px))!important}
+#card.v2 .sInfo{margin-left:4px!important}
+/* emoji button back on the thumb column, above Run; God (admins) moves up one */
+#emoBtn{display:flex!important;right:19px!important;bottom:158px!important;width:50px!important;height:50px!important}
+#godBtn{bottom:216px!important}
+#emoPick{right:calc(80px + env(safe-area-inset-right))!important;bottom:calc(150px + env(safe-area-inset-bottom))!important}
+#begBtn,#mgBtn{right:104px!important;bottom:194px!important}   /* their old spot is the emoji button's now */
