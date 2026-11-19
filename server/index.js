@@ -986,7 +986,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -2200,6 +2200,13 @@ function act(a, m) {
     }
     case 'furnshop.buy': {                  // the furniture shop: same items as the house menu, delivered to your own house
       if (!a.hown) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่คุณจิ๋ม สำนักงานอสังหาฯ 🏡', '🛋️', false);
+      if (m.hfloor || m.hwall) {             // a floor or a wallpaper for the house: bought once, then chosen per storey in the home menu
+        const fl = !!m.hfloor, id = String(m.hfloor || m.hwall), def = (fl ? D.HOME_FLOORS : D.HOME_WALLS)[id], key = fl ? 'hfl' : 'hwl';
+        if (!def) return; if (!def.price || (a[key] || []).includes(id)) return toast(a, `มี${def.name}แล้ว`, 'ℹ️', false);
+        if (!pay(a, def.price)) return;
+        a[key] = [...(a[key] || []), id]; joy(a, 3); markMe(a);
+        return toast(a, `ซื้อ${fl ? 'พื้น' : 'วอลเปเปอร์'} "${def.name}" แล้ว · เปลี่ยนได้ที่ 🛋️ จัดบ้าน › แท็บพื้น/ผนัง`, fl ? '🟫' : '🎨');
+      }
       const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
       let key = m.item;
       if (f.multi) {                        // walls, doors, screens, garden pieces: buy as many as you need (up to 20 at a time)
@@ -3109,7 +3116,7 @@ function routeTo(n, goal, areaId) {
     const [x, y] = q[h]; if (x === gx && y === gy) break;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx, ny = y + dy, k = key(nx, ny);
-      if (prev.has(k) || nx < A.x || ny < A.y || nx >= A.x + A.w || ny >= A.y + A.h || D.blocked(nx + .5, ny + .5)) continue;
+      if (prev.has(k) || nx < A.x || ny < A.y || nx >= A.x + A.w || ny >= A.y + A.h || D.blocked(nx + .5, ny + .5) && !(n.zb && D.POOL.x0 && nx >= D.POOL.x0 && nx < D.POOL.x1 && ny >= D.POOL.y0 && ny < D.POOL.y1)) continue;   // zombies wade through the park pool
       prev.set(k, key(x, y)); q.push([nx, ny]);
     }
   }
@@ -3430,7 +3437,7 @@ function meView(a) {
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0,
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
-    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], achGot: a.achGot || [], achReward: ACH_GEMS,
+    earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
   };
 }
 function worldView() {
@@ -3443,7 +3450,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(),
   };
@@ -3554,7 +3561,7 @@ function login(ws, m, pre) {
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
-    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
+    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
   send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
@@ -3886,6 +3893,14 @@ function onMessage(ws, raw) {
     }
     case 'wear': return wear(a, m);
     case 'yfarm': return yardFarm(a, m);
+    case 'hstyle': {                        // put a floor / wallpaper you own on one storey of your house
+      if (!a.hown) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);
+      const fl = Math.round(+m.fl) || 1; if (fl < 1 || fl > 1 + (a.hlv || 0)) return;
+      const cur = [...((a.hdeco || {})[fl] || ['fl_wood', 'cream'])];
+      if (m.floor) { const d = D.HOME_FLOORS[m.floor]; if (!d || d.price && !(a.hfl || []).includes(m.floor)) return; cur[0] = m.floor; }
+      if (m.wall) { const d = D.HOME_WALLS[m.wall]; if (!d || d.price && !(a.hwl || []).includes(m.wall)) return; cur[1] = m.wall; }
+      a.hdeco = { ...(a.hdeco || {}), [fl]: cur }; a.sd = true; markMe(a); wdAt = 0; return;
+    }
     case 'hplace': {                        // arrange your own furniture: put a piece on a floor of your house, or put it away
       const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องมีบ้านของตัวเองก่อน', '🏡', false);
       const k = String(m.k || ''); if (!furnOf(a).includes(k)) return;

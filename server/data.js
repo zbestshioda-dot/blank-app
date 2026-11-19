@@ -260,6 +260,16 @@ const HOME_TIERS = [
   { name: 'บ้านกลาง', icon: '🏡', price: 65000, floors: 1, zones: 1, desc: 'บ้าน 2 ชั้น + ขยายสวนให้แล้ว 1 โซน' },
   { name: 'บ้านใหญ่', icon: '🏘️', price: 160000, floors: 2, zones: 2, desc: 'บ้าน 3 ชั้นเต็ม + ขยายสวนให้แล้ว 2 โซน' },
 ];
+// house interiors: floor and wallpaper styles bought at the furniture shop, chosen per storey in the home menu (the first of each is free)
+const HOME_FLOORS = {
+  fl_wood: { name: 'พื้นไม้สัก', price: 0 }, fl_beige: { name: 'กระเบื้องครีม', price: 2500 }, fl_white: { name: 'กระเบื้องขาว', price: 2500 }, fl_tatami: { name: 'เสื่อทาทามิ', price: 3500 },
+  fl_mint: { name: 'กระเบื้องมิ้นท์', price: 3500 }, fl_checker: { name: 'ลายหมากรุก', price: 4500 }, fl_bluecheck: { name: 'ตารางฟ้า', price: 4500 }, fl_carpet_blue: { name: 'พรมน้ำเงิน', price: 6000 },
+  fl_stone: { name: 'หินธรรมชาติ', price: 7000 }, fl_concrete: { name: 'ปูนขัดมันลอฟท์', price: 7000 }, fl_marble: { name: 'หินอ่อนหรู', price: 15000 } };
+const HOME_WALLS = {
+  cream: { name: 'ครีมอบอุ่น', c: '#ecd2b2', price: 0 }, white: { name: 'ขาวมินิมอล', c: '#f1efe9', price: 1500 }, pink: { name: 'ชมพูพาสเทล', c: '#f6d6e4', price: 2500 },
+  sky: { name: 'ฟ้าสดใส', c: '#c9def0', price: 2500 }, mint: { name: 'เขียวมิ้นท์', c: '#cfe8d8', price: 2500 }, lemon: { name: 'เหลืองมะนาว', c: '#f6ecb0', price: 2500 },
+  lilac: { name: 'ม่วงลาเวนเดอร์', c: '#ddd0ee', price: 3000 }, sage: { name: 'เขียวเสจ', c: '#b9c9a4', price: 3000 }, plank: { name: 'ไม้ระแนง', c: '#a87a52', price: 5000, pat: 'plank' },
+  brick: { name: 'อิฐแดงลอฟท์', c: '#b5654a', price: 5000, pat: 'brick' }, navy: { name: 'กรมท่าหรู', c: '#3c4a6b', price: 6000 }, gold: { name: 'ทองหรูหรา', c: '#e2c37a', price: 15000, pat: 'damask' } };
 const HOME_STYLES = [['h_cottage1', 'กระท่อมไม้'], ['h_gable_red', 'หลังคาจั่วแดง'], ['h_cottage3', 'บ้านสวนอิฐ'], ['h_cottage2', 'บ้านหลังคาเขียว'], ['h_gable_blue', 'หลังคาจั่วฟ้า'], ['h_cottage4', 'บ้านพาสเทล']];
 {
   const X = HOUSING.x;
@@ -1510,5 +1520,5 @@ module.exports = { POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
-  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
+  VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };
