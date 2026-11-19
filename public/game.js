@@ -103,7 +103,7 @@ function paintSw() {
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
-fetch('assets/pchar.json?v=a1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=a1'; });
+fetch('assets/pchar.json?v=a3').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=a3'; });
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
 // starter colours are known before login (the creator screen); everything else comes from the server
 const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
@@ -138,7 +138,7 @@ function charLayer(frame, col, cat, lk) {
 // under the outfit's hat ('hair'); hoods, masks and helmets that cover everything keep the outfit as drawn
 const FEM_HEAD = { office: 'head', merchant: 'head', thai: 'head', tuxedo: 'head', hoodie: 'head', pajama: 'head', tracksuit: 'head',
   chef: 'hair', farmer: 'hair', fisher: 'hair', rider: 'hair', cowboy: 'hair', magician: 'hair', beggar: 'hair', pilot: 'hair', devil: 'hair' };
-const FEM_NECK = 40, FEM_HAT = 30;   // atlas rows: where her head ends / where her hair may show below a hat
+const FEM_NECK = 52, FEM_HAT = 30;   // atlas rows: where her head ends / where her hair may show below a hat
 function femOutfitFrame(sheet, step, lk) {
   const key = `F|${sheet}|${step}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
   const { w, h } = CH_ATLAS, body = charFrame(sheet + ':' + step, lk), mode = FEM_HEAD[sheet];
@@ -155,7 +155,9 @@ function femOutfitFrame(sheet, step, lk) {
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
-  pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin' };
+  pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
+  student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa' };   // women's versions are the 'f' + name sheets
+const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
 function drawAura(px, py, H, t, front, gold) {
@@ -3707,6 +3709,11 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19e', d: '19 พ.ย. (รอบ 42)', items: [
+    '👗 <b>ชุดใหม่ 12 แบบ</b> ที่ร้านแฟชั่น! ชุดนักเรียนไทย ลูกเสือ สงกรานต์ ล้านนา ผ้าซิ่น นักมวยไทย กระต่ายชมพู ตรุษจีน/กี่เพ้า ลูกทุ่งกากเพชร ไทยจักรี · ชุดชายกับหญิงแยกแบบกัน ร้านจะโชว์เฉพาะชุดที่ใส่ได้',
+    '😇 <b>ชุดเทวดา / นางฟ้า</b> ราคาพิเศษ 💎200',
+    '🎅 <b>ของขวัญปีใหม่!</b> ชาวเมืองทุกคนที่เข้าเล่นภายใน 31 ธ.ค. 2569 รับ <b>ชุดซานต้า</b> ฟรี ไม่มีขาย ดูที่จดหมาย ✉️',
+  ] },
   { v: '2026-11-19d', d: '19 พ.ย. (รอบ 41)', items: [
     '🏛️ <b>ระบบนายกเมือง!</b> เลือกตั้งทุก 4 สัปดาห์ (แอป 🏛️ ในมือถือ) · ลงสมัครได้ตั้งแต่ Lv.8 โหวตได้ตั้งแต่ Lv.5 · นายกได้ฉายา เงินเดือนรายวัน เลือกนโยบายเมือง และประกาศได้วันละครั้ง',
     '🏷️ ชื่อ แก๊ง และฉายา ไม่ซ้อนกันแล้ว · ป้ายแก๊งเล็กลงเท่าฉายา',
@@ -4293,7 +4300,7 @@ function renderPanel(p) {
       const home = me.house >= 0 ? `บ้านเลขที่ ${me.house + 1} ⭐${me.comfort}` : me.rent ? `เช่าบ้านเลขที่ ${me.rent.idx + 1}` : 'ยังไม่มี';
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🎣 ตกปลา<small>${rod}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
       const job = me.career !== 'none' && G.careers[me.career]?.where;
-      const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(G.outfitDefs[id]?.name || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
+      const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(ofName(G.outfitDefs[id]) || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
       return `<h2>🎒 กระเป๋า</h2><div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}<div class="list">${rows || '<div class="sub">ยังไม่มีของ</div>'}</div>
         <div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>
         <div class="secT">👕 ชุด</div>
@@ -4453,9 +4460,9 @@ function renderPanel(p) {
       const ft = 'outfit';   // the shop sells whole outfits only (shirts and trousers are gone)
       return `<h2>👗 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · ขายชุดพิเศษใส่ทั้งตัว แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ชุดที่ซื้อแล้วถอด/ใส่ได้ฟรีตลอด · ย้อมผมที่ร้านทำผม 💈</div>
         ${ft !== 'outfit' ? sec(ft, ft === 'shirt' ? '👕 เสื้อ' : '👖 กางเกง') : `
-        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([, o]) => o.price).map(([id, o]) => {
+        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([id, o]) => (o.price || o.gems) && (!o.g || o.g === me.gender || (me.outfits || []).includes(id))).sort(([, x], [, y]) => (x.gems ? 1e12 : x.price) - (y.gems ? 1e12 : y.price)).map(([id, o]) => {
           const has = (me.outfits || []).includes(id), on = me.outfit === id;
-          return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(o.name)}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
+          return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(o))}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(o.gems ? `💎${o.gems}` : money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`}`;
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคสตามจับโจร 🚨 เคสหมาหาย 🐕 เล่นจับผิดภาพหาโจร 🔍 และซ้อมยิงเป้า 🎯 · ได้รถสายตรวจขับฟรี · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) : ''}`;
@@ -4515,7 +4522,7 @@ function renderPanel(p) {
     }
     case 'mail': {
       if (!p.read) { p.read = 1; if ((me.mailN || 0) > 0) send({ t: 'mailread' }); }
-      const rows = mailList.map(x => `<div class="mailItem ${x.read ? '' : 'new'}"><small>${x.read ? '' : '🆕 '}จาก <b>${esc(x.from)}</b> · ${new Date(x.t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</small><p>${esc(x.text)}</p>${x.gift ? (x.got ? '<div class="sub">✅ รับของขวัญแล้ว</div>' : B(`🎁 รับของขวัญ${x.gift.eggs ? ` 🥚x${x.gift.eggs}` : ''}${x.gift.gems ? ` 💎${x.gift.gems}` : ''}`, { t: 'mailclaim', id: x.id }, 'primary')) : ''}
+      const rows = mailList.map(x => `<div class="mailItem ${x.read ? '' : 'new'}"><small>${x.read ? '' : '🆕 '}จาก <b>${esc(x.from)}</b> · ${new Date(x.t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</small><p style="white-space:pre-wrap">${esc(x.text)}</p>${x.gift ? (x.got ? '<div class="sub">✅ รับของขวัญแล้ว</div>' : B(`🎁 รับของขวัญ${x.gift.eggs ? ` 🥚x${x.gift.eggs}` : ''}${x.gift.gems ? ` 💎${x.gift.gems}` : ''}${x.gift.outfit ? ` 🎽 ${ofName(G.outfitDefs[x.gift.outfit])}` : ''}`, { t: 'mailclaim', id: x.id }, 'primary')) : ''}
         <div class="rowf" style="margin-top:4px">${B('↩️ ตอบกลับ', { fn: 'mailReply', to: x.from })}${B('🗑️', { t: 'maildel', id: x.id }, 'warn')}</div></div>`).join('');
       const names = [...new Set([...(me.friends || []).map(f => f.n), ...[...P.values()].filter(x => !x.npc && x.id !== myId).map(x => x.name)])];
       return `<h2>📬 กล่องจดหมาย</h2><div class="sub">ส่งถึงผู้เล่นคนไหนก็ได้ด้วยชื่อตัวละคร แม้เขาจะออฟไลน์ เก็บได้ 50 ฉบับล่าสุด</div>
