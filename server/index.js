@@ -107,8 +107,8 @@ function stat(a, key, n = 1, absolute = false) {
 // admins: every job unlocked unless they switch it off; the mayor title can be switched off too (then their own title shows)
 const allJobs = a => isAdmin(a) && a.god?.alljobs !== false;
 const adminTitle = a => isAdmin(a) && !a.god?.notitle;
-const titleOf = a => adminTitle(a) ? ADMIN_TITLE : D.ACHIEVEMENTS.find(x => x.id === a.title)?.title || '';
-const titleRar = a => adminTitle(a) ? 6 : D.ACHIEVEMENTS.find(x => x.id === a.title)?.r || 0;
+const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : D.ACHIEVEMENTS.find(x => x.id === a.title)?.title || '';
+const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : D.ACHIEVEMENTS.find(x => x.id === a.title)?.r || 0;
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -248,6 +248,7 @@ function exitRoom(a) {
 // ------------------------------------------------------------------ money
 function earn(a, amount) {
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
+  if (amount > 0 && mayor?.pol === 'tax') amount *= 1 + MAYOR.tax;   // the mayor's low-tax policy
   if (amount > 0 && a.gang) { const g0 = gangOf(a); if (g0) amount *= 1 + GANG.lv[g0.lvl - 1].inc; }   // a bigger gang house pays its members a little extra
   amount = Math.round(amount); a.money += amount; a.earned += amount; markMe(a);
   if (amount > 0) {
@@ -406,6 +407,83 @@ function gangOp(a, m) {
     if (to.ws) { toast(to, `คุณเป็นหัวหน้าแก๊ง ${g.name} แล้ว`, '👑'); markMe(to); } return markMe(a);
   }
 }
+
+// ------------------------------------------------------------------ city mayor (elected)
+// Every 4 weeks the town votes. Candidates pay to run and can campaign (reputation); one vote per player per cycle.
+// The winner serves the next cycle: a title, a daily salary, one city policy and a daily announcement. Two terms in a row at most.
+const MAYOR = { minLv: 8, voteLv: 5, fee: 50000, camp: 10000, campDay: 4, salary: 3000, care: 400, tax: .03, maxTerms: 2, weeks: 4,
+  pol: { tax: { n: '💹 ลดภาษี', d: 'รายได้ของทุกคนในเมือง +3%' }, care: { n: '🎁 เบี้ยเมือง', d: 'ทุกคนรับเบี้ยเมือง 400 บาททุกวัน' } } };
+let mayor = null;                // { l, n, pol, terms, at, ann, annD, salD }
+let elect = { cy: '', c: {} };   // c: login -> { n, rep, v: { voter: 1 }, t, rd: { d, n } }
+const cycleKey = () => String(Math.floor(Date.parse(weekKey()) / 604800e3 / MAYOR.weeks));
+const isMayor = a => !!mayor && mayor.l === lk(a);
+const votesOf = c => Object.keys(c.v).length;
+function mayorRoll() {
+  const cy = cycleKey(); if (elect.cy === cy) return;
+  if (elect.cy) {                                   // the last election just ended
+    const old = mayor, win = Object.entries(elect.c).map(([l, c]) => ({ l, n: c.n, t: c.t, vt: votesOf(c), s: votesOf(c) * 10 + c.rep }))
+      .filter(c => c.vt > 0 && !(old && c.l === old.l && (old.terms || 1) >= MAYOR.maxTerms)).sort((x, y) => y.s - x.s || x.t - y.t)[0];
+    if (win) {
+      const o = accounts.get(win.l);
+      mayor = { l: win.l, n: o?.name || win.n, pol: '', terms: old && old.l === win.l ? (old.terms || 1) + 1 : 1, at: now(), ann: '', annD: '', salD: '' };
+      feed(`🏛️ ผลเลือกตั้ง: ${mayor.n} ได้เป็นนายกเมืองคนใหม่ ด้วย ${win.vt} คะแนนเสียง!`);
+      if (o?.ws) toast(o, 'คุณได้เป็นนายกเมือง! เปิดแอป 🏛️ เลือกนโยบายและรับเงินเดือนได้เลย', '🏛️');
+    } else if (old) { mayor = null; feed('🏛️ สิ้นสุดวาระนายกเมือง ไม่มีผู้ชนะการเลือกตั้งรอบนี้ ตำแหน่งว่างลง'); }
+    sendRoster();
+  }
+  elect = { cy, c: {} }; gdirty();
+}
+setInterval(() => { try { mayorRoll(); } catch (e) { console.error('mayorRoll', e); } }, 60e3).unref?.();
+function mayorView(a) {
+  mayorRoll(); const me = lk(a), d = dayKey(), tw = Math.floor(Date.parse(weekKey()) / 604800e3), dow = (new Date(now() + 7 * 3600e3).getUTCDay() + 6) % 7;
+  const cands = Object.entries(elect.c).map(([l, c]) => ({ l, n: c.n, v: votesOf(c), rep: c.rep, s: votesOf(c) * 10 + c.rep })).sort((x, y) => y.s - x.s);
+  const mc = elect.c[me];
+  return { t: 'mayor', my: me, cur: mayor ? { l: mayor.l, n: mayor.n, pol: mayor.pol, terms: mayor.terms, ann: mayor.ann } : null, isMe: isMayor(a) ? 1 : 0, left: (MAYOR.weeks - (tw % MAYOR.weeks)) * 7 - dow, cands,
+    voted: Object.entries(elect.c).find(([, c]) => c.v[me])?.[0] || '', run: mc ? { rep: mc.rep, left: Math.max(0, MAYOR.campDay - (mc.rd?.d === d ? mc.rd.n : 0)) } : null,
+    claimed: a.mpd === d ? 1 : 0, salDone: mayor?.salD === d ? 1 : 0, annDone: mayor?.annD === d ? 1 : 0, lv: lvl(a), K: { ...MAYOR, pol: undefined }, pol: MAYOR.pol };
+}
+function mayorOp(a, m) {
+  mayorRoll(); const op = m.op, me = lk(a), d = dayKey();
+  if (op === 'view') return send(a, mayorView(a));
+  if (op === 'run') {
+    if (lvl(a) < MAYOR.minLv) return toast(a, `ต้องเลเวล ${MAYOR.minLv} ขึ้นไปจึงลงสมัครได้`, '🏛️', false);
+    if (elect.c[me]) return toast(a, 'คุณลงสมัครแล้ว', '🏛️', false);
+    if (mayor && mayor.l === me && (mayor.terms || 1) >= MAYOR.maxTerms) return toast(a, `เป็นนายกครบ ${MAYOR.maxTerms} วาระติดแล้ว ต้องพักหนึ่งสมัย`, '🏛️', false);
+    if (a.money < MAYOR.fee) return toast(a, `ค่าสมัคร ${MAYOR.fee.toLocaleString()} บาท`, '💸', false);
+    a.money -= MAYOR.fee; elect.c[me] = { n: a.name, rep: 0, v: {}, t: now(), rd: null }; gdirty(); markMe(a);
+    feed(`🗳️ ${a.name} ลงสมัครรับเลือกตั้งนายกเมือง!`); toast(a, 'ลงสมัครแล้ว! หาเสียงเพื่อเพิ่มชื่อเสียงได้ทุกวัน', '🗳️');
+  } else if (op === 'camp') {
+    const c = elect.c[me]; if (!c) return toast(a, 'ต้องลงสมัครก่อน', '🏛️', false);
+    if (!c.rd || c.rd.d !== d) c.rd = { d, n: 0 };
+    if (c.rd.n >= MAYOR.campDay) return toast(a, `วันนี้หาเสียงครบ ${MAYOR.campDay} ครั้งแล้ว`, '📣', false);
+    if (a.money < MAYOR.camp) return toast(a, `หาเสียงใช้เงิน ${MAYOR.camp.toLocaleString()} บาท`, '💸', false);
+    a.money -= MAYOR.camp; c.rd.n++; c.rep++; gdirty(); markMe(a); toast(a, `หาเสียงสำเร็จ ชื่อเสียง +1 (รวม ${c.rep})`, '📣');
+  } else if (op === 'vote') {
+    const l = String(m.l || '').toLowerCase(), c = elect.c[l];
+    if (lvl(a) < MAYOR.voteLv) return toast(a, `ต้องเลเวล ${MAYOR.voteLv} ขึ้นไปจึงโหวตได้`, '🗳️', false);
+    if (!c) return toast(a, 'ไม่พบผู้สมัครคนนี้', '🗳️', false);
+    if (l === me) return toast(a, 'โหวตให้ตัวเองไม่ได้', '🗳️', false);
+    if (Object.values(elect.c).some(x => x.v[me])) return toast(a, 'คุณโหวตไปแล้วในรอบนี้', '🗳️', false);
+    c.v[me] = 1; gdirty(); toast(a, `โหวตให้ ${c.n} แล้ว`, '🗳️');
+  } else if (op === 'claim') {
+    if (mayor?.pol !== 'care') return toast(a, 'ตอนนี้ไม่มีนโยบายเบี้ยเมือง', '🎁', false);
+    if (a.mpd === d) return toast(a, 'วันนี้รับเบี้ยเมืองไปแล้ว', '🎁', false);
+    a.mpd = d; a.sd = true; credit(a, MAYOR.care); toast(a, `รับเบี้ยเมือง ${MAYOR.care} บาท`, '🎁');
+  } else if (isMayor(a)) {
+    if (op === 'pol') {
+      if (!MAYOR.pol[m.k]) return; mayor.pol = m.k; gdirty();
+      feed(`🏛️ นายกเมือง ${mayor.n} ประกาศนโยบาย ${MAYOR.pol[m.k].n}: ${MAYOR.pol[m.k].d}`);
+    } else if (op === 'ann') {
+      if (mayor.annD === d) return toast(a, 'วันนี้ประกาศไปแล้ว พรุ่งนี้ประกาศใหม่ได้', '📢', false);
+      const t = cleanText(m.text, 70); if (t.length < 3) return toast(a, 'พิมพ์ประกาศอย่างน้อย 3 ตัวอักษร', '📢', false);
+      mayor.annD = d; mayor.ann = t; gdirty(); feed(`🏛️ นายกเมือง ${mayor.n}: ${t}`);
+    } else if (op === 'sal') {
+      if (mayor.salD === d) return toast(a, 'วันนี้รับเงินเดือนไปแล้ว', '💰', false);
+      mayor.salD = d; gdirty(); credit(a, MAYOR.salary); toast(a, `รับเงินเดือนนายกเมือง ${MAYOR.salary.toLocaleString()} บาท`, '🏛️');
+    }
+  }
+  send(a, mayorView(a));
+}
 const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
 const houseOf = a => (a.house >= 0 ? a.house : -1);
@@ -539,14 +617,14 @@ function worth(a) {
 
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
-const SAVE_KEYS = ['gang', 'gpd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['gang', 'gpd', 'mpd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -622,7 +700,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()] }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -3193,6 +3271,7 @@ function onMessage(ws, raw) {
     }
     case 'act': return act(a, m);
     case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband'].includes(m.op)) sendRoster(); return; }
+    case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
