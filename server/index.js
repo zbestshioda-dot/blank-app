@@ -4235,6 +4235,16 @@ function godAct(a, m) {
     const r = payRevoke(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, r, '↩️');
   }
   if (m.op === 'paycheck') { payVerify(String(m.ref || ''), 'admin').then(() => send(a, payAdminView())); return toast(a, 'กำลังตรวจกับ Stripe…', '🔄'); }
+  if (m.op === 'givegems') {                // give (or take back) diamonds to one player, with a mail telling them why
+    const x = accounts.get(String(m.login || '').toLowerCase()), n = Math.round(+m.n || 0), why = String(m.why || '').slice(0, 80).trim();
+    if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
+    if (!n || Math.abs(n) > 100000) return toast(a, 'จำนวนเพชรต้องไม่เป็น 0 และไม่เกิน 100,000', '💎', false);
+    const had = x.gems || 0; x.gems = Math.max(0, had + n); x.sd = true; dirty = true;
+    sysMail(x, n > 0 ? `💎 แอดมินส่งเพชรให้คุณ 💎${n.toLocaleString()}${why ? `\n\n${why}` : ''}` : `💎 แอดมินปรับลดเพชร 💎${Math.min(had, -n).toLocaleString()}${why ? `\n\n${why}` : ''}`);
+    if (x.ws) markMe(x);
+    console.log('god gems', a.login, x.login, n, why);
+    return toast(a, `${x.login}: 💎${had.toLocaleString()} → 💎${x.gems.toLocaleString()}`, '💎');
+  }
   if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
     const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
     if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
