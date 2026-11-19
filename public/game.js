@@ -2781,20 +2781,21 @@ initNearBtns();
 $('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.crowd) return;   // passers-by in the park and the temple: no name tags
-  if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * (p.title ? .8 : .46); p.tagT = t; }
+  if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * ((p.title ? .8 : .46) + (p.gg ? .16 : 0)); p.tagT = t; }
   const icon = p.red ? '🦹' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
-  if (p.gg && !p.npc) { const lt = /e8c83a|e8913a/.test(p.gg[2]); sign(`${p.gg[0]} ${p.gg[1]}`, px, top + TS * .12 + (p.afk ? TS * .26 : 0), { size: TS * .2, bg: p.gg[2], color: lt ? '#2a1a05' : '#fff' }); }   // gang tag under the name
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
+  const GT = p.gg && !p.npc, ty = top - TS * (GT ? .74 : .58);
+  if (GT) { const lt = /e8c83a|e8913a/.test(p.gg[2]); sign(`${p.gg[0]} ${p.gg[1]}`, px, top - TS * .5, { size: TS * .15, bg: p.gg[2], color: lt ? '#2a1a05' : '#fff' }); }   // small gang tag between the title and the name   // with a gang tag the title moves up one line
   if (p.title) {
-    ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58);
+    ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, ty);
     // title colour = rarity; legendary titles (and the mayor's) shimmer
     if (p.tr === 7 && !p.adm) { const w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), h0 = (t / 12) % 360; for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(h0 + k * 60) % 360},95%,66%)`); ctx.fillStyle = g; }
     else if (p.adm || p.tr >= 5) { const c0 = p.adm ? '#ffd34d' : RAR_COL[5], w = textW(`«${p.title}»`), g = ctx.createLinearGradient(px - w / 2, 0, px + w / 2, 0), sh = (t / 1400) % 1; g.addColorStop(0, c0); g.addColorStop(Math.max(0, sh - .15), c0); g.addColorStop(sh, '#fffbe6'); g.addColorStop(Math.min(1, sh + .15), c0); g.addColorStop(1, p.adm ? '#ffb52e' : '#ff8a1e'); ctx.fillStyle = g; }
     else ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d';
-    ctx.fillText(`«${p.title}»`, px, top - TS * .58);
+    ctx.fillText(`«${p.title}»`, px, ty);
   }
   if (p.emo && performance.now() < p.emoT) {
     const k = 1 - (p.emoT - performance.now()) / 4200, by = top - TS * (p.title ? 1.25 : 1.0) - Math.sin(Math.min(1, k * 4) * Math.PI / 2) * TS * .25;
