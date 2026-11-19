@@ -161,14 +161,16 @@ const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
 function drawAura(px, py, H, t, front, gold) {
-  const cy = py - H * .45;
+  const cy = py - H * .45, angel = gold === 'angel', fairy = gold === 'fairy', soft = angel || fairy;   // 😇 angel: white-gold light, halo and falling feathers · 🧚 fairy: pink-lilac glitter
   ctx.save();
   if (!front) {
     const pul = 1 + Math.sin(t / 380) * .08, r = H * .62 * pul, g = ctx.createRadialGradient(px, cy, H * .08, px, cy, r);
-    if (gold) { g.addColorStop(0, 'rgba(255,236,150,.7)'); g.addColorStop(.55, 'rgba(255,190,50,.38)'); g.addColorStop(1, 'rgba(200,120,0,0)'); }
+    if (angel) { g.addColorStop(0, 'rgba(255,252,230,.7)'); g.addColorStop(.55, 'rgba(255,236,170,.34)'); g.addColorStop(1, 'rgba(255,220,120,0)'); }
+    else if (fairy) { g.addColorStop(0, 'rgba(255,214,242,.7)'); g.addColorStop(.55, 'rgba(238,160,255,.34)'); g.addColorStop(1, 'rgba(200,100,255,0)'); }
+    else if (gold) { g.addColorStop(0, 'rgba(255,236,150,.7)'); g.addColorStop(.55, 'rgba(255,190,50,.38)'); g.addColorStop(1, 'rgba(200,120,0,0)'); }
     else { g.addColorStop(0, 'rgba(200,130,255,.75)'); g.addColorStop(.55, 'rgba(130,50,235,.42)'); g.addColorStop(1, 'rgba(60,0,120,0)'); }
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(px, cy, r * .78, r, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = gold ? `rgba(255,220,120,${.4 + Math.sin(t / 300) * .2})` : `rgba(214,170,255,${.35 + Math.sin(t / 300) * .2})`; ctx.lineWidth = 2;
+    ctx.strokeStyle = angel ? `rgba(255,248,200,${.45 + Math.sin(t / 300) * .2})` : fairy ? `rgba(255,190,240,${.45 + Math.sin(t / 300) * .2})` : gold ? `rgba(255,220,120,${.4 + Math.sin(t / 300) * .2})` : `rgba(214,170,255,${.35 + Math.sin(t / 300) * .2})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(px, py - 2, H * .36 * pul, H * .11 * pul, 0, 0, 7); ctx.stroke();
   }
   ctx.globalCompositeOperation = 'lighter';
@@ -176,8 +178,20 @@ function drawAura(px, py, H, t, front, gold) {
     const a = t / 900 + i * Math.PI * 2 / 9, z = Math.sin(a);
     if ((z > 0) !== front) continue;
     const rise = ((t / 1600 + i * .37) % 1), x = px + Math.cos(a) * H * .38, y = py - H * (.08 + rise * .85), s = (1.6 + z * .8) * (1 - rise * .5) * H / 60;
-    ctx.fillStyle = `hsla(${gold ? 42 + i * 2 : 270 + i * 9},100%,${70 + z * 10}%,${.85 * (1 - rise)})`;
+    ctx.fillStyle = `hsla(${angel ? 46 + i * 3 : fairy ? 300 + i * 8 : gold ? 42 + i * 2 : 270 + i * 9},100%,${(soft ? 82 : 70) + z * 8}%,${.85 * (1 - rise)})`;
     ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, s * 2.2), 0, 7); ctx.fill();
+  }
+  if (front && angel) {                                                          // a glowing halo over the head and a few feathers drifting down
+    const hy = py - H * 1.02 + Math.sin(t / 700) * H * .02;
+    ctx.strokeStyle = `rgba(255,240,170,${.8 + Math.sin(t / 250) * .15})`; ctx.lineWidth = Math.max(2, H * .05); ctx.shadowColor = '#ffe9a0'; ctx.shadowBlur = H * .25;
+    ctx.beginPath(); ctx.ellipse(px, hy, H * .2, H * .06, 0, 0, 7); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    for (let i = 0; i < 5; i++) { const f = (t / 3200 + i * .21) % 1, fx = px + Math.sin(t / 900 + i * 2) * H * .4 + (i - 2) * H * .1, fy = py - H * (.95 - f * .9);
+      ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.sin(t / 500 + i) * .8); ctx.globalAlpha = .85 * (1 - f); ctx.beginPath(); ctx.ellipse(0, 0, Math.max(1, H * .025), Math.max(2, H * .06), 0, 0, 7); ctx.fill(); ctx.restore(); }
+  }
+  if (front && fairy) {                                                          // twinkling stars around her
+    for (let i = 0; i < 6; i++) { const a = t / 1100 + i * 1.05, tw = .5 + .5 * Math.sin(t / 220 + i * 2), x = px + Math.cos(a) * H * .45, y = py - H * (.25 + (i % 3) * .28) + Math.sin(a * 1.3) * H * .06, r = Math.max(1.5, H * .04) * (.6 + tw * .8);
+      ctx.fillStyle = `rgba(255,${i % 2 ? 235 : 200},255,${.5 + tw * .5})`; ctx.fillRect(x - r * .3, y - r, r * .6, r * 2); ctx.fillRect(x - r, y - r * .3, r * 2, r * .6); }
   }
   ctx.restore();
 }
@@ -532,6 +546,10 @@ function handle(m) {
       if (panel?.kind === 'chat') refreshPanel(true);
       break;
     }
+    case 'quiz': {                                  // classroom pop quiz
+      document.querySelectorAll('.req.quiz').forEach(e => e.remove()); if (m.end) break;
+      const d = popup(`${m.teacher ? '👩‍🏫 <b>อาจารย์เรียกตอบ!</b>' : '📝 <b>ควิซประจำคาบ</b>'} <small>(${m.sec} วินาที)</small><br>${esc(m.q)}`, m.o.map((txt, i) => [txt, 'good', () => send({ t: 'quizans', i })]), m.sec * 1000);
+      d.classList.add('quiz'); FX.play('ding'); break; }
     case 'bite': fishBiteT = performance.now(); FX.play('bite'); if (navigator.vibrate) navigator.vibrate([60, 40, 90]); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 1.1); FX.burst(bobber.x, bobber.y, '#dff4ff', 10); } break;
     case 'hooked': fightStart(m.fight); break;
     case 'mt': misLive = m; break;
@@ -1402,7 +1420,7 @@ function draw(t) {
     else if (k === 2) { const tr = e, sw = Math.sin(t / 1300 + tr[0] * .7 + tr[1] * .4) * .022 + Math.sin(t / 470 + tr[0]) * .006, bx = (tr[0] + .5) * TS + X, byy = (tr[1] + 1.05) * TS + Y; ctx.save(); ctx.translate(bx, byy); ctx.transform(1, 0, -sw, 1, 0, 0); ctx.translate(-bx, -byy); spr(tr[2], tr[0] + .5, tr[1] + 1.05, X, Y); ctx.restore(); }   // trees sway in the breeze
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
-      else if (e[3] === 'ghost') { const bad = !!placeBad(); ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; if (bad) ctx.filter = 'sepia(1) saturate(6) hue-rotate(-50deg)'; sprF(e[0], e[1], e[2], X, Y, e[5]); ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.strokeStyle = bad ? '#ff4a4a' : '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      else if (e[3] === 'ghost') { const bad = !!placeBad(); ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; if (bad) ctx.filter = 'sepia(1) saturate(6) hue-rotate(-50deg)'; sprF(e[0], e[1], e[2], X, Y, e[5]); ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.strokeStyle = bad ? '#ff4a4a' : '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); if (e[4]?.spk) drawSprinkler(e, X, Y, t); }
       else { sprF(e[0], e[1], e[2], X, Y, e[5]); if (e[4]) drawYardCrop(e, X, Y, t); }
     }
     else if (k === 5) drawCar(e, X, Y);
@@ -1410,7 +1428,7 @@ function draw(t) {
     else if (k === 7) drawMisThing(e, X, Y, t);
     else if (k === 8) drawRideThing(e, X, Y, t);
     else if (k === 9) { const b2 = rideBottom(e), H0 = rH('car_base', RG.car.w); rdraw('car_roof', e.cx * TS + X, (b2 - H0 + .45) * TS + Y, RG.car.roofW, .5, .93, false, Math.sin(t / 900) * .012); }
-    else if (k === 10) drawParkGate(e.x, e.y + .7, X, Y);
+    else if (k === 10) drawParkGate(e.x, e.y + .7, X, Y, e.id === 'gate_park');
     else if (k === 11) drawWat(e, X, Y, t);
     else if (k === 12) drawWatWall(e, X, Y);
     else if (k === 13) drawWatTownGate(e, X, Y);
@@ -1479,6 +1497,7 @@ function drawYardLocks(A, X, Y, t) {
 }
 // a vegetable field in a home yard: seedlings that grow, then the ripe crop bobbing on top
 function drawYardCrop(e, X, Y, t) {
+  if (e[4].spk) return drawSprinkler(e, X, Y, t);
   if (e[4].tile) return drawSoilCrop(e, X, Y, t);
   const pl = wd?.houses?.[e[4].house]?.[10]?.[e[4].k], px = e[1] * TS + X, py = (e[2] - 1) * TS + Y;
   if (near?.id === 'yf:' + e[4].k) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.strokeRect(px - TS - 2, py - TS - 2, TS * 2 + 4, TS * 2 + 4); }
@@ -1496,18 +1515,56 @@ function drawYardCrop(e, X, Y, t) {
   if (left <= 0) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText('✨', px + TS * .8, py - TS * .85 + Math.sin(t / 200) * 3); }
   else { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(px - TS * .85, py + TS * .8, TS * 1.7, 4); ctx.fillStyle = '#9be15d'; ctx.fillRect(px - TS * .85, py + TS * .8, TS * 1.7 * prog, 4); }
 }
+// a sprinkler: the ghost shows the cells it reaches; a placed one sprays a ring of droplets now and then
+function drawSprinkler(e, X, Y, t) {
+  const r = e[4].spk, cx = Math.floor(e[1]), cy = Math.round(e[2]) - 1, x0 = (cx - r) * TS + X, y0 = (cy - r) * TS + Y, w = (2 * r + 1) * TS;
+  if (e[4].ghost) { ctx.fillStyle = 'rgba(90,170,255,.18)'; ctx.fillRect(x0, y0, w, w); ctx.strokeStyle = 'rgba(120,200,255,.8)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(x0, y0, w, w); ctx.setLineDash([]); return; }
+  const ph = ((t + cx * 377 + cy * 911) % 6000) / 1400; if (ph > 1) return;
+  const px = (cx + .5) * TS + X, py = (cy + .5) * TS + Y, R = (r + .5) * TS * ph;
+  ctx.fillStyle = `rgba(150,210,255,${.75 * (1 - ph)})`;
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.arc(px + Math.cos(a) * R, py + Math.sin(a) * R * .8 - Math.sin(ph * Math.PI) * TS * .3, Math.max(1.5, TS * .05), 0, 7); ctx.fill(); }
+}
+// a crop on a soil tile: wet soil darkens, a dry one asks for water; the plant goes seed -> sprout -> leafy -> budding -> ripe
+const CROP_TINT = {};
+function cropTint(id) {                         // the ripe crop's colour, for the buds (sampled once from its emoji)
+  if (CROP_TINT[id]) return CROP_TINT[id];
+  try { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.font = '14px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(G.items[id].icon, 8, 9);
+    const d = g.getImageData(0, 0, 16, 16).data; let r = 0, gg = 0, b = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && !(d[i + 1] > d[i] + 20 && d[i + 1] > d[i + 2] + 20)) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; }
+    return (CROP_TINT[id] = n ? `rgb(${r / n | 0},${gg / n | 0},${b / n | 0})` : '#ffcf4a'); } catch { return (CROP_TINT[id] = '#ffcf4a'); }
+}
 function drawSoilCrop(e, X, Y, t) {
   const pl = wd?.houses?.[e[4].house]?.[10]?.[e[4].k], px = e[1] * TS + X, py = (e[2] - .5) * TS + Y;
   if (near?.id === 'yf:' + e[4].k) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 2; ctx.strokeRect(px - TS / 2 + 1, py - TS / 2 + 1, TS - 2, TS - 2); }
   if (!pl) return;
-  const [crop, readyAt] = pl, it = G.items[crop], total = G.crops[crop].grow * 1000, left = readyAt - (Date.now() + clockOff), prog = clamp(1 - left / total, 0, 1);
-  const sway = Math.sin(t / 600 + e[1] * 3) * TS * .02;
-  if (left > 0) {
-    const h = TS * (.14 + prog * .4);
-    ctx.fillStyle = '#3f8a2a'; ctx.fillRect(px - 1 + sway, py + TS * .2 - h, 2, h); ctx.fillStyle = prog < .5 ? '#7cc843' : '#4fa632';
-    ctx.beginPath(); ctx.ellipse(px - h * .35 + sway, py + TS * .2 - h * .7, h * .38, h * .2, -.5, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(px + h * .35 + sway, py + TS * .2 - h * .85, h * .38, h * .2, .5, 0, 7); ctx.fill();
-  } else { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .55)}px serif`; ctx.fillText(it.icon, px, py + Math.sin(t / 260 + e[1] * 4) * 1.5); }
+  const [crop, readyAt, w] = pl, it = G.items[crop], left = readyAt - (Date.now() + clockOff), total = G.crops[crop].grow * 1000 * (w === 0 ? 2 : 1), prog = clamp(1 - left / total, 0, 1);
+  if (left > 0 && w !== 0) { ctx.fillStyle = 'rgba(40,20,5,.32)'; ctx.fillRect(px - TS * .42, py - TS * .42, TS * .84, TS * .84); }   // watered: dark damp soil
+  const sway = Math.sin(t / 600 + e[1] * 3) * TS * .03, by = py + TS * .22, st = left <= 0 ? 4 : Math.min(3, Math.floor(prog * 4));
+  const cs = atlas?.sprites?.[`cr_${crop}_${st}`];
+  if (cs && atlasImg) {                          // the painted plant (anchored at its feet, sways a touch, ripe ones bob)
+    const w = cs[2] / atlas.tile * TS, h = cs[3] / atlas.tile * TS, bob = st === 4 ? Math.sin(t / 420 + e[1] * 3) * 1 : 0;
+    ctx.save(); ctx.translate(Math.round(px), Math.round(py + TS * .46)); ctx.transform(1, 0, -sway / TS * .6, 1, 0, 0);
+    ctx.drawImage(atlasImg, cs[0], cs[1], cs[2], cs[3], Math.round(-w / 2), Math.round(-h + bob), Math.round(w), Math.round(h)); ctx.restore();
+  } else {
+  const leaf = (ang, len, wid, col) => { ctx.save(); ctx.translate(px + sway * .5, by - TS * .04); ctx.rotate(ang + sway / TS); ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(0, -len / 2, wid, len / 2, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(20,60,20,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -len * .8); ctx.stroke(); ctx.restore(); };
+  if (st === 0) {                               // seeds just sown
+    ctx.fillStyle = '#3b2412'; ctx.beginPath(); ctx.ellipse(px, by - TS * .05, TS * .2, TS * .08, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e8d6a0'; for (const [dx, dy] of [[-.08, -.06], [.06, -.04], [0, -.1]]) ctx.fillRect(px + dx * TS - 1, by + dy * TS - 1, 3, 2);
+  } else if (st === 1) {                        // sprout: two small leaves
+    ctx.fillStyle = '#4a8a2a'; ctx.fillRect(px - 1 + sway, by - TS * .2, 2, TS * .2);
+    leaf(-.9, TS * .2, TS * .07, '#8ad24e'); leaf(.9, TS * .2, TS * .07, '#8ad24e');
+  } else {                                      // leafy rosette, then buds in the crop's colour
+    const n = st === 2 ? 5 : 7, L = TS * (st === 2 ? .32 : .42);
+    for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i - (n - 1) / 2) * (Math.PI * 1.1 / (n - 1)); leaf(a + Math.PI / 2, L * (i % 2 ? .82 : 1), TS * .085, i % 2 ? '#3f9a4a' : '#52b25a'); }
+    leaf(0, L * 1.05, TS * .09, '#2f8a44');
+    if (st === 3) { ctx.fillStyle = cropTint(crop); for (const [dx, dy] of [[-.12, -.3], [.13, -.27], [0, -.4]]) { ctx.beginPath(); ctx.arc(px + dx * TS + sway, by + dy * TS, TS * .055, 0, 7); ctx.fill(); } }
+    if (st === 4) { ctx.font = `${Math.round(TS * .5)}px serif`; ctx.textAlign = 'center'; ctx.fillText(it.icon, px + sway, by - TS * .32 + Math.sin(t / 260 + e[1] * 4) * 1.5); }
+  }
+  }
+  if (left > 0 && w === 0) {                    // dry: a little water drop asks to be watered
+    const bob = Math.sin(t / 300 + e[1]) * 2; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(px + TS * .3, py - TS * .32 + bob, TS * .14, 0, 7); ctx.fill();
+    ctx.font = `${Math.round(TS * .2)}px serif`; ctx.textAlign = 'center'; ctx.fillText('💧', px + TS * .3, py - TS * .25 + bob);
+  }
 }
 // a garden bed: wooden frame, dark tilled soil in furrows, crops planted in two rows that grow and ripen
 function drawPlot(s, px, py, t) {
@@ -2208,7 +2265,7 @@ function drawPlayer(p, X, Y, t) {
     [...P.values()].filter(o => o.ps === p.id).forEach((o, i) => nameAndBubble(o, px + (i - .5) * TS * .2, top0 - TS * (.62 + i * .5), o.id === myId, t));   // the passengers' names (and chat) over the driver's
     return;
   }
-  const aura = (p.of === 'admin' || p.of === 'thai') && !lying, gold = p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold
+  const aura = (p.of === 'admin' || p.of === 'thai' || p.of === 'angel') && !lying, gold = p.of === 'angel' ? (p.g === 'f' ? 'fairy' : 'angel') : p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold · angel / fairy outfit: white-gold / pink
   if (aura) drawAura(px, py, H, now0, false, gold);
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
@@ -2727,7 +2784,14 @@ function drawWatTownGate(e, X, Y) {
   ctx.fillStyle = WAT.gold; ctx.fillRect(gx - u * 1.1, gy - u * 3.5, u * 2.2, u * .55); ctx.fillStyle = WAT.red2; ctx.font = `700 ${Math.round(u * .36)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛕 วัด', gx, gy - u * 3.22);
 }
 // the arch over the way in (town side and park side), with the park's name on its board
-function drawParkGate(x, y, X, Y) {
+function drawParkGate(x, y, X, Y, town) {
+  const sp = town && atlas?.sprites?.b_parkgate;
+  if (sp && atlasImg) {                              // the big painted entrance by the south avenue (seen from town)
+    const W = 7.2, w = W * TS, h = w * sp[3] / sp[2], px = x * TS + X, py = (y + .8) * TS + Y;
+    ctx.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], Math.round(px - w / 2), Math.round(py - h), Math.round(w), Math.round(h));
+    ctx.font = `700 ${Math.round(TS * .5)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#b4467a';
+    ctx.fillText('🎡 สวนสนุก', px, py - h * (1 - .256)); return;
+  }
   if (!RIDE_IMG()) return;
   const W = 4.4, H = rH('park_gate', W), px = x * TS + X, py = y * TS + Y;
   rdraw('park_gate', px, py, W);
@@ -2850,6 +2914,7 @@ const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FA
   { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
   { st: 'barber', name: 'ช่างโอ๋ (ช่างทำผม)', short: 'ช่างโอ๋', icon: '💈', dx: .6, dy: -1.15, lk: { hair: 'silver', shirt: 'black', pants: 'black' }, hi: ['อยากเปลี่ยนลุคไหมครับ', 'ทรงนี้ต้องลองสีบลอนด์นะ', 'ตัดผมใหม่ ชีวิตใหม่ครับ'] },
+  { st: 'plantshop', name: 'ป้าสายใจ (ร้านต้นไม้)', short: 'ป้าสายใจ', icon: '🌳', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'brown', shirt: 'green' }, hi: ['ต้นไม้ที่นี่ป้าดูแลเองทุกต้นเลยจ้ะ', 'อยากได้ร่มเงาหรือดอกไม้ บอกป้าได้นะ', 'ปลูกต้นไม้ในบ้านแล้วอากาศดี ใจก็สบาย 🌿']},
   { st: 'furnshop', name: 'น้องเก่ง (ร้านเฟอร์นิเจอร์)', short: 'น้องเก่ง', icon: '🛋️', dx: .6, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['โซฟาตัวนี้นั่งสบายมากครับ', 'จัดบ้านสวย อยู่แล้วมีความสุขนะ', 'ซื้อแล้วส่งถึงบ้านเลยครับ'] },
   { st: 'police', name: 'ดาบหญิงสมศรี (เวรประจำโต๊ะ)', short: 'ดาบสมศรี', icon: '👮', g: 'f', dx: .4, dy: -1.15, of: 'police', lk: { hair: 'brown' }, hi: ['มีอะไรให้ช่วยคะ', 'อยากเป็นตำรวจ คุยกับผู้กองเอกนะคะ'] },
   { st: 'school', name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', short: 'ผอ.ประเสริฐ', icon: '🎓', dx: .5, dy: -1.1, of: 'office', lk: { hair: 'silver' }, hi: ['ตั้งใจเรียนนะ อนาคตอยู่ในมือเธอ', 'นั่งโต๊ะเรียนครบชั่วโมงได้ 1 คาบ', 'ยินดีต้อนรับสู่มหาวิทยาลัย'] },
@@ -3385,7 +3450,7 @@ function icuDraw() {
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
 const NPC_FACE = { staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
-  staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_police: 'police_f', keep_school: 'elder_m',
+  staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
   keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
@@ -3411,6 +3476,7 @@ const TALK = {
   keep_petshop1: [['น้องๆ ที่นี่ฉีดวัคซีนครบทุกตัวค่ะ', 'อยากได้ตัวไหน บอกได้เลยนะคะ'], ['สัตว์เลี้ยงเดินตามเราได้ทุกที่เลยค่ะ', 'แตะที่ตัวเขาดู จะกระโดดดีใจด้วยนะ']],
   keep_petshop2: [['ผมเลี้ยงหมามาตั้งแต่เด็กครับ', 'เลยมาเปิดร้านนี้เลย'], ['ตัวหายากอย่างมังกรกับยูนิคอร์น ก็มีนะครับ', 'ต้องเก็บเงินหน่อย แต่คุ้มครับ']],
   keep_cstore4: [['ยายเปิดร้านนี้มาตั้งแต่หมู่บ้านเพิ่งสร้าง', 'เห็นเด็กๆ โตกันมาทุกคนเลย'], ['ผอมลงนะหลาน กินข้าวกินปลาบ้างสิ', 'ข้าวกล่องในตู้อร่อยนะ ยายชิมแล้ว']],
+  keep_plantshop: [['ต้นไม้ที่นี่ป้าดูแลเองทุกต้นเลยจ้ะ', 'อยากได้ร่มเงา พุ่มไม้ หรือดอกไม้ บอกป้าได้นะ'], ['ต้นไม้ในบ้านช่วยให้อากาศดี ใจก็สบายด้วยจ้ะ'], ['อยากปลูกผักกินเอง ไปดูแปลงดินที่ร้านเฟอร์นิเจอร์นะ ป้าเอาเมล็ดมาเองไม่ได้ แต่เอาใจช่วยจ้ะ 🌱']],
   keep_furnshop: [['ซื้อเฟอร์นิเจอร์แล้วส่งถึงบ้านเลยครับ', 'จัดวางเองได้ด้วยปุ่ม 🛋️ จัดบ้าน'], ['บ้านสบาย นอนหลับสบาย ความสุขก็เพิ่มขึ้นครับ'], ['ผมใส่ฮู้ดทั้งวันเพราะในร้านแอร์เย็นมากครับ 🥶']],
   cstore: [['เปิดยี่สิบสี่ชั่วโมงทุกวันค่ะ', 'น้ำ ขนม ข้าวกล่อง ยา มีครบ'], ['ดึกๆ หิวก็แวะมาได้นะคะ'], ['รับถุงไหมคะ... อ๋อ ไม่รับ ช่วยโลกด้วย ดีมากค่ะ 🌱']],
   town: [['ได้ยินว่าเที่ยงคืนที่มุมทะเลสาบฝั่งตะวันออก มีอะไรแปลกๆ ว่ายวนอยู่', 'ใครจะไปรู้... อาจเป็นแค่ข่าวลือก็ได้'],
@@ -3633,6 +3699,12 @@ function frameHtml(id, sz, fit = true) {
   if (fit && FRAMES_AT.hr?.[id]) { sz = Math.round(sz * 1.18); ps = Math.max(80, Math.min(100, Math.round(2 * FRAMES_AT.hr[id] * sz / (sz0 / 1.62) * 1.06 * 50) * 2)); }
   return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz0}" data-ps="${ps}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
 }
+function econHtml() {   // today's pump board and the economy mood (stats panel)
+  const e = me.econ; if (!e) return '';
+  const d = e.next - e.litre, arr = Math.abs(d) < .05 ? 'ทรงตัว' : d > 0 ? `ขึ้น ${d.toFixed(2)} ฿` : `ลง ${(-d).toFixed(2)} ฿`;
+  const mood = e.mood === 'slow' ? '📉 ซบเซา (ภาษีลดครึ่ง)' : e.mood === 'boom' ? '📈 คึกคัก' : '➖ ปกติ';
+  return `<div class="grid2"><div class="item"><div class="nm">⛽ ราคาน้ำมัน<small>฿${e.litre.toFixed(2)}/ลิตร · พรุ่งนี้${arr}</small></div></div><div class="item"><div class="nm">🏛️ เศรษฐกิจวันนี้<small>${mood}</small></div></div></div>`;
+}
 function frameRows() {
   const own = me.frames || [], cur = me.frame ?? -1, pic = myPic || facePng();
   const card = f => { const has = own.includes(f.id), on = cur === f.id;
@@ -3640,7 +3712,7 @@ function frameRows() {
       : has ? B(on ? 'ถอด' : 'ใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? '' : 'good') : B(money(f.price), { t: 'frame', op: 'buy', id: f.id }, 'good', me.money < f.price);
     return `<div class="frmCard ${on ? 'on' : ''} ${f.locked && !has ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64, false)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
   const sec = (t, list) => `<div class="secT">${t}</div><div class="frmGrid">${list.map(card).join('')}</div>`;
-  return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · ล็อกไว้ก่อน)', G.frameDefs.slice(24));
+  return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · สายรุ้งกับนีออนวางขายแล้ว)', G.frameDefs.slice(24));
 }
 const RAR = ['', 'ธรรมดา', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน', 'พิเศษ', 'ในตำนาน'];
 const RAR_COL = ['#ffd34d', '#e8e8e8', '#7be07b', '#62b8ff', '#d08cff', '#ffb43c', '#ffd34d', '#ff6bd6'];
@@ -3827,10 +3899,44 @@ function applyBox(career, st) {
     ${me.career !== 'none' ? `<div class="sub">ตอนนี้คุณเป็น${G.careers[me.career].name} สมัครงานนี้ = ลาออกจากงานเดิม</div>` : ''}
     ${B(`✍️ สมัครงาน${c.name}`, { t: 'act', st, a: 'apply', career }, 'primary big', miss.length > 0 || me.jobWait > 0)}</div>`;
 }
-const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
+const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19j', d: '19 พ.ย. (รอบ 53)', items: [
+    '🧾 <b>ลดภาษีรายได้</b> ฿30,000 แรกต่อวันไม่เสีย ส่วนที่เกินเสียแค่ 5% เกิน ฿100,000 เสีย 10% (เดิม 10% / 20%)',
+    '⛽ <b>ราคาน้ำมันขึ้นลงรายวัน</b> เหมือนปั๊มจริง ไม่เกิน ±15% และโดยรวมถูกลงกว่าเดิม ดูราคาวันนี้และพรุ่งนี้ได้ที่หน้าสถิติ',
+    '📉 <b>วันที่เศรษฐกิจซบเซา รัฐลดภาษีครึ่งหนึ่ง</b> ภาษีไม่มีวันสูงกว่าปกติ',
+  ] },
+  { v: '2026-11-19i', d: '19 พ.ย. (รอบ 52)', items: [
+    '📝 <b>ควิซระหว่างนั่งเรียน</b> มีคำถามเด้งขึ้นมาให้ตอบ ตอบถูกเรียนจบคาบเร็วขึ้น ตอนอาจารย์เรียกตอบถูกได้โบนัสเงินด้วย ตอบผิดไม่เสียอะไร',
+    '🔔 <b>แจ้งเตือนกลางจอเล็กลง</b> เป็นแถบเล็กๆ ไม่บังหน้าจอ',
+    '🐦 <b>เหตุการณ์สุ่มในห้องเรียน</b> นกบินเข้าห้อง เจอเหรียญใต้โต๊ะ เพื่อนส่งโน้ต หรือแบ่งขนมให้',
+  ] },
+  { v: '2026-11-19h', d: '19 พ.ย. (รอบ 51)', items: [
+    '🎡 <b>ย้ายทางเข้าสวนสนุกมาใกล้ๆ</b> อยู่ข้างถนนสายกลางใต้ลานเมือง เดินจากจุดเกิดไม่กี่ก้าว พร้อมซุ้มประตูใหม่ ตกแต่งลูกโป่ง ซุ้มตั๋ว และซุ้มขนม',
+  ] },
+  { v: '2026-11-19g', d: '19 พ.ย. (รอบ 50)', items: [
+    '🤧 <b>ป่วยยากขึ้น</b> โอกาสติดหวัด/ไข้หวัดใหญ่/อดนอนลดลงครึ่งหนึ่ง',
+    '🛡️ <b>ภูมิคุ้มกันนานขึ้น</b> หายป่วยแล้วกันป่วยซ้ำ 20 นาที (ออกจากโรงพยาบาล 30 นาที)',
+    '⚠️ <b>มีเตือนก่อนป่วย</b> ตากฝนใกล้เปียก หรือยืนใกล้คนป่วย จะมีข้อความเตือนให้หลบ',
+    '😌 <b>ไข้หวัดหายเองได้</b> นั่งหรือนอนพักในอาคารต่อเนื่อง 1 นาที',
+  ] },
+  { v: '2026-11-19f', d: '19 พ.ย. (รอบ 49)', items: [
+    '🌳 <b>ร้านต้นไม้เปิดแล้ว</b> (แทนร้านดอกไม้) จัดร้านเป็นระเบียบ ขายต้นไม้ในบ้านและของแต่งสวน คุยกับป้าสายใจได้เลย',
+    '🏡 <b>อสังหาริมทรัพย์เปิด 24 ชั่วโมง</b>',
+    '🖼️ <b>กรอบสายรุ้งกับนีออนวางขายแล้ว</b> ฿12,000 ที่เมนูกรอบรูป',
+    '😇 <b>ชุดเทวดา/นางฟ้ามีแอร่า</b> เทวดามีห่วงเรืองแสงกับขนนกร่วง นางฟ้ามีประกายดาวสีชมพู',
+    '🌾 <b>รูปพืชผักแบบวาดใหม่</b> ข้าว ข้าวโพด พริก ทุเรียน และพืชใหม่ในสวนบ้าน',
+    '🐞 แก้บัค: ที่นั่งบางตัวที่ลุกไม่ได้ (ติดกำแพง) ตอนนี้ขยับออกได้แล้ว',
+  ] },
+  { v: '2026-11-19e', d: '19 พ.ย. (รอบ 48)', items: [
+    '🌱 <b>ทุกคนปลูกผักในสวนบ้านได้แล้ว!</b> ซื้อ🟫 แปลงดินที่ร้านเฟอร์นิเจอร์ (แท็บสวน) วางต่อกันเป็นแปลงในสวนหลังบ้าน แล้วแตะแปลงเพื่อปลูก',
+    '💧 ผักต้อง<b>รดน้ำ</b> ไม่รดจะโตช้าลงครึ่งหนึ่ง แตะแปลงแล้วกด รดน้ำทั้งแปลง · ดินที่รดแล้วจะเป็นสีเข้ม ฝนตกก็รดให้',
+    '💦 <b>สปริงเกลอร์</b> ทองแดง (3×3) และอิริเดียม (5×5) วางกลางแปลงแล้วรดน้ำรอบตัวให้เอง ตอนวางจะเห็นกรอบสีฟ้าว่ารดถึงช่องไหน',
+    '🌿 ต้นผักโตให้เห็นทีละขั้น: เมล็ด → ต้นอ่อน → ใบเต็ม → ออกดอก → ผลสุก',
+    '🌾 อาชีพเกษตรกรปิดแล้ว ใครเป็นเกษตรกรอยู่จะกลับมาว่างงาน (เลือกอาชีพใหม่ได้) และได้คืนค่าสวนที่ไร่เต็มจำนวน',
+  ] },
   { v: '2026-11-19d', d: '19 พ.ย. (รอบ 47)', items: [
     '🛋️ <b>จัดบ้านใหม่!</b> กดปุ่มจัดบ้านในบ้าน แล้ว<b>แตะของในห้อง</b>เพื่อหยิบย้ายได้เลย · ปุ่ม 📦 เปิดคลังของ',
     '🗂️ คลังเฟอร์นิเจอร์แบ่งเป็นหมวดเหมือนร้าน มีรูปของจริง ของซ้ำรวมเป็นใบเดียวพร้อมตัวเลขจำนวน',
@@ -4397,13 +4503,14 @@ function renderPanel(p) {
     case 'yfield': {
       const k = st.slice(3), h = wd?.houses?.[me.house];
       if (near?.house !== me.house || !h) return '<h2>🌱 แปลงผัก</h2><div class="sub">แปลงผักของเจ้าของบ้าน</div>';
-      const pl = (h[10] || {})[k], slow = me.career !== 'farmer';
+      const pl = (h[10] || {})[k], slow = false;
       if (G.shop.furniture[fbase(k)]?.tile) {
-        const bed = soilBedOf(h, k), cr = h[10] || {}, empty = bed.filter(o => !cr[o]).length, ripe = bed.filter(o => cr[o] && cr[o][1] <= Date.now() + clockOff).length;
+        const bed = soilBedOf(h, k), cr = h[10] || {}, empty = bed.filter(o => !cr[o]).length, ripe = bed.filter(o => cr[o] && cr[o][1] <= Date.now() + clockOff).length, dry = bed.filter(o => cr[o] && cr[o][2] === 0 && cr[o][1] > Date.now() + clockOff).length;
         const rows = Object.entries(G.crops).map(([id, c]) => { const sd = Math.ceil(c.seed / 3);
           return itemRow(id, `<div>${B(`1 ช่อง ${money(sd)}`, { t: 'yfarm', k, op: 'plant', crop: id }, '', !!pl)}${B(`ทั้งแปลง ${money(sd * empty)}`, { t: 'yfarm', k, op: 'plant', crop: id, all: 1 }, 'good', !empty)}</div>`, `โต ~${Math.round(c.grow * (slow ? 1.25 : 1) / 60 * 10) / 10} นาที · ช่องละ 1-2 หน่วย · ราคาตลาด ~${money(wd?.mk[id]?.ref || G.items[id].base)}`); }).join('');
-        return `<h2>🟫 แปลงดิน ${bed.length} ช่อง</h2><div class="sub">ว่าง ${empty} · กำลังโต ${bed.length - empty - ripe} · สุกแล้ว ${ripe}${pl ? ` · ช่องนี้: ${G.items[pl[0]].icon} <span class="cd" data-t="${pl[1]}"></span>` : ''}${slow ? ' · ชาวสวนปลูกโตเร็วกว่า 25%' : ''}</div>
-          ${ripe ? B(`🧺 เก็บเกี่ยวทั้งแปลง (${ripe} ช่อง)`, { t: 'yfarm', k, op: 'harvest', all: 1 }, 'primary big') : ''}<div class="list">${rows}</div>`;
+        return `<h2>🟫 แปลงดิน ${bed.length} ช่อง</h2><div class="sub">ว่าง ${empty} · กำลังโต ${bed.length - empty - ripe} · สุกแล้ว ${ripe}${pl ? ` · ช่องนี้: ${G.items[pl[0]].icon} <span class="cd" data-t="${pl[1]}"></span>` : ''}</div>
+          ${dry ? B(`💧 รดน้ำทั้งแปลง (${dry} ช่อง · ⚡${Math.max(1, Math.ceil(dry / 4))})`, { t: 'yfarm', k, op: 'water', all: 1 }, 'primary big') : ''}
+          ${ripe ? B(`🧺 เก็บเกี่ยวทั้งแปลง (${ripe} ช่อง)`, { t: 'yfarm', k, op: 'harvest', all: 1 }, 'primary big') : ''}<div class="sub">💡 ผักที่ไม่ได้รดน้ำโตช้าลงครึ่งหนึ่ง · วาง💦 สปริงเกลอร์ (ร้านเฟอร์นิเจอร์ › สวน) ไว้กลางแปลงแล้วจะรดน้ำรอบตัวให้เองทุกครั้งที่ปลูก · ฝนตกก็รดให้</div><div class="list">${rows}</div>`;
       }
       if (!pl) {
         const rows = Object.entries(G.crops).map(([id, c]) => itemRow(id, B(`ปลูก ${money(c.seed)}`, { t: 'yfarm', k, op: 'plant', crop: id }), `โต ~${Math.round(c.grow * (slow ? 1.25 : 1) / 60 * 10) / 10} นาที · ได้ ${c.min}-${c.max} · ราคาตลาด ~${money(wd?.mk[id]?.ref || G.items[id].base)}`)).join('');
@@ -4515,7 +4622,7 @@ function renderPanel(p) {
     case 'toolshop': {
       const order = [me.career, ...Object.keys(G.shop.tools).filter(c => c !== me.career)].filter(c => G.shop.tools[c]);
       const rows = order.map(c => {
-        const d = G.shop.tools[c], t = (me.tools || {})[c] || 0, cc = G.careers[c] || { fisher: { icon: '🎣', name: 'ตกปลา (ทุกคน)' } }[c] || { icon: '', name: c };
+        const d = G.shop.tools[c], t = (me.tools || {})[c] || 0, cc = G.careers[c] || { fisher: { icon: '🎣', name: 'ตกปลา (ทุกคน)' }, farmer: { icon: '🌱', name: 'ปลูกผักในสวนบ้าน (ทุกคน)' } }[c] || { icon: '', name: c };
         const sub = t >= 3 ? `สูงสุดแล้ว · ${d.fx[2]}` : `ถัดไป: ${d.fx[t]}${t ? ` · ตอนนี้: ${d.fx[t - 1]}` : ''}`;
         return itemRowRaw(d.icon, `${d.name} <span class="tag">${cc.icon} ${cc.name}</span> <span style="color:var(--acc)">${'★'.repeat(t)}${'☆'.repeat(3 - t)}</span>`, sub,
           t >= 3 ? '<span class="tag">MAX</span>' : B(money(G.shop.toolPrices[t]), { t: 'act', st, a: 'buy', career: c }, c === me.career ? 'good' : ''));
@@ -4647,6 +4754,15 @@ function renderPanel(p) {
       return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งเข้าคลังที่บ้าน จัดวางเองด้วยปุ่ม 🛋️ จัดบ้าน · ความสบายรวมสูงสุด ⭐30${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
+    case 'plantshop': {
+      const own = !!me.hown, cats = [['garden', '🌳 ต้นไม้ & สวน'], ['indoor', '🪴 ต้นไม้ในบ้าน']];
+      const tab = cats.some(c => c[0] === p.ptab) ? p.ptab : 'garden';
+      const list = Object.entries(G.shop.furniture).filter(([k, f]) => !f.gift && (tab === 'garden' ? f.cat === 'garden' : G.shop.plantIndoor.includes(k))).sort((a, b) => a[1].price - b[1].price);
+      const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
+        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
+      return `<h2>🌳 ร้านต้นไม้</h2><div class="sub">${hoursTxt('flower')} · ต้นไม้ใหญ่ พุ่มไม้ ดอกไม้ และไม้ประดับ ซื้อแล้วส่งเข้าคลังที่บ้าน วางเองด้วยปุ่ม 🛋️ จัดบ้าน · 🌱 อยากปลูกผัก? ซื้อ 🟫 แปลงดิน ที่ร้านเฟอร์นิเจอร์ (แท็บสวน)</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อต้นไม้ได้</div>'}
+        <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ptab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
+    }
     case 'barber':
     case 'fashion': {
       const W = { hair: [], shirt: [], pants: [], ...(me.wardrobe || {}) }, lk = me.look || {};
@@ -4714,7 +4830,7 @@ function renderPanel(p) {
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
         <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
-        <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div><div class="item"><div class="nm">🧾 ภาษีวันนี้<small>${money(me.taxT?.paid || 0)} (รายได้ ${money(me.taxT?.e || 0)})</small></div></div><div class="item"><div class="nm">⛽ ค่าน้ำมันวันนี้<small>${money(me.fuelT || 0)}</small></div></div></div><div class="sub">ภาษีรายวัน: รายได้ ฿20,000 แรกไม่เสีย · ส่วนที่เกินเสีย 10% · เกิน ฿60,000 เสีย 20% · รีเซ็ตเที่ยงคืน</div>
+        <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div><div class="item"><div class="nm">🧾 ภาษีวันนี้<small>${money(me.taxT?.paid || 0)} (รายได้ ${money(me.taxT?.e || 0)})</small></div></div><div class="item"><div class="nm">⛽ ค่าน้ำมันวันนี้<small>${money(me.fuelT || 0)}</small></div></div></div>${econHtml()}<div class="sub">ภาษีรายวัน: รายได้ ฿30,000 แรกไม่เสีย · ส่วนที่เกินเสีย 5% · เกิน ฿100,000 เสีย 10%${me.econ?.taxMul < 1 ? ' · <b>วันนี้ลดครึ่งหนึ่ง</b>' : ''} · รีเซ็ตเที่ยงคืน</div>
         ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
           return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
           <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
@@ -4950,7 +5066,7 @@ function phonePanel(p) {
     const T = G.taxi; if (!T) body = '<div class="sub">ยังไม่เปิดบริการ</div>';
     else {
       const AA = areaOf(me.x, me.y), ar = AA?.id || '', area = ar.startsWith('yard') ? 'housing' : ar, inRoom = !AA || AA.kind === 'room' || ar === 'farm';
-      const OUT = { housing: { x: 50, y: 4 }, park: { x: 50, y: 87 }, temple: { x: 74, y: 73.8 } }, here = OUT[area] || { x: me.x, y: me.y };
+      const OUT = { housing: { x: 50, y: 4 }, park: { x: 54, y: 57.4 }, temple: { x: 74, y: 73.8 } }, here = OUT[area] || { x: me.x, y: me.y };
       const fee = d => { const t = OUT[d.id] || d; return Math.round(T.base + Math.hypot(here.x - t.x, here.y - t.y) * T.perTile + (area !== 'town' ? T.far : 0) + (OUT[d.id] ? T.far : 0)); };
       const rows = T.dest.filter(d => Math.hypot(me.x - d.x, me.y - d.y) >= 3).map(d => [d, fee(d)]).sort((x, y) => x[1] - y[1])
         .map(([d, f]) => itemRowRaw(d.icon, esc(d.label), `ค่าโดยสาร <b style="color:var(--acc)">${money(f)}</b>`, B('🚕 ไป', { fn: 'taxiGo', dest: d.id }, 'good', inRoom || me.money < f))).join('');
@@ -5011,7 +5127,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=2'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v6').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v6'; });
+fetch('assets/atlas.json?v=v9').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v9'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
@@ -5762,6 +5878,10 @@ function startPlace(k) {
     placing = { k, house: r.house, fl: 9, brush: true, bx: [.5, r.w - .5, 1, r.h - .5], x: Math.floor(m.x - r.x) + .5, y: Math.floor(m.y - r.y) + 1 };
     return placeBar(k);
   }
+  if (r.yard && G.shop.furniture[fbase(k)]?.sprk) {   // sprinklers sit on a grid cell
+    placing = { k, house: r.house, fl: 9, cell: true, bx: [.5, r.w - .5, 1, r.h - .5], x: Math.floor(m.x - r.x) + .5, y: Math.floor(m.y - r.y) + 1 };
+    return placeBar(k);
+  }
   if (r.yard) {                                  // out in the yard
     placing = { flip: !!furnPos(wd.houses[r.house], k)?.[3], k, house: r.house, fl: 9, bx: [.7, r.w - .7, 1.5, r.h - .8], x: clamp(Math.round((m.x - r.x) * 2) / 2, .7, r.w - .7), y: clamp(Math.round((m.y - r.y - .8) * 2) / 2, 1.5, r.h - .8) };
     return placeBar(k);
@@ -5815,6 +5935,7 @@ function placeTap(wx, wy) {
     const nk = nextSoil(placing.k); if (!nk) { toast('วางแปลงดินครบแล้ว ซื้อเพิ่มได้ที่ร้านเฟอร์นิเจอร์ (แท็บสวน)', '🟫'); return endPlace(); }
     placing.k = nk; placing.x = cx + 1.5; placing.y = cy + 1; placeBar(nk); return;
   }
+  if (placing.cell) { placing.x = clamp(Math.floor(wx - r.x) + .5, placing.bx[0], placing.bx[1]); placing.y = clamp(Math.floor(wy - r.y) + 1, placing.bx[2], placing.bx[3]); return layoutFurniture(); }
   placing.x = clamp(Math.round((wx - r.x) * 4) / 4, placing.bx[0], placing.bx[1]); placing.y = clamp(Math.round((wy - r.y + .3) * 4) / 4, placing.bx[2], placing.bx[3]); layoutFurniture();
 }
 // can the piece in hand stand here? not poking into the room's walls, and not through a partition wall (nor a wall through furniture)
@@ -5825,6 +5946,8 @@ function placeBad() {
   const hw = a[2] / atlas.tile / 2 - .12, isWall = f.cat === 'wall', h = wd?.houses?.[placing.house]; if (!h) return '';
   if (placing.fl !== 9) { const r = AREA[`r_house${placing.house}` + (placing.fl > 1 ? `_f${placing.fl}` : '')]; if (r && (placing.x - hw < 1 - .05 || placing.x + hw > r.w - 1 + .05)) return 'วางทะลุกำแพงไม่ได้ ขยับเข้ามาในห้องอีกนิด'; }
   if (FLATF(sp)) return '';
+  if (placing.cell) { const cx = Math.floor(placing.x), cy = Math.round(placing.y) - 1;
+    return h[2].some(k => k !== placing.k && furnPos(h, k)?.[0] === 9 && (G.shop.furniture[fbase(k)]?.tile || G.shop.furniture[fbase(k)]?.sprk) && Math.floor(furnPos(h, k)[1]) === cx && Math.round(furnPos(h, k)[2]) - 1 === cy) ? 'ช่องนี้มีแปลงดินหรือสปริงเกลอร์อยู่แล้ว' : ''; }
   for (const k of h[2]) {
     if (k === placing.k) continue; const g = G.shop.furniture[fbase(k)], p = furnPos(h, k); if (!g || !p || p[0] !== placing.fl) continue;
     if ((g.cat === 'wall') === isWall || FLATF(furnSpr(k))) continue;          // walls may meet walls; rugs lie under anything
@@ -5875,10 +5998,10 @@ function layoutFurniture() {
         const pos = furnPos(h, k); let sp = furnSpr(k); if (!(pos && pos[0] === 9 && sp)) continue;
         const f = G.shop.furniture[fbase(k)];
         if (f?.tile) sp = soilSprite(soil, Math.floor(pos[1]), Math.round(pos[2]) - 1);   // joins up with the soil next to it
-        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, f?.field ? { k, house: r.house, tile: !!f.tile } : null, pos[3]]); hitAdd(r, k, sp, pos);
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, f?.field ? { k, house: r.house, tile: !!f.tile } : f?.sprk ? { k, house: r.house, spk: f.sprk } : null, pos[3]]); hitAdd(r, k, sp, pos);
         addWall(f, sp, r.x + pos[1], r.y + pos[2]);
       }
-      if (placing && placing.house === r.house && placing.fl === 9) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', null, placing.flip]);
+      if (placing && placing.house === r.house && placing.fl === 9) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', G.shop.furniture[fbase(placing.k)]?.sprk ? { spk: G.shop.furniture[fbase(placing.k)].sprk, ghost: 1 } : null, placing.flip]);
       continue;
     }
     if (r.kind !== 'room') continue;
