@@ -581,12 +581,12 @@ const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house ===
 const POOL = {};   // the park pool's water (filled in below): swimmers move freely inside it, nobody else (and no vehicle) can enter
 const ENERGY_MUL = 1.3;   // every energy cost (jobs, quests, fishing...) x this
 const RIDES = {
-  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 60, mins: 3, cap: 6, gain: { energy: 0.8, health: 0.32, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
-  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 90, mins: 4, cap: 8, gain: { energy: 0.72, health: 0.48, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
-  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 120, mins: 2, cap: 6, gain: { energy: 0.48, health: 0.16, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
-  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 80, mins: 4, cap: 10, gain: { energy: 0.96, health: 0.88, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
-  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 70, mins: 2, cap: 4, gain: { energy: 0.48, health: 0.16, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
-  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 40, mins: 2, cap: 3, gain: { energy: 0.4, health: 0.16, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
+  carousel: { name: 'ม้าหมุน', icon: '🎠', price: 60, mins: 3, cap: 6, gain: { energy: 2.0, health: 0.8, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
+  ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 90, mins: 4, cap: 8, gain: { energy: 1.8, health: 1.2, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
+  coaster:  { name: 'รถไฟเหาะ', icon: '🎢', price: 120, mins: 2, cap: 6, gain: { energy: 1.2, health: 0.4, happy: .8 }, desc: 'หวาดเสียว! ความสุขพุ่งที่สุด' },
+  pool:     { name: 'สระว่ายน้ำ', icon: '🏊', price: 80, mins: 4, cap: 10, gain: { energy: 2.4, health: 2.2, happy: .3 }, desc: 'ว่ายน้ำคลายร้อน ฟื้นเลือดดีที่สุด' },
+  bumper:   { name: 'รถบั๊มพ์', icon: '🚗', price: 70, mins: 2, cap: 4, gain: { energy: 1.2, health: 0.4, happy: .6 }, desc: 'ขับชนกันสนุกๆ' },
+  shooting: { name: 'เกมยิงเป้า', icon: '🎯', price: 40, mins: 2, cap: 3, gain: { energy: 1.0, health: 0.4, happy: .45 }, desc: 'ยิงเป้าเล่นเพลินๆ ราคาถูก' },
 };
 {
   const X = PARK.x, Y = PARK.y, P = PARK;
@@ -907,6 +907,7 @@ const ITEMS = {
   bread:  { name: 'ขนมปังไส้หมูหยอง', icon: '🥐', kind: 'goods', base: 30, eat: { hunger: 18 } },
   coffee: { name: 'กาแฟกระป๋อง', icon: '☕', kind: 'goods', base: 35, eat: { energy: 12 } },
   bento:  { name: 'ข้าวกล่องเวฟ', icon: '🍱', kind: 'goods', base: 55, eat: { hunger: 32, energy: 4 } },
+  petegg: { name: 'ไข่สัตว์เลี้ยงปริศนา', icon: '🥚', kind: 'goods', base: 0, egg: 1 },   // from inviting friends: open it in the bag to hatch a random pet
   popcorn: { name: 'ป๊อปคอร์นคาราเมล', icon: '🍿', kind: 'goods', base: 45, eat: { hunger: 8, happy: 5 } },
   cottoncandy: { name: 'สายไหมสีชมพู', icon: '🍭', kind: 'goods', base: 35, eat: { hunger: 3, happy: 7 } },
   soda: { name: 'น้ำอัดลมเย็นเจี๊ยบ', icon: '🥤', kind: 'goods', base: 25, eat: { hunger: 2, happy: 3 } },
@@ -1114,7 +1115,7 @@ const VEHICLES = {   // bought at the car showroom; ride outdoors (🛵 button) 
   porsche: { name: 'คลาสสิกเงินยวง', icon: '🚗', gem: 450, speed: 2.2, kind: 'car', license: 'driving', aura: '#cfe3ff' },
   jag:     { name: 'โรดสเตอร์เขียวมรกต', icon: '🚗', gem: 500, speed: 2.2, kind: 'car', license: 'driving', aura: '#3fe08a' },
   spider:  { name: 'สไปเดอร์ขาวทองคำ', icon: '🏎️', gem: 650, speed: 2.3, kind: 'car', license: 'driving', aura: '#ffd34d' },
-  heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', gem: 1500, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
+  heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', gem: 10000, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
   heli2:   { name: 'เฮลิคอปเตอร์กู้ภัยแดง', icon: '🚁', gem: 2000, speed: 2.6, kind: 'heli', license: 'driving', aura: '#ff6a8a', fly: 1, hidden: 1 },   // no longer sold (owners keep it)
   police:  { name: 'รถสายตรวจ', icon: '🚓', price: 150000, speed: 1.9, kind: 'car', license: 'driving', job: 'police' },
 };

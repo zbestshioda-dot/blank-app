@@ -417,6 +417,92 @@ function gangOp(a, m) {
 
 
 
+
+// ------------------------------------------------------------------ system letters (with gifts you claim in the mailbox)
+function sysMail(o, text, gift) {
+  o.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: '🏙️ เมือง Life Town', text, t: now(), read: 0, ...(gift ? { gift, got: 0 } : {}) }, ...(o.mail || [])].slice(0, 50);
+  o.sd = true; dirty = true;
+  if (o.ws) { markMe(o); send(o, { t: 'mail', list: o.mail }); toast(o, '📬 มีจดหมายใหม่ เปิดอ่านที่ ✉️', '📬'); }
+}
+function mailClaim(a, id) {
+  const x = (a.mail || []).find(y => y.id === id); if (!x || !x.gift || x.got) return;
+  x.got = 1; x.read = 1; const g = x.gift;
+  if (g.eggs) addItem(a, 'petegg', g.eggs);
+  if (g.gems) a.gems = (a.gems || 0) + g.gems;
+  if (g.money) credit(a, g.money);
+  a.sd = true; markMe(a); send(a, { t: 'mail', list: a.mail });
+  toast(a, `รับของขวัญแล้ว:${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
+}
+// a mystery egg: hatches into a pet you do not have yet (rarer ones less often)
+function hatchEgg(a) {
+  if (!(a.inv.petegg > 0)) return;
+  const pool = Object.entries(D.PETS).filter(([k]) => !(a.pets || []).includes(k));
+  addItem(a, 'petegg', -1);
+  if (!pool.length) { a.gems = (a.gems || 0) + 30; markMe(a); return toast(a, 'คุณมีสัตว์เลี้ยงครบทุกตัวแล้ว! ไข่กลายเป็น 💎30', '💎'); }
+  const W = { 1: 50, 2: 25, 3: 12, 4: 5, 5: 1.5 }, tot = pool.reduce((t, [, p]) => t + (W[p.rar] || 1), 0);
+  let r = Math.random() * tot, id = pool[0][0];
+  for (const [k, p] of pool) { r -= W[p.rar] || 1; if (r <= 0) { id = k; break; } }
+  const P = D.PETS[id]; a.pets = [...(a.pets || []), id]; a.pet = id; markMe(a); sendRoster(); joy(a, 8 + P.rar * 3);
+  send(a, { t: 'hatch', id, rar: P.rar });
+  if (P.rar >= 4) feed(`🥚 ${a.name} ฟักไข่ได้ ${P.icon}${P.name} สุดหายาก!`);
+  return toast(a, `🐣 ไข่ฟักแล้ว! ได้ ${P.icon}${P.name} มาเลี้ยง เดินตามคุณอยู่`, '🐣');
+}
+// ------------------------------------------------------------------ invite friends: a code to share; the new player gets an egg, the inviter an egg + 10 gems (in the mailbox)
+const REF = { gems: 10, max: 20, newHours: 72, needMin: 30 };   // the inviter is paid once the friend has really played 30 minutes
+function refCode(a) {
+  if (a.rcode) return a.rcode;
+  const C = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c;
+  do { c = ''; for (let i = 0; i < 6; i++) c += C[Math.floor(Math.random() * C.length)]; } while ([...accounts.values()].some(o => o.rcode === c));
+  a.rcode = c; a.sd = true; return c;
+}
+function refUse(a, code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (a.refBy) return toast(a, 'คุณใส่โค้ดเพื่อนไปแล้ว', '🎟️', false);
+  if (now() - (a.created || 0) > REF.newHours * 3600e3) return toast(a, `ใส่โค้ดเพื่อนได้เฉพาะผู้เล่นใหม่ภายใน ${REF.newHours / 24} วันแรก`, '🎟️', false);
+  const o = [...accounts.values()].find(x => x.rcode === code);
+  if (!o) return toast(a, 'ไม่พบโค้ดนี้ ตรวจดูอีกครั้งนะ', '🎟️', false);
+  if (o === a) return toast(a, 'ใส่โค้ดของตัวเองไม่ได้', '🎟️', false);
+  a.refBy = lk(o); a.sd = true; o.refN = (o.refN || 0) + 1; o.sd = true;
+  sysMail(a, `🎉 ยินดีต้อนรับ! คุณใส่โค้ดของ ${o.name} รับไข่สัตว์เลี้ยงปริศนา 1 ใบ แล้วเปิดในกระเป๋าเพื่อฟักเลย`, { eggs: 1 });
+  a.refPend = 1;
+  sysMail(o, `🎟️ ${a.name} ใช้โค้ดชวนเพื่อนของคุณแล้ว! เมื่อเพื่อนเล่นครบ ${REF.needMin} นาที คุณจะได้ไข่สัตว์เลี้ยงสุ่ม 1 ใบ และ 💎${REF.gems}`);
+  markMe(a); toast(a, `ใช้โค้ดของ ${o.name} แล้ว! ไปรับไข่ที่จดหมาย ✉️`, '🎟️');
+}
+// ------------------------------------------------------------------ market: unsold listings are bought by the town at a fair price
+const LIST_AUTO = 2 * 3600e3;   // after 2 hours on the stall
+function listingsTick() {
+  const t = now();
+  for (const o of accounts.values()) {
+    const L0 = o.listings || []; if (!L0.length) continue;
+    let total = 0, n = 0, keep = [];
+    for (const L of L0) {
+      if (!L.t) { L.t = t; o.sd = true; }
+      if (t - L.t < LIST_AUTO) { keep.push(L); continue; }
+      const fair = Math.max(1, Math.floor(Math.min(L.price, marketPrice(L.item) * 0.9)));
+      total += fair * L.qty; n += L.qty;
+    }
+    if (!n) continue;
+    o.listings = keep; o.sd = true; dirty = true; wdAt = 0;
+    const got = Math.floor(total * 0.92); credit(o, got); stat(o, 'psold', n);
+    if (o.ws) { quest(o, 'sell', n); toast(o, `🏪 ของที่วางขายครบ 2 ชั่วโมง ตลาดรับซื้อให้ ${n} ชิ้น ได้ ${money(got)}`, '💰'); markMe(o); }
+    else { sysMail(o, `🏪 ของที่คุณวางขายไว้ครบ 2 ชั่วโมงแล้ว ตลาดกลางรับซื้อให้ ${n} ชิ้น ในราคาตลาด ได้เงิน ${money(got)} เข้ากระเป๋าแล้ว`); }
+  }
+}
+// every minute: count real play (moved in the last 2 minutes) and pay the inviter once the friend reaches REF.needMin
+function refTick() {
+  const t = now();
+  for (const a of online.values()) {
+    if (!a.refPend || t - (a.lastMoveT || 0) > 120e3) continue;
+    a.actMin = (a.actMin || 0) + 1; a.sd = true;
+    if (a.actMin < REF.needMin) continue;
+    a.refPend = 0;
+    const o = accounts.get(a.refBy) || [...accounts.values()].find(x => lk(x) === a.refBy); if (!o) continue;
+    o.refPaid = (o.refPaid || 0) + 1; o.sd = true; dirty = true;
+    if (o.refPaid <= REF.max) sysMail(o, `🎉 ${a.name} เล่นครบ ${REF.needMin} นาทีแล้ว! รับไข่สัตว์เลี้ยงสุ่ม 1 ใบ และ 💎${REF.gems}`, { eggs: 1, gems: REF.gems });
+  }
+}
+setInterval(() => { try { refTick(); } catch (e) { console.error('refTick', e); } }, 60e3).unref?.();
+setInterval(() => { try { listingsTick(); } catch (e) { console.error('listingsTick', e); } }, 60e3).unref?.();
 // ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
 let ideas = [], ideaSeq = 1;
 function ideaView(a, sort) {
@@ -669,7 +755,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -902,7 +988,7 @@ function deliveryFee(x, y) {
 }
 const ridersOnline = () => [...online.values()].filter(r => r.career === 'rider' && !r.down);
 function orderView(o) {
-  return { id: o.id, item: o.item, state: o.state, fee: o.fee, tip: o.tip, cust: o.custName, npc: !!o.npc, rider: o.riderName || '', t: o.t,
+  return { id: o.id, item: o.item, qty: o.qty || 1, src: o.src || 'food', state: o.state, fee: o.fee, tip: o.tip, cust: o.custName, npc: !!o.npc, rider: o.riderName || '', t: o.t,
     dest: o.npc ? { x: o.npc.x, y: o.npc.y } : null, area: o.npc ? o.npc.area : null };
 }
 function ordersChanged() { for (const a of online.values()) if (a.career === 'rider' || allJobs(a) || [...orders.values()].some(o => o.cust === a)) markMe(a); }
@@ -919,6 +1005,27 @@ function placeOrder(a, m) {
   const rs = ridersOnline();
   rs.forEach(r => toast(r, `🛵 ออเดอร์ใหม่! ${it.icon}${it.name} ส่งให้ ${a.name} ค่าส่ง ${money(fee)}${tip ? ` + ทิป ${money(tip)}` : ''} (เปิดแอพไรเดอร์ใน 📱)`, '🔔'));
   toast(a, rs.length ? `สั่ง ${it.icon}${it.name} แล้ว ${money(total)} รอไรเดอร์รับออเดอร์ (มีไรเดอร์ออนไลน์ ${rs.length} คน)` : `สั่ง ${it.icon}${it.name} แล้ว ${money(total)} — ตอนนี้ไม่มีไรเดอร์ ร้านจะส่งเองแต่ช้ากว่า`, '🛵');
+  ordersChanged();
+}
+// order goods from the central market from the phone: bought from players' stalls now, a rider fetches them from the market
+function placeMarketOrder(a, m) {
+  const id = m.item, it = D.ITEMS[id]; if (!it) return;
+  if ([...orders.values()].filter(o => o.cust === a).length >= 2) return toast(a, 'สั่งได้ทีละไม่เกิน 2 ออเดอร์', '🛵', false);
+  let want = clamp(Math.floor(+m.qty) || 1, 1, 10);
+  const offers = []; for (const o of accounts.values()) if (o !== a) for (const L of o.listings || []) if (L.item === id) offers.push([L, o]);
+  offers.sort((x, y) => x[0].price - y[0].price);
+  let n = 0, cost = 0; for (const [L] of offers) { const k = Math.min(L.qty, want - n); n += k; cost += k * L.price; if (n >= want) break; }
+  if (!n) return toast(a, 'ตอนนี้ไม่มีผู้เล่นวางขายของชิ้นนี้', '🏪', false);
+  const fee = Math.round(deliveryFee(a.x, a.y) * .9), tip = clamp(Math.floor(+m.tip) || 0, 0, 500);
+  if (!pay(a, cost + fee + tip)) return;
+  let left = n; const soldBy = new Map();
+  for (const [L, o] of offers) { while (left > 0 && L.qty > 0) { L.qty--; left--; credit(o, Math.floor(L.price * 0.92)); soldBy.set(o, (soldBy.get(o) || 0) + 1); } if (L.qty <= 0) o.listings = o.listings.filter(x => x !== L); if (!left) break; }
+  for (const [o, k] of soldBy) { stat(o, 'psold', k); if (o.ws) { quest(o, 'sell', k); toast(o, `${a.name} สั่ง ${it.icon}${it.name} ของคุณ ${k} ชิ้น (ไรเดอร์กำลังมารับ)`, '💰'); } }
+  const o = { id: nextOrder++, cust: a, custName: a.name, item: id, qty: n, price: cost, fee, tip, state: 'open', t: now(), rider: null, src: 'market' };
+  orders.set(o.id, o); markMe(a); wdAt = 0;
+  const rs = ridersOnline();
+  rs.forEach(r => toast(r, `🛵 ออเดอร์ใหม่จากตลาดกลาง! ${it.icon}${it.name} x${n} ส่งให้ ${a.name} ค่าส่ง ${money(fee)}${tip ? ` + ทิป ${money(tip)}` : ''}`, '🛵'));
+  toast(a, `สั่ง ${it.icon}${it.name} x${n} แล้ว ${money(cost + fee + tip)} · ${rs.length ? `รอไรเดอร์ไปรับที่ตลาด (ออนไลน์ ${rs.length} คน)` : 'ยังไม่มีไรเดอร์ออนไลน์ ถ้าไม่มีใครรับใน 10 นาที ของจะส่งเข้ากระเป๋าให้เอง'}`, '🛵');
   ordersChanged();
 }
 function spawnNpcOrder() {
@@ -940,19 +1047,20 @@ function custNpcAdd(o) {
 function custNpcDel(o) { const i = npcs.findIndex(n => n.custOf === o.id); if (i >= 0) { npcs.splice(i, 1); npcRosterDirty = true; } }
 function cancelOrder(o, why) {
   orders.delete(o.id); custNpcDel(o);
-  if (o.cust) { o.cust.money += o.price + o.fee + o.tip; o.cust.sd = true; markMe(o.cust); toast(o.cust, `ออเดอร์ ${D.ITEMS[o.item].name} ถูกยกเลิก (${why}) คืนเงินแล้ว`, '↩️', false); }
+  if (o.cust && o.src === 'market') { addItem(o.cust, o.item, o.qty || 1); o.cust.money += o.fee + o.tip; o.cust.sd = true; markMe(o.cust); toast(o.cust, `ส่งของจากตลาดไม่สำเร็จ (${why}) · ${D.ITEMS[o.item].name} x${o.qty || 1} ใส่กระเป๋าให้แล้ว คืนค่าส่ง`, '↩️', false); }
+  else if (o.cust) { o.cust.money += o.price + o.fee + o.tip; o.cust.sd = true; markMe(o.cust); toast(o.cust, `ออเดอร์ ${D.ITEMS[o.item].name} ถูกยกเลิก (${why}) คืนเงินแล้ว`, '↩️', false); }
   if (o.rider) toast(o.rider, `ออเดอร์ของ ${o.custName} ถูกยกเลิก (${why})`, '↩️', false);
   ordersChanged();
 }
 function finishOrder(o, rider) {
   orders.delete(o.id); custNpcDel(o);
-  if (o.cust) { addItem(o.cust, o.item, 1); markMe(o.cust); o.cust.sd = true; }
+  if (o.cust) { addItem(o.cust, o.item, o.qty || 1); markMe(o.cust); o.cust.sd = true; }
   if (rider) {
     const got = earn(rider, (o.fee * (1 + [0, .1, .2, .35][tier(rider, 'rider')]) * jobPay(rider) + o.tip) * wellbeing(rider));
     addXp(rider); stat(rider, 'delivered'); quest(rider, 'deliver');
-    toast(rider, `ส่งอาหารให้ ${o.custName} สำเร็จ! ได้ ${money(got)}${o.tip ? ` (รวมทิป ${money(o.tip)})` : ''}`, '🛵');
+    toast(rider, `ส่ง${o.src === 'market' ? 'ของ' : 'อาหาร'}ให้ ${o.custName} สำเร็จ! ได้ ${money(got)}${o.tip ? ` (รวมทิป ${money(o.tip)})` : ''}`, '🛵');
     if (o.cust) toast(o.cust, `${rider.name} มาส่ง ${D.ITEMS[o.item].icon}${D.ITEMS[o.item].name} แล้ว! (อยู่ในกระเป๋า 🎒)`, '🛵');
-  } else if (o.cust) toast(o.cust, `ร้านมาส่ง ${D.ITEMS[o.item].icon}${D.ITEMS[o.item].name} แล้ว (อยู่ในกระเป๋า 🎒)`, '🛵');
+  } else if (o.cust) toast(o.cust, `${o.src === 'market' ? 'ตลาดกลางส่งของให้เอง' : 'ร้านมาส่ง'} ${D.ITEMS[o.item].icon}${D.ITEMS[o.item].name}${o.qty > 1 ? ' x' + o.qty : ''} แล้ว (อยู่ในกระเป๋า 🎒)`, '🛵');
   ordersChanged();
 }
 function riderAct(a, m) {
@@ -967,13 +1075,13 @@ function riderAct(a, m) {
     if (!hasLic(a, 'driving')) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุแล้ว! ต่ออายุที่โชว์รูมรถ (ปีละครั้ง)' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
     if (!spend(a, 5)) return;                       // every job / quest costs energy
     o.state = 'taken'; o.rider = a; o.riderName = a.name; o.takenAt = now(); custNpcAdd(o);
-    if (o.cust) toast(o.cust, `${a.name} รับออเดอร์แล้ว กำลังไปรับอาหารที่ร้าน`, '🛵');
-    toast(a, 'รับออเดอร์แล้ว! ไปรับอาหารที่เคาน์เตอร์ร้านอาหารก่อน', '🛵');
+    if (o.cust) toast(o.cust, `${a.name} รับออเดอร์แล้ว กำลังไปรับ${o.src === 'market' ? 'ของที่ตลาด' : 'อาหารที่ร้าน'}`, '🛵');
+    toast(a, o.src === 'market' ? 'รับออเดอร์แล้ว! ไปรับของที่ตลาดกลางก่อน' : 'รับออเดอร์แล้ว! ไปรับอาหารที่เคาน์เตอร์ร้านอาหารก่อน', '🛵');
     return ordersChanged();
   }
   if (m.t === 'order_drop') { if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; custNpcDel(o); ordersChanged(); } return; }
   if (m.t === 'order_deliver') {
-    if (o.rider !== a || o.state !== 'picked') return toast(a, 'ยังไม่ได้รับอาหารจากร้าน', '🛵', false);
+    if (o.rider !== a || o.state !== 'picked') return toast(a, o.src === 'market' ? 'ยังไม่ได้รับของจากตลาดกลาง' : 'ยังไม่ได้รับอาหารจากร้าน', '🛵', false);
     const tgt = o.cust ? o.cust : o.npc, ok = tgt && areaId(a) === (o.cust ? areaId(o.cust) : o.npc.area) && Math.hypot(a.x - tgt.x, a.y - tgt.y) < 2.5;
     if (o.cust && !o.cust.ws) return cancelOrder(o, 'ลูกค้าออฟไลน์');
     if (!ok) return toast(a, `ต้องไปให้ถึงตัวลูกค้าก่อน (${o.custName})`, '📍', false);
@@ -1319,10 +1427,11 @@ function act(a, m) {
       const q = Math.floor(+m.qty), price = Math.floor(+m.price);
       if (!it || !(q > 0) || !(price > 0)) return toast(a, 'ใส่จำนวนและราคาให้ถูกต้อง', '⚠️', false);
       if ((a.inv[id] || 0) < q) return toast(a, 'มีของไม่พอ', '⚠️', false);
+      if (it.egg) return toast(a, 'ไข่สัตว์เลี้ยงขายไม่ได้', '🥚', false);
       if (price > it.base * 5) return toast(a, `ตั้งราคาได้ไม่เกิน ${money(it.base * 5)} ต่อชิ้น`, '⚠️', false);
       if ((a.listings || []).length >= 8) return toast(a, 'วางขายได้พร้อมกันไม่เกิน 8 รายการ', '⚠️', false);
       addItem(a, id, -q);
-      a.listings = [...(a.listings || []), { id: nextListing++, item: id, qty: q, price }];
+      a.listings = [...(a.listings || []), { id: nextListing++, item: id, qty: q, price, t: now() }];
       markMe(a); wdAt = 0;
       return toast(a, `วางขาย ${it.icon}${it.name} x${q} ราคา ${money(price)}/ชิ้น`, '🏷️');
     }
@@ -1358,7 +1467,8 @@ function act(a, m) {
       addItem(a, id, q); markMe(a); quest(a, 'buy', q);
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ${money(unit * q)} · ขอบคุณที่ใช้บริการ 🙏`, '🏪');
     }
-    case 'market.npcbuy': {
+    case 'market.npcbuy': return toast(a, 'ร้าน NPC ที่ตลาดกลางเลิกขายแล้ว · ซื้อจากผู้เล่นได้ หรือสั่งให้ไรเดอร์ไปรับมาส่งในแอพ 📱 เดลิเวอรี', '🏪', false);
+    case 'market.npcbuy_old': {
       const id = m.item, it = D.ITEMS[id]; if (!it || it.kind === 'fish' && (it.base >= 1000 || it.rar >= 3) || it.menu) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = npcSellPrice(id);
       if (!pay(a, unit * q)) return;
@@ -1421,10 +1531,18 @@ function act(a, m) {
       addItem(a, m.item, q); markMe(a);
       return toast(a, `ซื้อ${it.icon}${it.name} x${q} ใส่กระเป๋าแล้ว ${money(it.base * q)} (กินได้ทุกเมื่อในกระเป๋า 🎒)`, '🥡');
     }
+    case 'market.pickup': {
+      if (!need(a, 'rider')) return;
+      const mine = [...orders.values()].filter(o => o.rider === a && o.state === 'taken' && o.src === 'market');
+      if (!mine.length) return toast(a, 'ไม่มีออเดอร์ของจากตลาดที่ต้องรับ', '🛵', false);
+      mine.forEach(o => { o.state = 'picked'; if (o.cust) toast(o.cust, `${a.name} รับของจากตลาดแล้ว กำลังไปส่ง`, '🛵'); });
+      ordersChanged();
+      return toast(a, `รับของ ${mine.length} ออเดอร์จากตลาดแล้ว! ไปส่งให้ลูกค้า`, '📦');
+    }
     case 'restaurant.pickup': {
       if (!need(a, 'rider')) return;
-      const mine = [...orders.values()].filter(o => o.rider === a && o.state === 'taken');
-      if (!mine.length) return toast(a, 'ไม่มีออเดอร์ที่ต้องรับ (รับออเดอร์ในแอพไรเดอร์ 📱 ก่อน)', '🛵', false);
+      const mine = [...orders.values()].filter(o => o.rider === a && o.state === 'taken' && o.src !== 'market');
+      if (!mine.length) return toast(a, 'ไม่มีออเดอร์อาหารที่ต้องรับ (ของจากตลาดไปรับที่ตลาดกลาง)', '🛵', false);
       mine.forEach(o => { o.state = 'picked'; if (o.cust) toast(o.cust, `${a.name} รับอาหารแล้ว กำลังไปส่ง`, '🛵'); });
       ordersChanged();
       return toast(a, `รับอาหาร ${mine.length} ออเดอร์แล้ว! ไปส่งให้ลูกค้า (ดูทางในแอพ)`, '🥡');
@@ -1670,6 +1788,7 @@ function act(a, m) {
     case 'pier.cast': {                    // cast from the water's edge (the big button); the float lands a couple of tiles out
       if (!rodOf(a)) return toast(a, `ต้องมีเบ็ดตกปลาก่อน — ซื้อได้ที่สมาคมประมง (เริ่ม ${money(D.RODS.bamboo.price)})`, '🎣', false);
       if (a.cast) return;
+      if (riding(a)) return toast(a, 'ลงจากรถก่อนถึงจะตกปลาได้', '🎣', false);
       if (!spend(a, 8)) return;
       const bite = now() + rnd(2500, 7000) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
       a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round(2200 + r.zone * 3000 + 30 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
@@ -3341,6 +3460,10 @@ function onMessage(ws, raw) {
     case 'act': return act(a, m);
     case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband'].includes(m.op)) sendRoster(); return; }
     case 'visit': { if (a.down) return; const o = byPhone.get(String(m.p || '')); if (!o || !o.ws || !o.hown || hidden(o)) return toast(a, 'เพื่อนคนนี้ไม่ได้ออนไลน์อยู่ หรือยังไม่มีบ้าน', '🏡', false); return goHome(a, o); }
+    case 'morder': { if (!cd(a, 'morder', 1500, true)) return; return placeMarketOrder(a, m); }
+    case 'mailclaim': return mailClaim(a, m.id);
+    case 'refcode': return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: !a.refBy && now() - (a.created || 0) < REF.newHours * 3600e3 ? 1 : 0, gems: REF.gems });
+    case 'refuse': { if (!cd(a, 'refuse', 2000, true)) return; refUse(a, m.code); return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: 0, gems: REF.gems }); }
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
@@ -3367,7 +3490,7 @@ function onMessage(ws, raw) {
     }
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
-    case 'use': return useItem(a, m.item);
+    case 'use': return m.item === 'petegg' ? (cd(a, 'use', 600) && hatchEgg(a)) : useItem(a, m.item);
     case 'pet.leash': { if (!a.leash) return toast(a, 'ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง', '🦮', false); a.leashOn = a.leashOn ? 0 : 1; markMe(a); sendRoster(); return toast(a, a.leashOn ? 'ใส่สายจูงแล้ว' : 'ถอดสายจูงแล้ว', '🦮'); }
     case 'pet.name': {
       if (!(a.pets || []).includes(m.id)) return;
@@ -3491,6 +3614,7 @@ function onMessage(ws, raw) {
       if (!k || a.ride === k && !m.on) { if (D.VEHICLES[a.ride]?.fly && D.blocked(a.x, a.y)) return toast(a, 'หาที่โล่งลงจอดก่อน 🚁', '🚁', false); a.ride = ''; }
       else {
         const v = D.VEHICLES[k]; if (!v || !(a.vehicles || []).includes(k)) return;
+        if (a.cast) return toast(a, 'เก็บเบ็ดก่อนถึงจะขึ้นรถได้', '🎣', false);
         if (a.pass) hopOff(a);
         if (v.license && !hasLic(a, v.license)) return toast(a, licExpired(a, 'driving') ? 'ใบขับขี่หมดอายุ! ต่ออายุที่โชว์รูมรถก่อนขับ' : 'ต้องมีใบขับขี่ก่อน', '🪪', false);
         a.ride = k;
@@ -3810,7 +3934,7 @@ function tick() {
     if (t > npcPatientAt) { const docs = [...online.values()].some(o => o.career === 'doctor'); npcPatientAt = t + (docs ? rnd(60000, 120000) : rnd(150000, 300000)); spawnPatient(); }
     // food delivery
     for (const o of [...orders.values()]) {
-      if (o.state === 'open' && !o.npc && t - o.t > (ridersOnline().length ? 90000 : 60000)) finishOrder(o, null);
+      if (o.state === 'open' && !o.npc && t - o.t > (o.src === 'market' ? (ridersOnline().length ? 600000 : 180000) : ridersOnline().length ? 90000 : 60000)) finishOrder(o, null);
       else if (o.state === 'open' && o.npc && t - o.t > 240000) { orders.delete(o.id); custNpcDel(o); ordersChanged(); }
       else if (o.state !== 'open' && o.takenAt && t - o.takenAt > 360000) { const r = o.rider; o.state = 'open'; o.rider = null; o.riderName = ''; o.takenAt = 0; if (r) toast(r, `ส่งออเดอร์ของ ${o.custName} ช้าเกินไป ออเดอร์ถูกส่งต่อให้คนอื่น`, '⌛', false); ordersChanged(); }
     }
