@@ -600,7 +600,7 @@ const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house ===
 // k: ride, cx/cy: centre of its footprint, w/h: footprint (solid), cap: riders at once, price: ticket, mins: ticket length,
 // gain: per second while riding
 const POOL = {};   // the park pool's water (filled in below): swimmers move freely inside it, nobody else (and no vehicle) can enter
-const ENERGY_MUL = 1.3;   // every energy cost (jobs, quests, fishing...) x this
+const ENERGY_MUL = 0.9;   // every energy cost (jobs, quests, fishing...) x this (was 1.3: players ran dry too fast)
 const RIDES = {
   carousel: { name: 'ม้าหมุน', icon: '🎠', price: 0, mins: 3, cap: 6, gain: { energy: 2.0, health: 0.8, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
   ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 0, mins: 4, cap: 8, gain: { energy: 1.8, health: 1.2, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },
@@ -808,20 +808,20 @@ const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
 const DOCTOR = { start: 8, end: 20, wage: [88, 98, 110, 125, 140, 158, 178] };   // (old shift pay, kept for reference)
 // ICU cases: pay per case by level, x (0.6 + 0.6 * score); a new case is ready this long after the last one
-const ICU = { pay: [55, 62, 70, 80, 90, 104, 120], next: 75000, energy: 6,
+const ICU = { pay: [55, 62, 70, 80, 90, 104, 120], next: 45000, energy: 6,
   cpr: { n: 20, bpm: [100, 110, 120] }, surgery: { steps: 5 },
   patients: ['คุณสมชาย (หัวใจหยุดเต้น)', 'ป้าบุญมี (หมดสติกลางตลาด)', 'น้องปิ่น (อุบัติเหตุจักรยาน)', 'ลุงเหม (ไส้ติ่งแตก)', 'พี่ก้อง (ถูกรถชน)', 'คุณยายทองคำ (หัวใจวาย)', 'หนุ่มนักวิ่ง (ล้มหมดสติ)', 'ช่างไฟ (ไฟดูด)'] };   // above office: needs a degree + licence
 // lost-dog cases for police: find the dog before the time runs out; pay = base + perMin x the minutes the search took (x a speed bonus when found early)
 // job mini-games, played on the client and paid by the server: score is capped by max and by how long the game ran (rate per second)
 const JOBGAMES = {
-  spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 40, min: 10, max: 5, per: 8, rate: .5 },
-  shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 40, min: 20, max: 30, per: 1.4, rate: 1.6 },
-  cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 25, min: 20, max: 10, per: 5.5, rate: .4 },
-  slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 30, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
+  spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 25, min: 10, max: 5, per: 8, rate: .5 },
+  shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 25, min: 20, max: 30, per: 1.4, rate: 1.6 },
+  cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 15, min: 20, max: 10, per: 5.5, rate: .4 },
+  slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 18, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
-const THIEFQ = { energy: 6, next: 50000, base: 110, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
-const DOGQ = { next: 45000, energy: 5, base: 70, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
+const THIEFQ = { energy: 6, next: 30000, base: 110, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
+const DOGQ = { next: 27000, energy: 5, base: 70, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
   dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],
   names: ['โมจิ', 'ถุงเงิน', 'ทองดี', 'บราวนี่', 'ข้าวปั้น', 'ลัคกี้', 'มะลิ', 'ซุปเปอร์', 'โบว์', 'หมูกรอบ', 'ลาเต้', 'ขาวจั๊วะ'],
   owners: ['คุณยายบุญมี', 'น้องปิ่น', 'ลุงสมชาย', 'ป้าแดง', 'คุณหมอใจดี', 'เด็กชายต้น', 'พี่ติ๊ก', 'ครูสมศรี'] };

@@ -96,6 +96,7 @@ function wellbeing(a) {
 function stat(a, key, n = 1, absolute = false) {
   a.stats = a.stats || {};
   a.stats[key] = absolute ? Math.max(a.stats[key] || 0, n) : (a.stats[key] || 0) + n;
+  if (!absolute) try { repFrom(a, key, n); } catch {}
   for (const ac of D.ACHIEVEMENTS) {
     if (ac.stat !== key || (a.ach || []).includes(ac.id) || a.stats[key] < ac.n) continue;
     a.ach = [...(a.ach || []), ac.id];
@@ -699,7 +700,8 @@ const znAlive = a => zn?.ph === 'on' && zn.alive.has(a.id);
 const zombies = () => npcs.filter(n => n.zb);
 function znState(a) {
   if (!zn) return { t: 'zn', ph: 'off' };
-  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '' };
+  const names = zn.ph === 'on' ? [...zn.alive].map(id => online.get(id)?.name).filter(Boolean).slice(0, 30) : [];
+  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, names, me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '' };
 }
 function znSendAll() { for (const o of online.values()) send(o, znState(o)); }
 function znStart(t, test) {
@@ -762,7 +764,7 @@ function znEnd(t) {
   npcRosterDirty = true;
   feed(alive.length ? `🌅 ฟ้าสางแล้ว ซอมบี้หายไปหมด · ผู้รอดชีวิต ${alive.length} คน: ${alive.slice(0, 8).map(a => a.name).join(', ')}${alive.length > 8 ? ' ...' : ''}` : '🌅 ฟ้าสางแล้ว ซอมบี้หายไปหมด · คืนนี้ไม่มีใครรอดเลย!');
   const was = zn; zn = null;
-  for (const o of online.values()) { send(o, { t: 'zn', ph: 'end', won: was.alive.has(o.id) ? 1 : 0, n: alive.length }); }
+  for (const o of online.values()) { send(o, { t: 'zn', ph: 'end', won: was.alive.has(o.id) ? 1 : 0, n: alive.length, names: alive.map(a => a.name).slice(0, 30), ids: alive.map(a => a.id) }); }
 }
 function znTick() {
   const t = now(), bk = new Date(t + 7 * 3600e3), day = dayKey();
@@ -873,6 +875,20 @@ const MAYOR = { minLv: 8, voteLv: 5, fee: 50000, camp: 10000, campDay: 4, salary
   pol: { tax: { n: '💹 ลดภาษี', d: 'รายได้ของทุกคนในเมือง +3%' }, care: { n: '🎁 เบี้ยเมือง', d: 'ทุกคนรับเบี้ยเมือง 400 บาททุกวัน' } } };
 let mayor = null;                // { l, n, pol, terms, at, ann, annD, salD }
 let elect = { cy: '', c: {} };   // c: login -> { n, rep, v: { voter: 1 }, t, rd: { d, n } }
+// candidates also earn reputation by doing good for the town (free, capped per day); paid campaigning stays on top
+const REP_SRC = { donated: [1, 'ให้ทานผู้อื่น'], treated: [.5, 'รักษาคนไข้'], revived: [1, 'ช่วยชีวิตคน'], missions: [.5, 'ทำภารกิจช่วยเมือง'],
+  delivered: [.5, 'ส่งของให้ชาวเมือง'], trash: [.05, 'เก็บขยะให้เมือง'], pray: [.25, 'ทำบุญที่วัด'], zsurvive: [3, 'รอดจากคืนปล่อยผี'], quizOk: [.2, 'ตั้งใจเรียน'] };
+const REP_DAY = 6;
+function repFrom(a, key, n) {
+  const src = REP_SRC[key]; if (!src || !a?.login) return;
+  const c = elect.c[lk(a)]; if (!c) return;
+  const d = dayKey(); if (!c.ad || c.ad.d !== d) c.ad = { d, n: 0 };
+  if (c.ad.n >= REP_DAY) return;
+  c.fr = (c.fr || 0) + src[0] * n;
+  const g = Math.min(Math.floor(c.fr), REP_DAY - c.ad.n); if (g <= 0) return;
+  c.fr -= Math.floor(c.fr); c.rep += g; c.ad.n += g; gdirty();
+  toast(a, `ชื่อเสียง +${g} จาก${src[1]} (รวม ${c.rep})${c.ad.n >= REP_DAY ? ' · วันนี้ได้ครบแล้ว' : ''}`, '🌟');
+}
 const cycleKey = () => String(Math.floor(Date.parse(weekKey()) / 604800e3 / MAYOR.weeks));
 const isMayor = a => !!mayor && mayor.l === lk(a);
 const votesOf = c => Object.keys(c.v).length;
@@ -897,7 +913,7 @@ function mayorView(a) {
   const cands = Object.entries(elect.c).map(([l, c]) => ({ l, n: c.n, v: votesOf(c), rep: c.rep, s: votesOf(c) * 10 + c.rep })).sort((x, y) => y.s - x.s);
   const mc = elect.c[me];
   return { t: 'mayor', my: me, cur: mayor ? { l: mayor.l, n: mayor.n, pol: mayor.pol, terms: mayor.terms, ann: mayor.ann } : null, isMe: isMayor(a) ? 1 : 0, left: (MAYOR.weeks - (tw % MAYOR.weeks)) * 7 - dow, cands,
-    voted: Object.entries(elect.c).find(([, c]) => c.v[me])?.[0] || '', run: mc ? { rep: mc.rep, left: Math.max(0, MAYOR.campDay - (mc.rd?.d === d ? mc.rd.n : 0)) } : null,
+    voted: Object.entries(elect.c).find(([, c]) => c.v[me])?.[0] || '', run: mc ? { rep: mc.rep, left: Math.max(0, MAYOR.campDay - (mc.rd?.d === d ? mc.rd.n : 0)), act: mc.ad?.d === d ? mc.ad.n : 0, actMax: REP_DAY } : null,
     claimed: a.mpd === d ? 1 : 0, salDone: mayor?.salD === d ? 1 : 0, annDone: mayor?.annD === d ? 1 : 0, lv: lvl(a), K: { ...MAYOR, pol: undefined }, pol: MAYOR.pol };
 }
 function mayorOp(a, m) {
@@ -2961,14 +2977,14 @@ function misNext(a) {
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
   const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((110 + 80 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
-  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else a.misNext = t + 30000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
+  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else a.misNext = t + 18000; earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(pay)}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
 }
 const FX0 = (a, kind) => send(a, { t: 'mfx', kind });
 function misTick(a, t, dt) {
   const m = a.mis, c = m.steps[m.i];
-  if (t > m.until) { a.mis = null; if (m.kind === 'icu') a.icuNext = t + D.ICU.next; else a.misNext = t + 60000; joy(a, -3); markMe(a); return toast(a, `⏰ หมดเวลา! ภารกิจ "${m.title}" ล้มเหลว`, '😢', false); }
+  if (t > m.until) { a.mis = null; if (m.kind === 'icu') a.icuNext = t + D.ICU.next; else a.misNext = t + 36000; joy(a, -3); markMe(a); return toast(a, `⏰ หมดเวลา! ภารกิจ "${m.title}" ล้มเหลว`, '😢', false); }
   if (!c || areaId(a) !== (c.area || 'town')) return;
   const d = Math.hypot(a.x - c.x, a.y - c.y);
   const last = m.trail[m.trail.length - 1]; if (!last || Math.hypot(a.x - last[0], a.y - last[1]) > .35) { m.trail.push([a.x, a.y]); if (m.trail.length > 80) m.trail.shift(); }
