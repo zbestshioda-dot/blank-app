@@ -521,7 +521,7 @@ function handle(m) {
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
       paintChatBox(m);
-      const s = P.get(m.id); if (s && !m.sys && !m.w) {
+      const s = P.get(m.id); if (s && !m.sys && !m.w && !m.g) {
         const em = (m.text.match(/\p{Extended_Pictographic}(\u200d\p{Extended_Pictographic}|\ufe0f)*/gu) || []).slice(0, 3).join('');   // emoji in a chat line float big over your head
         const only = em && !m.text.replace(/[\p{Extended_Pictographic}\ufe0f\u200d\s]/gu, '');
         if (em) { s.emo = em; s.emoT = performance.now() + 4500; }
@@ -587,11 +587,11 @@ function handle(m) {
 // ---- the chat box under the status card: tabs, foldable, type straight into it
 let cbTab = 'all', cbFolded = false, cbUnread = 0;
 try { cbFolded = localStorage.getItem('lt_cb') === '1'; } catch { }
-const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : !m.sys && !m.w);
+const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : cbTab === 'gang' ? m.g : !m.sys && !m.w && !m.g);
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
   box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
-    : `<div class="${m.call ? 'call' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
+    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
   box.scrollTop = box.scrollHeight;
   if (added && cbFolded && !added.sys) { cbUnread++; $('#cbNew').textContent = cbUnread; }
 }
@@ -604,10 +604,10 @@ $('#cbFold').onclick = () => { FX.play('click'); foldChat(true); };
 $('#cbOpen').onclick = () => { FX.play('click'); foldChat(false); };
 document.querySelectorAll('#chatBox [data-ct]').forEach(b => b.onclick = () => {
   cbTab = b.dataset.ct; document.querySelectorAll('#chatBox [data-ct]').forEach(x => x.classList.toggle('on', x === b));
-  $('#cbIn').placeholder = cbTab === 'world' || cbTab === 'all' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
+  $('#cbIn').placeholder = cbTab === 'gang' ? (me?.gang ? 'แตะเพื่อพิมพ์ · แชทแก๊ง (เห็นแค่สมาชิก)' : 'ยังไม่มีแก๊ง · เข้าร่วมได้ในแอป 🏴') : cbTab === 'world' || cbTab === 'all' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
   paintChatBox();
 });
-$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (!i.value.trim()) return; const ch = cbTab === 'world' || cbTab === 'all' ? 'world' : 'near'; if (!worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; i.blur(); };
+$('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (!i.value.trim()) return; const ch = cbTab === 'gang' ? 'gang' : cbTab === 'world' || cbTab === 'all' ? 'world' : 'near'; if (ch !== 'gang' && !worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; i.blur(); };
 foldChat(cbFolded);
 function logLine(html, cls, bubbleOnly) {
   const l = $('#log'); const d = document.createElement('div');
@@ -623,8 +623,12 @@ function toast(msg, icon = '✅', ok = true) {
   if (recentToasts.get(key) > t0 - 8000) return;
   recentToasts.set(key, t0); if (recentToasts.size > 50) recentToasts.delete(recentToasts.keys().next().value);
   // notices float above your own character's head (the CBT ticker stays at the top of the screen)
-  heads.push({ text: `${icon} ${msg}`, ok, t: t0, life: Math.min(7000, 3200 + msg.length * 45) });
-  while (heads.length > 2) heads.shift();
+  // notices pop up in the middle of the screen, as the same card as the fishing cue
+  const box = $('#notices'), d = document.createElement('div'), life = Math.min(7000, 3200 + msg.length * 45);
+  d.className = 'notice' + (ok ? '' : ' bad'); d.innerHTML = `<b>${esc(icon)}</b><small>${esc(msg)}</small>`;
+  d.style.animationDuration = `.25s, ${life}ms`;
+  box.prepend(d); while (box.children.length > 2) box.lastChild.remove();
+  setTimeout(() => d.remove(), life);
 }
 const heads = [];
 const wrapCache = new Map();
@@ -641,18 +645,19 @@ function drawHeads(X, Y) {
   const m = P.get(myId), now = performance.now(); if (!m) { heads.length = 0; return; }
   for (let i = heads.length - 1; i >= 0; i--) if (now - heads[i].t > heads[i].life) heads.splice(i, 1);
   if (!heads.length) return;
-  const fs = Math.max(11, Math.round(TS * .27)), lh = fs * 1.3, maxW = Math.min(VW - 40, TS * 6.5);
+  const fs = clamp(Math.round(TS * .26), 12, 15), lh = fs * 1.35, maxW = Math.min(VW - 40, 340);   // same card look as the fishing cue: dark, gold rim
   ctx.save(); ctx.font = `600 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   let by = (m.ry + (m.oy || 0)) * TS + Y - TS * 2.15 - (m.pose ? 0 : 0);
   const cx = clamp((m.rx + (m.ox || 0)) * TS + X, maxW / 2 + 8, VW - maxW / 2 - 8);
   for (let i = heads.length - 1; i >= 0; i--) {                    // newest closest to the head, older ones above
     const h = heads[i], age = now - h.t, a = Math.min(1, age / 180, (h.life - age) / 450);
-    const lines = wrapText(h.text, maxW - 18), w = Math.max(...lines.map(l => textW(l))) + 18, hh = lines.length * lh + 8;
+    const lines = wrapText(h.text, maxW - 28), w = Math.max(...lines.map(l => textW(l))) + 28, hh = lines.length * lh + 14;
     by -= hh + 4; const y = by + (1 - Math.min(1, age / 180)) * 8;
     ctx.globalAlpha = Math.max(0, a);
-    ctx.fillStyle = h.ok ? 'rgba(255,248,232,.96)' : 'rgba(255,232,224,.97)'; ctx.strokeStyle = h.ok ? '#6b8f2c' : '#b8452f'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(cx - w / 2, y, w, hh, 9); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#3a2410'; lines.forEach((l, k) => ctx.fillText(l, cx, y + 4 + lh * (k + .5)));
+    ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+    ctx.fillStyle = h.ok ? 'rgba(48,30,12,.9)' : 'rgba(70,22,14,.92)'; ctx.beginPath(); ctx.roundRect(cx - w / 2, y, w, hh, 13); ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.strokeStyle = h.ok ? '#d9b25a' : '#e0574a'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = '#fff6e0'; lines.forEach((l, k) => ctx.fillText(l, cx, y + 7 + lh * (k + .5)));
   }
   ctx.restore();
 }
@@ -682,10 +687,13 @@ function paintDogChip() {
   if (!q) return c.classList.add('hidden');
   const left = Math.max(0, Math.ceil((q.until - Date.now() - clockOff) / 1000));
   const tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  c.classList.remove('hidden'); c.classList.toggle('late', left < 30); c.textContent = q.kind === 'thief' ? `🚨 จับโจร ${q.name} · ${tm}` : `🐕 ตามหา น้อง${q.name} · ${tm}`;
+  c.classList.remove('hidden'); c.classList.toggle('late', left < 30); c.innerHTML = `${esc(q.kind === 'thief' ? `🚨 จับโจร ${q.name} · ${tm}` : `🐕 ตามหา น้อง${q.name} · ${tm}`)}<span class="chipX" data-x="dog">✕</span>`;
   document.querySelectorAll('.dogcd').forEach(el => { el.textContent = tm; });
 }
 setInterval(paintDogChip, 500);
+const quitAsk = (txt, go) => popup(txt, [['ยกเลิกเลย', 'warn', go], ['ทำต่อ', 'good', () => { }]], 10000);
+$('#dogChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const q = me?.dogq; if (q) quitAsk(q.kind === 'thief' ? `ยกเลิกเคสจับโจร "${esc(q.name)}"?` : `ยกเลิกเคสตามหาน้อง${esc(q.name)}?`, () => send({ t: 'questquit' })); }, true);
+$('#misChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const m = me?.mis; if (m) quitAsk(`ยกเลิกภารกิจ "${esc(m.title)}"?`, () => send({ t: 'mission', op: 'quit' })); }, true);
 $('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
 $('#cbOn').onclick = () => openPanel({ kind: 'friends' });
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
@@ -757,7 +765,7 @@ function paintHud() {
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
   const atDesk = me.career === 'office' && me.chair != null && me.chair >= 0 || me.desk != null && me.desk >= 0; $('#mgBtn').classList.add('hidden'); if (!$('#mg').classList.contains('hidden') && !JG.cur && !$('#mgBody .mgEnd') && !$('#gLinkBtn')) mgClose();   // (mini-games were removed)
-  $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
+  if (!placing) $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>';
   $('#begBtn').classList.toggle('hidden', !job('beggar'));
   $('#begBtn').classList.toggle('on', me.pose === 'beg');
   $('#begBtn').innerHTML = me.pose === 'beg' ? '<span>🧍</span><small>ลุก</small>' : '<span>🥣</span><small>ขอทาน</small>';
@@ -1276,7 +1284,8 @@ function frame(t) {
 
   near = findNear();
   const ab = $('#actBtn');
-  if (near) {
+  if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); $('#actLabel').textContent = 'หมุน'; }
+  else if (near) {
     ab.classList.remove('idle'); let ico = near.icon;
     const closed = near.type === 'door' && near.house === undefined && (near.renov || !isOpen(near.bld));
     const stf = STAFF_AT[near.id];
@@ -1288,7 +1297,8 @@ function frame(t) {
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); $('#actLabel').textContent = 'ใช้งาน'; }
-  if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); $('#actLabel').textContent = 'ลงจากรถ'; }
+  if (placing) { }
+  else if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); $('#actLabel').textContent = 'ลงจากรถ'; }
   else if (swimming()) { ab.classList.remove('idle', 'closed'); actIco('🪜'); $('#actLabel').textContent = 'ขึ้นจากสระ'; }   // in a bumper car the big button gets you out
   else if (me.pass) { ab.classList.remove('idle', 'closed'); actIco('🚶'); $('#actLabel').textContent = 'ลงรถ'; }       // riding with a friend
   else if (!near && onBike()) { ab.classList.remove('idle', 'closed'); actIco('🔥'); $('#actLabel').textContent = 'สับโดด'; }   // on a bike with nothing around: pop a wheelie
@@ -1388,8 +1398,8 @@ function draw(t) {
     else if (k === 2) { const tr = e, sw = Math.sin(t / 1300 + tr[0] * .7 + tr[1] * .4) * .022 + Math.sin(t / 470 + tr[0]) * .006, bx = (tr[0] + .5) * TS + X, byy = (tr[1] + 1.05) * TS + Y; ctx.save(); ctx.translate(bx, byy); ctx.transform(1, 0, -sw, 1, 0, 0); ctx.translate(-bx, -byy); spr(tr[2], tr[0] + .5, tr[1] + 1.05, X, Y); ctx.restore(); }   // trees sway in the breeze
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
-      else if (e[3] === 'ghost') { ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; spr(e[0], e[1], e[2], X, Y); ctx.globalAlpha = 1; ctx.strokeStyle = '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
-      else { spr(e[0], e[1], e[2], X, Y); if (e[4]) drawYardCrop(e, X, Y, t); }
+      else if (e[3] === 'ghost') { ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; sprF(e[0], e[1], e[2], X, Y, e[5]); ctx.globalAlpha = 1; ctx.strokeStyle = '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      else { sprF(e[0], e[1], e[2], X, Y, e[5]); if (e[4]) drawYardCrop(e, X, Y, t); }
     }
     else if (k === 5) drawCar(e, X, Y);
     else if (k === 6) drawPet(e, X, Y, t);
@@ -1843,7 +1853,7 @@ function paintMisChip() {
   if (cur?.k === 'work') extra = ` ${Math.floor(((misLive?.k === 'work' ? misLive.prog : cur.prog) || 0) / cur.sec * 100)}%`;
   if (cur?.k === 'escort' && misLive?.wait) extra = ' · รอด้วย!';
   c.classList.remove('hidden'); c.classList.toggle('late', left < 30);
-  c.textContent = `${m.icon} ${cur ? (MIS_K[cur.k] || '') + ' ' + cur.label : m.title}${extra} · ${tm}`;
+  const html = `${esc(`${m.icon} ${cur ? (MIS_K[cur.k] || '') + ' ' + cur.label : m.title}${extra} · ${tm}`)}<span class="chipX">✕</span>`; if (c.innerHTML !== html) c.innerHTML = html;
   document.querySelectorAll('.miscd').forEach(el => { el.textContent = tm; });
 }
 setInterval(paintMisChip, 250);
@@ -3733,6 +3743,14 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19h', d: '19 พ.ย. (รอบ 45)', items: [
+    '🎡 <b>สวนสนุกเปิดให้เล่นฟรี!</b> ทุกเครื่องเล่นไม่ต้องซื้อตั๋วแล้ว',
+    '✕ <b>ยกเลิกเควสได้ทุกที่</b> กดกากบาทบนแถบเควส (ตามหาหมา จับโจร ภารกิจอาชีพ)',
+    '🚑 หมดสติรอบที่ 2 ของวันขึ้นไป ฟื้นเร็วขึ้น: เริ่มที่ 10 วินาที แล้วค่อยๆ นานขึ้น สูงสุด 30 วินาที',
+    '🛋️ <b>จัดบ้านแบบใหม่</b> ไม่มีแถบบังกลางจอแล้ว ใช้ปุ่มขวาล่าง: ✓ วาง · ✕ ยกเลิก · 🔄 หมุน · 📦 เก็บ · ระหว่างจัดบ้านพลังงาน ความอิ่ม เลือด ความสุขไม่ลด',
+    '🛏️ <b>ย้ายเตียงประจำบ้านได้แล้ว</b> (อยู่ในรายการจัดบ้าน วางได้ที่ชั้น 1)',
+    '🏴 <b>แชทแก๊ง</b> แท็บใหม่ข้างแชทโลก ข้อความสีส้ม เห็นแค่สมาชิกแก๊ง',
+  ] },
   { v: '2026-11-19g', d: '19 พ.ย. (รอบ 44)', items: [
     '🎫 <b>ลอตเตอรี่มาแล้ว!</b> แอปใหม่ในมือถือ ใบละ ฿100 ออกทุกวันที่ 1 และ 16 เวลา 16:00 น. รางวัลที่ 1 ฿3,000,000 · 3 ตัวท้าย · 2 ตัวท้าย · ถูกรางวัลรับเงินที่จดหมาย (ไอเดียจากคุณ Tood 💡)',
     '👑 <b>ฉายาเศรษฐี</b> ซื้อได้ที่หน้าเปลี่ยนฉายา ตั้งแต่ ฿1 ล้าน ถึง ฿100 ล้าน',
@@ -4297,12 +4315,12 @@ function renderPanel(p) {
     case 'homedeco': {
       if (me.house < 0) return '<h2>🛋️ จัดบ้าน</h2><div class="sub">ต้องมีบ้านของตัวเองก่อน</div>';
       const h = wd?.houses?.[me.house]; if (!h) return '';
-      const own = [...new Set([...(me.furniture || []), ...(me.keep || [])])];
+      const own = [...new Set(['sbed', ...(me.furniture || []), ...(me.keep || [])])];
       const soils = own.filter(k => G.shop.furniture[fbase(k)]?.tile), soilOn = soils.filter(k => furnPos(h, k)).length;
       const soilRow = soils.length ? itemRowRaw('🟫', `แปลงดิน ${soils.length} ช่อง`, `วางในสวนแล้ว ${soilOn} · ในคลัง ${soils.length - soilOn} · ช่องที่ติดกันต่อเป็นแปลงเดียว`,
         `<div class="col2">${B('🟫 วาง', { fn: 'place', k: nextSoil() || soils[0] }, 'good', soils.length === soilOn)}${soilOn ? B('📦 เก็บหมด', { fn: 'soilStore' }) : ''}</div>`) : '';
       const rows = soilRow + own.filter(k => !G.shop.furniture[fbase(k)]?.tile).map(k => { const f = G.shop.furniture[fbase(k)]; if (!f) return ''; const pos = furnPos(h, k), n = k.split('#')[1] || (f.multi ? 1 : 0);
-        return itemRowRaw(f.icon, f.name + (n ? ` #${n}` : ''), pos ? (pos[0] === 9 ? '🌳 วางอยู่ในสวน' : `วางอยู่ชั้น ${pos[0]}`) : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos ? B('📦', { t: 'hplace', k, store: 1 }) : ''}${f.multi && !pos ? B('♻️', { t: 'hplace', k, del: 1 }) : ''}</div>`); }).join('');
+        return itemRowRaw(f.icon, f.name + (n ? ` #${n}` : ''), pos ? (pos[0] === 9 ? '🌳 วางอยู่ในสวน' : `วางอยู่ชั้น ${pos[0]}`) : '📦 อยู่ในคลัง', `<div class="col2">${B(pos ? '✋ ย้าย' : '📍 วาง', { fn: 'place', k }, 'good')}${pos && k !== 'sbed' ? B('📦', { t: 'hplace', k, store: 1 }) : ''}${f.multi && !pos ? B('♻️', { t: 'hplace', k, del: 1 }) : ''}</div>`); }).join('');
       return `<h2>🛋️ จัดบ้าน</h2><div class="sub">เลือกชิ้นที่จะวาง แล้วแตะพื้นห้องในชั้นที่คุณยืนอยู่ · ของในคลังยังนับความสบาย ⭐ · ซื้อเพิ่มที่ 🛋️ ร้านเฟอร์นิเจอร์ในเมือง · บ้านมี ${1 + (h[8] || 0)}/${G.shop.floors} ชั้น (ต่อเติมที่บันได 🪜)</div>
         <div class="list">${rows || '<div class="sub">ยังไม่มีเฟอร์นิเจอร์ ซื้อได้ที่ร้านเฟอร์นิเจอร์ในเมือง</div>'}</div>`;
     }
@@ -4523,9 +4541,9 @@ function renderPanel(p) {
       const S = STN(st), R = G.rides?.[S?.k]; if (!R) return '';
       const mine = P.get(myId), on = mine?.pose === 'fun' && String(mine.fn).startsWith(S.k + ':'), n = ridersOf(S.k).size;
       const g = R.gain, pm = v => `+${Math.round(v * 60)}/นาที`;
-      return `<h2>${R.icon} ${esc(R.name)}</h2><div class="sub">${esc(R.desc)} · ตั๋วละ <b>${money(R.price)}</b> เล่นได้ ${R.mins} นาที · ตอนนี้มีคนเล่น ${n}/${R.cap}</div>
+      return `<h2>${R.icon} ${esc(R.name)}</h2><div class="sub">${esc(R.desc)} · <b style="color:var(--ok)">เล่นฟรี!</b> ครั้งละ ${R.mins} นาที · ตอนนี้มีคนเล่น ${n}/${R.cap}</div>
         <div class="grid2"><div class="item"><div class="nm">⚡ พลังงาน<small><b style="color:var(--ok)">${pm(g.energy)}</b></small></div></div><div class="item"><div class="nm">❤️ เลือด<small><b style="color:var(--ok)">${pm(g.health)}</b></small></div></div><div class="item"><div class="nm">😊 ความสุข<small><b style="color:var(--ok)">${pm(g.happy)}</b></small></div></div><div class="item"><div class="nm">⏱️ เวลา<small><b>${R.mins} นาที/ตั๋ว</b></small></div></div></div>
-        ${on ? B('🚶 ลงจากเครื่องเล่น', { t: 'rideoff' }, 'big') : B(`🎟️ ซื้อตั๋ว ${money(R.price)} แล้วเล่นเลย`, { t: 'act', st, a: 'play' }, 'primary big', n >= R.cap || me.money < R.price)}
+        ${on ? B('🚶 ลงจากเครื่องเล่น', { t: 'rideoff' }, 'big') : B(R.price ? `🎟️ ซื้อตั๋ว ${money(R.price)} แล้วเล่นเลย` : '🎉 เล่นเลย (ฟรี)', { t: 'act', st, a: 'play' }, 'primary big', n >= R.cap || me.money < R.price)}
         <div class="sub" style="margin-top:8px">ระหว่างเล่นได้พลังงาน เลือด และความสุขทุกวินาที · เดินออกเมื่อไหร่ก็ลงจากเครื่องเล่น</div>`;
     }
     case 'gate': return `<h2>${STN(st).icon} ${STN(st).label}</h2>${B('เดินทาง', { t: 'act', st, a: 'go' }, 'primary big')}`;
@@ -4870,6 +4888,10 @@ function spr(name, cx, by, X, Y, scale = 1) {
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
   ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
   return true;
+}
+function sprF(name, cx, by, X, Y, flip) {   // a sprite, mirrored left-right when flip is set (turned furniture)
+  if (!flip) return spr(name, cx, by, X, Y);
+  const px = Math.round(cx * TS + X); ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); const r = spr(name, 0, by, 0, Y); ctx.restore(); return r;
 }
 function tex(name, tx, ty, px, py) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
@@ -5554,7 +5576,7 @@ let roomGrid = [], roomFurniture = [], roomWalls = [];   // roomWalls: footprint
 const FURN_SPRITE = { rugr: 'f_rug_round', rugb: 'f_rug_blue', cactus: 'f_cactus', plant2: 'f_plant2', lamp: 'f_floorlamp', table: 'f_table_chairs', rtable: 'f_round_table', shelf: 'f_bookshelf', desk: 'f_laptop_desk', wardrobe2: 'f_wardrobe', mirror: 'f_mirror', armchair: 'f_armchair', bunk: 'f_bunk', coffee: 'f_coffee', winer: 'f_wine_rack',
   bookcase: 'f_bookshelf_wide', gclock: 'f_clock', teddy: 'i_teddy', flamp: 'f_floorlamp', vase: 'f_vase', plant: 'f_plant', sofa: 'f_sofa_red', tv: 'f_tv', bed: 'f_bed_pink', aqua: 'f_aquarium', art: 'f_pictures', piano: 'f_guitar', jacuzzi: 'f_bath' };
 // where each piece of bought furniture stands in the house (by kind, so a home always looks arranged)
-const FURN_POS = { bookcase: [4.6, 1.6], gclock: [6.3, 1.5], teddy: [2.9, 6.8], flamp: [10.2, 6.6], vase: [4.9, 4.3], tv: [8, 2.9], sofa: [8, 6.7], plant: [11, 8.7], aqua: [9.6, 8.7], art: [9.2, 1.05], piano: [1.1, 5.9], bed: [2.2, 6.2], jacuzzi: [11.8, 5.5] };
+const FURN_POS = { sbed: [3.4, 3.3], bookcase: [4.6, 1.6], gclock: [6.3, 1.5], teddy: [2.9, 6.8], flamp: [10.2, 6.6], vase: [4.9, 4.3], tv: [8, 2.9], sofa: [8, 6.7], plant: [11, 8.7], aqua: [9.6, 8.7], art: [9.2, 1.05], piano: [1.1, 5.9], bed: [2.2, 6.2], jacuzzi: [11.8, 5.5] };
 function buildAreas() {
   AREA = Object.fromEntries(G.areas.map(a => [a.id, a]));
   roomGrid = new Array(G.map.w * G.map.h);
@@ -5576,10 +5598,10 @@ function startPlace(k) {
     return placeBar(k);
   }
   if (r.yard) {                                  // out in the yard
-    placing = { k, house: r.house, fl: 9, bx: [.7, r.w - .7, 1.5, r.h - .8], x: clamp(Math.round((m.x - r.x) * 2) / 2, .7, r.w - .7), y: clamp(Math.round((m.y - r.y - .8) * 2) / 2, 1.5, r.h - .8) };
+    placing = { flip: !!furnPos(wd.houses[r.house], k)?.[3], k, house: r.house, fl: 9, bx: [.7, r.w - .7, 1.5, r.h - .8], x: clamp(Math.round((m.x - r.x) * 2) / 2, .7, r.w - .7), y: clamp(Math.round((m.y - r.y - .8) * 2) / 2, 1.5, r.h - .8) };
     return placeBar(k);
   }
-  placing = { k, house: r.house, fl: r.floor || 1, bx: [.7, 13.3, 1.2, 9.5], x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
+  placing = { flip: !!furnPos(wd.houses[r.house], k)?.[3], k, house: r.house, fl: r.floor || 1, bx: [.7, 13.3, 1.2, 9.5], x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
   placeBar(k);
 }
 function placeBar(k) {
@@ -5590,15 +5612,31 @@ function placeBar(k) {
     $('#placeBar').classList.remove('hidden'); $('#plOk').onclick = () => { endPlace(); FX.play('click'); };
     layoutFurniture(); return;
   }
-  $('#placeBar').innerHTML = `<b>${f.icon} ${esc(f.name)}</b><small>แตะพื้นห้องเพื่อเลื่อน · ปุ่มลูกศรขยับละเอียด</small><div class="pb">${['⬅️', '⬆️', '⬇️', '➡️'].map((a, i) => `<button data-nud="${i}">${a}</button>`).join('')}<button id="plOk" class="primary">✓ วาง</button><button id="plStore">📦 เก็บ</button><button id="plX">✕</button></div>`;
+  placeMode(true);
+  $('#placeBar').innerHTML = `<b>${f.icon} ${esc(f.name)}</b><small>แตะพื้นเพื่อเลื่อน · ✓ วาง · ✕ ยกเลิก · 🔄 หมุน · 📦 เก็บ</small><div class="pb" style="display:none">${['⬅️', '⬆️', '⬇️', '➡️'].map((a, i) => `<button data-nud="${i}">${a}</button>`).join('')}<button id="plOk" class="primary">✓ วาง</button><button id="plStore">📦 เก็บ</button><button id="plX">✕</button></div>`;
   $('#placeBar').classList.remove('hidden');
   $('#placeBar').querySelectorAll('[data-nud]').forEach(b => b.onclick = () => { const d = [[-.25, 0], [0, -.25], [0, .25], [.25, 0]][+b.dataset.nud]; placing.x = clamp(placing.x + d[0], placing.bx[0], placing.bx[1]); placing.y = clamp(placing.y + d[1], placing.bx[2], placing.bx[3]); layoutFurniture(); });
-  $('#plOk').onclick = () => { send({ t: 'hplace', k, fl: placing.fl, x: placing.x, y: placing.y }); endPlace(); FX.play('click'); };
+  $('#plOk').onclick = () => { send({ t: 'hplace', k, fl: placing.fl, x: placing.x, y: placing.y, flip: placing.flip ? 1 : 0 }); endPlace(); FX.play('click'); };
   $('#plStore').onclick = () => { send({ t: 'hplace', k, store: 1 }); endPlace(); };
   $('#plX').onclick = () => endPlace();
   layoutFurniture();
 }
-function endPlace() { placing = null; $('#placeBar').classList.add('hidden'); layoutFurniture(); }
+function endPlace() { placing = null; $('#placeBar').classList.add('hidden'); placeMode(false); layoutFurniture(); }
+// while arranging: the big buttons bottom-right turn into the tools (✓ instead of run, ✕ instead of rest, 🔄 on the action button, 📦 instead of the bag)
+const PLACE_BTN = { runBtn: ['✓', 'วาง', () => $('#plOk')?.click()], restBtn: ['✕', 'ยกเลิก', () => $('#plX')?.click()], bagBtn: ['📦', 'เก็บ', () => $('#plStore')?.click()] };
+function placeMode(on) {
+  document.body.classList.toggle('placing', on);
+  for (const [id, [ic, lb]] of Object.entries(PLACE_BTN)) {
+    const b = $('#' + id); if (!b) continue;
+    if (on) { if (b.dataset.orig == null) b.dataset.orig = b.innerHTML; b.innerHTML = `<span>${ic}</span><small>${lb}</small>`; }
+    else if (b.dataset.orig != null) { b.innerHTML = b.dataset.orig; delete b.dataset.orig; }
+  }
+  if (!on) { actIconKey = ''; if (me) $('#restBtn').innerHTML = me.pose === 'rest' ? '<span>🧍</span><small>ลุก</small>' : '<span>😌</span><small>พัก</small>'; }
+  send({ t: 'decor', on: !!on });   // stats hold still while you decorate
+}
+for (const id of Object.keys(PLACE_BTN)) $('#' + id).addEventListener('click', e => { if (!placing) return; e.stopImmediatePropagation(); e.preventDefault(); FX.play('click'); PLACE_BTN[id][2](); }, true);
+$('#actBtn').addEventListener('pointerdown', e => { if (!placing) return; e.stopImmediatePropagation(); e.preventDefault(); FX.play('click'); placing.flip = !placing.flip; layoutFurniture(); }, true);
+$('#actBtn').addEventListener('pointerup', e => { if (placing) { e.stopImmediatePropagation(); } }, true);
 function nextSoil(skip) {                       // the next soil tile still in storage
   const h = wd?.houses?.[me.house]; if (!h) return null;
   return (me.furniture || []).find(o => o !== skip && G.shop.furniture[fbase(o)]?.tile && !furnPos(h, o)) || null;
@@ -5654,23 +5692,24 @@ function layoutFurniture() {
         const pos = furnPos(h, k); let sp = furnSpr(k); if (!(pos && pos[0] === 9 && sp)) continue;
         const f = G.shop.furniture[fbase(k)];
         if (f?.tile) sp = soilSprite(soil, Math.floor(pos[1]), Math.round(pos[2]) - 1);   // joins up with the soil next to it
-        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, f?.field ? { k, house: r.house, tile: !!f.tile } : null]);
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, f?.field ? { k, house: r.house, tile: !!f.tile } : null, pos[3]]);
         addWall(f, sp, r.x + pos[1], r.y + pos[2]);
       }
-      if (placing && placing.house === r.house && placing.fl === 9) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost']);
+      if (placing && placing.house === r.house && placing.fl === 9) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', null, placing.flip]);
       continue;
     }
     if (r.kind !== 'room') continue;
     for (const f of r.furniture || []) roomFurniture.push(f);
     if (r.rk === 'house') {
       const h = wd?.houses?.[r.house], fl = r.floor || 1; if (!h) continue;
+      if (fl === 1) { const bs = G.stations.find(x => x.id === 'hbed' + r.house), bp = h[0] ? furnPos(h, 'sbed') : null; if (bs) { if (!h[0]) { bs.x = r.x + 3.4; bs.y = r.y + 3.7; } else if (bp && bp[0] === 1) { bs.x = r.x + bp[1]; bs.y = r.y + bp[2] + .4; } } }
       for (const k of h[2]) {
         if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
         const pos = furnPos(h, k), sp = furnSpr(k); if (!(pos && pos[0] === fl && sp)) continue;
-        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2]]);
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, null, pos[3]]);
         addWall(G.shop.furniture[fbase(k)], sp, r.x + pos[1], r.y + pos[2]);
       }
-      if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost']);
+      if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', null, placing.flip]);
     }
   }
 }
@@ -6349,6 +6388,6 @@ function mgEnd(key, score) {
 }
 FN.mgAgain = m => mgStart(m.key);
 FN.mgMenu = () => mgMenu();
-window.__lt = { send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel, drawCharTo };   // read-only hooks for automated UI tests
+window.__lt = { send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel, drawCharTo, get G() { return G; } };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();
