@@ -466,7 +466,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0 });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -506,6 +506,7 @@ function handle(m) {
     case 'catch': catchPop(m.item, m.first); break;
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
+    case 'zn': case 'zspawn': case 'zdie': znMsg(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
     case 'lotto': window.__lotto = m; if (panel?.kind === 'lotto') refreshPanel(true); break;
     case 'ideas': window.__ideas = m; if (panel?.kind === 'ideas') refreshPanel(true); break;
@@ -1032,7 +1033,7 @@ function onTap(sx, sy) {
   }
   let hit = null, hd = .8;
   for (const p of P.values()) {
-    if (p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
+    if (p.id === myId || p.zb || areaOf(p.x, p.y)?.id !== here) continue;
     const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
   }
   if (hit) { FX.play('click'); if (hit.npc && !hit.bot) return talkToTown(hit); return openPanel({ kind: 'player', pid: hit.id }); }
@@ -1096,7 +1097,7 @@ function nearestPerson(r = 3) {
   const m = P.get(myId); if (!m) return null; const here = areaOf(m.x, m.y)?.id;
   let best = null, bd = r;
   for (const p of P.values()) {
-    if (p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
+    if (p.id === myId || p.zb || areaOf(p.x, p.y)?.id !== here) continue;
     const d = Math.hypot(p.x - m.x, p.y - m.y); if (d < bd) { bd = d; best = p; }
   }
   return best;
@@ -1392,6 +1393,7 @@ function draw(t) {
   if (myRoom?.rk === 'hospital') (wd?.beds || []).forEach((b, i) => { if (b && b[5]) { const s = STN('bed' + i); ents.push([s.y + .3, 4, npcPatient(b, s)]); } });
   ents.sort((a, b) => a[0] - b[0]);
   if (!myRoom && !ECO) drawCastShadows(ents, X, Y, night);
+  drawZDecals(X, Y, t, A);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
     else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y); }   // z: hung on a wall; open: only while that shop is open
@@ -1452,6 +1454,7 @@ function draw(t) {
   let dark = myRoom ? 0 : night;
   if (myRoom && myRoom.rk === 'office') { const h = hourNow(); if (h >= G.shift.ot || h < 6) dark = 0.62; }
   if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); if (!myRoom) drawLights(X, Y, dark); }
+  if (!myRoom) drawZTint(t);
   drawHeads(X, Y);
   if (myRoom && myRoom.rk === 'office' && dark > 0) sign(`💡 ไฟปิดแล้ว (เลิกงาน ${hhmm(G.shift.ot)})`, VW / 2, VH * .2, { size: 14 });
   // short fade through black when you go through a door or a gate
@@ -2089,7 +2092,88 @@ function drawPetIcon(c, id) {
   g.drawImage(petImg, bx, meta.row * C + by, bw, bh, (c.width - bw * k) / 2, c.height - bh * k - c.height * .08, bw * k, bh * k);
 }
 const SKIN = ['#f3cfa6', '#e2b084', '#c98f60', '#8f5c3c'], HAIR = ['#2b1d14', '#5a3a22', '#b8692a', '#e5c15a', '#1c1c30', '#6d3b8f', '#c9473f', '#ececec'];
+// ---- ZOMBIE NIGHT (every 13th, 20:00): zombie sprites, slime where they rise, the countdown / survival bar, overrun + end cards
+let ZB = null, zbImg = null, ZN = { ph: 'off' }, zDecals = [];
+fetch('assets/zombie.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { ZB = j; zbImg = im; }; im.src = 'assets/zombie.webp?v=1'; }).catch(() => {});
+const zDecalImg = new Image(); zDecalImg.src = 'assets/zdecal.webp?v=1';
+function drawZombie(p, X, Y, t) {
+  const px = Math.round(p.rx * TS + X), py = Math.round(p.ry * TS + Y + TS * .32);
+  if (px < -120 || py < -160 || px > VW + 120 || py > VH + 160) return;
+  const f8 = ((p.f | 0) % 8 + 8) % 8, dir = { 0: 'left', 1: 'left', 2: 'up', 3: 'right', 4: 'right', 5: 'right', 6: 'down', 7: 'left' }[f8];
+  const moving = Math.hypot(p.x - p.rx, p.y - p.ry) > .02;
+  p.walk = (p.walk || 0) + (moving ? (p.zb === 'run' ? .3 : .16) * FDT * 60 : 0);
+  const fi = moving ? [1, 0, 2, 0][Math.floor(p.walk / 1.4) % 4] : 0, col = (dir === 'down' ? 0 : dir === 'up' ? 3 : 6) + fi;
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (p.zb === 'brute' ? .5 : .32), TS * .12, 0, 0, 7); ctx.fill();
+  if (!zbImg) { ctx.font = `${Math.round(TS * .9)}px serif`; ctx.textAlign = 'center'; ctx.fillText('🧟', px, py - TS * .3); return; }
+  const k = TS * 1.55 / 96, w = ZB.w * k, h = ZB.h * k, row = ZB.rows[p.zb] || 0;
+  ctx.save(); ctx.translate(px, py);
+  if (dir === 'left') ctx.scale(-1, 1);
+  ctx.drawImage(zbImg, col * ZB.w, row * ZB.h, ZB.w, ZB.h, -ZB.feet[0] * k, -ZB.feet[1] * k, w, h);
+  ctx.restore();
+}
+let zGroanT = 0;
+function drawZDecals(X, Y, t, A) {
+  if (ZN.ph === 'on' && t > zGroanT) { zGroanT = t + 2500 + Math.random() * 3000; const m = P.get(myId); if (m && [...P.values()].some(p => p.zb && Math.hypot(p.x - m.x, p.y - m.y) < 7)) FX.play('groan'); }
+
+  if (!zDecals.length) return;
+  const now0 = performance.now(); zDecals = zDecals.filter(d => now0 - d.t < 40000);
+  for (const d of zDecals) {
+    if (A && d.area !== A.id) continue;
+    const px = d.x * TS + X, py = d.y * TS + Y + TS * .3, s = TS * (d.big ? 1.3 : 1);
+    if (px < -s || py < -s || px > VW + s || py > VH + s || !zDecalImg.complete) continue;
+    const age = (now0 - d.t) / 40000, grow = Math.min(1, (now0 - d.t) / 400);
+    ctx.globalAlpha = Math.max(0, 1 - age * age) * .9;
+    ctx.drawImage(zDecalImg, d.i * 96, 0, 96, 96, px - s / 2 * grow, py - s / 2 * .55 * grow, s * grow, s * .55 * grow);
+    ctx.globalAlpha = 1;
+  }
+}
+function drawZTint(t) {
+  if (ZN.ph !== 'on' && ZN.ph !== 'warn') return;
+  const a = ZN.ph === 'on' ? .34 : .14 + Math.sin(t / 250) * .05;
+  ctx.fillStyle = `rgba(14,48,26,${a})`; ctx.fillRect(0, 0, VW, VH);
+  const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .3, VW / 2, VH / 2, Math.max(VW, VH) * .75);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, ZN.ph === 'warn' ? `rgba(120,0,0,${.35 + Math.sin(t / 250) * .15})` : 'rgba(0,10,4,.6)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+}
+const zIcon = (i, sz) => `<i class="zic" style="width:${sz}px;height:${sz}px;background-size:${sz * 9}px ${sz}px;background-position:-${i * sz}px 0"></i>`;
+function znHud() {
+  const el = $('#znBar'); if (!el) return;
+  if (ZN.ph !== 'warn' && ZN.ph !== 'on') { el.classList.add('hidden'); return; }
+  const left = Math.max(0, Math.ceil(((ZN.endT || 0) - performance.now()) / 1000)), mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  let title, sub;
+  if (ZN.ph === 'warn') { title = `ซอมบี้บุกใน ${mm}`; sub = me && roomOf(me.x, me.y) ? '⚠️ ออกจากอาคารด่วน! อยู่ข้างในจะโดนรุม' : 'อยู่นอกอาคาร เตรียมวิ่งหนี!'; }
+  else { title = `เอาตัวรอดอีก ${mm}`; sub = ZN.me === 'alive' ? `ระลอก ${ZN.wave || 1} · ผู้รอด ${ZN.alive} คน · ห้ามให้ซอมบี้ถึงตัว!` : ZN.me === 'dead' ? `คุณสลบแล้ว · ผู้รอด ${ZN.alive} คน` : `ดูอยู่ข้างสนาม · ผู้รอด ${ZN.alive} คน`; }
+  el.classList.remove('hidden'); el.classList.toggle('warn', ZN.ph === 'warn'); el.classList.toggle('dead', ZN.me === 'dead');
+  el.innerHTML = `${zIcon(ZN.ph === 'warn' ? 0 : ZN.me === 'dead' ? 6 : 1, 34)}<div><b>${title}</b><small>${sub}</small></div>`;
+}
+setInterval(znHud, 250);
+function znCard(html, cls, ms) {
+  const d = document.createElement('div'); d.className = 'znCard ' + (cls || ''); d.innerHTML = html; document.body.appendChild(d);
+  d.onclick = () => d.remove(); setTimeout(() => d.classList.add('out'), ms); setTimeout(() => d.remove(), ms + 600);
+}
+function znMsg(m) {
+  if (m.t === 'zn') {
+    const was = ZN.ph;
+    if (m.ph === 'end') {
+      ZN = { ph: 'off' }; znHud(); FX.play(m.won ? 'levelup' : 'chime');
+      znCard(`${zIcon(m.won ? 8 : 2, 84)}<b>${m.won ? 'คุณรอดชีวิต!' : 'ฟ้าสางแล้ว'}</b><p>${m.won ? 'รางวัลผู้รอดชีวิตส่งไปที่กล่องจดหมาย ✉️ แล้ว' : `คืนนี้มีผู้รอด ${m.n} คน · เดือนหน้าลองใหม่นะ`}</p>`, m.won ? 'win' : '', 5000);
+      return;
+    }
+    ZN = { ...m, endT: performance.now() + Math.max(0, m.end - (Date.now() + clockOff)) };
+    if (m.ph === 'warn' && was !== 'warn') { FX.play('alarm'); znCard(`<img src="assets/zbanner.webp?v=1" alt=""><b>คืนปล่อยผี!</b><p>ซอมบี้กำลังบุกเมือง ออกจากอาคารให้ทัน แล้วเอาตัวรอดให้ได้</p>`, 'banner', 4500); }
+    if (m.ph === 'on' && was === 'warn' && m.me === 'alive') znCard(`${zIcon(1, 70)}<b>พวกมันมาแล้ว!</b><p>วิ่งหนี อย่าให้ซอมบี้เข้าใกล้ · ห้ามเข้าอาคาร</p>`, '', 2600);
+    znHud();
+  } else if (m.t === 'zspawn') {
+    const t0 = performance.now();
+    for (const [area, x, y] of m.p) { zDecals.push({ area, x, y, t: t0 + Math.random() * 300, i: Math.random() < .5 ? 0 : 3 }); if (Math.random() < .3) zDecals.push({ area, x: x + .4, y: y + .2, t: t0, i: Math.random() < .5 ? 1 : 4 }); }
+  } else if (m.t === 'zdie') {
+    FX.play('zbite');
+    if (m.why === 'in') znCard(`<img src="assets/zoverrun.webp?v=1" alt=""><b>ซอมบี้ทะลักเข้ามาในอาคาร!</b><p>คุณโดนรุมจนสลบ ฟื้นขึ้นมาที่จัตุรัส</p>`, 'overrun', 4200);
+    else znCard(`${zIcon(6, 80)}<b>โดนกัด!</b><p>คุณสลบไป ฟื้นขึ้นมาที่จัตุรัส · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600);
+  }
+}
 function drawPlayer(p, X, Y, t) {
+  if (p.zb) return drawZombie(p, X, Y, t);
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
   const snap = v => Math.round(v * DPR) / DPR;
   const fo = p.pose === 'fun' && p.fn ? funPos(p) : null;   // on a park ride: drawn where the ride carries them
@@ -2971,6 +3055,7 @@ function drawMini() {
   const mini = $('#mini'); if (mini.width !== base.width) { mini.width = base.width; mini.height = base.height; }
   const g = mini.getContext('2d'); g.drawImage(base, 0, 0);
   for (const p of P.values()) {
+    if (p.zb && areaOf(p.rx, p.ry)?.id === A?.id || p.zb && mapId === areaOf(p.rx, p.ry)?.id) { g.fillStyle = '#ff2b2b'; g.fillRect((p.rx - A.x) * 2 - 2, (p.ry - A.y) * 2 - 2, 4, 4); continue; }
     if (p.npc || p.id === myId) continue;
     const q = outPos(p.rx, p.ry); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
     const s = 5, mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2;
@@ -3743,6 +3828,12 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19z', d: '19 พ.ย. (รอบ 46)', items: [
+    '🧟 <b>คืนปล่อยผี!</b> ทุกวันที่ 13 เวลา 20:00 น. ซอมบี้จะบุกเมือง มีเวลา 60 วินาทีให้ออกจากอาคาร ใครอยู่ข้างในจะโดนรุมแล้วฟื้นที่จัตุรัส',
+    '🏃 ซอมบี้มาเป็นระลอกตามจุดที่มีผู้เล่น ทั้งในเมือง ไร่ หมู่บ้าน สวนสนุก วัด และสวนหลังบ้าน ระวัง <b>ซอมบี้วิ่ง</b> กับ <b>ซอมบี้ยักษ์</b> ระลอกสุดท้าย',
+    '🚪 ระหว่างคืนปล่อยผี ประตูทุกอาคารถูกปิดตาย ต้องหนีอยู่ข้างนอกเท่านั้น จุดแดงบนแผนที่เล็กคือซอมบี้',
+    '📜 รอดถึงฟ้าสาง รับ <b>จดหมายผู้รอดชีวิต</b> ฿5,000 + 💎5 และฉายา «ผู้รอดชีวิต» / «นักล่าซอมบี้» (รอด 5 ครั้ง)',
+  ] },
   { v: '2026-11-19h', d: '19 พ.ย. (รอบ 45)', items: [
     '🎡 <b>สวนสนุกเปิดให้เล่นฟรี!</b> ทุกเครื่องเล่นไม่ต้องซื้อตั๋วแล้ว',
     '✕ <b>ยกเลิกเควสได้ทุกที่</b> กดกากบาทบนแถบเควส (ตามหาหมา จับโจร ภารกิจอาชีพ)',
@@ -4691,6 +4782,7 @@ function renderPanel(p) {
         <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
+        <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏃 ความเร็ว x<span id="godSpdV">${(g.speed || 1).toFixed(1)}</span></b><small>เลื่อนปรับได้ 1–5 เท่า (กดค้างปุ่มวิ่งได้อีก)</small></span><input id="godSpd" type="range" min="1" max="5" step="0.5" value="${g.speed || 1}" style="width:130px"></div>
@@ -6388,6 +6480,6 @@ function mgEnd(key, score) {
 }
 FN.mgAgain = m => mgStart(m.key);
 FN.mgMenu = () => mgMenu();
-window.__lt = { send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel, drawCharTo, get G() { return G; } };   // read-only hooks for automated UI tests
+window.__lt = { get zn() { return ZN; }, send, mgStart, mgMenu, get traffic() { return traffic; }, get ambs() { return ambs; }, ambStart, P, camera, walkTo, get wd() { return wd; }, get me() { return me; }, get myId() { return myId; }, get running() { return running; }, get TS() { return TS; }, openPanel, drawCharTo, get G() { return G; } };   // read-only hooks for automated UI tests
 $('#tchatForm').onsubmit = e => { e.preventDefault(); const i = $('#tchatIn'); if (i.value.trim()) send({ t: 'trade_chat', text: i.value }); i.value = ''; };
 })();

@@ -1307,3 +1307,25 @@ body.placing #talkBtn,body.placing #emoBtn,body.placing #homeBtn,body.placing #g
 body:has(#fishCue:not(.hidden)) #notices{top:28%}
 @keyframes ncIn{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes ncLife{0%,88%{opacity:1}100%{opacity:0}}
+
+/* zombie night */
+.zic{display:inline-block;flex:none;background-image:url(assets/zicons.webp?v=1);background-repeat:no-repeat;image-rendering:pixelated}
+#znBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 64px);transform:translateX(-50%);z-index:8;pointer-events:none;display:flex;align-items:center;gap:10px;padding:8px 16px 8px 10px;border-radius:14px;
+  background:linear-gradient(rgba(6,20,10,.82),rgba(6,20,10,.82)),url(assets/zbanner.webp?v=1) center/cover;border:3px solid #6fdc6f;color:#eaffea;box-shadow:0 4px 18px rgba(0,0,0,.6),0 0 18px rgba(80,220,80,.35);max-width:92vw}
+#znBar b{display:block;font-size:17px;letter-spacing:.3px;text-shadow:0 2px 0 #000}
+#znBar small{display:block;font-size:12px;opacity:.92}
+#znBar.warn{border-color:#ff4a3a;box-shadow:0 0 22px rgba(255,40,30,.6);animation:znPulse 1s infinite}
+#znBar.dead{border-color:#8a8a8a;filter:grayscale(.6)}
+@keyframes znPulse{50%{transform:translateX(-50%) scale(1.05)}}
+.znCard{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);z-index:60;width:min(380px,88vw);text-align:center;padding:14px 16px 16px;border-radius:16px;
+  background:#1a1410;border:3px solid #6fdc6f;color:#fff;box-shadow:0 10px 40px rgba(0,0,0,.7);animation:znIn .35s ease-out}
+.znCard b{display:block;font-size:22px;margin:6px 0 4px;text-shadow:0 2px 0 #000}
+.znCard p{margin:0;font-size:14px;opacity:.9}
+.znCard img{display:block;width:100%;border-radius:10px}
+.znCard .zic{margin:0 auto}
+.znCard.banner{border-color:#ff4a3a}
+.znCard.overrun,.znCard.bite{border-color:#ff3030;background:#200808}
+.znCard.overrun{width:min(560px,94vw)}
+.znCard.win{border-color:#ffd34d;background:#221a08}
+.znCard.out{opacity:0;transition:opacity .5s}
+@keyframes znIn{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
