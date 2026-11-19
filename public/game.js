@@ -102,6 +102,10 @@ function paintSw() {
 // ---- pixel character (public/assets/pchar.webp, built by tools/build_pixel_chars.py)
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
+// recoloured character frames: an LRU cache (a hit moves the frame to the back) big enough for a busy square, so frames are not rebuilt every frame
+const CH_MAX = 1400;
+const chGet = k => { const c = chCache.get(k); if (c) { chCache.delete(k); chCache.set(k, c); } return c; };
+const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCache.delete(chCache.keys().next().value); return c; };
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 fetch('assets/pchar.json?v=a4').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=a4'; });
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
@@ -110,7 +114,7 @@ const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7c
 const lookColor = (cat, id) => typeof id === 'string' && id[0] === '#' ? id : G?.looks?.[cat]?.[id]?.color || STARTER_COLORS[cat][id] || STARTER_COLORS[cat][Object.keys(STARTER_COLORS[cat])[0]];
 // one tinted frame, cached per (frame, colours)
 function charFrame(frame, lk) {
-  const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
+  const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chGet(key); if (c) return c;
   const { w, h, rows, per } = CH_ATLAS, r0 = rows[frame] ?? 0, bx = per ? Math.floor(r0 / per) * w * 4 : 0, row = per ? r0 % per : r0;   // frames wrap into blocks of `per` rows
   c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   g.drawImage(chImg, bx, row * h, w, h, 0, 0, w, h);
@@ -122,7 +126,7 @@ function charFrame(frame, lk) {
     t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
     g.drawImage(tmp, 0, 0);
   });
-  chCache.set(key, c); if (chCache.size > 400) chCache.delete(chCache.keys().next().value);
+  chPut(key, c);
   return c;
 }
 // one recoloured layer (hair) of a frame on its own canvas
@@ -140,7 +144,7 @@ const FEM_HEAD = { office: 'head', merchant: 'head', thai: 'head', tuxedo: 'head
   chef: 'hair', farmer: 'hair', fisher: 'hair', rider: 'hair', cowboy: 'hair', magician: 'hair', beggar: 'hair', pilot: 'hair', devil: 'hair' };
 const FEM_NECK = 52, FEM_HAT = 30;   // atlas rows: where her head ends / where her hair may show below a hat
 function femOutfitFrame(sheet, step, lk) {
-  const key = `F|${sheet}|${step}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chCache.get(key); if (c) return c;
+  const key = `F|${sheet}|${step}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chGet(key); if (c) return c;
   const { w, h } = CH_ATLAS, body = charFrame(sheet + ':' + step, lk), mode = FEM_HEAD[sheet];
   c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   if (mode === 'head') {
@@ -151,7 +155,7 @@ function femOutfitFrame(sheet, step, lk) {
     g.drawImage(body, 0, 0);
     g.drawImage(charLayer('f:' + step, 3, 'hair', lk), 0, FEM_HAT, w, h - FEM_HAT, 0, FEM_HAT, w, h - FEM_HAT);
   }
-  chCache.set(key, c); return c;
+  return chPut(key, c);
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
@@ -254,7 +258,7 @@ function dyeFrame(fr, dye) {
 const MONK_LOOK = { shirt: '#f0a03a', pants: '#e08a26', hair: '#d9a77c' };
 // most outfit / uniform sheets have the hair painted into the sprite (no hair mask layer), so a dyed colour never showed.
 // Recolour it: inside the base sprite's hair area, pixels that look like the painted brown hair (warm, darkish) are re-tinted
-const HAIR_MASKED = {};
+const HAIR_MASKED = {}, HAIR_MASK = {};
 function sheetHasHair(sheet) {
   if (sheet in HAIR_MASKED) return HAIR_MASKED[sheet];
   const { w, h, rows, per } = CH_ATLAS, r0 = rows[sheet + 'down0'] ?? 0, bx = per ? Math.floor(r0 / per) * w * 4 : 0, row = per ? r0 % per : r0;
@@ -268,9 +272,9 @@ function hairFix(fr, outfit, step, gender, lk) {
   const sh = outfit.slice(0, -1).replace(/^f(?=[a-z]{3})/, m => CH_ATLAS.rows[outfit.slice(1) + 'down0'] !== undefined ? '' : m);
   if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh] || sheetHasHair(outfit)) return fr;
   const y0 = HAIR_HAT[sh] ? FEM_HAT : 0;
-  const key = `H|${outfit}|${step}|${gender}|${lk.hair}|${lk.shirt}|${lk.pants}`; let c = chCache.get(key); if (c) return c;
+  const key = `H|${outfit}|${step}|${gender}|${lk.hair}|${lk.shirt}|${lk.pants}`; let c = chGet(key); if (c) return c;
   const { w, h, rows } = CH_ATLAS, base = (gender === 'f' && rows['f:' + step] !== undefined ? 'f:' : '') + step;
-  const m = charLayer(base, 3, 'hair', { hair: '#ffffff' }).getContext('2d').getImageData(0, 0, w, h).data;
+  const m = HAIR_MASK[base] || (HAIR_MASK[base] = charLayer(base, 3, 'hair', { hair: '#ffffff' }).getContext('2d').getImageData(0, 0, w, h).data);
   c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d', { willReadFrequently: true }); t.drawImage(fr, 0, 0);
   const im = t.getImageData(0, 0, w, h), d = im.data, hx = lookColor('hair', lk.hair), C = [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
   for (let i = y0 * w * 4; i < d.length; i += 4) {
@@ -280,7 +284,7 @@ function hairFix(fr, outfit, step, gender, lk) {
     const v = Math.min(255, Math.round((r * 2 + gg * 3 + b * 4) / 9 * 255 / 70));
     d[i] = v * C[0] / 255 | 0; d[i + 1] = v * C[1] / 255 | 0; d[i + 2] = v * C[2] / 255 | 0;
   }
-  t.putImageData(im, 0, 0); chCache.set(key, c); return c;
+  t.putImageData(im, 0, 0); return chPut(key, c);
 }
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
@@ -504,9 +508,14 @@ function handle(m) {
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
-      const prev = me; me = m; if (!prev || prev.frame !== m.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = m.name; paintHud(); refreshPanel(); if (prev && prev.id === m.id) onMeDiff(prev, m); break; }
+      const prev = me; me = m.d && prev ? { ...prev, ...m } : m; if (!prev || prev.frame !== me.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = me.name; paintHud(); refreshPanel(); if (prev && prev.id === me.id) onMeDiff(prev, me); break; }   // d: only the fields that changed
     case 'announce': setTicker(m.text); showTicker(); break;
-    case 'wd': { if ((m.ann || '') !== tickerAnn) setTicker(m.ann); const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); wd = m; clockOff = m.now - Date.now(); paintEvent(); refreshPanel(); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } break; }
+    case 'wd': {   // the full snapshot on login, then only the parts that changed (d: 1)
+      if ('ann' in m && (m.ann || '') !== tickerAnn) setTicker(m.ann);
+      wd = m.d && wd ? { ...wd, ...m } : m; clockOff = m.now - Date.now(); paintEvent();
+      if (!m.d || Object.keys(m).some(k => k !== 't' && k !== 'd' && k !== 'now' && k !== 'on')) refreshPanel();
+      if (m.houses) { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } }
+      break; }
     case 'roster': {
       const ids = new Set();
       for (const p of m.players) {
@@ -514,7 +523,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0 });
+        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -2312,6 +2321,27 @@ function znMsg(m) {
     else znCard(`${zIcon(6, 40)}<b>โดนกัด!</b><p>คุณสลบไป ฟื้นขึ้นมาที่จัตุรัส · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600);
   }
 }
+// ☂️ an open umbrella held over the head: a coloured canopy (panels + scalloped rim), a shaft down to the hand, swaying a little
+const UMB_COL = [['#e8505b', '#ffd2d5'], ['#3d7be0', '#cfe0ff'], ['#f2b705', '#fff1b8'], ['#2fb36a', '#c9f5da'], ['#8a5cf0', '#e3d6ff'], ['#ff8a3d', '#ffe0c7']];
+function drawUmbrella(px, top, H, id, t) {
+  const [c1, c2] = UMB_COL[Math.abs(+id || 0) % UMB_COL.length], r = TS * .62, cx = px + TS * .2, cy = top - TS * .04, hand = top + H * .5;
+  ctx.save(); ctx.translate(cx, hand); ctx.rotate(Math.sin(t / 650 + (+id || 0)) * .05); ctx.translate(-cx, -hand);
+  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = Math.max(2, TS * .05); ctx.lineCap = 'round';   // shaft and J handle
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, hand); ctx.arc(cx - TS * .07, hand, TS * .07, 0, Math.PI); ctx.stroke();
+  const n = 6, rim = cy, ry = r * .66, sw = 2 * r / n, X = i => cx - r + i * sw;   // canopy: a half-dome with a scalloped rim, panels in two colours
+  ctx.beginPath(); ctx.moveTo(cx - r, rim); ctx.ellipse(cx, rim, r, ry, 0, Math.PI, 2 * Math.PI);
+  for (let i = n - 1; i >= 0; i--) ctx.quadraticCurveTo(X(i) + sw / 2, rim - TS * .07, X(i), rim);
+  ctx.closePath(); ctx.fillStyle = c1; ctx.fill();
+  ctx.save(); ctx.clip(); ctx.fillStyle = c2;
+  for (let i = 1; i < n; i += 2) { ctx.beginPath(); ctx.moveTo(cx, rim - ry); ctx.lineTo(X(i), rim + 2); ctx.lineTo(X(i + 1), rim + 2); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(cx - r * .35, rim - ry * .55, r * .2, ry * .14, -.6, 0, 7); ctx.fill();   // shine
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx - r, rim); ctx.ellipse(cx, rim, r, ry, 0, Math.PI, 2 * Math.PI);
+  for (let i = n - 1; i >= 0; i--) ctx.quadraticCurveTo(X(i) + sw / 2, rim - TS * .07, X(i), rim);
+  ctx.stroke();
+  ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(cx, rim - ry - TS * .02, TS * .04, 0, 7); ctx.fill();   // tip
+  ctx.restore();
+}
 function drawPlayer(p, X, Y, t) {
   if (p.zb) return drawZombie(p, X, Y, t);
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
@@ -2357,6 +2387,8 @@ function drawPlayer(p, X, Y, t) {
   if (fo?.swim) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py - H * .42, TS * .45 + Math.sin(t / 300) * 2, TS * .13, 0, 0, 7); ctx.stroke(); swimFx(p.id, fo.x, fo.y - .42 * H / TS, t); }
   if (fo) drawSeatFront(fk, px, py + (fk === 'carousel' ? 0 : TS * .1), fk === 'coaster' ? '#ffd45e' : fcol, fo);
   if (aura) drawAura(px, py, H, now0, true, gold);
+  const umb = !lying && !fo && wd?.ev?.id === 'rain' && (p.id === myId ? (me?.inv?.umbrella || 0) > 0 : p.um) && !roomOf(p.x, p.y);
+  if (umb) drawUmbrella(px, py - H * .97 - bob + (sitting ? H * .19 : 0), H, p.id, now0);   // ☂️ in the rain (the name tag moves up above it)
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
@@ -2365,7 +2397,7 @@ function drawPlayer(p, X, Y, t) {
   if (emote) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
   const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
-  nameAndBubble(p, px, top, mine, t);
+  nameAndBubble(p, px, umb ? top - TS * .42 : top, mine, t);
 }
 // ------------------------------------------------------------------ amusement park: rides drawn in code (until painted sprites
 // ride_<key> exist in the atlas), and riders moving with them. Riders' real position is the ride's ticket spot; we only draw them on the ride.
@@ -3060,7 +3092,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * ((p.title ? .8 : .46) + (p.gg ? .16 : 0)); p.tagT = t; }
   if (NAME_MODE === 'none' && !p.red) return chatOnly(p, px, top - TS * .22, t);   // player setting: characters only (chat still shows)
   if (NAME_MODE === 'name' && (p.gg || p.title)) p = { ...p, gg: null, title: '' };
-  const icon = p.red ? '🦹' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
+  const icon = p.red ? '🦹' : p.umb ? '☂️' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
@@ -3727,6 +3759,11 @@ function eggFx(m) {
   }
 }
 function talkToTown(o) {
+  if (o.umb) {   // ☂️ the umbrella man in the square (only while it rains)
+    const has = (me?.inv?.umbrella || 0) > 0;
+    return dialog({ name: o.name, face: null, npc: o.id, lines: has ? ['ฝนตกหนักเลยนะ', 'อ้าว มีร่มแล้วนี่ ดีแล้วๆ ไม่เปียกไม่เป็นหวัด'] : ['ร่มจ้า ร่ม! ฝนตกแบบนี้ไม่มีร่มเดี๋ยวก็เป็นหวัด', `คันละ ${money(o.umb)} ซื้อครั้งเดียวใช้ได้ตลอด`, 'เก็บไว้ในกระเป๋า ฝนตกตอนอยู่ข้างนอกจะกางให้เอง'],
+      choices: [...(has ? [] : [{ label: `☂️ ซื้อร่ม ${money(o.umb)}`, cls: 'primary', fn: () => { send({ t: 'umbbuy' }); dialogClose(); } }]), { label: '👋 ลาก่อน', fn: dialogClose }] });
+  }
   send({ t: 'npctalk', id: o.id });
   const info = { label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, bye = { label: '👋 ลาก่อน', fn: dialogClose };
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
@@ -4151,6 +4188,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-20a', d: '20 พ.ย. (รอบ 60)', items: [
+    '⚡ แก้อาการแลค: ส่งข้อมูลระหว่างเกมกับเซิร์ฟน้อยลงราว 3–4 เท่า และตัวละครวาดลื่นขึ้นในที่คนเยอะ',
+    '☂️ ร่มกันฝน! ฝนตกเมื่อไหร่ ลุงชัยจะถือร่มเดินมาขายที่จัตุรัส (มาเฉพาะตอนฝนตก) เก็บไว้ในกระเป๋า ฝนตกตอนอยู่ข้างนอกจะกางให้เอง ไม่เปียก ไม่เป็นหวัด',
     '💇 แก้สีผมที่ย้อมไม่ขึ้นตอนใส่ชุดทำงานหรือชุดพิเศษ ตอนนี้เห็นสีผมแล้ว (ถ้าใส่หมวก จะเห็นเฉพาะผมใต้หมวก)',
   ] },
   { v: '2026-11-19p', d: '19 พ.ย. (รอบ 59)', items: [
@@ -5231,6 +5270,7 @@ function renderPanel(p) {
         <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
+        <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
