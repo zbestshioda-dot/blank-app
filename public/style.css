@@ -1247,3 +1247,14 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border
 /* tactile buttons: a quick squish on press, springy release */
 #actBtn,#nearBtns button,#rideBtn,.phApp,.grid2 button{transition:transform .12s cubic-bezier(.3,1.6,.5,1)}
 #actBtn:active,#nearBtns button:active:not(:disabled),#rideBtn:active,.phApp:active,.grid2 button:active{transform:scale(.92)!important}
+
+/* a stat filling fast (amusement park ride, sleeping): flowing >> after the bar */
+.bar::after{content:'';width:0;transition:width .2s}
+.bar.boost::after{content:'»»';width:auto;font:900 13px/1 sans-serif;color:#7dff8a;text-shadow:0 0 4px #2bd14a,0 1px 0 #000;animation:boostFlow .7s linear infinite;margin-left:-2px}
+@keyframes boostFlow{0%{opacity:.35;transform:translateX(-2px)}60%{opacity:1;transform:translateX(2px)}100%{opacity:.35;transform:translateX(3px)}}
+
+/* new-mail envelope */
+#mailFab{order:1;pointer-events:auto;align-self:flex-start;position:relative;font-size:26px;line-height:1;padding:6px 9px;border-radius:14px;background:linear-gradient(#fff6dc,#ffd98a);border:2px solid #b97a2a;box-shadow:0 3px 0 #7a4a14,0 0 12px rgba(255,210,110,.8);animation:mailBob 1.4s ease-in-out infinite;margin-top:4px}
+#mailFab b{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#e0332a;color:#fff;font:700 11px/18px sans-serif;text-align:center}
+#mailFab.hidden{display:none}
+@keyframes mailBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-4px) rotate(4deg)}}

@@ -157,14 +157,15 @@ const OUTFIT_SHEET = { cashier: 'merchant', doctor: 'doctor', police: 'police', 
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin' };
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
-function drawAura(px, py, H, t, front) {
+function drawAura(px, py, H, t, front, gold) {
   const cy = py - H * .45;
   ctx.save();
   if (!front) {
     const pul = 1 + Math.sin(t / 380) * .08, r = H * .62 * pul, g = ctx.createRadialGradient(px, cy, H * .08, px, cy, r);
-    g.addColorStop(0, 'rgba(200,130,255,.75)'); g.addColorStop(.55, 'rgba(130,50,235,.42)'); g.addColorStop(1, 'rgba(60,0,120,0)');
+    if (gold) { g.addColorStop(0, 'rgba(255,236,150,.7)'); g.addColorStop(.55, 'rgba(255,190,50,.38)'); g.addColorStop(1, 'rgba(200,120,0,0)'); }
+    else { g.addColorStop(0, 'rgba(200,130,255,.75)'); g.addColorStop(.55, 'rgba(130,50,235,.42)'); g.addColorStop(1, 'rgba(60,0,120,0)'); }
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(px, cy, r * .78, r, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = `rgba(214,170,255,${.35 + Math.sin(t / 300) * .2})`; ctx.lineWidth = 2;
+    ctx.strokeStyle = gold ? `rgba(255,220,120,${.4 + Math.sin(t / 300) * .2})` : `rgba(214,170,255,${.35 + Math.sin(t / 300) * .2})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(px, py - 2, H * .36 * pul, H * .11 * pul, 0, 0, 7); ctx.stroke();
   }
   ctx.globalCompositeOperation = 'lighter';
@@ -172,7 +173,7 @@ function drawAura(px, py, H, t, front) {
     const a = t / 900 + i * Math.PI * 2 / 9, z = Math.sin(a);
     if ((z > 0) !== front) continue;
     const rise = ((t / 1600 + i * .37) % 1), x = px + Math.cos(a) * H * .38, y = py - H * (.08 + rise * .85), s = (1.6 + z * .8) * (1 - rise * .5) * H / 60;
-    ctx.fillStyle = `hsla(${270 + i * 9},100%,${70 + z * 10}%,${.85 * (1 - rise)})`;
+    ctx.fillStyle = `hsla(${gold ? 42 + i * 2 : 270 + i * 9},100%,${70 + z * 10}%,${.85 * (1 - rise)})`;
     ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, s * 2.2), 0, 7); ctx.fill();
   }
   ctx.restore();
@@ -180,11 +181,15 @@ function drawAura(px, py, H, t, front) {
 // ---- vehicles: atlas sprites w_<key>_s (side, faces left) / _f (front) / _b (back)
 const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's' : view === 'front' ? 'f' : 'b'}`];
 const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
-const VEH_FACE_R = new Set(['suv']);   // side sprites drawn facing right (the rest face left)
+const VEH_FACE_R = new Set(['spider']);   // side sprites drawn facing right (the rest face left)
+// some top views only have one picture for both directions: flip it so the nose points the way you drive
+const VEH_FLIP_B = new Set(['heli', 'heli2', 'jag', 'lambo', 'mclaren', 'phantom', 'spider']), VEH_FLIP_F = new Set(['porsche']);
 function drawVeh(key, view, faceLeft, px, py) {
-  const s = vehSpr(key, view); if (!s || !atlasImg) return;
+  const flipY = view === 'back' && VEH_FLIP_B.has(key) || view === 'front' && VEH_FLIP_F.has(key);
+  const s = flipY || view === 'back' && VEH_FLIP_F.has(key) ? vehSpr(key, 'front') : vehSpr(key, view); if (!s || !atlasImg) return;
   const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS;
   ctx.save(); ctx.translate(px, py + TS * .06); if (view === 'side' && !faceLeft !== VEH_FACE_R.has(key)) ctx.scale(-1, 1);
+  if (flipY) { ctx.translate(0, -h); ctx.scale(1, -1); }
   ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
 }
 function drawRide(p, v, px, py, k, view, dir) {
@@ -457,7 +462,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', gg: p.gg || 0 });
+        Object.assign(s, { id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -498,6 +503,7 @@ function handle(m) {
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
+    case 'ideas': window.__ideas = m; if (panel?.kind === 'ideas') refreshPanel(true); break;
     case 'mayor': window.__mayor = m; if (panel?.kind === 'mayor') refreshPanel(true); break;
     case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
@@ -728,15 +734,18 @@ function paintHud() {
   if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
   else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
   $('#statusBox').classList.toggle('hidden', !chips.length);
+  { const n = me.mailN || 0, f = $('#mailFab'); if (f) { f.classList.toggle('hidden', !n); $('#mailFabN').textContent = n > 9 ? '9+' : n; if (!f.onclick) f.onclick = () => openPanel({ kind: 'mail' }); } }
   paintPortrait(); $('#phoneBtn').classList.toggle('has', (me.mailN || 0) > 0 || (me.bills || []).length > 0 || achTodo().length > 0);
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
-  $('#meMoney').textContent = Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
+  $('#meMoney').textContent = me.monInf ? '∞' : Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
   $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
+  { const fun = me.pose === 'fun', bed = me.pose === 'bed';   // ▶▶ next to the bars that are filling fast (park rides, sleeping)
+    for (const [k, on] of [['energy', (fun || bed) && me.energy < 100], ['health', fun && me.health < 100], ['happy', fun && (me.happy ?? 80) < 100]]) document.querySelector(`.bar[data-bar="${k}"]`)?.classList.toggle('boost', !!on); }
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
@@ -832,9 +841,9 @@ $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard
 { let c = null; try { c = localStorage.getItem('lt_card'); } catch { } setCard(c === null ? innerWidth < 700 && innerHeight > innerWidth : c === '1'); }
 // what each bar means and how to fill it
 const BAR_HELP = {
-  energy: ['⚡', 'พลังงาน: ใช้ตอนทำงาน/ตกปลา/เรียน · เพิ่มได้จาก 😌 นั่งพักหลับตา (เร็ว 3 เท่า), นั่งม้านั่ง, นอนที่บ้าน, กินอาหาร หรือเครื่องดื่มชูกำลัง'],
+  energy: ['⚡', 'พลังงาน: ใช้ตอนทำงาน/ตกปลา/เรียน · เพิ่มได้จาก 🎡 เล่นเครื่องเล่นในสวนสนุก หรือ 🛏️ นอนที่เตียงในบ้าน (อาหารและการนั่งพักไม่เพิ่มพลังงาน)'],
   hunger: ['🍗', 'ความอิ่ม: ลดลงเรื่อยๆ · เพิ่มได้จากการกินอาหาร (ร้านอาหาร ตลาด สั่งในมือถือ หรือของในกระเป๋า 🎒) ถ้าหิวนานเลือดจะลด'],
-  health: ['❤️', 'สุขภาพ: ลดเมื่อหิวนานหรือป่วย · เพิ่มได้จาก 😌 นั่งพัก (ถ้าไม่หิว), กินให้อิ่มเกิน 60, ชุดปฐมพยาบาล 🩹, นอนเตียงให้หมอรักษา'],
+  health: ['❤️', 'สุขภาพ: ลดเมื่อหิวนานหรือป่วย · เพิ่มได้จาก 🎡 สวนสนุก (สระว่ายน้ำดีที่สุด), กินให้อิ่มเกิน 60, ชุดปฐมพยาบาล 🩹, นอนเตียงให้หมอรักษา'],
   happy: ['😊', 'ความสุข: ลดลงเรื่อยๆ ถ้าต่ำกว่า 20 จะทำงานไม่ได้ · เพิ่มได้จากกินของที่อยากกิน 🤤, นั่งม้านั่งที่จัตุรัส, คุยแชท, โทรหาเพื่อน, บริจาคให้ขอทาน, นอนบ้านตัวเอง'],
 };
 document.querySelectorAll('[data-bar]').forEach(b => b.onclick = e => { e.stopPropagation(); const [ic, t] = BAR_HELP[b.dataset.bar]; FX.play('click'); popup(`${ic} ${t}`, [['เข้าใจแล้ว', 'good', () => {}]], 12000); });
@@ -1122,7 +1131,7 @@ function findNear() {
 }
 const onBike = () => { const m = P.get(myId), v = me?.ride && G.shop?.vehicles?.[me.ride]; return !!(v && v.kind === 'moto' && me.ride !== 'escoot' && m && !roomOf(m.x, m.y) && !me.pose); };
 function onAction() {
-  if (driving()) return send({ t: 'rideoff' });
+  if (driving() || swimming()) return send({ t: 'rideoff' });
   if (me.pass) return send({ t: 'hopoff' });
   if (!near && onBike()) { const t0 = performance.now(); if (t0 < actCd) return; actCd = t0 + 1800; return send({ t: 'wheelie' }); }
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
@@ -1222,7 +1231,8 @@ function frame(t) {
       const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, sp = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * dt;
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
-      const ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && blockedAt(m.x, m.y), free = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
+      const swim = swimming(), inPool0 = nearPoolW(m.x, m.y), ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && !swim && blockedAt(m.x, m.y), free0 = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
+      const free = (x, y) => swim ? inPoolW(x, y) : !inPool0 && nearPoolW(x, y) ? false : free0(x, y);   // swimmers stay in the water; nobody walks or drives into it
       const bx = m.x, by = m.y;
       const nx = r2(m.x + dx * sp); if (free(nx, m.y)) m.x = nx;
       const ny = r2(m.y + dy * sp); if (free(m.x, ny)) m.y = ny;
@@ -1271,7 +1281,8 @@ function frame(t) {
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); $('#actLabel').textContent = 'ใช้งาน'; }
-  if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); $('#actLabel').textContent = 'ลงจากรถ'; }   // in a bumper car the big button gets you out
+  if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); $('#actLabel').textContent = 'ลงจากรถ'; }
+  else if (swimming()) { ab.classList.remove('idle', 'closed'); actIco('🪜'); $('#actLabel').textContent = 'ขึ้นจากสระ'; }   // in a bumper car the big button gets you out
   else if (me.pass) { ab.classList.remove('idle', 'closed'); actIco('🚶'); $('#actLabel').textContent = 'ลงรถ'; }       // riding with a friend
   else if (!near && onBike()) { ab.classList.remove('idle', 'closed'); actIco('🔥'); $('#actLabel').textContent = 'สับโดด'; }   // on a bike with nothing around: pop a wheelie
   paintFishCue();
@@ -1346,7 +1357,7 @@ function draw(t) {
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) {
     if (p.ps && P.get(p.ps)?.veh) continue;   // passengers are drawn with the bike / inside the car they ride in
     const rs = p.pose === 'fun' && p.fn ? STN('ride_' + String(p.fn).split(':')[0]) : null;   // riders are drawn with their ride (in front of it; behind the shooting counter)
-    ents.push([rs ? (rs.k === 'shooting' ? (RIDE_IMG() ? rideBottom(rs) + .4 : rs.cy - rs.h / 2 + .4) : rs.k === 'bumper' ? p.ry + .3 : rideBottom(rs) + .2) : p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);
+    ents.push([rs ? (rs.k === 'shooting' ? (RIDE_IMG() ? rideBottom(rs) + .4 : rs.cy - rs.h / 2 + .4) : rs.k === 'bumper' || rs.k === 'pool' ? p.ry + .3 : rideBottom(rs) + .2) : p.ry + .3 + (p.veh && G.shop?.vehicles?.[p.veh]?.fly && !roomOf(p.x, p.y) ? 1e5 : 0), 4, p]);
   }   // helicopters fly over the roofs
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3) && !roomOf(p.x, p.y)) ents.push([q.y + .3, 6, q]); }   // pets wait outside: none indoors
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
@@ -2013,10 +2024,18 @@ function drawPet(q, X, Y, t) {
   const sw = size * sx, sh = size * sy;
   const legend = G.pets?.[q.id]?.rar >= 5;
   if (legend) petGlow(px, py - h - sh * .45, size, now0);
+  const ow = P.get(q.owner);
+  if (ow?.pl && !ow.veh && !ow.pose) {                       // 🦮 the lead: from the owner's hand to the pet's collar, sagging a little
+    const hx = Math.round(ow.rx * TS + X) + (q.x < ow.rx ? -TS * .18 : TS * .18), hy = Math.round(ow.ry * TS + Y) - TS * .1, nx = px, ny = py - h - sh * .5;
+    ctx.save(); ctx.strokeStyle = '#c0392b'; ctx.lineWidth = Math.max(1.5, TS * .035); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo((hx + nx) / 2, Math.max(hy, ny) + TS * .22, nx, ny); ctx.stroke();
+    ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(nx, ny, Math.max(2, TS * .05), 0, 7); ctx.fill(); ctx.restore();
+  }
   ctx.save(); ctx.translate(px, py - h);
   if (q.view === 'side' && q.flip !== PET_FACE_L.has(q.id)) ctx.scale(-1, 1);
   ctx.drawImage(petImg, (group * 4 + fr) * C, meta.row * C, C, C, -sw / 2, -sh + size * .03, sw, sh);
   ctx.restore();
+  if (ow?.pn) sign(ow.pn, px, py - h - sh - TS * .08, { size: TS * .16, bg: 'rgba(255,248,230,.9)', color: '#6b3d1e' });   // its name
 }
 // legendary pets (rarity 5) shimmer: a soft halo and four-point stars drifting around them
 function petGlow(cx, cy, size, t) {
@@ -2085,8 +2104,8 @@ function drawPlayer(p, X, Y, t) {
     [...P.values()].filter(o => o.ps === p.id).forEach((o, i) => nameAndBubble(o, px + (i - .5) * TS * .2, top0 - TS * (.62 + i * .5), o.id === myId, t));   // the passengers' names (and chat) over the driver's
     return;
   }
-  const aura = p.of === 'admin' && !lying, now0 = performance.now();
-  if (aura) drawAura(px, py, H, now0, false);
+  const aura = (p.of === 'admin' || p.of === 'thai') && !lying, gold = p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold
+  if (aura) drawAura(px, py, H, now0, false, gold);
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
   else if (fo?.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, p, px, py + Math.sin(t / 380 + p.id) * TS * .05, k, 'front', 0); }   // swimming: only head and shoulders above the water
@@ -2095,7 +2114,7 @@ function drawPlayer(p, X, Y, t) {
   ctx.restore();
   if (fo?.swim) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py - H * .42, TS * .45 + Math.sin(t / 300) * 2, TS * .13, 0, 0, 7); ctx.stroke(); swimFx(p.id, fo.x, fo.y - .42 * H / TS, t); }
   if (fo) drawSeatFront(fk, px, py + (fk === 'carousel' ? 0 : TS * .1), fk === 'coaster' ? '#ffd45e' : fcol, fo);
-  if (aura) drawAura(px, py, H, now0, true);
+  if (aura) drawAura(px, py, H, now0, true, gold);
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
@@ -2110,6 +2129,9 @@ function drawPlayer(p, X, Y, t) {
 // ride_<key> exist in the atlas), and riders moving with them. Riders' real position is the ride's ticket spot; we only draw them on the ride.
 const bump = { x: 0, y: 0, until: 0 };
 const driving = () => { const m = P.get(myId); return !!m && m.pose === 'fun' && String(m.fn).startsWith('bumper:'); };
+const swimming = () => { const m = P.get(myId); return !!m && m.pose === 'fun' && String(m.fn).startsWith('pool:'); };
+const inPoolW = (x, y) => { const Q = G.pool; return !!Q?.x0 && x > Q.x0 + .4 && x < Q.x1 - .4 && y > Q.y0 + .7 && y < Q.y1 - .1; };
+const nearPoolW = (x, y) => { const Q = G.pool; return !!Q?.x0 && x > Q.x0 - .35 && x < Q.x1 + .35 && y > Q.y0 - .1 && y < Q.y1 + .45; };
 const RIDE_SEATS = { carousel: 6, ferris: 8, coaster: 6, bumper: 4, pool: 10, shooting: 3 };
 const RIDE_COL = ['#ff7aa8', '#7ac8ff', '#ffd45e', '#8be08b', '#c79bff', '#ff9f5e', '#5ee0d0', '#ffb3c7', '#9fb6ff', '#ffe28a'];
 const rideBottom = s => s.cy + s.h / 2;
@@ -2182,7 +2204,8 @@ function seatPos(s, slot, T) {
 }
 function funPos(p) {
   const [k, sl] = String(p.fn || '').split(':'), s = STN('ride_' + k); if (!s) return null;
-  if (k === 'bumper') return { x: p.rx + (p.ox || 0), y: p.ry + (p.oy || 0) + .32, lift: .1, sit: 1, car: RIDE_COL[(+sl || 0) % RIDE_COL.length], s, drive: 1 };   // you drive it: drawn where you really are
+  if (k === 'bumper') return { x: p.rx + (p.ox || 0), y: p.ry + (p.oy || 0) + .32, lift: .1, sit: 1, car: RIDE_COL[(+sl || 0) % RIDE_COL.length], s, drive: 1 };
+  if (k === 'pool') return { x: p.rx + (p.ox || 0), y: p.ry + (p.oy || 0) + .32, lift: 0, swim: 1, s, drive: 1 };   // you swim it yourself: drawn where you really are   // you drive it: drawn where you really are
   return { ...seatPos(s, +sl || 0, performance.now() / 1000), s };
 }
 // townsfolk riding along on the empty seats, so the park never looks dead (drawn only, they are not players)
@@ -2378,12 +2401,12 @@ function crowdMake(A) {
   if (A.id === 'park') {
     const P0 = (c, y) => [X + c, y];   // park walks: columns from the park's left edge, rows as map rows
     const R = [
-      [P0(3, 70), P0(34.5, 70), P0(34.5, 55), P0(34.5, 70), P0(67, 70), P0(34.5, 70), P0(34.5, 86), P0(34.5, 70)],
-      [P0(8, 70.6), P0(16.5, 70.6), P0(16.5, 64.6), P0(16.5, 70.6), P0(44.5, 70.6), P0(44.5, 64.6), P0(44.5, 70.6), P0(60.5, 70.6), P0(60.5, 64.6), P0(60.5, 74.6), P0(60.5, 70.6)],
-      [P0(34.5, 70.4), P0(44.5, 70.4), P0(44.5, 75), P0(44.5, 70.4), P0(60.5, 70.4), P0(60.5, 75), P0(60.5, 70.4), P0(34.5, 70.4), P0(34.5, 84), P0(34.5, 70.4)],
-      [P0(2, 69.6), P0(25, 69.6), P0(34.4, 69.6), P0(34.4, 58), P0(34.4, 69.6), P0(2, 69.6)]];
+      [P0(3, 67), P0(25.5, 67), P0(25.5, 55), P0(25.5, 67), P0(49, 67), P0(25.5, 67), P0(25.5, 80), P0(25.5, 67)],
+      [P0(6, 67.6), P0(11, 67.6), P0(11, 64), P0(11, 67.6), P0(32, 67.6), P0(32, 64), P0(32, 67.6), P0(44, 67.6), P0(44, 64), P0(44, 67.6)],
+      [P0(25.5, 67.4), P0(34, 67.4), P0(34, 69.6), P0(34, 67.4), P0(45, 67.4), P0(45, 69.4), P0(45, 67.4), P0(25.5, 67.4), P0(25.5, 78.8), P0(40, 78.8), P0(25.5, 78.8), P0(25.5, 67.4)],
+      [P0(2, 66.6), P0(12, 66.6), P0(12, 69.8), P0(12, 66.6), P0(25.4, 66.6), P0(25.4, 56), P0(25.4, 66.6), P0(2, 66.6)]];
     for (let i = 0; i < 16; i++) { const kid = i % 3 === 1; person(i, R[i % R.length], kid ? { small: .72, balloon: pk(BALLOON) } : r() < .2 ? { balloon: pk(BALLOON) } : {}); }
-    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 31.6, y: 68.6, rx: X + 31.6, ry: 68.6, f: 6, path: null, seller: 1 });
+    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 21, y: 68.6, rx: X + 21, ry: 68.6, f: 6, path: null, seller: 1 });
   } else if (A.id === 'town') {
     // pavements run beside every main road: people stroll along them and stop to look around
     const seg = (x0, x1, y) => [[x0, y], [x1, y]], walks = [
@@ -2421,7 +2444,7 @@ function crowdEnts(A, ents, vis) {
     ents.push([m.ry + .3, 4, m]);
     if (m.balloon || m.seller) ents.push([m.ry + .31, 14, { fx: 'balloon', m }]);
   }
-  if (A.id === 'park') ents.push([69.2, 14, { fx: 'bunting', y: 69.2 }], [72.2, 14, { fx: 'bunting', y: 72.2 }], [1e5, 14, { fx: 'bubbles', x: A.x + 16.5, y: 63.6 }]);
+  if (A.id === 'park') ents.push([66.2, 14, { fx: 'bunting', y: 66.2 }], [69.2, 14, { fx: 'bunting', y: 69.2 }], [1e5, 14, { fx: 'bubbles', x: A.x + 11, y: 63.6 }]);
   if (A.id === 'town') {   // town critters: pigeons in the square, cats and dogs on the pavements
     for (const c of TWNC) {
       if (c.wait > 0) c.wait -= dt; else { const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy); if (d < .1) { c.wait = 2 + Math.random() * 6; c.tx = c.x + (Math.random() - .5) * 8; c.ty = c.home; c.tx = clamp(c.tx, 8, 90); } else { const st = Math.min(d, (c.e === '🐈' ? .9 : 1.3) * dt); c.x += dx / d * st; c.y += dy / d * st; c.dir = dx < 0 ? -1 : 1; } }
@@ -3013,7 +3036,8 @@ const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="$
 const FN = {
   aucBid(m) { const v = +($('#aucAmt')?.value || 0); send({ t: 'act', st: m.st, a: 'bid', amt: v }); },
   openPets() { openPanel({ kind: 'pets' }); },
-  titles: () => { panel.titles = !panel.titles; refreshPanel(true); if (panel.titles) setTimeout(() => { const t = document.querySelector('#panelBody .secT'); t && t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); },
+  titles: () => { panel.titles = !panel.titles; panel.frames = false; refreshPanel(true); const b = document.querySelector('#panelBody'); if (b) b.scrollTop = 0; },
+  frames: () => { panel.frames = !panel.frames; panel.titles = false; refreshPanel(true); const b = document.querySelector('#panelBody'); if (b) b.scrollTop = 0; },
   photo: () => pickPhoto(),
   place: m => startPlace(m.k),
   photoDel: () => send({ t: 'pic', data: '' }),
@@ -3022,6 +3046,16 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  openIdeas() { send({ t: 'idea', op: 'list', sort: 'new' }); openPanel({ kind: 'ideas', sort: 'new' }); },
+  idea(m, root) {
+    if (m.op === 'del' && !confirm('ลบโพสต์นี้?')) return;
+    if (m.op === 'sort') { panel.sort = m.sort; return send({ t: 'idea', op: 'list', sort: m.sort }); }
+    if (m.op === 'open') { panel.open = panel.open === m.id ? 0 : m.id; return refreshPanel(true); }
+    const text = m.op === 'post' ? root.querySelector('#ideaIn')?.value : m.op === 'cm' ? root.querySelector('#ideaCm' + m.id)?.value : '';
+    send({ t: 'idea', op: m.op, id: m.id, text, sort: panel.sort });
+    if (m.op === 'post') { const e = root.querySelector('#ideaIn'); if (e) e.value = ''; }
+  },
+  petName(m) { const cur = me.pnames?.[m.id] || ''; const n = prompt(`ตั้งชื่อ${G.pets[m.id]?.name || 'สัตว์เลี้ยง'} (ไม่เกิน 12 ตัวอักษร · เว้นว่าง = ลบชื่อ)`, cur); if (n === null) return; send({ t: 'pet.name', id: m.id, name: n.trim() }); },
   openMayor() { send({ t: 'mayor', op: 'view' }); openPanel({ kind: 'mayor' }); },
   mayor(m, root) {
     if (m.op === 'run' && !confirm('ลงสมัครนายกเมือง ค่าสมัคร ' + (window.__mayor?.K?.fee || 50000).toLocaleString() + ' บาท (ไม่คืนเงิน) ยืนยัน?')) return;
@@ -3079,7 +3113,7 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
-  godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0)) return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
+  godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0) && m.op !== 'setmoney') return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: m.op || 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
   godName(m, root) { send({ t: 'god', op: 'rename', name: root.querySelector('#godName')?.value || '' }); },
 };
 let bugList = null;
@@ -3906,6 +3940,20 @@ function checkNews() {
 }
 
 // ---- gang / club panel (phone app 🏴)
+function ideasPanel(p) {
+  const I = window.__ideas, ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'เมื่อกี้' : m < 60 ? m + ' นาที' : m < 1440 ? Math.floor(m / 60) + ' ชม.' : Math.floor(m / 1440) + ' วัน'; };
+  const posts = !I ? '<div class="sub">กำลังโหลด…</div>' : I.list.map(i => `<div class="item" style="display:block">
+      <div style="display:flex;gap:8px;align-items:center"><b>💡 ${esc(i.n)}</b><small style="opacity:.7">${ago(i.t)}</small>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
+      <p style="margin:6px 0;white-space:pre-wrap;word-break:break-word">${esc(i.text)}</p>
+      <div class="grid2">${B(`${i.liked ? '👍 ถูกใจแล้ว' : '👍 ถูกใจ'} ${i.likes || ''}`, { fn: 'idea', op: 'like', id: i.id }, i.liked ? 'primary' : '')}${B(`💬 คอมเมนต์ ${i.cm.length || ''}`, { fn: 'idea', op: 'open', id: i.id })}</div>
+      ${p.open === i.id ? `<div style="margin-top:6px">${i.cm.map(c => `<div style="padding:4px 8px;margin:3px 0;border-radius:10px;background:rgba(0,0,0,.12)"><b>${c.a ? '👑 ' : ''}${esc(c.n)}</b> <small style="opacity:.7">${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<small>ยังไม่มีคอมเมนต์</small>'}
+        <div class="rowf" style="margin-top:4px"><input id="ideaCm${i.id}" maxlength="150" placeholder="เขียนคอมเมนต์…">${B('ส่ง', { fn: 'idea', op: 'cm', id: i.id }, 'primary')}</div></div>` : ''}
+    </div>`).join('') || '<div class="sub">ยังไม่มีไอเดีย มาเป็นคนแรกเลย!</div>';
+  return `<h2>💡 ไอเดียทำเกม</h2><div class="sub">อยากให้เมืองมีอะไรเพิ่ม เสนอได้เลย ทีมงานอ่านทุกโพสต์ · กดถูกใจไอเดียที่ชอบ ไอเดียยอดนิยมมีโอกาสได้ทำจริง</div>
+    <textarea id="ideaIn" maxlength="300" rows="3" style="width:100%;box-sizing:border-box;border-radius:10px;padding:8px;font:inherit" placeholder="เช่น อยากให้มีร้านกาแฟในสวนสนุก…"></textarea>
+    ${B('📝 โพสต์ไอเดีย', { fn: 'idea', op: 'post' }, 'primary')}
+    <div class="tabs" style="margin-top:8px">${B('🆕 ล่าสุด', { fn: 'idea', op: 'sort', sort: 'new' }, p.sort !== 'top' ? 'primary' : '')}${B('🔥 ยอดนิยม', { fn: 'idea', op: 'sort', sort: 'top' }, p.sort === 'top' ? 'primary' : '')}</div>${posts}`;
+}
 function mayorPanel() {
   const M = window.__mayor; if (!M) return '<h2>🏛️ เลือกตั้งนายกเมือง</h2><div class="sub">กำลังโหลด…</div>';
   const K = M.K, c = M.cur, ok = v => v ? '✅' : '❌';
@@ -4031,6 +4079,12 @@ function renderPanel(p) {
         body = `<div class="list">${body}</div>`;
       }
       return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')}</div>${tabs}${body}`;
+    }
+    case 'pshop': {
+      const rows = (G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
+        return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
+          [e.hunger && `อิ่ม +${e.hunger}`, e.happy && `สุข +${e.happy}`, !it.eat && 'ของฝาก ขายต่อได้', `มีอยู่ ${me.inv[id] || 0}`].filter(Boolean).join(' · ')); }).join('');
+      return `<h2>🍿 ร้านขนม & ของฝากสวนสนุก</h2><div class="sub">ป๊อปคอร์น สายไหม ฮอตดอก น้ำเย็นๆ ลูกโป่ง และตุ๊กตาของฝาก · ซื้อแล้วเก็บในกระเป๋า กดใช้ได้ทุกเมื่อ</div><div class="list">${rows}</div>`;
     }
     case 'tshop': {
       const rows = (G.tshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.tshop.markup), e = it.eat || {};
@@ -4182,11 +4236,15 @@ function renderPanel(p) {
       const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => G.pets[a].price - G.pets[b].price);
       const card = id => { const pt = G.pets[id], own = have.includes(id), on = me.pet === id;
         const btn = own ? (!shopMode || on) ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : '<small>มีแล้ว ✓</small>' : B(money(pt.price), { t: 'act', st: p.st, a: 'buy', pet: id }, 'good', me.money < pt.price);
-        return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
+        const nm = me.pnames?.[id], nameBtn = own && !shopMode ? B(nm ? '✏️ เปลี่ยนชื่อ' : '✏️ ตั้งชื่อ', { fn: 'petName', id }) : '';
+        return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${nm ? `<b>"${esc(nm)}"</b><br>` : ''}${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small>${nameBtn}<span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
       const mine = ids.filter(id => have.includes(id)), shop = ids.filter(id => !have.includes(id));
-      if (shopMode) return `<h2>🐾 ${esc(STN(p.st)?.label || 'ร้านสัตว์เลี้ยง')}</h2><div class="sub">${hoursTxt('petshop')} · รับเลี้ยงแล้วเรียกออกมาเดินตามได้ที่เมนู 🐾 สัตว์เลี้ยง · เลี้ยงได้ทีละ 1 ตัว · มี ${have.length}/${ids.length} ตัว</div>
+      const leashRow = shopMode ? itemRowRaw('🦮', 'สายจูงสัตว์เลี้ยง', 'ใส่ให้สัตว์เลี้ยงตัวไหนก็ได้ · ใส่/ถอดได้ในแอพ 🐾 สัตว์เลี้ยง', me.leash ? '<small>มีแล้ว ✓</small>' : B(money(me.leashPrice || 800), { t: 'act', st: p.st, a: 'leash' }, 'good', me.money < (me.leashPrice || 800)))
+        : me.leash ? `<div class="setRow"><span><b>🦮 สายจูง</b><small>ใส่แล้วจะเห็นสายจูงจากมือคุณถึงสัตว์เลี้ยง</small></span>${B(me.leashOn ? 'ใส่อยู่ · ถอด' : 'ถอดอยู่ · ใส่', { t: 'pet.leash' }, me.leashOn ? 'good' : '')}</div>` : '<div class="sub">🦮 ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง</div>';
+      if (shopMode) return `<h2>🐾 ${esc(STN(p.st)?.label || 'ร้านสัตว์เลี้ยง')}</h2>${leashRow}<div class="sub">${hoursTxt('petshop')} · รับเลี้ยงแล้วเรียกออกมาเดินตามได้ที่เมนู 🐾 สัตว์เลี้ยง · เลี้ยงได้ทีละ 1 ตัว · มี ${have.length}/${ids.length} ตัว</div>
         <div class="looks">${ids.map(card).join('')}</div>`;
       return `<h2>🐾 สัตว์เลี้ยง</h2><div class="sub">${me.pet ? `ตอนนี้ ${G.pets[me.pet].icon} <b>${esc(G.pets[me.pet].name)}</b> เดินตามคุณอยู่ · แตะที่ตัวมันเพื่อเล่นด้วย` : 'เรียกสัตว์เลี้ยงออกมาเดินตามคุณได้ (รับเลี้ยงเพิ่มที่ร้านสัตว์เลี้ยง 🐾 ถนนเหนือ)'} · เลี้ยงได้ทีละ 1 ตัว</div>
+        ${mine.length ? leashRow : ''}
         ${mine.length ? `<div class="secT">💖 สัตว์เลี้ยงของฉัน (${mine.length})</div><div class="looks">${mine.map(card).join('')}</div>` : ''}
         ${mine.length ? '' : '<div class="jobbox">ยังไม่มีสัตว์เลี้ยง · ไปรับเลี้ยงที่ร้านสัตว์เลี้ยง 🐾 (ถนนเหนือ) ได้เลย</div>'}`;
     }
@@ -4234,7 +4292,7 @@ function renderPanel(p) {
       const drive = !hasDL ? itemRowRaw('🪪', 'สอบใบขับขี่', `ค่าสอบ ${money(dl.price)} · ตอบคำถามจราจร 3 ข้อ ต้องถูกทุกข้อ · ต้องต่ออายุทุกปีในเกม (${money(dl.renew)})`, B('📝 สอบ', { t: 'act', st, a: 'dtest' }, 'good'))
         : itemRowRaw('🪪', `ใบขับขี่ ${licExp('driving') ? '<span class="tag" style="background:var(--bad)">หมดอายุ</span>' : ''}`, licExp('driving') ? 'หมดอายุแล้ว — ต่ออายุเพื่อทำงานไรเดอร์ต่อ' : `ใช้ได้อีก ${leftD} วันในเกม (1 ปี = 60 วันในเกม = 1 วันจริง)`, B(`ต่ออายุ ${money(dl.renew)}`, { t: 'act', st, a: 'renew' }, licExp('driving') ? 'primary' : '', !licExp('driving') && leftD > 15));
       const tab = ['car', 'gem'].includes(p.vtab) ? p.vtab : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
-      const cards = Object.entries(G.shop.vehicles).filter(([, v]) => (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
+      const cards = Object.entries(G.shop.vehicles).filter(([k, v]) => (!v.hidden || (me.vehicles || []).includes(k)) && (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
         const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
         const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
         return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas class="vfit" data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
@@ -4405,16 +4463,18 @@ function renderPanel(p) {
     case 'ach':
     case 'profile': {
       const ti = G.ach.find(x => x.id === me.title), got = (me.ach || []).length;
+      // changing the title or the frame opens its own page with a back button
+      if (p.titles) return `<h2>${B('‹ กลับ', { fn: 'titles' })} 🏅 เปลี่ยนฉายา</h2><div class="sub">สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
+        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="list">${achRows()}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'titles' })}`;
+      if (p.frames) return `<h2>${B('‹ กลับ', { fn: 'frames' })} 🖼️ กรอบรูป</h2>${frameRows()}${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'frames' })}`;
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
-        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B(p.titles ? '▲ ซ่อนฉายา' : '🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B(p.frames ? '▲ ซ่อนกรอบ' : '🖼️ กรอบรูป', { fn: 'qtab', set: { frames: !p.frames } })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
+        <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b><div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
         <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div></div>
         ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
           return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
           <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
-        ${p.frames ? frameRows() : ''}
-        ${p.titles ? `<div class="secT">🏅 เปลี่ยนฉายา · สีบอกความหายาก: ${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${RAR[r]}</span>`).join('')}</div>
-        <div class="sub">ตั้งฉายาที่ปลดล็อกแล้วให้ลอยบนหัว ทุกคนในเมืองเห็น · ที่ปลดล็อกแล้วอยู่ด้านบน</div><div class="list">${achRows()}</div>` : ''}`;
+`;
     }
     case 'mail': {
       if (!p.read) { p.read = 1; if ((me.mailN || 0) > 0) send({ t: 'mailread' }); }
@@ -4457,7 +4517,7 @@ function renderPanel(p) {
         💼 <b>หางาน</b>: คุยกับ NPC เจ้าหน้าที่ (💬) ที่ยืนข้างเคาน์เตอร์ของแต่ละที่ · เปลี่ยนงานแล้วรอ 5 นาที<br>
         🎓 <b>เรียน</b>: ลงทะเบียนที่มหาวิทยาลัย แล้วนั่งที่โต๊ะเรียน 1 ชั่วโมงในเกม = 1 คาบ · ใบขับขี่ต้องต่ออายุทุกปี<br>
         🕐 <b>เวลา</b>: 1 วันในเกม = 24 นาที (กลางคืน 19:00–07:00 ผ่านไปใน 3 นาที) · ร้านต่างๆ มีเวลาเปิด-ปิด<br>
-        😌 <b>พัก</b>: นั่งพักได้ทุกที่ พลังงานฟื้นเร็ว 3 เท่า และเลือดค่อยๆ ฟื้น (ถ้าไม่หิว)<br>
+        😌 <b>พัก</b>: นั่งพักหลับตาแก้ง่วง · พลังงาน/เลือดคืนได้ที่ 🎡 สวนสนุก หรือ 🛏️ เตียงในบ้าน<br>
         ❤️ <b>สุขภาพ</b>: หิวนานเลือดลด · ป่วยต้องหาหมอ · แตะแถบสถานะเพื่อดูวิธีเพิ่ม<br>
         🍱 <b>ตุนอาหาร</b>: ซื้อใส่กระเป๋าที่ร้านอาหาร แล้วกด "ใช้" ในกระเป๋าตอนหิว<br>
         👥 <b>เพื่อน</b>: คุยกับคนอื่นแล้ว "📱 ขอเบอร์" (ปฏิเสธ 2 ครั้ง ต้องรอ 10 นาที) · ดูเพื่อนที่ออนไลน์ที่เมนู 👥<br>
@@ -4489,9 +4549,10 @@ function renderPanel(p) {
     }
     case 'gang': return gangPanel(p);
     case 'mayor': return mayorPanel();
+    case 'ideas': return ideasPanel(p);
     case 'friends': {
       const fr = (me.friends || []).slice().sort((a, b) => (b.fav || 0) - (a.fav || 0) || b.on - a.on);
-      const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', `${f.fav ? '⭐ ' : ''}${esc(f.n)}`, f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call) : '')).join('');
+      const rows = fr.map(f => itemRowRaw(f.on ? (f.afk ? '🌙' : '🟢') : '⚪', `${f.fav ? '⭐ ' : ''}${esc(f.n)}`, f.on ? `${f.afk ? 'ไม่อยู่หน้าจอ · ' : 'ออนไลน์ · '}${esc(f.where)}` : 'ออฟไลน์', f.on ? `<div class="col2">${B('📞 โทร', { t: 'call', phone: f.p }, 'good', !!call)}${f.home === 1 ? B('🏡 ไปเที่ยวบ้าน', { t: 'visit', p: f.p }) : f.home === 2 ? '<small>มีบ้าน · เขายังไม่ได้บันทึกเบอร์คุณ</small>' : ''}</div>` : '')).join('');
       const others = [...P.values()].filter(x => !x.npc && x.id !== myId && !fr.some(f => f.n === x.name));
       const orow = others.map(x => itemRowRaw(x.afk ? '🌙' : '🟢', `${x.adm ? '👑 ' : ''}${esc(x.name)} <span class="tag">${CAREER_ICON(x.c)} ${G.careers[x.c]?.name || ''}</span>`, `${AREA[areaOf(x.x, x.y)?.id]?.name || areaOf(x.x, x.y)?.label || ''}${x.afk ? ' · ไม่อยู่หน้าจอ' : ''}`, '')).join('');
       const onN = fr.filter(f => f.on).length;
@@ -4507,7 +4568,8 @@ function renderPanel(p) {
       const g = me.god || {};
       const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small>${b.done ? '<small style="color:var(--ok)">✅ แจ้งผู้เล่นแล้ว</small>' : B('✅ ตอบกลับว่าแก้แล้ว', { fn: 'bugReply', bt: b.t, login: b.login || '' }, 'good')}</div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
       return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
-        <div class="secT">💰 เพิ่มเงิน (ไม่จำกัด)</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="1" placeholder="จำนวนเงิน เช่น 1000000">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}</div>
+        <div class="setRow"><span><b>♾️ เงิน/เพชรไม่จำกัด</b><small>เปิดอยู่ = ซื้อได้ทุกอย่าง ปิด = กลับไปใช้เงินจริงของคุณ</small></span>${B(me.monInf ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'inf' }, me.monInf ? 'good' : '')}</div>
+        <div class="secT">💰 ปรับเงินตัวเอง${me.monInf ? ' <small>(ปิดเงินไม่จำกัดก่อนจึงลด/ตั้งได้)</small>' : ''}</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="0" placeholder="จำนวนเงิน เช่น 1000000"></div><div class="grid2">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}${B('➖ ลด', { fn: 'godMoney', op: 'submoney' }, '', !!me.monInf)}${B('🎯 ตั้งเป็นจำนวนนี้', { fn: 'godMoney', op: 'setmoney' }, '', !!me.monInf)}</div>
         <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
@@ -4606,12 +4668,12 @@ function riderJobs() {
 // 📱 the phone: a pixel handset with a home screen of apps; each app opens on the screen, or the matching menu
 // [label, action, picture in the 4x4 app sheet, badge key]
 const PH_APPS = [
-  ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['แชท', { fn: 'open', kind: 'chat' }, 1], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
+  ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
   ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], ['เพื่อน', { fn: 'open', kind: 'friends' }, 7],
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
@@ -5333,7 +5395,7 @@ const TUT = () => [
   ['🚪', 'เข้าอาคาร', 'เดินไปหน้าประตู แล้วกด<b>ปุ่มกลมสีเหลือง</b> (คอม: E) · ร้านต่างๆ มี<b>เวลาเปิด-ปิด</b> ดูได้ที่ป้าย'],
   ['🎣', 'หาเงินก้อนแรก', 'แนะนำให้<b>ตกปลา</b>ก่อน! ซื้อเบ็ดกับ<b>น้าเล็ก</b>ที่สมาคมประมง (ริมทะเลสาบ) แล้วไปท่าตกปลา · ยืนริมน้ำแล้วกดปุ่มใหญ่เหวี่ยงเบ็ด พอ<b>ทุ่นจมกดตวัด</b> กดค้างเย่อปลาเข้าฝั่ง แล้ว<b>ยกตอนปลาโผล่</b> · เอาปลาไปขายได้เลย'],
   ['💼', 'หางานทำ', 'คุณเริ่มต้น<b>ว่างงาน</b> · คุยกับ <b>NPC เจ้าหน้าที่ 💬</b> ที่ยืนข้างเคาน์เตอร์ เช่น พ่อค้า (คลังสินค้า), เกษตรกร (สหกรณ์ในไร่) · งานบริษัท/หมอต้องเรียนจบที่มหาวิทยาลัยก่อน'],
-  ['❤️', 'ดูแลตัวเอง', 'กินให้อิ่ม ป่วยต้องหาหมอ · <b>นั่งพัก</b> (😌) ได้ทุกที่ ฟื้นพลังงานและเลือด · <b>แตะแถบสถานะ</b>เพื่อดูวิธีเพิ่ม · 💬 ปุ่ม<b>คุย</b>ไว้คุยกับคนใกล้ๆ'],
+  ['❤️', 'ดูแลตัวเอง', 'กินให้อิ่ม ป่วยต้องหาหมอ · พลังงานหมดไป <b>สวนสนุก</b> 🎡 หรือ<b>นอนที่เตียงในบ้าน</b> 🛏️ · <b>แตะแถบสถานะ</b>เพื่อดูวิธีเพิ่ม · 💬 ปุ่ม<b>คุย</b>ไว้คุยกับคนใกล้ๆ'],
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป (ยกเลิกได้ที่ปุ่มใต้สถานะ) · เมนู 💼 บอกว่าแต่ละงานสมัครที่ไหน'],
 ];
 let tutStep = 0, tutPending = false, pendingDaily = null;
@@ -5725,7 +5787,8 @@ function flashScreen(rgb, a0) { const d = document.createElement('div'); d.style
 function onMeDiff(a, b) {
   const s = P.get(myId); if (!s) return;
   const x = s.x, y = s.y;
-  const dm = b.money - a.money;
+  const dm = b.monInf && b.money > a.money ? 0 : b.money - a.money;
+  if (a.energy >= 10 && b.energy < 10 && !b.down) toast('พลังงานใกล้หมดแล้ว! ไปเล่นเครื่องเล่นที่ 🎡 สวนสนุก หรือกลับไปนอนที่ 🛏️ เตียงในบ้าน (อาหารกับการนั่งพักไม่เพิ่มพลังงานแล้ว)', '😴', false);   // the admin's unlimited wallet refilling is not income
   if (dm) { const sp = document.createElement('span'); sp.className = 'mfloat'; sp.style.color = dm > 0 ? '#ffd34d' : '#ff8a7a'; sp.textContent = (dm > 0 ? '+' : '−') + money(Math.abs(dm)); $('#card').appendChild(sp); setTimeout(() => sp.remove(), 1600); }
   if (dm > 0) { FX.play('coin', dm >= 1000); FX.float(x, y, '+' + money(dm), '#ffd34d', dm >= 1000 ? .55 : .42); if (dm >= 300) FX.burst(x, y, '#ffd34d', Math.min(24, 6 + Math.floor(dm / 200))); FX.sparkle(x, y - .5, '#fff1a8', dm >= 1000 ? 14 : dm >= 200 ? 8 : 4); if (dm >= 3000) flashScreen('255,226,140', .22); }
   else if (dm < 0) { FX.play('spend'); FX.float(x + .4, y, '−' + money(-dm), '#ff8a7a', .34); }
