@@ -1412,6 +1412,7 @@ function draw(t) {
     if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret)$/.test(s.type) && !isNear) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
+    if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
