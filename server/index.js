@@ -9,6 +9,7 @@ const { WebSocketServer } = require('ws');
 const D = require('./data');
 const store = require('./store');
 const Q = require('./quests');
+const PAY = require('./pay');
 
 const PORT = process.env.PORT || 8080;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -111,9 +112,11 @@ function stat(a, key, n = 1, absolute = false) {
 // admins: every job unlocked unless they switch it off; the mayor title can be switched off too (then their own title shows)
 const allJobs = a => isAdmin(a) && a.god?.alljobs !== false;
 const adminTitle = a => isAdmin(a) && !a.god?.notitle;
-const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.find(x => x.id === id);
-const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : titleDef(a.title)?.title || '';
-const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : titleDef(a.title)?.r || 0;
+const vipOn = a => (a.vipT || 0) > now();
+const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.find(x => x.id === id) || (id === 'vip' ? D.PAY_TITLE : null);
+const myTitle = a => a.title === 'vip' && !vipOn(a) ? null : titleDef(a.title);   // the supporter title disappears when it runs out
+const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : myTitle(a)?.title || '';
+const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : myTitle(a)?.r || 0;
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -1104,14 +1107,14 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -1188,7 +1191,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), [...accounts.values()].map(rec).concat([meta]));
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -3562,7 +3565,7 @@ function meView(a) {
   return {
     t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -3711,8 +3714,8 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0 } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
@@ -3902,6 +3905,7 @@ function onMessage0(ws, raw) {
     case 'lotto': { if (!cd(a, 'lotto', 400, true)) return; return lottoOp(a, m); }
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
+    case 'pay': { if (!cd(a, 'pay', 800, true)) return; return payOp(a, m); }
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app
@@ -4121,7 +4125,7 @@ function onMessage0(ws, raw) {
     }
 
 
-    case 'title': { if (!m.id || (a.ach || []).includes(m.id) || (a.luxT || []).includes(m.id)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
+    case 'title': { if (!m.id || (a.ach || []).includes(m.id) || (a.luxT || []).includes(m.id) || m.id === 'vip' && vipOn(a)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
     case 'luxbuy': {
       const T = D.LUX_TITLES.find(x => x.id === m.id); if (!T || (a.luxT || []).includes(T.id) || !cd(a, 'luxbuy', 1500, true)) return;
       if (!pay(a, T.price)) return;
@@ -4219,6 +4223,13 @@ function godAct(a, m) {
     if (x.ws) ledSweep(x);
     return send(a, { t: 'ledger', who: `${x.name} (${x.login})`, money: x.money, list: (x.ledger || []).slice(-150) });
   }
+  if (m.op === 'payorders') return send(a, payAdminView());
+  if (m.op === 'payok') {                   // credit an order by hand, after checking it in the Stripe dashboard
+    const o = payOrders[String(m.ref || '')]; if (!o) return toast(a, 'ไม่พบรายการนี้', '💎', false);
+    if (o.st === 'paid') return toast(a, 'รายการนี้เติมเพชรไปแล้ว', '💎', false);
+    payCredit(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, `ส่งของรายการ ${o.ref} ให้ ${o.l} แล้ว`, '💎');
+  }
+  if (m.op === 'paycheck') { payVerify(String(m.ref || ''), 'admin').then(() => send(a, payAdminView())); return toast(a, 'กำลังตรวจกับ Stripe…', '🔄'); }
   if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
     const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
     if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
@@ -4476,12 +4487,107 @@ function tick() {
   if (t > saveAt) { saveAt = t + 15000; save(); }
 }
 
+// ------------------------------------------------------------------ 💎 real-money top-up (Stripe Checkout, see pay.js)
+let payOrders = {};   // ref -> { ref, l, n, pack, gems, thb, m, t, st: new|paid|review|exp, why, bonus, gbp, paidT, by }
+const PAY_OPEN = 6;   // at most this many unpaid orders per player in 15 minutes
+function payMine(a) { const l = lk(a); return Object.values(payOrders).filter(o => o.l === l && o.st !== 'exp').sort((x, y) => y.t - x.t).slice(0, 10).map(o => ({ ref: o.ref, pack: o.pack, gems: o.gems, bonus: o.bonus || 0, thb: o.thb, m: o.m, t: o.t, st: o.st })); }
+function payView(a) {
+  return { t: 'pay', on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, packs: PAY.PACKS, first: a.paidG ? 0 : 1, bonus: PAY.FIRST_BONUS,
+    methods: Object.fromEntries(Object.entries(PAY.METHODS).map(([k, v]) => [k, { n: v.n, min: v.min }])), banks: PAY.BANKS, my: payMine(a), gems: a.gems || 0,
+    vipT: a.vipT || 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0 };
+}
+function payOp(a, m) {
+  if (m.op === 'view') return send(a, payView(a));
+  if (m.op === 'check') {
+    const o = payOrders[String(m.ref || '')]; if (!o || o.l !== lk(a)) return send(a, payView(a));
+    if (o.st === 'paid') { send(a, payView(a)); return toast(a, 'รายการนี้สำเร็จแล้ว ของเข้าบัญชีเรียบร้อย ดูรายละเอียดในจดหมาย ✉️', '💎'); }
+    return payVerify(o.ref, 'player').then(() => { send(a, payView(a)); if (payOrders[o.ref]?.st !== 'paid') toast(a, 'ยังไม่พบการชำระเงินของรายการนี้ ถ้าจ่ายแล้วรอสักครู่ หรือแจ้งแอดมินพร้อมเลขรายการ', '⏳', false); });
+  }
+  if (m.op !== 'buy') return;
+  if (!PAY.ON) return toast(a, 'ระบบเติมเงินยังไม่เปิดให้บริการ', '💎', false);
+  const pk = PAY.PACKS.find(p => p.id === m.pack);
+  if (!pk) return toast(a, 'เลือกแพ็กก่อน', '💎', false);
+  if (pk.kind === 'outfit' && (a.outfits || []).includes(pk.of)) return toast(a, 'คุณมีชุดนี้แล้ว', '👗', false);
+  const l = lk(a), t = now();
+  if (Object.values(payOrders).filter(o => o.l === l && o.st === 'new' && t - o.t < 15 * 60e3).length >= PAY_OPEN) return toast(a, 'มีรายการที่ยังไม่จ่ายหลายรายการแล้ว รอสักครู่ค่อยลองใหม่', '⏳', false);
+  let ref; do ref = PAY.newRef(); while (payOrders[ref]);
+  const o = payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'stripe', t, st: 'new' };
+  const label = pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? 'ชุดเทวดา/นางฟ้า' : `💎${pk.gems}`;
+  payPrune(); gdirty();
+  PAY.createCheckout(o, label).then(({ url, sid }) => { o.sid = sid; gdirty(); send(a, { t: 'payredir', ref, url }); })
+    .catch(e => { delete payOrders[ref]; console.log('pay checkout failed', e.message); toast(a, 'เปิดหน้าชำระเงินไม่สำเร็จ ลองใหม่อีกครั้ง', '⚠️', false); });
+}
+async function payVerify(ref, src) {
+  const o = payOrders[ref]; if (!o || o.st === 'paid' || o.busy) return;
+  o.busy = 1;
+  try {
+    const r = await PAY.checkStatus(o);
+    if (payOrders[ref] !== o || o.st === 'paid') return;
+    if (r.ok && r.amount + 0.01 >= o.thb) { o.gbp = r.gbp; payCredit(o, 'stripe'); }
+    else if (r.ok) { o.st = 'review'; o.why = `ยอดไม่ตรง (จ่าย ${r.amount} / ต้อง ${o.thb})`; gdirty(); }
+    else { o.why = r.why; if (r.expired) o.st = 'exp'; else if (src === 'back' && !r.pending) o.st = 'review'; gdirty(); }
+    if (!r.ok) console.log('pay verify', ref, src, r.why, r.raw ? JSON.stringify(r.raw).slice(0, 300) : '');
+  } finally { delete o.busy; }
+}
+function payCredit(o, by) {
+  const x = accounts.get(o.l); if (!x) { o.st = 'review'; o.why = 'ไม่พบบัญชีผู้เล่น'; gdirty(); return; }
+  const pk = PAY.PACKS.find(p => p.id === o.pack) || {};
+  let got;
+  if (pk.kind === 'title') {                 // supporter title: +30 days (stacks), switched on right away
+    const T = D.PAY_TITLE; x.vipT = Math.max(now(), x.vipT || 0) + T.days * 86400e3; x.title = T.id; o.bonus = 0;
+    got = `ฉายาพิเศษ «${T.title}» ใช้ได้ถึง ${new Date(x.vipT + 7 * 3600e3).toISOString().slice(0, 10)} (ใส่ให้แล้ว เปลี่ยนได้ที่ 🏅 ฉายา)`;
+  } else if (pk.kind === 'outfit') {         // angel / fairy outfit by gender; if they already had it, refund as diamonds
+    const OF = D.OUTFITS[pk.of], nm = x.gender === 'f' && OF.nf ? OF.nf : OF.name; o.bonus = 0;
+    if ((x.outfits || []).includes(pk.of)) { x.gems = (x.gems || 0) + 300; got = `คุณมี${nm}อยู่แล้ว จึงเปลี่ยนเป็น 💎300 ให้แทน`; }
+    else { x.outfits = [...(x.outfits || []), pk.of]; x.outfit = pk.of; got = `${nm} (ใส่ให้แล้ว ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า)`; }
+  } else {
+    o.bonus = x.paidG ? 0 : Math.round(o.gems * PAY.FIRST_BONUS); x.paidG = 1;
+    x.gems = (x.gems || 0) + o.gems + o.bonus; got = `💎${o.gems}${o.bonus ? ` + โบนัสเติมครั้งแรก 💎${o.bonus}` : ''}`;
+  }
+  x.paidN = (x.paidN || 0) + 1; x.paidThb = (x.paidThb || 0) + o.thb;
+  o.st = 'paid'; o.paidT = now(); o.by = by; delete o.why; x.sd = true; dirty = true; gdirty();
+  console.log('pay credited', o.ref, o.l, o.pack, o.thb, by);
+  sysMail(x, `💖 ชำระเงินสำเร็จ!\n\nได้รับ ${got}\nยอดชำระ ฿${o.thb} · รายการ ${o.ref}\n\nขอบคุณที่สนับสนุนเมืองของเรานะ 💖`);
+  if (x.ws) { markMe(x); sendRoster(); send(x, payView(x)); }
+}
+function payPrune() {
+  const t = now(), all = Object.values(payOrders);
+  for (const o of all) if (o.st === 'new' && t - o.t > 24 * 3600e3) o.st = 'exp';
+  if (all.length > 3000) for (const o of all.sort((x, y) => x.t - y.t).slice(0, all.length - 3000)) if (o.st !== 'review') delete payOrders[o.ref];
+}
+function payAdminView() {
+  const all = Object.values(payOrders).sort((x, y) => y.t - x.t), paid = all.filter(o => o.st === 'paid'), d = dayKey();
+  const sum = l => l.reduce((s, o) => s + o.thb, 0), today = paid.filter(o => new Date(o.paidT + 7 * 3600e3).toISOString().slice(0, 10) === d);
+  return { t: 'payadmin', on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, base: PAY.BASE, hook: PAY.HOOK ? 1 : 0, total: sum(paid), n: paid.length, today: sum(today), todayN: today.length,
+    review: all.filter(o => o.st === 'review').length, list: all.filter(o => o.st !== 'exp').slice(0, 60).map(({ busy, ...o }) => o) };
+}
+function payHook(req, res) {   // Stripe webhook: signature checked when a secret is set, and the session is re-read from Stripe anyway
+  const chunks = []; let n = 0;
+  req.on('data', c => { n += c.length; if (n > 200000) req.destroy(); else chunks.push(c); });
+  req.on('end', () => {
+    const raw = Buffer.concat(chunks).toString('utf8'), ok = PAY.verifyHook(raw, req.headers['stripe-signature']);
+    if (ok === false) { res.writeHead(400); return res.end('bad signature'); }
+    res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('OK');
+    let ev = {}; try { ev = JSON.parse(raw); } catch { return; }
+    const ob = ev.data?.object || {}, ref = String(ob.client_reference_id || ob.metadata?.ref || ''), o = payOrders[ref];
+    if (!o) return;
+    if (!o.sid && /^cs_/.test(ob.id || '')) o.sid = ob.id;
+    o.back = ev.type; gdirty();
+    if (/^checkout\.session\./.test(ev.type || '')) payVerify(ref, 'back');
+  });
+}
+setInterval(() => {   // re-check recent unpaid orders now and then (a postback can get lost)
+  if (!PAY.ON) return; const t = now();
+  for (const o of Object.values(payOrders)) if ((o.st === 'new' && o.sid || o.st === 'review') && t - o.t < 6 * 3600e3) payVerify(o.ref, 'timer');
+}, 3 * 60e3).unref?.();
+
 // ------------------------------------------------------------------ http
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
 const STATIC = new Map();
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
+  if (url === '/pay/stripe/hook' && req.method === 'POST') return payHook(req, res);
   if (url === '/ads.txt') { res.writeHead(ADS_CLIENT ? 200 : 404, { 'Content-Type': 'text/plain' }); return res.end(ADS_CLIENT ? `google.com, ${ADS_CLIENT.replace('ca-', '')}, DIRECT, f08c47fec0942fa0\n` : ''); }   // AdSense checks this file
   if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
   if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town

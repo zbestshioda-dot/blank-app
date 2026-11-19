@@ -1496,9 +1496,11 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   chinese:   { name: 'ชุดตรุษจีนมังกรทอง', nf: 'ชุดกี่เพ้าตรุษจีน', how: 'ซื้อที่ร้านแฟชั่น', price: 199999 },
   lukthung:  { name: 'ชุดนักร้องลูกทุ่งกากเพชร', how: 'ซื้อที่ร้านแฟชั่น', price: 349999 },
   chakri:    { name: 'ชุดไทยจักรี', how: 'ซื้อที่ร้านแฟชั่น', price: 888888, g: 'f' },
-  angel:     { name: 'ชุดเทวดา', nf: 'ชุดนางฟ้า', how: 'ซื้อที่ร้านแฟชั่น (💎 เพชร)', gems: 200 },
+  angel:     { name: 'ชุดเทวดา', nf: 'ชุดนางฟ้า', how: 'แพ็กเติมเงิน ฿99 (ไม่มีขายในร้าน)' },
   santa:     { name: 'ชุดซานต้า', nf: 'ชุดซานต้าสาว', how: 'ของขวัญปีใหม่ 2570 จากเมือง (ไม่มีขาย)' } };
 // prestige titles bought with money (a money sink for the rich): not achievements, never counted in the achievement total
+// the supporter title from the ฿49 top-up pack: lasts 30 days per purchase (stacks), sparkly rarity 8
+const PAY_TITLE = { id: 'vip', title: '💖 ผู้สนับสนุนเมือง', r: 8, days: 30 };
 const LUX_TITLES = [
   { id: 'lux1', title: 'คนมีอันจะกิน', r: 4, price: 1000000 },
   { id: 'lux2', title: 'พ่อเลี้ยงใหญ่', r: 5, price: 5000000 },
@@ -1593,7 +1595,7 @@ for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEn
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
 module.exports = { QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
-  RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES,
+  RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
