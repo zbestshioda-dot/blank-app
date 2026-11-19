@@ -751,7 +751,7 @@ function paintHud() {
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
   $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
   { const fun = me.pose === 'fun', bed = me.pose === 'bed';   // ▶▶ next to the bars that are filling fast (park rides, sleeping)
-    for (const [k, on] of [['energy', (fun || bed) && me.energy < 100], ['health', fun && me.health < 100], ['happy', fun && (me.happy ?? 80) < 100]]) document.querySelector(`.bar[data-bar="${k}"]`)?.classList.toggle('boost', !!on); }
+    for (const [k, on] of [['energy', (fun || bed) && me.energy < 100 || (me.pose === 'seat' || me.pose === 'rest') && me.energy < 50], ['health', fun && me.health < 100], ['happy', fun && (me.happy ?? 80) < 100]]) document.querySelector(`.bar[data-bar="${k}"]`)?.classList.toggle('boost', !!on); }
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
@@ -847,7 +847,7 @@ $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard
 { let c = null; try { c = localStorage.getItem('lt_card'); } catch { } setCard(c === null ? innerWidth < 700 && innerHeight > innerWidth : c === '1'); }
 // what each bar means and how to fill it
 const BAR_HELP = {
-  energy: ['⚡', 'พลังงาน: ใช้ตอนทำงาน/ตกปลา/เรียน · เพิ่มได้จาก 🎡 เล่นเครื่องเล่นในสวนสนุก หรือ 🛏️ นอนที่เตียงในบ้าน (อาหารและการนั่งพักไม่เพิ่มพลังงาน)'],
+  energy: ['⚡', 'พลังงาน: ใช้ตอนทำงาน/ตกปลา/เรียน · เพิ่มได้จาก 🎡 เล่นเครื่องเล่นในสวนสนุก หรือ 🛏️ นอนที่เตียงในบ้าน · 🪑 นั่งพักฟื้นได้นิดหน่อยถึงครึ่งหลอด (อาหารไม่เพิ่มพลังงาน)'],
   hunger: ['🍗', 'ความอิ่ม: ลดลงเรื่อยๆ · เพิ่มได้จากการกินอาหาร (ร้านอาหาร ตลาด สั่งในมือถือ หรือของในกระเป๋า 🎒) ถ้าหิวนานเลือดจะลด'],
   health: ['❤️', 'สุขภาพ: ลดเมื่อหิวนานหรือป่วย · เพิ่มได้จาก 🎡 สวนสนุก (สระว่ายน้ำดีที่สุด), กินให้อิ่มเกิน 60, ชุดปฐมพยาบาล 🩹, นอนเตียงให้หมอรักษา'],
   happy: ['😊', 'ความสุข: ลดลงเรื่อยๆ ถ้าต่ำกว่า 20 จะทำงานไม่ได้ · เพิ่มได้จากกินของที่อยากกิน 🤤, นั่งม้านั่งที่จัตุรัส, คุยแชท, โทรหาเพื่อน, บริจาคให้ขอทาน, นอนบ้านตัวเอง'],
@@ -2810,9 +2810,13 @@ function initNearBtns() {
 }
 initNearBtns();
 $('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); };
+let NAME_MODE = 'all'; try { NAME_MODE = localStorage.getItem('lt_names') || 'all'; } catch { }
+const NAME_TXT = { all: '🏷️ ป้ายเหนือหัว: แสดงทั้งหมด', name: '🏷️ ป้ายเหนือหัว: แค่ชื่อ', none: '🏷️ ป้ายเหนือหัว: ซ่อนหมด' };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (p.crowd) return;   // passers-by in the park and the temple: no name tags
   if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * ((p.title ? .8 : .46) + (p.gg ? .16 : 0)); p.tagT = t; }
+  if (NAME_MODE === 'none' && !p.red) return chatOnly(p, px, top - TS * .22, t);   // player setting: characters only (chat still shows)
+  if (NAME_MODE === 'name' && (p.gg || p.title)) p = { ...p, gg: null, title: '' };
   const icon = p.red ? '🦹' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (p.adm) premiumName(label, px, top - TS * .22, t);
@@ -2841,6 +2845,18 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
     const w = textW(txt) + 16, bh = TS * .5, by = yTop - GAP - 7 - bh / 2;
+    ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + 1);
+  }
+}
+// names hidden: only the emote and the chat bubble float over the head
+function chatOnly(p, px, yTop, t) {
+  if (p.emo && performance.now() < p.emoT) { ctx.font = `${Math.round(TS * .75)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.emo, px, yTop - TS * .3 - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2); }
+  if (p.bubble && performance.now() < p.bt) {
+    const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
+    ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = textW(txt) + 16, bh = TS * .5, by = yTop - bh / 2;
     ctx.fillStyle = 'rgba(255,255,255,.96)'; ctx.beginPath(); ctx.roundRect(px - w / 2, by - bh / 2, w, bh, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(px - 6, by + bh / 2 - 1); ctx.lineTo(px + 6, by + bh / 2 - 1); ctx.lineTo(px, by + bh / 2 + 7); ctx.fill();
     ctx.fillStyle = '#222'; ctx.fillText(txt, px, by + 1);
@@ -3105,6 +3121,7 @@ const FN = {
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
   fs(m) { closePanel(); screenMode(m.mode); },
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
+  names() { const L = ['all', 'name', 'none']; NAME_MODE = L[(L.indexOf(NAME_MODE) + 1) % 3]; try { localStorage.setItem('lt_names', NAME_MODE); } catch { } refreshPanel(true); toast(NAME_TXT[NAME_MODE], '🏷️'); },
   eco() { ECO = !ECO; try { localStorage.setItem('lt_eco', ECO ? '1' : '0'); } catch { } resize(); refreshPanel(true); toast(ECO ? 'เปิดโหมดประหยัดแบต: เล่นยังลื่น ยืนเฉยๆ จะพักเครื่องให้เย็น' : 'ปิดโหมดประหยัดแบต: ภาพเต็ม 60 เฟรม', '🔋'); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
@@ -3506,18 +3523,21 @@ function paintPortrait() {
 }
 // a profile frame drawn over a photo of size ~ sz/1.6 centred in the same box (the frame's hole sits on the centre)
 let FRAMES_AT = null;
-fetch('assets/frames.json?v=1').then(r => r.json()).then(j => { FRAMES_AT = j; if (me) paintPortrait(); }).catch(() => { });
-function frameHtml(id, sz) {
+fetch('assets/frames.json?v=2').then(r => r.json()).then(j => { FRAMES_AT = j; if (me) paintPortrait(); }).catch(() => { });
+function frameHtml(id, sz, fit = true) {
   if (!FRAMES_AT || id < 0) return '';
-  const [hx, hy] = FRAMES_AT.holes[id] || [.5, .5], c = FRAMES_AT.cols, sp = id >= 24;
-  return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
+  const [hx, hy] = FRAMES_AT.holes[id] || [.5, .5], c = FRAMES_AT.cols, sp = id >= 24, sz0 = sz;
+  // fit: the frame grows a little (the layout makes room for it) and the photo shrinks a little so the photo fills the frame's hole without the ring covering it
+  let ps = 100;
+  if (fit && FRAMES_AT.hr?.[id]) { sz = Math.round(sz * 1.18); ps = Math.max(80, Math.min(100, Math.round(2 * FRAMES_AT.hr[id] * sz / (sz0 / 1.62) * 1.06 * 50) * 2)); }
+  return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz0}" data-ps="${ps}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
 }
 function frameRows() {
   const own = me.frames || [], cur = me.frame ?? -1, pic = myPic || facePng();
   const card = f => { const has = own.includes(f.id), on = cur === f.id;
     const btn = f.locked && !has ? (me.admin ? B(on ? 'ใส่อยู่ ✓' : '👑 ลองใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? 'primary' : '') : '<small>🔒 เร็วๆ นี้</small>')
       : has ? B(on ? 'ถอด' : 'ใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? '' : 'good') : B(money(f.price), { t: 'frame', op: 'buy', id: f.id }, 'good', me.money < f.price);
-    return `<div class="frmCard ${on ? 'on' : ''} ${f.locked && !has ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
+    return `<div class="frmCard ${on ? 'on' : ''} ${f.locked && !has ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64, false)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
   const sec = (t, list) => `<div class="secT">${t}</div><div class="frmGrid">${list.map(card).join('')}</div>`;
   return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · ล็อกไว้ก่อน)', G.frameDefs.slice(24));
 }
@@ -3568,10 +3588,10 @@ function cropOpen(im) {
   $('#cropZoom').value = 1;
   $('#cropX').onclick = $('#cropNo').onclick = () => { $('#crop').classList.add('hidden'); crop = null; };
   $('#cropOk').onclick = () => {
-    const O = 160, c = document.createElement('canvas'); c.width = c.height = O; const g = c.getContext('2d'), kk = k() * O / S;
+    const O = 384, c = document.createElement('canvas'); c.width = c.height = O; const g = c.getContext('2d'), kk = k() * O / S;
     g.fillStyle = '#fff'; g.fillRect(0, 0, O, O);
     g.drawImage(im, O / 2 - crop.cx * kk, O / 2 - crop.cy * kk, im.width * kk, im.height * kk);
-    let q = .85, d = c.toDataURL('image/jpeg', q); while (d.length > 22000 && q > .3) { q -= .1; d = c.toDataURL('image/jpeg', q); }
+    let q = .9, fmt = c.toDataURL('image/webp', .5).startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg', d = c.toDataURL(fmt, q); while (d.length > 78000 && q > .3) { q -= .08; d = c.toDataURL(fmt, q); }
     send({ t: 'pic', data: d }); $('#crop').classList.add('hidden'); crop = null;
   };
   $('#crop').classList.remove('hidden'); crop.draw();
@@ -3710,6 +3730,11 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-19f', d: '19 พ.ย. (รอบ 43)', items: [
+    '🪑 <b>นั่งพักได้พลังงานคืนนิดหน่อย</b> (นั่งต่อเนื่อง 10 วินาทีขึ้นไป ฟื้นได้ถึง 50%) · อยากเต็มหลอดต้องนอนเตียงหรือไปสวนสนุก · ขอบคุณไอเดียจากคุณสมรศรี 💡',
+    '🏷️ <b>ซ่อนป้ายเหนือหัวได้</b> ที่ ⚙️ ตั้งค่า: แสดงทั้งหมด / แค่ชื่อ / ซ่อนหมด (เหลือแต่ตัวละครกับข้อความแชท) · ไอเดียจากคุณสมรศรีเช่นกัน',
+    '🖼️ กรอบรูปไม่บังหน้าแล้ว · รูปโปรไฟล์คมขึ้น (อัปรูปใหม่อีกครั้งเพื่อให้ได้รูปคม)',
+  ] },
   { v: '2026-11-19e', d: '19 พ.ย. (รอบ 42)', items: [
     '👗 <b>ชุดใหม่ 12 แบบ</b> ที่ร้านแฟชั่น! ชุดนักเรียนไทย ลูกเสือ สงกรานต์ ล้านนา ผ้าซิ่น นักมวยไทย กระต่ายชมพู ตรุษจีน/กี่เพ้า ลูกทุ่งกากเพชร ไทยจักรี · ชุดชายกับหญิงแยกแบบกัน ร้านจะโชว์เฉพาะชุดที่ใส่ได้',
     '😇 <b>ชุดเทวดา / นางฟ้า</b> ราคาพิเศษ 💎200',
@@ -4646,6 +4671,7 @@ function renderPanel(p) {
     case 'settings': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⚙️ ตั้งค่า</h2>
+        <div class="secT">🏷️ ป้ายเหนือหัว</div><div class="grid2">${B(NAME_TXT[NAME_MODE], { fn: 'names' }, NAME_MODE === 'all' ? '' : 'good')}</div><div class="sub">แตะเพื่อสลับ: แสดงทั้งหมด → แค่ชื่อ → ซ่อนหมด (เหลือแต่ตัวละครกับข้อความแชท) · ตั้งแค่ในเครื่องนี้</div>
         <div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = เดินลื่น 60 เฟรม แต่ตอนยืนเฉยๆ ลดเหลือ 30 ให้เครื่องเย็น (เปิดอยู่แล้วบนมือถือ)</div>
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
@@ -5843,7 +5869,7 @@ function onMeDiff(a, b) {
   const s = P.get(myId); if (!s) return;
   const x = s.x, y = s.y;
   const dm = b.monInf && b.money > a.money ? 0 : b.money - a.money;
-  if (a.energy >= 10 && b.energy < 10 && !b.down) toast('พลังงานใกล้หมดแล้ว! ไปเล่นเครื่องเล่นที่ 🎡 สวนสนุก หรือกลับไปนอนที่ 🛏️ เตียงในบ้าน (อาหารกับการนั่งพักไม่เพิ่มพลังงานแล้ว)', '😴', false);   // the admin's unlimited wallet refilling is not income
+  if (a.energy >= 10 && b.energy < 10 && !b.down) toast('พลังงานใกล้หมดแล้ว! ไปเล่นเครื่องเล่นที่ 🎡 สวนสนุก หรือกลับไปนอนที่ 🛏️ เตียงในบ้าน (นั่งพักฟื้นได้ช้าๆ ถึงครึ่งหลอด)', '😴', false);   // the admin's unlimited wallet refilling is not income
   if (dm) { const sp = document.createElement('span'); sp.className = 'mfloat'; sp.style.color = dm > 0 ? '#ffd34d' : '#ff8a7a'; sp.textContent = (dm > 0 ? '+' : '−') + money(Math.abs(dm)); $('#card').appendChild(sp); setTimeout(() => sp.remove(), 1600); }
   if (dm > 0) { FX.play('coin', dm >= 1000); FX.float(x, y, '+' + money(dm), '#ffd34d', dm >= 1000 ? .55 : .42); if (dm >= 300) FX.burst(x, y, '#ffd34d', Math.min(24, 6 + Math.floor(dm / 200))); FX.sparkle(x, y - .5, '#fff1a8', dm >= 1000 ? 14 : dm >= 200 ? 8 : 4); if (dm >= 3000) flashScreen('255,226,140', .22); }
   else if (dm < 0) { FX.play('spend'); FX.float(x + .4, y, '−' + money(-dm), '#ff8a7a', .34); }
