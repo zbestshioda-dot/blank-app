@@ -252,14 +252,45 @@ function dyeFrame(fr, dye) {
   g.putImageData(d, 0, 0); DYE.set(fr, c); return c;
 }
 const MONK_LOOK = { shirt: '#f0a03a', pants: '#e08a26', hair: '#d9a77c' };
+// most outfit / uniform sheets have the hair painted into the sprite (no hair mask layer), so a dyed colour never showed.
+// Recolour it: inside the base sprite's hair area, pixels that look like the painted brown hair (warm, darkish) are re-tinted
+const HAIR_MASKED = {};
+function sheetHasHair(sheet) {
+  if (sheet in HAIR_MASKED) return HAIR_MASKED[sheet];
+  const { w, h, rows, per } = CH_ATLAS, r0 = rows[sheet + 'down0'] ?? 0, bx = per ? Math.floor(r0 / per) * w * 4 : 0, row = per ? r0 % per : r0;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d', { willReadFrequently: true });
+  t.drawImage(chImg, bx + 3 * w, row * h, w, h, 0, 0, w, h); const d = t.getImageData(0, 0, w, h).data;
+  let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+  return HAIR_MASKED[sheet] = n > 50;
+}
+const HAIR_HAT = { farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
+function hairFix(fr, outfit, step, gender, lk) {
+  const sh = outfit.slice(0, -1).replace(/^f(?=[a-z]{3})/, m => CH_ATLAS.rows[outfit.slice(1) + 'down0'] !== undefined ? '' : m);
+  if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh] || sheetHasHair(outfit)) return fr;
+  const y0 = HAIR_HAT[sh] ? FEM_HAT : 0;
+  const key = `H|${outfit}|${step}|${gender}|${lk.hair}|${lk.shirt}|${lk.pants}`; let c = chCache.get(key); if (c) return c;
+  const { w, h, rows } = CH_ATLAS, base = (gender === 'f' && rows['f:' + step] !== undefined ? 'f:' : '') + step;
+  const m = charLayer(base, 3, 'hair', { hair: '#ffffff' }).getContext('2d').getImageData(0, 0, w, h).data;
+  c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d', { willReadFrequently: true }); t.drawImage(fr, 0, 0);
+  const im = t.getImageData(0, 0, w, h), d = im.data, hx = lookColor('hair', lk.hair), C = [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+  for (let i = y0 * w * 4; i < d.length; i += 4) {
+    if (!m[i + 3] || !d[i + 3]) continue;
+    const r = d[i], gg = d[i + 1], b = d[i + 2];
+    if (Math.max(r, gg, b) > 135 || r + 8 < gg || gg + 8 < b || r - b > 120) continue;   // not hair: hats, halos, skin, coloured caps
+    const v = Math.min(255, Math.round((r * 2 + gg * 3 + b * 4) / 9 * 255 / 70));
+    d[i] = v * C[0] / 255 | 0; d[i + 1] = v * C[1] / 255 | 0; d[i + 2] = v * C[2] / 255 | 0;
+  }
+  t.putImageData(im, 0, 0); chCache.set(key, c); return c;
+}
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const lk = p.of === 'monk' ? MONK_LOOK : { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;   // 🙏 monks: saffron robe, shaved head
-  const fr0 = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined
-    ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
-  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), fr = fm || (p.dye ? dyeFrame(fr0, p.dye) : fr0);
+  const fem = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined;
+  const fr0 = fem ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
+  const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WALK[view][step % 4], p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
+  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), fr = fm || (p.dye ? dyeFrame(fr1, p.dye) : fr1);
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -4119,6 +4150,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20a', d: '20 พ.ย. (รอบ 60)', items: [
+    '💇 แก้สีผมที่ย้อมไม่ขึ้นตอนใส่ชุดทำงานหรือชุดพิเศษ ตอนนี้เห็นสีผมแล้ว (ถ้าใส่หมวก จะเห็นเฉพาะผมใต้หมวก)',
+  ] },
   { v: '2026-11-19p', d: '19 พ.ย. (รอบ 59)', items: [
     '💎 เปิดร้านเติมเงิน! กดไอคอน 💎 ข้างมือถือได้เลย',
     '💖 ฉายาวิ้งวับ "ผู้สนับสนุนเมือง" 30 วัน และ 😇 ชุดเทวดา/นางฟ้า ดูตัวอย่างตัวละครของเราเองก่อนซื้อได้',
