@@ -3322,7 +3322,7 @@ function zoomPic(src) {   // a player's photo, big
   d.onclick = () => d.remove(); document.body.appendChild(d);
 }
 function bindPanel(root) {
-  bindStocks(root);
+  bindStocks(root); bindWall(root);
   root.querySelectorAll('img.phZoom').forEach(i => { i.style.cursor = 'zoom-in'; i.onclick = () => zoomPic(i.src); });
   { const ti = root.querySelector('#tipIn'); if (ti) ti.oninput = () => { if (panel) panel.tip = Math.max(0, Math.min(500, Math.floor(+ti.value) || 0)); }; }   // keep the tip through panel redraws
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
@@ -3367,6 +3367,7 @@ const FN = {
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
   morder(m, root) { const tip = Math.floor(+root.querySelector('#tipIn')?.value || 0); panel.tip = tip; send({ t: 'morder', item: m.item, qty: m.qty, tip }); },
   openInvite() { send({ t: 'refcode' }); openPanel({ kind: 'invite' }); },
   refShare() { const R = window.__ref; if (!R) return; const url = location.origin + '/?ref=' + R.code, text = `มาเล่นเมืองชีวิตนี้เลือกได้ด้วยกัน! ใช้โค้ด ${R.code} รับไข่สัตว์เลี้ยงฟรี 🥚`;
@@ -4187,6 +4188,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20b', d: '20 พ.ย. (รอบ 61)', items: [
+    '🖼️ <b>วอลเปเปอร์มือถือ</b> ใส่รูปของตัวเองได้ ปรับซูม เลื่อนซ้าย-ขวา ขึ้น-ลง และความมืดได้ หรือเลือกสีพื้นฐาน (แอปวอลเปเปอร์ในมือถือ)',
+    '😀 ปุ่มอิโมจิกลับมาแล้ว อยู่เหนือปุ่มวิ่ง',
+    '📊 แถบสถานะดูง่ายขึ้น: ไม่มีตัวเลข หลอดอยู่ชิดชื่อ กรอบกว้างขึ้น',
+  ] },
   { v: '2026-11-20a', d: '20 พ.ย. (รอบ 60)', items: [
     '⚡ แก้อาการแลค: ส่งข้อมูลระหว่างเกมกับเซิร์ฟน้อยลงราว 3–4 เท่า และตัวละครวาดลื่นขึ้นในที่คนเยอะ',
     '☂️ ร่มกันฝน! ฝนตกเมื่อไหร่ ลุงชัยจะถือร่มเดินมาขายที่จัตุรัส (มาเฉพาะตอนฝนตก) เก็บไว้ในกระเป๋า ฝนตกตอนอยู่ข้างนอกจะกางให้เอง ไม่เปียก ไม่เป็นหวัด',
@@ -5365,18 +5371,54 @@ function riderJobs() {
 }
 // 📱 the phone: a pixel handset with a home screen of apps; each app opens on the screen, or the matching menu
 // [label, action, picture in the 4x4 app sheet, badge key]
+// ---- phone wallpaper (this device only): a preset colour, or the player's own picture with zoom / position / darkness
+const WALL_COLS = ['linear-gradient(160deg,#ffd3e2,#c9a8ff)', 'linear-gradient(160deg,#a8e6ff,#3a7bd5)', 'linear-gradient(160deg,#b9f6ca,#2e9e6b)', 'linear-gradient(160deg,#ffe29a,#ff8a5c)',
+  'linear-gradient(160deg,#2b2d42,#0b0c18)', 'linear-gradient(160deg,#ff9a9e,#fecfef)', 'linear-gradient(160deg,#fdfbfb,#d6dde6)', 'linear-gradient(160deg,#4b2c20,#a46a3c)',
+  '#e84a5f', '#2f80ed', '#27ae60', '#111'];
+const WALL_DEF = { z: 1, x: 50, y: 50, d: 0 };
+let PWALL = null; try { PWALL = JSON.parse(localStorage.getItem('lt_wall') || 'null'); } catch { }
+function wallSave() { try { if (PWALL) localStorage.setItem('lt_wall', JSON.stringify(PWALL)); else localStorage.removeItem('lt_wall'); return true; } catch { toast('รูปใหญ่เกินไป เก็บในเครื่องไม่ได้ ลองรูปอื่น', '⚠️', false); return false; } }
+function wallStyle(W) {
+  if (!W) return '';
+  if (!W.img) return WALL_COLS[W.c] ? `background:${WALL_COLS[W.c]}` : '';
+  const z = W.z ?? 1, x = W.x ?? 50, y = W.y ?? 50, d = W.d ?? 0;
+  return `background:linear-gradient(rgba(0,0,0,${d}),rgba(0,0,0,${d})),url(${W.img}) ${x}% ${y}%/cover;transform:scale(${z});transform-origin:${x}% ${y}%`;
+}
+const wallLayer = () => `<div class="phWall" style="${wallStyle(PWALL)}"></div>`;
+function bindWall(root) {
+  const f = root.querySelector('#wallFile'), pk = root.querySelector('#wallPick');
+  if (pk && f) pk.onclick = () => f.click();
+  if (f) f.onchange = () => {
+    const file = f.files?.[0]; if (!file) return;
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const old = PWALL; PWALL = { img: c.toDataURL('image/jpeg', .8), ...WALL_DEF };
+      if (!wallSave()) PWALL = old; else toast('ตั้งวอลเปเปอร์แล้ว', '🖼️');
+      refreshPanel(true);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('เปิดรูปนี้ไม่ได้', '⚠️', false); };
+    img.src = url;
+  };
+  root.querySelectorAll('input[data-wall]').forEach(r => {
+    r.oninput = () => { if (!PWALL?.img) return; PWALL[r.dataset.wall] = +r.value; root.querySelectorAll('.phWall').forEach(w => w.setAttribute('style', wallStyle(PWALL))); };
+    r.onchange = () => { wallSave(); panelSig = ''; };
+  });
+}
 const PH_APPS = [
   ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
   ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], ['เพื่อน', { fn: 'open', kind: 'friends' }, 7],
-  ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['เควสต์', { fn: 'open', kind: 'quests' }, 10], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
+  ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['ไอเดีย', '💡', { fn: 'openIdeas' }, 0, 'linear-gradient(#fff3a0,#f2b705)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['งาน', '💼', { fn: 'open', kind: 'career' }, 0, 'linear-gradient(#ffd27a,#e59a2f)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['วิธีเล่น', '❔', { fn: 'open', kind: 'help' }, 0, 'linear-gradient(#bfe3ff,#5ea8e6)'], ['แจ้งบัค', '🐞', { fn: 'open', kind: 'bug' }, 0, 'linear-gradient(#ffc2b8,#e0604c)'],
   ['แท็กซี่', '🚕', { fn: 'qtab', set: { tab: 'taxi' } }, 0, 'linear-gradient(#ffe680,#f2b705)'], ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
-const PH_TITLE = { mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
+const PH_TITLE = { wall: 'วอลเปเปอร์', mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
   const dt = me?.date, clock = hhmm(hourNow());
@@ -5385,7 +5427,7 @@ function phonePanel(p) {
     const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
     const apps = PH_APPS.map(([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`).join('')
       + PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay)).map(([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`).join('');
-    return `<div class="phone"><div class="phScr home">${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
+    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phApps">${apps}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
   if (tab === 'contacts') {
@@ -5435,6 +5477,15 @@ function phonePanel(p) {
     <a class="qrSave" href="assets/ui/support_qr.png?v=1" download="lifetown-support-qr.png">📥 บันทึกรูป QR</a><small class="qrHint">หรือกดค้างที่รูปแล้วเลือก "บันทึกรูปภาพ"</small>
     <div class="by">ผู้จัดทำ<br><b>นาย วราวุฒิ สีเสือ</b></div></div>`;
   else if (tab === 'wx') { const ev = wd?.ev, h = hourNow(); body = `<div class="phWx"><div class="big">${ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️'}</div><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small><div class="jobbox">${ev ? esc(ev.text) : 'วันนี้อากาศปกติ ไม่มีเหตุการณ์พิเศษ'}</div></div>`; }
+  else if (tab === 'wall') {
+    const W = PWALL || {}, sw = WALL_COLS.map((c, i) => `<button class="wSw${!W.img && W.c === i ? ' on' : ''}" style="background:${c}" data-m='{"fn":"wallSet","c":${i}}'></button>`).join('');
+    const sl = (k, l, min, max, st) => `<label class="wSl">${l}<input type="range" data-wall="${k}" min="${min}" max="${max}" step="${st}" value="${W[k] ?? WALL_DEF[k]}"></label>`;
+    body = `<div class="wPrev">${wallLayer()}</div>
+      <div class="sub"><b>📷 ใช้รูปของคุณ</b></div><div class="grid2"><button class="good" id="wallPick" type="button">📷 เลือกรูป</button><input type="file" id="wallFile" accept="image/*" hidden>${B('↺ ค่าเริ่มต้น', { fn: 'wallSet', c: -1 })}</div>
+      ${W.img ? `<div class="sub" style="margin-top:8px"><b>ปรับรูป</b></div>${sl('z', '🔍 ซูม', 1, 3, .05)}${sl('x', '↔️ ซ้าย-ขวา', 0, 100, 1)}${sl('y', '↕️ ขึ้น-ลง', 0, 100, 1)}${sl('d', '🌙 ความมืด', 0, .6, .02)}` : ''}
+      <div class="sub" style="margin-top:8px"><b>🎨 สีพื้นฐาน</b></div><div class="wSws">${sw}</div>
+      <div class="sub">วอลเปเปอร์เก็บไว้ในเครื่องนี้เท่านั้น ถ้าเปลี่ยนเครื่องต้องตั้งใหม่</div>`;
+  }
   else if (tab === 'music') body = `<div class="phWx"><div class="big">🎵</div><b>${(h => h >= 6 && h < 19 ? 'เพลงกลางวัน' : 'เพลงกลางคืน')(hourNow())}</b><small>เพลงเปลี่ยนเองตามเวลาในเกม</small></div><div class="grid2">${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🔇 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'primary' : '')}${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'primary' : '')}</div>`;
   const sub = tab === 'contacts' || tab === 'call' ? `<div class="tabs">${B('📇 รายชื่อ', { fn: 'qtab', set: { tab: 'contacts' } }, tab === 'contacts' ? 'primary' : '')}${B(call ? '📞 กำลังคุย' : '📞 สาย', { fn: 'qtab', set: { tab: 'call' } }, tab === 'call' ? 'primary' : '')}</div>`
     : tab === 'food' || tab === 'rider' || tab === 'mkt' ? `<div class="tabs">${B('🍔 อาหาร', { fn: 'qtab', set: { tab: 'food' } }, tab === 'food' ? 'primary' : '')}${B('🏪 ของจากตลาด', { fn: 'qtab', set: { tab: 'mkt' } }, tab === 'mkt' ? 'primary' : '')}${job('rider') ? B('🛵 งานไรเดอร์', { fn: 'qtab', set: { tab: 'rider' } }, tab === 'rider' ? 'primary' : '') : ''}</div>` : '';

@@ -1387,3 +1387,18 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 #godBtn{bottom:216px!important}
 #emoPick{right:calc(80px + env(safe-area-inset-right))!important;bottom:calc(150px + env(safe-area-inset-bottom))!important}
 #begBtn,#mgBtn{right:104px!important;bottom:194px!important}   /* their old spot is the emoji button's now */
+/* phone wallpaper: a layer behind the home screen (preset colour or the player's picture), and its settings page */
+.phScr.home{isolation:isolate}
+.phWall{position:absolute;inset:0;z-index:-1;pointer-events:none}
+.phWall[style=""]{display:none}
+.wPrev{position:relative;isolation:isolate;overflow:hidden;width:42%;aspect-ratio:9/17;margin:4px auto 10px;border-radius:14px;border:2px solid #3a2410;background:url(assets/phone/wall.webp) center/cover}
+.wSws{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:4px 0 8px}
+.wSw{aspect-ratio:1;padding:0!important;border-radius:50%!important;border:2px solid rgba(0,0,0,.35)!important;box-shadow:none!important}
+.wSw.on{outline:3px solid #ffd770;outline-offset:1px}
+.wSl{display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0}.wSl input{flex:1}
+/* HUD: bars sit right after their short labels; the card reaches toward the minimap (a gap left), the quest box keeps its size */
+#card.v2{width:min(320px,calc(100vw - 143px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important}
+#card.v2 .sInfo .bar label{width:30px!important;flex:none}
+#card.v2 .sInfo .bar{gap:6px!important}
+#card.v2 .sInfo{padding-right:10px!important}
+#card.v2 #qBox{width:min(236px,calc(100vw - 160px));box-sizing:border-box}
