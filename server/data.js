@@ -99,7 +99,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('market', 'b_market2', 60, 30, { label: 'ตลาดกลาง', icon: '🏪', st: 'market', outdoor: true });   // an open stall: trade right at the counter, no interior
   B('hospital', 'b_hospital2', 68, 30, { label: 'โรงพยาบาล', icon: '🏥', st: 'hospital' });
   pathDown(B('office', 'b_tower', 79, 28, { label: 'บริษัท ไทยเทค', icon: '🏢', st: 'office' }), 30);
-  B('flower', 'b_flower2', 13, 30, { label: 'ร้านดอกไม้', icon: '💐', deco: true, renov: true });
+  B('flower', 'b_flower2', 13, 30, { label: 'ร้านต้นไม้', icon: '🌳', st: 'plantshop', rk: 'plantshop', layout: 'plantshop', late: 3 });   // walk-in plant nursery (its room is laid out last, so no older room moves)
   // north street: the civic street
   B('police', 'b_police2', 18, 13, { label: 'สถานีตำรวจ', icon: '👮', st: 'police' });
   B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true, renov: true });
@@ -446,6 +446,12 @@ const LAYOUT = {
   petshop2: [['x_cashdesk', 7, 2.5], ['f_window', 3.6, 1.1], ['f_window', 10.4, 1.1], ['x_wclock', 7, 0.95, false], ['x_aquarium', 1.7, 2.7], ['f_aquarium', 12.3, 2.7],
     ['x_fern', 4.2, 2.7], ['x_plant', 9.8, 2.7], ['f_rug_blue', 7, 7.2, false], ['x_mshelf', 1.6, 8.8], ['x_shelf_s', 12.4, 8.8], ['o_catstatue', 4.6, 9.0], ['x_fern', 9.4, 9.0],
     ['i_pricestand', 5.2, 5.2, false], ['i_pricestand', 8.8, 5.2, false]],
+  // plant nursery: cooler and flower stand behind the desk, shelves of pots down both walls, two display beds in the middle, trees and palms in the corners
+  plantshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.6, 1.1], ['f_window', 10.4, 1.1], ['x_wclock', 7, 0.95, false],
+    ['x_flowerfridge', 1.9, 2.8], ['x_flowers', 12.2, 2.8], ['x_fern', 4.6, 2.8], ['x_plant', 9.4, 2.8],
+    ['f_shelf_pots', 1.5, 5.3], ['x_vases', 1.7, 7.3], ['f_shelf_pots', 12.5, 5.3], ['x_ferns', 12.3, 7.3],
+    ['flowerbed', 4.9, 6.8, false], ['flowerbed2', 9.1, 6.8, false], ['f_cactus', 6.5, 5.1], ['o_cactus', 7.5, 5.1, false],
+    ['x_tree', 2.0, 9.1], ['o_potpalm', 12.2, 9.2], ['x_hosereel', 4.4, 9.1], ['x_bucket2', 9.6, 9.2], ['i_pricestand', 5.9, 9.0, false], ['i_pricestand', 8.1, 9.0, false], ['f_welcome', 7, 9.55, false]],
   // furniture showroom: sofa corner, bedroom set, dining set and lamps on display; the sales desk is top centre
   furnshop: [['x_cashdesk', 7, 2.5], ['f_window', 3.4, 1.1], ['f_window', 10.6, 1.1], ['x_wclock', 7, 0.95, false], ['f_bookshelf_wide', 1.9, 2.7], ['x_sideboard', 12.2, 2.6],
     ['f_rug_red', 3.4, 6.3], ['f_sofa_red', 3.4, 5.6], ['f_armchair', 5.4, 6.2], ['f_floorlamp', 1.4, 6.0], ['f_bed_pink', 11.4, 5.9], ['f_drawer', 12.9, 5.6], ['x_flamp', 9.6, 5.8],
@@ -468,7 +474,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -638,10 +644,12 @@ const RIDES = {
   for (const [x, y] of [[X + 8, Y + 13.9], [X + 22, Y + 13.9], [X + 28, Y + 13.9], [X + 40, Y + 13.9], [X + 22, Y + 18.4], [X + 28, Y + 18.4], [X + 47, Y + 18.2]]) prop('o_lampball', x, y);
   for (let y = P.y; y < P.y + P.h; y++) for (let x = P.x; x < P.x + P.w; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
   // the way in from town: an arch at the south edge, where the main road leaves town (like the farm and the housing estate)
-  STATIONS.push({ id: 'gate_park', type: 'gate', to: 'park_in', label: 'ไปสวนสนุก', icon: '🎡', x: 50, y: 87.2, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'gate_park', type: 'gate', to: 'park_in', label: 'ไปสวนสนุก', icon: '🎡', x: 54, y: 55.3, r: 1.8, area: 'town' });   // the amusement park's arch now stands just off the south avenue, a short walk from the square
+  for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][0] >= 50 && TREES[i][0] <= 58 && TREES[i][1] >= 52 && TREES[i][1] <= 61) { set(TREES[i][0], TREES[i][1], '.'); TREES.splice(i, 1); }   // clear the ground in front of the arch
+  for (let i = PROPS.length - 1; i >= 0; i--) if (PROPS[i].s === 'o_topiary' && PROPS[i].x === 56.4 && PROPS[i].y === 54) { set(56, 53, '.'); PROPS.splice(i, 1); }
+  rect(51, 55, 6, 2, 'c');                                                            // cobblestone from the avenue to the arch
   rect(49, 76, 2, 14, '='); for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][1] >= 88 && TREES[i][0] >= 47 && TREES[i][0] <= 52) TREES.splice(i, 1);   // a gap in the tree line for the road
-  prop('signpost', 52.7, 86.6);
-  GATES.park_in = { x: X + 5, y: Y + 15.5 }; GATES.town_from_park = { x: 50, y: 85.4 };
+  GATES.park_in = { x: X + 5, y: Y + 15.5 }; GATES.town_from_park = { x: 54, y: 57.4 };
 }
 // ================================================================= THE TEMPLE: a walled ground of sand and lawns - the ordination
 // hall (โบสถ์) with a stone courtyard, a golden chedi, an open sala by a bodhi tree, a lotus pond, the temple shop and the bell tower.
@@ -732,6 +740,20 @@ function blocked(x, y, r = RADIUS) {
          isSolidTile(Math.floor(x - r), Math.floor(y + r)) || isSolidTile(Math.floor(x + r), Math.floor(y + r));
 }
 const SPAWN = { x: 50, y: 36.6 };
+// a seat whose spot is walled in on every side would trap whoever sits there (the joystick just rubber-bands): move it to the nearest spot with a free way out
+{
+  const clear = (x0, y0, x1, y1) => { const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.2)); for (let i = 1; i <= n; i++) if (blocked(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, i === n ? RADIUS - 0.04 : RADIUS - 0.12)) return false; return true; };
+  const open = (x, y) => { let k = 0; for (let i = 0; i < 8; i++) if (clear(x, y, x + Math.cos(i * Math.PI / 4) * .15, y + Math.sin(i * Math.PI / 4) * .15)) k++; return k; };
+  for (const st of STATIONS) {
+    if (st.type !== 'seat' || open(st.x, st.y) > 0) continue;
+    let best = null;
+    for (let dx = -1.5; dx <= 1.5; dx += .1) for (let dy = -1.5; dy <= 1.5; dy += .1) {
+      const x = st.x + dx, y = st.y + dy, d = Math.hypot(dx, dy);
+      if ((!best || d < best.d) && !blocked(x, y) && open(x, y) === 8) best = { d, x: +x.toFixed(2), y: +y.toFixed(2) };
+    }
+    if (best) { st.x = best.x; st.y = best.y; }
+  }
+}
 
 // ================================================================= time
 // One in-game day lasts 24 real minutes. Nights pass twice as fast as days:
@@ -769,7 +791,7 @@ const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', '
 const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
-  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
@@ -810,6 +832,10 @@ const ITEMS = {
   corn:   { name: 'ข้าวโพด', icon: '🌽', kind: 'crop', base: 45, eat: { hunger: 8 } },
   chili:  { name: 'พริก', icon: '🌶️', kind: 'crop', base: 65 },
   durian: { name: 'ทุเรียน', icon: '🍈', kind: 'crop', base: 220, eat: { hunger: 20, energy: 5 } },
+  tomato: { name: 'มะเขือเทศ', icon: '🍅', kind: 'crop', base: 90, eat: { hunger: 8 } },
+  sunflower: { name: 'ทานตะวัน', icon: '🌻', kind: 'crop', base: 75 },
+  pumpkin: { name: 'ฟักทอง', icon: '🎃', kind: 'crop', base: 140, eat: { hunger: 15 } },
+  watermelon: { name: 'แตงโม', icon: '🍉', kind: 'crop', base: 190, eat: { hunger: 12, energy: 3 } },
 
   // fish (rar = rarity 1 ทั่วไป · 2 ไม่ธรรมดา · 3 หายาก · 4 มหากาพย์ · 5 ตำนาน; spr = sprite in the atlas)
   sfish:     { name: 'ปลาซิว', icon: '🐟', kind: 'fish', base: 25, rar: 1 },
@@ -942,6 +968,10 @@ const CROPS = {
   corn:   { seed: 30,  grow: 360, min: 4, max: 5 },
   chili:  { seed: 50,  grow: 480, min: 4, max: 5 },
   durian: { seed: 200, grow: 900, min: 3, max: 4 },
+  tomato: { seed: 70, grow: 600, min: 4, max: 5 },
+  sunflower: { seed: 60, grow: 540, min: 4, max: 5 },
+  pumpkin: { seed: 110, grow: 720, min: 3, max: 4 },
+  watermelon: { seed: 150, grow: 840, min: 3, max: 4 },
 };
 // ops: what each ingredient goes through in the cooking battle before it goes on the plate (chop / fry need you standing
 // at the board or the pan; boil / grill cook by themselves and must be taken off in time or they are ruined)
@@ -982,15 +1012,15 @@ const RODS = {
   dragon: { name: 'เบ็ดมังกรทะเลลึก', icon: '🐉', price: 250000, zone: 0.44, luck: 3.2, junk: 0.12, desc: 'เบ็ดในตำนาน ปลามหากาพย์-ตำนานกินเบ็ดบ่อยที่สุด' },
 };
 const ROD_ORDER = Object.keys(RODS);
-// profile frames (public/assets/frames.webp, in this order): 12 metal & gem rings, 12 cute ones, 12 special ones (locked for now)
+// profile frames (public/assets/frames.webp, in this order): 12 metal & gem rings, 12 cute ones, 12 special ones (rainbow and neon are on sale, the rest locked for now)
 const FRAMES = [
   ['กรอบไม้', 300], ['กรอบไม้หมุด', 600], ['กรอบเงิน', 1500], ['กรอบทอง', 3000], ['กรอบแพลทินัม', 5000], ['แหวนเพชร', 12000],
   ['แหวนทับทิม', 6000], ['แหวนมรกต', 6000], ['แหวนไพลิน', 6000], ['แหวนอเมทิสต์', 7000], ['สร้อยไข่มุก', 8000], ['ออบซิเดียน', 9000],
   ['ซากุระ', 2000], ['ทานตะวัน', 2000], ['เถาวัลย์ดอกไม้', 2500], ['ปุยเมฆ', 2500], ['ออร่าชมพู', 3000], ['ราตรีดาว', 3500],
   ['หัวใจ', 2500], ['แมวเหมียว', 3000], ['กระต่ายโบว์', 3000], ['น้องหมา', 3000], ['ลูกกวาด', 3500], ['ป่าเห็ด', 3500],
   ['มงกุฎราชา', 0, 1], ['ปีกเทวดา', 0, 1], ['ปีศาจ', 0, 1], ['เปลวเพลิง', 0, 1], ['คริสตัลน้ำแข็ง', 0, 1], ['สายฟ้า', 0, 1],
-  ['กาแล็กซี', 0, 1], ['สายรุ้ง', 0, 1], ['นีออน', 0, 1], ['ลายไทย', 0, 1], ['ดอกบัว', 0, 1], ['สายน้ำ', 0, 1],
-].map(([name, price, special], id) => ({ id, name, price, special: !!special, locked: !!special }));
+  ['กาแล็กซี', 0, 1], ['สายรุ้ง', 12000, 1, 1], ['นีออน', 12000, 1, 1], ['ลายไทย', 0, 1], ['ดอกบัว', 0, 1], ['สายน้ำ', 0, 1],
+].map(([name, price, special, open], id) => ({ id, name, price, special: !!special, locked: !!special && !open }));   // 4th flag: a special frame that is on sale
 // pets: bought in the pet panel (the pet shops are closed for renovation), one follows you around. rar 1-5 like fish
 const PETS = {
   chick:    { name: 'ลูกเจี๊ยบ', icon: '🐤', price: 500, rar: 1, desc: 'ตัวจิ๋วเจี๊ยบๆ กระโดดตุ๊บๆ' },
@@ -1042,6 +1072,7 @@ function waterPool(x, y) {
 const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
 const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
 for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + k;
+for (const k of ['rice', 'corn', 'chili', 'durian']) ITEMS[k].spr = 'ic_' + k;   // real pictures for the first four crops (the rest use their emoji)
 ITEMS.chest.spr = null;
 const FISHING = { rod: 150, xpPerLv: 8, maxLv: 10, zone: [0.2, 0.26, 0.32, 0.4] };   // zone = width of the timing window per rod tier
 
@@ -1050,7 +1081,6 @@ const FISHING = { rod: 150, xpPerLv: 8, maxLv: 10, zone: [0.2, 0.26, 0.32, 0.4] 
 const CAREERS = {
   none:     { name: 'ว่างงาน', icon: '🙂', where: null, desc: 'ยังไม่มีงานทำ ไปสมัครงานตามอาคารต่างๆ' },
   office:   { name: 'พนักงานบริษัท', icon: '👔', where: 'office', need: ['degree'], desc: 'เข้างาน 08:00–17:00 (โอทีต่อได้ถึง 21:00 ค่าส่ง x1.25) รับซองเอกสารที่บริษัทไปส่งตามอาคารทั่วเมือง ได้เงินทุกครั้งที่ส่งถึง ยิ่งไกลยิ่งได้มาก มาสายโดนหักเงินและอาจถูกเลิกจ้าง' },
-  farmer:   { name: 'เกษตรกร', icon: '🌾', where: 'coop', need: [], desc: 'ซื้อสวนของตัวเองที่ไร่ชานเมือง ปลูกพืช ขายที่จุดรับซื้อในไร่หรือตลาดกลาง ขยายแปลงได้' },
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ประมูลสินค้าที่โรงประมูล (คลังสินค้าเดิม) แข่งกับคู่แข่ง เดาราคาให้แม่น ชนะต่ำกว่ามูลค่าจริง = กำไร สูงกว่า = ขาดทุน · ของในกระเป๋ายังวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง' },
@@ -1060,6 +1090,39 @@ const CAREERS = {
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
 // the degree comes from classes at the university; other licences are bought
+// classroom pop quizzes: o[0] is the right answer (the server shuffles); lv hs / uni
+const QUIZ = [
+  { q: "เมืองหลวงของประเทศไทยคือเมืองอะไร", o: ["กรุงเทพมหานคร", "เชียงใหม่", "ภูเก็ต", "ขอนแก่น"], lv: 'hs' },
+  { q: "7 × 8 เท่ากับเท่าไร", o: ["56", "54", "48", "64"], lv: 'hs' },
+  { q: "น้ำเดือดที่กี่องศาเซลเซียส (ที่ระดับน้ำทะเล)", o: ["100", "90", "120", "80"], lv: 'hs' },
+  { q: "ดาวดวงใดอยู่ใกล้ดวงอาทิตย์ที่สุด", o: ["ดาวพุธ", "ดาวศุกร์", "ดาวโลก", "ดาวอังคาร"], lv: 'hs' },
+  { q: "พืชใช้ก๊าซอะไรในการสังเคราะห์แสง", o: ["คาร์บอนไดออกไซด์", "ออกซิเจน", "ไนโตรเจน", "ไฮโดรเจน"], lv: 'hs' },
+  { q: "สระในภาษาไทยมีทั้งหมดกี่รูป", o: ["21 รูป", "32 รูป", "44 รูป", "18 รูป"], lv: 'hs' },
+  { q: "แม่น้ำสายหลักที่ไหลผ่านกรุงเทพฯ คือแม่น้ำอะไร", o: ["เจ้าพระยา", "โขง", "ปิง", "มูล"], lv: 'hs' },
+  { q: "ข้อใดเป็นสัตว์เลี้ยงลูกด้วยนม", o: ["ปลาวาฬ", "ปลาฉลาม", "เต่า", "จระเข้"], lv: 'hs' },
+  { q: "1 ชั่วโมงมีกี่นาที", o: ["60", "100", "30", "24"], lv: 'hs' },
+  { q: "ประเทศใดอยู่ติดกับประเทศไทยทางทิศตะวันออก", o: ["กัมพูชา", "เมียนมา", "มาเลเซีย", "เวียดนาม"], lv: 'hs' },
+  { q: "ผลรวมมุมภายในของสามเหลี่ยมคือกี่องศา", o: ["180", "90", "360", "270"], lv: 'hs' },
+  { q: "น้ำ (H₂O) ประกอบด้วยธาตุอะไรบ้าง", o: ["ไฮโดรเจนกับออกซิเจน", "ไฮโดรเจนกับคาร์บอน", "ออกซิเจนกับไนโตรเจน", "คาร์บอนกับออกซิเจน"], lv: 'hs' },
+  { q: "วันลอยกระทงตรงกับเดือนอะไรตามปฏิทินจันทรคติ", o: ["เดือน 12", "เดือน 5", "เดือน 8", "เดือน 1"], lv: 'hs' },
+  { q: "สัตว์ชนิดใดเป็นสัตว์ประจำชาติไทย", o: ["ช้าง", "เสือ", "ม้า", "นกยูง"], lv: 'hs' },
+  { q: "12 หารด้วย 4 เท่ากับเท่าไร", o: ["3", "4", "2", "6"], lv: 'hs' },
+  { q: "สีแดงผสมสีเหลืองได้สีอะไร", o: ["สีส้ม", "สีเขียว", "สีม่วง", "สีน้ำตาล"], lv: 'hs' },
+  { q: "GDP ย่อมาจากอะไร", o: ["Gross Domestic Product", "General Debt Plan", "Global Demand Price", "Gross Dollar Profit"], lv: 'uni' },
+  { q: "อัตราเงินเฟ้อสูงขึ้น หมายความว่าอะไร", o: ["ราคาสินค้าโดยรวมสูงขึ้น", "ราคาสินค้าโดยรวมลดลง", "ค่าเงินแข็งขึ้นเสมอ", "คนว่างงานน้อยลงเสมอ"], lv: 'uni' },
+  { q: "ข้อใดคือสกุลเงินของประเทศญี่ปุ่น", o: ["เยน", "วอน", "หยวน", "ริงกิต"], lv: 'uni' },
+  { q: "ภาษาโปรแกรมใดนิยมใช้เขียนหน้าเว็บให้โต้ตอบได้", o: ["JavaScript", "SQL", "Excel", "Photoshop"], lv: 'uni' },
+  { q: "ค่า 2 ยกกำลัง 10 เท่ากับเท่าไร", o: ["1,024", "512", "2,048", "1,000"], lv: 'uni' },
+  { q: "ผู้เขียนบทละคร \"โรมิโอกับจูเลียต\" คือใคร", o: ["เชกสเปียร์", "ดิคเกนส์", "โมซาร์ท", "ดาร์วิน"], lv: 'uni' },
+  { q: "ทฤษฎีวิวัฒนาการโดยการคัดเลือกตามธรรมชาติ เสนอโดยใคร", o: ["ชาลส์ ดาร์วิน", "ไอแซก นิวตัน", "กาลิเลโอ", "หลุยส์ ปาสเตอร์"], lv: 'uni' },
+  { q: "ข้อใดเป็นอวัยวะที่สูบฉีดเลือดไปทั่วร่างกาย", o: ["หัวใจ", "ปอด", "ตับ", "ไต"], lv: 'uni' },
+  { q: "ธนาคารกลางของประเทศไทยคือ", o: ["ธนาคารแห่งประเทศไทย", "ธนาคารกรุงเทพ", "ธนาคารออมสิน", "ธนาคารกสิกรไทย"], lv: 'uni' },
+  { q: "ความเร็วแสงในสุญญากาศประมาณกี่กิโลเมตรต่อวินาที", o: ["300,000", "30,000", "3,000", "3,000,000"], lv: 'uni' },
+  { q: "ดอกเบี้ยทบต้น หมายถึง", o: ["คิดดอกเบี้ยจากเงินต้นรวมดอกเบี้ยที่สะสม", "คิดดอกเบี้ยจากเงินต้นเท่านั้น", "ไม่มีดอกเบี้ย", "ดอกเบี้ยลดลงทุกปี"], lv: 'uni' },
+  { q: "ข้อใดคือหน่วยวัดความถี่", o: ["เฮิรตซ์", "โอห์ม", "โวลต์", "นิวตัน"], lv: 'uni' },
+  { q: "โรคใดเกิดจากการขาดวิตามินซี", o: ["เลือดออกตามไรฟัน (โรคลักปิดลักเปิด)", "โรคเหน็บชา", "โรคกระดูกอ่อน", "โรคตาบอดกลางคืน"], lv: 'uni' },
+  { q: "เมืองหลวงของประเทศออสเตรเลียคือ", o: ["แคนเบอร์รา", "ซิดนีย์", "เมลเบิร์น", "เพิร์ธ"], lv: 'uni' },
+];
 const LICENSES = {
   hs:       { name: 'วุฒิ ม.6', icon: '📘', price: 1500, classes: 4, where: 'school' },
   degree:   { name: 'ปริญญาตรี', icon: '🎓', price: 4500, classes: 6, need: 'hs', where: 'school' },
@@ -1228,6 +1291,8 @@ const FURNITURE = {
   xpbench: { name: 'ม้านั่งสวน', icon: '🪑', price: 3500, comfort: 0, cat: 'deco', spr: 'x_pbench' },
   // home-yard garden pieces: buy as many as you like and lay them out in your yard (fields grow vegetables)
   gsoil: { name: 'แปลงดินปลูกผัก (1 ช่อง · วางต่อกันได้)', icon: '🟫', price: 300, comfort: 0, cat: 'garden', spr: 'y_soil15', multi: 1, max: 200, field: 1, tile: 1 },
+  gsprk: { name: 'สปริงเกลอร์ทองแดง (รดน้ำรอบตัว 3×3)', icon: '💦', price: 2500, comfort: 0, cat: 'garden', spr: 'y_sprk1', multi: 1, sprk: 1 },
+  gsprk2: { name: 'สปริงเกลอร์อิริเดียม (รดน้ำรอบตัว 5×5)', icon: '💦', price: 9000, comfort: 0, cat: 'garden', spr: 'y_sprk2', multi: 1, sprk: 2 },
   gfield: { name: 'แปลงผัก (ปลูกพืชได้)', icon: '🌱', price: 2500, comfort: 0, cat: 'garden', spr: 'y_field', multi: 1, field: 1 },
   gtree: { name: 'ต้นไม้ใหญ่', icon: '🌳', price: 3000, comfort: 0, cat: 'garden', spr: 'tree', multi: 1, solid: 1, sw: 0.8 },
   gtreeoak: { name: 'ต้นโอ๊ก', icon: '🌳', price: 3500, comfort: 0, cat: 'garden', spr: 'tree_oak', multi: 1, solid: 1, sw: 0.8 },
@@ -1346,7 +1411,7 @@ const BANK = { rate: 0.005, cap: 200000, loanMax: 30000, loanFee: 0.02, loanRate
 
 // ================================================================= health
 const DISEASES = {
-  cold:    { name: 'ไข้หวัด', icon: '🤒', cure: 'fever', drain: 0.05, income: 0.8, sym: ['ตัวร้อน มีไข้', 'ไอ จาม น้ำมูกไหล', 'หนาวสั่น'], cause: 'ตากฝนนานๆ อยู่ใกล้คนป่วย หรือช่วงไข้หวัดระบาด', self: 'หายเองไม่ได้ ต้องให้หมอรักษา' },
+  cold:    { name: 'ไข้หวัด', icon: '🤒', cure: 'fever', drain: 0.05, income: 0.8, sym: ['ตัวร้อน มีไข้', 'ไอ จาม น้ำมูกไหล', 'หนาวสั่น'], cause: 'ตากฝนนานๆ อยู่ใกล้คนป่วย หรือช่วงไข้หวัดระบาด', self: 'นั่งหรือนอนพักในอาคาร 1 นาทีก็หาย หรือให้หมอรักษา' },
   flu:     { name: 'ไข้หวัดใหญ่', icon: '🦠', cure: 'antiviral', drain: 0.12, income: 0.7, hunger: 1.3, sym: ['ไข้สูง ปวดเมื่อยทั้งตัว', 'ไอแห้ง เจ็บคอ', 'อ่อนเพลียมาก'], cause: 'ช่วงไข้หวัดใหญ่ระบาด ติดต่อกันได้', self: 'อันตราย! เลือดลดเร็ว ต้องให้หมอรักษา' },
   exhaust: { name: 'อ่อนเพลียสะสม', icon: '😵', cure: 'iv', regen: 0.5, income: 0.85, drain: 0.02, sym: ['เหนื่อยง่าย หน้ามืด', 'กล้ามเนื้ออ่อนแรง', 'ใจสั่น'], cause: 'ทำงานตอนพลังงานต่ำ', self: 'นอนพักให้หายง่วงจะหาย หรือให้หมอรักษา' },
   insomnia:{ name: 'อดนอน', icon: '🥱', cure: 'sleep', income: 0.75, sym: ['ง่วงตลอดเวลา ตาลอย', 'สมาธิสั้น ทำงานพลาด', 'ปวดหัวตื้อๆ'], cause: 'ไม่ได้นอนนานเกิน 2 วันในเกม', self: 'นอนที่บ้าน หรือนั่งพักหลับตาจนหายง่วง' },
@@ -1440,9 +1505,9 @@ const ACHIEVEMENTS = [
   { id: 'off1', r: 1, c: 'office', stat: 'shifts', n: 3, title: 'มนุษย์เงินเดือน', desc: 'เข้างานครบ 3 วัน' },
   { id: 'off2', r: 2, c: 'office', stat: 'ontime', n: 10, title: 'ตรงต่อเวลา', desc: 'เข้างานตรงเวลา 10 วัน' },
   { id: 'off3', r: 3, c: 'office', stat: 'promo', n: 4, title: 'ผู้จัดการไฟแรง', desc: 'ได้เลื่อนตำแหน่ง 4 ครั้ง' },
-  { id: 'far1', r: 1, c: 'farmer', stat: 'harvest', n: 15, title: 'มือใหม่หัดปลูก', desc: 'เก็บเกี่ยว 15 ครั้ง' },
-  { id: 'far2', r: 3, c: 'farmer', stat: 'plots', n: 6, title: 'เจ้าของไร่', desc: 'ขยายสวนจนครบ 6 แปลง' },
-  { id: 'far3', r: 3, c: 'farmer', stat: 'durian', n: 10, title: 'ราชาทุเรียน', desc: 'เก็บทุเรียน 10 ครั้ง' },
+  { id: 'far1', r: 1, stat: 'harvest', n: 15, title: 'มือใหม่หัดปลูก', desc: 'เก็บเกี่ยว 15 ครั้ง' },
+  { id: 'far2', r: 3, stat: 'plots', n: 6, title: 'เจ้าของไร่', desc: 'ขยายสวนจนครบ 6 แปลง' },
+  { id: 'far3', r: 3, stat: 'durian', n: 10, title: 'ราชาทุเรียน', desc: 'เก็บทุเรียน 10 ครั้ง' },
   { id: 'fis1', r: 1, c: null, stat: 'fish', n: 25, title: 'นักตกปลา', desc: 'ตกปลาได้ 25 ตัว' },
   { id: 'fis2', r: 4, c: null, stat: 'shark', n: 1, title: 'นักล่าฉลาม', desc: 'ตกฉลามได้' },
   { id: 'fis3', r: 5, c: null, stat: 'chest', n: 1, title: 'ผู้โชคดี', desc: 'ตกได้หีบสมบัติ' },
@@ -1467,7 +1532,7 @@ const ACHIEVEMENTS = [
   { id: 'fis7', r: 3, c: null, stat: 'fishdex', n: 15, title: 'นักสะสมปลา', desc: 'ตกปลาได้ครบ 15 ชนิด' },
   { id: 'fis8', r: 4, c: null, stat: 'epicfish', n: 5, title: 'ตำนานริมน้ำ', desc: 'ตกปลาระดับมหากาพย์ขึ้นไปได้ 5 ตัว' },
   { id: 'fis9', r: 5, c: null, stat: 'goldenfish', n: 1, title: 'ผู้ครอบครองปลาทองคำ', desc: 'ตกปลาทองคำได้' },
-  { id: 'far4', r: 4, c: 'farmer', stat: 'harvest', n: 200, title: 'เทพเกษตร', desc: 'เก็บเกี่ยว 200 ครั้ง' },
+  { id: 'far4', r: 4, stat: 'harvest', n: 200, title: 'เทพเกษตร', desc: 'เก็บเกี่ยว 200 ครั้ง' },
   { id: 'che3', r: 5, c: 'chef', stat: 'cooked', n: 500, title: 'ยอดเชฟแห่งเมือง', desc: 'ปรุงอาหาร 500 จาน' },
   { id: 'doc4', r: 5, c: 'doctor', stat: 'treated', n: 200, title: 'แพทย์ในตำนาน', desc: 'รักษาคนไข้หาย 200 คน' },
   { id: 'rid3', r: 5, c: 'rider', stat: 'delivered', n: 300, title: 'ตำนานไรเดอร์', desc: 'ส่งอาหารสำเร็จ 300 ออเดอร์' },
@@ -1514,7 +1579,9 @@ const FORTUNES = [
 ];
 // food no longer gives energy (energy comes back by sleeping at home or at the amusement park)
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
-module.exports = { POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+// what the plant nursery sells: every garden piece, plus the potted plants for indoors
+const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
+module.exports = { QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

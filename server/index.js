@@ -131,7 +131,7 @@ function infect(a, id, chance = 1) {
 function cure(a, id) {
   if (!(a.dz || []).includes(id)) return false;
   a.dz = a.dz.filter(x => x !== id);
-  a.immune = { ...(a.immune || {}), [id]: now() + 240000 };
+  a.immune = { ...(a.immune || {}), [id]: now() + 20 * 60000 };   // 20 minutes of immunity after recovering
   markMe(a); sendRoster(); return true;
 }
 function sleepWell(a) { a.awake = 0; cure(a, 'insomnia'); cure(a, 'exhaust'); }
@@ -186,7 +186,27 @@ function enterRoom(a, m) {
   if (s.yspawn) return teleport(a, s.yspawn.x, s.yspawn.y);   // the estate-street door opens onto the house's own yard
   teleport(a, room.spawn.x, room.spawn.y);
 }
-// vegetable fields in your own yard: anyone with a house can farm here (farmers grow faster and harvest more)
+// vegetable fields in your own yard: anyone with a house can farm here
+// soil crops need water: a dry crop grows at half speed until it is watered (watering can, a sprinkler in range, or rain)
+const DRY = 2;
+const soilCell = (a, o) => { const p = a.fpos?.[o]; return p && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.tile ? `${Math.floor(p[1])},${Math.round(p[2]) - 1}` : null; };
+function wetCells(a) {                     // every soil cell a placed sprinkler reaches
+  const out = new Set();
+  for (const o of furnOf(a)) {
+    const r = D.FURNITURE[fbase(o)]?.sprk, p = a.fpos?.[o]; if (!r || !p || p[0] !== YARD_FL) continue;
+    const cx = Math.floor(p[1]), cy = Math.round(p[2]) - 1;
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) out.add(`${cx + dx},${cy + dy}`);
+  }
+  return out;
+}
+function waterCrop(pl, t) { if (pl[2] !== 0) return false; if (pl[1] > t) pl[1] = t + (pl[1] - t) / DRY; pl[2] = 1; return true; }
+function ySprinkle(a, all) {               // sprinklers (or rain: all) water every dry crop they reach
+  if (!a.ycrops) return 0;
+  const wet = all ? null : wetCells(a), t = now(); let n = 0;
+  for (const [o, pl] of Object.entries(a.ycrops)) if (pl[2] === 0 && (all || wet.has(soilCell(a, o))) && waterCrop(pl, t)) n++;
+  if (n) { a.sd = true; markMe(a); wdAt = 0; }
+  return n;
+}
 function yardFarm(a, m) {
   if (a.down) return;
   const i = a.house; if (i < 0 || houses[i] !== a) return toast(a, 'ต้องเป็นเจ้าของบ้านก่อน', '🏡', false);
@@ -200,7 +220,7 @@ function yardFarm(a, m) {
     if (pl) return toast(a, 'แปลงนี้ปลูกอยู่แล้ว', '⚠️', false);
     if (!pay(a, c.seed)) return;
     if (!spend(a, 5)) { a.money += c.seed; return; }
-    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')) * (a.career === 'farmer' ? 1 : 1.25);
+    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer'));
     a.ycrops[k] = [m.crop, now() + c.grow * 1000 * g]; markMe(a); wdAt = 0;
     return toast(a, `ปลูก${D.ITEMS[m.crop].name}แล้ว`, '🌱');
   }
@@ -231,10 +251,18 @@ function soilFarm(a, k, m) {
     if (a.money < cost) return toast(a, `เงินไม่พอ (ค่าเมล็ด ${money(cost)})`, '💸', false);
     if (!spend(a, energy)) return;
     a.money -= cost;
-    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')) * (a.career === 'farmer' ? 1 : 1.25), ready = now() + c.grow * 1000 * g;
-    for (const o of empty) a.ycrops[o] = [m.crop, ready];
+    const g = (ev('rain') ? 0.5 : ev('drought') ? 1.6 : 1) * (1 - 0.15 * tier(a, 'farmer')), wet = wetCells(a);
+    for (const o of empty) { const w = ev('rain') || wet.has(soilCell(a, o)) ? 1 : 0; a.ycrops[o] = [m.crop, now() + c.grow * 1000 * g * (w ? 1 : DRY), w]; }
     markMe(a); wdAt = 0;
-    return toast(a, `ปลูก${D.ITEMS[m.crop].name} ${empty.length} ช่อง (ค่าเมล็ด ${money(cost)})`, '🌱');
+    const dry = empty.filter(o => a.ycrops[o][2] === 0).length;
+    return toast(a, `ปลูก${D.ITEMS[m.crop].name} ${empty.length} ช่อง (ค่าเมล็ด ${money(cost)})${dry ? ` · อย่าลืมรดน้ำ 💧 ${dry} ช่อง` : ' · สปริงเกลอร์รดน้ำให้แล้ว 💦'}`, '🌱');
+  }
+  if (m.op === 'water') {
+    const t = now(), dry = keys.filter(o => a.ycrops[o]?.[2] === 0); if (!dry.length) return toast(a, 'ไม่มีช่องที่ต้องรดน้ำ', '💧', false);
+    if (!spend(a, Math.max(1, Math.ceil(dry.length / 4)))) return;
+    for (const o of dry) waterCrop(a.ycrops[o], t);
+    markMe(a); wdAt = 0;
+    return toast(a, `รดน้ำแล้ว ${dry.length} ช่อง ผักโตเร็วขึ้นเท่าตัว 💧`, '💧');
   }
   if (m.op === 'harvest') {
     const ripe = keys.filter(o => a.ycrops[o] && a.ycrops[o][1] <= now()); if (!ripe.length) return toast(a, 'ยังไม่มีอะไรสุก', '🌱', false);
@@ -266,25 +294,46 @@ function earn(a, amount) {
   }
   return amount;
 }
+// ---- the economy: fuel prices move day by day like a real pump board (a slow wave plus a little noise, never more than ±15%),
+// and in a slow economy the government halves income tax. Taxes never go above the normal rates.
+const econCache = new Map();
+function econ(dk = dayKey()) {
+  if (econCache.has(dk)) return econCache.get(dk);
+  const n = Math.round(Date.parse(dk) / 864e5);
+  let x = Math.imul(n * 31 + 7, 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; const r = (x >>> 0) / 4294967296;
+  const f = Math.max(.85, Math.min(1.15, 1 + .1 * Math.sin(n * 2 * Math.PI / 9) + (r - .5) * .08));
+  const cyc = Math.sin(n * 2 * Math.PI / 14 + 1), mood = cyc > .55 ? 'boom' : cyc < -.55 ? 'slow' : 'normal';
+  const e = { fuel: Math.round(f * 100) / 100, taxMul: mood === 'slow' ? .5 : 1, mood };
+  if (econCache.size > 20) econCache.clear(); econCache.set(dk, e); return e;
+}
+const nextDayKey = () => new Date(Date.parse(dayKey()) + 864e5).toISOString().slice(0, 10);
+const FUEL_BAHT = 32;   // the pump board price on a normal day (just for show: the real cost scales with the same factor)
+const econView = () => { const e = econ(), n = econ(nextDayKey()); return { fuel: e.fuel, litre: +(FUEL_BAHT * e.fuel).toFixed(2), next: +(FUEL_BAHT * n.fuel).toFixed(2), taxMul: e.taxMul, mood: e.mood }; };
+let econDay = '';
+setInterval(() => {
+  const dk = dayKey(); if (dk === econDay) return; const first = !econDay; econDay = dk; if (first) return;
+  const v = econView(), d = v.next - v.litre;
+  feed(`⛽ ราคาน้ำมันวันนี้ ฿${v.litre.toFixed(2)}/ลิตร${v.mood === 'slow' ? ' · 📉 เศรษฐกิจซบเซา รัฐลดภาษีรายได้ครึ่งหนึ่งวันนี้' : v.mood === 'boom' ? ' · 📈 เศรษฐกิจคึกคัก' : ''}`);
+}, 60000);
 // fuel: your own vehicles cost a little per tile driven (faster = thirstier); company vehicles (delivery bike, patrol car) are free
 function fuel(a, d) {
   const v = riding(a); if (!v || a.ride === 'delivery' || a.ride === 'police' || !(d > 0) || d > 20 || godInf(a)) return;
-  a.fuelDue = (a.fuelDue || 0) + d * 0.01 * v.speed * v.speed;
+  a.fuelDue = (a.fuelDue || 0) + d * 0.008 * v.speed * v.speed * econ().fuel;   // a bit cheaper than before, times today's pump price
   if (a.fuelDue < 5) return;
   const c = Math.floor(a.fuelDue);
   if (a.money < c) { a.fuelDue = 0; a.ride = ''; a.mvb = moveCap(a); markMe(a); sendRoster(); return toast(a, 'เงินไม่พอเติมน้ำมัน ⛽ ต้องลงเดินก่อน', '⛽', false); }
   a.money -= c; a.fuelDue -= c; a.fuelDay = a.fuelDay?.d === dayKey() ? a.fuelDay : { d: dayKey(), c: 0 }; a.fuelDay.c += c; markMe(a);
 }
 // income tax by the real (Bangkok) day: the first ฿20,000 is free, then 10%, and 20% above ฿60,000
-const TAX = [[20000, 0], [60000, .1], [Infinity, .2]];
+const TAX = [[30000, 0], [100000, .05], [Infinity, .1]];   // lowered: ฿30k free, then 5%, 10% above ฿100k
 function taxOf(a, amount) {
   if (!(amount > 0) || isAdmin(a)) return 0;
   const d = dayKey(), T = a.tax?.d === d ? a.tax : (a.tax = { d, e: 0, paid: 0 });
-  let rest = amount, e = T.e, due = 0, lo = 0;
-  for (const [hi, r] of TAX) { if (e < hi && rest > 0) { const part = Math.min(rest, hi - e); due += part * r; rest -= part; e += part; } lo = hi; }
+  let rest = amount, e = T.e, due = 0, lo = 0; const tm = econ().taxMul;
+  for (const [hi, r] of TAX) { if (e < hi && rest > 0) { const part = Math.min(rest, hi - e); due += part * r * tm; rest -= part; e += part; } lo = hi; }
   const first = T.paid === 0 && due > 0;
   T.e += amount; due = Math.round(due); T.paid += due;
-  if (first && a.ws) toast(a, `💸 วันนี้รายได้เกิน ${money(TAX[0][0])} แล้ว เริ่มเสียภาษี 10% (เกิน ${money(TAX[1][0])} เสีย 20%) · รีเซ็ตทุกเที่ยงคืน`, '🧾');
+  if (first && a.ws) toast(a, `💸 วันนี้รายได้เกิน ${money(TAX[0][0])} แล้ว เริ่มเสียภาษี ${tm < 1 ? '2.5% (ลดครึ่งหนึ่ง เศรษฐกิจซบเซา)' : '5%'} · รีเซ็ตทุกเที่ยงคืน`, '🧾');
   return due;
 }
 function credit(o, amount) {          // pay someone who may be offline
@@ -731,7 +780,7 @@ function ideaOp(a, m) {
 // Ghosts never lose money (that would look fake), and each one's rest length is random so they don't all wake together.
 let ghosts = [];
 // [name, career, rank slot, margin, title] - names and titles look like ordinary players'
-const GHOST = [['Bankky', 'merchant', 0, .035, 'mer2'], ['มิ้นท์ชอบนอน', 'doctor', 1, .05, 'doc1'], ['KaoHom', 'farmer', 2, .03, 'far3'], ['NoeyNoey', 'merchant', 4, .06, 'gen2'], ['ต้นกล้า', 'rider', 6, .04, 'rid1'], ['Pond_zz', 'doctor', 9, .05, 'fis1']];
+const GHOST = [['Bankky', 'merchant', 0, .035, 'mer2'], ['มิ้นท์ชอบนอน', 'doctor', 1, .05, 'doc1'], ['KaoHom', 'merchant', 2, .03, 'far3'], ['NoeyNoey', 'merchant', 4, .06, 'gen2'], ['ต้นกล้า', 'rider', 6, .04, 'rid1'], ['Pond_zz', 'doctor', 9, .05, 'fis1']];
 function ghostLook() {   // keep the saved money, always show the current names/titles (old saves had other names)
   ghosts.forEach((g, i) => { const G = GHOST[i]; if (!G) return; g.n = accounts.has(G[0].toLowerCase()) ? G[0] + '_' : G[0]; g.c = G[1]; g.ti = G[4]; });
 }
@@ -1188,7 +1237,7 @@ const TAXI_DEST = [
 ].filter(d => d.x !== undefined);
 function taxiFee(a, d) {
   let area = areaId(a) || 'town'; if (area.startsWith('yard')) area = 'housing';
-  const OUT = { housing: { x: 50, y: 4 }, park: { x: 50, y: 87 }, temple: { x: 74, y: 73.8 } };
+  const OUT = { housing: { x: 50, y: 4 }, park: { x: 54, y: 57.4 }, temple: { x: 74, y: 73.8 } };
   const here = OUT[area] || { x: a.x, y: a.y }, there = OUT[d.id] || d;
   return Math.round(TAXI.base + Math.hypot(here.x - there.x, here.y - there.y) * TAXI.perTile + (area !== 'town' ? TAXI.far : 0) + (OUT[d.id] ? TAXI.far : 0));
 }
@@ -1214,7 +1263,7 @@ function taxiCall(a, m) {
 }
 function deliveryFee(x, y) {
   let area = D.areaAt(x, y)?.id || 'town'; if (area.startsWith('yard')) area = 'housing';   // a home yard is reached through the estate street
-  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : area === 'park' ? { x: 50, y: 87 } : area === 'temple' ? { x: 74, y: 73.8 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
+  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : area === 'park' ? { x: 55, y: 56.6 } : area === 'temple' ? { x: 74, y: 73.8 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
   const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' || area === 'park' || area === 'temple' ? 25 : 0);
   return Math.round(D.RIDER.baseFee + d * D.RIDER.perTile);
 }
@@ -1441,6 +1490,28 @@ function doctorTick(a, t, h, dt) {
   if (o.pend >= D.DOCTOR.wage[l - 1]) { earn(a, o.pend); o.pend = 0; if (o.hours >= 4 && !o.xp) { o.xp = 1; addXp(a); } }
 }
 // university: sit at a desk; one game hour seated = one class
+// something to do while sitting in class: pop quizzes, the teacher calling on you, and small random happenings
+function classroomFun(a, id) {
+  const t = now();
+  if (a.quiz && t > a.quiz.until) { a.quiz = null; send(a, { t: 'quiz', end: 1 }); }
+  if (a.quiz) return;
+  if (!a.nextQuiz || t - a.nextQuiz > 120000) a.nextQuiz = t + 10000;
+  if (t < a.nextQuiz) return;
+  a.nextQuiz = t + 25000 + Math.random() * 20000;
+  const r = Math.random();
+  if (r < .75) {
+    const teacher = r > .6, pool = D.QUIZ.filter(q => q.lv === (id === 'degree' ? 'uni' : 'hs')), q = pool[Math.floor(Math.random() * pool.length)];
+    const opts = q.o.map((txt, i) => ({ txt, ok: i === 0 })).sort(() => Math.random() - .5), sec = teacher ? 12 : 20;
+    a.quiz = { ans: opts.findIndex(o => o.ok), right: q.o[0], teacher, until: t + sec * 1000 };
+    return send(a, { t: 'quiz', q: q.q, o: opts.map(o => o.txt), teacher, sec });
+  }
+  const e = Math.floor(Math.random() * 4);
+  if (e === 0) { joy(a, 2); toast(a, 'นกบินเข้ามาในห้องเรียน เพื่อนๆ หัวเราะกันใหญ่', '🐦'); }
+  else if (e === 1) { earn(a, 20); toast(a, 'เจอเหรียญใต้โต๊ะเรียน +฿20', '🪙'); }
+  else if (e === 2) { joy(a, 3); toast(a, 'เพื่อนส่งโน้ตตลกมาให้ ยิ้มออกเลย', '📝'); }
+  else { a.energy = Math.min(100, a.energy + 6); toast(a, 'เพื่อนข้างๆ แบ่งขนมให้ พลังงานเพิ่มขึ้น', '🍪'); }
+  markMe(a);
+}
 function studyTick(a, h, dt) {
   const id = a.enrolled, L = id && D.LICENSES[id];
   if (!L) { standUp(a); return; }
@@ -1449,6 +1520,7 @@ function studyTick(a, h, dt) {
   a.energy = Math.max(0, a.energy - 0.05 * dt);
   if (a.energy <= 1) { standUp(a); return toast(a, 'หมดแรง! ไปกินอะไรแล้วค่อยกลับมาเรียน', '😵', false); }
   const S = a.school && a.school.id === id ? a.school : (a.school = { id, p: 0 });
+  classroomFun(a, id);
   S.p += dt * D.gameRate(h);
   if (S.p < 1) { if (Math.random() < 0.2) markMe(a); return; }
   S.p = 0; a.classes = (a.classes || 0) + 1; markMe(a); quest(a, 'study');
@@ -2198,9 +2270,9 @@ function act(a, m) {
       a.furniture = [...a.furniture, m.item]; markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${f.icon}${f.name} ความสบาย +${f.comfort} (รวม ${comfort(a)})`, f.icon);
     }
-    case 'furnshop.buy': {                  // the furniture shop: same items as the house menu, delivered to your own house
+    case 'furnshop.buy': case 'plantshop.buy': {                  // the furniture shop (and the plant nursery: garden pieces and potted plants only): delivered to your own house
       if (!a.hown) return toast(a, 'ต้องมีบ้านของตัวเองก่อน ซื้อบ้านได้ที่คุณจิ๋ม สำนักงานอสังหาฯ 🏡', '🛋️', false);
-      if (m.hfloor || m.hwall) {             // a floor or a wallpaper for the house: bought once, then chosen per storey in the home menu
+      if ((m.hfloor || m.hwall) && s.type === 'furnshop') {             // a floor or a wallpaper for the house: bought once, then chosen per storey in the home menu
         const fl = !!m.hfloor, id = String(m.hfloor || m.hwall), def = (fl ? D.HOME_FLOORS : D.HOME_WALLS)[id], key = fl ? 'hfl' : 'hwl';
         if (!def) return; if (!def.price || (a[key] || []).includes(id)) return toast(a, `มี${def.name}แล้ว`, 'ℹ️', false);
         if (!pay(a, def.price)) return;
@@ -2208,6 +2280,7 @@ function act(a, m) {
         return toast(a, `ซื้อ${fl ? 'พื้น' : 'วอลเปเปอร์'} "${def.name}" แล้ว · เปลี่ยนได้ที่ 🛋️ จัดบ้าน › แท็บพื้น/ผนัง`, fl ? '🟫' : '🎨');
       }
       const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
+      if (s.type === 'plantshop' && f.cat !== 'garden' && !D.PLANT_INDOOR.includes(m.item)) return toast(a, 'ร้านต้นไม้ขายแต่ต้นไม้และของแต่งสวนนะ', '🌳', false);
       let key = m.item;
       if (f.multi) {                        // walls, doors, screens, garden pieces: buy as many as you need (up to 20 at a time)
         const max = f.max || FURN_MULTI_MAX, have = a.furniture.filter(k => fbase(k) === m.item).length, q = Math.min(clamp(Math.floor(+m.qty) || 1, 1, 20), max - have);
@@ -3317,7 +3390,6 @@ const roomPts = (rid, pts) => { const r = ROOM[rid]; return pts.map(([dx, dy]) =
 const WORKERS = [
   { career: 'office', name: 'คุณเก่ง (พนักงาน)', area: 'r_office', look: { hair: 'black', shirt: 'white', pants: 'black' },
     pts: () => D.STATIONS.filter(s => s.type === 'chair' && !chairs[s.idx]).map(s => [s.x, s.y]), pose: () => (hourNow() >= D.SHIFT.start && hourNow() < D.SHIFT.end ? 'chair' : null), stay: () => rnd(40, 90) },
-  { career: 'farmer', name: 'ลุงสม (ชาวไร่)', area: 'farm', pts: () => D.STATIONS.filter(s => s.type === 'gplot' && !lots[s.lot]).map(s => [s.x, s.y + 1.1]).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(6, 12) },
   { career: 'merchant', name: 'เจ๊หมวย (แม่ค้า)', area: 'town', pts: () => { const m = ST.market; return [[m.x - 2.4, m.y], [m.x + 2.4, m.y], [m.x - 1.2, m.y + .3], [m.x + 1.2, m.y + .3]].filter(([x, y]) => !D.blocked(x, y)); }, stay: () => rnd(5, 12) },
   { career: 'doctor', name: 'หมอแนน (แพทย์เวร)', area: 'r_hospital', always: true, pts: () => D.STATIONS.filter(s => s.type === 'bed').map(s => [s.x, s.y + .95]).concat(roomPts('r_hospital', [[5, 5]])).filter(([x, y]) => !D.blocked(x, y)), stay: () => rnd(4, 8), job: npcDoctor },
   { career: 'rider', name: 'พี่บอย (ไรเดอร์)', area: 'town', pts: () => [ST_XY('door_restaurant'), ...D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined).map(s => [s.x, s.y + .3])].filter(p => p && !D.blocked(p[0], p[1])), stay: () => rnd(3, 6), speed: 2.4 },
@@ -3435,7 +3507,7 @@ function meView(a) {
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
-    mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0,
+    mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
     jobWait: jobCooldown(a), stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
   };
@@ -3544,7 +3616,18 @@ function login(ws, m, pre) {
     accounts.set(lname, a); isNew = true;
   }
   Q.ensure(a); santaGift(a);
-  if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) { a.career = 'none'; a.cook = null; setTimeout(() => a.ws === ws && toast(a, 'อาชีพเชฟปิดแล้ว คุณกลับมาว่างงาน เลือกอาชีพใหม่ได้เลย · ที่ครัวใหญ่มีเกมหั่นผักผลไม้ให้ทุกคนเล่นหาเงินแทน 🔪', '🍳'), 4000); }
+  if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) {   // a career that has been closed
+    const was = a.career; a.career = 'none'; a.cook = null;
+    const msg = was === 'farmer' ? 'อาชีพเกษตรกรปิดแล้ว คุณกลับมาว่างงาน เลือกอาชีพใหม่ได้เลย · ตอนนี้ทุกคนปลูกผักในสวนบ้านได้ (ร้านเฟอร์นิเจอร์ › สวน › แปลงดิน) 🌱'
+      : 'อาชีพเชฟปิดแล้ว คุณกลับมาว่างงาน เลือกอาชีพใหม่ได้เลย · ที่ครัวใหญ่มีเกมหั่นผักผลไม้ให้ทุกคนเล่นหาเงินแทน 🔪';
+    setTimeout(() => a.ws === ws && toast(a, msg, was === 'farmer' ? '🌱' : '🍳'), 4000);
+  }
+  if (a.garden && !D.CAREERS.farmer) {     // farmers' plots at the (closed) farm: refunded in full
+    const g = a.garden, back = D.GARDEN.lotPrice + D.GARDEN.expand.slice(0, g.n).reduce((x, y) => x + y, 0);
+    if (lots[g.lot] === a || lots[g.lot]?.name === a.name) lots[g.lot] = null;
+    a.garden = null; a.money += back; a.sd = true;
+    setTimeout(() => a.ws === ws && toast(a, `ไร่ชานเมืองปิดแล้ว คืนค่าสวนของคุณเต็มจำนวน ${money(back)} 💰`, '🌾'), 6000);
+  }
   const daily = dailyLogin(a);
   a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
@@ -3561,7 +3644,7 @@ function login(ws, m, pre) {
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
-    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
+    shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   send(a, meView(a)); send(a, worldView());
   send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
@@ -3655,7 +3738,8 @@ function move(a, m) {
   a.mvb = Math.min(moveCap(a), (a.mvb ?? moveCap(a)) + SPEED * speedOf(a) * Math.max(runMul(a), a.runT > t - 1500 ? D.RUN.mul : 1) * 1.35 * dt);
   const d = Math.hypot(x - a.x, y - a.y);
   const swim = a.pose === 'fun' && a.fun?.k === 'pool';
-  if (d > a.mvb + 0.05 || (swim ? !inPoolWater(x, y) : !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && !nearPool(a.x, a.y))) return place(a, a.x, a.y);
+  const trapped = d > 0.01 && D.blocked(a.x, a.y, D.RADIUS - 0.04) && !D.blocked(x, y, D.RADIUS - 0.04) && D.areaAt(x, y)?.id === D.areaAt(a.x, a.y)?.id && !swim;   // standing inside a wall margin (a bad seat spot): any step out to open ground is allowed
+  if (d > a.mvb + 0.05 || (swim ? !inPoolWater(x, y) : !trapped && !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && !nearPool(a.x, a.y))) return place(a, a.x, a.y);
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper' && !swim) standUp(a);   // (bumper cars are driven, swimmers swim: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
@@ -3825,6 +3909,16 @@ function onMessage(ws, raw) {
       if (dist > (a.stats?.runBest || 0)) stat(a, 'runBest', dist, true);
       return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}${raw > pay ? ` (เต็มเพดาน ฿400 ต่อรอบ จากที่คิดได้ ${money(raw)})` : ''}`, '♻️');
     }
+    case 'quizans': {                       // an answer to a classroom pop quiz
+      const q = a.quiz; if (!q) return; a.quiz = null;
+      if (a.desk < 0 || !a.school) return;
+      if (+m.i === q.ans) {
+        a.school.p = Math.min(.99, a.school.p + (q.teacher ? .6 : .4)); joy(a, q.teacher ? 3 : 1); stat(a, 'quizOk', 1);
+        if (q.teacher) earn(a, 40);
+        return toast(a, q.teacher ? 'ตอบถูก! อาจารย์ชม ได้โบนัส ฿40 และเรียนเร็วขึ้น' : 'ตอบถูก! เรียนเร็วขึ้น', '🎓');
+      }
+      return toast(a, `ตอบผิด คำตอบที่ถูกคือ "${q.right}"`, '📖', false);
+    }
     case 'frame': {                         // profile frames: buy one, wear it (or take it off with -1)
       const f = D.FRAMES[+m.id];
       if (m.op === 'wear') { if (+m.id === -1) { a.frame = -1; markMe(a); return; } if (!f || !(a.frames || []).includes(f.id) && !(f.locked && isAdmin(a))) return; a.frame = f.id; markMe(a); return toast(a, `ใส่${f.name}แล้ว`, '🖼️'); }
@@ -3918,10 +4012,18 @@ function onMessage(ws, raw) {
           if (fd?.tile) {                     // soil tiles sit on the grid, one per cell, and join up with their neighbours
             const cx = Math.floor(x), cy = Math.round(y) - 1;
             if (!yardOpen(a, D.yardZone(cx + .5, cy + .5))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
+            if (Object.entries(a.fpos).some(([o, p]) => o !== k && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.sprk && Math.floor(p[1]) === cx && Math.round(p[2]) - 1 === cy)) return toast(a, 'ช่องนี้มีสปริงเกลอร์อยู่', '💦', false);
             if (Object.entries(a.fpos).some(([o, p]) => o !== k && p[0] === YARD_FL && D.FURNITURE[fbase(o)]?.tile && Math.floor(p[1]) === cx && Math.round(p[2]) - 1 === cy)) return toast(a, 'ช่องนี้มีแปลงดินแล้ว', '🟫', false);
             a.fpos[k] = [fl, cx + .5, cy + 1]; markMe(a); wdAt = 0; return;
           }
           if (!yardOpen(a, D.yardZone(x, y))) return toast(a, 'พื้นที่นี้ยังไม่ได้ปลดล็อก', '🔒', false);
+          if (fd?.sprk) {                     // sprinklers sit on a grid cell between the soil and water the cells around them
+            const cx = Math.floor(x), cy = Math.round(y) - 1;
+            if (Object.entries(a.fpos).some(([o, p]) => o !== k && p[0] === YARD_FL && (D.FURNITURE[fbase(o)]?.tile || D.FURNITURE[fbase(o)]?.sprk) && Math.floor(p[1]) === cx && Math.round(p[2]) - 1 === cy)) return toast(a, 'ช่องนี้มีของวางอยู่แล้ว', '💦', false);
+            a.fpos[k] = [fl, cx + .5, cy + 1];
+            const n = ySprinkle(a); if (n) toast(a, `สปริงเกลอร์รดน้ำผักให้แล้ว ${n} ช่อง 💦`, '💦');
+            markMe(a); wdAt = 0; return;
+          }
         } else if (fl < 1 || fl > 1 + (a.hlv || 0) || !(x >= .7 && x <= 13.3 && y >= 1.2 && y <= 9.5)) return toast(a, 'วางตรงนี้ไม่ได้', '⚠️', false);
         if (k === 'sbed' && fl !== 1) return toast(a, 'เตียงประจำบ้านวางได้เฉพาะชั้น 1', '🛏️', false);
         a.fpos[k] = [fl, Math.round(x * 20) / 20, Math.round(y * 20) / 20, m.flip ? 1 : 0];
@@ -4130,6 +4232,7 @@ function tick() {
 
   const slow = t > slowAt; if (slow) slowAt = t + 1000;
   if (slow) plotTick();
+  if (slow && ev('rain')) for (const a of online.values()) ySprinkle(a, true);   // rain waters every garden
   const flu = ev('flu');
   for (const a of online.values()) {
     const indoors = !!D.roomAt(a.x, a.y);
@@ -4176,14 +4279,23 @@ function tick() {
     }
     if (slow && !a.down) {
       // ---- ways to get sick (often enough that doctors have work)
-      if (a.awake > 40 * 60) infect(a, 'insomnia', 0.02);
-      if (ev('rain') && !indoors) { a.wet = (a.wet || 0) + 1; if (a.wet > 40) infect(a, 'cold', 0.01); } else a.wet = Math.max(0, (a.wet || 0) - 2);
-      if (flu) { infect(a, 'flu', indoors ? 0.002 : 0.004); infect(a, 'cold', 0.002); }
-      if (!indoors) infect(a, 'cold', 0.0007);
+      if (a.awake > 40 * 60) infect(a, 'insomnia', 0.01);
+      if (ev('rain') && !indoors) {
+        a.wet = (a.wet || 0) + 1;
+        if (a.wet === 30 && !(a.dz || []).includes('cold')) toast(a, 'ฝนตก ตัวเริ่มเปียกแล้ว! รีบหลบเข้าที่ร่มก่อนจะเป็นหวัด', '🌧️', false);
+        if (a.wet > 40) infect(a, 'cold', 0.005);
+      } else a.wet = Math.max(0, (a.wet || 0) - 2);
+      if (flu) { infect(a, 'flu', indoors ? 0.001 : 0.002); infect(a, 'cold', 0.001); }
+      if (!indoors) infect(a, 'cold', 0.0004);
       if (a.hunger <= 0) { a.starve = (a.starve || 0) + 1; if (a.starve > 60) infect(a, 'malnut'); } else a.starve = 0;
       if (a.hunger >= 80) cure(a, 'malnut');
       // contagion: standing next to someone with a cold or the flu
-      if ((a.dz || []).some(d => d === 'cold' || d === 'flu')) for (const o of online.values()) if (o !== a && areaId(o) === areaId(a) && dist(o, a) < 2.5) infect(o, a.dz.includes('flu') ? 'flu' : 'cold', 0.01);
+      if ((a.dz || []).some(d => d === 'cold' || d === 'flu')) for (const o of online.values()) if (o !== a && areaId(o) === areaId(a) && dist(o, a) < 2.5) {
+        if (!(o.dz || []).length && cd(o, 'sickwarn', 60000, true)) toast(o, `${a.name || 'คนข้างๆ'} ป่วยอยู่ ถอยห่างหน่อยจะได้ไม่ติด`, '🤧', false);
+        infect(o, a.dz.includes('flu') ? 'flu' : 'cold', 0.005);
+      }
+      // a light cold clears by itself after a good rest (sitting or lying down indoors for a minute)
+      if ((a.dz || []).includes('cold') && indoors && (a.pose === 'seat' || a.pose === 'bed' || a.pose === 'rest')) { a.rest = (a.rest || 0) + 1; if (a.rest >= 60) { a.rest = 0; cure(a, 'cold'); toast(a, 'พักผ่อนเต็มที่ ไข้หวัดหายเองแล้ว', '😌'); } } else a.rest = 0;
       if (a.career === 'office') officeTick(a, t, h, 1);
       if (a.desk >= 0) studyTick(a, h, 1);
       if (a.call?.payer) callBill(a);
@@ -4203,7 +4315,7 @@ function tick() {
         if (t > (a.down.until || a.down.t + 60000)) {
           // the staff patch you up properly: illnesses treated, a decent amount of health back; free for new / broke players
           const fee = a.down.free ? 0 : Math.min(600, Math.round(a.money * 0.1)); a.money -= fee;
-          a.dz = []; a.immune = a.immune || {}; for (const k of Object.keys(DZ)) a.immune[k] = now() + 10 * 60000;
+          a.dz = []; a.immune = a.immune || {}; for (const k of Object.keys(DZ)) a.immune[k] = now() + 30 * 60000;
           revive(a, 70); sendRoster(); toast(a, `🏥 ฟื้นแล้ว! เจ้าหน้าที่รักษาโรคให้หายหมด (กันป่วยซ้ำ 10 นาที) · ${fee ? `ค่ารักษา ${money(fee)}` : 'รักษาฟรี 💚'}`, '🏥');
         }
       }
