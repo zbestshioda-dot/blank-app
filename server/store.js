@@ -6,6 +6,9 @@ const path = require('path');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'players.json');
+// One-time restore: if the save file doesn't exist yet (a fresh volume), start from seed/players.json
+// when it was deployed alongside the code. Kept out of git (.gitignore) because it holds every player's PIN.
+const SEED = path.join(__dirname, '..', 'seed', 'players.json');
 const URL = process.env.DATABASE_URL;
 let pool = null;
 
@@ -22,6 +25,10 @@ async function init() {
 
 async function loadAll() {
   if (pool) { const r = await pool.query('SELECT data FROM players'); return r.rows.map(x => x.data); }
+  if (!fs.existsSync(FILE) && fs.existsSync(SEED)) {
+    try { const rows = JSON.parse(fs.readFileSync(SEED, 'utf8')); console.log('storage: restored ' + rows.length + ' records from ' + SEED); return rows; }
+    catch (e) { console.error('seed unreadable:', e.message); }
+  }
   try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return []; }
 }
 
