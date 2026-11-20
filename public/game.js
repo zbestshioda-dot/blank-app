@@ -5950,7 +5950,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=2'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v9').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v9'; });
+fetch('assets/atlas.json?v=v10').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v10'; });
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
