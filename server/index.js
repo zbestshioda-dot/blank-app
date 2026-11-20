@@ -3195,12 +3195,15 @@ function billUp(a) {
   const cur = D.monthIdx(now());
   if (a.billMonth == null) { a.billMonth = cur; return; }
   if (a.billMonth >= cur) return;
+  // billMonth only moves while the player is online, so it is the last month they played: only that month is billed (and an
+  // older unpaid bill turns late); the months they were away are skipped: no bill, no late fee, no cut-off
+  const away = cur - a.billMonth > 1;   // back after missing a whole month: unpaid bills get this month to be paid, no cut-off on login
   let n = 0;
-  while (a.billMonth < cur && n < 3) {
+  while (a.billMonth < cur && n < 1) {
     a.billMonth++; n++;
     const home = holdsHome(a);
     // an unpaid bill from before last month: water and power get cut, plus a late fee
-    for (const b of a.bills || []) if (!b.late && a.billMonth > b.m + 1) {
+    if (!away) for (const b of a.bills || []) if (!b.late && a.billMonth > b.m + 1) {
       b.late = true; const fee = Math.round((b.water + b.elec) * D.UTIL.lateFee); b.elec += fee; a.utilOff = true;
       toast(a, `ค้างค่าน้ำค่าไฟเกินกำหนด! ถูกตัดน้ำตัดไฟ + ค่าปรับ ${money(fee)} (นอนที่บ้านไม่ได้)`, '🔌', false); joy(a, -10);
     }
