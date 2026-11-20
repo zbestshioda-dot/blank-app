@@ -1,6 +1,5 @@
 # Deploys the game to fly.io on every push to this branch.
-# First run only: backs up the live players.json, creates the persistent volume, and deploys with the
-# backup as seed/players.json so the fresh volume starts with every player's save (see server/store.js).
+# Player saves are in Postgres (DATABASE_URL secret on fly.io), so a deploy never touches them.
 # Needs the repo secret FLY_API_TOKEN (fly.io → app → Tokens → New Token). Without it the job is skipped.
 name: Deploy to fly.io
 on:
@@ -21,21 +20,15 @@ jobs:
         if: steps.tok.outputs.ok
       - uses: superfly/flyctl-actions/setup-flyctl@master
         if: steps.tok.outputs.ok
-      - name: First time - back up players and create the volume
+      - name: Remove the unused lifetown_data volume (players are in Postgres)
         if: steps.tok.outputs.ok
         run: |
           set -e
-          if flyctl volumes list --json | grep -q '"lifetown_data"'; then echo "volume exists - normal deploy"; exit 0; fi
-          if flyctl secrets list | grep -q DATABASE_URL; then
-            echo "players are in Postgres - no file to back up"
-          else
-            mkdir -p seed
-            flyctl ssh sftp get /app/data/players.json seed/players.json
-            test -s seed/players.json || { echo "backup is empty - stopping so nothing is lost"; exit 1; }
-            ls -l seed/players.json
-          fi
-          flyctl scale count 1 --yes
-          flyctl volumes create lifetown_data --region sin --size 1 --yes
+          for row in $(flyctl volumes list --json | jq -r '.[] | select(.name=="lifetown_data") | "\(.id),\(.attached_machine_id // "")"'); do
+            vol=${row%,*}; m=${row#*,}
+            if [ -n "$m" ]; then flyctl machine stop "$m"; flyctl machine destroy "$m" --force; fi   # stop first so the game saves
+            flyctl volumes destroy "$vol" --yes
+          done
       - name: Deploy
         if: steps.tok.outputs.ok
         run: flyctl deploy --remote-only --yes
