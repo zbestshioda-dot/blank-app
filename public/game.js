@@ -107,7 +107,7 @@ const CH_MAX = 1400;
 const chGet = k => { const c = chCache.get(k); if (c) { chCache.delete(k); chCache.set(k, c); } return c; };
 const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCache.delete(chCache.keys().next().value); return c; };
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
-fetch('assets/pchar.json?v=a4').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=a4'; });
+fetch('assets/pchar.json?v=a5').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=a5'; });
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
 // starter colours are known before login (the creator screen); everything else comes from the server
 const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
@@ -160,7 +160,8 @@ function femOutfitFrame(sheet, step, lk) {
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
 const OUTFIT_SHEET = { cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
-  student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa' };   // women's versions are the 'f' + name sheets
+  student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
+  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -287,6 +288,26 @@ function hairFix(fr, outfit, step, gender, lk) {
   t.putImageData(im, 0, 0); return chPut(key, c);
 }
 // skin tone: sprites are drawn with one warm skin; other tones recolour the skin pixels (keeping their shading) per frame
+// 🎨 dyed shop outfits: every clothes pixel (not skin, hair, outline or black) takes the dye's hue; white/grey cloth gets a pastel tint
+const OF_DYE = new Map();
+function outfitDye(fr, hue) {
+  let m = OF_DYE.get(fr); if (!m) OF_DYE.set(fr, m = {}); if (m[hue]) return m[hue];
+  const c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(fr, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height), a = d.data, H = hue / 60;
+  for (let i = 0; i < a.length; i += 4) {
+    if (a[i + 3] < 40) continue;
+    const r = a[i], gg = a[i + 1], b = a[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), v = mx / 255;
+    if (v < .24 || isSkin(r, gg, b)) continue;
+    let s = mx ? (mx - mn) / mx : 0, h = 0;
+    if (mx > mn) { h = mx === r ? ((gg - b) / (mx - mn)) % 6 : mx === gg ? (b - r) / (mx - mn) + 2 : (r - gg) / (mx - mn) + 4; h *= 60; if (h < 0) h += 360; }
+    if (s > .28 && h < 45 && v < .62) continue;              // brown hair, leather, wood
+    if (s < .15) s = .3;
+    const f = H - Math.floor(H), p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f)), k = Math.floor(H) % 6;
+    const [R, G2, B2] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][k];
+    a[i] = R * 255; a[i + 1] = G2 * 255; a[i + 2] = B2 * 255;
+  }
+  g.putImageData(d, 0, 0); return (m[hue] = c);
+}
 const SKIN_REF = [239, 150, 94], SKIN_COL = { fair: [247, 205, 176], light: [242, 185, 141], brown: [185, 112, 63], dark: [127, 74, 43] };
 const skinMemo = new WeakMap();
 function isSkin(r, g, b) {
@@ -309,13 +330,13 @@ function skinFix(fr, tone) {
 }
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
-  const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
+  const ofd = G?.outfitDefs?.[p.of], sheet0 = OUTFIT_SHEET[ofd?.base || p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const lk = p.of === 'monk' ? MONK_LOOK : { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;   // 🙏 monks: saffron robe, shaved head
   const fem = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined;
   const fr0 = fem ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
   const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WALK[view][step % 4], p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
-  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : frS);
+  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : ofd?.hue !== undefined ? outfitDye(frS, ofd.hue) : frS);
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -4311,6 +4332,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20f', d: '20 พ.ย. (รอบ 65)', items: [
+    '👗 <b>ชุดแฟชั่นใหม่ 11 แบบ</b> ที่ร้านแฟชั่น (มีแบบผู้หญิงด้วย): ชุดนอนลายเสือ · ช่างภาพสายลุย · ชุดกันฝนเหลือง · นักสำรวจป่า · แมวขาวขนฟู · และชุดเพชร 💎 ไก่น้อยกุ๊กกุ๊ก · สายเซิร์ฟฮาวาย · ฮิปฮอปสตรีท · ไทยราชสำนัก · จอมยุทธ์มังกรแดง · อัศวินเกราะเงิน',
+    '🎨 <b>ชุดย้อมสี!</b> กดจุดสีใต้ชุดในร้านแฟชั่นเพื่อดูสีอื่น ชุดเก่าก็มีสีใหม่ด้วย (แต่ละสีซื้อแยกกัน)'] },
   { v: '2026-11-20e', d: '20 พ.ย. (รอบ 64)', items: [
     '🪪 <b>หน้าข้อมูลผู้เล่นใหม่</b>: โชว์ตัวละครในชุด สัตว์เลี้ยง และรถของคุณไว้อวด (ตัวละครอยู่หน้ารถเสมอ) · กด ✏️ เลือกเองได้จากของที่มี · คนอื่นแตะดูก็เห็น',
     '🏅 เลือกความสำเร็จที่จะโชว์ได้เอง 3 อัน · หน้าข้อมูลเหลือแค่ทรัพย์สินรวมกับความสำเร็จ ดูสะอาดตา',
@@ -5250,9 +5274,12 @@ function renderPanel(p) {
       const ft = 'outfit';   // the shop sells whole outfits only (shirts and trousers are gone)
       return `<h2>👗 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · ขายชุดพิเศษใส่ทั้งตัว แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ชุดที่ซื้อแล้วถอด/ใส่ได้ฟรีตลอด · ย้อมผมที่ร้านทำผม 💈</div>
         ${ft !== 'outfit' ? sec(ft, ft === 'shirt' ? '👕 เสื้อ' : '👖 กางเกง') : `
-        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([id, o]) => (o.price || o.gems) && (!o.g || o.g === me.gender || (me.outfits || []).includes(id))).sort(([, x], [, y]) => (x.gems ? 1e12 : x.price) - (y.gems ? 1e12 : y.price)).map(([id, o]) => {
-          const has = (me.outfits || []).includes(id), on = me.outfit === id;
-          return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(o))}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(o.gems ? `💎${o.gems}` : money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
+        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div><div class="looks">${Object.entries(G.outfitDefs).filter(([id, o]) => (o.price || o.gems) && !o.base && (!o.g || o.g === me.gender || (me.outfits || []).includes(id))).sort(([, x], [, y]) => (x.gems ? 1e12 + x.gems : x.price) - (y.gems ? 1e12 + y.gems : y.price)).map(([bid]) => {
+          const vs = [bid, ...Object.keys(G.outfitDefs).filter(k => G.outfitDefs[k].base === bid)], mine = me.outfits || [];
+          const id = vs.includes(p['dy_' + bid]) ? p['dy_' + bid] : vs.includes(me.outfit) ? me.outfit : bid, o = G.outfitDefs[id];
+          const has = mine.includes(id), on = me.outfit === id;
+          const dots = vs.length > 1 ? `<div class="dyeDots">${vs.map(v => { const h = G.outfitDefs[v].hue; return `<button class="dyeDot ${v === id ? 'on' : ''}" title="${esc(ofName(G.outfitDefs[v]))}" style="background:${h === undefined ? 'conic-gradient(#e55,#ec4,#5c6,#4ae,#a6e,#e55)' : `hsl(${h},75%,58%)`}" data-m="${esc(JSON.stringify({ fn: 'qtab', set: { ['dy_' + bid]: v } }))}">${mine.includes(v) ? '✓' : ''}</button>`; }).join('')}</div>` : '';
+          return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(o))}</small>${dots}${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(o.gems ? `💎${o.gems}` : money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`}`;
     }
     case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคสตามจับโจร 🚨 เคสหมาหาย 🐕 เล่นจับผิดภาพหาโจร 🔍 และซ้อมยิงเป้า 🎯 · ได้รถสายตรวจขับฟรี · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) : ''}`;

@@ -1502,7 +1502,27 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   lukthung:  { name: 'ชุดนักร้องลูกทุ่งกากเพชร', how: 'ซื้อที่ร้านแฟชั่น', price: 349999 },
   chakri:    { name: 'ชุดไทยจักรี', how: 'ซื้อที่ร้านแฟชั่น', price: 888888, g: 'f' },
   angel:     { name: 'ชุดเทวดา', nf: 'ชุดนางฟ้า', how: 'แพ็กเติมเงิน ฿99 (ไม่มีขายในร้าน)' },
-  santa:     { name: 'ชุดซานต้า', nf: 'ชุดซานต้าสาว', how: 'ของขวัญปีใหม่ 2570 จากเมือง (ไม่มีขาย)' } };
+  santa:     { name: 'ชุดซานต้า', nf: 'ชุดซานต้าสาว', how: 'ของขวัญปีใหม่ 2570 จากเมือง (ไม่มีขาย)' },
+  // fashion collection 2 (normal money for the plain ones, diamonds for the prettiest)
+  tigerpj:   { name: 'ชุดนอนลายเสือ', how: 'ซื้อที่ร้านแฟชั่น', price: 29999 },
+  photog:    { name: 'ชุดช่างภาพสายลุย', how: 'ซื้อที่ร้านแฟชั่น', price: 49999, g: 'm' },
+  raincoat:  { name: 'ชุดกันฝนสีเหลือง', how: 'ซื้อที่ร้านแฟชั่น', price: 69999 },
+  explorer:  { name: 'ชุดนักสำรวจป่า', how: 'ซื้อที่ร้านแฟชั่น', price: 99999 },
+  catsuit:   { name: 'ชุดแมวขาวขนฟู', how: 'ซื้อที่ร้านแฟชั่น', price: 159999 },
+  chicken:   { name: 'ชุดไก่น้อยกุ๊กกุ๊ก', how: 'ซื้อที่ร้านแฟชั่น', gems: 100 },
+  surf:      { name: 'ชุดสายเซิร์ฟฮาวาย', how: 'ซื้อที่ร้านแฟชั่น', gems: 150 },
+  hiphop:    { name: 'ชุดฮิปฮอปสตรีท', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 },
+  thairoyal: { name: 'ชุดไทยราชสำนัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 250 },
+  martial:   { name: 'ชุดจอมยุทธ์มังกรแดง', nf: 'ชุดจอมยุทธ์หญิงมังกรแดง', how: 'ซื้อที่ร้านแฟชั่น', gems: 350 },
+  knight:    { name: 'ชุดอัศวินเกราะเงิน', how: 'ซื้อที่ร้านแฟชั่น', gems: 450 } };
+// 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
+const DYES = { red: ['แดง', 0], orange: ['ส้ม', 28], yellow: ['เหลือง', 52], green: ['เขียว', 125], sky: ['ฟ้า', 195], blue: ['น้ำเงิน', 228], purple: ['ม่วง', 275], pink: ['ชมพู', 325] };
+const DYE_SETS = { pajama: ['pink', 'sky'], tracksuit: ['red', 'green'], hoodie: ['purple', 'yellow'], devil: ['blue', 'green'], pilot: ['blue', 'red'], songkran: ['pink', 'purple'],
+  bunny: ['sky', 'purple'], chinese: ['blue', 'green'], lukthung: ['pink', 'blue'], muaythai: ['blue', 'green'], student: ['pink', 'sky'],
+  tigerpj: ['pink', 'sky'], raincoat: ['red', 'sky', 'green'], explorer: ['sky', 'purple'], catsuit: ['pink', 'sky'], chicken: ['blue', 'purple'],
+  surf: ['pink', 'purple'], hiphop: ['blue', 'green'], thairoyal: ['pink', 'green'], martial: ['blue', 'purple'], knight: ['blue', 'green'] };
+for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
+  OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue }; }
 // prestige titles bought with money (a money sink for the rich): not achievements, never counted in the achievement total
 // the supporter title from the ฿49 top-up pack: lasts 30 days per purchase (stacks), sparkly rarity 8
 const PAY_TITLE = { id: 'vip', title: '💖 ผู้สนับสนุนเมือง', r: 8, days: 30 };
