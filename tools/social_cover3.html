@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@500;600&family=Noto+Sans+Thai:wght@700;800;900&family=Silkscreen:wght@700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block;width:820px;height:428px}</style>
+</head><body><canvas id="c" width="1640" height="856"></canvas>
+<script>
+// Promo video renderer: render(t) draws one frame at time t (seconds). Driven frame by frame by render.js.
+const SRV = 'http://localhost:3123/assets/';
+const W = 820, H = 428, BEAT = 60 / 128;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+let NOTEXT = false; window.setNoText = v => { NOTEXT = v; };
+g.setTransform(2, 0, 0, 2, 0, 0);
+const img = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+let A, AI, CH, CI, PIN, PETS, PI;
+window.ready = (async () => {
+  A = await (await fetch(SRV + 'atlas.json')).json(); AI = await img(SRV + 'atlas.webp');
+  CH = await (await fetch(SRV + 'pchar.json')).json(); CI = await img(SRV + 'pchar.webp');
+  PIN = await img(SRV + 'ui/pin.png'); PETS = await (await fetch(SRV + 'pets.json')).json(); PI = await img(SRV + 'pets.webp');
+  await document.fonts.load('900 40px "Noto Sans Thai"'); await document.fonts.load('600 20px Mitr'); await document.fonts.load('700 20px Silkscreen');
+  return true;
+})();
+
+// ---------- helpers
+const cl = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const eo = x => 1 - Math.pow(1 - cl(x), 3);
+const eob = x => { x = cl(x); const c1 = 2.2, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const rnd = i => { const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+function spr(name, x, y, w, alpha = 1) {   // bottom-centre anchored
+  const s = A.sprites[name]; if (!s) return 0;
+  const h = s[3] / s[2] * w; g.globalAlpha = alpha;
+  g.drawImage(AI, s[0], s[1], s[2], s[3], x - w / 2, y - h, w, h); g.globalAlpha = 1; return h;
+}
+function ground(name, x, y, size) {
+  const s = A.sprites[name]; if (!s) return; const q = A.tile, h = size / 2;
+  for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) g.drawImage(AI, s[0] + i * q, s[1] + k * q, q, q, x + i * h, y + k * h, h + .6, h + .6);
+}
+// characters: same tinting as the game (base + tinted shirt/pants/hair layers)
+const chCache = new Map();
+const LOOK = [['#e0645a', '#3b4a6b', '#3a2416'], ['#5aa0e0', '#bdbdbd', '#6e4528'], ['#7cc06a', '#5b4636', '#c9a15a'], ['#f2c14e', '#2f2f3a', '#1d1d1d'], ['#ffffff', '#6b7fe0', '#a0522d']];
+function frame(fr, lk) {
+  const key = fr + lk.join(); let c = chCache.get(key); if (c) return c;
+  const { w, h, rows } = CH, row = rows[fr] ?? 0;
+  c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.drawImage(CI, 0, row * h, w, h, 0, 0, w, h);
+  const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
+  [1, 2, 3].forEach((col, i) => {
+    t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h);
+    t.drawImage(CI, col * w, row * h, w, h, 0, 0, w, h);
+    t.globalCompositeOperation = 'multiply'; t.fillStyle = lk[i]; t.fillRect(0, 0, w, h);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(CI, col * w, row * h, w, h, 0, 0, w, h);
+    x.drawImage(tmp, 0, 0);
+  });
+  chCache.set(key, c); return c;
+}
+const WALK = { front: ['down0', 'down1', 'down0', 'down2'], side: ['left0', 'left1', 'left0', 'left2'] };
+function chara(outfit, x, y, k, view, step, faceRight, look = 0) {
+  const pre = outfit && CH.rows[outfit + ':down0'] !== undefined ? outfit + ':' : '';
+  const fr = frame(pre + WALK[view][step & 3], LOOK[look % LOOK.length]), [ax, ay] = CH.feet;
+  g.save(); g.translate(x, y); if (view === 'side' && faceRight) g.scale(-1, 1);
+  g.imageSmoothingEnabled = false; g.drawImage(fr, -ax * k, -ay * k, CH.w * k, CH.h * k); g.restore();
+}
+function shadow(x, y, rx) { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, rx, rx * .32, 0, 0, 7); g.fill(); }
+function text(s, x, y, size, opt = {}) {
+  if (NOTEXT) return;
+  g.save(); g.translate(x, y); if (opt.rot) g.rotate(opt.rot); if (opt.scale) g.scale(opt.scale, opt.scale);
+  g.font = `${opt.weight || 900} ${size}px ${opt.font || '"Noto Sans Thai"'}`; g.textAlign = opt.align || 'center'; g.textBaseline = 'middle';
+  g.lineJoin = 'round'; g.globalAlpha = opt.alpha ?? 1;
+  if (opt.stroke !== false) { g.lineWidth = size * (opt.sw || .24); g.strokeStyle = opt.strokeColor || '#3a1d0e'; g.strokeText(s, 0, 0); }
+  if (opt.grad) { const gr = g.createLinearGradient(0, -size / 2, 0, size / 2); gr.addColorStop(0, opt.grad[0]); gr.addColorStop(1, opt.grad[1]); g.fillStyle = gr; } else g.fillStyle = opt.color || '#fff';
+  g.fillText(s, 0, 0); g.restore();
+}
+function pill(x, y, w, h, fill, stroke) {
+  g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, h / 2); g.fillStyle = fill; g.fill();
+  if (stroke) { g.lineWidth = 3; g.strokeStyle = stroke; g.stroke(); }
+}
+function flash(a, color = '255,255,255') { if (a > 0) { g.fillStyle = `rgba(${color},${cl(a)})`; g.fillRect(0, 0, W, H); } }
+function rays(cx, cy, t, color, n = 14, alpha = .18) {
+  g.save(); g.translate(cx, cy); g.rotate(t * .5); g.fillStyle = color; g.globalAlpha = alpha;
+  for (let i = 0; i < n; i++) { g.rotate(Math.PI * 2 / n); g.beginPath(); g.moveTo(0, 0); g.lineTo(-60, -1200); g.lineTo(60, -1200); g.fill(); }
+  g.restore();
+}
+function confetti(t, t0, n = 70, seed = 1) {
+  const COLS = ['#ff5a7a', '#ffd23f', '#4fd1ff', '#7cff6b', '#c77dff', '#ffffff'];
+  const dt = t - t0; if (dt < 0) return;
+  for (let i = 0; i < n; i++) {
+    const r1 = rnd(i * 3 + seed), r2 = rnd(i * 7 + seed), r3 = rnd(i * 11 + seed);
+    const x = W * r1 + Math.sin(dt * 3 + i) * 20, y = -30 + (dt * (260 + r2 * 260)) - r3 * 200;
+    if (y > H + 20) continue;
+    g.save(); g.translate(x, y); g.rotate(dt * (4 + r3 * 6) + i); g.fillStyle = COLS[i % COLS.length];
+    g.fillRect(-5, -3, 10, 6); g.restore();
+  }
+}
+function sparkle(x, y, s, a) {
+  g.save(); g.translate(x, y); g.globalAlpha = a; g.fillStyle = '#fff8c8';
+  g.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? s * .25 : s; const an = i * Math.PI / 4; g.lineTo(Math.cos(an) * r, Math.sin(an) * r); } g.fill(); g.restore();
+}
+
+function pet(name, x, y, size) { const m = PETS.pets[name]; if (!m) return; const C = PETS.cell; g.imageSmoothingEnabled = false; g.drawImage(PI, 0, m.row * C, C, C, x - size / 2, y - size, size, size); }
+function glowText(s, x, y, size, grad, opt = {}) {
+  g.save(); g.shadowColor = opt.glow || 'rgba(255,190,60,.9)'; g.shadowBlur = size * .5; text(s, x, y, size, { grad, ...opt }); g.restore(); text(s, x, y, size, { grad, ...opt });
+}
+function chip(x, y, label, bg, fs) {
+  g.save(); g.font = `800 ${fs}px "Noto Sans Thai"`; const w = g.measureText(label).width + fs * 1.3, h = fs * 1.75;
+  g.fillStyle = 'rgba(40,20,8,.55)'; g.beginPath(); g.roundRect(x - w / 2, y - h / 2 + 3, w, h, h / 2); g.fill();
+  g.fillStyle = bg; g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, h / 2); g.fill();
+  g.lineWidth = 2.5; g.strokeStyle = '#3a1d0e'; g.stroke();
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = fs * .22; g.lineJoin = 'round'; g.strokeStyle = 'rgba(40,20,8,.6)'; g.strokeText(label, x, y + 1); g.fillText(label, x, y + 1); g.restore();
+}
+function badge(x, y, r, l1, l2, t) {
+  g.save(); g.translate(x, y); g.rotate(-.18 + Math.sin(t) * .02);
+  g.fillStyle = '#3a1d0e'; g.beginPath(); for (let i = 0; i < 32; i++) { const rr = i % 2 ? r * .82 : r; const a = i * Math.PI / 16; g.lineTo(Math.cos(a) * (rr + 3), Math.sin(a) * (rr + 3)); } g.fill();
+  const gr = g.createRadialGradient(0, -r * .3, 2, 0, 0, r); gr.addColorStop(0, '#ff8aa0'); gr.addColorStop(1, '#e02a4a'); g.fillStyle = gr;
+  g.beginPath(); for (let i = 0; i < 32; i++) { const rr = i % 2 ? r * .82 : r; const a = i * Math.PI / 16; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.fill();
+  g.restore(); text(l1, x, y - r * .16, r * .5, { color: '#fff', rot: -.18, sw: .2 }); text(l2, x, y + r * .32, r * .26, { color: '#ffe35a', rot: -.18, sw: .25, weight: 800 });
+}
+function btn(cx, cy, label, w, h, fs) {
+  g.save(); g.translate(cx, cy);
+  g.shadowColor = 'rgba(255,200,60,.8)'; g.shadowBlur = 18;
+  const bg = g.createLinearGradient(0, -h / 2, 0, h / 2); bg.addColorStop(0, '#fff07a'); bg.addColorStop(1, '#f59a1a');
+  g.fillStyle = '#5c3a1e'; g.beginPath(); g.roundRect(-w / 2, -h / 2 + 4, w, h, h / 2); g.fill(); g.shadowBlur = 0;
+  g.fillStyle = bg; g.beginPath(); g.roundRect(-w / 2, -h / 2, w, h, h / 2); g.fill();
+  g.lineWidth = 3; g.strokeStyle = '#5c3a1e'; g.stroke();
+  g.font = `900 ${fs}px "Noto Sans Thai"`; g.fillStyle = '#3a1d0e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 0, 2); g.restore();
+}
+function sunset() {   // warm sky tint over the whole scene
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(255,120,60,.30)'); gr.addColorStop(.5, 'rgba(255,190,90,.10)'); gr.addColorStop(1, 'rgba(60,20,80,.25)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+}
+
+// ---------- cover v3: golden-hour lakeside, friends around a campfire
+function lakePath() {
+  g.beginPath();
+  g.moveTo(470, H + 10);
+  g.bezierCurveTo(470, 380, 520, 330, 600, 318);
+  g.bezierCurveTo(680, 306, 700, 290, 760, 280);
+  g.bezierCurveTo(800, 274, 830, 270, W + 20, 268);
+  g.lineTo(W + 20, H + 10); g.closePath();
+}
+function cover3(t) {
+  g.clearRect(0, 0, W, H); g.imageSmoothingEnabled = false;
+  const C = 64;
+  for (let y = 0; y < H; y += C) for (let x = 0; x < W; x += C) ground((x / C + y / C) % 3 ? 'g_grass' : 'g_grass_dots', x, y, C);
+  // dirt path from the houses down to the beach
+  g.fillStyle = 'rgba(214,180,120,.75)'; g.beginPath(); g.moveTo(560, 0); g.bezierCurveTo(540, 120, 640, 170, 630, 300); g.lineTo(690, 300); g.bezierCurveTo(700, 170, 600, 120, 620, 0); g.fill();
+  // lake: sand rim, then water
+  g.save(); g.translate(-14, -12); lakePath(); g.fillStyle = '#e8cf8e'; g.fill(); g.restore();
+  lakePath(); const wg = g.createLinearGradient(0, 270, 0, H); wg.addColorStop(0, '#4fb8e8'); wg.addColorStop(1, '#1a5fa8'); g.fillStyle = wg; g.fill();
+  g.save(); lakePath(); g.clip();
+  g.fillStyle = 'rgba(255,230,160,.35)'; for (let i = 0; i < 26; i++) { const x = 480 + rnd(i) * 360, y = 300 + rnd(i + 7) * 130; g.fillRect(x, y, 14 + rnd(i + 3) * 26, 2.5); }
+  g.restore();
+  // houses along the top edge (cropped, like the town behind)
+  const HOUSES = [['h_cottage2', 40], ['tree_pink', 120], ['h_gable_red', 200], ['tree', 300], ['h_cottage1', 400], ['pine', 500], ['h_gable_blue', 700], ['h_cottage3', 790]];
+  for (const [n, x] of HOUSES) { shadow(x, 92, 50); spr(n, x, 96, n.startsWith('h_') ? 120 : 80); }
+  spr('o_lantern', 470, 120, 26); spr('o_lantern', 660, 120, 26);
+  // left-bottom greenery
+  spr('tree_oak', 30, 430, 110); spr('bush', 120, 428, 50); spr('flowerbed', 330, 432, 70);
+  // pier into the lake + fisher with a big catch
+  g.fillStyle = '#5c3a1e'; for (let i = 0; i < 4; i++) g.fillRect(712 + (i % 2) * 52, 330 + Math.floor(i / 2) * 60, 8, 34);
+  g.save(); g.beginPath(); g.rect(700, 300, 76, 128); g.clip(); for (let y = 300; y < 428; y += 32) ground('g_planks', 700, y, 76); g.restore();
+  g.strokeStyle = '#3a1d0e'; g.lineWidth = 2; g.strokeRect(700, 300, 76, 130);
+  shadow(738, 352, 14); chara('fisher', 738, 352, .9, 'side', 0, true, 2);
+  g.strokeStyle = '#3a1d0e'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(752, 322); g.quadraticCurveTo(780, 270, 805, 300); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(805, 300); g.lineTo(800, 340); g.stroke();
+  // splash + leaping fish
+  for (let i = 0; i < 10; i++) { g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(612 + Math.cos(i * .63) * 26, 392 - Math.abs(Math.sin(i * 1.7)) * 20, 3 + rnd(i) * 3, 0, 7); g.fill(); }
+  g.save(); g.translate(612, 352); g.rotate(-.5); spr('fish_marlin', 0, 20, 92); g.restore();
+  g.save(); g.translate(540, 404); g.rotate(.4); spr('fish_koi', 0, 12, 34); g.restore();
+  g.save(); g.translate(790, 392); g.rotate(-.3); spr('fish_clownfish', 0, 10, 26); g.restore();
+  // camp on the grass: tent, fire, friends, pets
+  spr('tent', 492, 222, 92);
+  const fx = 610, fy = 262;
+  const glow = g.createRadialGradient(fx, fy - 10, 4, fx, fy - 10, 120); glow.addColorStop(0, 'rgba(255,190,80,.55)'); glow.addColorStop(1, 'rgba(255,150,60,0)'); g.fillStyle = glow; g.fillRect(fx - 130, fy - 140, 260, 260);
+  spr('firewood', 668, 268, 30); spr('deckchair', 760, 238, 30);
+  const crew = [['tracksuit', 552, 266, 3], ['office', 584, 296, 0], ['cowboy', 642, 298, 2], ['pilot', 676, 262, 1], ['chef', 594, 230, 4], ['fdoctor', 632, 228, 3]];
+  crew.sort((a, b) => a[2] - b[2]);
+  for (const [o, x, y, lk] of crew) { if (y > fy && !crew.drawnFire) { spr('campfire', fx, fy + 6, 40); crew.drawnFire = 1; } shadow(x, y, 13); chara(o, x, y, .95, 'front', 0, false, lk); }
+  if (!crew.drawnFire) spr('campfire', fx, fy + 6, 40);
+  shadow(512, 304, 12); pet('capybara', 512, 308, 50);
+  shadow(498, 356, 10); pet('penguin', 498, 360, 40);
+  shadow(548, 326, 10); pet('panda', 548, 330, 42);
+  shadow(800, 200, 10); pet('dragon', 795, 204, 44);
+  // warm sunset over everything + vignette behind the title
+  sunset();
+  const cx = 250;
+  const v = g.createRadialGradient(cx, H * .45, 30, cx, H * .45, 420); v.addColorStop(0, 'rgba(25,8,2,.74)'); v.addColorStop(.55, 'rgba(25,8,2,.50)'); v.addColorStop(1, 'rgba(25,8,2,0)');
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
+  rays(cx, 110, t, '#ffd36a', 20, .13);
+  // helicopter top right
+  g.save(); g.translate(735, 64); g.rotate(-.05); shadow(0, 70, 40); spr('w_heli2_s', 0, 0, 140); g.restore();
+  // fireflies
+  for (let i = 0; i < 16; i++) { const x = 440 + rnd(i + 20) * 380, y = 150 + rnd(i + 40) * 200; g.fillStyle = 'rgba(255,240,150,.9)'; g.shadowColor = '#ffe680'; g.shadowBlur = 6; g.beginPath(); g.arc(x, y, 1.6, 0, 7); g.fill(); g.shadowBlur = 0; }
+  // speech bubbles from the campfire
+  bubble3(612, 168, 'มาเป็นเพื่อนกันนะ! 👋', -.04);
+  bubble3(722, 282, 'ได้ปลาใหญ่! 🎣', .04);
+  // title block
+  if (PIN) { g.imageSmoothingEnabled = false; g.drawImage(PIN, cx - 28, 8, 56, 64); }
+  glowText('เมืองชีวิตนี้', cx, 100, 50, ['#ffffff', '#ffe08a']);
+  glowText('เลือกได้!', cx + 4, 160, 72, ['#ffe35a', '#ff7a1a'], { rot: -.05 });
+  text('L I F E   T O W N', cx, 210, 19, { weight: 900, color: '#ffe8c0', sw: .3 });
+  text('ชวนเพื่อนมาใช้ชีวิตในเมืองเดียวกัน!', cx, 240, 19, { weight: 800, color: '#7cf3ff', sw: .3 });
+  const chips = [['👥 เพิ่มเพื่อน เล่นด้วยกัน', '#e8453c'], ['🎣 ตกปลา 79 ชนิด', '#1fa3a8'], ['🐾 สัตว์เลี้ยง 32 ชนิด', '#e0639b'],
+    ['🚁 รถหรู & เฮลิคอปเตอร์', '#2f8fe0'], ['🏡 ซื้อบ้าน แต่งบ้าน', '#3fae55'], ['💼 เลือกอาชีพได้เอง', '#8a5ad6']];
+  chips.forEach(([l, c], i) => chip(cx + (i % 2 ? 1 : -1) * 82, 272 + Math.floor(i / 2) * 30, l, c, 12));
+  btn(cx, 370, 'เล่นฟรีเลย! 👉 is.gd/lifetown', 290, 40, 19);
+  text('ไม่ต้องโหลด · มือถือและคอม · ผู้เล่นจริงออนไลน์', cx, 406, 12, { color: '#ffffff', weight: 800, sw: .35 });
+  for (let i = 0; i < 6; i++) sparkle(cx + Math.cos(i * 1.1) * 200, 130 + Math.sin(i * 1.7) * 60, 5 + rnd(i) * 6, .8);
+}
+function bubble3(x, y, s, rot) {
+  g.save(); g.translate(x, y); g.rotate(rot);
+  g.font = '600 12px Mitr'; const w = g.measureText(s).width + 18;
+  g.fillStyle = '#fff'; g.strokeStyle = '#3a1d0e'; g.lineWidth = 1.8;
+  g.beginPath(); g.roundRect(-w / 2, -26, w, 24, 10); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(-5, -3); g.lineTo(0, 5); g.lineTo(5, -3); g.fill(); g.stroke();
+  g.fillRect(-6, -5, 12, 3);
+  g.fillStyle = '#3a1d0e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, 0, -13); g.restore();
+}
+window.cover3 = cover3;
+</script></body></html>
