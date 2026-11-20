@@ -12,3 +12,5 @@
 - The user uploads files through the GitHub web page: `git pull` first every session.
 - Before saying something is missing, check the code and `NEWS` — it may already be done.
 - Live site is fly.io app `newlifetownth`; it only updates when someone runs `fly deploy`. Player data must stay on the volume (`/data`) or in Postgres.
+- Model hint: at the start of a task, if it clearly fits a cheaper or stronger model, say so in one Thai line
+  (Haiku = text/number tweaks; Sonnet = normal updates; Opus = big client+server features, lag, hard bugs, player data; Fable = only when Opus got stuck).
