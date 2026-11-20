@@ -1414,3 +1414,5 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .socTabs button,.socSub button{flex:1;background:#fff!important;color:#1d5fc8!important;border:2px solid #b9d1f7!important;box-shadow:none!important;font-weight:600}
 .socTabs button.on,.socSub button.on{background:#1d6fe0!important;color:#fff!important;border-color:#1d5fc8!important}
 .socSub button{padding:3px 6px;font-size:12px}
+/* the name badge under the portrait: text centred inside the pill, Thai vowels not clipped */
+#card.v2 .pfp #meName{text-align:center!important;box-sizing:border-box!important;line-height:1.5!important;padding:0 8px!important}
