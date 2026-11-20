@@ -4292,7 +4292,7 @@ function godAct(a, m) {
     return send(a, { t: 'ledger', who: `${x.name} (${x.login})`, money: x.money, list: (x.ledger || []).slice(-150) });
   }
   if (m.op === 'payorders') return send(a, payAdminView());
-  if (m.op === 'payok') {                   // credit an order by hand, after checking it in the Stripe dashboard
+  if (m.op === 'payok') {                   // credit an order by hand, after checking the money arrived in the bank app
     const o = payOrders[String(m.ref || '')]; if (!o) return toast(a, 'ไม่พบรายการนี้', '💎', false);
     if (o.st === 'paid') return toast(a, 'รายการนี้เติมเพชรไปแล้ว', '💎', false);
     payCredit(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, `ส่งของรายการ ${o.ref} ให้ ${o.l} แล้ว`, '💎');
@@ -4302,7 +4302,7 @@ function godAct(a, m) {
     if (o.st === 'void') return toast(a, 'รายการนี้ถูกยกเลิกไปแล้ว', '💎', false);
     const r = payRevoke(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, r, '↩️');
   }
-  if (m.op === 'paycheck') { payVerify(String(m.ref || ''), 'admin').then(() => send(a, payAdminView())); return toast(a, 'กำลังตรวจกับ Stripe…', '🔄'); }
+  if (m.op === 'paycheck') { payVerify(String(m.ref || ''), 'admin').then(() => send(a, payAdminView())); return toast(a, 'กำลังตรวจสลิปอีกครั้ง…', '🔄'); }
   if (m.op === 'givegems') {                // give (or take back) diamonds to one player, with a mail telling them why
     const x = accounts.get(String(m.login || '').toLowerCase()), n = Math.round(+m.n || 0), why = String(m.why || '').slice(0, 80).trim();
     if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
@@ -4575,21 +4575,31 @@ function tick() {
   if (t > saveAt) { saveAt = t + 15000; save(); }
 }
 
-// ------------------------------------------------------------------ 💎 real-money top-up (Stripe Checkout, see pay.js)
-let payOrders = {};   // ref -> { ref, l, n, pack, gems, thb, m, t, st: new|paid|review|exp, why, bonus, gbp, paidT, by }
+// ------------------------------------------------------------------ 💎 real-money top-up (PromptPay QR + slip check by Slip2Go, see pay.js)
+let payOrders = {};   // ref -> { ref, l, n, pack, gems, thb, m, t, st: new|paid|review|exp|void, why, bonus, slip, qr, tries, paidT, by }
 const PAY_OPEN = 6;   // at most this many unpaid orders per player in 15 minutes
-function payMine(a) { const l = lk(a); return Object.values(payOrders).filter(o => o.l === l && o.st !== 'exp').sort((x, y) => y.t - x.t).slice(0, 10).map(o => ({ ref: o.ref, pack: o.pack, gems: o.gems, bonus: o.bonus || 0, thb: o.thb, m: o.m, t: o.t, st: o.st })); }
+const PAY_TTL = 24 * 3600e3;
+function payMine(a) { const l = lk(a); return Object.values(payOrders).filter(o => o.l === l && o.st !== 'exp').sort((x, y) => y.t - x.t).slice(0, 10).map(o => ({ ref: o.ref, pack: o.pack, gems: o.gems, bonus: o.bonus || 0, thb: o.thb, m: o.m, t: o.t, st: o.st, why: o.st === 'review' ? o.why || '' : '', ...(o.st === 'new' && o.m === 'slip' ? { qr: PAY.promptPayQR(o.thb) } : {}) })); }
 function payView(a) {
-  return { t: 'pay', on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, packs: PAY.PACKS, first: a.paidG ? 0 : 1, bonus: PAY.FIRST_BONUS,
-    methods: Object.fromEntries(Object.entries(PAY.METHODS).map(([k, v]) => [k, { n: v.n, min: v.min }])), banks: PAY.BANKS, my: payMine(a), gems: a.gems || 0,
-    vipT: a.vipT || 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0 };
+  return { t: 'pay', on: PAY.ON ? 1 : 0, sb: 0, packs: PAY.PACKS, first: a.paidG ? 0 : 1, bonus: PAY.FIRST_BONUS, methods: {}, banks: {}, my: payMine(a), gems: a.gems || 0,
+    vipT: a.vipT || 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0, to: PAY.NAME, pp: PAY.ppShow() };
 }
 function payOp(a, m) {
   if (m.op === 'view') return send(a, payView(a));
-  if (m.op === 'check') {
+  if (m.op === 'check' || m.op === 'slip') {
     const o = payOrders[String(m.ref || '')]; if (!o || o.l !== lk(a)) return send(a, payView(a));
     if (o.st === 'paid') { send(a, payView(a)); return toast(a, 'รายการนี้สำเร็จแล้ว ของเข้าบัญชีเรียบร้อย ดูรายละเอียดในจดหมาย ✉️', '💎'); }
-    return payVerify(o.ref, 'player').then(() => { send(a, payView(a)); if (payOrders[o.ref]?.st !== 'paid') toast(a, 'ยังไม่พบการชำระเงินของรายการนี้ ถ้าจ่ายแล้วรอสักครู่ หรือแจ้งแอดมินพร้อมเลขรายการ', '⏳', false); });
+    if (m.op === 'check') return send(a, payView(a));
+    const qr = String(m.qr || '').trim();
+    if (!/^[\x20-\x7e]{20,400}$/.test(qr)) return toast(a, 'อ่าน QR บนสลิปไม่ได้ ลองใช้รูปสลิปเต็มๆ ที่บันทึกจากแอปธนาคาร', '📷', false);
+    if (o.st !== 'new' && o.st !== 'review') return toast(a, 'รายการนี้ปิดไปแล้ว กดชำระใหม่อีกครั้ง', '⏳', false);
+    if ((o.tries || 0) >= 8) return toast(a, 'ส่งสลิปหลายครั้งเกินไป แจ้งแอดมินพร้อมเลขรายการ #' + o.ref, '⚠️', false);
+    o.tries = (o.tries || 0) + 1; o.qr = qr; gdirty();
+    toast(a, 'กำลังตรวจสลิป…', '🔎');
+    return payVerify(o.ref, 'player').then(() => {
+      send(a, payView(a)); const x = payOrders[o.ref];
+      if (x?.st !== 'paid') toast(a, (x?.why || 'ตรวจสลิปไม่ผ่าน') + (x?.st === 'review' ? ' · แอดมินจะตรวจให้' : ''), '⚠️', false);
+    });
   }
   if (m.op !== 'buy') return;
   if (!PAY.ON) return toast(a, 'ระบบเติมเงินยังไม่เปิดให้บริการ', '💎', false);
@@ -4597,24 +4607,29 @@ function payOp(a, m) {
   if (!pk) return toast(a, 'เลือกแพ็กก่อน', '💎', false);
   if (pk.kind === 'outfit' && (a.outfits || []).includes(pk.of)) return toast(a, 'คุณมีชุดนี้แล้ว', '👗', false);
   const l = lk(a), t = now();
+  const same = Object.values(payOrders).find(o => o.l === l && o.st === 'new' && o.pack === pk.id && t - o.t < 30 * 60e3);
+  if (same) { send(a, payView(a)); return send(a, { t: 'payqr', ref: same.ref }); }   // reuse the open order of the same pack
   if (Object.values(payOrders).filter(o => o.l === l && o.st === 'new' && t - o.t < 15 * 60e3).length >= PAY_OPEN) return toast(a, 'มีรายการที่ยังไม่จ่ายหลายรายการแล้ว รอสักครู่ค่อยลองใหม่', '⏳', false);
   let ref; do ref = PAY.newRef(); while (payOrders[ref]);
-  const o = payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'stripe', t, st: 'new', ...(PAY.SANDBOX ? { sb: 1 } : {}) };
-  const label = pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? 'ชุดเทวดา/นางฟ้า' : `💎${pk.gems}`;
+  payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'slip', t, st: 'new' };
   payPrune(); gdirty();
-  PAY.createCheckout(o, label).then(({ url, sid }) => { o.sid = sid; gdirty(); send(a, { t: 'payredir', ref, url }); })
-    .catch(e => { delete payOrders[ref]; console.log('pay checkout failed', e.message); toast(a, 'เปิดหน้าชำระเงินไม่สำเร็จ ลองใหม่อีกครั้ง', '⚠️', false); });
+  send(a, payView(a)); send(a, { t: 'payqr', ref });
 }
 async function payVerify(ref, src) {
-  const o = payOrders[ref]; if (!o || o.st === 'paid' || o.st === 'void' || o.busy) return;
+  const o = payOrders[ref]; if (!o || o.st === 'paid' || o.st === 'void' || o.busy || o.m !== 'slip' || !o.qr) return;
   o.busy = 1;
   try {
-    const r = await PAY.checkStatus(o);
+    const r = await PAY.checkSlip(o.qr);
     if (payOrders[ref] !== o || o.st === 'paid') return;
-    if (r.ok && r.amount + 0.01 >= o.thb) { o.gbp = r.gbp; payCredit(o, 'stripe'); }
-    else if (r.ok) { o.st = 'review'; o.why = `ยอดไม่ตรง (จ่าย ${r.amount} / ต้อง ${o.thb})`; gdirty(); }
-    else { o.why = r.why; if (r.expired) o.st = 'exp'; else if (src === 'back' && !r.pending) o.st = 'review'; gdirty(); }
-    if (!r.ok) console.log('pay verify', ref, src, r.why, r.raw ? JSON.stringify(r.raw).slice(0, 300) : '');
+    if (!r.ok) { o.why = r.why; if (!r.retry && !r.bad && !r.dup) o.st = 'review'; o.code = r.code; gdirty(); console.log('pay slip', ref, src, r.code, r.why, r.raw ? JSON.stringify(r.raw).slice(0, 400) : ''); return; }
+    const used = Object.values(payOrders).find(x => x !== o && x.slip === r.transRef && x.st !== 'void');
+    o.code = r.code;
+    if (used) { o.why = 'สลิปนี้เคยใช้กับรายการอื่นแล้ว'; gdirty(); return; }
+    if (r.amount + 0.001 < o.thb) { o.why = `ยอดในสลิป ฿${r.amount} ไม่ถึงราคา ฿${o.thb}`; o.st = 'review'; o.slip = r.transRef; gdirty(); return; }
+    if (!r.when || r.when < o.t - 10 * 60e3) { o.why = 'สลิปนี้โอนก่อนกดสั่งซื้อ ใช้ได้เฉพาะสลิปที่โอนหลังสั่งซื้อ'; gdirty(); return; }
+    o.slip = r.transRef; o.paidAmt = r.amount;
+    if (r.recvOk !== true) { o.st = 'review'; o.why = r.recvOk === false ? 'ชื่อผู้รับเงินในสลิปไม่ตรงกับบัญชีของเกม' : 'รอแอดมินตรวจชื่อผู้รับในสลิป (ยังไม่ได้ตั้ง SLIP_RECEIVER)'; gdirty(); console.log('pay slip review', ref, o.why, JSON.stringify(r.raw?.data?.receiver || {}).slice(0, 300)); return; }
+    payCredit(o, 'slip');
   } finally { delete o.busy; }
 }
 function payCredit(o, by) {
@@ -4658,42 +4673,21 @@ function payRevoke(o, by) {
 }
 function payPrune() {
   const t = now(), all = Object.values(payOrders);
-  for (const o of all) if (o.st === 'new' && t - o.t > 24 * 3600e3) o.st = 'exp';
+  for (const o of all) if (o.st === 'new' && t - o.t > PAY_TTL) o.st = 'exp';
   if (all.length > 3000) for (const o of all.sort((x, y) => x.t - y.t).slice(0, all.length - 3000)) if (o.st !== 'review') delete payOrders[o.ref];
 }
 function payAdminView() {
   const all = Object.values(payOrders).sort((x, y) => y.t - x.t), paid = all.filter(o => o.st === 'paid'), d = dayKey();
   const sum = l => l.reduce((s, o) => s + o.thb, 0), today = paid.filter(o => new Date(o.paidT + 7 * 3600e3).toISOString().slice(0, 10) === d);
-  return { t: 'payadmin', on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, base: PAY.BASE, hook: PAY.HOOK ? 1 : 0, total: sum(paid), n: paid.length, today: sum(today), todayN: today.length,
+  return { t: 'payadmin', on: PAY.ON ? 1 : 0, sb: 0, sk: PAY.SK ? 1 : 0, pp: PAY.ppShow(), to: PAY.NAME, recv: PAY.RECV ? 1 : 0, total: sum(paid), n: paid.length, today: sum(today), todayN: today.length,
     review: all.filter(o => o.st === 'review').length, list: all.filter(o => o.st !== 'exp').slice(0, 60).map(({ busy, ...o }) => o) };
 }
-function payHook(req, res) {   // Stripe webhook: signature checked when a secret is set, and the session is re-read from Stripe anyway
-  const chunks = []; let n = 0;
-  req.on('data', c => { n += c.length; if (n > 200000) req.destroy(); else chunks.push(c); });
-  req.on('end', () => {
-    const raw = Buffer.concat(chunks).toString('utf8'), ok = PAY.verifyHook(raw, req.headers['stripe-signature']);
-    if (ok === false) { res.writeHead(400); return res.end('bad signature'); }
-    res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('OK');
-    let ev = {}; try { ev = JSON.parse(raw); } catch { return; }
-    const ob = ev.data?.object || {}, ref = String(ob.client_reference_id || ob.metadata?.ref || ''), o = payOrders[ref];
-    if (!o) return;
-    if (!o.sid && /^cs_/.test(ob.id || '')) o.sid = ob.id;
-    o.back = ev.type; gdirty();
-    if (/^checkout\.session\./.test(ev.type || '')) payVerify(ref, 'back');
-  });
-}
-setInterval(() => {   // re-check recent unpaid orders now and then (a postback can get lost)
-  if (!PAY.ON) return; const t = now();
-  for (const o of Object.values(payOrders)) if ((o.st === 'new' && o.sid || o.st === 'review') && t - o.t < 6 * 3600e3) payVerify(o.ref, 'timer');
-}, 3 * 60e3).unref?.();
-
 // ------------------------------------------------------------------ http
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
 const STATIC = new Map();
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
-  if (url === '/pay/stripe/hook' && req.method === 'POST') return payHook(req, res);
   if (url === '/ads.txt') { res.writeHead(ADS_CLIENT ? 200 : 404, { 'Content-Type': 'text/plain' }); return res.end(ADS_CLIENT ? `google.com, ${ADS_CLIENT.replace('ca-', '')}, DIRECT, f08c47fec0942fa0\n` : ''); }   // AdSense checks this file
   if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
   if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town

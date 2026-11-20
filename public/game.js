@@ -613,6 +613,7 @@ function handle(m) {
     case 'ledger': ledgerRes = m; if (panel?.kind === 'ledger') refreshPanel(true); break;
     case 'pay': payRes = m; if (panel?.kind === 'topup') refreshPanel(true); break;
     case 'payadmin': payAdm = m; if (panel?.kind === 'payadmin') refreshPanel(true); break;
+    case 'payqr': payOpenRef = m.ref; if (panel?.kind === 'topup') refreshPanel(true); else openPanel({ kind: 'topup' }); break;
     case 'payredir': toast('กำลังไปหน้าชำระเงิน…', '💳'); setTimeout(() => { location.href = m.url; }, 300); break;
     case 'godfind': godFindRes = m; if (panel?.kind === 'god') refreshPanel(true); break;
     case 'quiz': {                                  // classroom pop quiz
@@ -3356,7 +3357,7 @@ function socHead(k) {
   return `<div class="socHead"><b>📘 LifeBook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('💡 ไอเดีย', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 งาน', 'career', k === 'career')}</div>${sub}`;
 }
 function bindPanel(root) {
-  bindStocks(root); bindWall(root);
+  bindStocks(root); bindWall(root); bindPay(root);
   root.querySelectorAll('img.phZoom').forEach(i => { i.style.cursor = 'zoom-in'; i.onclick = () => zoomPic(i.src); });
   { const ti = root.querySelector('#tipIn'); if (ti) ti.oninput = () => { if (panel) panel.tip = Math.max(0, Math.min(500, Math.floor(+ti.value) || 0)); }; }   // keep the tip through panel redraws
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
@@ -3490,16 +3491,15 @@ const FN = {
   payPack(m) { paySel.pack = m.id; refreshPanel(true); },
   payMethod(m) { paySel.m = m.id; refreshPanel(true); },
   payBuy(m, root) {
-    const tel = root.querySelector('#payTel')?.value || '', bank = root.querySelector('#payBank')?.value || '';
     if (!root.querySelector('#payOk')?.checked) return toast('ติ๊กยืนยันก่อนชำระเงิน', '☑️');
-    if (payRes?.sb) toast('โหมดทดสอบ (Sandbox) ไม่ได้ตัดเงินจริง', '🧪');
-    try { localStorage.setItem('lt_paytel', tel); } catch { }
-    send({ t: 'pay', op: 'buy', pack: paySel.pack, m: paySel.m, tel, bank });
+    send({ t: 'pay', op: 'buy', pack: paySel.pack });
   },
+  payShow(m) { payOpenRef = m.ref; refreshPanel(true); },
+  payHide() { payOpenRef = ''; refreshPanel(true); },
   payCheck(m) { send({ t: 'pay', op: 'check', ref: m.ref }); },
   openPayAdmin() { payAdm = null; send({ t: 'god', op: 'payorders' }); openPanel({ kind: 'payadmin' }); },
   payVoid(m) { if (confirm(m.paid ? `ดึงของจากรายการ ${m.ref} คืน?\nใช้กับรายการทดสอบ/ที่คืนเงินแล้วเท่านั้น ผู้เล่นจะได้จดหมายแจ้ง` : `ยกเลิกรายการ ${m.ref}?`)) send({ t: 'god', op: 'payvoid', ref: m.ref }); },
-  payOk(m) { if (confirm(`เติมเพชรให้รายการ ${m.ref} ด้วยมือ?\nทำเฉพาะเมื่อเช็กในหน้า Stripe แล้วว่าได้รับเงินจริง`)) send({ t: 'god', op: 'payok', ref: m.ref }); },
+  payOk(m) { if (confirm(`เติมเพชรให้รายการ ${m.ref} ด้วยมือ?\nทำเฉพาะเมื่อเช็กในแอปธนาคารแล้วว่าเงินเข้าจริง`)) send({ t: 'god', op: 'payok', ref: m.ref }); },
   payRecheck(m) { send({ t: 'god', op: 'paycheck', ref: m.ref }); },
   openLedger() { ledgerRes = null; send({ t: 'ledger' }); openPanel({ kind: 'ledger' }); },
   godLedger(m) { ledgerRes = null; send({ t: 'god', op: 'ledger', login: m.login }); openPanel({ kind: 'ledger', admin: 1 }); },
@@ -3908,7 +3908,45 @@ function frameHtml(id, sz, fit = true) {
   return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz0}" data-ps="${ps}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
 }
 let godFindRes = null, ledgerRes = null, payRes = null, payAdm = null, payBackRef = '';
-const paySel = { pack: 'p100', m: 'mbank' };
+const paySel = { pack: 'p100', m: 'slip' };
+let payOpenRef = '';
+// 💎 PromptPay QR (draw) and slip QR (read): small libraries, loaded only when the top-up shop opens
+const libLoad = {};
+const loadLib = (k, src) => libLoad[k] || (libLoad[k] = new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = () => { delete libLoad[k]; no(new Error('load ' + k)); }; document.head.appendChild(sc); }));
+const QR_LIB = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js', JSQR_LIB = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+async function readSlipQR(file) {
+  const bmp = await createImageBitmap(file);
+  const tries = [1400, 900, 2000, 600];
+  if ('BarcodeDetector' in window) { try { const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bmp); if (r[0]?.rawValue) return r[0].rawValue; } catch { } }
+  await loadLib('jsqr', JSQR_LIB);
+  for (const mx of tries) {
+    const k = Math.min(1, mx / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const g = c.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+    const r = window.jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
+    if (r?.data) return r.data;
+  }
+  return '';
+}
+function bindPay(root) {
+  const cv = root.querySelector('#payQr');
+  if (cv && cv.dataset.qr) loadLib('qr', QR_LIB).then(() => {
+    const q = window.qrcode(0, 'M'); q.addData(cv.dataset.qr); q.make();
+    const n = q.getModuleCount(), cell = Math.max(4, Math.floor(260 / (n + 8))), sz = cell * (n + 8), g = cv.getContext('2d');
+    cv.width = cv.height = sz; g.fillStyle = '#fff'; g.fillRect(0, 0, sz, sz); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect((c + 4) * cell, (r + 4) * cell, cell, cell);
+    const sv = root.querySelector('#payQrSave'); if (sv) sv.onclick = () => { const a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = `promptpay-${cv.dataset.ref}.png`; a.click(); };
+  }).catch(() => { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'sub', textContent: 'โหลด QR ไม่สำเร็จ ลองปิดแล้วเปิดใหม่ หรือโอนเข้าพร้อมเพย์ตามเลขด้านล่าง' })); });
+  const f = root.querySelector('#paySlip'), pk = root.querySelector('#paySlipPick');
+  if (pk && f) pk.onclick = () => f.click();
+  if (f) f.onchange = async () => {
+    const file = f.files?.[0]; f.value = ''; if (!file) return;
+    toast('กำลังอ่านสลิป…', '📷');
+    let qr = ''; try { qr = await readSlipQR(file); } catch { }
+    if (!qr) return toast('หา QR บนสลิปไม่เจอ ใช้รูปสลิปเต็มใบที่บันทึกจากแอปธนาคาร (อย่าครอปจนตัด QR)', '📷', false);
+    send({ t: 'pay', op: 'slip', ref: f.dataset.ref, qr });
+  };
+}
 try { const q = new URLSearchParams(location.search); if (q.get('paid')) payBackRef = q.get('paid').replace(/\D/g, '').slice(0, 20); if (q.get('paid') || q.get('paycancel')) history.replaceState(null, '', location.pathname); } catch { }
 const PAY_ST = { new: ['⏳ รอชำระ', 'var(--muted,#999)'], paid: ['✅ สำเร็จ', 'var(--good)'], review: ['🔎 รอตรวจสอบ', '#e0913a'], exp: ['หมดอายุ', '#999'], void: ['↩️ ยกเลิกแล้ว', '#c9302c'] };
 // ✨ live previews of the paid items: the sparkly supporter title over your own character, and you in the angel / fairy outfit
@@ -3954,7 +3992,7 @@ function payBanner() {
 }
 function topupHtml() {
   const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
-  if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า STRIPE_SECRET_KEY ใน Fly.io ก่อน' : ''}</div>`;
+  if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า SLIP2GO_SECRET และ PROMPTPAY_ID ใน Fly.io ก่อน' : ''}</div>`;
   const avail = p => !(p.kind === 'outfit' && R.hasAngel);
   if (!R.packs.find(p => p.id === paySel.pack && avail(p))) paySel.pack = (R.packs.find(p => p.id === 'p100') || R.packs[0]).id;
   const pk = R.packs.find(p => p.id === paySel.pack);
@@ -3967,22 +4005,25 @@ function topupHtml() {
       : `<b style="font-size:18px">💎${p.gems}</b>${bon ? `<small style="color:var(--good)">+${bon} โบนัส</small>` : ''}`;
     return `<button class="item" ${ok ? '' : 'disabled'} style="display:block;text-align:center;${on ? 'border:3px solid #2fa34a;background:#e4ffd6;box-shadow:0 0 0 2px #2fa34a' : ''}" data-m='${JSON.stringify({ fn: 'payPack', id: p.id })}'>${on ? '<small style="color:#2fa34a;font-weight:800">✓ เลือกอยู่</small>' : ''}${head}<div style="font-weight:800">฿${p.thb}</div>${p.tag && !p.kind ? `<small class="tag">${p.tag}</small>` : ''}</button>`; };
   const special = R.packs.filter(p => p.kind), gems = R.packs.filter(p => !p.kind);
-  const meths = Object.keys(R.methods).length > 1 ? `<div class="secT">ช่องทางชำระเงิน</div><div class="grid2">${Object.entries(R.methods).map(([k, v]) => B(v.n, { fn: 'payMethod', id: k }, k === paySel.m ? 'good' : '')).join('')}</div>` : '';
-  let tel = ''; try { tel = localStorage.getItem('lt_paytel') || ''; } catch { }
-  const extra = paySel.m === 'truemoney' ? `<div class="rowf"><input id="payTel" inputmode="numeric" maxlength="10" placeholder="เบอร์ TrueMoney 10 หลัก" value="${esc(tel)}"></div>`
-    : paySel.m === 'mbank' ? `<div class="secT">🏦 จ่ายผ่านแอปธนาคาร</div><div class="rowf"><select id="payBank">${Object.entries(R.banks).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>` : '';
   const what = o => o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`;
   const my = (R.my || []).map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
-    return `<div class="item"><div class="nm">${what(o)} · ฿${o.thb}<small>${new Date(o.t).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · #${o.ref}</small></div><b style="color:${st[1]};white-space:nowrap">${st[0]}</b>${o.st === 'new' || o.st === 'review' ? B('🔄 ตรวจ', { fn: 'payCheck', ref: o.ref }) : ''}</div>`; }).join('');
+    return `<div class="item"><div class="nm">${what(o)} · ฿${o.thb}<small>${new Date(o.t).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · #${o.ref}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div><b style="color:${st[1]};white-space:nowrap">${st[0]}</b>${o.st === 'new' && o.qr && o.ref !== payOpenRef ? B('📷 ส่งสลิป', { fn: 'payShow', ref: o.ref }) : ''}</div>`; }).join('');
+  const op = (R.my || []).find(o => o.ref === payOpenRef && o.st === 'new' && o.qr);
+  const box = op ? `<div class="jobbox" style="text-align:center"><b>สแกนจ่าย ฿${op.thb} รับ ${what(op)}</b><br><small>#${op.ref}</small><br>
+      <canvas id="payQr" data-qr="${esc(op.qr)}" data-ref="${op.ref}" style="width:220px;height:220px;max-width:100%;background:#fff;margin:6px auto;display:block"></canvas>
+      <small>พร้อมเพย์ ${esc(R.pp || '')}${R.to ? ` · ชื่อบัญชี <b>${esc(R.to)}</b>` : ''}<br>ยอดต้องเป็น <b>฿${op.thb}</b> พอดี · ตรวจชื่อบัญชีก่อนกดโอน</small>
+      <div class="grid2" style="margin-top:6px"><button type="button" id="payQrSave">💾 บันทึกรูป QR</button>${B('✖ ปิด', { fn: 'payHide' })}</div>
+      <div class="sub" style="margin-top:8px">โอนเสร็จแล้ว ส่งรูปสลิปจากแอปธนาคาร ของจะเข้าทันทีเมื่อตรวจผ่าน</div>
+      <button type="button" class="primary big" id="paySlipPick">📷 อัปโหลดสลิป</button><input type="file" id="paySlip" data-ref="${op.ref}" accept="image/*" hidden></div>` : '';
   const got = pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first ? Math.round(pk.gems * R.bonus) : 0));
   return `<h2>💎 ร้านเติมเงิน</h2>${R.sb ? '<div class="jobbox">🧪 โหมดทดสอบ (Sandbox) ไม่ตัดเงินจริง</div>' : ''}
     <div class="sub">คุณมี 💎${(me?.gems || 0).toLocaleString()}${R.first ? ' · 🎉 เติมเพชรครั้งแรกรับโบนัส +' + Math.round(R.bonus * 100) + '%' : ''}</div>
     <div class="secT">✨ ของพิเศษ</div><div class="grid2">${special.map(card).join('')}</div>
     <div class="secT">💎 เพชร</div><div class="grid2">${gems.map(card).join('')}</div>
-    ${meths}${extra}<div class="sub" style="margin-top:6px">💳 จ่ายด้วยบัตรเครดิต/เดบิต หรือ PromptPay บนหน้าชำระเงินของ Stripe</div>
+    ${box}<div class="sub" style="margin-top:6px">📱 จ่ายด้วยการสแกน QR พร้อมเพย์จากแอปธนาคารไหนก็ได้ แล้วอัปโหลดสลิป</div>
     <label class="sub" style="display:flex;gap:6px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="payOk" style="width:auto"> <span>ฉันอายุ 18 ปีขึ้นไป หรือได้รับอนุญาตจากผู้ปกครองแล้ว และเข้าใจว่าของที่ซื้อเป็นไอเทมในเกม ไม่สามารถแลกคืนเป็นเงินได้</span></label>
-    ${B(`💳 ชำระ ฿${pk.thb} รับ ${got}`, { fn: 'payBuy' }, 'primary big')}
-    <small style="opacity:.75">ชำระผ่าน Stripe · ของเข้าอัตโนมัติหลังจ่ายสำเร็จ (ปกติไม่เกิน 1–2 นาที) · มีปัญหาแจ้งแอดมินพร้อมเลขรายการ</small>
+    ${B(`📱 ชำระ ฿${pk.thb} รับ ${got}`, { fn: 'payBuy' }, 'primary big')}
+    <small style="opacity:.75">ตรวจสลิปอัตโนมัติ · 1 สลิปใช้ได้ครั้งเดียว · ใช้ได้เฉพาะสลิปที่โอนหลังกดชำระ · มีปัญหาแจ้งแอดมินพร้อมเลขรายการ</small>
     ${my ? `<div class="secT">รายการของฉัน</div><div class="list">${my}</div>` : ''}`;
 }
 function payAdminHtml() {
@@ -3990,11 +4031,11 @@ function payAdminHtml() {
   if (!R) return `<h2>${back}💎 รายการเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   const rows = R.list.map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
     return `<div class="item" style="display:block"><div class="nm"><b>${esc(o.n || o.l)}</b> <span class="tag">${esc(o.l)}</span> · 💎${o.gems}${o.bonus ? '+' + o.bonus : ''} · <b>฿${o.thb}</b> ${o.sb ? '<span class="tag">🧪 ทดสอบ</span> ' : ''}<b style="color:${st[1]}">${st[0]}</b><small>#${o.ref} · ${esc(o.m)} · ${new Date(o.t).toLocaleString('th-TH')}${o.back ? ' · แจ้งล่าสุด ' + esc(o.back) : ''}${o.by ? ' · โดย ' + esc(o.by) : ''}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div>
-      ${o.st === 'paid' ? `<div class="grid2">${B('↩️ ดึงของคืน', { fn: 'payVoid', ref: o.ref, paid: 1 }, 'warn')}</div>` : o.st === 'void' ? `<div class="grid2">${B('✅ คืนของให้ (เงินเข้าจริง)', { fn: 'payOk', ref: o.ref }, 'warn')}</div>` : `<div class="grid2">${B('🔄 ตรวจกับ Stripe', { fn: 'payRecheck', ref: o.ref })}${B('✅ เติมให้ด้วยมือ', { fn: 'payOk', ref: o.ref }, 'warn')}${B('🗑️ ยกเลิกรายการ', { fn: 'payVoid', ref: o.ref })}</div>`}</div>`; }).join('');
+      ${o.st === 'paid' ? `<div class="grid2">${B('↩️ ดึงของคืน', { fn: 'payVoid', ref: o.ref, paid: 1 }, 'warn')}</div>` : o.st === 'void' ? `<div class="grid2">${B('✅ คืนของให้ (เงินเข้าจริง)', { fn: 'payOk', ref: o.ref }, 'warn')}</div>` : `<div class="grid2">${B('🔄 ตรวจสลิปอีกครั้ง', { fn: 'payRecheck', ref: o.ref })}${B('✅ เติมให้ด้วยมือ', { fn: 'payOk', ref: o.ref }, 'warn')}${B('🗑️ ยกเลิกรายการ', { fn: 'payVoid', ref: o.ref })}</div>`}</div>`; }).join('');
   return `<h2>${back}💎 รายการเติมเงิน</h2>
-    <div class="sub">${R.on ? (R.sb ? '🧪 โหมดทดสอบ (sk_test)' : '🟢 รับเงินจริง') : '🔴 ยังไม่ได้ตั้งค่า STRIPE_SECRET_KEY'} · Webhook: <code>${esc(R.base || '-')}/pay/stripe/hook</code> ${R.hook ? '✅' : '(ยังไม่ได้ตั้ง STRIPE_WEBHOOK_SECRET)'}</div>
+    <div class="sub">${R.on ? '🟢 เปิดรับเงิน' : '🔴 ปิดอยู่'} · พร้อมเพย์ ${esc(R.pp || '— (ตั้ง PROMPTPAY_ID)')} · ${R.to ? 'ชื่อ ' + esc(R.to) : 'ยังไม่ได้ตั้ง PAY_NAME'} · Slip2Go ${R.sk ? '✅' : '❌ (ตั้ง SLIP2GO_SECRET)'} · ${R.recv ? 'ตรวจชื่อผู้รับ ✅' : '⚠️ ยังไม่ได้ตั้ง SLIP_RECEIVER: ทุกสลิปต้องรอแอดมินกดยืนยัน'}</div>
     <div class="grid2"><div class="item"><div class="nm">วันนี้<small style="color:var(--good)">฿${R.today.toLocaleString()} (${R.todayN} รายการ)</small></div></div><div class="item"><div class="nm">รวมทั้งหมด<small style="color:var(--good)">฿${R.total.toLocaleString()} (${R.n} รายการ)</small></div></div></div>
-    ${R.review ? `<div class="jobbox">🔎 รอตรวจสอบ ${R.review} รายการ: เช็กยอดในหน้า Stripe ก่อนกดเติมด้วยมือ</div>` : ''}
+    ${R.review ? `<div class="jobbox">🔎 รอตรวจสอบ ${R.review} รายการ: เช็กว่าเงินเข้าในแอปธนาคารก่อนกดเติมด้วยมือ</div>` : ''}
     <div class="list">${rows || '<div class="sub">ยังไม่มีรายการ</div>'}</div>`;
 }
 function ledgerHtml(p) {
@@ -4229,6 +4270,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20c', d: '20 พ.ย. (รอบ 62)', items: [
+    '💎 <b>ร้านเติมเงินแบบใหม่</b> สแกน QR พร้อมเพย์จากแอปธนาคารไหนก็ได้ แล้วอัปโหลดสลิป ระบบตรวจสลิปให้อัตโนมัติ ของเข้าทันที',
+  ] },
   { v: '2026-11-20b', d: '20 พ.ย. (รอบ 61)', items: [
     '🖼️ <b>วอลเปเปอร์มือถือ</b> ใส่รูปของตัวเองได้ ปรับซูม เลื่อนซ้าย-ขวา ขึ้น-ลง และความมืดได้ หรือเลือกสีพื้นฐาน (แอปวอลเปเปอร์ในมือถือ)',
     '📱 จัดแอปในมือถือใหม่เป็นหมวด: ติดต่อ · เงินทอง · ชีวิตประจำวัน · รางวัล · อื่นๆ หาแอปง่ายขึ้น',
