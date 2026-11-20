@@ -1859,7 +1859,7 @@ function apply(a, career) {
   if (career === 'beggar' && a.money + (a.bank || 0) > 2000) return toast(a, `มีเงินเกิน ${money(2000)} (รวมเงินฝาก) เป็นขอทานไม่ได้แล้ว`, '🥣', false);
   const wait = jobCooldown(a);
   if (wait > 0) return toast(a, `เพิ่งเปลี่ยนงานไป ต้องรออีก ${Math.ceil(wait / 60000)} นาทีถึงจะสมัครงานใหม่ได้`, '⏳', false);
-  if (a.career === 'office') { a.xp.office = 0; a.office = null; }
+  if (a.career === 'office') a.office = null;   // quitting keeps the office level (being fired still resets it)
   if (a.career !== 'none' || (a.jobChanges || []).length) a.jobChanges = [...(a.jobChanges || []).filter(x => now() - x < 86400e3), now()];
   else a.jobChanges = [now() - 86400e3 + 1000];             // the very first job does not count against you
   if (a.career === 'rider' && career !== 'rider') riderBikeTake(a);
@@ -1887,7 +1887,7 @@ function apply(a, career) {
 function resign(a) {
   if (a.career === 'none') return;
   const c = D.CAREERS[a.career];
-  if (a.career === 'office') { a.xp.office = 0; a.office = null; }
+  if (a.career === 'office') a.office = null;   // quitting keeps the office level (being fired still resets it)
   if (a.career === 'rider') riderBikeTake(a);
   if (a.career === 'police') policeCarTake(a);
   standUp(a); a.career = 'none'; a.cast = null; markMe(a); sendRoster();
@@ -2224,7 +2224,7 @@ function act(a, m) {
       a.cook = null;
       const it = D.ITEMS[c.rid], left = Math.max(0, (c.until - now()) / c.limit), extra = Math.random() < 0.2 * tier(a, 'chef') + (left > .4 ? .25 : 0) ? 1 : 0;
       const tip = Math.round(it.base * .35 * left * jobPay(a));
-      addItem(a, c.rid, 1 + extra); addXp(a); quest(a, 'cook'); stat(a, 'cooked', 1 + extra); if (tip > 0) earn(a, tip); markMe(a);
+      addItem(a, c.rid, 1 + extra); quest(a, 'cook'); stat(a, 'cooked', 1 + extra); if (tip > 0) earn(a, tip); markMe(a);
       if (Math.random() < 0.02) infect(a, 'injury');
       send(a, { t: 'kfx', kind: 'serve' });
       return toast(a, `🛎️ เสิร์ฟ ${it.icon}${it.name} สำเร็จ! เหลือเวลา ${Math.round(left * 100)}%${extra ? ' · ทำไว ได้เพิ่มอีก 1 จาน!' : ''}${tip ? ` · ทิป ${money(tip)}` : ''}`, '🍳');
@@ -3304,6 +3304,9 @@ function misTick(a, t, dt) {
       const fd = Math.hypot(a.x - c.fx, a.y - c.fy); c.wait = fd > 9;
       if (fd > 1.4 && !c.wait) {                         // follow your footsteps (never through walls)
         while (m.trail.length > 1 && Math.hypot(m.trail[0][0] - c.fx, m.trail[0][1] - c.fy) < .3) m.trail.shift();
+        // cut corners: head for the newest footstep in clear view, so backtracking / overshooting the customer does not make them walk the detour too
+        const clear = (x0, y0, x1, y1) => { const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / .3); for (let i = 1; i <= n; i++) if (D.blocked(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false; return true; };
+        if (t > (c.losAt || 0)) { c.losAt = t + 400; for (let j = m.trail.length - 1; j > 0; j--) if (Math.hypot(m.trail[j][0] - c.fx, m.trail[j][1] - c.fy) < 12 && clear(c.fx, c.fy, m.trail[j][0], m.trail[j][1])) { m.trail.splice(0, j); break; } }
         const tgt = m.trail[0] || [a.x, a.y];
         const dx = tgt[0] - c.fx, dy = tgt[1] - c.fy, l = Math.hypot(dx, dy) || 1, st = Math.min(l, 2.5 * dt);
         c.fx += dx / l * st; c.fy += dy / l * st;

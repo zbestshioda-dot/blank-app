@@ -1387,6 +1387,7 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 #godBtn{bottom:216px!important}
 #emoPick{right:calc(80px + env(safe-area-inset-right))!important;bottom:calc(150px + env(safe-area-inset-bottom))!important}
 #begBtn,#mgBtn{right:104px!important;bottom:194px!important}   /* their old spot is the emoji button's now */
+#homeBtn{right:104px!important;bottom:136px!important}   /* the emoji button took its old spot; this is the ride button's spot (no riding indoors) */
 /* phone wallpaper: a layer behind the home screen (preset colour or the player's picture), and its settings page */
 .phScr.home{isolation:isolate}
 .phWall{position:absolute;inset:0;z-index:-1;pointer-events:none}

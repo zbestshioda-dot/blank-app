@@ -283,17 +283,27 @@ function sheetHasHair(sheet) {
 const HAIR_HAT = { farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
 function hairFix(fr, outfit, step, gender, lk) {
   const sh = outfit.slice(0, -1).replace(/^f(?=[a-z]{3})/, m => CH_ATLAS.rows[outfit.slice(1) + 'down0'] !== undefined ? '' : m);
-  if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh] || sheetHasHair(outfit)) return fr;
+  if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh]) return fr;
+  const own = sheetHasHair(outfit);   // the sheet has its own hair layer (already dyed): only fix painted hair sticking out of it
   const y0 = HAIR_HAT[sh] ? FEM_HAT : 0;
   const key = `H|${outfit}|${step}|${gender}|${lk.hair}|${lk.shirt}|${lk.pants}`; let c = chGet(key); if (c) return c;
   const { w, h, rows } = CH_ATLAS, base = (gender === 'f' && rows['f:' + step] !== undefined ? 'f:' : '') + step;
-  const m = HAIR_MASK[base] || (HAIR_MASK[base] = charLayer(base, 3, 'hair', { hair: '#ffffff' }).getContext('2d').getImageData(0, 0, w, h).data);
+  const mk = own ? outfit + step : base, m = HAIR_MASK[mk] || (HAIR_MASK[mk] = charLayer(mk, 3, 'hair', { hair: '#ffffff' }).getContext('2d').getImageData(0, 0, w, h).data);
   c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d', { willReadFrequently: true }); t.drawImage(fr, 0, 0);
   const im = t.getImageData(0, 0, w, h), d = im.data, hx = lookColor('hair', lk.hair), C = [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+  const isHair = i => { const r = d[i], gg = d[i + 1], b = d[i + 2]; return d[i + 3] && !(Math.max(r, gg, b) > 135 || r + 8 < gg || gg + 8 < b || r - b > 120); };   // not hair: hats, halos, skin, coloured caps
+  // the sheet's own hairdo can reach past the base hair area (buns, ponytails, wavy hair): grow the area along connected
+  // hair-coloured pixels (a few px at most), so one head never ends up with two colours
+  const sel = new Uint8Array(w * h), q = [];
+  for (let p = y0 * w; p < w * h; p++) if (m[p * 4 + 3] && (own || isHair(p * 4))) { sel[p] = own ? 2 : 1; q.push(p, 0); }   // 2 = dyed already, leave as is
+  for (let k = 0; k < q.length; k += 2) {
+    const p = q[k], dep = q[k + 1]; if (dep >= 10) continue;
+    const x = p % w, y = (p / w) | 0;
+    for (const n of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > y0 ? p - w : -1, y < FEM_NECK ? p + w : -1]) if (n >= 0 && !sel[n] && isHair(n * 4)) { sel[n] = 1; q.push(n, dep + 1); }
+  }
   for (let i = y0 * w * 4; i < d.length; i += 4) {
-    if (!m[i + 3] || !d[i + 3]) continue;
+    if (sel[i >> 2] !== 1) continue;
     const r = d[i], gg = d[i + 1], b = d[i + 2];
-    if (Math.max(r, gg, b) > 135 || r + 8 < gg || gg + 8 < b || r - b > 120) continue;   // not hair: hats, halos, skin, coloured caps
     const v = Math.min(255, Math.round((r * 2 + gg * 3 + b * 4) / 9 * 255 / 70));
     d[i] = v * C[0] / 255 | 0; d[i + 1] = v * C[1] / 255 | 0; d[i + 2] = v * C[2] / 255 | 0;
   }
@@ -1338,6 +1348,7 @@ function onAction() {
     if (me.cast.state === 'fight') return fightPress();
     return strike();
   }
+  if (near.type === 'note') return dialog({ name: near.label, face: null, lines: [near.text], choices: [{ label: '👌 โอเค', fn: dialogClose }] });   // a plain readable sign
   if (near.type === 'wish' || near.type === 'secret') { if (t < actCd) return; actCd = t + 900; return doAct(near.id, near.type === 'wish' ? 'toss' : 'read'); }
   if (panel?.st === near.id) { closePanel(); return; }
   if (dlgQ) { dlgTap(); return; }
@@ -1584,7 +1595,7 @@ function draw(t) {
     const px = s.x * TS + X, py = s.y * TS + Y;
     if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
     const isNear = near && near.id === s.id;
-    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret)$/.test(s.type) && !isNear) continue;
+    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note)$/.test(s.type) && !isNear) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
@@ -4498,6 +4509,14 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-22c', d: '22 พ.ย.', items: [
+    '☂️ ร้านสะดวกซื้อมีร่มขายแล้ว ซื้อได้ทุกเวลา (ลุงชัยยังมาขายตอนฝนตกเหมือนเดิม)',
+    '🍳 ทำอาหารที่ครัวใหญ่ไม่บวก EXP อาชีพอื่นแล้ว (ได้อาหาร + ทิปเหมือนเดิม)',
+    '💼 ลาออกจากพนักงานบริษัทเอง เลเวลไม่หายแล้ว (ถ้าโดนไล่ออกยังเริ่มใหม่)',
+    '🧑‍🤝‍🧑 ภารกิจพาลูกค้า: ลูกค้าเดินลัดตามเรา ไม่เดินย้อนกลับไปทางเก่าแล้ว',
+    '💇 ย้อมผมติดทั้งหัว ไม่เหลือ 2 สี (ชุดจีน ชุดเซิร์ฟ ฯลฯ)',
+    '🪧 ป้ายทางเข้าหมู่บ้านจัดสรรกดอ่านได้แล้ว · 🛋️ ปุ่มจัดบ้านไม่ซ้อนปุ่มอิโมจิแล้ว',
+  ]},
   { v: '2026-11-22b', d: '22 พ.ย.', items: [
     '🔮 แม่หมอจันทรามายืนหน้าเต็นท์แล้ว (เดิมโดนเต็นท์บังมองไม่เห็น)',
     '🃏 หน้าดูดวงใหม่: เลือกไพ่คว่ำ 3 ใบ (การเงิน/การงาน/ความรัก) แล้วไพ่พลิกเปิดพร้อมคำทำนาย',

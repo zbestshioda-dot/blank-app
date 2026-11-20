@@ -206,6 +206,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   STATIONS.push({ id: 'gate_farm', type: 'gate', to: 'farm_in', label: 'ไปไร่ชานเมือง', icon: '🌾', x: 3, y: 32, r: 1.6, area: 'town', renov: true });   // the farm is closed for renovation
   STATIONS.push({ id: 'gate_housing', type: 'gate', to: 'housing_in', label: 'ไปหมู่บ้านจัดสรร', icon: '🏘️', x: 50, y: 5, r: 1.6, area: 'town' });
   prop('sign_walk', 4.6, 30.3); prop('signpost', 52.8, 7.4);
+  STATIONS.push({ id: 'note_housing', type: 'note', label: 'ป้ายบอกทาง', icon: '🪧', x: 52.8, y: 7.55, r: .9, area: 'town', text: '⬆️ ทางนี้ไปหมู่บ้านจัดสรร 🏘️ ยินดีต้อนรับจ้า' });   // looks like the secret signs, so it reads too
   // the town wall along the north edge, with the wooden town gate standing open over the road to the housing estate
   fenceRow('wall_stone', 1, 47.27, 5.95); fenceRow('wall_stone', 52.73, 97, 5.95);
   prop('gate_wood_l', 48.13, 5.95); prop('gate_wood_r', 51.87, 5.95);
@@ -808,7 +809,7 @@ const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeM
 const PSHOP = { items: ['popcorn', 'cottoncandy', 'icecream', 'soda', 'hotdog', 'balloon', 'parkplush'], markup: 1 };   // the amusement park's snack bar & souvenirs
 const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', 'namlamyai', 'water'], markup: 1 };
 const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
-const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit'], markup: 1.35 };
+const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit', 'umbrella'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
