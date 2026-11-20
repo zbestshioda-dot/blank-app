@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const D = require('./data');
+const BALL = require('./ball');                 // the football on the pitch map
 const store = require('./store');
 const Q = require('./quests');
 
@@ -522,7 +523,7 @@ const PICKUP = ST.restaurant;                      // the restaurant counter (in
 const RESTO_OUT = D.ROOMS.find(r => r.bld === 'restaurant').outside;
 function deliveryFee(x, y) {
   let area = D.areaAt(x, y)?.id || 'town'; if (area.startsWith('yard')) area = 'housing';   // a home yard is reached through the estate street
-  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
+  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : area === 'pitch' ? D.GATES.town_from_pitch : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
   const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' ? 25 : 0);
   return Math.round(D.RIDER.baseFee + d * D.RIDER.perTile);
 }
@@ -833,7 +834,9 @@ function act(a, m) {
       const g = D.GATES[s.to]; if (!g) return;
       if (s.renov && !(isAdmin(a) && a.god?.doors)) return toast(a, 'ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
       if (!cd(a, 'door', 1200, true)) return;
-      return teleport(a, g.x, g.y);
+      teleport(a, g.x, g.y);
+      if (s.to === 'pitch_in') send(a, BALL.msg());     // show the ball straight away
+      return;
     }
     case 'seat.sit': {
       for (const o of online.values()) if (o !== a && o.seat === s.id) return toast(a, 'ที่นั่งนี้มีคนนั่งแล้ว', '🪑', false);
@@ -2532,7 +2535,7 @@ function login(ws, m) {
   dirty = true;
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
-    t: 'init', id: a.id,
+    t: 'init', id: a.id, pitch: D.PITCH_FIELD, ball: BALL.msg(),
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: chatLog.filter(m => !(m.id < 0)).slice(-25), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
@@ -2661,6 +2664,11 @@ function onMessage(ws, raw) {
   if (!a || a.ws !== ws) return;
   switch (m.t) {
     case 'p': return move(a, m);
+    case 'kick': {                          // football: kick the ball in front of you (power 0 = a pass, 1 = a full shot)
+      if (areaId(a) !== 'pitch' || a.down || riding(a) || !cd(a, 'kick', 300, true)) return;
+      BALL.kick(a, m.p, now());
+      return;
+    }
     case 'chat': {                          // local chat: only people near you see it (bubble over your head)
       const text = cleanText(m.text, 120); if (!text) return;
       if (isAdmin(a) && /^all(\s|$)/i.test(text)) {   // admin: "all <text>" replaces the ticker notice for everyone, "all" alone restores the CBT notice
@@ -3088,6 +3096,20 @@ function tick() {
   for (const [id, r] of reqs) if (t > r.exp) { reqs.delete(id); toast(r.from, r.kind === 'call' ? `${r.to.name} ไม่รับสาย` : `${r.to.name} ไม่ตอบรับ`, '⌛', false); }
   // bank interest
   if (slow && t % 30000 < 1000) for (const a of online.values()) if (a.bank > 0 || a.loan > 0) { accrue(a); markMe(a); }
+
+  // the football: stepped here, and its state sent to whoever is on the pitch
+  {
+    const onPitch = [...online.values()].filter(a => areaId(a) === 'pitch');
+    const res = BALL.tick(t, dt, onPitch.filter(a => !a.down && !hidden(a) && !riding(a)));
+    for (const e of res.evs) if (e.k === 'goal') {
+      feed(`⚽ ${e.by || 'ใครสักคน'} ยิงประตูที่สนามฟุตบอล!`);
+      for (const a of onPitch) toast(a, `GOAL! ⚽ ${e.by || ''} ยิงเข้า!`, '🥅');
+    }
+    if (onPitch.length && (res.send || res.evs.length)) {
+      const mm = JSON.stringify(BALL.msg()), ee = res.evs.length ? JSON.stringify({ t: 'ballev', evs: res.evs }) : null;
+      for (const a of onPitch) if (a.ws.readyState === 1) { a.ws.send(mm); if (ee) a.ws.send(ee); }
+    }
+  }
 
   // positions
   const ps = [];
