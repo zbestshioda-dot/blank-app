@@ -1971,17 +1971,16 @@ function act(a, m) {
       if (m.id && !(a.balloons || []).includes(m.id)) return;
       a.balloon = m.id || ''; markMe(a); sendRoster(); return;
     }
-    // ---------------- 🔮 fortune teller's tent: pay a few coins, draw 3 tarot cards (past / present / future)
+    // ---------------- 🔮 fortune teller's tent: pick a topic (money / work / love), pay a few coins, draw one tarot card, once a day
     case 'fortune.read': {
-      const F = D.FORTUNE, d = dayKey(); let f = a.fortune; if (!f || f.d !== d) f = a.fortune = { d, n: 0, bonus: 0, last: f?.last || null };
+      const F = D.FORTUNE, d = dayKey(), topic = String(m.topic || '');
+      if (!F.topics[topic]) return;
+      if (a.fortune?.d === d) return toast(a, 'วันนี้คุณดูดวงไปแล้ว พรุ่งนี้มาใหม่นะ', '🔮', false);
       if (!cd(a, 'fortune', 1500, true)) return;
-      if (f.n >= F.perDay) return toast(a, `วันนี้ดูดวงครบ ${F.perDay} ครั้งแล้ว ไพ่ขอพักก่อน พรุ่งนี้มาใหม่นะ`, '🔮', false);
       if (!pay(a, F.price)) return;
-      const ids = Object.keys(D.TAROT).sort(() => Math.random() - .5).slice(0, 3);
-      const cards = ids.map(id => ({ id, r: Math.random() < .35 ? 1 : 0 }));   // r = reversed
-      const good = cards.every(c => D.TAROT[c.id][c.r ? 'rev' : 'up'][1] > 0);
-      f.n++; f.last = cards; f.good = good ? 1 : 0; f.paid = 0;
-      if (good && !f.bonus) { f.bonus = 1; f.paid = F.bonus; a.money += F.bonus; a.earned = (a.earned || 0) + F.bonus; joy(a, 6); feed(`🔮✨ ${a.name} เปิดไพ่ยิปซีได้ดวงดีทั้ง 3 ใบ!`); }
+      const id = pick(Object.keys(D.TAROT)), r = Math.random() < .35 ? 1 : 0, good = D.TAROT[id].s[r] > 0;
+      a.fortune = { d, topic, id, r, good: good ? 1 : 0, paid: good ? F.bonus : 0 };
+      if (good) { a.money += F.bonus; a.earned = (a.earned || 0) + F.bonus; joy(a, 6); }
       stat(a, 'tarot'); markMe(a); FX0(a, 'pick');
       return;
     }
@@ -3844,7 +3843,7 @@ function meView(a) {
     t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * wwSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
-    bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], fortune: a.fortune ? (a.fortune.d === dayKey() ? a.fortune : { last: a.fortune.last, n: 0 }) : null, balloon: a.balloon || '',
+    bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], fortune: a.fortune?.d === dayKey() ? a.fortune : null, balloon: a.balloon || '',
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
