@@ -392,6 +392,7 @@ function credit(o, amount) {          // pay someone who may be offline
 const gangs = new Map();   // id -> gang; saved inside the __meta record
 let gangSeq = 1;
 const GANG = {
+  rename: 300,   // 💎 to rename a gang (boss only)
   create: 20000, dayCap: 300, perPt: 40, msnPer: 150, msnPay: 800, msnBank: 500, restMs: 30 * 60e3,
   icons: ['🐉', '🦅', '🌸', '⚡', '🔥', '🐯', '🐺', '🦈', '🌙', '👑'],
   colors: ['#e0584a', '#e8913a', '#e8c83a', '#5cb85c', '#3aa6c9', '#5b6fd8', '#a65bd8', '#e86fa6'],
@@ -468,6 +469,19 @@ function gangOp(a, m) {
   }
   const g = gangOf(a); if (!g) return toast(a, 'คุณยังไม่มีแก๊ง', '🏴', false);
   const role = g.mem[me].r, staff = role !== 'mem', tl = String(m.l || '').toLowerCase(), tm = g.mem[tl], to = accounts.get(tl);
+  if (op === 'rename') {                   // the boss renames the gang for 💎300
+    if (role !== 'boss') return toast(a, 'เฉพาะหัวหน้าแก๊งเปลี่ยนชื่อได้', '🏴', false);
+    const name = String(m.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+    if (name.length < 2) return toast(a, 'ตั้งชื่อแก๊งอย่างน้อย 2 ตัวอักษร', '🏴', false);
+    if (name === g.name) return toast(a, 'ชื่อนี้คือชื่อเดิมของแก๊ง', '🏴', false);
+    if (impersonates(name) || [...gangs.values()].some(o => o !== g && nameKey(o.name) === nameKey(name))) return toast(a, 'ชื่อนี้ใช้ไม่ได้หรือมีคนใช้แล้ว', '🏴', false);
+    const cost = GANG.rename; if (!godInf(a) && (a.gems || 0) < cost) return toast(a, `เพชรไม่พอ เปลี่ยนชื่อแก๊งใช้ 💎${cost} (มี 💎${a.gems || 0})`, '💎', false);
+    if (!godInf(a)) a.gems -= cost;
+    const old = g.name; g.name = name; gdirty(); markMe(a);
+    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (o?.ws) { toast(o, `แก๊ง ${old} เปลี่ยนชื่อเป็น ${g.icon} ${name}`, '🏴'); markMe(o); } }
+    feed(`🏴 แก๊ง ${old} เปลี่ยนชื่อเป็น ${g.icon} ${name}`);
+    return gangList(a);
+  }
   if (op === 'accept' || op === 'deny') {
     if (!staff) return toast(a, 'เฉพาะหัวหน้า/รองหัวหน้า', '🏴', false);
     const i = g.req.findIndex(r => r.l === tl); if (i < 0) return;
@@ -3941,7 +3955,7 @@ function onMessage0(ws, raw) {
       feed(`✏️ ${old} เปลี่ยนชื่อเป็น ${nm}`);
       return toast(a, `เปลี่ยนชื่อเป็น "${nm}" แล้ว · ใช้ 💎${cost}`, '✏️');
     }
-    case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband'].includes(m.op)) sendRoster(); return; }
+    case 'gang': { if (a.down) return; if (!cd(a, 'gang', 300, true)) return; gangOp(a, m); if (['create', 'accept', 'leave', 'kick', 'disband', 'rename'].includes(m.op)) sendRoster(); return; }
     case 'visit': { if (a.down) return; const o = byPhone.get(String(m.p || '')); if (!o || !o.ws || !o.hown || hidden(o)) return toast(a, 'เพื่อนคนนี้ไม่ได้ออนไลน์อยู่ หรือยังไม่มีบ้าน', '🏡', false); return goHome(a, o); }
     case 'morder': { if (!cd(a, 'morder', 1500, true)) return; return placeMarketOrder(a, m); }
     case 'mailclaim': return mailClaim(a, m.id);
