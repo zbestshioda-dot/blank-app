@@ -202,6 +202,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   STATIONS.push({ id: 'pier_s1', type: 'fishspot', pool: 'sea', label: 'สะพานปลา (ทะเล)', icon: '🎣', x: 105, y: 61, r: 1.8, area: 'town' });
   STATIONS.push({ id: 'pier_s2', type: 'fishspot', pool: 'sea', label: 'ริมหาด (ทะเล)', icon: '🎣', x: 101.2, y: 38, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'pier_p', type: 'fishspot', pool: 'lake', label: 'บ่อตกปลา', icon: '🎣', x: 80, y: 49.2, r: 1.6, area: 'town' });
+  STATIONS.push({ id: 'balloon', type: 'balloon', label: 'ร้านลูกโป่ง', icon: '🎈', x: 51.5, y: 37.5, r: 1.4, area: 'town' });   // a balloon seller by the fountain
   STATIONS.push({ id: 'guide', type: 'guide', label: 'จุดแนะนำเมือง', icon: '💁', x: 54.5, y: 35.2, r: 1.4, area: 'town' });   // the town guide by the fountain (talking is all on the client)
   STATIONS.push({ id: 'gate_farm', type: 'gate', to: 'farm_in', label: 'ไปไร่ชานเมือง', icon: '🌾', x: 3, y: 32, r: 1.6, area: 'town', renov: true });   // the farm is closed for renovation
   STATIONS.push({ id: 'gate_housing', type: 'gate', to: 'housing_in', label: 'ไปหมู่บ้านจัดสรร', icon: '🏘️', x: 50, y: 5, r: 1.6, area: 'town' });
@@ -813,6 +814,14 @@ const ICU = { pay: [55, 62, 70, 80, 90, 104, 120], next: 45000, energy: 6,
   patients: ['คุณสมชาย (หัวใจหยุดเต้น)', 'ป้าบุญมี (หมดสติกลางตลาด)', 'น้องปิ่น (อุบัติเหตุจักรยาน)', 'ลุงเหม (ไส้ติ่งแตก)', 'พี่ก้อง (ถูกรถชน)', 'คุณยายทองคำ (หัวใจวาย)', 'หนุ่มนักวิ่ง (ล้มหมดสติ)', 'ช่างไฟ (ไฟดูด)'] };   // above office: needs a degree + licence
 // lost-dog cases for police: find the dog before the time runs out; pay = base + perMin x the minutes the search took (x a speed bonus when found early)
 // job mini-games, played on the client and paid by the server: score is capped by max and by how long the game ran (rate per second)
+// 🎈 balloons: buy once, hold one in your hand (shown to everyone); shape 'h' = heart, 's' = star
+const BALLOONS = {
+  red: { name: 'ลูกโป่งแดง', c: '#ff4d5e', price: 80 }, blue: { name: 'ลูกโป่งฟ้า', c: '#4da6ff', price: 80 }, yellow: { name: 'ลูกโป่งเหลือง', c: '#ffd23a', price: 80 },
+  green: { name: 'ลูกโป่งเขียว', c: '#5ad15a', price: 80 }, pink: { name: 'ลูกโป่งชมพู', c: '#ff8ad0', price: 100 }, purple: { name: 'ลูกโป่งม่วง', c: '#a77bff', price: 100 },
+  white: { name: 'ลูกโป่งขาว', c: '#f4f4f4', price: 120 }, black: { name: 'ลูกโป่งดำ', c: '#3a3a44', price: 150 },
+  heart: { name: 'ลูกโป่งหัวใจ', c: '#ff3a6a', price: 400, sh: 'h' }, star: { name: 'ลูกโป่งดาว', c: '#ffc21a', price: 400, sh: 's' },
+  gold: { name: 'ลูกโป่งทองคำ', c: '#e8b830', price: 0, gems: 5, sh: 's' },
+};
 const JOBGAMES = {
   spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 25, min: 10, max: 5, per: 8, rate: .5 },
   shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 25, min: 20, max: 30, per: 1.4, rate: 1.6 },
@@ -1645,7 +1654,7 @@ const FORTUNES = [
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
-module.exports = { QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

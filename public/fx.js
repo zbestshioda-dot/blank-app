@@ -73,9 +73,9 @@ window.FX = (() => {
     },
     levelup() { [N.C5, N.E5, N.G5, N.C6].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.18, at: i * 0.09 })); tone(N.E6, 0.6, { vol: 0.1, at: 0.36 }); },
     chime() { [N.G5, N.C6, N.E6].forEach((f, i) => tone(f, 0.7, { vol: 0.14, at: i * 0.08, attack: 0.01 })); },
-    bell() {   // big temple bell: low gong with slow-beating partials and a long tail
-      [[98, .3], [196.5, .16], [262, .1], [331, .07], [494, .04]].forEach(([f, v]) => { tone(f, 4.2, { vol: v, attack: 0.004 }); tone(f * 1.006, 3.6, { vol: v * .5, attack: 0.004 }); });
-      noise(0.08, { filter: 'lowpass', freq: 900, vol: 0.18 });
+    bell(k = 1) {   // big temple bell: low gong with slow-beating partials and a long tail (k: loudness, <1 = far away)
+      [[98, .3], [196.5, .16], [262, .1], [331, .07], [494, .04]].forEach(([f, v]) => { tone(f, 4.2, { vol: v * k, attack: 0.004 }); tone(f * 1.006, 3.6, { vol: v * .5 * k, attack: 0.004 }); });
+      noise(0.08, { filter: 'lowpass', freq: 900, vol: 0.18 * k });
     },
     pray() { [N.C5, N.G5].forEach((f, i) => tone(f, 1.6, { vol: 0.1, at: i * 0.25, attack: 0.05 })); },
     ding() { tone(N.C6, 0.25, { vol: 0.18 }); tone(N.E6, 0.45, { vol: 0.16, at: 0.12 }); },

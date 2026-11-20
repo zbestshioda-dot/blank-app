@@ -174,6 +174,7 @@ function enterRoom(a, m) {
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 1.2) return toast(a, 'เดินไปที่ประตูก่อน', '🚪', false);
   const master = isAdmin(a) && a.god?.doors;              // god mode: every door opens
   if (s.renov && !master) return toast(a, `${s.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
+  if (ww) return toast(a, '🌕 คืนหมาป่า: ประตูทุกบานปิดตาย! อยู่ข้างนอกแล้ววิ่งหนีให้รอด', '🐺', false);
   if (znAlive(a) || zn?.ph === 'warn') return toast(a, 'ประตูถูกปิดตาย! ข้างในมีซอมบี้ อยู่นอกอาคารแล้วหนีให้รอด', '🧟', false);
   const riderIn = s.bld === 'restaurant' && [...orders.values()].some(o => o.rider === a && o.state === 'taken');   // a rider with food to collect may slip in the back door
   if (s.house === undefined && !buildingOpen(s.bld) && !master && !riderIn) {
@@ -857,6 +858,109 @@ function znTick() {
   if (t % 5000 < 250) znSendAll();
 }
 setInterval(() => { try { if (online.size || zn) znTick(); } catch (e) { console.error('znTick', e); } }, 250).unref?.();
+// ------------------------------------------------------------------ 🐺 WEREWOLF NIGHT: on the full-moon night (Bangkok) at 21:00
+// one random player in town turns into the werewolf and hunts the others. A werewolf that stops moving for 3 s loses the curse:
+// someone else turns. Survivors at dawn get the full prize; if the wolves eat everyone, the pot is shared (the first wolf, the host, gets most).
+const WW = { hour: 21, warn: 30e3, dur: 4 * 60e3, afk: 3000, grace: 4000, speed: 1.25, bite: .95, prize: { money: 3000, gems: 3 }, perHead: 1500, perKill: 400, min: 2 };
+let ww = null, wwDone = '', wwAnnounced = '';
+const SYN = 29.530588853, NM0 = Date.UTC(2000, 0, 6, 18, 14);
+const fullMoonAt = t => Math.abs(((t - NM0) / 864e5) % SYN - SYN / 2) <= .5;   // within half a day of the full moon
+const wwOn = () => ww?.ph === 'on';
+const wwWolf = a => wwOn() && ww.wolf === a.id;
+const wwAlive = a => wwOn() && ww.alive.has(a.id);
+function wwState(a) {
+  if (!ww) return { t: 'ww', ph: 'off' };
+  const w = online.get(ww.wolf);
+  return { t: 'ww', ph: ww.ph, end: ww.ph === 'warn' ? ww.t0 : ww.end, alive: ww.alive?.size || 0, wolf: ww.wolf || 0, wname: w?.name || '', host: ww.host || 0,
+    me: ww.ph !== 'on' ? '' : ww.wolf === a.id ? 'wolf' : ww.alive.has(a.id) ? 'alive' : ww.dead.has(a.id) ? 'dead' : 'out' };
+}
+function wwSendAll() { for (const o of online.values()) send(o, wwState(o)); }
+function wwStart(t, test) {
+  if (zn) return;
+  ww = { ph: 'warn', t0: t + (test ? 10e3 : WW.warn), alive: new Set(), dead: new Set(), kills: new Map(), test, n: 0 };
+  if (!test) wwDone = dayKey();
+  feed('🌕🐺 คืนจันทร์เต็มดวง! ใครสักคนในเมืองกำลังจะกลายเป็นหมาป่า... ออกมาข้างนอกให้หมด');
+  for (const o of online.values()) toast(o, `🌕 คืนจันทร์เต็มดวง! อีก ${Math.round((ww.t0 - t) / 1000)} วินาที จะมีคนกลายเป็นหมาป่า ทุกคนจะถูกพาออกมาในเมือง`, '🐺', false);
+  wwSendAll();
+}
+// everyone taking part is brought out into town: from a building to its door, from other maps to the town spawn
+function wwBringOut(a) {
+  if (a.fun) rideOff(a);
+  const r = D.roomAt(a.x, a.y);
+  if (r?.outside && D.areaAt(r.outside.x, r.outside.y)?.id === 'town') return teleport(a, r.outside.x, r.outside.y);
+  if (areaId(a) !== 'town') { const p = standNear('town', D.SPAWN.x + rnd(-2, 2), D.SPAWN.y + rnd(-1, 2)) || [D.SPAWN.x, D.SPAWN.y]; teleport(a, p[0], p[1]); }
+}
+function wwPickWolf(t, not) {
+  const c = [...ww.alive].map(id => online.get(id)).filter(o => o && o.id !== not && areaId(o) === 'town' && !o.down);
+  if (!c.length) return false;
+  const w = pick(c); ww.alive.delete(w.id); ww.wolf = w.id; ww.since = t; ww.lastSeen = t; ww.wx = w.x; ww.wy = w.y;
+  if (!ww.host) ww.host = w.id;
+  if (!ww.kills.has(w.id)) ww.kills.set(w.id, 0);
+  markMe(w); sendRoster();
+  send(w, { t: 'wwturn' });
+  for (const o of online.values()) if (o !== w) toast(o, `🐺 ${w.name} กลายเป็นหมาป่าแล้ว! วิ่งหนีเร็ว!`, '🐺', false);
+  wwSendAll(); return true;
+}
+function wwRelease(t, why) {   // the wolf is human again (back among the survivors), someone else turns
+  const old = online.get(ww.wolf), id = ww.wolf; ww.wolf = 0;
+  if (old && !ww.dead.has(old.id)) { ww.alive.add(old.id); markMe(old); toast(old, why === 'afk' ? '😮‍💨 คุณยืนนิ่งเกิน 3 วินาที คำสาปหมาป่าหลุดไปหาคนอื่นแล้ว! ตอนนี้คุณเป็นคนธรรมดา วิ่งหนีด้วย!' : '🐺 คำสาปหมาป่าหลุดไปหาคนอื่นแล้ว', '🌕', false); }
+  if (!wwPickWolf(t, id) && old && online.has(id)) { ww.alive.delete(id); ww.wolf = id; ww.since = t; ww.lastSeen = t; markMe(old); }
+  sendRoster();
+}
+function wwEat(w, o) {
+  ww.alive.delete(o.id); ww.dead.add(o.id); ww.kills.set(w.id, (ww.kills.get(w.id) || 0) + 1);
+  const s = ST.square, p = standNear('town', s.x + rnd(-2, 2), s.y + rnd(1, 3)) || [D.SPAWN.x, D.SPAWN.y]; teleport(o, p[0], p[1]);
+  send(o, { t: 'wwdie', by: w.name }); send(w, { t: 'mfx', kind: 'catch' });
+  feed(`🐺 หมาป่า ${w.name} ขย้ำ ${o.name}! เหลือผู้รอด ${ww.alive.size} คน`);
+  wwSendAll();
+}
+function wwEnd() {
+  const was = ww; ww = null; sendRoster();
+  const alive = [...was.alive].map(id => online.get(id)).filter(Boolean), wolves = [...was.kills.entries()].map(([id, k]) => [online.get(id), k]).filter(([o]) => o);
+  if (!was.n) { for (const o of online.values()) send(o, { t: 'ww', ph: 'off' }); return; }
+  let txt;
+  if (alive.length) {
+    for (const a of alive) { sysMail(a, `🌅 คุณรอดจากคืนจันทร์เต็มดวง!\n\nหมาป่าตามล่าทั้งคืน แต่คุณวิ่งหนีจนฟ้าสาง ทางเมืองมอบรางวัลผู้รอดชีวิตให้เต็มจำนวน`, { ...WW.prize }); joy(a, 8); stat(a, 'wwsurvive'); }
+    for (const [o, k] of wolves) if (k) sysMail(o, `🐺 คืนนี้คุณเป็นหมาป่าและขย้ำได้ ${k} คน แต่ยังมีคนรอดถึงเช้า\n\nได้ค่าล่า ${money(k * WW.perKill)}`, { money: k * WW.perKill });
+    txt = `🌅 ฟ้าสาง หมาป่าแพ้! ผู้รอด ${alive.length} คน: ${alive.slice(0, 8).map(a => a.name).join(', ')}`;
+  } else {
+    const pot = WW.perHead * was.n, host = online.get(was.host), tk = wolves.reduce((s, [, k]) => s + k, 0), share = new Map();
+    if (host) share.set(host, Math.round(pot * .5));
+    const rest = host ? pot * .5 : pot;
+    for (const [o, k] of wolves) share.set(o, (share.get(o) || 0) + Math.round(tk ? rest * k / tk : o === host ? rest : 0));
+    for (const [o, v] of share) if (v > 0) { sysMail(o, `🐺 หมาป่าชนะ! ไม่มีใครรอดถึงเช้า\n\n${o === host ? 'คุณคือโฮสหมาป่าตัวแรก ได้ส่วนแบ่งมากที่สุด' : 'คุณช่วยล่าด้วย ได้ส่วนแบ่งตามจำนวนที่ขย้ำ'}: ${money(v)}`, { money: v }); joy(o, 8); }
+    txt = `🐺 หมาป่าชนะ! กินคนหมดเมือง · โฮส ${host?.name || '-'} ได้ส่วนแบ่งมากสุด`;
+  }
+  feed(txt);
+  for (const o of online.values()) send(o, { t: 'ww', ph: 'end', won: alive.some(a => a.id === o.id) ? 1 : 0, wolfWon: alive.length ? 0 : 1, names: alive.map(a => a.name).slice(0, 20), host: online.get(was.host)?.name || '', msg: txt });
+}
+function wwTick() {
+  const t = now(), bk = new Date(t + 7 * 3600e3), day = dayKey();
+  if (!ww && !zn && wwDone !== day && fullMoonAt(t)) {
+    const h = bk.getUTCHours() + bk.getUTCMinutes() / 60;
+    if (h >= WW.hour - 1 && h < WW.hour && wwAnnounced !== day) { wwAnnounced = day; feed(`🌕 คืนนี้จันทร์เต็มดวง! ${WW.hour}:00 น. จะมีคนในเมืองกลายเป็นหมาป่า เตรียมตัวให้ดี`); for (const o of online.values()) toast(o, `🌕 คืนนี้ ${WW.hour}:00 น. คืนหมาป่า! ใครจะโดนคำสาป?`, '🐺'); }
+    if (h >= WW.hour && h < WW.hour + .5) wwStart(t);
+  }
+  if (!ww) return;
+  if (ww.ph === 'warn' && t >= ww.t0) {
+    ww.ph = 'on'; ww.end = t + (ww.test ? 150e3 : WW.dur);
+    for (const o of online.values()) if (o.login && !hidden(o) && !o.down) { wwBringOut(o); ww.alive.add(o.id); }
+    ww.n = ww.alive.size;
+    if (ww.n < WW.min && !ww.test || !wwPickWolf(t)) { feed('🌕 คืนนี้คนในเมืองน้อยเกินไป หมาป่าไม่ออกล่า...'); return wwEnd(); }
+    return;
+  }
+  if (ww.ph !== 'on') return;
+  const w = online.get(ww.wolf);
+  if (!w || !w.ws || w.down) { wwRelease(t, 'gone'); return; }
+  if (w.x !== ww.wx || w.y !== ww.wy) { ww.wx = w.x; ww.wy = w.y; ww.lastSeen = t; }
+  if (t - ww.since > WW.grace && t - ww.lastSeen > WW.afk) { feed(`🐺 หมาป่า ${w.name} ยืนนิ่ง คำสาปหลุด!`); wwRelease(t, 'afk'); return; }
+  for (const id of [...ww.alive]) { const o = online.get(id); if (!o) { ww.alive.delete(id); continue; } if (areaId(o) !== 'town' || D.roomAt(o.x, o.y)) wwBringOut(o); }
+  if (areaId(w) !== 'town' || D.roomAt(w.x, w.y)) wwBringOut(w);
+  for (const id of [...ww.alive]) { const o = online.get(id); if (o && !o.down && Math.hypot(o.x - w.x, o.y - w.y) < WW.bite) wwEat(w, o); }
+  if (t >= ww.end || !ww.alive.size) return wwEnd();
+  if (t % 5000 < 250) wwSendAll();
+}
+setInterval(() => { try { if (online.size || ww) wwTick(); } catch (e) { console.error('wwTick', e); } }, 250).unref?.();
 // ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
 let ideas = [], ideaSeq = 1;
 function ideaView(a, sort) {
@@ -1043,7 +1147,7 @@ const comfort = a => a.hown ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
-const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1);   // riding a vehicle outdoors
+const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1) * (wwWolf(a) ? WW.speed : 1);   // (🐺 the werewolf is faster)   // riding a vehicle outdoors
 const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
 const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
 function accrue(a) {
@@ -1165,7 +1269,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -1805,10 +1909,24 @@ function act(a, m) {
   const wb = wellbeing(a);
   if (m.a === 'apply') { if (s.type !== 'staff' && D.CAREERS[m.career]?.where !== s.type || s.type === 'staff' && s.career !== m.career) return; return apply(a, m.career); }
   switch (key) {
+    // ---------------- 🎈 balloon seller: buy a colour once, then hold whichever you like (or none)
+    case 'balloon.buy': {
+      const B = D.BALLOONS[m.id]; if (!B) return; a.balloons = a.balloons || [];
+      if (a.balloons.includes(m.id)) return toast(a, 'มีลูกโป่งสีนี้แล้ว', '🎈', false);
+      if (B.gems) { if ((a.gems || 0) < B.gems) return toast(a, `เพชรไม่พอ (ต้องใช้ 💎${B.gems})`, '💎', false); a.gems -= B.gems; }
+      else if (!pay(a, B.price)) return;
+      a.balloons.push(m.id); a.balloon = m.id; markMe(a); sendRoster(); FX0(a, 'pick');
+      return toast(a, `🎈 ได้${B.name}แล้ว! ถืออยู่ในมือ (เปลี่ยนสีหรือเก็บได้ที่ร้านลูกโป่ง)`, '🎈');
+    }
+    case 'balloon.hold': {
+      if (m.id && !(a.balloons || []).includes(m.id)) return;
+      a.balloon = m.id || ''; markMe(a); sendRoster(); return;
+    }
     // ---------------- getting around
     case 'gate.go': {
       const g = D.GATES[s.to]; if (!g) return;
       if (s.renov && !(isAdmin(a) && a.god?.doors)) return toast(a, 'ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
+      if (ww && D.areaAt(g.x, g.y)?.id !== 'town') return toast(a, '🌕 คืนหมาป่า: ออกนอกเมืองไม่ได้จนกว่าจะฟ้าสาง!', '🐺', false);
       if (zn && ['park_in', 'housing_in', 'temple_in'].includes(s.to)) return toast(a, '🧟 คืนปล่อยผี: สวนสนุก หมู่บ้านจัดสรร และวัด ปิดชั่วคราว เอาตัวรอดในเมืองให้ได้!', '🚧', false);
       if (!cd(a, 'door', 1200, true)) return;
       return teleport(a, g.x, g.y);
@@ -3623,7 +3741,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -3657,8 +3775,8 @@ function meView(a) {
   return {
     t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
-    bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair,
+    tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * (wwWolf(a) ? WW.speed : 1), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], balloon: a.balloon || '',
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
@@ -3820,7 +3938,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -4380,6 +4498,7 @@ function godAct(a, m) {
     const e = D.EVENTS.find(x => x.id === 'rain'); if (!e) return;
     event = { ...e, until: now() + 240e3 }; nextEventAt = event.until + 150e3; feed(e.text); wdAt = 0; return toast(a, 'ฝนตก 4 นาที', '🌧️');
   }
+  if (m.op === 'werewolf') { if (ww) { ww.n = 0; wwEnd(); return toast(a, 'หยุดคืนหมาป่าแล้ว', '🐺'); } wwDone = ''; return wwStart(now(), true); }
   if (m.op === 'zombie') { if (zn) { for (const z of zombies()) npcs.splice(npcs.indexOf(z), 1); zn = null; npcRosterDirty = true; znSendAll(); return toast(a, 'หยุดคืนปล่อยผีแล้ว', '🧟'); } znDone = ''; return znStart(now(), true); }
   if (m.op === 'nocd') { a.god.nocd = !a.god.nocd; if (a.god.nocd) a.cd = {}; toast(a, a.god.nocd ? 'God mode: ไม่มีคูลดาวน์' : 'ปิด: ไม่มีคูลดาวน์', '⚡'); }
   else if (m.op === 'lock') { a.god.lock = !a.god.lock; toast(a, a.god.lock ? 'God mode: ล็อกสเตตัสเต็ม (ไม่ป่วย/ไม่หมดสติ)' : 'ปิด: ล็อกสเตตัส', '🛡️'); }

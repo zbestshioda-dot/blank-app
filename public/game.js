@@ -571,7 +571,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0 });
+        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '' });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -612,6 +612,7 @@ function handle(m) {
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'zn': case 'zspawn': case 'zdie': znMsg(m); break;
+    case 'ww': case 'wwturn': case 'wwdie': wwMsg(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
     case 'lotto': window.__lotto = m; if (panel?.kind === 'lotto') refreshPanel(true); break;
     case 'ideas': window.__ideas = m; if (panel?.kind === 'ideas') refreshPanel(true); break;
@@ -2362,9 +2363,60 @@ function znWinner(m) {   // big floating winner announcement, no taps needed, fa
     : `<div class="t">🌅 ฟ้าสางแล้ว</div><div class="y">คืนนี้ไม่มีใครรอดเลย... เดือนหน้าแก้มือนะ</div>`;
   document.body.appendChild(d); setTimeout(() => d.remove(), 8200);
 }
+// ---- 🐺 WEREWOLF NIGHT (full moon, 21:00): one player is the werewolf; a painted sheet (assets/werewolf.*, same layout as the zombie
+// sheet: rows walk/run, columns down0-2 up0-2 side0-2) when it exists, else a big wolf drawn from the emoji
+let WW = { ph: 'off' }, WWB = null, wwImg = null;
+fetch('assets/werewolf.json?v=1').then(r => r.ok ? r.json() : null).then(j => { if (!j) return; const im = new Image(); im.onload = () => { WWB = j; wwImg = im; }; im.src = 'assets/werewolf.webp?v=1'; }).catch(() => {});
+function drawWolf(p, X, Y, t) {
+  const px = Math.round(p.rx * TS + X), py = Math.round(p.ry * TS + Y + TS * .32);
+  if (px < -120 || py < -160 || px > VW + 120 || py > VH + 160) return;
+  const moving = Math.hypot(p.x - p.rx, p.y - p.ry) > .02, f8 = ((p.f | 0) % 8 + 8) % 8, dir = { 0: 'left', 1: 'left', 2: 'up', 3: 'right', 4: 'right', 5: 'right', 6: 'down', 7: 'left' }[f8];
+  p.walk = (p.walk || 0) + (moving ? .3 * FDT * 60 : 0);
+  const pul = .75 + Math.sin(t / 160) * .25;
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(px, py, TS * .45, TS * .15, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,60,30,${.7 * pul})`; ctx.lineWidth = Math.max(2, TS * .07); ctx.beginPath(); ctx.ellipse(px, py, TS * .62, TS * .22, 0, 0, 7); ctx.stroke();
+  let top;
+  if (wwImg) {
+    const fi = moving ? [1, 0, 2, 0][Math.floor(p.walk / 1.4) % 4] : 0, col = (dir === 'down' ? 0 : dir === 'up' ? 3 : 6) + fi, row = WWB.rows?.[moving ? 'run' : 'walk'] || 0;
+    const k = TS * 1.8 / 96, w = WWB.w * k, h = WWB.h * k;
+    ctx.save(); ctx.translate(px, py); if (dir === 'left') ctx.scale(-1, 1);
+    ctx.drawImage(wwImg, col * WWB.w, row * WWB.h, WWB.w, WWB.h, -WWB.feet[0] * k, -WWB.feet[1] * k, w, h); ctx.restore();
+    top = py - WWB.feet[1] * k;
+  } else {
+    const s = TS * 1.35, hop = moving ? Math.abs(Math.sin(p.walk / 2)) * TS * .12 : 0;
+    ctx.save(); ctx.translate(px, py - hop); if (dir === 'right') ctx.scale(-1, 1);
+    ctx.font = `${Math.round(s)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.shadowColor = 'rgba(255,40,20,.9)'; ctx.shadowBlur = 14 * pul; ctx.fillText('🐺', 0, TS * .1); ctx.restore();
+    top = py - s - hop;
+  }
+  nameAndBubble(p, px, top + TS * .1, p.id === myId, t);
+}
+function wwCard(html, cls, ms) { znCard(html, cls, ms); }
+function wwMsg(m) {
+  if (m.t === 'wwturn') { FX.play('alarm'); if (navigator.vibrate) navigator.vibrate([80, 60, 160]); wwCard('<div style="font-size:64px">🐺</div><b>คุณกลายเป็นหมาป่า!</b><p>ไล่ขย้ำผู้เล่นคนอื่น (แค่วิ่งชน) · คุณวิ่งเร็วขึ้น · <b>ห้ามยืนนิ่งเกิน 3 วินาที</b> ไม่งั้นคำสาปจะหลุดไปหาคนอื่น!</p>', 'warn', 4500); return; }
+  if (m.t === 'wwdie') { FX.play('zbite'); wwCard(`<div style="font-size:56px">🩸</div><b>โดนหมาป่าขย้ำ!</b><p>${esc(m.by || '')} จับคุณได้ · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600); return; }
+  const was = WW.ph;
+  if (m.ph === 'end') {
+    WW = { ph: 'off' }; FX.play(m.won ? 'levelup' : 'chime');
+    const d = document.createElement('div'); d.className = 'znWin';
+    d.innerHTML = m.wolfWon ? `<div class="t">🐺 หมาป่าชนะ! 🐺</div><div class="y">ไม่มีใครรอดถึงเช้า · โฮสหมาป่า <b>${esc(m.host)}</b> ได้ส่วนแบ่งมากที่สุด</div>`
+      : `<div class="t">🌅 ผู้รอดชีวิตคืนจันทร์เต็มดวง</div><div class="n">${(m.names || []).slice(0, 10).map(n => `<span>${esc(n)}</span>`).join('')}</div>${m.won ? '<div class="y">คุณรอด! รางวัลส่งเข้าจดหมายแล้ว 📬</div>' : ''}`;
+    document.body.appendChild(d); setTimeout(() => d.remove(), 8200); return;
+  }
+  WW = { ...m, endT: performance.now() + Math.max(0, (m.end || 0) - (Date.now() + clockOff)) };
+  if (m.ph === 'warn' && was !== 'warn') { FX.play('alarm'); wwCard('<div style="font-size:64px">🌕</div><b>คืนจันทร์เต็มดวง!</b><p>อีกไม่นานจะมีใครสักคนกลายเป็นหมาป่า · ทุกคนจะถูกพาออกมาในเมือง · ประตูทุกบานปิด</p>', 'warn', 4000); }
+  if (m.ph === 'on' && was === 'warn' && m.me === 'alive') wwCard(`<div style="font-size:56px">🐺</div><b>${esc(m.wname)} คือหมาป่า!</b><p>วิ่งหนีอย่าให้โดนตัว รอดถึงเช้า = ได้รางวัลเต็ม</p>`, 'warn', 3000);
+}
+function wwHud(el) {
+  const left = Math.max(0, Math.ceil(((WW.endT || 0) - performance.now()) / 1000)), mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  const title = WW.ph === 'warn' ? `🌕 หมาป่าออกล่าใน ${mm}` : WW.me === 'wolf' ? `🐺 คุณคือหมาป่า · ${mm}` : `🌕 รอดอีก ${mm}`;
+  const sub = WW.ph === 'warn' ? 'ออกจากอาคาร เตรียมวิ่ง!' : WW.me === 'wolf' ? `ไล่ขย้ำให้หมด · เหลือ ${WW.alive} คน · ห้ามยืนนิ่ง!` : WW.me === 'dead' ? `คุณโดนขย้ำแล้ว · ผู้รอด ${WW.alive} คน` : WW.me === 'alive' ? `หมาป่า: ${WW.wname} · ผู้รอด ${WW.alive} คน` : `ดูอยู่ข้างสนาม · ผู้รอด ${WW.alive} คน`;
+  el.classList.remove('hidden'); el.classList.toggle('warn', WW.ph === 'warn' || WW.me === 'wolf'); el.classList.toggle('dead', WW.me === 'dead');
+  el.innerHTML = `<span style="font-size:24px">🐺</span><div><b>${title}</b><small>${esc(sub)}</small></div>`;
+}
 function znHud() {
   const el = $('#znBar'); if (!el) return;
   znList();
+  if (ZN.ph === 'off' && (WW.ph === 'warn' || WW.ph === 'on')) return wwHud(el);
   if (ZN.ph !== 'warn' && ZN.ph !== 'on') { el.classList.add('hidden'); return; }
   const left = Math.max(0, Math.ceil(((ZN.endT || 0) - performance.now()) / 1000)), mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   let title, sub;
@@ -2402,6 +2454,27 @@ function znMsg(m) {
 }
 // ☂️ an open umbrella held over the head: a coloured canopy (panels + scalloped rim), a shaft down to the hand, swaying a little
 const UMB_COL = [['#e8505b', '#ffd2d5'], ['#3d7be0', '#cfe0ff'], ['#f2b705', '#fff1b8'], ['#2fb36a', '#c9f5da'], ['#8a5cf0', '#e3d6ff'], ['#ff8a3d', '#ffe0c7']];
+// 🎈 a balloon on a string from the hand (or a whole bunch for the seller)
+function balloonShape(x, y, r, col, sh) {
+  ctx.fillStyle = col; ctx.beginPath();
+  if (sh === 'h') { ctx.moveTo(x, y + r * .9); ctx.bezierCurveTo(x - r * 1.5, y - r * .1, x - r * .7, y - r * 1.3, x, y - r * .45); ctx.bezierCurveTo(x + r * .7, y - r * 1.3, x + r * 1.5, y - r * .1, x, y + r * .9); }
+  else if (sh === 's') { for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .5 : r * 1.1; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); }
+  else ctx.ellipse(x, y, r * .85, r, 0, 0, 7);
+  ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = Math.max(1, r * .08); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(x - r * .3, y - r * .35, r * .18, r * .28, -.5, 0, 7); ctx.fill();
+  if (!sh) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + r * .95); ctx.lineTo(x - r * .14, y + r * 1.15); ctx.lineTo(x + r * .14, y + r * 1.15); ctx.fill(); }
+}
+function drawBalloon(id, px, top, H, pid, t) {
+  const hx = px + TS * .32, hy = top + H * .5, r = TS * .26;
+  const list = id === 'bunch' ? ['red', 'blue', 'yellow', 'green', 'pink', 'heart', 'purple'] : [id];
+  list.forEach((k, i) => {
+    const B = G.balloons?.[k]; if (!B) return;
+    const sw = Math.sin(t / 700 + (+pid || 0) % 13 + i * 1.7) * TS * .12, n = list.length;
+    const bx = hx + sw + (n > 1 ? (i - (n - 1) / 2) * r * 1.1 : TS * .08), by = top - TS * (n > 1 ? .55 + (i % 3) * .3 : .45);
+    ctx.strokeStyle = 'rgba(60,60,60,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + sw * .3, (hy + by) / 2, bx, by + r); ctx.stroke();
+    balloonShape(bx, by, r, B.c, B.sh);
+  });
+}
 function drawUmbrella(px, top, H, id, t) {
   const [c1, c2] = UMB_COL[Math.abs(+id || 0) % UMB_COL.length], r = TS * .62, cx = px + TS * .2, cy = top - TS * .04, hand = top + H * .5;
   ctx.save(); ctx.translate(cx, hand); ctx.rotate(Math.sin(t / 650 + (+id || 0)) * .05); ctx.translate(-cx, -hand);
@@ -2423,6 +2496,7 @@ function drawUmbrella(px, top, H, id, t) {
 }
 function drawPlayer(p, X, Y, t) {
   if (p.zb) return drawZombie(p, X, Y, t);
+  if (WW.ph === 'on' && WW.wolf && p.id === WW.wolf) return drawWolf(p, X, Y, t);
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
   const snap = v => Math.round(v * DPR) / DPR;
   const fo = p.pose === 'fun' && p.fn ? funPos(p) : null;   // on a park ride: drawn where the ride carries them
@@ -2469,6 +2543,7 @@ function drawPlayer(p, X, Y, t) {
   const umb = !lying && !fo && wd?.ev?.id === 'rain' && (p.id === myId ? (me?.inv?.umbrella || 0) > 0 : p.um) && !roomOf(p.x, p.y);
   if (umb) drawUmbrella(px, py - H * .97 - bob + (sitting ? H * .19 : 0), H, p.id, now0);   // ☂️ in the rain (the name tag moves up above it)
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
+  if (p.bl && !lying && !fo?.swim) drawBalloon(p.bl, px, top + (umb ? -TS * .3 : 0), H, p.id, now0);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
@@ -2863,7 +2938,14 @@ function drawCrowdFx(e, X, Y, t) {
   }
 }
 // the bell rings by itself at dawn and at dusk while you are in the temple
-{ let lastH = -1; setInterval(() => { if (!G || !me) return; const h = Math.floor(hourNow()), m = P.get(myId); if (lastH >= 0 && h !== lastH && (h === 6 || h === 18) && m && areaOf(m.x, m.y)?.id === 'temple') { bellT = performance.now(); FX.play('bell'); } lastH = h; }, 1000); }
+// 🔔 temple bells: at 6:00 and 18:00 three strokes (loud in the temple, softer in town); and now and then a lone stroke in the temple
+// (or faintly near the temple gate in town)
+{ let lastH = -1, nextAmb = performance.now() + 20000; setInterval(() => { if (!G || !me) return; const h = Math.floor(hourNow()), m = P.get(myId), ar = m && areaOf(m.x, m.y)?.id, inT = ar === 'temple';
+  const gate = STN('gate_temple'), dg = m && gate && ar === 'town' ? Math.hypot(m.x - gate.x, m.y - gate.y) : 1e9;
+  if (lastH >= 0 && h !== lastH && (h === 6 || h === 18) && (inT || ar === 'town')) { const k = inT ? 1 : dg < 30 ? .5 : .25; for (let i = 0; i < 3; i++) setTimeout(() => { if (inT) bellT = performance.now(); FX.play('bell', k); }, i * 2600); }
+  lastH = h;
+  if (performance.now() > nextAmb) { nextAmb = performance.now() + 50000 + Math.random() * 60000; if (inT) { bellT = performance.now(); FX.play('bell', .7); } else if (dg < 18) FX.play('bell', .3); }
+}, 1000); }
 const WAT = { red: '#b8322a', red2: '#8e241e', green: '#2f7d4f', gold: '#e3b23c', gold2: '#b88516', white: '#f6f0e2', shade: '#d9cfba', wood: '#8a5a2b', wood2: '#6b421d' };
 let bellT = 0;
 function poly(pts, fill, stroke, lw = 2) { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
@@ -3103,11 +3185,12 @@ function buildStaff() {
     const s = G.stations.find(x => x.id === d.st); if (!s) continue;
     const x = s.x + d.dx, y = s.y + d.dy;
     const n = { id: 'keep_' + d.st, staff: 1, keeper: 1, career: d.c || '', c: d.c || '', of: d.of || '', name: d.name, short: d.short, st: s.id, g: d.g || 'm', lk: { hair: 'brown', shirt: 'white', pants: 'gray', ...(d.lk || {}) },
-      x, y, rx: x, ry: y, f: 6, dz: [], line: () => ` ${n.cur || d.hi[0]}`, greetT: 0, icon: d.icon, his: d.hi };
+      x, y, rx: x, ry: y, f: 6, dz: [], line: () => ` ${n.cur || d.hi[0]}`, greetT: 0, icon: d.icon, his: d.hi, bl: d.bl || '' };
     STAFF.push(n); STAFF_AT[s.id] = n;
   }
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
+  { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: -.9, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ถือเดินเล่นสวยๆ', 'สีไหนดีหลาน ลุงมีครบ', 'ลูกโป่งหัวใจ เอาไปให้แฟนสิ'] },
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ! อยากได้เพื่อนตัวฟูไหมคะ', 'ทุกตัวสุขภาพดีค่ะ ลูบได้นะคะ', 'ตัวไหนถูกใจ ลองแตะดูได้เลยค่ะ'] },
   { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
@@ -4344,6 +4427,13 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20h', d: '20 พ.ย. (รอบ 67)', items: [
+    '🌕🐺 <b>คืนหมาป่า</b> ทุกคืนจันทร์เต็มดวง 21:00 น. สุ่มคนในเมืองกลายเป็นหมาป่า ไล่ขย้ำคนอื่น · หมาป่ายืนนิ่งเกิน 3 วิ คำสาปหลุดไปหาคนใหม่ · รอดถึงเช้าได้รางวัลเต็ม ถ้าหมาป่ากินหมด โฮสหมาป่าได้ส่วนแบ่งมากสุด',
+    '💼 <b>อาชีพใหม่ 6 อาชีพ</b>: 🧒 เด็กวัด · ⚱️ สัปเหร่อ (หน้าประตูวัด) · 🔧 ช่างซ่อมรถ (หน้าโชว์รูม) · 😎 นักเลง (ตลาด) · 📷 ช่างภาพ (จัตุรัส) · 📦 พนักงานส่งของ (หน้าคลังสินค้า) ทำภารกิจเดินจริงในเมือง',
+    '📋 ภารกิจใหม่: หมอออกตรวจผู้ป่วย 5 บ้าน · ตำรวจสืบคดีงัดร้านทอง · ช่างซ่อมรถ 3 คัน · ช่างภาพถ่ายภาพ 5 สถานที่ · ส่งพัสดุ 10 ชิ้น',
+    '🎈 <b>ร้านลูกโป่งลุงโป่ง</b> ข้างน้ำพุ ซื้อแล้วถือเดินให้ทุกคนเห็น มีทรงหัวใจ ดาว และลูกโป่งทองคำ',
+    '🔔 ระฆังวัดดังบ่อยขึ้น ได้ยินถึงในเมือง (6 โมงเช้า/6 โมงเย็นตี 3 ครั้ง)',
+    '🆕 แก้หน้าข่าวอัปเดตไม่เด้ง'] },
   { v: '2026-11-20g', d: '20 พ.ย. (รอบ 66)', items: [
     '⌨️ <b>พนักงานบริษัท</b>: งานใหม่ "พิมพ์เอกสารตามแบบ" นั่งโต๊ะคอมพิมพ์ให้ตรงต้นแบบ (กดที่บริษัท)',
     '📦 <b>พนักงานร้านสะดวกซื้อ</b>: งานใหม่ "เติมของและจัดเรียงชั้น" หยิบจากลังวางให้ตรงช่อง',
@@ -5202,6 +5292,14 @@ function renderPanel(p) {
         <div class="jobbox">💬 ซื้อเบ็ด/อัปเกรดเบ็ด คุยกับ <b>น้าเล็ก</b> ที่ยืนอยู่ข้างๆ</div>
         ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}<div class="sub" style="margin-top:10px">📖 ดูสมุดภาพปลาได้ในมือถือ (แอปสมุดปลา)</div>`;
     }
+    case 'balloon': {
+      const own = me.balloons || [], rows = Object.entries(G.balloons || {}).map(([k, b]) => {
+        const has = own.includes(k), on = me.balloon === k;
+        const btn = has ? B(on ? '✋ เก็บ' : '🎈 ถือ', { t: 'act', st, a: 'hold', id: on ? '' : k }, on ? '' : 'good') : B(b.gems ? `💎${b.gems}` : money(b.price), { t: 'act', st, a: 'buy', id: k }, 'primary', b.gems ? (me.gems || 0) < b.gems : me.money < b.price);
+        return itemRowRaw(`<span style="color:${b.c};font-size:26px">${b.sh === 'h' ? '❤' : b.sh === 's' ? '★' : '●'}</span>`, `${esc(b.name)}${on ? ' <span class="tag">ถืออยู่</span>' : has ? ' <span class="tag">มีแล้ว</span>' : ''}`, b.sh ? 'รูปทรงพิเศษ' : 'ลูกโป่งกลม', btn);
+      }).join('');
+      return `<h2>🎈 ร้านลูกโป่งลุงโป่ง</h2><div class="sub">ซื้อครั้งเดียวได้ตลอด ถือเดินเล่นให้ทุกคนเห็น · ถือได้ทีละลูก กดเปลี่ยนสีได้ตลอด</div><div class="list">${rows}</div>`;
+    }
     case 'staff': {
       const S = STN(st), key = S.career;
       if (key === 'fishing') {
@@ -5483,6 +5581,7 @@ function renderPanel(p) {
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
         <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
+        <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
         <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
