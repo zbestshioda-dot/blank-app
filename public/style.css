@@ -1107,9 +1107,3 @@ body.hasEvent #topBar{top:146px!important}
 kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;border:2px solid #5c3a1e;border-bottom-width:4px;background:#fff6e0;font:700 12px 'Mitr','Noto Sans Thai',sans-serif;color:#3a1d0e;text-align:center;line-height:1.3}
 #keyHint{position:fixed;left:10px;bottom:10px;z-index:4;display:none;align-items:center;gap:6px;padding:5px 10px;border-radius:12px;border:2px solid #5c3a1e;background:rgba(255,243,214,.92);font:600 12px 'Mitr','Noto Sans Thai',sans-serif;color:#3a1d0e;cursor:pointer;box-shadow:0 2px 0 #5c3a1e}
 @media (hover:hover) and (pointer:fine){body.inGame #keyHint{display:flex}}
-
-/* football: the kick button (only on the pitch); holding it charges a ring */
-#kickBtn{right:36px;bottom:156px;width:64px;height:64px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;background:linear-gradient(#5fb86a,#2f7a3a)!important;--p:0}
-#kickBtn span{font-size:26px!important}
-#kickBtn::before{content:'';position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(#ffd34d calc(var(--p)*360deg),transparent 0);-webkit-mask:radial-gradient(circle,transparent 62%,#000 64%);mask:radial-gradient(circle,transparent 62%,#000 64%);pointer-events:none}
-#kickBtn.charging{transform:scale(1.08)}

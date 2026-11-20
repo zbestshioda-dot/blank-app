@@ -63,7 +63,6 @@ window.FX = (() => {
     spend() { tone(660, 0.07, { type: 'triangle', vol: 0.08 }); tone(440, 0.1, { type: 'triangle', vol: 0.08, at: 0.05 }); },
     fail() { tone(220, 0.18, { type: 'square', vol: 0.07, slide: 140 }); },
     pop() { tone(500, 0.08, { vol: 0.2, slide: 950 }); },
-    kick(v = 0.5) { noise(0.07, { freq: 260 + 400 * v, q: 1.2, vol: 0.12 + 0.18 * v }); tone(130 + 60 * v, 0.1, { vol: 0.12 + 0.1 * v, slide: 70 }); },   // a boot on the ball: v = how hard
     click() { tone(1400, 0.03, { vol: 0.05 }); },
     step(kind) {
       if (kind === 'p') { tone(170 + Math.random() * 30, 0.06, { type: 'triangle', vol: 0.07 }); return; }

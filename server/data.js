@@ -12,8 +12,7 @@ const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
-const PX0 = YX0 + 4 * 34;                                // the football pitch map sits after the yards
-const W = PX0 + 48, H = 90;                              // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards + the pitch
+const W = YX0 + 4 * 34, H = 90;                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
 
 // ---------------------------------------------------------------- grid helpers
 // tile codes: . grass  = road  , sidewalk  c cobble path  k plaza bricks  w water  p pier/bridge
@@ -564,31 +563,7 @@ for (const room of ROOMS.filter(r => r.rk === 'house' && !r.floor)) {
 const yardZone = (x, y) => Math.max(0, Math.min(2, Math.floor((x - 1) / YARD.zw))) + 3 * Math.max(0, Math.min(2, Math.floor((y - 1) / YARD.zh)));
 // the room a house floor lives in, and where you arrive on it
 const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house === house && (r.floor || 1) === fl);
-
-// ================================================================= FOOTBALL PITCH (its own map, reached by a gate in the east park)
-// The ball itself lives on the server (server/ball.js); this is the ground, the lines it plays by and the gates.
-const PITCH = { id: 'pitch', kind: 'map', name: 'สนามฟุตบอล', x: PX0, y: 0, w: 48, h: 32 };
-const PITCH_FIELD = { x0: PX0 + 6, y0: 6, x1: PX0 + 42, y1: 26, cx: PX0 + 24, cy: 16, gh: 2.5, gd: 2, gz: 1.8 };   // the lines (tiles); goal mouth = cy ± gh, nets reach gd behind the end line, bar at gz
-{
-  const P = PITCH, F = PITCH_FIELD;
-  rect(P.x, P.y, P.w, P.h, '.');
-  for (let y = F.y0; y < F.y1; y++) for (let x = F.x0; x < F.x1; x++) set(x, y, Math.floor((x - F.x0) / 3) % 2 ? 'H' : 'G');   // mown stripes across the pitch
-  rect(F.cx - 1, F.y1 + 1, 2, P.h - 2 - F.y1 - 1, 'c');                                  // path from the gate up to the touchline
-  for (let x = P.x; x < P.x + P.w; x++) { set(x, P.y, 'T'); set(x, P.y + P.h - 1, 'T'); }   // a ring of trees round the edge
-  for (let y = P.y; y < P.y + P.h; y++) { set(P.x, y, 'T'); set(P.x + P.w - 1, y, 'T'); }
-  for (let ty = P.y; ty < P.y + P.h; ty++) for (let tx = P.x; tx < P.x + P.w; tx++) if (grid[ty][tx] === 'T') TREES.push([tx, ty, TREE_KINDS[(tx * 7 + ty * 13) % TREE_KINDS.length]]);
-  for (const x of [F.x0 + 4, F.cx - 5, F.cx + 5, F.x1 - 4]) { prop('o_lampball', x, F.y1 + 1.95, 'grass'); prop('o_lampball', x, F.y0 - 1.05, 'grass'); }
-  for (const x of [F.x0 + 9, F.x1 - 9]) for (const [y, n] of [[F.y1 + 2.9, 'a'], [F.y0 - 1.9, 'b']]) {
-    prop('o_bench', x, y, false);
-    STATIONS.push({ id: 'seat_p' + n + x, type: 'seat', label: 'ม้านั่งข้างสนาม', icon: '🪑', x, y: y - .25, r: 1.1, area: 'pitch' });
-  }
-  prop('signpost', F.cx + 2.6, F.y1 + 3.6);
-  prop('tree_oak', P.x + 3, P.y + 4); prop('tree_pink', P.x + P.w - 4, P.y + 4); prop('tree_oak', P.x + 3, P.y + P.h - 5); prop('tree_pink', P.x + P.w - 4, P.y + P.h - 5);
-  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_pitch', label: 'กลับเข้าเมือง', icon: '🏙️', x: F.cx, y: P.h - 2.4, r: 1.6, area: 'pitch' });
-  STATIONS.push({ id: 'gate_pitch', type: 'gate', to: 'pitch_in', label: 'ไปสนามฟุตบอล', icon: '⚽', x: 52.5, y: 66.6, r: 1.6, area: 'town' });
-  GATES.pitch_in = { x: F.cx, y: P.h - 4.9 }; GATES.town_from_pitch = { x: 52.5, y: 64.2 };
-}
-const AREAS = [TOWN, FARM, HOUSING, ...ROOMS, ...YARDS, PITCH];
+const AREAS = [TOWN, FARM, HOUSING, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
 for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;
@@ -1321,7 +1296,7 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
 module.exports = {
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
-  W, H, TILES, AREAS, PITCH, PITCH_FIELD, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
+  W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
   RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,

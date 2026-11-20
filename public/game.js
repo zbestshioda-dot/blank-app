@@ -329,7 +329,7 @@ function handle(m) {
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
-      G = m; myId = m.id; BALL = null; ballSet(m.ball); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
+      G = m; myId = m.id; P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop();
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
@@ -352,8 +352,6 @@ function handle(m) {
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
       break;
     }
-    case 'ball': ballSet(m); break;
-    case 'ballev': ballEvents(m.evs); break;
     case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { if (Math.hypot(x - s.x, y - s.y) > 4) { s.rx = x; s.ry = y; } s.x = x; s.y = y; s.f = f; } } break;
     case 'fix': {
       if (m.fx) fixId = m.fx;
@@ -781,11 +779,10 @@ addEventListener('keydown', e => {
   if (e.key === 'p') openPanel({ kind: 'phone' });
   if (e.key === 'r') $('#restBtn').click();
   if (e.key === 'f') talk();
-  if ((e.key === 'k' || e.key === 'K') && !e.repeat) kickStart();
   if (e.key === 'Shift' && !running) { shiftRun = true; setRun(true); }
   if (e.key === 'c' || e.key === 't' || e.key === 'Enter' && panel) { e.preventDefault(); openChatBox(); }
 });
-addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'k' || e.key === 'K') kickGo(); if (e.key === 'e' || e.key === ' ') reelHold = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'e' || e.key === ' ') reelHold = false; if (e.key === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
@@ -966,7 +963,6 @@ function findNear() {
   return best;
 }
 function onAction() {
-  if (!near && inPitch()) return kickTap();            // on the pitch the big button passes the ball
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
   const t = performance.now();
   const master = me.admin && me.god?.doors;
@@ -1061,7 +1057,7 @@ function frame(t) {
     if (sendT > 0.066 && sig !== lastSent) { sendT = 0; lastSent = sig; send({ t: 'p', x: +m.x.toFixed(2), y: +m.y.toFixed(2), f: m.f, fx: fixId }); }
   }
   for (const p of P.values()) if (p.id !== myId) { const k = Math.min(1, dt * 12); p.rx += (p.x - p.rx) * k; p.ry += (p.y - p.ry) * k; }
-  stepPets(dt); stepFight(dt); stepBall(dt); paintKick();
+  stepPets(dt); stepFight(dt);
 
   near = findNear();
   const ab = $('#actBtn');
@@ -1120,7 +1116,6 @@ function draw(t) {
     if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
   }
   if (myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
-  if (A?.id === 'pitch' && G.pitch) drawPitch(X, Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
   for (const s of G.stations) {
@@ -1145,7 +1140,6 @@ function draw(t) {
   rivalEnts(ents, vis);
   if (me?.cook && myRoom?.rk === 'kitchen') ents.push([1e8, 7, { k: 'cook' }]);
   if (myRoom?.rk === 'petshop') for (const q of shopPets(myRoom)) ents.push([q.y + .3, 6, q]);   // the shop's own animals
-  if (A?.id === 'pitch' && G.pitch) pitchEnts(ents);
   for (const n of STAFF) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]);
   { const t0 = performance.now(); stepAmbs(Math.min(.1, (t0 - (window.__ambT || t0)) / 1000)); window.__ambT = t0; }
   for (const a of ambs) if (a.area === A?.id) { if (!a.body.gone) ents.push([a.body.ry + .3, 4, a.body]); ents.push([a.y + halfY(a), 5, a]); }
@@ -1165,8 +1159,6 @@ function draw(t) {
     else if (k === 5) drawCar(e, X, Y);
     else if (k === 6) drawPet(e, X, Y, t);
     else if (k === 7) drawMisThing(e, X, Y, t);
-    else if (k === 8) drawPost(e, X, Y);
-    else if (k === 9) drawBall(e, X, Y);
     else drawPlayer(e, X, Y, t);
   }
   if (A?.yard) drawYardLocks(A, X, Y, t);
@@ -1208,7 +1200,6 @@ function draw(t) {
   if (myRoom && myRoom.rk === 'office') { const h = hourNow(); if (h >= G.shift.ot || h < 6) dark = 0.62; }
   if (dark > 0.01) { ctx.fillStyle = `rgba(8,12,48,${dark})`; ctx.fillRect(0, 0, VW, VH); if (!myRoom) drawLights(X, Y, dark); }
   drawHeads(X, Y);
-  if (A?.id === 'pitch') drawGoalBanner();
   if (myRoom && myRoom.rk === 'office' && dark > 0) sign(`💡 ไฟปิดแล้ว (เลิกงาน ${hhmm(G.shift.ot)})`, VW / 2, VH * .2, { size: 14 });
   // short fade through black when you go through a door or a gate
   const fp = (performance.now() - fadeT) / 350;
@@ -1716,121 +1707,6 @@ function petPlay(q, love) {
   if (love || (q.shop || q.owner === myId) && Math.random() < .3) FX.play('pet', [PET_VOICE[q.id] || 'squeak', love ? 1 : .55]);
   if (love) { FX.play('pop'); FX.float(q.x, q.y - .9, '❤', '#ff6b9a', .55); FX.burst(q.x, q.y - .5, '#ff9ec0', 8); if (navigator.vibrate) navigator.vibrate(12); }
 }
-// ------------------------------------------------------------------ football
-// The server owns the ball. Here it only keeps rolling and hopping between its updates (same rules as server/ball.js),
-// then glides to wherever the next update says it is.
-let BALL = null, kickT = 0, goalAt = 0, goalBy = '', pitchHint = false;
-function ballSet(m) {
-  if (!m) return;
-  if (!BALL) BALL = { x: m.x, y: m.y, z: m.z, vx: m.vx, vy: m.vy, vz: m.vz, rot: 0, g: m.g, by: m.by };
-  const far = Math.hypot(m.x - BALL.x, m.y - BALL.y) > 1.6 || m.g !== BALL.g;   // a restart or a throw-in snaps; small differences glide
-  const k = far ? 1 : .55;
-  BALL.x += (m.x - BALL.x) * k; BALL.y += (m.y - BALL.y) * k; BALL.z += (m.z - BALL.z) * k;
-  BALL.vx = m.vx; BALL.vy = m.vy; BALL.vz = m.vz; BALL.g = m.g; BALL.by = m.by;
-}
-function ballEvents(evs) {
-  for (const e of evs || []) {
-    if (e.k === 'kick') { FX.play('kick', e.v); if (BALL) FX.dust(BALL.x, BALL.y); }
-    else if (e.k === 'hit') FX.play('kick', e.v * .6);
-    else if (e.k === 'out') { FX.play('notice'); if (BALL) { FX.ring(BALL.x, BALL.y, '#ffffff', 600, 1); BALL.x = e.x; BALL.y = e.y; BALL.z = BALL.vx = BALL.vy = BALL.vz = 0; } }
-    else if (e.k === 'goal') { FX.play('levelup'); goalAt = performance.now(); goalBy = e.by || ''; if (BALL) FX.burst(BALL.x, BALL.y, '#ffd34d', 28); }
-  }
-}
-function stepBall(dt) {
-  const b = BALL, F = G?.pitch; if (!b || !F) return;
-  let left = Math.min(dt, .1);
-  while (left > 0) {
-    const h = Math.min(left, .025); left -= h;
-    if (b.z > 0 || b.vz > 0) {
-      b.vz -= 30 * h; b.z += b.vz * h;
-      if (b.z <= 0) { b.z = 0; if (b.vz < -1.6) { b.vz = -b.vz * .6; b.vx *= .93; b.vy *= .93; } else b.vz = 0; }
-    }
-    const d = Math.exp(-(b.z > 0 ? .25 : .8) * h); b.vx *= d; b.vy *= d;
-    if (b.z === 0 && b.vz === 0 && Math.hypot(b.vx, b.vy) < .15) b.vx = b.vy = 0;
-    b.x += b.vx * h; b.y += b.vy * h;
-    b.rot += Math.hypot(b.vx, b.vy) * h / .22 * (b.vx < 0 ? -1 : 1);
-    if (b.g) {                                                   // in the net it stops against the netting
-      const left0 = b.x < F.cx, lo = left0 ? F.x0 - F.gd + .3 : F.x1 + .3, hi = left0 ? F.x0 - .3 : F.x1 + F.gd - .3;
-      b.x = clamp(b.x, lo, hi); b.y = clamp(b.y, F.cy - F.gh + .3, F.cy + F.gh - .3);
-    }
-  }
-}
-const inPitch = () => { const m = P.get(myId); return !!m && areaOf(m.x, m.y)?.id === 'pitch'; };
-// kick: tap = a pass, hold = the ring fills and the shot gets harder
-const kickPower = () => clamp((performance.now() - kickT) / 900, .2, 1);
-function kickStart() { if (!kickT && inPitch() && !me?.down) kickT = performance.now(); }
-function kickGo() { if (!kickT) return; const p = kickPower(); kickT = 0; $('#kickBtn').classList.remove('charging'); $('#kickBtn').style.setProperty('--p', 0); send({ t: 'kick', p: +p.toFixed(2) }); }
-function kickTap() { if (inPitch() && !me?.down) send({ t: 'kick', p: .3 }); }
-{
-  const kb = $('#kickBtn');
-  kb.addEventListener('pointerdown', e => { e.preventDefault(); try { kb.setPointerCapture(e.pointerId); } catch { } kickStart(); kb.classList.add('charging'); });
-  for (const ev of ['pointerup', 'pointercancel']) kb.addEventListener(ev, e => { e.preventDefault(); kickGo(); });
-}
-function paintKick() {
-  const kb = $('#kickBtn'), on = inPitch();
-  kb.classList.toggle('hidden', !on);
-  if (on && !pitchHint) { pitchHint = true; toast('⚽ เดินชนบอลเพื่อเลี้ยง · ปุ่ม ⚽ เตะ: แตะ = ส่ง, กดค้างยิ่งแรง (คอม: K) · บอลออกนอกเส้นจะกลับมาที่จุดที่ออก', '⚽', true); }
-  if (kickT) kb.style.setProperty('--p', kickPower().toFixed(2));
-}
-// the pitch markings, painted on the grass (the mown stripes themselves are ground tiles)
-function drawPitch(X, Y) {
-  const F = G.pitch, px = x => x * TS + X, py = y => y * TS + Y, lw = Math.max(2, TS * .075);
-  ctx.save(); ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.fillStyle = 'rgba(255,255,255,.9)';
-  const box = (x, y, w, h) => ctx.strokeRect(px(x), py(y), w * TS, h * TS);
-  box(F.x0, F.y0, F.x1 - F.x0, F.y1 - F.y0);
-  ctx.beginPath(); ctx.moveTo(px(F.cx), py(F.y0)); ctx.lineTo(px(F.cx), py(F.y1)); ctx.stroke();                         // halfway line
-  ctx.beginPath(); ctx.arc(px(F.cx), py(F.cy), 3 * TS, 0, 7); ctx.stroke();                                              // centre circle
-  ctx.beginPath(); ctx.arc(px(F.cx), py(F.cy), TS * .13, 0, 7); ctx.fill();
-  const pb = F.gh + 2.5, pd = 5.5, ga = F.gh + .5, gd = 2;                                                               // penalty area, goal area
-  box(F.x0, F.cy - pb, pd, pb * 2); box(F.x1 - pd, F.cy - pb, pd, pb * 2);
-  box(F.x0, F.cy - ga, gd, ga * 2); box(F.x1 - gd, F.cy - ga, gd, ga * 2);
-  for (const sx of [F.x0 + 4, F.x1 - 4]) { ctx.beginPath(); ctx.arc(px(sx), py(F.cy), TS * .11, 0, 7); ctx.fill(); }      // penalty spots
-  for (const [cx, cy, a0] of [[F.x0, F.y0, 0], [F.x1, F.y0, Math.PI / 2], [F.x1, F.y1, Math.PI], [F.x0, F.y1, Math.PI * 1.5]]) { ctx.beginPath(); ctx.arc(px(cx), py(cy), TS * .7, a0, a0 + Math.PI / 2); ctx.stroke(); }   // corner arcs
-  // the nets lie behind each end line: a pale grid with a white frame
-  for (const left of [true, false]) {
-    const x = left ? F.x0 - F.gd : F.x1, y = F.cy - F.gh, w = F.gd, h = F.gh * 2;
-    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(px(x), py(y), w * TS, h * TS);
-    ctx.lineWidth = Math.max(1, TS * .025); ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.beginPath();
-    for (let i = 0; i <= w * 4; i++) { ctx.moveTo(px(x + i / 4), py(y)); ctx.lineTo(px(x + i / 4), py(y + h)); }
-    for (let j = 0; j <= h * 2; j++) { ctx.moveTo(px(x), py(y + j / 2)); ctx.lineTo(px(x + w), py(y + j / 2)); }
-    ctx.stroke(); ctx.lineWidth = lw; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.strokeRect(px(x), py(y), w * TS, h * TS);
-  }
-  ctx.restore();
-}
-// goal posts stand up from the grass; the bar joins the two (drawn with the nearer post)
-function pitchEnts(ents) {
-  const F = G.pitch;
-  for (const x of [F.x0, F.x1]) for (const [y, bar] of [[F.cy - F.gh, false], [F.cy + F.gh, true]]) ents.push([y + .02, 8, { x, y, bar, y0: F.cy - F.gh, y1: F.cy + F.gh }]);
-  if (BALL) ents.push([BALL.y + .22, 9, BALL]);
-}
-function drawPost(p, X, Y) {
-  const F = G.pitch, px = p.x * TS + X, py = p.y * TS + Y, hgt = F.gz * TS, w = Math.max(4, TS * .13);
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, w * 1.3, w * .65, 0, 0, 7); ctx.fill();
-  const bar = (x, y, ww, hh) => { ctx.fillStyle = 'rgba(20,45,25,.75)'; ctx.fillRect(x - 1, y - 1, ww + 2, hh + 2); ctx.fillStyle = '#fbfbfb'; ctx.fillRect(x, y, ww, hh); };   // white with a dark edge, so it shows against the painted line
-  bar(px - w / 2, py - hgt, w, hgt);
-  if (p.bar) bar(px - w / 2, p.y0 * TS + Y - hgt, w, (p.y1 - p.y0) * TS);       // the crossbar, drawn with the nearer post
-}
-function drawBall(b, X, Y) {
-  const r = TS * .2, px = b.x * TS + X, gy = b.y * TS + Y, lift = b.z * TS * .9, cy = gy - r - lift;
-  const s = 1 - Math.min(.55, b.z * .3);
-  ctx.fillStyle = `rgba(0,0,0,${.3 * s})`; ctx.beginPath(); ctx.ellipse(px, gy - r * .25, r * 1.05 * s, r * .55 * s, 0, 0, 7); ctx.fill();
-  ctx.save(); ctx.translate(px, cy); ctx.rotate(b.rot);
-  ctx.fillStyle = '#fafafa'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
-  ctx.fillStyle = '#23252b'; ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 - Math.PI / 2; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r * .42, Math.sin(a) * r * .42); } ctx.closePath(); ctx.fill();
-  for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 - Math.PI / 2 + Math.PI / 5; ctx.beginPath(); ctx.arc(Math.cos(a) * r * .95, Math.sin(a) * r * .95, r * .34, 0, 7); ctx.fill(); }
-  ctx.strokeStyle = 'rgba(35,37,43,.55)'; ctx.lineWidth = Math.max(1, r * .12); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke();
-  ctx.restore();
-}
-// a banner for a few seconds after a goal
-function drawGoalBanner() {
-  const age = performance.now() - goalAt; if (age > 2600) return;
-  const k = Math.min(1, age / 220), a = age > 2200 ? (2600 - age) / 400 : 1;
-  ctx.save(); ctx.globalAlpha = a; ctx.translate(VW / 2, VH * .24); ctx.scale(.6 + .4 * k, .6 + .4 * k);
-  ctx.font = `900 ${Math.round(Math.min(VW * .16, 84))}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.lineWidth = 8; ctx.strokeStyle = '#1d5e2b'; ctx.fillStyle = '#ffe28a'; ctx.strokeText('GOAL!', 0, 0); ctx.fillText('GOAL!', 0, 0);
-  if (goalBy) { ctx.font = `700 ${Math.round(Math.min(VW * .06, 28))}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 5; ctx.strokeText('⚽ ' + goalBy, 0, 52); ctx.fillStyle = '#fff'; ctx.fillText('⚽ ' + goalBy, 0, 52); }
-  ctx.restore();
-}
 function stepPets(dt) {
   const now0 = performance.now();
   for (const p of P.values()) {
@@ -2161,7 +2037,7 @@ function drawPlayerPixel(p, X, Y, t) {
 }
 // minimap: the map you are on (inside a building: the map outside it)
 const miniBase = {};
-const MINI_COLORS = { G: '#4f9e4a', H: '#58aa52', '=': '#555a63', ',': '#b7b4a6', c: '#a89c86', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#c0643a', T: '#2f6b3a', '.': '#5e9b57', o: '#5e9b57', m: '#7fb04e', k: '#c98a5a', ' ': '#07090c' };
+const MINI_COLORS = { '=': '#555a63', ',': '#b7b4a6', c: '#a89c86', w: '#4aa3d1', p: '#a47b50', s: '#e3d19a', f: '#7b5538', B: '#c0643a', T: '#2f6b3a', '.': '#5e9b57', o: '#5e9b57', m: '#7fb04e', k: '#c98a5a', ' ': '#07090c' };
 function buildMini() {
   for (const a of G.areas.filter(a => a.kind === 'map')) {
     const c = document.createElement('canvas'); c.width = a.w * 2; c.height = a.h * 2; const g = c.getContext('2d');
@@ -2839,10 +2715,6 @@ const needCareer = c => job(c) ? '' : `<div class="sub" style="color:var(--bad)"
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
-  { v: '2026-11-20a', d: '20 พ.ย. (รอบ 1)', items: [
-    '⚽ <b>สนามฟุตบอลเปิดแล้ว!</b> เดินเข้าประตู ⚽ ริมถนนใหญ่ฝั่งใต้ของเมือง (มีไอคอน ⚽ ลอยอยู่) แล้วเข้าไปเตะบอลกับเพื่อนๆ ได้เลย',
-    '🥅 เดินชนบอลเพื่อเลี้ยง · ปุ่ม ⚽ เตะ: แตะ = ส่งบอล, กดค้างยิ่งแรง (คอม: กด K ค้าง) · บอลเด้งและกลิ้งจริง ยิงเข้าประตูมีป้าย GOAL!',
-    '📍 บอลออกนอกเส้นจะกลับมาวางที่จุดที่ออกไป · ยิงเข้าประตูแล้วเริ่มใหม่จากจุดกลางสนาม'] },
   { v: '2026-11-16v', d: '16 พ.ย. (รอบ 22)', items: [
     '👥 เดินเข้าใกล้ผู้เล่นคนอื่น จะมีปุ่ม <b>ข้อมูล</b> และ <b>เพิ่มเพื่อน</b> ขึ้นเหนือชื่อเขา',
     '🚁 แก้บั๊ก<b>เฮลิคอปเตอร์โดนดึงกลับ</b>ตอนบินข้ามตึก',
@@ -3435,7 +3307,7 @@ function renderPanel(p) {
     case 'keys': {
       const K = (k, d) => `<div class="keyRow"><span>${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</span><em>${d}</em></div>`;
       return `<h2>⌨️ เล่นบนคอม</h2><div class="sub">ใช้ได้ทั้งคีย์บอร์ดและเมาส์ · กด <kbd>H</kbd> เพื่อเปิดหน้านี้อีกครั้ง</div><div class="keyGrid">
-        ${K('W A S D', 'เดิน (หรือปุ่มลูกศร)')}${K('Shift', 'กดค้างเพื่อวิ่ง')}${K('E Space', 'ใช้งาน / เข้าอาคาร / ดึงเบ็ด / ส่งบอล')}${K('K', 'เตะบอล (กดค้างยิ่งแรง) ในสนามฟุตบอล')}${K('F', 'คุยกับคนใกล้ๆ')}
+        ${K('W A S D', 'เดิน (หรือปุ่มลูกศร)')}${K('Shift', 'กดค้างเพื่อวิ่ง')}${K('E Space', 'ใช้งาน / เข้าอาคาร / ดึงเบ็ด')}${K('F', 'คุยกับคนใกล้ๆ')}
         ${K('R', 'นั่งพัก')}${K('Enter T', 'พิมพ์แชท')}${K('B I', 'กระเป๋า')}${K('P', 'มือถือ')}
         ${K('M', 'แผนที่')}${K('Q', 'เควสต์')}${K('Esc', 'ปิดหน้าต่าง')}${K('H', 'คีย์ลัด (หน้านี้)')}
         ${K('🖱️คลิก', 'คลิกพื้นเพื่อเดินไปตรงนั้น · คลิกคนเพื่อดูข้อมูล')}${K('🖱️กดค้าง', 'เดินตามเมาส์')}${K('🖱️ล้อ', 'ซูมเข้า/ออก')}</div>`;
@@ -3708,12 +3580,6 @@ function drawTile(ch, tx, ty, px, py, tm) {
   switch (ch) {
     case '.': { const v = hash(tx >> 1, ty >> 1); tex(v < .84 ? 'g_grass' : v < .92 ? 'g_grass_dots' : 'g_grass_flowers', tx, ty, px, py); return; }
     case 'm': tex(hash(tx >> 1, ty >> 1) < .9 ? 'g_grass3' : 'g_grass_dots', tx, ty, px, py); return;
-    case 'G': case 'H': {                                              // the pitch: mown stripes, a few darker blades
-      ctx.fillStyle = ch === 'G' ? '#4c9a47' : '#58a852'; ctx.fillRect(px, py, S, S);
-      const v = hash(tx, ty); ctx.fillStyle = ch === 'G' ? 'rgba(30,90,40,.28)' : 'rgba(30,90,40,.22)';
-      ctx.fillRect(px + v * TS * .7, py + (1 - v) * TS * .6, 2, Math.max(2, TS * .09)); ctx.fillRect(px + (1 - v) * TS * .6, py + v * TS * .7, 2, Math.max(2, TS * .09));
-      return;
-    }
     case 's': tex('g_sand', tx, ty, px, py); return;
     case 'k': tex('g_terracotta', tx, ty, px, py); return;
     case 'c': tex('g_cobble', tx, ty, px, py); return;
@@ -4088,7 +3954,7 @@ function drawLights(X, Y, dark) {
 }
 
 // ------------------------------------------------------------------ navigation across maps
-const GATE_TO = { farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', pitch_in: 'pitch', town_from_pitch: 'town' };
+const GATE_TO = { farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town' };
 function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
@@ -4137,7 +4003,7 @@ function drawGuide(X, Y, t) {
 
 // full-screen map of one outdoor area: a clean, simplified drawing with numbered markers
 // and a legend underneath. Tap a marker or a legend row to get the yellow guide arrow.
-const MAP_COL = { G: '#5aa856', H: '#64b45e', '=': '#5d636d', ',': '#c9c5b5', c: '#c4b494', w: '#5fb4e6', p: '#b48a5c', s: '#ecdcab', f: '#8a6040', B: '#9a8a7a', T: '#6fae5c', '.': '#8cc56f', o: '#8cc56f', m: '#a7d07a', k: '#e0b083', ' ': '#07090c' };
+const MAP_COL = { '=': '#5d636d', ',': '#c9c5b5', c: '#c4b494', w: '#5fb4e6', p: '#b48a5c', s: '#ecdcab', f: '#8a6040', B: '#9a8a7a', T: '#6fae5c', '.': '#8cc56f', o: '#8cc56f', m: '#a7d07a', k: '#e0b083', ' ': '#07090c' };
 let mapZoom = 1, mapCur = null;
 function zoomMap(z, cx, cy) {
   const box = $('#mapScroll'), old = mapZoom; mapZoom = clamp(z, 1, 5); if (mapZoom === old) return;
