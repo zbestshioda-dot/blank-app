@@ -101,6 +101,7 @@ function stat(a, key, n = 1, absolute = false) {
   for (const ac of D.ACHIEVEMENTS) {
     if (ac.stat !== key || (a.ach || []).includes(ac.id) || a.stats[key] < ac.n) continue;
     a.ach = [...(a.ach || []), ac.id];
+    if (ac.nt) { toast(a, `ปลดล็อกความสำเร็จ "${ac.title}" — ${ac.desc} (รับ 💎${ac.g} ได้ที่หน้าความสำเร็จ)`, '🏅'); send(a, { t: 'ach', id: ac.id }); joy(a, 5); continue; }   // small ones: no title, no town-wide news
     if (!a.title) a.title = ac.id;
     toast(a, `ปลดล็อกความสำเร็จ "${ac.title}" — ${ac.desc} (ตั้งเป็นฉายาบนหัวได้ที่เมนู 🏅)`, '🏅');
     send(a, { t: 'ach', id: ac.id }); joy(a, 10);
@@ -3423,7 +3424,7 @@ function botJoin(quiet) {
   if (!name) return;
   const sp = standNear('town', D.SPAWN.x + rnd(-3, 3), D.SPAWN.y + rnd(-2, 2)) || [D.SPAWN.x, D.SPAWN.y];
   const g = Math.random() < .5 ? 'f' : 'm', lv = rint(1, 9);
-  const n = { id: -(500 + botSeq++), bot: { plan: [], xp: rnd(0, 1), lv, days: rint(1, 40), worth: rint(800, 25000), fishLv: rint(1, 6), title: Math.random() < .5 ? pick(D.ACHIEVEMENTS.filter(x => x.r <= 2)) : null },
+  const n = { id: -(500 + botSeq++), bot: { plan: [], xp: rnd(0, 1), lv, days: rint(1, 40), worth: rint(800, 25000), fishLv: rint(1, 6), title: Math.random() < .5 ? pick(D.ACHIEVEMENTS.filter(x => x.r <= 2 && !x.nt)) : null },
     name, area: 'town', x: sp[0], y: sp[1], f: 6, path: [], wait: rnd(1, 3), g, look: randLook(), speed: rnd(1.5, 2.1), pickedAt: 0,
     c: Math.random() < .5 ? 'none' : pick(BOT_JOBS) };
   if (n.c === 'none') n.bot.lv = 1;
@@ -3836,7 +3837,7 @@ function achClaim(a, id) {
   const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
   if (!todo.length) return toast(a, 'ไม่มีรางวัลให้รับ', '🏅', false);
   let gem = 0;
-  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) gem += ACH_GEMS[ac.r || 1]; }
+  for (const x of todo) { const ac = D.ACHIEVEMENTS.find(y => y.id === x); if (ac) gem += ac.g || ACH_GEMS[ac.r || 1]; }
   a.achGot = [...got, ...todo]; a.gems = (a.gems || 0) + gem; markMe(a); dirty = true;
   toast(a, `รับรางวัลความสำเร็จ ${todo.length} รายการ ได้ 💎${gem}`, '💎');
 }
@@ -4193,7 +4194,7 @@ function onMessage0(ws, raw) {
     }
 
 
-    case 'title': { if (!m.id || (a.ach || []).includes(m.id) || (a.luxT || []).includes(m.id) || m.id === 'vip' && vipOn(a)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
+    case 'title': { if (!m.id || (a.ach || []).includes(m.id) && !titleDef(m.id)?.nt || (a.luxT || []).includes(m.id) || m.id === 'vip' && vipOn(a)) { a.title = m.id || ''; markMe(a); sendRoster(); } return; }
     case 'luxbuy': {
       const T = D.LUX_TITLES.find(x => x.id === m.id); if (!T || (a.luxT || []).includes(T.id) || !cd(a, 'luxbuy', 1500, true)) return;
       if (!pay(a, T.price)) return;
@@ -4225,7 +4226,7 @@ function onMessage0(ws, raw) {
       if (bn) eggMayor(a, bn);
       if (bn) { const b = bn.bot; return send(a, { t: 'info', id: bn.id, name: bn.name, pic: '', c: bn.c, lv: b.lv, title: b.title?.title || '', tr: b.title?.r || 0, adm: 0, ach: b.title ? [[b.title.title, b.title.r]] : [], worth: b.worth, days: b.days, fishLv: b.fishLv, home: 0, degree: 0, phone: '' }); }
       const o = playerById(m.id); if (!o || o.npc) return;
-      const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(Boolean).sort((x, y) => y.r - x.r);
+      const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(x => x && !x.nt).sort((x, y) => y.r - x.r);
       return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', fr: frameOf(o), c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
         ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
         home: o.hown ? 1 : 0, hslot: o.hown && o.house >= 0 ? 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });

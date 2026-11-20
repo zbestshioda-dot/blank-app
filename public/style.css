@@ -1416,3 +1416,17 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .socSub button{padding:3px 6px;font-size:12px}
 /* the name badge under the portrait: text centred inside the pill, Thai vowels not clipped */
 #card.v2 .pfp #meName{text-align:center!important;box-sizing:border-box!important;line-height:1.5!important;padding:0 8px!important}
+/* chat: the ⠿ grip drags the window (and the folded 💬 button) anywhere on screen */
+#cbGrip{flex:none;cursor:grab;touch-action:none;color:#ffd770;font-size:15px;line-height:1;padding:2px 5px 2px 2px;user-select:none;-webkit-user-select:none}
+#cbOpen{touch-action:none}
+/* HUD: portrait and status card pulled to the left edge (lined up with the chat); landscape: the card is as wide as the quest box */
+#card.v2 .pfp #meName{max-width:84px;overflow:hidden;text-overflow:ellipsis}
+#card.v2 .l1{flex-wrap:nowrap}#card.v2 .money,#card.v2 #meGems{white-space:nowrap;flex:none}
+@media (orientation:portrait){
+  #card.v2{left:calc(14px + env(safe-area-inset-left))!important;width:min(340px,calc(100vw - 126px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important}
+}
+@media (orientation:landscape){
+  #card.v2{left:14px!important;width:236px!important}
+  #card.v2 #qBox,#card.v2 #qline{width:236px!important;box-sizing:border-box}
+  #card.v2 .money{font-size:14px}
+}

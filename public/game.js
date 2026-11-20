@@ -600,7 +600,7 @@ function handle(m) {
     case 'chat': {
       chatLog.push(m); if (chatLog.length > 60) chatLog.shift();
       paintChatBox(m);
-      const s = P.get(m.id); if (s && !m.sys && !m.w && !m.g) {
+      const s = P.get(m.id); if (s && !m.sys && !m.g) {   // world chat floats over the head too
         const em = (m.text.match(/\p{Extended_Pictographic}(\u200d\p{Extended_Pictographic}|\ufe0f)*/gu) || []).slice(0, 3).join('');   // emoji in a chat line float big over your head
         const only = em && !m.text.replace(/[\p{Extended_Pictographic}\ufe0f\u200d\s]/gu, '');
         if (em) { s.emo = em; s.emoT = performance.now() + 4500; }
@@ -698,6 +698,30 @@ document.querySelectorAll('#chatBox [data-ct]').forEach(b => b.onclick = () => {
 });
 $('#cbForm').onsubmit = e => { e.preventDefault(); const i = $('#cbIn'); if (!i.value.trim()) return; const ch = cbTab === 'gang' ? 'gang' : cbTab === 'world' || cbTab === 'all' ? 'world' : 'near'; if (ch !== 'gang' && !worldOk(ch)) return; send({ t: 'chat', text: i.value, ch }); i.value = ''; i.blur(); };
 foldChat(cbFolded);
+// the chat window can be dragged anywhere (by its ⠿ grip, or the folded 💬 button); one spot per screen orientation
+{
+  const feed = $('#feed'), key = () => 'lt_cbpos_' + (innerWidth > innerHeight ? 'l' : 'p');
+  const place = (x, y) => {
+    const w = feed.offsetWidth || 200, h = Math.max(40, feed.offsetHeight || 40);
+    x = Math.max(0, Math.min(innerWidth - Math.min(w, 120), x)); y = Math.max(0, Math.min(innerHeight - Math.min(h, 40), y));
+    feed.style.setProperty('left', x + 'px', 'important'); feed.style.setProperty('top', y + 'px', 'important'); return [x, y];
+  };
+  const load = () => { let v = null; try { v = JSON.parse(localStorage.getItem(key()) || 'null'); } catch { }
+    if (v) place(v[0], v[1]); else { feed.style.removeProperty('left'); feed.style.removeProperty('top'); } };
+  let moved = false;
+  const drag = el => el.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    const r = feed.getBoundingClientRect(), sx = e.clientX, sy = e.clientY; moved = false; let last = null;
+    const mv = ev => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return; moved = true; ev.preventDefault(); last = place(r.left + ev.clientX - sx, r.top + ev.clientY - sy); };
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      if (moved && last) try { localStorage.setItem(key(), JSON.stringify(last)); } catch { } };
+    addEventListener('pointermove', mv, { passive: false }); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  });
+  drag($('#cbGrip')); drag($('#cbOpen'));
+  $('#cbOpen').addEventListener('click', e => { if (moved) { moved = false; e.stopImmediatePropagation(); foldChat(true); } }, true);   // a drag is not a tap
+  $('#cbGrip').ondblclick = () => { try { localStorage.removeItem(key()); } catch { } load(); };
+  addEventListener('resize', () => setTimeout(load, 60)); load();
+}
 function logLine(html, cls, bubbleOnly) {
   const l = $('#log'); const d = document.createElement('div');
   if (cls) d.className = cls; d.innerHTML = html;
@@ -3827,9 +3851,10 @@ function talkQuest(type) {
 function fishBook() {
   const all = Object.entries(G.items).filter(([, it]) => it.kind === 'fish' && it.rar && it.spr).sort((a, b) => a[1].rar - b[1].rar || a[1].base - b[1].base);
   const dex = me.fishdex || {}, got = all.filter(([id]) => dex[id]).length;
-  const cells = all.map(([id, it]) => `<div class="fbook ${dex[id] ? 'got' : ''} r${it.rar}" title="${esc(it.name)}"><canvas class="fspr" data-spr="${it.spr}" width="56" height="40"></canvas><small>${dex[id] ? esc(it.name) : '???'}</small>${dex[id] ? `<em>x${dex[id]}</em>` : ''}</div>`).join('');
+  const cell = ([id, it]) => `<div class="fbook ${dex[id] ? 'got' : ''} r${it.rar}" title="${esc(it.name)}"><canvas class="fspr" data-spr="${it.spr}" width="56" height="40"></canvas><small>${dex[id] ? esc(it.name) : '???'}</small>${dex[id] ? `<em>x${dex[id]}</em>` : ''}</div>`;
+  const cells = [...new Set(all.map(([, it]) => it.rar))].map(r => { const g = all.filter(([, it]) => it.rar === r); return `<div class="fbookH"><span class="rtag r${r}">${G.fishRarity[r] || RAR[r]}</span> <small>${g.filter(([id]) => dex[id]).length}/${g.length}</small></div><div class="fbookGrid">${g.map(cell).join('')}</div>`; }).join('');
   return `<div class="secT" style="margin-top:14px">📖 สมุดภาพปลา ${got}/${all.length}</div>
-    <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div><div class="fbookGrid">${cells}</div>`;
+    <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div>${cells}`;
 }
 // rods: the shop list at the fishing club (st) or the bag list (no st): stats, buy, hold
 function rodRows(st) {
@@ -4137,7 +4162,7 @@ function cropOpen(im) {
   $('#crop').classList.remove('hidden'); crop.draw();
 }
 const achTodo = () => (me?.ach || []).filter(x => !(me.achGot || []).includes(x));
-const achRew = a => (me.achReward || [])[a.r || 1] || 0;
+const achRew = a => a.g || (me.achReward || [])[a.r || 1] || 0;
 function achvPanel() {
   const todo = achTodo(), sum = todo.reduce((t, id) => t + achRew(G.ach.find(x => x.id === id) || {}), 0), got = (me.ach || []).length;
   const st = a => (me.achGot || []).includes(a.id) ? 2 : (me.ach || []).includes(a.id) ? 0 : 1;
@@ -4146,9 +4171,10 @@ function achvPanel() {
     const s2 = st(a), c = a.c ? G.careers[a.c] : null, pv = Math.min(a.n, me.stats?.[a.stat] || 0);
     if (a.secret && s2 === 1) return `<div class="item"><div class="em">❔</div><div class="nm"><b>??? ความสำเร็จลับ</b><small>ยังเป็นความลับ... ลองสังเกตสิ่งรอบตัว ฟังชาวเมืองคุยกัน</small></div><span class="tag">💎?</span></div>`;
     const btn = s2 === 0 ? B(`🎁 รับ 💎${achRew(a)}`, { t: 'achclaim', id: a.id }, 'primary') : s2 === 2 ? '<span class="tag">รับแล้ว ✓</span>' : `<span class="tag">💎${achRew(a)}</span>`;
+    if (a.nt) return `<div class="item ${s2 === 2 ? 'done' : ''}"><div class="em">${s2 === 1 ? '🔒' : '⭐'}</div><div class="nm"><b>${esc(a.title)}</b> <span class="tag">ไม่มีฉายา</span><small>${a.desc} · ${pv.toLocaleString()}/${a.n.toLocaleString()}</small><div class="wbar"><u style="width:${pct(a) * 100}%"></u></div></div>${btn}</div>`;
     return `<div class="item ${s2 === 2 ? 'done' : ''}"><div class="em">${s2 === 1 ? '🔒' : '🏅'}</div><div class="nm">${titleHtml(a.title, a.r)} <span class="rtag r${a.r || 1}">${RAR[a.r || 1]}</span>${c ? ` <span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${pv.toLocaleString()}/${a.n.toLocaleString()}</small><div class="wbar"><u style="width:${pct(a) * 100}%"></u></div></div>${btn}</div>`;
   }).join('');
-  return `<h2>🏅 ความสำเร็จ</h2><div class="sub">ปลดล็อกแล้ว ${got}/${G.ach.length} · ทุกความสำเร็จได้เพชร 💎5–15 ตามความยาก และใช้เป็นฉายาบนหัวได้</div>
+  return `<h2>🏅 ความสำเร็จ</h2><div class="sub">ปลดล็อกแล้ว ${got}/${G.ach.length} · ได้เพชร 💎5–20 ตามความยาก พร้อมฉายาบนหัว · ⭐ ความสำเร็จเล็กๆ ได้ 💎1–3 (ไม่มีฉายา)</div>
     ${todo.length ? `<div class="jobbox">🎁 รอรับรางวัล ${todo.length} รายการ รวม <b>💎${sum}</b>${B('รับทั้งหมด', { t: 'achclaim', id: 'all' }, 'primary big')}</div>` : ''}
     <div class="list">${rows}</div>`;
 }
@@ -4235,7 +4261,7 @@ function rewardsPanel() {
 }
 function achRows() {
   const has = id => (me.ach || []).includes(id) ? 0 : 1;   // unlocked titles first, then by rarity
-  return G.ach.slice().sort((x, y) => has(x.id) - has(y.id) || (x.r || 1) - (y.r || 1)).map(a => {
+  return G.ach.filter(a => !a.nt).sort((x, y) => has(x.id) - has(y.id) || (x.r || 1) - (y.r || 1)).map(a => {
     const has = (me.ach || []).includes(a.id), c = a.c ? G.careers[a.c] : null, prog = Math.min(a.n, me.stats?.[a.stat] || 0), on = me.title === a.id;
     return `<div class="item ${has ? 'done' : ''}"><div class="em">${has ? '🏅' : '🔒'}</div><div class="nm">${titleHtml(a.title, a.r)}<span class="rtag r${a.r || 1}">${RAR[a.r || 1]}</span> ${c ? `<span class="tag">${c.icon} ${c.name}</span>` : ''}<small>${a.desc} · ${prog.toLocaleString()}/${a.n.toLocaleString()}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้ฉายานี้', { t: 'title', id: on ? '' : a.id }, on ? 'primary' : 'good') : ''}</div>`;
   }).join('');
@@ -4270,6 +4296,13 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20d', d: '20 พ.ย. (รอบ 63)', items: [
+    '📐 จัดหน้าจอใหม่: รูปโปรไฟล์กับแถบสถานะชิดซ้ายขึ้น · จอแนวนอนแถบสถานะยาวเท่ากล่องเควสต์ · จอแนวตั้งเห็นเงินกับเพชรครบ',
+    '💬 <b>ลากหน้าต่างแชทได้</b> จับที่ปุ่ม ⠿ แล้วลากไปวางตรงไหนก็ได้ (แตะสองครั้งเพื่อคืนที่เดิม)',
+    '🗨️ แชทโลกขึ้นเป็นข้อความบนหัวตัวละครแล้ว',
+    '📖 สมุดภาพปลาแบ่งหมวดตามความหายาก ธรรมดา → ตำนาน',
+    '⭐ <b>ความสำเร็จเล็กๆ 20 อย่าง</b> ไม่มีฉายา แต่ได้เพชร 💎1–3',
+  ] },
   { v: '2026-11-20c', d: '20 พ.ย. (รอบ 62)', items: [
     '💎 <b>ร้านเติมเงินแบบใหม่</b> สแกน QR พร้อมเพย์จากแอปธนาคารไหนก็ได้ แล้วอัปโหลดสลิป ระบบตรวจสลิปให้อัตโนมัติ ของเข้าทันที',
   ] },
@@ -5261,7 +5294,7 @@ function renderPanel(p) {
         <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b> ${B('✏️ แก้ไขชื่อ 💎10', { fn: 'rename' })}<div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
         <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div><div class="item"><div class="nm">🧾 ภาษีวันนี้<small>${money(me.taxT?.paid || 0)} (รายได้ ${money(me.taxT?.e || 0)})</small></div></div><div class="item"><div class="nm">⛽ ค่าน้ำมันวันนี้<small>${money(me.fuelT || 0)}</small></div></div></div>${econHtml()}<div class="sub">ภาษีรายวัน: รายได้ ฿30,000 แรกไม่เสีย · ส่วนที่เกินเสีย 5% · เกิน ฿100,000 เสีย 10%${me.econ?.taxMul < 1 ? ' · <b>วันนี้ลดครึ่งหนึ่ง</b>' : ''} · รีเซ็ตเที่ยงคืน</div>
-        ${(() => { const mine = G.ach.filter(a => (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
+        ${(() => { const mine = G.ach.filter(a => !a.nt && (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
           return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
           <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
 `;
