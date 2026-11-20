@@ -4497,6 +4497,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-21c', d: '21 พ.ย. (รอบ 74)', items: [
+    '⚡ ไฟล์เกมเล็กลง โหลดเข้าเกมเร็วขึ้น (โดยเฉพาะเน็ตมือถือ)',
+  ] },
   { v: '2026-11-21b', d: '21 พ.ย. (รอบ 73)', items: [
     '📣 แอดมินกดคัดลอกข่าวอัปเดตไปโพสต์ในกลุ่มเฟสได้ในคลิกเดียว (⚙️ → โพสต์ข่าวลงเฟส)'] },
   { v: '2026-11-21a', d: '21 พ.ย. (รอบ 72)', items: [

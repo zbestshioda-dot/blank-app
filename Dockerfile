@@ -27,6 +27,9 @@ RUN npm ci
 # Copy application code
 COPY . .
 
+# Shrink the game code players download (~914 KB -> ~700 KB, ~270 KB -> ~225 KB gzipped)
+RUN npx -y esbuild@0.24.0 public/game.js public/fx.js --minify --charset=utf8 --log-level=error --allow-overwrite --outdir=public
+
 
 # Final stage for app image
 FROM base

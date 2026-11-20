@@ -164,3 +164,11 @@ cython_debug/
 #.idea/data/
 node_modules/
 data/
+
+# not needed on the server
+.git
+.claude
+tools/
+srv.log
+public/assets/pchar.webp
+public/assets/pchar.json
