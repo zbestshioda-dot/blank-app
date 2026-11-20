@@ -3622,6 +3622,10 @@ const FN = {
   openInvite() { send({ t: 'refcode' }); openPanel({ kind: 'invite' }); },
   refShare() { const R = window.__ref; if (!R) return; const url = location.origin + '/?ref=' + R.code, text = `มาเล่นเมืองชีวิตนี้เลือกได้ด้วยกัน! ใช้โค้ด ${R.code} รับไข่สัตว์เลี้ยงฟรี 🥚`;
     if (navigator.share) navigator.share({ title: 'เมืองชีวิตนี้เลือกได้', text, url }).catch(() => { }); else { try { navigator.clipboard.writeText(text + ' ' + url); toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย', '📋'); } catch { prompt('คัดลอกลิงก์นี้', url); } } },
+  fbCopy(m) {
+    const t = fbText(m.n), done = () => { try { localStorage.setItem('lt_fbpost', NEWS[0].v); } catch { } toast('คัดลอกแล้ว ไปวางในกลุ่มเฟสได้เลย', '📣'); };
+    navigator.clipboard?.writeText(t).then(done, () => { const a = $('#fbTxt'); if (a) { a.select(); document.execCommand('copy'); } done(); }) || (() => { const a = $('#fbTxt'); a?.select(); document.execCommand('copy'); done(); })();
+  },
   refCopy() { const R = window.__ref; if (!R) return; try { navigator.clipboard.writeText(R.code); toast('คัดลอกโค้ดแล้ว', '📋'); } catch { prompt('โค้ดของคุณ', R.code); } },
   refUse(m, root) { const c = root.querySelector('#refIn')?.value || ''; if (c.trim().length < 4) return toast('กรอกโค้ดเพื่อน', '🎟️', false); send({ t: 'refuse', code: c }); },
   openLotto() { send({ t: 'lotto', op: 'view' }); openPanel({ kind: 'lotto' }); },
@@ -4493,6 +4497,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-21b', d: '21 พ.ย. (รอบ 73)', items: [
+    '📣 แอดมินกดคัดลอกข่าวอัปเดตไปโพสต์ในกลุ่มเฟสได้ในคลิกเดียว (⚙️ → โพสต์ข่าวลงเฟส)'] },
   { v: '2026-11-21a', d: '21 พ.ย. (รอบ 72)', items: [
     '📱 <b>แก้ iPhone เด้งออก/หน้าเว็บมีปัญหา</b>: ภาพตัวละครแยกเป็นไฟล์เล็กตามชุด โหลดเฉพาะชุดที่มีคนใส่อยู่ใกล้ๆ ใช้หน่วยความจำน้อยลงมาก',
     '⚡ เจอผู้เล่นคนอื่นแล้วไม่กระตุก (ถ้าชุดยังโหลดไม่เสร็จ จะเห็นใส่ชุดธรรมดาแป๊บเดียว)'] },
@@ -4908,6 +4914,14 @@ const NEWS = [
     '🗺️ แผนที่: เอาวงกลมดำมีตัวเลขออก ใช้สัญลักษณ์ของแต่ละที่แทน · มินิแมพแสดงตัวอาคารชัดขึ้น',
     '🆕 มีหน้าสรุปอัปเดตแบบนี้ทุกครั้งที่อัปเดตเกม' ] },
 ];
+// 📣 the latest updates as a plain-text Facebook post (Facebook no longer lets apps post to groups, so the admin pastes it)
+const fbClean = h => h.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+function fbNewCount() { let v = ''; try { v = localStorage.getItem('lt_fbpost') || ''; } catch { } const i = NEWS.findIndex(n => n.v === v); return i < 0 ? 1 : Math.max(1, i); }
+function fbText(n) {
+  const L = NEWS.slice(0, n);
+  return [`🆕 อัปเดตเกม Life Town เมืองชีวิตนี้เลือกได้! (${L[0].d.replace(/\s*\(.*\)/, '')})`, '',
+    ...L.flatMap(x => x.items.map(t => '• ' + fbClean(t))), '', `🎮 เล่นฟรีบนมือถือ/คอม ไม่ต้องโหลด: ${location.origin}`, '#LifeTown #เกมมือถือ #เกมออนไลน์'].join('\n');
+}
 function newsHtml() {
   return `<h2>🆕 อัปเดตล่าสุด</h2>` + NEWS.slice(0, 5).map((n, i) => `<div class="sub" style="margin-top:${i ? 12 : 4}px"><b>${n.d}</b></div><ul style="margin:4px 0 0;padding-left:20px;line-height:1.7;font-size:14px">${n.items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('');
 }
@@ -5029,6 +5043,13 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'news': return newsHtml();
+    case 'fbpost': {
+      const n = Math.max(1, Math.min(NEWS.length, p.n || fbNewCount())), txt = fbText(n);
+      return `<h2>📣 โพสต์ข่าวลงเฟส</h2><div class="sub">กดคัดลอก แล้วไปวางในกลุ่มเฟส · เลือกจำนวนรอบอัปเดตที่จะรวมในโพสต์ได้</div>
+        <div class="tabs">${[1, 2, 3, 5].map(k => B(`${k} รอบ`, { fn: 'qtab', set: { n: k } }, n === k ? 'primary' : '')).join('')}</div>
+        <textarea id="fbTxt" readonly style="width:100%;height:320px;font-size:14px;line-height:1.5;padding:8px;box-sizing:border-box;border-radius:8px">${esc(txt)}</textarea>
+        <div style="margin-top:8px">${B('📋 คัดลอกข้อความ', { fn: 'fbCopy', n }, 'primary big')}</div>`;
+    }
     case 'icu': {
       const wait = Math.max(0, Math.ceil(((me.icuNext || 0) - Date.now() - clockOff) / 1000));
       if (!job('doctor')) return `<h2>🚨 ICU · ห้องฉุกเฉิน</h2><div class="sub">เฉพาะแพทย์เท่านั้น · หมอรับเคสฉุกเฉินที่นี่ แล้วลงมือรักษาจริงในห้อง</div>`;
@@ -5664,6 +5685,7 @@ function renderPanel(p) {
         <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
         <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
         <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
+        <div class="setRow"><span><b>📣 โพสต์ข่าวลงเฟส</b><small>ได้ข้อความอัปเดตพร้อมลิงก์เกม ไปวางในกลุ่มเฟสได้เลย</small></span>${B('📋 เปิด', { fn: 'open', kind: 'fbpost' }, 'primary')}</div>
         <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
         <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
