@@ -1006,7 +1006,9 @@ const blockedAt = (x, y) => { const r = G.radius; return yardLocked(x, y) || sol
 const keys = {};
 let joy = null;
 // letter keys by their position, so WASD / E / space work with a Thai keyboard layout too
-const K = e => /^Key[A-Z]$/.test(e.code || '') ? e.code.slice(3).toLowerCase() : e.code === 'Space' ? ' ' : e.key;
+// some keyboards/IMEs send no e.code, only the Thai character: map the Thai Kedmanee keys back to their letters
+const TH_KEY = { 'ไ': 'w', 'ฟ': 'a', 'ห': 's', 'ก': 'd', 'ำ': 'e', 'ิ': 'b', 'ร': 'i', 'ท': 'm', 'ๆ': 'q', '้': 'h', 'ย': 'p', 'พ': 'r', 'ด': 'f', 'แ': 'c', 'ะ': 't', '"': 'w', 'ฤ': 'a', 'ฆ': 's', 'ฏ': 'd', 'ฎ': 'e' };
+const K = e => /^Key[A-Z]$/.test(e.code || '') ? e.code.slice(3).toLowerCase() : e.code === 'Space' ? ' ' : TH_KEY[e.key] || e.key || '';
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) { if (K(e) === 'Escape') e.target.blur(); return; }
   keys[K(e).toLowerCase()] = true;
@@ -1025,7 +1027,11 @@ addEventListener('keydown', e => {
   if (K(e) === 'c' || K(e) === 't' || K(e) === 'Enter' && panel) { e.preventDefault(); openChatBox(); }
 });
 addEventListener('keyup', e => { keys[K(e).toLowerCase()] = false; if (K(e) === 'e' || K(e) === ' ') reelHold = false; if (K(e) === 'Shift' && shiftRun) { shiftRun = false; setRun(false); } });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+const keysUp = () => { for (const k in keys) keys[k] = false; };
+addEventListener('blur', keysUp);
+document.addEventListener('visibilitychange', keysUp);
+document.addEventListener('focusin', e => { if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) keysUp(); });
+document.addEventListener('focusout', keysUp);
 
 const cv = $('#cv'), mainCtx = cv.getContext('2d'); let ctx = mainCtx;   // ctx is swapped to an offscreen canvas while ground chunks are baked
 let TS = 40, VW = 0, VH = 0, DPR = 1;
