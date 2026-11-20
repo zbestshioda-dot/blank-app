@@ -202,7 +202,6 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   STATIONS.push({ id: 'pier_s1', type: 'fishspot', pool: 'sea', label: 'สะพานปลา (ทะเล)', icon: '🎣', x: 105, y: 61, r: 1.8, area: 'town' });
   STATIONS.push({ id: 'pier_s2', type: 'fishspot', pool: 'sea', label: 'ริมหาด (ทะเล)', icon: '🎣', x: 101.2, y: 38, r: 1.6, area: 'town' });
   STATIONS.push({ id: 'pier_p', type: 'fishspot', pool: 'lake', label: 'บ่อตกปลา', icon: '🎣', x: 80, y: 49.2, r: 1.6, area: 'town' });
-  STATIONS.push({ id: 'balloon', type: 'balloon', label: 'ร้านลูกโป่ง', icon: '🎈', x: 51.5, y: 37.5, r: 1.4, area: 'town' });   // a balloon seller by the fountain
   STATIONS.push({ id: 'guide', type: 'guide', label: 'จุดแนะนำเมือง', icon: '💁', x: 54.5, y: 35.2, r: 1.4, area: 'town' });   // the town guide by the fountain (talking is all on the client)
   STATIONS.push({ id: 'gate_farm', type: 'gate', to: 'farm_in', label: 'ไปไร่ชานเมือง', icon: '🌾', x: 3, y: 32, r: 1.6, area: 'town', renov: true });   // the farm is closed for renovation
   STATIONS.push({ id: 'gate_housing', type: 'gate', to: 'housing_in', label: 'ไปหมู่บ้านจัดสรร', icon: '🏘️', x: 50, y: 5, r: 1.6, area: 'town' });
@@ -652,6 +651,7 @@ const RIDES = {
   STATIONS.push({ id: 'pshop', type: 'pshop', label: 'ร้านขนม & ของฝากสวนสนุก', icon: '🍿', x: X + 10.5, y: Y + 23.4, r: 1.8, area: 'park' });
   shop('foodtruck', 15, 3); shop('icecream', 20, 3, .8); shop('cartstall', 24.5, 2); shop('b_cafe2', 31, 4, .55);
   for (const c of [35.4, 36.6]) prop('x_vending', X + c, Y + 24.6);
+  STATIONS.push({ id: 'balloon', type: 'balloon', label: 'ร้านลูกโป่ง', icon: '🎈', x: X + 27.5, y: Y + 23.4, r: 1.5, area: 'park' });   // 🎈 the balloon seller on the shopping street
   STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 11.5, r: 1.6, area: 'park' });
   prop('signpost', X + 4.2, Y + 9.9);
   for (const [x, y] of [[X + 12, Y + 9.4], [X + 24, Y + 9.4], [X + 24, Y + 13.4], [X + 37, Y + 13.4], [X + 6, Y + 21.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x + '_' + y, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y + .2, r: .7, area: 'park' }); }
@@ -1218,7 +1218,7 @@ const VEHICLES = {   // bought at the car showroom; ride outdoors (🛵 button) 
   porsche: { name: 'คลาสสิกเงินยวง', icon: '🚗', gem: 450, speed: 2.2, kind: 'car', license: 'driving', aura: '#cfe3ff' },
   jag:     { name: 'โรดสเตอร์เขียวมรกต', icon: '🚗', gem: 500, speed: 2.2, kind: 'car', license: 'driving', aura: '#3fe08a' },
   spider:  { name: 'สไปเดอร์ขาวทองคำ', icon: '🏎️', gem: 650, speed: 2.3, kind: 'car', license: 'driving', aura: '#ffd34d' },
-  heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', gem: 10000, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
+  heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', locked: 1, gem: 10000, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
   heli2:   { name: 'เฮลิคอปเตอร์กู้ภัยแดง', icon: '🚁', gem: 2000, speed: 2.6, kind: 'heli', license: 'driving', aura: '#ff6a8a', fly: 1, hidden: 1 },   // no longer sold (owners keep it)
   police:  { name: 'รถสายตรวจ', icon: '🚓', price: 150000, speed: 1.9, kind: 'car', license: 'driving', job: 'police' },
 };
@@ -1545,7 +1545,7 @@ const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout
   costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight'] };
 for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
-  OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }
+  OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', nosale: 1, ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }
 // prestige titles bought with money (a money sink for the rich): not achievements, never counted in the achievement total
 // the supporter title from the ฿49 top-up pack: lasts 30 days per purchase (stacks), sparkly rarity 8
 const PAY_TITLE = { id: 'vip', title: '💖 ผู้สนับสนุนเมือง', r: 8, days: 30 };

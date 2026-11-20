@@ -1961,7 +1961,7 @@ function act(a, m) {
     case 'fashion.outfit': {                // whole outfits: bought once, then worn / taken off from here or the settings
       const it = D.OUTFITS[m.id]; if (!it) return;
       if ((a.outfits || []).includes(m.id)) { a.outfit = a.outfit === m.id ? '' : m.id; markMe(a); return sendRoster(); }
-      if (!it.price && !it.gems) return;
+      if (!it.price && !it.gems || it.nosale) return;
       if (it.g && it.g !== a.gender) return toast(a, `ชุดนี้สำหรับ${it.g === 'f' ? 'ผู้หญิง' : 'ผู้ชาย'}เท่านั้น`, '👗', false);
       const nm = a.gender === 'f' && it.nf ? it.nf : it.name;
       if (it.gems) { if (!godInf(a) && (a.gems || 0) < it.gems) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${it.gems}`, '💎', false); if (!godInf(a)) a.gems -= it.gems; }
@@ -2545,6 +2545,7 @@ function act(a, m) {
       const v = D.VEHICLES[m.v]; if (!v) return;
       const own = (a.vehicles || []).includes(m.v);
       if (v.hidden && !own) return toast(a, 'รุ่นนี้เลิกขายแล้ว', '🚗', false);
+      if (v.locked && !own && m.a === 'buy') return toast(a, '🔒 รุ่นนี้ยังไม่เปิดขาย รอติดตามเร็วๆ นี้', '🚁', false);
       if (m.a === 'sell') {
         if (!own) return; if (v.gem) return toast(a, 'รถพิเศษ (เพชร) ขายคืนไม่ได้', '💎', false);
         if (m.v === 'police' && a.policeCar) return toast(a, 'รถสายตรวจเป็นของสถานีตำรวจ (ยืมใช้) ขายไม่ได้', '🚓', false);

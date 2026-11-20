@@ -3190,7 +3190,7 @@ function buildStaff() {
   }
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
-  { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: -.9, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ถือเดินเล่นสวยๆ', 'สีไหนดีหลาน ลุงมีครบ', 'ลูกโป่งหัวใจ เอาไปให้แฟนสิ'] },
+  { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: 1, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ถือเดินเล่นสวยๆ', 'สีไหนดีหลาน ลุงมีครบ', 'ลูกโป่งหัวใจ เอาไปให้แฟนสิ'] },
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ! อยากได้เพื่อนตัวฟูไหมคะ', 'ทุกตัวสุขภาพดีค่ะ ลูบได้นะคะ', 'ตัวไหนถูกใจ ลองแตะดูได้เลยค่ะ'] },
   { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
@@ -4427,6 +4427,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20i', d: '20 พ.ย. (รอบ 68)', items: [
+    '🎈 ร้านลูกโป่งลุงโป่งย้ายไปอยู่ที่<b>สวนสนุก</b> (ถนนร้านค้าด้านใต้) · ลูกโป่งที่ซื้อแล้วยังถือได้เหมือนเดิม',
+    '👗 ร้านแฟชั่นเลิกขายชุดสีพิเศษ (ใครซื้อไปแล้วยังใส่ได้จากกระเป๋า)',
+    '🚁 เฮลิคอปเตอร์ส่วนตัวในโชว์รูม ล็อกไว้ก่อน เร็วๆ นี้เปิดขาย'] },
   { v: '2026-11-20h', d: '20 พ.ย. (รอบ 67)', items: [
     '🌕🐺 <b>คืนหมาป่า</b> ทุกคืนจันทร์เต็มดวง 21:00 น. สุ่มคนในเมืองกลายเป็นหมาป่า ไล่ขย้ำคนอื่น · หมาป่ายืนนิ่งเกิน 3 วิ คำสาปหลุดไปหาคนใหม่ · รอดถึงเช้าได้รางวัลเต็ม ถ้าหมาป่ากินหมด โฮสหมาป่าได้ส่วนแบ่งมากสุด',
     '💼 <b>อาชีพใหม่ 6 อาชีพ</b>: 🧒 เด็กวัด · ⚱️ สัปเหร่อ (หน้าประตูวัด) · 🔧 ช่างซ่อมรถ (หน้าโชว์รูม) · 😎 นักเลง (ตลาด) · 📷 ช่างภาพ (จัตุรัส) · 📦 พนักงานส่งของ (หน้าคลังสินค้า) ทำภารกิจเดินจริงในเมือง',
@@ -5249,7 +5253,7 @@ function renderPanel(p) {
       const tab = ['car', 'gem'].includes(p.vtab) ? p.vtab : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
       const cards = Object.entries(G.shop.vehicles).filter(([k, v]) => (!v.hidden || (me.vehicles || []).includes(k)) && (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
         const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
-        const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
+        const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : v.locked ? B('🔒 เร็วๆ นี้', { t: 'act', st, a: 'buy', v: key }, '', true) : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
         return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas class="vfit" data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
       return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่นี่เลย'}</div>
         <div class="list" style="margin-bottom:8px">${drive}</div><div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${me.gemInf ? '∞ (แอดมิน)' : (me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
@@ -5395,8 +5399,8 @@ function renderPanel(p) {
       const ft = 'outfit';   // the shop sells whole outfits only (shirts and trousers are gone)
       return `<h2>👗 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · ขายชุดพิเศษใส่ทั้งตัว แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ชุดที่ซื้อแล้วถอด/ใส่ได้ฟรีตลอด · ย้อมผมที่ร้านทำผม 💈</div>
         ${ft !== 'outfit' ? sec(ft, ft === 'shirt' ? '👕 เสื้อ' : '👖 กางเกง') : `
-        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div>${(() => { const CT = [['casual', '👕 ลำลอง'], ['thai', '🇹🇭 ไทย & เทศกาล'], ['costume', '🎭 คอสตูม'], ['dye', '🎨 สีพิเศษ']], oc = CT.some(c => c[0] === p.oc) ? p.oc : 'casual';
-          const ok = ([id, o]) => (o.price || o.gems) && (!o.g || o.g === me.gender || (me.outfits || []).includes(id));
+        <div class="sub" style="margin-top:10px"><b>👗 ชุดพิเศษ</b> · ใส่ทับทั้งตัว (แทนชุดอาชีพด้วย) · ซื้อครั้งเดียว ถอด/ใส่ได้ตลอด</div>${(() => { const CT = [['casual', '👕 ลำลอง'], ['thai', '🇹🇭 ไทย & เทศกาล'], ['costume', '🎭 คอสตูม']], oc = CT.some(c => c[0] === p.oc) ? p.oc : 'casual';
+          const ok = ([id, o]) => (o.price || o.gems) && !o.nosale && (!o.g || o.g === me.gender || (me.outfits || []).includes(id));
           const tabs = `<div class="tabs ftabs">${CT.map(([k, l]) => { const n = Object.entries(G.outfitDefs).filter(e => ok(e) && e[1].cat === k).length; return B(`${l} <i class="tcnt">${n}</i>`, { fn: 'qtab', set: { oc: k } }, oc === k ? 'primary' : ''); }).join('')}</div>`;
           const cost = o => o.gems ? 1e12 + o.gems : o.price;
           return tabs + `<div class="looks">${Object.entries(G.outfitDefs).filter(e => ok(e) && e[1].cat === oc).sort(([, x], [, y]) => oc === 'dye' ? (x.base > y.base ? 1 : x.base < y.base ? -1 : x.hue - y.hue) : cost(x) - cost(y)).map(([id, o]) => {
