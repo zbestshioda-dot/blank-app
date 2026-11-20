@@ -20,7 +20,8 @@ ITEMS = {'b_rider': ('a', 0, 0, 5.6), 'b_toolshop': ('a', 1, 0, 5), 'b_market': 
          'b_rider2': ('f', 0, 0, 5.6), 'b_market2': ('f', 1, 0, 5.4), 'b_flower2': ('f', 0, 1, 5),
          'b_police2': ('g', 0, 0, 5.6), 'b_fire2': ('g', 1, 0, 6),
          'b_furnshop': ('h', 0, 0, 6), 'b_gas': ('h', 1, 0, 6.6),
-         'b_pet1': ('i', 0, 0, 6.0), 'b_gym1': ('i', 1, 0, 6.4), 'b_pet2': ('i', 0, 1, 5.8), 'b_gym2': ('i', 1, 1, 5.2)}
+         'b_pet1': ('i', 0, 0, 6.0), 'b_gym1': ('i', 1, 0, 6.4), 'b_pet2': ('i', 0, 1, 5.8), 'b_gym2': ('i', 1, 1, 5.2),
+         'b_fortune': ('j', 0, 0, 4.6)}
 SHEET = lambda k: os.path.join(ROOT, 'tools', 'sheets', f'pixel_buildings_{k}.jpg')
 
 def cut(sheet, col, row):

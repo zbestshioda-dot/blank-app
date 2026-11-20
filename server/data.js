@@ -373,6 +373,12 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
     // a paved doorstep from the door down to the street
     const cx = Math.floor(b.x + b.w / 2); for (let y = b.y + b.h; y < front + 1; y++) for (const xx of [cx - 1, cx]) if ('.m'.includes(get(xx, y))) set(xx, y, 'c');
   }
+  // 0b) 🔮 the fortune teller's tent: a street counter (no room), reads tarot for coins
+  {
+    const b = B('fortune', 'b_fortune', 38, 22, { label: 'เต็นท์แม่หมอพยากรณ์', icon: '🔮', st: 'fortune', stype: 'fortune', noSlot: true });
+    for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
+    for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
+  }
   // 1) back gardens: every shop or service whose back faces open grass gets a 3-row garden behind it: a white picket
   //    fence along the far edge, a hedge against the back wall, bushes in the corners and a flower bed in the middle
   for (const b of BUILDINGS) {
@@ -1532,7 +1538,8 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   hiphop:    { name: 'ชุดฮิปฮอปสตรีท', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 },
   thairoyal: { name: 'ชุดไทยราชสำนัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 250 },
   martial:   { name: 'ชุดจอมยุทธ์มังกรแดง', nf: 'ชุดจอมยุทธ์หญิงมังกรแดง', how: 'ซื้อที่ร้านแฟชั่น', gems: 350 },
-  knight:    { name: 'ชุดอัศวินเกราะเงิน', how: 'ซื้อที่ร้านแฟชั่น', gems: 450 } };
+  knight:    { name: 'ชุดอัศวินเกราะเงิน', how: 'ซื้อที่ร้านแฟชั่น', gems: 450 },
+  fortune:   { name: 'ชุดแม่หมอพยากรณ์', how: 'ซื้อที่ร้านแฟชั่น', gems: 300 } };
 // 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
 const DYES = { red: ['แดง', 0], orange: ['ส้ม', 28], yellow: ['เหลือง', 52], green: ['เขียว', 125], sky: ['ฟ้า', 195], blue: ['น้ำเงิน', 228], purple: ['ม่วง', 275], pink: ['ชมพู', 325] };
 const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songkran: ['pink', 'purple'], bunny: ['sky', 'purple'], chinese: ['blue', 'purple'],
@@ -1542,7 +1549,7 @@ const DYE_WHITE = ['catsuit', 'chicken', 'knight'];   // white / silver cloth al
 // shop tabs
 const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop'],
   thai: ['songkran', 'lanna', 'phasin', 'muaythai', 'lukthung', 'chinese', 'chakri', 'thai', 'thairoyal'],
-  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight'] };
+  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune'] };
 for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
   OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', nosale: 1, ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }
@@ -1650,11 +1657,22 @@ const FORTUNES = [
   'โชคดีจะมาตอนที่คุณไม่ทันตั้งตัว', 'วันนี้เหมาะกับการโทรหาเพื่อนเก่า', 'น้ำพุบอกว่า... ขอเหรียญอีกสักเหรียญ', 'ดวงความรักสดใส ยิ้มเยอะๆ นะ',
   'เที่ยงคืนเป็นเวลาของสิ่งแปลกประหลาด', 'คนที่เดินผ่านคุณไปเมื่อกี้ อาจไม่ใช่คนธรรมดา', 'อดทนอีกนิด สิ่งที่รอจะมาถึง', 'วันนี้ใครให้อะไร รับไว้ด้วยรอยยิ้ม',
 ];
+// 🔮 tarot reading at the fortune teller's tent: 3 cards (past / present / future), each upright or reversed. s: 1 good omen, 0 neutral, -1 warning
+const FORTUNE = { price: 50, perDay: 3, bonus: 30, bonusDay: 1 };   // all-three-good readings pay a small bonus, once a day
+const TAROT = {
+  fool:       { n: 'ไพ่ผู้เริ่มต้น (The Fool)', up: ['การเริ่มต้นใหม่กำลังรออยู่ กล้าก้าวออกไปเลย', 1], rev: ['ระวังความประมาท คิดให้รอบคอบก่อนตัดสินใจ', -1] },
+  magician:   { n: 'ไพ่นักมายากล (The Magician)', up: ['คุณมีทุกอย่างที่ต้องใช้อยู่ในมือแล้ว ลงมือเลย', 1], rev: ['มีคนพูดเกินจริง อย่าเพิ่งเชื่อทุกคำ', -1] },
+  priestess:  { n: 'ไพ่นักบวชหญิง (The High Priestess)', up: ['เชื่อสัญชาตญาณของคุณ คำตอบอยู่ข้างใน', 0], rev: ['มีบางอย่างซ่อนอยู่ ลองถามให้ชัดก่อน', -1] },
+  empress:    { n: 'ไพ่จักรพรรดินี (The Empress)', up: ['ความอุดมสมบูรณ์และความรักกำลังเติบโต', 1], rev: ['อย่าลืมดูแลตัวเองบ้าง พักผ่อนให้พอ', 0] },
+  emperor:    { n: 'ไพ่จักรพรรดิ (The Emperor)', up: ['ความมั่นคงและการวางแผนที่ดีจะพาคุณไปได้ไกล', 1], rev: ['อย่าดื้อเกินไป ลองฟังความเห็นคนอื่น', -1] },
+  hierophant: { n: 'ไพ่พระสังฆราช (The Hierophant)', up: ['ผู้ใหญ่ใจดีหรือคนมีประสบการณ์จะช่วยแนะนำคุณ', 1], rev: ['ลองคิดนอกกรอบ ไม่ต้องทำตามแบบเดิมเสมอไป', 0] },
+  chariot:    { n: 'ไพ่รถศึก (The Chariot)', up: ['ความมุ่งมั่นของคุณจะพาไปถึงเป้าหมาย', 1], rev: ['ไปเร็วเกินไปอาจพลาด ชะลอสักนิด', -1] },
+  strength:   { n: 'ไพ่พลัง (Strength)', up: ['ความใจเย็นและกำลังใจของคุณชนะทุกอย่าง', 1], rev: ['ช่วงนี้ใจอาจอ่อนแรง ขอกำลังใจจากเพื่อนได้', 0] } };
 // food no longer gives energy (energy comes back by sleeping at home or at the amusement park)
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
-module.exports = { BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

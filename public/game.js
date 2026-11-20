@@ -109,7 +109,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b1', chSheets = {};
+const CH_V = 'b2', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -173,7 +173,7 @@ function femOutfitFrame(sheet, step, lk) {
 const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
-  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight' };   // women's versions are the 'f' + name sheets
+  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -3248,6 +3248,7 @@ function buildStaff() {
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
   { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: 1, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ถือเดินเล่นสวยๆ', 'สีไหนดีหลาน ลุงมีครบ', 'ลูกโป่งหัวใจ เอาไปให้แฟนสิ'] },
+  { st: 'fortune', name: 'แม่หมอจันทรา (แม่หมอพยากรณ์)', short: 'แม่หมอจันทรา', icon: '🔮', g: 'f', of: 'fortune', dx: .9, dy: -1.1, lk: { hair: 'brown' }, hi: ['มาสิลูก ให้ไพ่บอกทางให้', 'ไพ่ 3 ใบ อดีต ปัจจุบัน อนาคต', 'ใจเย็นๆ แล้วตั้งคำถามในใจนะ'] },
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ! อยากได้เพื่อนตัวฟูไหมคะ', 'ทุกตัวสุขภาพดีค่ะ ลูบได้นะคะ', 'ตัวไหนถูกใจ ลองแตะดูได้เลยค่ะ'] },
   { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
@@ -4497,6 +4498,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-22', d: '22 พ.ย.', items: [
+    '🔮 เปิดเต็นท์แม่หมอจันทรา กลางเมือง: เปิดไพ่ยิปซี 3 ใบ ครั้งละ ฿50 วันละ 3 ครั้ง ได้ดวงดีทั้ง 3 ใบรับโบนัส',
+    '👗 ชุดใหม่ "ชุดแม่หมอพยากรณ์" ที่ร้านแฟชั่น (💎300)',
+  ] },
   { v: '2026-11-21c', d: '21 พ.ย. (รอบ 74)', items: [
     '⚡ ไฟล์เกมเล็กลง โหลดเข้าเกมเร็วขึ้น (โดยเฉพาะเน็ตมือถือ)',
   ] },
@@ -5111,6 +5116,17 @@ function renderPanel(p) {
       }
       const pick = (me.jobs || []).some(j => j.mine && j.state === 'taken' && j.src === 'market') ? `<div class="jobbox ok">🛵 มีของต้องรับไปส่ง ${B('📦 รับของจากตลาด', { t: 'act', st, a: 'pickup' }, 'primary')}</div>` : '';
       return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')} · ของที่วางขายครบ 2 ชั่วโมงแล้วยังไม่มีคนซื้อ ตลาดจะรับซื้อให้ที่ 40% ของราคาตลาด (ขายให้ผู้เล่นด้วยกันได้ราคาดีกว่า)</div>${pick}${tabs}${body}`;
+    }
+    case 'fortune': {   // 🔮 tarot tent: 3 cards, upright or reversed (reversed = the same picture turned upside down)
+      const F = G.fortuneCfg || { price: 50, perDay: 3, bonus: 30 }, T = G.tarot || {}, ids = Object.keys(T), f = me.fortune;
+      const used = f?.n || 0, left = Math.max(0, F.perDay - used), last = f?.last;
+      const card = (c, i) => { const t = T[c.id]; if (!t) return ''; const [txt, sc] = t[c.r ? 'rev' : 'up'];
+        return `<div style="flex:1;min-width:0;text-align:center"><div class="sub">${['อดีต', 'ปัจจุบัน', 'อนาคต'][i]}</div>
+          <div style="width:84px;height:106px;margin:4px auto;border:3px solid #d9a521;border-radius:8px;background:url(assets/tarot.webp) -${ids.indexOf(c.id) * 84}px 0/${ids.length * 84}px 106px;image-rendering:pixelated;${c.r ? 'transform:rotate(180deg)' : ''}"></div>
+          <b style="font-size:12px">${esc(t.n)}${c.r ? ' · กลับหัว' : ''}</b><div class="sub" style="color:${sc > 0 ? '#2e9e5b' : sc < 0 ? '#c0482b' : 'inherit'}">${esc(txt)}</div></div>`; };
+      const res = last ? `<div class="jobbox" style="display:flex;gap:6px;align-items:flex-start">${last.map(card).join('')}</div>${f.good && f.paid ? `<div class="jobbox ok">✨ ดวงดีทั้ง 3 ใบ! รับโบนัส ${money(f.paid)}</div>` : f.good ? '<div class="jobbox ok">✨ ดวงดีทั้ง 3 ใบ! (โบนัสวันนี้รับไปแล้ว)</div>' : ''}` : '';
+      return `<h2>🔮 เต็นท์แม่หมอจันทรา</h2><div class="sub">เปิดไพ่ยิปซี 3 ใบ (อดีต · ปัจจุบัน · อนาคต) ครั้งละ ${money(F.price)} · วันละ ${F.perDay} ครั้ง · ดวงดีทั้ง 3 ใบรับโบนัสวันละครั้ง</div>
+        <div class="grid2">${B(`🔮 เปิดไพ่ (${money(F.price)})`, { t: 'act', st, a: 'read' }, 'primary', left <= 0 || me.money < F.price)}</div><div class="sub">วันนี้เหลือ ${left}/${F.perDay} ครั้ง</div>${res}`;
     }
     case 'pshop': {
       const rows = (G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
