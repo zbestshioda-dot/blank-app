@@ -658,7 +658,7 @@ const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab 
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
   box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
-    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
+    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b${m.adm || P.get(m.id)?.adm ? ' class="adm"' : ''}>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
   box.scrollTop = box.scrollHeight;
   if (added && cbFolded && !added.sys) { cbUnread++; $('#cbNew').textContent = cbUnread; }
 }
@@ -3861,7 +3861,7 @@ function worldOk(ch) {
   if (left > 0) { toast(`แชทโลกส่งได้ทุก 3 วินาที · รออีก ${left} วินาที แล้วกดส่งใหม่ได้เลย (ข้อความยังอยู่ในช่องพิมพ์)`, '💬', false); return false; }
   worldAt = Date.now(); return true;
 }
-const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b${m.adm || P.get(m.id)?.adm ? ' class="adm"' : ''}>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
 // ---- profile photo, titles by rarity, mail
 let myPic = '', mailList = [], tradeChat = [];
 const infoCache = new Map();
