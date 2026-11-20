@@ -33,7 +33,7 @@ async function loadAll() {
 }
 
 // records: array of plain objects with .name. In file mode `all` (every player) is written instead.
-async function save(records, all) {
+async function save(records, all, full) {
   if (pool) {
     if (!records.length) return;
     const names = records.map(r => (r.login || r.name).toLowerCase());   // the login ID is the key
@@ -44,10 +44,19 @@ async function save(records, all) {
        ON CONFLICT (name_lc) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [names, datas]);
     return;
   }
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(FILE + '.tmp', JSON.stringify(typeof all === 'function' ? all() : all));
-  fs.renameSync(FILE + '.tmp', FILE);
+  // file mode: keep each player's JSON text cached and only re-encode the ones that changed, then write without blocking
+  // the game (encoding every player at once froze the server for a moment every save = lag for everyone).
+  // Everything is re-encoded from scratch every few minutes in case something changed an offline player quietly.
+  const t = Date.now();
+  if (full || !cache.size || t - fullAt > 5 * 60e3) {
+    cache.clear(); fullAt = t;
+    for (const r of (typeof all === 'function' ? all() : all)) cache.set(String(r.login || r.name).toLowerCase(), JSON.stringify(r));
+  } else for (const r of records) cache.set(String(r.login || r.name).toLowerCase(), JSON.stringify(r));
+  await fs.promises.mkdir(DATA_DIR, { recursive: true });
+  await fs.promises.writeFile(FILE + '.tmp', '[' + [...cache.values()].join(',') + ']');
+  await fs.promises.rename(FILE + '.tmp', FILE);
 }
+const cache = new Map(); let fullAt = 0;
 
 async function close() { if (pool) await pool.end().catch(() => {}); }
 module.exports = { init, loadAll, save, close };

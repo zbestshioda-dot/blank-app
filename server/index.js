@@ -1352,7 +1352,7 @@ async function save(force) {
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
   const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
-    await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]));
+    await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
   } catch (e) { dirty = true; if (wroteBugs) bugsDirty = true; console.error('save failed:', e.message); }
   saving = false;
@@ -3746,7 +3746,11 @@ function pubInfo(a) {
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
-function sendRoster() {
+// many things change the roster in one moment (a whole tick can call this dozens of times): send it at most once per ~60 ms
+let rosterQ = null;
+function sendRoster() { if (!rosterQ) rosterQ = setTimeout(sendRosterNow, 60); }
+function sendRosterNow() {
+  rosterQ = null;
   const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
   const pub = JSON.stringify({ t: 'roster', players: all.filter(p => !p._h).concat(npc) });
   for (const o of online.values()) {

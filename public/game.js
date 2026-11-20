@@ -1351,7 +1351,7 @@ function frame(t) {
   requestAnimationFrame(frame);
   // battery saver: full 60 fps while you walk, touch or anything moves near you; 30 fps only when standing idle
   const idle = performance.now() - Math.max(lastInput, liveT) > 1500 && !joy;
-  if (ECO && idle && t - frameT < 30) return; frameT = t;
+  if (ECO && (idle ? t - frameT < 30 : t - frameT < 14)) return; frameT = t;   // (and never more than 60 fps on phones: 90/120 Hz screens heat up and slow down)
   dlgTick();
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.05, (t - last) / 1000); last = t; FDT = dt;
@@ -4435,6 +4435,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20k', d: '20 พ.ย. (รอบ 70)', items: [
+    '⚡ <b>ลดแลค</b>: เซิร์ฟเวอร์ไม่ค้างตอนบันทึกข้อมูลแล้ว (เดิมกระตุกพร้อมกันทุก 15 วินาที) · ส่งข้อมูลผู้เล่นน้อยลง',
+    '📱 มือถือจอ 90/120Hz วาดภาพไม่เกิน 60 เฟรม เครื่องไม่ร้อน ลื่นนานขึ้น'] },
   { v: '2026-11-20j', d: '20 พ.ย. (รอบ 69)', items: [
     '🐺 หมาป่ามีรูปใหม่ วาดเต็มตัว เดิน/วิ่งได้ทุกทิศ · มี<b>เส้นขอบสีม่วง</b>รอบตัว มองเห็นง่ายแม้กลางคืน',
     '🌕 การ์ดเตือนคืนจันทร์เต็มดวงมีภาพใหม่'] },
