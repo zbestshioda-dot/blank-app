@@ -658,7 +658,7 @@ const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab 
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
   box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
-    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b${m.adm || P.get(m.id)?.adm ? ' class="adm"' : ''}>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
+    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
   box.scrollTop = box.scrollHeight;
   if (added && cbFolded && !added.sys) { cbUnread++; $('#cbNew').textContent = cbUnread; }
 }
@@ -3420,6 +3420,7 @@ const FN = {
     if (SURE[m.op] && !confirm(SURE[m.op])) return;
     if (m.op === 'create') return send({ t: 'gang', op: 'create', name: root.querySelector('#gName')?.value ?? panel.gnm ?? '', icon: panel.gic, color: panel.gco });
     if (m.op === 'donate') return send({ t: 'gang', op: 'donate', amt: +root.querySelector('#gAmt')?.value || 0 });
+    if (m.op === 'rename') { const nm = (root.querySelector('#gRename')?.value || '').trim(); if (nm.length < 2) return toast('พิมพ์ชื่อแก๊งใหม่อย่างน้อย 2 ตัวอักษร', '🏴', false); if (!confirm(`เปลี่ยนชื่อแก๊งเป็น "${nm}" ใช้ 💎300?`)) return; return send({ t: 'gang', op: 'rename', name: nm }); }
     send({ t: 'gang', op: m.op, l: m.l, id: m.id });
     if (m.op === 'req' || m.op === 'create') setTimeout(() => send({ t: 'gang', op: 'list' }), 400);
   },
@@ -3861,7 +3862,7 @@ function worldOk(ch) {
   if (left > 0) { toast(`แชทโลกส่งได้ทุก 3 วินาที · รออีก ${left} วินาที แล้วกดส่งใหม่ได้เลย (ข้อความยังอยู่ในช่องพิมพ์)`, '💬', false); return false; }
   worldAt = Date.now(); return true;
 }
-const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b${m.adm || P.get(m.id)?.adm ? ' class="adm"' : ''}>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
 // ---- profile photo, titles by rarity, mail
 let myPic = '', mailList = [], tradeChat = [];
 const infoCache = new Map();
@@ -4212,6 +4213,8 @@ const NEWS = [
     '📱 จัดแอปในมือถือใหม่เป็นหมวด: ติดต่อ · เงินทอง · ชีวิตประจำวัน · รางวัล · อื่นๆ หาแอปง่ายขึ้น',
     '📘 <b>LifeBook</b> แอปโซเชียลสีฟ้า รวมไอเดีย (และแจ้งบัค) เพื่อน และงาน ไว้ในแอปเดียว',
     '😀 ปุ่มอิโมจิกลับมาแล้ว อยู่เหนือปุ่มวิ่ง',
+    '🏴 หัวหน้าแก๊งเปลี่ยนชื่อแก๊งได้แล้ว 💎300 (บ้านแก๊ง → เปลี่ยนชื่อแก๊ง)',
+    '🧾 ค่าน้ำค่าไฟถูกลงครึ่งหนึ่ง และไม่คิดค่าน้ำค่าไฟช่วงที่ออฟไลน์',
     '📊 แถบสถานะดูง่ายขึ้น: ไม่มีตัวเลข หลอดอยู่ชิดชื่อ กรอบกว้างขึ้น',
   ] },
   { v: '2026-11-20a', d: '20 พ.ย. (รอบ 60)', items: [
@@ -4672,6 +4675,7 @@ function gangPanel(p) {
       <div class="rowf" style="margin-top:10px"><input id="gAmt" type="number" min="100" value="1000" inputmode="numeric"></div>
       ${B('💰 บริจาคเข้าคลังแก๊ง', { fn: 'gang', op: 'donate' }, 'primary')}
       ${N ? `<div class="item" style="margin-top:10px"><div class="nm">⬆️ อัปเกรดเป็น ${N.n}<small>ใช้เงินคลัง ${money(N.cost)} ${g.bank >= N.cost ? '✅' : '❌'} · แต้มรวม ${N.pts.toLocaleString()} ${g.pts >= N.pts ? '✅' : '❌'} · รับได้ ${N.cap} คน${N.inc ? ` · รายได้ +${Math.round(N.inc * 100)}%` : ''} · พัก +${N.rest}</small></div>${B('อัปเกรด', { fn: 'gang', op: 'upgrade' }, g.role === 'boss' ? 'good' : '', g.role !== 'boss')}</div>` : '<div class="sub">🏆 บ้านแก๊งอัปเกรดสูงสุดแล้ว</div>'}
+      ${g.role === 'boss' ? `<div class="secT">✏️ เปลี่ยนชื่อแก๊ง</div><div class="rowf"><input id="gRename" maxlength="14" placeholder="ชื่อแก๊งใหม่"></div>${B('✏️ เปลี่ยนชื่อ 💎300', { fn: 'gang', op: 'rename' }, 'primary', !me.admin && (me.gems || 0) < 300)}` : ''}
       <div class="grid2" style="margin-top:14px">${B('🚪 ออกจากแก๊ง', { fn: 'gang', op: 'leave' })}${g.role === 'boss' ? B('💥 ยุบแก๊ง', { fn: 'gang', op: 'disband' }) : ''}</div>`;
   } else if (gt === 'mem') {
     body = g.mem.map(m => { const me0 = m.l === g.my, act = [];

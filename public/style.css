@@ -1416,5 +1416,3 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .socSub button{padding:3px 6px;font-size:12px}
 /* the name badge under the portrait: text centred inside the pill, Thai vowels not clipped */
 #card.v2 .pfp #meName{text-align:center!important;box-sizing:border-box!important;line-height:1.5!important;padding:0 8px!important}
-/* admins' names in the chat are purple */
-b.adm,#cbLog b.adm,.w b.adm,.g b.adm{color:#b46bff!important;text-shadow:0 0 4px rgba(180,107,255,.45)}
