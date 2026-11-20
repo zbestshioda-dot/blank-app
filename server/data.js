@@ -375,9 +375,10 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   }
   // 0b) 🔮 the fortune teller's tent: a street counter (no room), reads tarot for coins
   {
-    const b = B('fortune', 'b_fortune', 38, 22, { label: 'เต็นท์แม่หมอพยากรณ์', icon: '🔮', st: 'fortune', stype: 'fortune', noSlot: true });
+    const b = B('fortune', 'b_fortune', 43, 58, { label: 'เต็นท์แม่หมอพยากรณ์', icon: '🔮', st: 'fortune', stype: 'fortune', noSlot: true });
     for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
-    for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
+    for (let j = b.y + b.h; j < b.y + b.h + 5; j++) for (let i = b.x - 2; i < b.x + b.w + 2; i++) dropTree(i, j);   // keep the doorway clear of trees
+    for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x - 2 && q.x < b.x + b.w + 2 && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 5 && !/fence|hedge/.test(q.s || '')) PROPS.splice(k, 1); }
   }
   // 1) back gardens: every shop or service whose back faces open grass gets a 3-row garden behind it: a white picket
   //    fence along the far edge, a hedge against the back wall, bushes in the corners and a flower bed in the middle
