@@ -6,6 +6,15 @@ primary_region = 'sin'
 
 [build]
 
+# Player saves live on a persistent volume so a deploy never wipes them.
+# Create it once first:  fly volumes create lifetown_data --region sin --size 1
+[env]
+  DATA_DIR = '/data'
+
+[mounts]
+  source = 'lifetown_data'
+  destination = '/data'
+
 [http_service]
   internal_port = 8080
   force_https = true
