@@ -3406,6 +3406,7 @@ function bindPanel(root) {
   bindSpr(root);
   root.querySelectorAll('[data-pet]').forEach(c => { const draw = () => { if (!PET_AT || !petImg) return setTimeout(draw, 300); drawPetIcon(c, c.dataset.pet); }; draw(); });
   if (root.querySelector('canvas[data-pp]')) ppStart();
+  root.querySelectorAll('[data-show]').forEach(c => drawShow(c));
   root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
@@ -3417,6 +3418,8 @@ const FN = {
   openPets() { openPanel({ kind: 'pets' }); },
   titles: () => { panel.titles = !panel.titles; panel.frames = false; refreshPanel(true); const b = document.querySelector('#panelBody'); if (b) b.scrollTop = 0; },
   frames: () => { panel.frames = !panel.frames; panel.titles = false; refreshPanel(true); const b = document.querySelector('#panelBody'); if (b) b.scrollTop = 0; },
+  showEd: () => { panel.showEd = !panel.showEd; panel.titles = panel.frames = false; refreshPanel(true); const b = document.querySelector('#panelBody'); if (b) b.scrollTop = 0; },
+  showAch(m) { const cur = me.show?.ach || [], has = cur.includes(m.id); if (!has && cur.length >= 3) return toast('เลือกโชว์ได้สูงสุด 3 อัน กดเอาอันเดิมออกก่อน', '🏅'); send({ t: 'show', ach: has ? cur.filter(x => x !== m.id) : [...cur, m.id] }); },
   photo: () => pickPhoto(),
   place: m => startPlace(m.k),
   decoPick: () => startPick(),
@@ -3881,6 +3884,18 @@ function waterPoolAt(x, y) {
 let waterNear = null;
 const POOL_NAME = { sea: '🌊 ทะเล', lake: '🏞️ น้ำจืด (ทะเลสาบ/บ่อ)', river: '🐟 แม่น้ำ' };
 // draws atlas sprites into <canvas data-spr> (furniture/vehicles stand on the bottom edge, fish (.fspr) are centred and can scale up)
+// 🪪 profile showcase: the car at the back, the character always in front of it, the pet beside
+function drawShow(c) {
+  const d = JSON.parse(c.dataset.show || '{}'), cs = d.car && `w_${d.car}_s`;
+  if (!chImg || (cs && (!atlas || !atlasImg)) || (d.pet && (!PET_AT || !petImg))) return setTimeout(() => drawShow(c), 300);
+  const g = c.getContext('2d'), W = c.width, H = c.height; g.clearRect(0, 0, W, H);
+  const sp = cs && atlas.sprites[cs];
+  if (sp) { const k = Math.min(W * .78 / sp[2], H * .62 / sp[3]); g.imageSmoothingEnabled = k < 1; g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (W - sp[2] * k) / 2 - (d.pet ? 10 : 0), H - 8 - sp[3] * k, sp[2] * k, sp[3] * k); }
+  const meta = d.pet && PET_AT.pets[d.pet];
+  if (meta) { const C = PET_AT.cell, [bx, by, bw, bh] = petBox(meta.row), k = Math.min(H * .34 / bh, W * .2 / bw); g.imageSmoothingEnabled = true; g.drawImage(petImg, bx, meta.row * C + by, bw, bh, W * .74 - bw * k / 2, H - 6 - bh * k, bw * k, bh * k); }
+  drawCharTo(g, { g: d.g, lk: d.lk || {}, of: d.of || '' }, sp || meta ? W * .42 : W / 2, H - 6, H * .78 / CH_ATLAS.h, 'front', 0);
+}
+const showCv = (sh, w = 260, h = 150) => `<div class="showBox"><canvas data-show="${esc(JSON.stringify(sh))}" width="${w}" height="${h}"></canvas></div>`;
 function bindSpr(root) {
   root.querySelectorAll('[data-spr]').forEach(c => { const draw = () => { const sp = atlas?.sprites?.[c.dataset.spr]; if (!sp || !atlasImg) return setTimeout(draw, 300);
     const fish = c.classList.contains('fspr'), fit = c.classList.contains('vfit'), g = c.getContext('2d'), k = fish ? Math.min((c.width - 2) / sp[2], (c.height - 2) / sp[3]) : fit ? Math.min((c.width - 20) / sp[2], (c.height - 14) / sp[3]) : Math.min((c.width - 8) / sp[2], (c.height - 6) / sp[3], 1.6);
@@ -4296,6 +4311,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20e', d: '20 พ.ย. (รอบ 64)', items: [
+    '🪪 <b>หน้าข้อมูลผู้เล่นใหม่</b>: โชว์ตัวละครในชุด สัตว์เลี้ยง และรถของคุณไว้อวด (ตัวละครอยู่หน้ารถเสมอ) · กด ✏️ เลือกเองได้จากของที่มี · คนอื่นแตะดูก็เห็น',
+    '🏅 เลือกความสำเร็จที่จะโชว์ได้เอง 3 อัน · หน้าข้อมูลเหลือแค่ทรัพย์สินรวมกับความสำเร็จ ดูสะอาดตา',
+    '🎒 แท็บชุดในกระเป๋าเป็นรูปชุดแบบเดียวกับร้านขายชุด · เอาข้อมูลเบ็ดออกจากกระเป๋า (เปลี่ยนเบ็ดได้ที่ร้านน้าเล็ก)'] },
   { v: '2026-11-20d', d: '20 พ.ย. (รอบ 63)', items: [
     '📐 จัดหน้าจอใหม่: รูปโปรไฟล์กับแถบสถานะชิดซ้ายขึ้น · จอแนวนอนแถบสถานะยาวเท่ากล่องเควสต์ · จอแนวตั้งเห็นเงินกับเพชรครบ',
     '💬 <b>ลากหน้าต่างแชทได้</b> จับที่ปุ่ม ⠿ แล้วลากไปวางตรงไหนก็ได้ (แตะสองครั้งเพื่อคืนที่เดิม)',
@@ -5047,19 +5066,17 @@ function renderPanel(p) {
       const shown = ents.filter(([id]) => gcat === 'all' || catOf(id) === gcat).sort((a, b) => ord[catOf(a[0])] - ord[catOf(b[0])] || G.items[b[0]].base * b[1] - G.items[a[0]].base * a[1]);
       const ctabs = `<div class="tabs ftabs">${CATS.map(([k, l]) => { const n = k === 'all' ? ents.length : ents.filter(([id]) => catOf(id) === k).length; return B(l + (n ? ` <i class="tcnt">${n}</i>` : ''), { fn: 'qtab', set: { gcat: k } }, gcat === k ? 'primary' : ''); }).join('')}</div>`;
       const totalV = shown.reduce((s, [id, q]) => s + G.items[id].base * q, 0);
-      const gtabs = `<div class="tabs">${[['items', '🎒 ของ'], ['wear', '👕 ชุด & เบ็ด'], ['info', '📋 ข้อมูล']].map(([k, l]) => B(l, { fn: 'qtab', set: { gtab: k } }, gtab === k ? 'primary' : '')).join('')}</div>`;
+      const gtabs = `<div class="tabs">${[['items', '🎒 ของ'], ['wear', '👕 ชุด'], ['info', '📋 ข้อมูล']].map(([k, l]) => B(l, { fn: 'qtab', set: { gtab: k } }, gtab === k ? 'primary' : '')).join('')}</div>`;
       const rows = shown.map(([id, q]) => { const it = G.items[id]; return itemRow(id, it.egg ? B('🐣 เปิดไข่', { t: 'use', item: id }, 'primary') : it.eat ? B('ใช้', { t: 'use', item: id }, 'good') : '', it.egg ? `x${q} · ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)` : `x${q} · ~${money(it.base)}${it.eat ? ' · ' + eatText(it.eat) : ''}`); }).join('');
       const licTxt = me.licenses.map(l => G.licenses[l].icon + G.licenses[l].name).join(', ') || 'ไม่มี';
-      const rod = G.rods[me.rodEq] ? `${G.rods[me.rodEq].icon} ${G.rods[me.rodEq].name} · ตกปลา Lv.${me.fishLv}` : 'ยังไม่มีเบ็ด (ซื้อที่สมาคมประมง)';
       const tools = Object.entries(me.tools || {}).map(([c, t]) => `${G.shop.tools[c]?.icon || ''}${'★'.repeat(t)}`).join(' ') || '—';
       const home = me.house >= 0 ? `บ้านเลขที่ ${me.house + 1} ⭐${me.comfort}` : me.rent ? `เช่าบ้านเลขที่ ${me.rent.idx + 1}` : 'ยังไม่มี';
-      const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🎣 ตกปลา<small>${rod}</small></div></div><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
+      const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
       const job = me.career !== 'none' && G.careers[me.career]?.where;
-      const outfits = (me.outfits || []).map(id => `<div class="setRow"><span><b>🎽 ${esc(ofName(G.outfitDefs[id]) || id)}</b><small>${esc(G.outfitDefs[id]?.how || '')}</small></span>${B(me.outfit === id ? 'ใส่อยู่ ✓' : 'ใส่', { fn: 'look', set: { outfit: me.outfit === id ? '' : id } }, me.outfit === id ? 'primary' : 'good')}</div>`).join('');
+      const outfits = (me.outfits || []).length ? `<div class="looks">${me.outfits.map(id => { const on = me.outfit === id; return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(G.outfitDefs[id]) || id)}</small>${B(on ? 'ถอด' : 'ใส่', { fn: 'look', set: { outfit: on ? '' : id } }, on ? '' : 'good')}</div>`; }).join('')}</div>` : '';
       if (gtab === 'items') return `<h2>🎒 กระเป๋า</h2>${gtabs}${ctabs}<div class="sub">${shown.length} อย่าง · มูลค่าประมาณ ${money(totalV)}</div><div class="list">${rows || '<div class="sub">ไม่มีของในหมวดนี้</div>'}</div>`;
       if (gtab === 'info') return `<h2>🎒 กระเป๋า</h2>${gtabs}<div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}`;
       return `<h2>🎒 กระเป๋า</h2>${gtabs}
-        <div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>
         <div class="secT">👕 ชุด</div>
         <div class="setRow"><span><b>ซ่อนชุดอาชีพ</b><small>${job ? `ใส่เสื้อผ้าของตัวเองแทนชุด${G.careers[me.career].name}` : 'ตอนนี้ยังไม่มีชุดอาชีพ'}</small></span>${B(me.hideJob ? 'ซ่อนอยู่' : 'แสดงอยู่', { fn: 'look', set: { hideJob: !me.hideJob } }, me.hideJob ? 'good' : '')}</div>
         ${outfits || '<div class="sub">ชุดพิเศษ (รางวัล) จะมาอยู่ตรงนี้ เช่น 🎽 ชุดนักตกปลา (ตกปลาถึงเลเวลสูงสุด) · ชุดแฟชั่นจะมาเพิ่มในอนาคต</div>'}`;
@@ -5123,7 +5140,7 @@ function renderPanel(p) {
       const here = pool.filter(([id]) => id && G.items[id].rar), got = here.filter(([id]) => me.fishdex?.[id]).length;
       const fishes = `${here.length} ชนิด (ตกได้แล้ว ${got}) ` + [1, 2, 3, 4, 5].map(r => [r, here.filter(([id]) => G.items[id].rar === r).length]).filter(([, n]) => n).map(([r, n]) => `<span class="rtag r${r}">${G.fishRarity[r]} ${n}</span>`).join('') + ' · ดูรายชื่อในแอปสมุดปลาในมือถือ';
       const rod = G.rods[me.rodEq];
-      const head = `<h2>🎣 ${esc(s.label)}</h2><div class="sub">${rod ? `ในมือ: ${rod.icon} <b>${esc(rod.name)}</b> (เปลี่ยนได้ในกระเป๋า) · ` : ''}ปลาแถวนี้: ${fishes} · ตกปลา Lv.${me.fishLv}${me.fishLv >= G.fishing.maxLv ? ' (สูงสุด)' : ` (${me.fishXp % G.fishing.xpPerLv}/${G.fishing.xpPerLv})`}</div>`;
+      const head = `<h2>🎣 ${esc(s.label)}</h2><div class="sub">${rod ? `ในมือ: ${rod.icon} <b>${esc(rod.name)}</b> (เปลี่ยนได้ที่ร้านน้าเล็ก) · ` : ''}ปลาแถวนี้: ${fishes} · ตกปลา Lv.${me.fishLv}${me.fishLv >= G.fishing.maxLv ? ' (สูงสุด)' : ` (${me.fishXp % G.fishing.xpPerLv}/${G.fishing.xpPerLv})`}</div>`;
       if (!me.rod) return `${head}<div class="jobbox">🎣 ต้องมี<b>เบ็ดตกปลา</b>ก่อน ซื้อได้กับน้าเล็กที่สมาคมประมง (${money(G.fishing.rod)}) · ใครก็ตกปลาได้ ไม่ต้องสมัครงาน${B('📍 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good big')}</div>`;
       let btn;
       if (!c) btn = B('🎣 เหวี่ยงเบ็ด (⚡8)', { t: 'act', st, a: 'cast' }, 'primary big');
@@ -5290,14 +5307,28 @@ function renderPanel(p) {
           return `<div class="item ${has ? 'done' : ''}"><div class="em">👑</div><div class="nm">${titleHtml(T.title, T.r)}<span class="rtag r${T.r}">${RAR[T.r] || ''}</span><small>${has ? 'เป็นเจ้าของแล้ว' : money(T.price)}</small></div>${has ? B(on ? 'ใช้อยู่ ✓' : 'ใช้', { t: 'title', id: on ? '' : T.id }, on ? 'primary' : 'good') : B(`ซื้อ ${money(T.price)}`, { t: 'luxbuy', id: T.id }, '', me.money < T.price)}</div>`; }).join('')}</div>
         <div class="list">${achRows()}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'titles' })}`;
       if (p.frames) return `<h2>${B('‹ กลับ', { fn: 'frames' })} 🖼️ กรอบรูป</h2>${frameRows()}${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'frames' })}`;
+      const sh = { of: '', pet: '', car: '', ach: [], ...(me.show || {}) }, shCv = { of: sh.of, pet: sh.pet, car: sh.car, g: me.gender, lk: me.look || {} };
+      const myAch = G.ach.filter(a => !a.nt && (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1));
+      if (p.showEd) {
+        const pick = (on, inner, m) => `<div class="look ${on ? 'on' : ''}">${inner}${B(on ? 'โชว์อยู่ ✓' : 'โชว์', { t: 'show', ...m }, on ? 'primary' : 'good', on)}</div>`;
+        const ofs = ['', ...(me.outfits || [])].map(id => pick(sh.of === id, `<canvas data-of="${id}" width="72" height="96"></canvas><small>${id ? esc(ofName(G.outfitDefs[id]) || id) : 'ชุดปกติ'}</small>`, { of: id })).join('');
+        const pets = ['', ...(me.pets || []).filter(id => G.pets[id])].map(id => pick(sh.pet === id, id ? `<canvas data-pet="${id}" width="72" height="72"></canvas><small>${G.pets[id].icon} ${esc(me.pnames?.[id] || G.pets[id].name)}</small>` : '<div class="shNone">🚫</div><small>ไม่โชว์</small>', { pet: id })).join('');
+        const cars = ['', ...(me.vehicles || []).filter(k => G.shop.vehicles[k])].map(k => pick(sh.car === k, k ? `<canvas class="vfit" data-spr="w_${k}_s" width="110" height="64"></canvas><small>${G.shop.vehicles[k].icon} ${esc(G.shop.vehicles[k].name)}</small>` : '<div class="shNone">🚫</div><small>ไม่โชว์</small>', { car: k })).join('');
+        const achs = myAch.map(a => { const on = sh.ach.includes(a.id); return `<div class="item ${on ? 'done' : ''}"><div class="em">🏅</div><div class="nm">${titleHtml(a.title, a.r || 1)}</div>${B(on ? 'โชว์อยู่ ✓' : 'โชว์', { fn: 'showAch', id: a.id }, on ? 'primary' : 'good')}</div>`; }).join('');
+        return `<h2>${B('‹ กลับ', { fn: 'showEd' })} ✏️ แก้ไขหน้าโชว์</h2>${showCv(shCv)}
+          <div class="secT">👕 ชุด</div><div class="looks">${ofs}</div>
+          <div class="secT">🐾 สัตว์เลี้ยง</div><div class="looks">${pets}</div>
+          <div class="secT">🚗 รถ</div><div class="looks">${cars}</div>
+          <div class="secT">🏅 ความสำเร็จที่โชว์ (${sh.ach.length}/3)</div><div class="list">${achs || '<div class="sub">ยังไม่มีความสำเร็จ</div>'}</div>${B('‹ กลับไปหน้าข้อมูลผู้เล่น', { fn: 'showEd' })}`;
+      }
+      const top3 = (sh.ach.length ? sh.ach.map(id => myAch.find(a => a.id === id)).filter(Boolean) : myAch).slice(0, 3);
       return `<h2>🪪 ข้อมูลผู้เล่น</h2>
         <div class="prof"><div class="phCol"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${myPic || facePng()}" alt="">${frameHtml(me.frame ?? -1, 124)}</span>${B('🏅 เปลี่ยนฉายา', { fn: 'titles' }, 'good')}${B('🖼️ กรอบรูป', { fn: 'frames' })}</div><div class="pi"><b>${me.admin ? '👑 ' : ''}${esc(me.name)}</b> ${B('✏️ แก้ไขชื่อ 💎10', { fn: 'rename' })}<div>${CAREER_ICON(me.career)} ${G.careers[me.career]?.name || 'ว่างงาน'} · Lv.${me.lv}</div><div>${me.admin ? titleHtml(G.adminTitle || 'นายกเทศมนตรี', 6) : ti ? titleHtml(ti.title, ti.r) : '<small>ยังไม่ได้ตั้งฉายา</small>'}</div>
           <div class="grid2" style="margin-top:6px">${B('🖼️ เปลี่ยนรูปจากอัลบั้ม', { fn: 'photo' }, 'good')}${myPic ? B('ลบรูป', { fn: 'photoDel' }) : ''}</div></div></div>
-        <div class="grid2"><div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div><div class="item"><div class="nm">🎣 ตกปลา<small>Lv.${me.fishLv}</small></div></div><div class="item"><div class="nm">📱 เบอร์<small>${me.phone}</small></div></div><div class="item"><div class="nm">🏅 ฉายา<small>${got}/${G.ach.length}</small></div></div><div class="item"><div class="nm">🧾 ภาษีวันนี้<small>${money(me.taxT?.paid || 0)} (รายได้ ${money(me.taxT?.e || 0)})</small></div></div><div class="item"><div class="nm">⛽ ค่าน้ำมันวันนี้<small>${money(me.fuelT || 0)}</small></div></div></div>${econHtml()}<div class="sub">ภาษีรายวัน: รายได้ ฿30,000 แรกไม่เสีย · ส่วนที่เกินเสีย 5% · เกิน ฿100,000 เสีย 10%${me.econ?.taxMul < 1 ? ' · <b>วันนี้ลดครึ่งหนึ่ง</b>' : ''} · รีเซ็ตเที่ยงคืน</div>
-        ${(() => { const mine = G.ach.filter(a => !a.nt && (me.ach || []).includes(a.id)).sort((x, y) => (y.r || 1) - (x.r || 1)), todo = achTodo().length;
-          return `<div class="secT">🏅 ความสำเร็จ ${mine.length}/${G.ach.length}</div><div class="tchips">${mine.slice(0, 16).map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}${mine.length > 16 ? `<small>+${mine.length - 16}</small>` : ''}</div>
-          <div class="grid2" style="margin-top:6px">${B(todo ? `🎁 รับรางวัล (${todo})` : '📋 ความสำเร็จทั้งหมด', { fn: 'open', kind: 'achv' }, todo ? 'primary' : 'good')}${B('📅 รางวัลเข้าเกม', { fn: 'open', kind: 'rewards' })}</div>`; })()}
-`;
+        ${showCv(shCv)}<div class="showEdBtn">${B('✏️ แก้ไขชุด สัตว์เลี้ยง รถ', { fn: 'showEd' })}</div>
+        <div class="item"><div class="nm">💰 ทรัพย์สินรวม<small>${money(me.worth)}</small></div></div>
+        <div class="secT">🏅 ความสำเร็จ</div><div class="tchips">${top3.map(a => `<span class="rar${a.r || 1}">🏅 ${esc(a.title)}</span>`).join('') || '<small>ยังไม่มี ลองทำงาน ตกปลา หรือเข้าเกมทุกวัน</small>'}</div>
+        <div class="showEdBtn">${B('✏️ เลือกความสำเร็จที่โชว์', { fn: 'showEd' })}</div>`;
     }
     case 'mail': {
       if (!p.read) { p.read = 1; if ((me.mailN || 0) > 0) send({ t: 'mailread' }); }
@@ -5360,7 +5391,7 @@ function renderPanel(p) {
       const prof = `<div class="prof"><span class="phWrap"><img class="ph phZoom" title="แตะเพื่อดูรูปใหญ่" src="${inf?.pic || `assets/ui/face_${o.g === 'f' ? 'f' : 'm'}.png`}" alt="">${frameHtml(inf?.fr ?? -1, 124)}</span><div class="pi">
         <div>${CAREER_ICON(o.c)} ${G.careers[o.c]?.name || 'ว่างงาน'} · Lv.${o.lv || 1}</div><div>${titleHtml(o.title, o.tr)}</div>
         ${inf ? `<small>💰 ${money(inf.worth)} · 🎣 Lv.${inf.fishLv} · อยู่ในเมือง ${inf.days} วัน${inf.home ? ` · 🏠 บ้าน #${inf.home}` : ''}${inf.degree ? ' · 🎓' : ''}${inf.phone ? ` · 📱 ${inf.phone}` : ''}</small>` : '<small>กำลังโหลด...</small>'}</div></div>
-        ${inf?.ach?.length ? `<div class="tchips">${inf.ach.slice(0, 12).map(([t, r]) => `<span class="rar${r}">🏅 ${esc(t)}</span>`).join('')}</div>` : ''}`;
+        ${inf?.sh ? showCv(inf.sh) : ''}${inf?.ach?.length ? `<div class="tchips">${inf.ach.slice(0, 3).map(([t, r]) => `<span class="rar${r}">🏅 ${esc(t)}</span>`).join('')}</div>` : ''}`;
       return `<h2>${o.adm ? '👑 ' : ''}${esc(o.name)}${o.afk ? ' <span class="tag">💤 ไม่อยู่</span>' : ''}</h2>${prof}
         <div class="grid2" style="margin-bottom:6px">${B('✉️ ส่งจดหมาย', { fn: 'open', kind: 'mail', set: { to: o.name } })}</div>
         <div class="sub">${far ? '⚠️ อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน' : 'อยู่ใกล้พอที่จะติดต่อกันได้'}</div>

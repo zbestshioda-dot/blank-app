@@ -1126,7 +1126,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -3567,6 +3567,11 @@ const npcVisible = n => !n.worker || n.on;
 const npcInfo = n => n.bot ? botPub(n) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, ...(n.umb ? { um: 1, umb: UMB.price } : {}), name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
 // what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
+function showOf(a) {                       // what the profile shows off (defaults: the outfit, pet and car in use)
+  const s = a.show || {}, has = (l, k) => k && (l || []).includes(k);
+  return { of: s.of !== undefined ? (s.of === '' || has(a.outfits, s.of) ? s.of : '') : a.outfit || '', pet: s.pet !== undefined ? (has(a.pets, s.pet) ? s.pet : '') : a.pet || '',
+    car: s.car !== undefined ? (has(a.vehicles, s.car) ? s.car : '') : (a.vehicles || [])[0] || '', ach: (s.ach || []).filter(id => (a.ach || []).includes(id)) };
+}
 function outfitOf(a) {
   if (a.god?.cloak && isAdmin(a)) return 'admin';           // admin-only cloak + aura (god mode)
   if (a.outfit && (a.outfits || []).includes(a.outfit)) return a.outfit;
@@ -3616,7 +3621,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4049,6 +4054,14 @@ function onMessage0(ws, raw) {
       if ('outfit' in m) a.outfit = (a.outfits || []).includes(m.outfit) ? m.outfit : '';
       markMe(a); return sendRoster();
     }
+    case 'show': {                          // profile showcase: outfit + pet + car to show off, and 3 pinned achievements
+      const sh = { ...(a.show || {}) };
+      if ('of' in m) sh.of = m.of === '' || (a.outfits || []).includes(m.of) ? m.of : sh.of;
+      if ('pet' in m) sh.pet = !m.pet || (a.pets || []).includes(m.pet) ? m.pet || '' : sh.pet;
+      if ('car' in m) sh.car = !m.car || (a.vehicles || []).includes(m.car) ? m.car || '' : sh.car;
+      if (Array.isArray(m.ach)) sh.ach = [...new Set(m.ach)].filter(id => (a.ach || []).includes(id) && !titleDef(id)?.nt).slice(0, 3);
+      a.show = sh; markMe(a); return;
+    }
     case 'bug': return bugReport(a, m);
     case 'unstick': {                         // the client could not walk for a while: drop anything that pins the player, resync the position
       if (!cd(a, 'unstick', 3000, true)) return;
@@ -4226,10 +4239,10 @@ function onMessage0(ws, raw) {
       if (bn) eggMayor(a, bn);
       if (bn) { const b = bn.bot; return send(a, { t: 'info', id: bn.id, name: bn.name, pic: '', c: bn.c, lv: b.lv, title: b.title?.title || '', tr: b.title?.r || 0, adm: 0, ach: b.title ? [[b.title.title, b.title.r]] : [], worth: b.worth, days: b.days, fishLv: b.fishLv, home: 0, degree: 0, phone: '' }); }
       const o = playerById(m.id); if (!o || o.npc) return;
-      const ach = (o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(x => x && !x.nt).sort((x, y) => y.r - x.r);
+      const sh = showOf(o), ach = (sh.ach.length ? sh.ach : o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(x => x && !x.nt).sort((x, y) => y.r - x.r).slice(0, 3);
       return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', fr: frameOf(o), c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
         ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
-        home: o.hown ? 1 : 0, hslot: o.hown && o.house >= 0 ? 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
+        sh: { of: sh.of, pet: sh.pet, car: sh.car, g: o.gender, lk: o.look || {} }, home: o.hown ? 1 : 0, hslot: o.hown && o.house >= 0 ? 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
     }
     case 'mail': {                          // letters: reach anyone, online or not
       const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
