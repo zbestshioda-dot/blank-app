@@ -1467,6 +1467,10 @@ const LOOKS = {
   shirt: { white: { name: 'เสื้อยืดขาว', price: 300, color: '#ffffff' }, blue: { name: 'เสื้อยืดฟ้า', price: 300, color: '#5aa0e0' }, green: { name: 'เสื้อยืดเขียว', price: 300, color: '#7cc06a' },
            red: { name: 'เสื้อยืดแดง', price: 300, color: '#e0645a' }, yellow: { name: 'เสื้อยืดเหลือง', price: 400, color: '#f2c84b' }, pink: { name: 'เสื้อยืดชมพู', price: 400, color: '#f29ac0' },
            purple: { name: 'เสื้อยืดม่วง', price: 600, color: '#9a7ae0' }, black: { name: 'เสื้อยืดดำ', price: 600, color: '#45454f' } },
+  // skin tone: free, pick any time at the barber (the sprites are drawn in 'warm'; the others are recoloured on the client)
+  skin:  { warm: { name: 'ผิวสองสี (เริ่มต้น)', price: 0, color: '#ef965e' }, fair: { name: 'ผิวขาว', price: 0, color: '#f7cdb0' },
+           light: { name: 'ผิวขาวเหลือง', price: 0, color: '#f2b98d' }, brown: { name: 'ผิวแทน', price: 0, color: '#b9703f' },
+           dark: { name: 'ผิวเข้ม', price: 0, color: '#7f4a2b' } },
   pants: { gray: { name: 'กางเกงเทา (เริ่มต้น)', price: 0, color: '#bdbdbd' }, jeans: { name: 'กางเกงยีนส์', price: 400, color: '#5574b0' }, brown: { name: 'กางเกงน้ำตาล', price: 400, color: '#93613f' },
            black: { name: 'กางเกงดำ', price: 500, color: '#3d3d47' }, green: { name: 'กางเกงเขียวขี้ม้า', price: 500, color: '#6f8e4c' } },
 };

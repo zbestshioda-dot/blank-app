@@ -3256,7 +3256,8 @@ function donate(a, m) {
 // ------------------------------------------------------------------ looks
 function wear(a, m) {
   const cat = m.cat; if (!D.LOOKS[cat]) return;
-  if (m.id && !a.wardrobe[cat].includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่น (ผมที่ร้านทำผม) ก่อน', '💇', false);
+  if (cat === 'skin') { if (!D.LOOKS.skin[m.id]) return; a.look = { ...a.look, skin: m.id }; markMe(a); sendRoster(); return toast(a, `เปลี่ยนเป็น${D.LOOKS.skin[m.id].name}แล้ว`, '🎨'); }   // skin tones are free
+  if (m.id && !(a.wardrobe[cat] || []).includes(m.id)) return toast(a, 'ยังไม่มีชิ้นนี้ ซื้อที่ร้านแฟชั่น (ผมที่ร้านทำผม) ก่อน', '💇', false);
   if (!m.id) return;
   a.look = { ...a.look, [cat]: m.id || '' }; markMe(a); sendRoster();
 }
