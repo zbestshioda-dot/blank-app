@@ -3902,20 +3902,20 @@ function onMessage0(ws, raw) {
       if (m.ch === 'gang') {                  // gang chat: only members read it (orange), kept per gang
         const g = gangOf(a); if (!g) return toast(a, 'คุณยังไม่มีแก๊ง เข้าร่วมหรือตั้งแก๊งได้ในแอป 🏴', '🏴', false);
         if (!cd(a, 'gchat', 1200)) return;
-        const gm = { t: 'chat', g: 1, gn: g.name, id: a.id, name: a.name, c: a.career, text, ts: now() };
+        const gm = { t: 'chat', g: 1, gn: g.name, id: a.id, name: a.name, c: a.career, text, ts: now(), ...(isAdmin(a) ? { adm: 1 } : {}) };
         g.chat = [...(g.chat || []), gm].slice(-30); gdirty();
         for (const o of online.values()) if (o.gang === g.id && g.mem[lk(o)]) send(o, gm);
         return quest(a, 'chat');
       }
       if (m.ch === 'world') {                 // town-wide chat: everyone reads it in the chat box, no bubble over the head
         if (!cd(a, 'wchat', 3000)) return;
-        const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };
+        const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now(), ...(isAdmin(a) ? { adm: 1 } : {}) };
         chatLog.push(wm); if (chatLog.length > 40) chatLog.shift();
         broadcast(wm); botHear(a, text, true);
         return quest(a, 'chat');            // the chat box has no 'near' tab now, so town chat counts for the chat quests
       }
       if (!cd(a, 'chat', 800)) return;
-      const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now() };
+      const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now(), ...(isAdmin(a) ? { adm: 1 } : {}) };
       const here = areaId(a);
       let heard = 0;
       for (const o of online.values()) if (areaId(o) === here && dist(o, a) <= 14) { send(o, msg); if (o !== a) heard++; }
