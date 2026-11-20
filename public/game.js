@@ -103,11 +103,22 @@ function paintSw() {
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
 // recoloured character frames: an LRU cache (a hit moves the frame to the back) big enough for a busy square, so frames are not rebuilt every frame
-const CH_MAX = 1400;
+const CH_MAX = 600;   // (~30 MB of small canvases; 1400 was too much for iPhones)
 const chGet = k => { const c = chCache.get(k); if (c) { chCache.delete(k); chCache.set(k, c); } return c; };
 const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCache.delete(chCache.keys().next().value); return c; };
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
-fetch('assets/pchar.json?v=a6').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { CH_ATLAS = { ...j, canvas: [j.w, j.h] }; chImg = im; chWait.splice(0).forEach(f => f()); }; im.src = 'assets/pchar.webp?v=a6'; });
+// one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
+// the old single atlas decoded to ~135 MB and iPhones reloaded the page
+const CH_V = 'b1', chSheets = {};
+function chSheet(g) {
+  let e = chSheets[g]; if (e) return e.ok ? e.im : null;
+  e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
+  e.im.src = `assets/pchar/${g}.webp?v=${CH_V}`; return null;
+}
+// where a frame lives: { img, y } once its sheet is loaded, else null (and the sheet starts loading)
+function chSrc(frame) { const a = CH_ATLAS?.at[frame]; if (!a) return null; const im = chSheet(a[0]); return im ? { img: im, y: a[1] * CH_ATLAS.h } : null; }
+function chBoot() { if (chImg || !chSheets._base?.ok || !chSheets.f?.ok) return; chImg = chSheets._base.im; chWait.splice(0).forEach(f => f()); }
+fetch(`assets/pchar/index.json?v=${CH_V}`).then(r => r.json()).then(j => { CH_ATLAS = { ...j, rows: j.at, canvas: [j.w, j.h] }; chSheet('_base'); chSheet('f'); });
 const DEFAULT_LOOK = { hair: 'brown', shirt: 'white', pants: 'gray' };
 // starter colours are known before login (the creator screen); everything else comes from the server
 const STARTER_COLORS = { shirt: { white: '#ffffff', blue: '#5aa0e0', green: '#7cc06a', red: '#e0645a' }, hair: { brown: '#6e4528' }, pants: { gray: '#bdbdbd' } };
@@ -115,27 +126,28 @@ const lookColor = (cat, id) => typeof id === 'string' && id[0] === '#' ? id : G?
 // one tinted frame, cached per (frame, colours)
 function charFrame(frame, lk) {
   const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chGet(key); if (c) return c;
-  const { w, h, rows, per } = CH_ATLAS, r0 = rows[frame] ?? 0, bx = per ? Math.floor(r0 / per) * w * CH_ATLAS.layers.length : 0, row = per ? r0 % per : r0;   // frames wrap into blocks of `per` rows
+  const { w, h } = CH_ATLAS, S = chSrc(frame) || chSrc(frame.split(':').pop()); if (!S) return null;
+  const sy = S.y, src = S.img, bx = 0;
   c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
-  g.drawImage(chImg, bx, row * h, w, h, 0, 0, w, h);
+  g.drawImage(src, bx, sy, w, h, 0, 0, w, h);
   const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
   [['shirt', 1], ['pants', 2], ['hair', 3]].forEach(([cat, col]) => {
     t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h);
-    t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
+    t.drawImage(src, bx + col * w, sy, w, h, 0, 0, w, h);
     t.globalCompositeOperation = 'multiply'; t.fillStyle = lookColor(cat, lk[cat]); t.fillRect(0, 0, w, h);
-    t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(src, bx + col * w, sy, w, h, 0, 0, w, h);
     g.drawImage(tmp, 0, 0);
   });
-  chPut(key, c);
+  if (S === chSrc(frame)) chPut(key, c);   // (a stand-in while the outfit sheet loads is not kept)
   return c;
 }
 // one recoloured layer (hair) of a frame on its own canvas
 function charLayer(frame, col, cat, lk) {
-  const { w, h, rows, per } = CH_ATLAS, r0 = rows[frame] ?? 0, bx = per ? Math.floor(r0 / per) * w * CH_ATLAS.layers.length : 0, row = per ? r0 % per : r0;
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d');
-  t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
+  const { w, h } = CH_ATLAS, S = chSrc(frame) || chSrc(frame.split(':').pop());
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d'); if (!S) return c;
+  t.drawImage(S.img, col * w, S.y, w, h, 0, 0, w, h);
   t.globalCompositeOperation = 'multiply'; t.fillStyle = lookColor(cat, lk[cat]); t.fillRect(0, 0, w, h);
-  t.globalCompositeOperation = 'destination-in'; t.drawImage(chImg, bx + col * w, row * h, w, h, 0, 0, w, h);
+  t.globalCompositeOperation = 'destination-in'; t.drawImage(S.img, col * w, S.y, w, h, 0, 0, w, h);
   return c;
 }
 // women wearing an outfit that only exists as a men's sheet: her own head on the outfit's body ('head'), or her hair showing
@@ -262,9 +274,9 @@ const MONK_LOOK = { shirt: '#f0a03a', pants: '#e08a26', hair: '#d9a77c' };
 const HAIR_MASKED = {}, HAIR_MASK = {};
 function sheetHasHair(sheet) {
   if (sheet in HAIR_MASKED) return HAIR_MASKED[sheet];
-  const { w, h, rows, per } = CH_ATLAS, r0 = rows[sheet + 'down0'] ?? 0, bx = per ? Math.floor(r0 / per) * w * CH_ATLAS.layers.length : 0, row = per ? r0 % per : r0;
+  const { w, h } = CH_ATLAS, S = chSrc(sheet + 'down0'); if (!S) return false;   // (sheet still loading: ask again later)
   const c = document.createElement('canvas'); c.width = w; c.height = h; const t = c.getContext('2d', { willReadFrequently: true });
-  t.drawImage(chImg, bx + 3 * w, row * h, w, h, 0, 0, w, h); const d = t.getImageData(0, 0, w, h).data;
+  t.drawImage(S.img, 3 * w, S.y, w, h, 0, 0, w, h); const d = t.getImageData(0, 0, w, h).data;
   let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
   return HAIR_MASKED[sheet] = n > 50;
 }
@@ -293,9 +305,9 @@ function hairFix(fr, outfit, step, gender, lk) {
 const OF_DYE = new WeakMap(), OF_MASK = new Map();
 function dyeMask(frame) {
   let m = OF_MASK.get(frame); if (m) return m;
-  const { w, h, rows, per } = CH_ATLAS, L = CH_ATLAS.layers.length, r0 = rows[frame]; if (r0 === undefined || L < 5) return null;
+  const { w, h } = CH_ATLAS, L = CH_ATLAS.layers.length, S = chSrc(frame); if (!S || L < 5) return null;
   const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(chImg, Math.floor(r0 / per) * w * L + 4 * w, (r0 % per) * h, w, h, 0, 0, w, h);
+  g.drawImage(S.img, 4 * w, S.y, w, h, 0, 0, w, h);
   m = g.getImageData(0, 0, w, h).data; OF_MASK.set(frame, m); return m;
 }
 function outfitDye(fr, frame, hue, wt, cut) {
@@ -340,6 +352,7 @@ function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   const ofd = G?.outfitDefs?.[p.of], sheet0 = OUTFIT_SHEET[ofd?.base || p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const lk = p.of === 'monk' ? MONK_LOOK : { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;   // 🙏 monks: saffron robe, shaved head
+  if (outfit && !chSrc(outfit + WALK[view][step % 4])) return drawCharTo(g, { ...p, of: '', dye: 0 }, fx, fy, k, view, step, faceLeft, seated);   // outfit sheet still loading: plain clothes for a moment
   const fem = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined;
   const fr0 = fem ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
   const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WALK[view][step % 4], p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
@@ -4480,6 +4493,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-21a', d: '21 พ.ย. (รอบ 72)', items: [
+    '📱 <b>แก้ iPhone เด้งออก/หน้าเว็บมีปัญหา</b>: ภาพตัวละครแยกเป็นไฟล์เล็กตามชุด โหลดเฉพาะชุดที่มีคนใส่อยู่ใกล้ๆ ใช้หน่วยความจำน้อยลงมาก',
+    '⚡ เจอผู้เล่นคนอื่นแล้วไม่กระตุก (ถ้าชุดยังโหลดไม่เสร็จ จะเห็นใส่ชุดธรรมดาแป๊บเดียว)'] },
   { v: '2026-11-20l', d: '20 พ.ย. (รอบ 71)', items: [
     '🐺 <b>คืนหมาป่าโฉมใหม่</b>: คนที่โดนกัดจะกลายเป็น<b>หมาป่าลูกน้อง</b> ช่วยล่าคนอื่นต่อ · มนุษย์จะไม่เห็นใครบนมินิแมพ',
     '👃 สกิลหมาป่า (แทนปุ่มเดิม): <b>ดมกลิ่น</b> (แทนกระเป๋า) มนุษย์ขึ้นจุดแดงบนแผนที่ + ลูกศรชี้ 8 วิ · <b>วิ่งไว</b> (แทนปุ่มวิ่ง) 5 วิ · <b>เรียกสมุน</b> (แทนปุ่มใช้งาน) หมาป่า 2 ตัวมาช่วยไล่ 20 วิ',

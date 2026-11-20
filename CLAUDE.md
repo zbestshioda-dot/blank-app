@@ -2,6 +2,7 @@
 
 - Every time you ship an update to the game, add a short Thai summary entry at the top of `NEWS` in `public/game.js`
   (new `v` id + date + one line per change). Players see it once after the update, and under ⚙️ → 🆕 อัปเดต.
+- Character sprites: the game loads `public/assets/pchar/<sheet>.webp` (one per outfit). After any change to `pchar.webp` (add_fashion.py, dye_masks.py, …) run `python3 tools/split_pchar.py` and bump `CH_V` in `public/game.js`.
 - Room interiors are laid out in slots in declaration order; buildings added later use `late` (1, 2, …) so existing rooms keep their place.
 
 ## How to work with this user (save tokens, keep quality)
