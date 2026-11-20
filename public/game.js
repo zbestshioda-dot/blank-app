@@ -286,6 +286,27 @@ function hairFix(fr, outfit, step, gender, lk) {
   }
   t.putImageData(im, 0, 0); return chPut(key, c);
 }
+// skin tone: sprites are drawn with one warm skin; other tones recolour the skin pixels (keeping their shading) per frame
+const SKIN_REF = [239, 150, 94], SKIN_COL = { fair: [247, 205, 176], light: [242, 185, 141], brown: [185, 112, 63], dark: [127, 74, 43] };
+const skinMemo = new WeakMap();
+function isSkin(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx < 150 || r !== mx) return false;
+  const s = (mx - mn) / mx; if (s < .45 || s > .76) return false;
+  const h = 60 * (g - b) / (mx - mn); return h >= 12 && h <= 28;     // the sprites' orange-tan skin; hair, shoes, khaki and straw fall outside
+}
+function skinFix(fr, tone) {
+  const T = SKIN_COL[tone]; if (!T || !fr) return fr;
+  let m = skinMemo.get(fr); if (!m) skinMemo.set(fr, m = {}); if (m[tone]) return m[tone];
+  const c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height;
+  const t = c.getContext('2d', { willReadFrequently: true }); t.drawImage(fr, 0, 0);
+  const im = t.getImageData(0, 0, c.width, c.height), d = im.data, L0 = SKIN_REF[0] * .3 + SKIN_REF[1] * .55 + SKIN_REF[2] * .15;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 40 || !isSkin(d[i], d[i + 1], d[i + 2])) continue;
+    const k = (d[i] * .3 + d[i + 1] * .55 + d[i + 2] * .15) / L0;
+    d[i] = Math.min(255, T[0] * k); d[i + 1] = Math.min(255, T[1] * k); d[i + 2] = Math.min(255, T[2] * k);
+  }
+  t.putImageData(im, 0, 0); return (m[tone] = c);
+}
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const sheet0 = OUTFIT_SHEET[p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
@@ -294,7 +315,7 @@ function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   const fem = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined;
   const fr0 = fem ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
   const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WALK[view][step % 4], p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
-  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), fr = fm || (p.dye ? dyeFrame(fr1, p.dye) : fr1);
+  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : frS);
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -4213,6 +4234,7 @@ const NEWS = [
     '📱 จัดแอปในมือถือใหม่เป็นหมวด: ติดต่อ · เงินทอง · ชีวิตประจำวัน · รางวัล · อื่นๆ หาแอปง่ายขึ้น',
     '📘 <b>LifeBook</b> แอปโซเชียลสีฟ้า รวมไอเดีย (และแจ้งบัค) เพื่อน และงาน ไว้ในแอปเดียว',
     '😀 ปุ่มอิโมจิกลับมาแล้ว อยู่เหนือปุ่มวิ่ง',
+    '🎨 <b>เลือกสีผิว</b>ได้แล้ว 5 แบบ ฟรี ที่ร้านทำผม 💈',
     '🏴 หัวหน้าแก๊งเปลี่ยนชื่อแก๊งได้แล้ว 💎300 (บ้านแก๊ง → เปลี่ยนชื่อแก๊ง)',
     '🧾 ค่าน้ำค่าไฟถูกลงครึ่งหนึ่ง และไม่คิดค่าน้ำค่าไฟช่วงที่ออฟไลน์',
     '📊 แถบสถานะดูง่ายขึ้น: ไม่มีตัวเลข หลอดอยู่ชิดชื่อ กรอบกว้างขึ้น',
@@ -5125,12 +5147,12 @@ function renderPanel(p) {
     }
     case 'barber':
     case 'fashion': {
-      const W = { hair: [], shirt: [], pants: [], ...(me.wardrobe || {}) }, lk = me.look || {};
+      const W = { hair: [], shirt: [], pants: [], ...(me.wardrobe || {}), skin: Object.keys(G.looks.skin || {}) }, lk = { skin: 'warm', ...(me.look || {}) };
       const sec = (cat, title) => `<div class="sub" style="margin-top:10px"><b>${title}</b></div><div class="looks">${Object.entries(G.looks[cat]).map(([id, it]) => {
         const has = W[cat].includes(id), on = lk[cat] === id;
-        return `<div class="look ${on ? 'on' : ''}"><canvas data-look="${cat}:${id}" width="72" height="96"></canvas><small>${esc(it.name)}</small>${on ? '<span class="tag">ใส่อยู่</span>' : has ? B('ใส่', { t: 'wear', cat, id }, 'good') : B(money(it.price), { t: 'act', st, a: 'buy', cat, id }, '')}</div>`;
+        return `<div class="look ${on ? 'on' : ''}"><canvas data-look="${cat}:${id}" width="72" height="96"></canvas><small>${esc(it.name)}</small>${on ? `<span class="tag">${cat === 'skin' ? 'ใช้อยู่' : 'ใส่อยู่'}</span>` : has ? B(cat === 'skin' ? 'เลือก' : 'ใส่', { t: 'wear', cat, id }, 'good') : B(money(it.price), { t: 'act', st, a: 'buy', cat, id }, '')}</div>`;
       }).join('')}</div>`;
-      if (p.kind === 'barber') return `<h2>💈 ร้านทำผม</h2><div class="sub">${hoursTxt('barber')} · ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน มาย้อมสีผมได้ที่นี่ (ทำผมใหม่แล้วมีความสุขเพิ่ม) · สีที่เคยทำแล้วเปลี่ยนกลับได้ฟรี</div>${sec('hair', '💇 ย้อมสีผม')}`;
+      if (p.kind === 'barber') return `<h2>💈 ร้านทำผม</h2><div class="sub">${hoursTxt('barber')} · ทุกคนเริ่มด้วยผมสีน้ำตาลเหมือนกัน มาย้อมสีผมได้ที่นี่ (ทำผมใหม่แล้วมีความสุขเพิ่ม) · สีที่เคยทำแล้วเปลี่ยนกลับได้ฟรี</div>${sec('hair', '💇 ย้อมสีผม')}${G.looks.skin ? sec('skin', '🎨 สีผิว (เปลี่ยนได้ฟรีตลอด)') : ''}`;
       const ft = 'outfit';   // the shop sells whole outfits only (shirts and trousers are gone)
       return `<h2>👗 ร้านแฟชั่น</h2><div class="sub">${hoursTxt('fashion')} · ขายชุดพิเศษใส่ทั้งตัว แต่งตัวใหม่แล้วมีความสุขเพิ่ม · ชุดที่ซื้อแล้วถอด/ใส่ได้ฟรีตลอด · ย้อมผมที่ร้านทำผม 💈</div>
         ${ft !== 'outfit' ? sec(ft, ft === 'shirt' ? '👕 เสื้อ' : '👖 กางเกง') : `
