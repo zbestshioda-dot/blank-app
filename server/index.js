@@ -1944,6 +1944,42 @@ function eggMayor(a, bn) {
   send(a, { t: 'egg', k: 'mayor', name: bn.name, gems: D.EGG.mayorGems });
   const bs = mayorPool().filter(n => n.id !== bn.id); if (bs.length) mayorBot = pick(bs).id;   // the mayor slips away into someone else
 }
+// 🔮 the fortune teller "sees" the player's real life: recent money flow, debts, job, phone contacts, pets — so the reading feels spot on
+function tarotSees(a, topic, good) {
+  const out = [], t0 = now() - 48 * 3600e3, L = (a.ledger || []).filter(e => e[0] >= t0 && !/แอดมิน/.test(e[2]));
+  const by = sign => { const m = {}; for (const e of L) if (Math.sign(e[1]) === sign) m[e[2]] = (m[e[2]] || 0) + Math.abs(e[1]); return Object.entries(m).sort((x, y) => y[1] - x[1]); };
+  const tin = L.filter(e => e[1] > 0).reduce((s, e) => s + e[1], 0), tout = L.filter(e => e[1] < 0).reduce((s, e) => s - e[1], 0);
+  const clean = w => String(w).replace(/^[^\p{L}\p{N}]+/u, '').trim() || w;
+  const initial = n => (String(n).replace(/^[\sเแโใไ"'(]+/, '')[0] || String(n)[0] || '?');
+  const days = Math.max(1, Math.floor((now() - (a.created || now())) / 864e5));
+  if (topic === 'money') {
+    const exp = by(-1)[0], inc = by(1)[0];
+    if ((a.loan || 0) > 0) out.push(`แม่หมอเห็นเงาหนี้ ${money(a.loan)} เกาะติดตัวคุณอยู่... เรื่องนี้กวนใจคุณมากกว่าที่ยอมรับใช่ไหม`);
+    if (exp && exp[1] >= 100) out.push(`สองวันมานี้ เงินของคุณไหลออกไปกับ "${clean(exp[0])}" มากที่สุด ถึง ${money(exp[1])}`);
+    if (inc && inc[1] >= 100) out.push(`ทางเงินที่เปิดให้คุณที่สุดตอนนี้คือ "${clean(inc[0])}" ${good ? 'ไพ่บอกว่าทางนี้ยังรุ่งต่อ' : 'แต่อย่าพึ่งทางเดียว'}`);
+    if (tin + tout > 0) out.push(tout > tin ? `เงินออกมากกว่าเงินเข้าอยู่ ${money(tout - tin)} ไพ่ใบนี้มาเตือนพอดี` : `เงินเข้ามากกว่าออก ${money(tin - tout)} พลังเงินของคุณกำลังขึ้น`);
+    if (a.money > 5000 && a.money > (a.bank || 0) * 3) out.push(`คุณถือเงินสดไว้ถึง ${money(a.money)} แต่ฝากธนาคารไว้แค่ ${money(a.bank || 0)}... แม่หมอว่าเก็บไว้ในที่ปลอดภัยบ้างนะ`);
+    if (!out.length) out.push(`กระแสเงินของคุณช่วงนี้นิ่งเงียบ เหมือนน้ำที่รอวันไหล`);
+  } else if (topic === 'work') {
+    const c = a.career && a.career !== 'none' && D.CAREERS[a.career], wk = by(1).find(([w]) => !/ขาย|ตกปลา|ลอตเ|หุ้น|ของขวัญ|มินิเกม/.test(w));
+    out.push(c ? `ไพ่เห็นคุณในชุด${c.name} ${c.icon || ''}` : `ไพ่เห็นว่าคุณยังไม่ปักหลักกับงานประจำ ใจยังลังเลอยู่`);
+    if (wk && wk[1] >= 100) out.push(`สองวันนี้งานที่ทำเงินให้คุณมากที่สุดคือ "${clean(wk[0])}" (${money(wk[1])})`);
+    out.push(`คุณอยู่เมืองนี้มา ${days} วันแล้ว ${days < 3 ? 'ยังเป็นช่วงตั้งตัว ทุกอย่างกำลังเริ่ม' : days < 14 ? 'กำลังเข้าที่เข้าทาง' : 'ประสบการณ์ของคุณคือทรัพย์สมบัติ'}`);
+    const g = a.gang && gangOf(a); if (g) out.push(`มีพวกพ้องจากแก๊ง "${g.name}" คอยหนุนหลังคุณอยู่`);
+  } else {
+    const cs = a.contacts || [], fav = cs.filter(c => c.fav), who = (fav.length ? fav : cs)[Math.floor(Math.random() * (fav.length || cs.length))];
+    if (who) out.push(good ? `มีคนที่ชื่อขึ้นต้นด้วย "${initial(who.n)}" ในโทรศัพท์ของคุณ... เขากำลังคิดถึงคุณอยู่` : `มีเรื่องค้างคาใจกับคนที่ชื่อขึ้นต้นด้วย "${initial(who.n)}" ลองทักไปก่อนสิ`);
+    else out.push(`โทรศัพท์ของคุณยังเงียบเหงา... ไพ่บอกว่ารักจะเริ่มเมื่อคุณกล้าทักใครสักคนก่อน`);
+    const pn = a.pet && a.pnames?.[a.pet]; if (pn) out.push(`เจ้า${pn}คือผู้ส่งความรักให้คุณทุกวัน อย่าลืมกอดมันนะ`);
+    if (L.some(e => /ของขวัญ/.test(e[2]))) out.push(`คุณเพิ่งให้ของขวัญใครสักคน... น้ำใจนั้นกำลังส่งผลกลับมา`);
+    if ((a.happy ?? 100) < 40) out.push(`ช่วงนี้ใจคุณเหงากว่าที่แสดงออกให้คนอื่นเห็น`);
+  }
+  return out.slice(0, 3);
+}
+function tarotLuck(a) {   // lucky number and colour: fixed for the day and the player, like a real horoscope
+  let h = 0; for (const ch of dayKey() + (a.login || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return { num: h % 90 + 10, col: ['แดง', 'ชมพู', 'ส้ม', 'เหลือง', 'เขียว', 'ฟ้า', 'น้ำเงิน', 'ม่วง', 'ขาว', 'ทอง'][(h >> 8) % 10] };
+}
 function act(a, m) {
   if (/^hbed\d+$/.test(m.st || '')) { const o = houses[ST[m.st]?.idx]; if (o) syncBed(o); }   // the bed may have been moved
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
@@ -1979,7 +2015,7 @@ function act(a, m) {
       if (!cd(a, 'fortune', 1500, true)) return;
       if (!pay(a, F.price)) return;
       const id = pick(Object.keys(D.TAROT)), r = Math.random() < .35 ? 1 : 0, good = D.TAROT[id].s[r] > 0;
-      a.fortune = { d, topic, id, r, good: good ? 1 : 0, paid: good ? F.bonus : 0 };
+      a.fortune = { d, topic, id, r, good: good ? 1 : 0, paid: good ? F.bonus : 0, sees: tarotSees(a, topic, good), luck: tarotLuck(a) };
       if (good) { a.money += F.bonus; a.earned = (a.earned || 0) + F.bonus; joy(a, 6); }
       stat(a, 'tarot'); markMe(a); FX0(a, 'pick');
       return;

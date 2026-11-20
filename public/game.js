@@ -4501,6 +4501,7 @@ const NEWS = [
   { v: '2026-11-22b', d: '22 พ.ย.', items: [
     '🔮 แม่หมอจันทรามายืนหน้าเต็นท์แล้ว (เดิมโดนเต็นท์บังมองไม่เห็น)',
     '🃏 หน้าดูดวงใหม่: เลือกไพ่คว่ำ 3 ใบ (การเงิน/การงาน/ความรัก) แล้วไพ่พลิกเปิดพร้อมคำทำนาย',
+    '👁️ แม่หมอแม่นขึ้น: มองเห็นชีวิตจริงของคุณในเมือง (เงินเข้าออก หนี้ งาน คนในโทรศัพท์ สัตว์เลี้ยง) + เลขนำโชคและสีมงคลประจำวัน',
   ] },
   { v: '2026-11-22', d: '22 พ.ย.', items: [
     '🔮 เปิดเต็นท์แม่หมอจันทรา กลางเมือง: เลือกดูการเงิน การงาน หรือความรัก เปิดไพ่ยิปซี 1 ใบ ฿50 วันละครั้ง ไพ่ดีรับโบนัส ฿30',
@@ -5143,7 +5144,9 @@ function renderPanel(p) {
         <div class="${fresh ? 'tfl' : ''}" style="perspective:600px;margin:10px auto"><div class="tcd" style="width:120px;height:152px;background:url(assets/tarot.webp) -${ids.indexOf(f.id) * 120}px 0/${ids.length * 120}px 152px;image-rendering:pixelated;${f.r ? 'transform:rotate(180deg)' : ''}"></div></div>
         <b style="font-size:15px">${esc(t.n)}</b>${f.r ? '<div class="sub">(ไพ่กลับหัว)</div>' : ''}
         <div style="display:inline-block;margin:6px 0;padding:2px 10px;border-radius:99px;background:${omen[1]};color:#fff;font-size:12px">${omen[0]}</div>
-        <div class="jobbox" style="font-size:15px;line-height:1.6">"${esc(t[f.r ? 'rev' : 'up'][f.topic] || '')}"<br><small>— แม่หมอจันทรา</small></div></div>
+        ${f.sees?.length ? `<div class="jobbox" style="text-align:left;line-height:1.6"><b>🔮 แม่หมอมองเห็นว่า...</b>${f.sees.map(x => `<div style="margin-top:4px">• ${esc(x)}</div>`).join('')}</div>` : ''}
+        <div class="jobbox" style="font-size:15px;line-height:1.6"><b>🃏 ไพ่บอกว่า</b><br>"${esc(t[f.r ? 'rev' : 'up'][f.topic] || '')}"<br><small>— แม่หมอจันทรา</small></div>
+        ${f.luck ? `<div class="sub">🍀 เลขนำโชควันนี้ <b>${f.luck.num}</b> · สีมงคล <b>${esc(f.luck.col)}</b></div>` : ''}</div>
         ${f.paid ? `<div class="jobbox ok">🍀 ไพ่ดี! แม่หมอแถมโชคให้ ${money(f.paid)}</div>` : ''}<div class="sub" style="text-align:center">พรุ่งนี้มาเปิดไพ่ใหม่ได้อีกนะ</div>`;
     }
     case 'pshop': {
