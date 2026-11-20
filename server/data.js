@@ -1517,12 +1517,17 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   knight:    { name: 'ชุดอัศวินเกราะเงิน', how: 'ซื้อที่ร้านแฟชั่น', gems: 450 } };
 // 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
 const DYES = { red: ['แดง', 0], orange: ['ส้ม', 28], yellow: ['เหลือง', 52], green: ['เขียว', 125], sky: ['ฟ้า', 195], blue: ['น้ำเงิน', 228], purple: ['ม่วง', 275], pink: ['ชมพู', 325] };
-const DYE_SETS = { pajama: ['pink', 'sky'], tracksuit: ['red', 'green'], hoodie: ['purple', 'yellow'], devil: ['blue', 'green'], pilot: ['blue', 'red'], songkran: ['pink', 'purple'],
-  bunny: ['sky', 'purple'], chinese: ['blue', 'green'], lukthung: ['pink', 'blue'], muaythai: ['blue', 'green'], student: ['pink', 'sky'],
-  tigerpj: ['pink', 'sky'], raincoat: ['red', 'sky', 'green'], explorer: ['sky', 'purple'], catsuit: ['pink', 'sky'], chicken: ['blue', 'purple'],
-  surf: ['pink', 'purple'], hiphop: ['blue', 'green'], thairoyal: ['pink', 'green'], martial: ['blue', 'purple'], knight: ['blue', 'green'] };
+const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songkran: ['pink', 'purple'], bunny: ['sky', 'purple'], chinese: ['blue', 'purple'],
+  lukthung: ['pink', 'blue'], muaythai: ['blue', 'green'], raincoat: ['red', 'sky', 'green'], catsuit: ['pink', 'sky'], chicken: ['blue', 'purple'],
+  surf: ['pink', 'purple'], hiphop: ['blue', 'green'], martial: ['blue', 'purple'], knight: ['blue', 'red'] };
+const DYE_WHITE = ['catsuit', 'chicken', 'knight'];   // white / silver cloth also takes a soft tint
+// shop tabs
+const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop'],
+  thai: ['songkran', 'lanna', 'phasin', 'muaythai', 'lukthung', 'chinese', 'chakri', 'thai', 'thairoyal'],
+  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight'] };
+for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
-  OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue }; }
+  OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }
 // prestige titles bought with money (a money sink for the rich): not achievements, never counted in the achievement total
 // the supporter title from the ฿49 top-up pack: lasts 30 days per purchase (stacks), sparkly rarity 8
 const PAY_TITLE = { id: 'vip', title: '💖 ผู้สนับสนุนเมือง', r: 8, days: 30 };
