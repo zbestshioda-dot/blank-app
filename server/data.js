@@ -832,7 +832,7 @@ const monthIdx = t => Math.floor(dayAt(t) / MONTH_DAYS);
 const YEAR0 = Math.floor(Math.floor(Date.UTC(2026, 10, 1) / DAY_MS) / (MONTH_DAYS * 12)) * MONTH_DAYS * 12;   // year 2569 starts here
 const dateAt = t => { const d = dayAt(t) - YEAR0; return { day: d % MONTH_DAYS + 1, month: Math.floor(d / MONTH_DAYS) % 12, year: 2569 + Math.floor(d / MONTH_DAYS / 12) }; };
 // a home's monthly bill: a fixed part + what you used (nights slept, furniture that runs on power)
-const UTIL = { water: 150, waterPerSleep: 25, elec: 220, elecPerComfort: 35, elecPerSleep: 20, lateFee: 0.15 };
+const UTIL = { water: 80, waterPerSleep: 12, elec: 110, elecPerComfort: 15, elecPerSleep: 10, lateFee: 0.15 };   // roughly half of the old rates (150/25, 220/35/20)
 for (const r of ROOMS) r.hours = HOURS[r.rk] || null;
 for (const b of BUILDINGS) b.hours = HOURS[b.house !== undefined ? 'house' : b.id] || null;
 
