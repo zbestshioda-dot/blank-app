@@ -3911,7 +3911,8 @@ function onMessage0(ws, raw) {
         if (!cd(a, 'wchat', 3000)) return;
         const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now() };
         chatLog.push(wm); if (chatLog.length > 40) chatLog.shift();
-        broadcast(wm); return botHear(a, text, true);
+        broadcast(wm); botHear(a, text, true);
+        return quest(a, 'chat');            // the chat box has no 'near' tab now, so town chat counts for the chat quests
       }
       if (!cd(a, 'chat', 800)) return;
       const msg = { t: 'chat', id: a.id, name: a.name, av: a.avatar, c: a.career, text, ts: now() };

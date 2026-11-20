@@ -11,7 +11,7 @@ const DEFS = {
   deliver: { cat: 'career', career: 'rider',    text: 'ส่งอาหารสำเร็จ {n} ออเดอร์', n: [3, 6], per: 60 },
   // social / daily life
   trade:   { cat: 'social', text: 'แลกเปลี่ยนกับผู้เล่นอื่น {n} ครั้ง', n: [1, 2], per: 200 },
-  chat:    { cat: 'social', text: 'คุยกับคนที่อยู่ใกล้ๆ {n} ครั้ง', n: [1, 3], per: 40 },
+  chat:    { cat: 'social', text: 'พิมพ์คุยในแชท {n} ครั้ง', n: [1, 3], per: 40 },
   eat:     { cat: 'social', text: 'กินอาหาร {n} ครั้ง', n: [2, 4], per: 40 },
   sit:     { cat: 'social', text: 'นั่งเล่นที่จัตุรัสกลางเมือง {n} ครั้ง', n: [1, 2], per: 60 },
   // general
@@ -116,7 +116,7 @@ const WDEFS = {
   earn:    { cat: 'money', text: 'หาเงินให้ได้ ฿{n}', n: [8000, 15000], step: 500, per: 0.25 },
   fish:    { cat: 'life', text: 'ตกปลาให้ได้ {n} ตัว', n: [25, 40], per: 70 },
   eat:     { cat: 'life', text: 'กินอาหาร {n} ครั้ง', n: [12, 20], per: 90 },
-  chat:    { cat: 'life', text: 'คุยกับคนที่อยู่ใกล้ๆ {n} ครั้ง', n: [10, 15], per: 90 },
+  chat:    { cat: 'life', text: 'พิมพ์คุยในแชท {n} ครั้ง', n: [10, 15], per: 90 },
   sell:    { cat: 'life', text: 'ขายของ {n} ชิ้น', n: [40, 80], per: 35 },
 };
 const WBONUS = 4000;
