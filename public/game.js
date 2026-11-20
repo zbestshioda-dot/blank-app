@@ -51,7 +51,7 @@ let ws, G = null, lastHouses = '';
 let me = null, wd = null, myId = 0;
 const P = new Map();                    // id -> player sprite
 let clockOff = 0;
-let panel = null, panelSig = '';
+let panel = null, panelSig = '', tarotSeen = '';
 let trade = null, tradeSig = '';
 let call = null; const callLog = [];
 const chatLog = [];
@@ -3248,7 +3248,7 @@ function buildStaff() {
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
   { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: 1, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ถือเดินเล่นสวยๆ', 'สีไหนดีหลาน ลุงมีครบ', 'ลูกโป่งหัวใจ เอาไปให้แฟนสิ'] },
-  { st: 'fortune', name: 'แม่หมอจันทรา (แม่หมอพยากรณ์)', short: 'แม่หมอจันทรา', icon: '🔮', g: 'f', of: 'fortune', dx: .9, dy: -1.1, lk: { hair: 'brown' }, hi: ['มาสิลูก ให้ไพ่บอกทางให้', 'การเงิน การงาน หรือความรัก อยากรู้เรื่องไหน', 'ใจเย็นๆ แล้วตั้งคำถามในใจนะ'] },
+  { st: 'fortune', name: 'แม่หมอจันทรา (แม่หมอพยากรณ์)', short: 'แม่หมอจันทรา', icon: '🔮', g: 'f', of: 'fortune', dx: -1.6, dy: .3, lk: { hair: 'brown' }, hi: ['มาสิลูก ให้ไพ่บอกทางให้', 'การเงิน การงาน หรือความรัก อยากรู้เรื่องไหน', 'ใจเย็นๆ แล้วตั้งคำถามในใจนะ'] },
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ! อยากได้เพื่อนตัวฟูไหมคะ', 'ทุกตัวสุขภาพดีค่ะ ลูบได้นะคะ', 'ตัวไหนถูกใจ ลองแตะดูได้เลยค่ะ'] },
   { st: 'petshop2', name: 'พี่ภูผา (ร้านสัตว์เลี้ยง สาขา 2)', short: 'พี่ภูผา', icon: '🐶', dx: .7, dy: -1.15, of: 'hoodie', lk: { hair: 'black' }, hi: ['เข้ามาดูน้องๆ ได้เลยครับ', 'หมา แมว กระต่าย มีครบครับ', 'เลี้ยงแล้วพาเดินเล่นทุกวันนะครับ'] },
   { st: 'restaurant', name: 'ป้าแดง (เจ้าของร้านอาหาร)', short: 'ป้าแดง', icon: '🍛', g: 'f', dx: .6, dy: -1.15, lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: ['หิวไหมจ๊ะ วันนี้มีเมนูเด็ดนะ', 'นั่งก่อนจ้ะ เดี๋ยวน้องเสิร์ฟให้', 'กินให้อิ่มนะลูก'] },
@@ -4498,6 +4498,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-22b', d: '22 พ.ย.', items: [
+    '🔮 แม่หมอจันทรามายืนหน้าเต็นท์แล้ว (เดิมโดนเต็นท์บังมองไม่เห็น)',
+    '🃏 หน้าดูดวงใหม่: เลือกไพ่คว่ำ 3 ใบ (การเงิน/การงาน/ความรัก) แล้วไพ่พลิกเปิดพร้อมคำทำนาย',
+  ] },
   { v: '2026-11-22', d: '22 พ.ย.', items: [
     '🔮 เปิดเต็นท์แม่หมอจันทรา กลางเมือง: เลือกดูการเงิน การงาน หรือความรัก เปิดไพ่ยิปซี 1 ใบ ฿50 วันละครั้ง ไพ่ดีรับโบนัส ฿30',
     '👗 ชุดใหม่ "ชุดแม่หมอพยากรณ์" ที่ร้านแฟชั่น (💎300)',
@@ -5117,18 +5121,30 @@ function renderPanel(p) {
       const pick = (me.jobs || []).some(j => j.mine && j.state === 'taken' && j.src === 'market') ? `<div class="jobbox ok">🛵 มีของต้องรับไปส่ง ${B('📦 รับของจากตลาด', { t: 'act', st, a: 'pickup' }, 'primary')}</div>` : '';
       return `<h2>🏪 ตลาดกลาง</h2><div class="sub">${hoursTxt('market')} · ของที่วางขายครบ 2 ชั่วโมงแล้วยังไม่มีคนซื้อ ตลาดจะรับซื้อให้ที่ 40% ของราคาตลาด (ขายให้ผู้เล่นด้วยกันได้ราคาดีกว่า)</div>${pick}${tabs}${body}`;
     }
-    case 'fortune': {   // 🔮 tarot tent: pick a topic, one card a day (reversed = the same picture turned upside down)
+    case 'fortune': {   // 🔮 tarot tent: pick a topic (3 face-down cards), one card a day; the new card flips over once
       const F = G.fortuneCfg, T = G.tarot || {}, ids = Object.keys(T), f = me.fortune;
-      let res = '';
-      if (f && T[f.id]) {
-        const t = T[f.id], tp = F.topics[f.topic] || ['🔮', ''];
-        res = `<div class="jobbox" style="text-align:center"><div class="sub">${tp[0]} ดูดวง${esc(tp[1])} วันนี้</div>
-          <div style="width:110px;height:139px;margin:6px auto;border:3px solid #d9a521;border-radius:8px;background:url(assets/tarot.webp) -${ids.indexOf(f.id) * 110}px 0/${ids.length * 110}px 139px;image-rendering:pixelated;${f.r ? 'transform:rotate(180deg)' : ''}"></div>
-          <b>${esc(t.n)}${f.r ? ' · กลับหัว' : ''}</b><div style="margin-top:6px;color:${f.good ? '#2e9e5b' : t.s[f.r] < 0 ? '#c0482b' : 'inherit'}">${esc(t[f.r ? 'rev' : 'up'][f.topic] || '')}</div></div>${f.paid ? `<div class="jobbox ok">✨ ไพ่ดี! รับโบนัส ${money(f.paid)}</div>` : ''}`;
+      const css = `<style>.tcd{width:96px;height:128px;border-radius:10px;border:3px solid #d9a521;box-shadow:0 4px 14px rgba(60,20,90,.35);margin:0 auto}
+        .tbk{background:radial-gradient(circle at 50% 45%,#f6d36b 0 9%,transparent 10%),repeating-linear-gradient(45deg,#3b1f6e 0 8px,#4a2a85 8px 16px);display:flex;align-items:flex-end;justify-content:center}
+        .tpk{flex:1;text-align:center;cursor:pointer;background:none;border:0;padding:4px;transition:transform .15s}.tpk:hover:not(:disabled){transform:translateY(-6px)}.tpk:disabled{opacity:.45;cursor:default}
+        .tpk b{display:block;margin-top:6px}.tfl{animation:tfl .9s ease-out}@keyframes tfl{0%{transform:rotateY(90deg) scale(.8);filter:brightness(3)}60%{transform:rotateY(0) scale(1.08)}100%{transform:none}}
+        .tglow{animation:tglow 2.4s ease-in-out infinite}@keyframes tglow{50%{box-shadow:0 0 22px #b07cff}}</style>`;
+      const head = `<h2>🔮 เต็นท์แม่หมอจันทรา</h2>`;
+      if (!f || !T[f.id]) {
+        const poor = me.money < F.price;
+        const picks = Object.entries(F.topics).map(([k, [ic, nm]]) => `<button class="tpk" data-m="${esc(JSON.stringify({ t: 'act', st, a: 'read', topic: k }))}" ${poor ? 'disabled' : ''}>
+          <div class="tcd tbk tglow"><span style="font-size:30px;margin-bottom:10px">${ic}</span></div><b>${nm}</b></button>`).join('');
+        return `${css}${head}<div class="jobbox" style="font-style:italic">"ตั้งจิตให้มั่น นึกถึงเรื่องที่อยากรู้... แล้วเลือกไพ่ใบที่ใจเรียกหา"<br><small>— แม่หมอจันทรา</small></div>
+          <div style="display:flex;gap:6px;margin:10px 0">${picks}</div>
+          <div class="sub" style="text-align:center">ค่าดูดวง ${money(F.price)} · วันละครั้ง · ถ้าได้ไพ่ดี แม่หมอแถมโชค ${money(F.bonus)}${poor ? '<br>⚠️ เงินไม่พอ' : ''}</div>`;
       }
-      const btns = Object.entries(F.topics).map(([k, [ic, nm]]) => B(`${ic} ${nm}`, { t: 'act', st, a: 'read', topic: k }, 'primary', !!f || me.money < F.price)).join('');
-      return `<h2>🔮 เต็นท์แม่หมอจันทรา</h2><div class="sub">เลือกเรื่องที่อยากรู้ แล้วเปิดไพ่ยิปซี 1 ใบ · ${money(F.price)} · วันละครั้ง · ไพ่ดีรับโบนัส ${money(F.bonus)}</div>
-        ${f ? '<div class="sub">วันนี้คุณดูดวงแล้ว พรุ่งนี้มาใหม่นะ</div>' : `<div class="grid2">${btns}</div>`}${res}`;
+      const t = T[f.id], tp = F.topics[f.topic] || ['🔮', ''], key = f.d + f.id + f.topic, fresh = key !== tarotSeen; tarotSeen = key;
+      const omen = f.good ? ['✨ ดวงดี', '#2e9e5b'] : t.s[f.r] < 0 ? ['⚠️ ระวัง', '#c0482b'] : ['🌙 กลางๆ', '#8a6d3b'];
+      return `${css}${head}<div style="text-align:center"><div class="sub">${tp[0]} ดวง${esc(tp[1])}ของคุณวันนี้</div>
+        <div class="${fresh ? 'tfl' : ''}" style="perspective:600px;margin:10px auto"><div class="tcd" style="width:120px;height:152px;background:url(assets/tarot.webp) -${ids.indexOf(f.id) * 120}px 0/${ids.length * 120}px 152px;image-rendering:pixelated;${f.r ? 'transform:rotate(180deg)' : ''}"></div></div>
+        <b style="font-size:15px">${esc(t.n)}</b>${f.r ? '<div class="sub">(ไพ่กลับหัว)</div>' : ''}
+        <div style="display:inline-block;margin:6px 0;padding:2px 10px;border-radius:99px;background:${omen[1]};color:#fff;font-size:12px">${omen[0]}</div>
+        <div class="jobbox" style="font-size:15px;line-height:1.6">"${esc(t[f.r ? 'rev' : 'up'][f.topic] || '')}"<br><small>— แม่หมอจันทรา</small></div></div>
+        ${f.paid ? `<div class="jobbox ok">🍀 ไพ่ดี! แม่หมอแถมโชคให้ ${money(f.paid)}</div>` : ''}<div class="sub" style="text-align:center">พรุ่งนี้มาเปิดไพ่ใหม่ได้อีกนะ</div>`;
     }
     case 'pshop': {
       const rows = (G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
