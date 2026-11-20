@@ -817,6 +817,9 @@ const JOBGAMES = {
   spot:  { career: 'police', name: 'จับผิดภาพหาโจร', icon: '🔍', energy: 5, cd: 25, min: 10, max: 5, per: 8, rate: .5 },
   shoot: { career: 'police', name: 'ซ้อมยิงเป้า', icon: '🎯', energy: 4, cd: 25, min: 20, max: 30, per: 1.4, rate: 1.6 },
   cash:  { career: 'cashier', name: 'คิดเงินทอนลูกค้า', icon: '🧾', energy: 4, cd: 15, min: 20, max: 10, per: 5.5, rate: .4 },
+  type:  { career: 'office', name: 'พิมพ์เอกสารตามแบบ', icon: '⌨️', energy: 4, cd: 20, min: 10, max: 12, per: 6, rate: .5 },
+  stock: { career: 'cashier', name: 'เติมของและจัดเรียงชั้น', icon: '📦', energy: 4, cd: 15, min: 20, max: 24, per: 2.6, rate: 1.2 },
+  vend:  { career: 'merchant', name: 'ส่งของเติมตู้กดน้ำ', icon: '🥤', energy: 4, cd: 20, min: 20, max: 30, per: 2.2, rate: 1.3 },
   slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 18, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him

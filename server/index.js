@@ -712,7 +712,9 @@ setTimeout(() => { try { lottoTick(); } catch (e) { console.error('lottoTick', e
 // wherever living players are and chase them; survive to the end = a reward by mail. Buildings stay unsafe (doors sealed) all wave.
 const ZN = { day: 13, hour: 20, warn: 60e3, dur: 5 * 60e3, waveEvery: 70e3, cap: 60,
   prize: { money: 5000, gems: 5 },
-  kinds: { walk: { speed: 1.6, r: .7, name: 'ซอมบี้' }, girl: { speed: 1.8, r: .7, name: 'ซอมบี้สาว' }, run: { speed: 3.2, r: .7, name: 'ซอมบี้วิ่ง' }, brute: { speed: 1.3, r: 1.05, name: 'ซอมบี้ยักษ์' } } };
+  kinds: { walk: { speed: 1.6, r: .7, name: 'ซอมบี้' }, girl: { speed: 1.8, r: .7, name: 'ซอมบี้สาว' }, run: { speed: 3.2, r: .7, name: 'ซอมบี้วิ่ง' }, brute: { speed: 1.3, r: 1.05, name: 'ซอมบี้ยักษ์' } },
+  // edge guards: on each of the 4 sides of the map, 2 fast runners + 1 fat one patrol the edge and run down anyone hugging it
+  guard: { band: 13, side: [['run', 3.5, 'ซอมบี้วิ่งไว'], ['run', 3.5, 'ซอมบี้วิ่งไว'], ['brute', 1.7, 'ซอมบี้อ้วน']] } };
 let zn = null, znDone = '', znSeq = 0, znAnnounced = '';
 const znAlive = a => zn?.ph === 'on' && zn.alive.has(a.id);
 const zombies = () => npcs.filter(n => n.zb);
@@ -746,10 +748,42 @@ function znKill(a, why) {
   feed(`🧟 ${a.name} ${why === 'in' ? 'โดนซอมบี้รุมในอาคาร' : 'โดนซอมบี้กัด'} · เหลือผู้รอด ${zn.alive.size} คน`);
   znSendAll();
 }
+// how far (tiles) a point is from one side of its area: 0 N, 1 E, 2 S, 3 W
+function znEdgeD(A, x, y, side) { return side === 0 ? y - A.y : side === 1 ? A.x + A.w - x : side === 2 ? A.y + A.h - y : x - A.x; }
+function znGuards(area, pts) {
+  zn.guarded = zn.guarded || new Set(); if (zn.guarded.has(area)) return; zn.guarded.add(area);
+  const A = D.AREAS.find(r => r.id === area), tiles = walkableIn(area);
+  for (let side = 0; side < 4; side++) {
+    const band = tiles.filter(([x, y]) => { const d = znEdgeD(A, x + .5, y + .5, side); return d > 1.5 && d < 7; }); if (!band.length) continue;
+    ZN.guard.side.forEach(([kind, speed, name], i) => {
+      const [x, y] = pick(band);
+      const z = { id: -(9000 + (znSeq++ % 900)), zb: kind, name, area, x: x + .5, y: y + .5, f: 2, path: [], wait: 1.5 + i * .4, speed: speed * rnd(.95, 1.05), zt: 0, g: 'm', look: {}, side, band, guard: 1,
+        next: () => znGuardGoal(z), stay: () => .15 };
+      npcs.push(z); pts.push([area, z.x, z.y]);
+    });
+  }
+}
+// a guard chases living players who come within `band` tiles of its edge; otherwise it walks up and down that edge
+function znGuardGoal(z) {
+  const A = D.AREAS.find(r => r.id === z.area); let best = null, bd = 1e9;
+  for (const o of online.values()) if (znAlive(o) && areaId(o) === z.area && znEdgeD(A, o.x, o.y, z.side) < ZN.guard.band) { const d = Math.hypot(o.x - z.x, o.y - z.y); if (d < bd) { bd = d; best = o; } }
+  z.tgt = best;
+  if (best) return znLead(z, best);
+  const [x, y] = pick(z.band); return [x + .5, y + .5];
+}
+// where to run to: straight at the target when close, else where it will be (its speed × the time to get there), so zombies cut you off
+function znLead(z, o) {
+  const d = Math.hypot(o.x - z.x, o.y - z.y), v = o.zv;
+  if (!v || d < 2.5 || z.lead === 0) return [o.x, o.y];
+  const T = Math.min(2.5, d / Math.max(1, z.speed)) * (z.lead || 1);
+  for (let k = 1; k >= 0.2; k -= .2) { const x = o.x + v[0] * T * k, y = o.y + v[1] * T * k; if (!D.blocked(x, y) && areaId({ x, y }) === z.area) return [x, y]; }
+  return [o.x, o.y];
+}
 function znSpawn(t) {
   zn.wave++; const pts = [], last = t + ZN.waveEvery >= zn.end;
   const areas = new Map();
   for (const o of online.values()) if (znAlive(o)) { const id = areaId(o); if (D.AREAS.find(r => r.id === id)?.kind === 'map') (areas.get(id) || areas.set(id, []).get(id)).push(o); }
+  for (const area of areas.keys()) znGuards(area, pts);
   for (const [area, ps] of areas) {
     const n = Math.min(14, 2 + zn.wave * 2 + ps.length), tiles = walkableIn(area);
     for (let i = 0; i < n && zombies().length < ZN.cap; i++) {
@@ -758,7 +792,7 @@ function znSpawn(t) {
       if (!p) { const [x, y] = pick(tiles); if (Math.min(...ps.map(o => Math.hypot(o.x - x - .5, o.y - y - .5))) > 6) p = [x + .5, y + .5]; }
       if (!p) continue;
       const r = Math.random(), kind = last && i < 2 ? 'brute' : zn.wave >= 2 && r < .25 ? 'run' : r < .6 ? 'walk' : 'girl', K = ZN.kinds[kind];
-      const z = { id: -(9000 + (znSeq++ % 900)), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1.2, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {},
+      const z = { id: -(9000 + (znSeq++ % 900)), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1.2, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {}, lead: i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : .6,   // some chase, some cut you off
         next: () => znGoal(z), stay: () => .15 };
       npcs.push(z); pts.push([area, +p[0].toFixed(1), +p[1].toFixed(1)]);
     }
@@ -772,7 +806,7 @@ function znGoal(z) {
   let best = null, bd = 1e9;
   for (const o of online.values()) if (znAlive(o) && areaId(o) === z.area) { const d = Math.hypot(o.x - z.x, o.y - z.y); if (d < bd) { bd = d; best = o; } }
   z.tgt = best;
-  if (best) return [best.x, best.y];
+  if (best) return znLead(z, best);
   const [x, y] = pick(walkableIn(z.area)); return [x + .5, y + .5];
 }
 function znEnd(t) {
@@ -808,6 +842,11 @@ function znTick() {
   if (t >= zn.next && t < zn.end - 25e3) { zn.next = t + (zn.test ? 40e3 : ZN.waveEvery); znSpawn(t); }
   for (const o of online.values()) if (znAlive(o) && (D.areaAt(o.x, o.y)?.kind === 'room' || o.down)) znKill(o, 'in');
   for (const o of online.values()) if (znAlive(o)) znEvict(o);
+  for (const o of online.values()) if (znAlive(o)) {   // each survivor's running speed (smoothed), for zombies that head them off
+    const p = o.zp, dt = p ? (t - p[2]) / 1000 : 0;
+    if (p && dt > 0 && dt < 2 && areaId(o) === p[3]) { const vx = (o.x - p[0]) / dt, vy = (o.y - p[1]) / dt, ok = Math.hypot(vx, vy) < 12; o.zv = ok ? [((o.zv?.[0] || 0) + vx) / 2, ((o.zv?.[1] || 0) + vy) / 2] : null; }
+    o.zp = [o.x, o.y, t, areaId(o)];
+  }
   for (const z of zombies()) {
     if (z.wait > 0) continue;
     const tg = z.tgt;

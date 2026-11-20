@@ -1435,3 +1435,10 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .showBox canvas{display:block;max-width:100%;height:auto;image-rendering:pixelated}
 .showEdBtn{display:flex;justify-content:center;margin:4px 0 10px}
 .shNone{width:72px;height:64px;display:flex;align-items:center;justify-content:center;font-size:28px;opacity:.5}
+.jgDoc{background:#fffdf6;border:2px dashed #b08a5a;border-radius:8px;padding:10px;margin:6px 0;text-align:center}.jgDoc small{display:block;color:#8a6a3a}.jgDoc b{font-size:20px;color:#2a1a0a}
+.jgIn{width:100%;font-size:18px;padding:10px;border-radius:8px;border:2px solid #b08a5a;box-sizing:border-box}.jgIn.bad{border-color:#d23a2a;background:#fff0ee}.jgIn.ok{border-color:#3a9a2a;background:#efffe8}
+.jgShelf .lbl{font-size:13px;font-weight:700;color:#5a3a1a;margin-top:4px}.jgShelf .row{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;background:#c99a62;padding:4px;border-radius:6px}
+.jgShelf button,.jgVend button,.jgCrates button{font-size:24px;padding:6px 0;background:#fff8ec;border-radius:6px}.jgShelf button:not(.full){opacity:.35;border:2px dashed #8a6a3a}.jgShelf button.bad,.jgVend button.bad{background:#ff8a7a;opacity:1}
+.jgBoxIt{text-align:center;font-size:18px;margin:8px 0;background:#e8d2a8;border-radius:8px;padding:6px}.jgBoxIt b{font-size:34px;vertical-align:middle}
+.jgVend{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;background:linear-gradient(#d33,#911);padding:8px;border-radius:10px;margin:6px 0}.jgVend button i{font-style:normal;display:block}.jgVend button small{font-size:11px;color:#2a7a2a;letter-spacing:-1px}.jgVend button.full{background:#d8ffd0}
+.jgCrates{display:flex;gap:5px;justify-content:center;flex-wrap:wrap}.jgCrates button{background:#b58a52;min-width:52px}.jgCrates button small{display:block;font-size:10px;color:#fff}.jgCrates button.on{outline:3px solid #ffd23a;background:#e0a84a}

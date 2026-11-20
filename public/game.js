@@ -4339,6 +4339,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20g', d: '20 พ.ย. (รอบ 66)', items: [
+    '⌨️ <b>พนักงานบริษัท</b>: งานใหม่ "พิมพ์เอกสารตามแบบ" นั่งโต๊ะคอมพิมพ์ให้ตรงต้นแบบ (กดที่บริษัท)',
+    '📦 <b>พนักงานร้านสะดวกซื้อ</b>: งานใหม่ "เติมของและจัดเรียงชั้น" หยิบจากลังวางให้ตรงช่อง',
+    '🥤 <b>พ่อค้า</b>: งานใหม่ "ส่งของเติมตู้กดน้ำ" ทั่วเมือง เติมตู้เต็มได้โบนัส (กดที่โรงประมูล)',
+    '🧟 <b>คืนปล่อยผีโหดขึ้น</b>: ขอบเมืองทั้ง 4 ทิศมีซอมบี้วิ่งไว 2 ตัว + ซอมบี้อ้วน 1 ตัวเฝ้าอยู่ หนีไปหลบขอบแมพไม่รอดแล้ว!',
+    '🧠 ซอมบี้ฉลาดขึ้น: บางตัวไม่วิ่งตามหลัง แต่<b>ดักหน้า</b>ทางที่คุณกำลังวิ่งไป'] },
   { v: '2026-11-20f', d: '20 พ.ย. (รอบ 65)', items: [
     '👗 <b>ชุดแฟชั่นใหม่ 11 แบบ</b> ที่ร้านแฟชั่น (มีแบบผู้หญิงด้วย): ชุดนอนลายเสือ · ช่างภาพสายลุย · ชุดกันฝนเหลือง · นักสำรวจป่า · แมวขาวขนฟู · และชุดเพชร 💎 ไก่น้อยกุ๊กกุ๊ก · สายเซิร์ฟฮาวาย · ฮิปฮอปสตรีท · ไทยราชสำนัก · จอมยุทธ์มังกรแดง · อัศวินเกราะเงิน',
     '🎨 <b>ชุดสีพิเศษ</b> ทั้งชุดใหม่และชุดเก่า แยกเป็นชุดละชิ้น อยู่ในแท็บ 🎨 สีพิเศษ (เปลี่ยนแค่สีผ้า ผิวกับผมเหมือนเดิม)',
@@ -4860,6 +4866,7 @@ function renderPanel(p) {
         status = `<div class="item" style="display:block">ตำแหน่ง <b>${G.titles[l - 1]}</b> · ค่าส่งเอกสาร <b>~${money(Math.round(wage * .3))}–${money(Math.round(wage * .95))}</b>/งาน (ยิ่งไกลยิ่งได้มาก)<br>วันนี้: ${state}</div>
           ${me.docjob ? `<div class="jobbox ok">📄 กำลังส่งเอกสารไปที่ <b>${esc(STN(me.docjob.dest)?.label || '')}</b> · ค่าส่ง ~${money(me.docjob.pay)}${B('📍 นำทาง', { fn: 'guide', key: me.docjob.dest }, 'good')}</div>` : B('📄 รับงานส่งเอกสาร', { t: 'act', st, a: 'job' }, 'primary big')}
           <div class="sub" style="margin-top:8px">📄 รับซองเอกสารที่นี่ เดินไปส่งให้ถึงหน้าอาคารปลายทาง ได้เงินทันที (ไกลได้มาก) แล้วกลับมารับงานต่อ · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} เริ่มเมื่อไหร่ก็ได้ ไม่มีมาสาย · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าส่ง x${G.shift.otMul})</div>
+          ${jgBox('type', 'นั่งโต๊ะคอม พิมพ์เอกสารตามต้นแบบให้ตรงทุกตัวอักษร 12 บรรทัด')}
           ${B('📦 ลาออก', { t: 'resign' }, 'warn')}`;
       }
       return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${job('office') ? '' : staffHint('office')}`;
@@ -4930,23 +4937,24 @@ function renderPanel(p) {
       const rows = (G.cstore?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.cstore.markup), e = it.eat || {};
         return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
           [e.hunger && `อิ่ม +${e.hunger}`, e.energy && `พลัง +${e.energy}`, e.health && `เลือด +${e.health}`, e.happy && `สุข +${e.happy}`].filter(Boolean).join(' · ') + ` · มีอยู่ ${me.inv[id] || 0}`); }).join('');
-      const cashier = job('cashier') ? jgBox('cash', 'เข้ากะแคชเชียร์ คิดเงินทอนลูกค้า 10 คน') : '';
+      const cashier = job('cashier') ? jgBox('cash', 'เข้ากะแคชเชียร์ คิดเงินทอนลูกค้า 10 คน') + jgBox('stock', 'ของหมดชั้น! หยิบของจากลังไปเติมและจัดเรียงให้ตรงช่อง') : '';
       return cashier + `<h2>🏪 ร้านสะดวกซื้อ 24 ชม.</h2><div class="sub">เปิดตลอด 24 ชั่วโมง ของมีเสมอ ไม่ต้องรอใครวางขาย · ราคาสูงกว่าตลาดนิดหน่อย</div><div class="list">${rows}</div>`;
     }
     case 'warehouse': {
       const c = me.auc, head = `<h2>🔨 โรงประมูล</h2><div class="sub">${hoursTxt('warehouse')} · ล็อตละ 20 วินาที ยื่นซองประมูลได้ครั้งเดียว (แก้ราคาได้ก่อนหมดเวลา) แข่งกับคู่แข่ง 3 คน · ใครเสนอสูงสุดชนะและจ่ายตามที่เสนอ · ได้ของมาแล้วโรงประมูลรับซื้อคืนในราคาจริงทันที: <b>ต่ำกว่าราคาจริง = กำไร</b> สูงกว่า = ขาดทุน</div>`;
       if (!job('merchant')) return `${head}<div class="jobbox">เฉพาะ<b>พ่อค้า</b> · สมัครได้ที่นี่</div>`;
+      const vend = jgBox('vend', 'ขนเครื่องดื่มขึ้นรถไปเติมตู้กดน้ำทั่วเมือง ใส่ให้ตรงช่อง เติมเต็มตู้ได้โบนัส');
       const lot = c ? `<div class="aucLot"><div class="aucIco">${c.icon}</div><div><b>${esc(c.name)}</b><div class="aucItems">${Object.entries(c.items).map(([id, q]) => `<span>${G.items[id].icon} ${esc(G.items[id].name)} ×${q}</span>`).join('')}</div><small>สภาพ: <b>${c.cond}</b> · 🧐 ผู้ประเมินว่าราวๆ <b>${money(c.lo)} – ${money(c.hi)}</b></small></div></div>` : '';
-      if (!c || c.stage === 'done' && !c.result) return `${head}<div class="jobbox">ยังไม่มีล็อตบนเวที</div>${B('🔨 เปิดล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
+      if (!c || c.stage === 'done' && !c.result) return `${head}${vend}<div class="jobbox">ยังไม่มีล็อตบนเวที</div>${B('🔨 เปิดล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
       if (c.stage === 'bid') {
         const bots = c.bots.map(b => `<div class="aucBot">${b.sent ? '✉️' : '🤔'} <b>${esc(b.name)}</b> <small>${esc(b.style)} · ${b.sent ? 'ยื่นซองแล้ว' : 'กำลังคิด...'}</small></div>`).join('');
-        return `${head}${lot}<div class="aucTimer">⏱ เหลือเวลา <b class="auccd" data-t="${c.until}"></b></div><div class="aucBots">${bots}<div class="aucBot me">${c.my ? '✉️' : '✍️'} <b>คุณ</b> <small>${c.my ? `ยื่นแล้ว ${money(c.my)} (แก้ได้)` : 'ยังไม่ได้ยื่น'}</small></div></div>
+        return `${head}${vend}${lot}<div class="aucTimer">⏱ เหลือเวลา <b class="auccd" data-t="${c.until}"></b></div><div class="aucBots">${bots}<div class="aucBot me">${c.my ? '✉️' : '✍️'} <b>คุณ</b> <small>${c.my ? `ยื่นแล้ว ${money(c.my)} (แก้ได้)` : 'ยังไม่ได้ยื่น'}</small></div></div>
           <div class="rowf" style="margin-top:8px"><input id="aucAmt" type="number" min="10" step="10" inputmode="numeric" placeholder="ราคาที่จะเสนอ (บาท)" value="${c.my || ''}">${B(c.my ? '✉️ แก้ซอง' : '✉️ ยื่นซอง', { fn: 'aucBid', st }, 'primary')}</div>
           <div class="sub">เงินสดที่มี ${money(me.money)} · ไม่ยื่นก็ได้ ถ้าคิดว่าแพงเกินไป</div>`;
       }
       const rows = c.result.map(([n, b, mine], i) => `<div class="aucRes ${i === 0 ? 'win' : ''} ${mine ? 'me' : ''}">${i === 0 ? '🏆' : `${i + 1}.`} <b>${esc(mine ? 'คุณ' : n)}</b><span>${money(b)}</span>${b <= c.real ? '<i class="up">ต่ำกว่าจริง</i>' : '<i class="dn">เกินราคาจริง</i>'}</div>`).join('');
       const iWon = c.result[0]?.[2], verdict = iWon ? (c.net >= 0 ? `<div class="aucVerdict good">🎉 คุณชนะ! กำไร <b>${money(c.net)}</b></div>` : `<div class="aucVerdict bad">😵 ชนะแต่จ่ายแพงไป ขาดทุน <b>${money(-c.net)}</b></div>`) : `<div class="aucVerdict">${esc(c.win)} ได้ไป${c.my ? ' · คุณไม่ได้เสียเงิน' : ''}</div>`;
-      return `${head}${lot}<div class="aucReal">💎 มูลค่าจริง <b>${money(c.real)}</b></div><div class="aucResList">${rows}</div>${verdict}${B('🔨 ล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
+      return `${head}${vend}${lot}<div class="aucReal">💎 มูลค่าจริง <b>${money(c.real)}</b></div><div class="aucResList">${rows}</div>${verdict}${B('🔨 ล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
     }
     case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${job('rider') ? `<div class="jobbox">🧡 <b>แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่งจะโผล่มาแย่งลูกค้าเป็นพักๆ (จุดสีส้มบนมินิแมพ) วิ่งไปชนแล้วสู้กันแบบผลัดกันเลือกท่า ชนะได้ค่าส่ง+ทิป · ${me.rival ? `ตอนนี้ ${esc(me.rival.name)} อยู่ในเมือง!` : B('🔎 ออกตามหาไรเดอร์ส้ม', { t: 'rbseek' }, 'primary')}</div>` + riderJobs() : ''}`;
     case 'restaurant': {
@@ -7012,7 +7020,7 @@ FN.jgClose = () => { jgStop(true); mgClose(); };
 function jgOpen(k, seed) {
   mgStop(); jgStop(false); $('#mg').classList.remove('hidden'); FX.play('notice');
   const g = JG.cur = { k, score: 0, r: jgRng(seed), t0: performance.now() };
-  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, slice: jgSlice })[k]?.(g);
+  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, slice: jgSlice, type: jgType, stock: jgStock, vend: jgVend })[k]?.(g);
 }
 const jgPick = (g, a) => a[Math.floor(g.r() * a.length)];
 
@@ -7168,6 +7176,73 @@ function jgSlice(g) {
   };
   g.raf = requestAnimationFrame(draw);
   jgClock(g, 40);
+}
+// ⌨️ office: type the line from the template exactly as shown (a quote, an invoice, a memo...)
+function jgType(g) {
+  const N = () => Math.floor(g.r() * 900 + 100), M = () => (Math.floor(g.r() * 90 + 10) * 100).toLocaleString();
+  const T = [() => `ใบเสนอราคาเลขที่ ${N()}`, () => `ยอดรวม ${M()} บาท`, () => `เรียน ผู้จัดการฝ่ายขาย`, () => `ประชุมวันจันทร์ ${Math.floor(g.r() * 5 + 9)}.00 น.`, () => `ใบแจ้งหนี้ INV-${N()}`,
+    () => `ส่งของภายใน ${Math.floor(g.r() * 6 + 2)} วัน`, () => `จึงเรียนมาเพื่อโปรดทราบ`, () => `ขอแสดงความนับถือ`, () => `รหัสพนักงาน TT${N()}`, () => `ห้องประชุม ${Math.floor(g.r() * 4 + 1)}0${Math.floor(g.r() * 9 + 1)}`,
+    () => `อนุมัติงบ ${M()} บาท`, () => `ลูกค้า บริษัท สยามรุ่ง จำกัด`, () => `โทร 02-${N()}-${N()}0`, () => `รายงานยอดขายไตรมาส ${Math.floor(g.r() * 4 + 1)}`, () => `กำหนดส่ง ${Math.floor(g.r() * 28 + 1)} มีนาคม`];
+  const norm = v => v.replace(/\s+/g, ' ').trim();
+  let want = '';
+  const next = () => {
+    if (JG.cur !== g) return;
+    if (g.score >= 12) { g.endWhy = 'พิมพ์ครบ 12 บรรทัด เป๊ะทุกตัว!'; return jgFinish(g); }
+    want = jgPick(g, T)();
+    $('#mgBody').innerHTML = jgHead(g, ` · บรรทัด ${g.score + 1}/12`) + `<div class="jgDoc"><small>📄 ต้นแบบ</small><b>${esc(want)}</b></div>
+      <div class="sub">🖥️ พิมพ์ให้ตรงต้นแบบทุกตัวอักษร (ถูกแล้วไปบรรทัดต่อไปเอง)</div><input id="jgIn" class="jgIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="พิมพ์ตรงนี้...">
+      <div class="grid2" style="margin-top:6px">${B('⏭️ ข้าม (-5 วิ)', { fn: 'jgTypeSkip' })}</div>`;
+    bindPanel($('#mgBody'));
+    const inp = $('#jgIn'); inp.focus();
+    inp.oninput = () => {
+      const v = norm(inp.value), ok = v === norm(want);
+      inp.classList.toggle('bad', !norm(want).startsWith(v));
+      if (ok) { g.score++; jgScore(g); FX.play('coin'); inp.disabled = true; inp.classList.add('ok'); setTimeout(next, 250); }
+    };
+  };
+  FN.jgTypeSkip = () => { if (JG.cur !== g) return; g.end -= 5000; FX.play('fail'); next(); };
+  jgClock(g, 75); next();
+}
+// 📦 convenience store: take items out of the box one by one and put each on the empty spot of the shelf that shows it
+function jgStock(g) {
+  const ROWS = [['🥤 เครื่องดื่ม', ['🥤', '🧃', '🥛', '💧']], ['🍪 ขนม', ['🍪', '🍫', '🍬', '🥨']], ['🧴 ของใช้', ['🧴', '🧻', '🧼', '🪥']]];
+  let slots = [], cur = null;
+  const fresh = () => { slots = ROWS.map(([, ic]) => Array.from({ length: 6 }, () => ({ ic: jgPick(g, ic), full: g.r() < .4 }))); };
+  const draw = () => {
+    const empty = slots.flat().filter(s => !s.full);
+    if (!empty.length) { fresh(); return draw(); }
+    if (!cur || !empty.some(s => s.ic === cur)) cur = jgPick(g, empty).ic;
+    $('#mgBody').innerHTML = jgHead(g) + `<div class="sub">หยิบของจากลังแล้วแตะช่องว่างบนชั้นที่มีรูปตรงกัน (วางผิด -3 วิ)</div>
+      <div class="jgShelf">${slots.map((r, i) => `<div class="lbl">${ROWS[i][0]}</div><div class="row">${r.map((s, j) => `<button data-s="${i}_${j}" class="${s.full ? 'full' : ''}">${s.ic}</button>`).join('')}</div>`).join('')}</div>
+      <div class="jgBoxIt">📦 ลังสินค้า → <b>${cur}</b></div>`;
+    $('#mgBody').querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
+      const [i, j] = b.dataset.s.split('_').map(Number), s = slots[i][j]; if (s.full) return;
+      if (s.ic === cur) { s.full = true; cur = null; g.score++; jgScore(g); FX.play('coin'); draw(); }
+      else { b.classList.add('bad'); g.end -= 3000; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(40); setTimeout(() => b.classList.remove('bad'), 300); }
+    });
+  };
+  fresh(); jgClock(g, 45); draw();
+}
+// 🥤 merchant: unload the truck into vending machines around town - pick a drink from a crate, drop it in a column that sells it
+function jgVend(g) {
+  const DR = ['🥤', '🧃', '☕', '💧', '🍵', '🥛'], SPOTS = ['หน้าสถานีตำรวจ', 'ป้ายรถเมล์', 'หน้าโรงพยาบาล', 'มหาวิทยาลัย', 'สวนสนุก', 'ตลาดกลาง', 'หน้าธนาคาร'];
+  let cols = [], hold = null, n = 0;
+  const fresh = () => { n++; const k = [...DR].sort(() => g.r() - .5).slice(0, 4), d = [...k, ...k].sort(() => g.r() - .5); cols = d.map(x => ({ d: x, c: Math.floor(g.r() * 4) })); };
+  const draw = () => {
+    if (cols.every(c => c.c >= 5)) { g.score += 3; jgScore(g); FX.play('levelup'); fresh(); }
+    const kinds = [...new Set(cols.map(c => c.d))];
+    $('#mgBody').innerHTML = jgHead(g, ` · ตู้ที่ ${n}`) + `<div class="sub">🚚 ตู้${SPOTS[(n - 1) % SPOTS.length]} · แตะลังเพื่อหยิบ แล้วแตะช่องที่ขายเครื่องดื่มนั้นและยังไม่เต็ม (ผิด -2 วิ) · เติมตู้เต็ม +3</div>
+      <div class="jgVend">${cols.map((c, i) => `<button data-c="${i}" class="${c.c >= 5 ? 'full' : ''}"><i>${c.d}</i><small>${'▮'.repeat(c.c)}${'▯'.repeat(5 - c.c)}</small></button>`).join('')}</div>
+      <div class="jgCrates">${kinds.map(d => `<button data-d="${d}" class="${hold === d ? 'on' : ''}">${d}<small>ลัง</small></button>`).join('')}</div>
+      <div class="sub">${hold ? `ถืออยู่: <b>${hold}</b>` : 'มือว่าง: หยิบจากลังก่อน'}</div>`;
+    $('#mgBody').querySelectorAll('[data-d]').forEach(b => b.onclick = () => { hold = b.dataset.d; FX.play('click'); draw(); });
+    $('#mgBody').querySelectorAll('[data-c]').forEach(b => b.onclick = () => {
+      const c = cols[+b.dataset.c]; if (!hold) return;
+      if (c.d === hold && c.c < 5) { c.c++; g.score++; jgScore(g); FX.play('coin'); if (c.c >= 5 || !cols.some(x => x.d === hold && x.c < 5)) hold = null; draw(); }
+      else { b.classList.add('bad'); g.end -= 2000; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(40); setTimeout(() => b.classList.remove('bad'), 300); }
+    });
+  };
+  fresh(); jgClock(g, 50); draw();
 }
 // the boxes that start them, shown in the police / store / kitchen panels
 function jgBox(k, note) {
