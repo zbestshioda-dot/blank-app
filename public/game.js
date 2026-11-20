@@ -571,7 +571,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '' });
+        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -1039,7 +1039,7 @@ $('#restBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); se
 // running: toggle with the 🏃 button, or hold Shift on a keyboard
 let running = false, shiftRun = false, runSetT = 0;
 const canRun = () => !!me && me.energy > G.run.minEnergy && !me.down;
-function setRun(on) { if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#actBtn').classList.toggle('run', on); $('#runBtn').classList.toggle('on', on); }
+function setRun(on) { if (on && wwIsWolf()) on = false; if (on && !canRun()) { if (me) toast('เหนื่อยเกินไป วิ่งไม่ไหว พักหรือกินอะไรก่อน', '🥵', false); on = false; } if (on === running) return; running = on; runSetT = performance.now(); send({ t: 'run', on }); $('#actBtn').classList.toggle('run', on); $('#runBtn').classList.toggle('on', on); }
 $('#runBtn').onclick = () => { FX.play('click'); setRun(!running); };
 $('#bagBtn').onclick = () => { FX.play('click'); panel?.kind === 'bag' ? closePanel() : openPanel({ kind: 'bag' }); };
 $('#begBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); send({ t: 'beg', on: me.pose !== 'beg' }); };
@@ -1432,7 +1432,8 @@ function frame(t) {
 
   near = findNear();
   const ab = $('#actBtn');
-  if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); $('#actLabel').textContent = 'หมุน'; }
+  if (wwIsWolf()) { const cd = wwCdLeft('summon'); ab.classList.remove('closed'); ab.classList.toggle('idle', cd > 0); actIco('📯'); $('#actLabel').textContent = cd ? `สมุน ${cd} วิ` : 'เรียกสมุน'; }
+  else if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); $('#actLabel').textContent = 'หมุน'; }
   else if (picking) { ab.classList.add('idle'); actIco('✋'); $('#actLabel').textContent = 'แตะของ'; }
   else if (near) {
     ab.classList.remove('idle'); let ico = near.icon;
@@ -1581,7 +1582,7 @@ function draw(t) {
   drawOtherCasts(X, Y, t); drawBobber(X, Y, t); drawMisGuide(X, Y, t);
   drawSirens(X, Y);
   FX.draw(ctx, X, Y, TS);
-  drawGuide(X, Y, t);
+  drawGuide(X, Y, t); drawSniff(X, Y, t);
   if (autoPath) {                          // tap-to-walk route: dotted line and a marker where you tapped
     const m = P.get(myId), pts = [[m.rx, m.ry], ...autoPath.pts];
     ctx.save(); ctx.setLineDash([TS * .14, TS * .14]); ctx.lineDashOffset = -t / 40; ctx.lineWidth = Math.max(3, TS * .08); ctx.lineCap = 'round';
@@ -2374,7 +2375,7 @@ function wwSil(row, col) {   // a solid purple copy of one werewolf frame (cache
   g.drawImage(wwImg, col * WWB.w, row * WWB.h, WWB.w, WWB.h, 0, 0, WWB.w, WWB.h); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#b44dff'; g.fillRect(0, 0, WWB.w, WWB.h);
   return (wwSilC[key] = c);
 }
-function drawWolf(p, X, Y, t) {
+function drawWolf(p, X, Y, t, sc = 1) {
   const px = Math.round(p.rx * TS + X), py = Math.round(p.ry * TS + Y + TS * .32);
   if (px < -120 || py < -160 || px > VW + 120 || py > VH + 160) return;
   const moving = Math.hypot(p.x - p.rx, p.y - p.ry) > .02, f8 = ((p.f | 0) % 8 + 8) % 8, dir = { 0: 'left', 1: 'left', 2: 'up', 3: 'right', 4: 'right', 5: 'right', 6: 'down', 7: 'left' }[f8];
@@ -2385,7 +2386,7 @@ function drawWolf(p, X, Y, t) {
   let top;
   if (wwImg) {
     const fi = moving ? [1, 0, 2, 0][Math.floor(p.walk / 1.4) % 4] : 0, col = (dir === 'down' ? 0 : dir === 'up' ? 3 : 6) + fi, row = WWB.rows?.[moving ? 'run' : 'walk'] || 0;
-    const k = TS * 1.6 / 96, w = WWB.w * k, h = WWB.h * k, sil = wwSil(row, col), o = Math.max(3, Math.round(TS * .08));
+    const k = TS * 1.6 * sc / 96, w = WWB.w * k, h = WWB.h * k, sil = wwSil(row, col), o = Math.max(3, Math.round(TS * .08));
     ctx.save(); ctx.translate(px, py); if (dir === 'left') ctx.scale(-1, 1);
     ctx.globalAlpha = .85 + pul * .15; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, -o], [-o, o], [o, o]]) ctx.drawImage(sil, -WWB.feet[0] * k + dx, -WWB.feet[1] * k + dy, w, h); ctx.globalAlpha = 1;   // thick purple outline: easy to spot
     ctx.drawImage(wwImg, col * WWB.w, row * WWB.h, WWB.w, WWB.h, -WWB.feet[0] * k, -WWB.feet[1] * k, w, h); ctx.restore();
@@ -2400,8 +2401,8 @@ function drawWolf(p, X, Y, t) {
 }
 function wwCard(html, cls, ms) { znCard(html, cls, ms); }
 function wwMsg(m) {
-  if (m.t === 'wwturn') { FX.play('alarm'); if (navigator.vibrate) navigator.vibrate([80, 60, 160]); wwCard('<div style="font-size:64px">🐺</div><b>คุณกลายเป็นหมาป่า!</b><p>ไล่ขย้ำผู้เล่นคนอื่น (แค่วิ่งชน) · คุณวิ่งเร็วขึ้น · <b>ห้ามยืนนิ่งเกิน 3 วินาที</b> ไม่งั้นคำสาปจะหลุดไปหาคนอื่น!</p>', 'warn', 4500); return; }
-  if (m.t === 'wwdie') { FX.play('zbite'); wwCard(`<div style="font-size:56px">🩸</div><b>โดนหมาป่าขย้ำ!</b><p>${esc(m.by || '')} จับคุณได้ · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600); return; }
+  if (m.t === 'wwturn') { FX.play('alarm'); if (navigator.vibrate) navigator.vibrate([80, 60, 160]); wwCard('<div style="font-size:64px">🐺</div><b>คุณกลายเป็นหมาป่า (โฮส)!</b><p>วิ่งชนมนุษย์เพื่อกัด คนที่โดนกัดจะกลายเป็นลูกน้องคุณ · ปุ่มเปลี่ยนเป็นสกิล 👃 ดมกลิ่น ⚡ วิ่งไว 📯 เรียกสมุน · <b>ห้ามยืนนิ่งเกิน 3 วินาที!</b></p>', 'warn', 5000); return; }
+  if (m.t === 'wwdie') { FX.play('zbite'); if (navigator.vibrate) navigator.vibrate([60, 40, 120]); wwCard(`<div style="font-size:56px">🐺</div><b>โดนกัด! คุณกลายเป็นหมาป่าลูกน้อง</b><p>${esc(m.by || '')} กัดคุณ · ไล่กัดมนุษย์ที่เหลือต่อ ถ้ากัดหมดเมือง หมาป่าแบ่งเงินรางวัลกัน · ใช้สกิล 👃 ⚡ 📯 ได้</p>`, 'bite', 4000); return; }
   const was = WW.ph;
   if (m.ph === 'end') {
     WW = { ph: 'off' }; FX.play(m.won ? 'levelup' : 'chime');
@@ -2416,10 +2417,45 @@ function wwMsg(m) {
 }
 function wwHud(el) {
   const left = Math.max(0, Math.ceil(((WW.endT || 0) - performance.now()) / 1000)), mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  const title = WW.ph === 'warn' ? `🌕 หมาป่าออกล่าใน ${mm}` : WW.me === 'wolf' ? `🐺 คุณคือหมาป่า · ${mm}` : `🌕 รอดอีก ${mm}`;
-  const sub = WW.ph === 'warn' ? 'ออกจากอาคาร เตรียมวิ่ง!' : WW.me === 'wolf' ? `ไล่ขย้ำให้หมด · เหลือ ${WW.alive} คน · ห้ามยืนนิ่ง!` : WW.me === 'dead' ? `คุณโดนขย้ำแล้ว · ผู้รอด ${WW.alive} คน` : WW.me === 'alive' ? `หมาป่า: ${WW.wname} · ผู้รอด ${WW.alive} คน` : `ดูอยู่ข้างสนาม · ผู้รอด ${WW.alive} คน`;
-  el.classList.remove('hidden'); el.classList.toggle('warn', WW.ph === 'warn' || WW.me === 'wolf'); el.classList.toggle('dead', WW.me === 'dead');
+  const nw = (WW.wolves || []).length;
+  const title = WW.ph === 'warn' ? `🌕 หมาป่าออกล่าใน ${mm}` : WW.me === 'wolf' ? `🐺 ${WW.boss ? 'คุณคือโฮสหมาป่า' : 'คุณคือหมาป่าลูกน้อง'} · ${mm}` : `🌕 รอดอีก ${mm}`;
+  const sub = WW.ph === 'warn' ? 'ออกจากอาคาร เตรียมวิ่ง!' : WW.me === 'wolf' ? `กัดมนุษย์ให้หมด · เหลือ ${WW.alive} คน${WW.boss ? ' · ห้ามยืนนิ่ง!' : ''}` : WW.me === 'alive' ? `หมาป่า ${nw} ตัว · มนุษย์ ${WW.alive} คน · แผนที่ไม่เห็นใคร ระวัง!` : `ดูอยู่ข้างสนาม · มนุษย์ ${WW.alive} คน`;
+  el.classList.remove('hidden'); el.classList.toggle('warn', WW.ph === 'warn' || WW.me === 'wolf'); el.classList.toggle('dead', false);
   el.innerHTML = `<span style="font-size:24px">🐺</span><div><b>${title}</b><small>${esc(sub)}</small></div>`;
+}
+const wwIsWolf = () => WW.ph === 'on' && WW.me === 'wolf';
+const wwNow = () => Date.now() + clockOff;
+const wwSniffing = () => wwIsWolf() && (WW.sk?.sniff || 0) > wwNow();
+// while you are a wolf the bag / run / action buttons become 👃 sniff, ⚡ sprint and 📯 summon
+const WW_BTN = { bagBtn: ['sniff', '👃', 'ดมกลิ่น'], runBtn: ['sprint', '⚡', 'วิ่งไว'], actBtn: ['summon', '📯', 'เรียกสมุน'] };
+function wwCdLeft(k) { return Math.max(0, Math.ceil(((WW.sk?.[k + 'Cd'] || 0) - wwNow()) / 1000)); }
+function wwBtns() {
+  const on = wwIsWolf();
+  for (const [id, [k, ic, lb]] of Object.entries(WW_BTN)) {
+    const b = $('#' + id); if (!b) continue;
+    if (id === 'actBtn') continue;   // (the action button is relabelled in the frame loop)
+    if (on) { const cd = wwCdLeft(k); if (!b.dataset.ww) { b.dataset.ww = b.innerHTML; } b.innerHTML = `<span>${ic}</span><small>${cd ? cd + ' วิ' : lb}</small>`; b.classList.toggle('wwCd', cd > 0); b.classList.add('wwSk'); }
+    else if (b.dataset.ww) { b.innerHTML = b.dataset.ww; delete b.dataset.ww; b.classList.remove('wwCd', 'wwSk'); }
+  }
+}
+setInterval(wwBtns, 250);
+for (const id of Object.keys(WW_BTN)) {
+  const b = $('#' + id), k = WW_BTN[id][0];
+  const stop = e => { if (!wwIsWolf()) return false; e.stopImmediatePropagation(); e.preventDefault(); return true; };
+  b.addEventListener('pointerdown', e => { if (stop(e)) { FX.play('click'); if (running) setRun(false); send({ t: 'wwskill', k }); } }, true);
+  b.addEventListener('pointerup', stop, true); b.addEventListener('pointercancel', stop, true); b.addEventListener('click', stop, true);
+}
+// 👃 while sniffing: a red arrow from the wolf to the nearest human
+function drawSniff(X, Y, t) {
+  if (!wwSniffing()) return;
+  const m = P.get(myId); if (!m) return;
+  let best = null, bd = 1e9; for (const id of WW.humans || []) { const o = P.get(id); if (!o) continue; const d = Math.hypot(o.x - m.x, o.y - m.y); if (d < bd) { bd = d; best = o; } }
+  if (!best) return;
+  const a = Math.atan2(best.ry - m.ry, best.rx - m.rx), cx = m.rx * TS + X, cy = m.ry * TS + Y, r = TS * 1.3 + Math.sin(t / 140) * 5;
+  ctx.save(); ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.rotate(a);
+  ctx.fillStyle = '#ff2a2a'; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(TS * .5, 0); ctx.lineTo(-TS * .28, -TS * .34); ctx.lineTo(-TS * .12, 0); ctx.lineTo(-TS * .28, TS * .34); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  sign(`👃 ${best.name || ''} · ${Math.round(bd)} ม.`, cx, cy + TS * 1.05, { size: TS * .3, bg: 'rgba(200,20,20,.92)' });
 }
 function znHud() {
   const el = $('#znBar'); if (!el) return;
@@ -2504,7 +2540,7 @@ function drawUmbrella(px, top, H, id, t) {
 }
 function drawPlayer(p, X, Y, t) {
   if (p.zb) return drawZombie(p, X, Y, t);
-  if (WW.ph === 'on' && WW.wolf && p.id === WW.wolf) return drawWolf(p, X, Y, t);
+  if (p.wwm || WW.ph === 'on' && WW.wolves?.includes(p.id)) return drawWolf(p, X, Y, t, p.id === WW.wolf ? 1.05 : p.wwm ? .78 : .9);
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
   const snap = v => Math.round(v * DPR) / DPR;
   const fo = p.pose === 'fun' && p.fn ? funPos(p) : null;   // on a park ride: drawn where the ride carries them
@@ -3428,7 +3464,16 @@ function drawMini() {
   const mapId = mapOf(areaOf(m.x, m.y)?.id), A = AREA[mapId], base = miniBase[mapId]; if (!base) return;
   const mini = $('#mini'); if (mini.width !== base.width) { mini.width = base.width; mini.height = base.height; }
   const g = mini.getContext('2d'); g.drawImage(base, 0, 0);
+  const wwOnMap = WW.ph === 'on', sniff = wwSniffing(), wolfMe = wwIsWolf();
   for (const p of P.values()) {
+    if (wwOnMap) {   // 🌕 werewolf night: humans see nobody; wolves see their pack (purple), and humans (red) while sniffing
+      if (p.id === myId || mapId !== 'town') continue;
+      const isW = p.wwm || WW.wolves?.includes(p.id), isH = WW.humans?.includes(p.id);
+      if (!(wolfMe && (isW || sniff && isH))) continue;
+      const mx = (p.rx - A.x) * 2, my = (p.ry - A.y) * 2, s = isH ? 7 : 5;
+      g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2); g.fillStyle = isH ? ((performance.now() / 250 | 0) % 2 ? '#ff1a1a' : '#ff7070') : '#b44dff'; g.fillRect(mx - s / 2, my - s / 2, s, s);
+      continue;
+    }
     if (p.zb && areaOf(p.rx, p.ry)?.id === A?.id || p.zb && mapId === areaOf(p.rx, p.ry)?.id) { g.fillStyle = '#ff2b2b'; g.fillRect((p.rx - A.x) * 2 - 2, (p.ry - A.y) * 2 - 2, 4, 4); continue; }
     if (p.npc || p.id === myId) continue;
     const q = outPos(p.rx, p.ry); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
@@ -4435,6 +4480,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20l', d: '20 พ.ย. (รอบ 71)', items: [
+    '🐺 <b>คืนหมาป่าโฉมใหม่</b>: คนที่โดนกัดจะกลายเป็น<b>หมาป่าลูกน้อง</b> ช่วยล่าคนอื่นต่อ · มนุษย์จะไม่เห็นใครบนมินิแมพ',
+    '👃 สกิลหมาป่า (แทนปุ่มเดิม): <b>ดมกลิ่น</b> (แทนกระเป๋า) มนุษย์ขึ้นจุดแดงบนแผนที่ + ลูกศรชี้ 8 วิ · <b>วิ่งไว</b> (แทนปุ่มวิ่ง) 5 วิ · <b>เรียกสมุน</b> (แทนปุ่มใช้งาน) หมาป่า 2 ตัวมาช่วยไล่ 20 วิ',
+    '💰 มนุษย์รอดถึงเช้าได้รางวัลเต็ม · ถ้ากัดหมดเมือง หมาป่าแบ่งเงินกัน โฮสได้มากสุด ที่เหลือตามจำนวนที่กัด'] },
   { v: '2026-11-20k', d: '20 พ.ย. (รอบ 70)', items: [
     '⚡ <b>ลดแลค</b>: เซิร์ฟเวอร์ไม่ค้างตอนบันทึกข้อมูลแล้ว (เดิมกระตุกพร้อมกันทุก 15 วินาที) · ส่งข้อมูลผู้เล่นน้อยลง',
     '📱 มือถือจอ 90/120Hz วาดภาพไม่เกิน 60 เฟรม เครื่องไม่ร้อน ลื่นนานขึ้น'] },

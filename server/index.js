@@ -859,25 +859,33 @@ function znTick() {
 }
 setInterval(() => { try { if (online.size || zn) znTick(); } catch (e) { console.error('znTick', e); } }, 250).unref?.();
 // ------------------------------------------------------------------ 🐺 WEREWOLF NIGHT: on the full-moon night (Bangkok) at 21:00
-// one random player in town turns into the werewolf and hunts the others. A werewolf that stops moving for 3 s loses the curse:
-// someone else turns. Survivors at dawn get the full prize; if the wolves eat everyone, the pot is shared (the first wolf, the host, gets most).
-const WW = { hour: 21, warn: 30e3, dur: 4 * 60e3, afk: 3000, grace: 4000, speed: 1.25, bite: .95, prize: { money: 3000, gems: 3 }, perHead: 1500, perKill: 400, min: 2 };
-let ww = null, wwDone = '', wwAnnounced = '';
+// one random player in town turns into the werewolf (the host) and hunts the others. Whoever gets bitten turns into a minion wolf and
+// hunts too. Wolves have skills: 👃 sniff (humans show red on their minimap + an arrow), ⚡ sprint, 📯 summon two AI minions.
+// Humans see nobody on their minimap. The host must keep moving: standing still for 3 s passes the curse to a human.
+// Humans alive at dawn get the full prize; if the wolves bite everyone, the pot is shared (the first host gets most).
+const WW = { hour: 21, warn: 30e3, dur: 4 * 60e3, afk: 3000, grace: 4000, speed: 1.25, bite: .95, prize: { money: 3000, gems: 3 }, perHead: 1500, perKill: 400, min: 2,
+  sk: { sniff: { dur: 8000, cd: 25000 }, sprint: { dur: 5000, cd: 15000, mul: 1.7 }, summon: { dur: 20000, cd: 40000, n: 2, speed: 3.1 } } };
+let ww = null, wwDone = '', wwAnnounced = '', wwSeq = 0;
 const SYN = 29.530588853, NM0 = Date.UTC(2000, 0, 6, 18, 14);
 const fullMoonAt = t => Math.abs(((t - NM0) / 864e5) % SYN - SYN / 2) <= .5;   // within half a day of the full moon
 const wwOn = () => ww?.ph === 'on';
-const wwWolf = a => wwOn() && ww.wolf === a.id;
+const wwWolf = a => wwOn() && ww.wolves.has(a.id);
 const wwAlive = a => wwOn() && ww.alive.has(a.id);
+const wwSk = a => ww.sk.get(a.id) || ww.sk.set(a.id, {}).get(a.id);
+const wwSpeed = a => wwWolf(a) ? WW.speed * ((ww.sk.get(a.id)?.sprintUntil || 0) > now() ? WW.sk.sprint.mul : 1) : 1;
+const wwMinions = () => npcs.filter(n => n.wwm);
 function wwState(a) {
   if (!ww) return { t: 'ww', ph: 'off' };
-  const w = online.get(ww.wolf);
-  return { t: 'ww', ph: ww.ph, end: ww.ph === 'warn' ? ww.t0 : ww.end, alive: ww.alive?.size || 0, wolf: ww.wolf || 0, wname: w?.name || '', host: ww.host || 0,
-    me: ww.ph !== 'on' ? '' : ww.wolf === a.id ? 'wolf' : ww.alive.has(a.id) ? 'alive' : ww.dead.has(a.id) ? 'dead' : 'out' };
+  const h = online.get(ww.wolf), on = ww.ph === 'on', s = on && ww.wolves.has(a.id) ? wwSk(a) : null;
+  return { t: 'ww', ph: ww.ph, end: ww.ph === 'warn' ? ww.t0 : ww.end, alive: ww.alive?.size || 0, wolf: ww.wolf || 0, wname: h?.name || '', host: ww.host || 0,
+    wolves: on ? [...ww.wolves] : [], humans: on && ww.wolves.has(a.id) ? [...ww.alive] : [],
+    me: !on ? '' : ww.wolves.has(a.id) ? 'wolf' : ww.alive.has(a.id) ? 'alive' : 'out', boss: ww.wolf === a.id ? 1 : 0,
+    sk: s ? { sniff: s.sniffUntil || 0, sniffCd: s.sniffCd || 0, sprint: s.sprintUntil || 0, sprintCd: s.sprintCd || 0, summonCd: s.summonCd || 0 } : null };
 }
 function wwSendAll() { for (const o of online.values()) send(o, wwState(o)); }
 function wwStart(t, test) {
   if (zn) return;
-  ww = { ph: 'warn', t0: t + (test ? 10e3 : WW.warn), alive: new Set(), dead: new Set(), kills: new Map(), test, n: 0 };
+  ww = { ph: 'warn', t0: t + (test ? 10e3 : WW.warn), alive: new Set(), wolves: new Set(), kills: new Map(), sk: new Map(), test, n: 0 };
   if (!test) wwDone = dayKey();
   feed('🌕🐺 คืนจันทร์เต็มดวง! ใครสักคนในเมืองกำลังจะกลายเป็นหมาป่า... ออกมาข้างนอกให้หมด');
   for (const o of online.values()) toast(o, `🌕 คืนจันทร์เต็มดวง! อีก ${Math.round((ww.t0 - t) / 1000)} วินาที จะมีคนกลายเป็นหมาป่า ทุกคนจะถูกพาออกมาในเมือง`, '🐺', false);
@@ -890,46 +898,76 @@ function wwBringOut(a) {
   if (r?.outside && D.areaAt(r.outside.x, r.outside.y)?.id === 'town') return teleport(a, r.outside.x, r.outside.y);
   if (areaId(a) !== 'town') { const p = standNear('town', D.SPAWN.x + rnd(-2, 2), D.SPAWN.y + rnd(-1, 2)) || [D.SPAWN.x, D.SPAWN.y]; teleport(a, p[0], p[1]); }
 }
-function wwPickWolf(t, not) {
+function wwPickWolf(t, not) {   // a random human becomes the cursed host
   const c = [...ww.alive].map(id => online.get(id)).filter(o => o && o.id !== not && areaId(o) === 'town' && !o.down);
   if (!c.length) return false;
-  const w = pick(c); ww.alive.delete(w.id); ww.wolf = w.id; ww.since = t; ww.lastSeen = t; ww.wx = w.x; ww.wy = w.y;
+  const w = pick(c); ww.alive.delete(w.id); ww.wolves.add(w.id); ww.wolf = w.id; ww.since = t; ww.lastSeen = t; ww.wx = w.x; ww.wy = w.y;
   if (!ww.host) ww.host = w.id;
   if (!ww.kills.has(w.id)) ww.kills.set(w.id, 0);
-  markMe(w); sendRoster();
-  send(w, { t: 'wwturn' });
+  if (w.run) { w.run = false; } markMe(w); sendRoster();
+  send(w, { t: 'wwturn', boss: 1 });
   for (const o of online.values()) if (o !== w) toast(o, `🐺 ${w.name} กลายเป็นหมาป่าแล้ว! วิ่งหนีเร็ว!`, '🐺', false);
   wwSendAll(); return true;
 }
-function wwRelease(t, why) {   // the wolf is human again (back among the survivors), someone else turns
+function wwRelease(t, why) {   // the host is human again (back among the survivors), another human becomes the host
   const old = online.get(ww.wolf), id = ww.wolf; ww.wolf = 0;
-  if (old && !ww.dead.has(old.id)) { ww.alive.add(old.id); markMe(old); toast(old, why === 'afk' ? '😮‍💨 คุณยืนนิ่งเกิน 3 วินาที คำสาปหมาป่าหลุดไปหาคนอื่นแล้ว! ตอนนี้คุณเป็นคนธรรมดา วิ่งหนีด้วย!' : '🐺 คำสาปหมาป่าหลุดไปหาคนอื่นแล้ว', '🌕', false); }
-  if (!wwPickWolf(t, id) && old && online.has(id)) { ww.alive.delete(id); ww.wolf = id; ww.since = t; ww.lastSeen = t; markMe(old); }
-  sendRoster();
+  if (old) { ww.wolves.delete(id); ww.sk.delete(id); ww.alive.add(id); markMe(old); toast(old, why === 'afk' ? '😮‍💨 คุณยืนนิ่งเกิน 3 วินาที คำสาปหมาป่าหลุดไปหาคนอื่นแล้ว! ตอนนี้คุณเป็นคนธรรมดา วิ่งหนีด้วย!' : '🐺 คำสาปหมาป่าหลุดไปหาคนอื่นแล้ว', '🌕', false); }
+  else ww.wolves.delete(id);
+  if (!wwPickWolf(t, id) && old && online.has(id)) { ww.alive.delete(id); ww.wolves.add(id); ww.wolf = id; ww.since = t; ww.lastSeen = t; markMe(old); }
+  sendRoster(); wwSendAll();
 }
-function wwEat(w, o) {
-  ww.alive.delete(o.id); ww.dead.add(o.id); ww.kills.set(w.id, (ww.kills.get(w.id) || 0) + 1);
-  const s = ST.square, p = standNear('town', s.x + rnd(-2, 2), s.y + rnd(1, 3)) || [D.SPAWN.x, D.SPAWN.y]; teleport(o, p[0], p[1]);
-  send(o, { t: 'wwdie', by: w.name }); send(w, { t: 'mfx', kind: 'catch' });
-  feed(`🐺 หมาป่า ${w.name} ขย้ำ ${o.name}! เหลือผู้รอด ${ww.alive.size} คน`);
+// a bite: the human turns into a minion wolf (the kill counts for whoever bit, or the wolf who summoned the AI minion)
+function wwEat(byId, o) {
+  const by = online.get(byId);
+  ww.alive.delete(o.id); ww.wolves.add(o.id); ww.kills.set(byId, (ww.kills.get(byId) || 0) + 1); if (!ww.kills.has(o.id)) ww.kills.set(o.id, 0);
+  if (o.run) o.run = false; markMe(o); sendRoster();
+  send(o, { t: 'wwdie', by: by?.name || 'หมาป่า' }); if (by) send(by, { t: 'mfx', kind: 'catch' });
+  feed(`🐺 ${by?.name || 'หมาป่า'} กัด ${o.name} กลายเป็นหมาป่าลูกน้อง! เหลือมนุษย์ ${ww.alive.size} คน`);
   wwSendAll();
 }
+// 🐺 wolf skills (they replace the bag, run and action buttons while you are a wolf)
+function wwSkill(a, m) {
+  if (!wwWolf(a) || a.down) return;
+  const t = now(), s = wwSk(a), k = String(m.k || ''), S = WW.sk[k]; if (!S) return;
+  const cdKey = k + 'Cd'; if ((s[cdKey] || 0) > t) return toast(a, `สกิลยังไม่พร้อม รออีก ${Math.ceil((s[cdKey] - t) / 1000)} วิ`, '⏳', false);
+  s[cdKey] = t + S.cd;
+  if (k === 'sniff') { s.sniffUntil = t + S.dur; toast(a, '👃 ดมกลิ่น! มนุษย์ทุกคนขึ้นจุดแดงบนแผนที่', '👃'); }
+  else if (k === 'sprint') { s.sprintUntil = t + S.dur; s.sprinting = 1; a.run = false; markMe(a); toast(a, '⚡ วิ่งไว!', '⚡'); }
+  else if (k === 'summon') {
+    for (let i = 0; i < S.n; i++) {
+      const p = standNear('town', a.x + rnd(-1.5, 1.5), a.y + rnd(-1.5, 1.5)) || [a.x, a.y];
+      const z = { id: -(9900 + (wwSeq++ % 90)), wwm: 1, owner: a.id, name: `สมุนของ${a.name}`, area: 'town', x: p[0], y: p[1], f: 2, path: [], wait: .4, speed: S.speed * rnd(.95, 1.05), zt: 0, g: 'm', look: {}, until: t + S.dur, lead: i ? .7 : 0,
+        next: () => wwMinionGoal(z), stay: () => .15 };
+      npcs.push(z);
+    }
+    npcRosterDirty = true; toast(a, '📯 เรียกสมุน 2 ตัวมาช่วยล่า (20 วิ)', '📯');
+  }
+  send(a, wwState(a));
+}
+function wwMinionGoal(z) {
+  let best = null, bd = 1e9;
+  for (const id of ww?.alive || []) { const o = online.get(id); if (o && areaId(o) === 'town') { const d = Math.hypot(o.x - z.x, o.y - z.y); if (d < bd) { bd = d; best = o; } } }
+  z.tgt = best; if (best) return znLead(z, best);
+  const [x, y] = pick(walkableIn('town')); return [x + .5, y + .5];
+}
+function wwClearMinions() { const ms = wwMinions(); if (!ms.length) return; for (const z of ms) npcs.splice(npcs.indexOf(z), 1); npcRosterDirty = true; }
 function wwEnd() {
-  const was = ww; ww = null; sendRoster();
+  const was = ww; ww = null; wwClearMinions(); sendRoster();
+  for (const id of was.wolves) { const o = online.get(id); if (o) markMe(o); }
   const alive = [...was.alive].map(id => online.get(id)).filter(Boolean), wolves = [...was.kills.entries()].map(([id, k]) => [online.get(id), k]).filter(([o]) => o);
   if (!was.n) { for (const o of online.values()) send(o, { t: 'ww', ph: 'off' }); return; }
   let txt;
   if (alive.length) {
     for (const a of alive) { sysMail(a, `🌅 คุณรอดจากคืนจันทร์เต็มดวง!\n\nหมาป่าตามล่าทั้งคืน แต่คุณวิ่งหนีจนฟ้าสาง ทางเมืองมอบรางวัลผู้รอดชีวิตให้เต็มจำนวน`, { ...WW.prize }); joy(a, 8); stat(a, 'wwsurvive'); }
-    for (const [o, k] of wolves) if (k) sysMail(o, `🐺 คืนนี้คุณเป็นหมาป่าและขย้ำได้ ${k} คน แต่ยังมีคนรอดถึงเช้า\n\nได้ค่าล่า ${money(k * WW.perKill)}`, { money: k * WW.perKill });
-    txt = `🌅 ฟ้าสาง หมาป่าแพ้! ผู้รอด ${alive.length} คน: ${alive.slice(0, 8).map(a => a.name).join(', ')}`;
+    for (const [o, k] of wolves) if (k) sysMail(o, `🐺 คืนนี้คุณเป็นหมาป่าและกัดได้ ${k} คน แต่ยังมีมนุษย์รอดถึงเช้า\n\nได้ค่าล่า ${money(k * WW.perKill)}`, { money: k * WW.perKill });
+    txt = `🌅 ฟ้าสาง หมาป่าแพ้! มนุษย์รอด ${alive.length} คน: ${alive.slice(0, 8).map(a => a.name).join(', ')}`;
   } else {
     const pot = WW.perHead * was.n, host = online.get(was.host), tk = wolves.reduce((s, [, k]) => s + k, 0), share = new Map();
     if (host) share.set(host, Math.round(pot * .5));
     const rest = host ? pot * .5 : pot;
     for (const [o, k] of wolves) share.set(o, (share.get(o) || 0) + Math.round(tk ? rest * k / tk : o === host ? rest : 0));
-    for (const [o, v] of share) if (v > 0) { sysMail(o, `🐺 หมาป่าชนะ! ไม่มีใครรอดถึงเช้า\n\n${o === host ? 'คุณคือโฮสหมาป่าตัวแรก ได้ส่วนแบ่งมากที่สุด' : 'คุณช่วยล่าด้วย ได้ส่วนแบ่งตามจำนวนที่ขย้ำ'}: ${money(v)}`, { money: v }); joy(o, 8); }
-    txt = `🐺 หมาป่าชนะ! กินคนหมดเมือง · โฮส ${host?.name || '-'} ได้ส่วนแบ่งมากสุด`;
+    for (const [o, v] of share) if (v > 0) { sysMail(o, `🐺 หมาป่าชนะ! ไม่มีมนุษย์รอดถึงเช้า\n\n${o === host ? 'คุณคือโฮสหมาป่าตัวแรก ได้ส่วนแบ่งมากที่สุด' : 'คุณช่วยล่าด้วย ได้ส่วนแบ่งตามจำนวนที่กัด'}: ${money(v)}`, { money: v }); joy(o, 8); }
+    txt = `🐺 หมาป่าชนะ! กัดคนทั้งเมืองกลายเป็นหมาป่า · โฮส ${host?.name || '-'} ได้ส่วนแบ่งมากสุด`;
   }
   feed(txt);
   for (const o of online.values()) send(o, { t: 'ww', ph: 'end', won: alive.some(a => a.id === o.id) ? 1 : 0, wolfWon: alive.length ? 0 : 1, names: alive.map(a => a.name).slice(0, 20), host: online.get(was.host)?.name || '', msg: txt });
@@ -951,14 +989,25 @@ function wwTick() {
   }
   if (ww.ph !== 'on') return;
   const w = online.get(ww.wolf);
-  if (!w || !w.ws || w.down) { wwRelease(t, 'gone'); return; }
-  if (w.x !== ww.wx || w.y !== ww.wy) { ww.wx = w.x; ww.wy = w.y; ww.lastSeen = t; }
-  if (t - ww.since > WW.grace && t - ww.lastSeen > WW.afk) { feed(`🐺 หมาป่า ${w.name} ยืนนิ่ง คำสาปหลุด!`); wwRelease(t, 'afk'); return; }
-  for (const id of [...ww.alive]) { const o = online.get(id); if (!o) { ww.alive.delete(id); continue; } if (areaId(o) !== 'town' || D.roomAt(o.x, o.y)) wwBringOut(o); }
-  if (areaId(w) !== 'town' || D.roomAt(w.x, w.y)) wwBringOut(w);
-  for (const id of [...ww.alive]) { const o = online.get(id); if (o && !o.down && Math.hypot(o.x - w.x, o.y - w.y) < WW.bite) wwEat(w, o); }
+  if (!w || !w.ws || w.down) { if (ww.alive.size) wwRelease(t, 'gone'); }
+  else {
+    if (w.x !== ww.wx || w.y !== ww.wy) { ww.wx = w.x; ww.wy = w.y; ww.lastSeen = t; }
+    if (ww.alive.size && t - ww.since > WW.grace && t - ww.lastSeen > WW.afk) { feed(`🐺 หมาป่า ${w.name} ยืนนิ่ง คำสาปหลุด!`); wwRelease(t, 'afk'); return; }
+  }
+  for (const id of [...ww.alive, ...ww.wolves]) { const o = online.get(id); if (!o) { ww.alive.delete(id); continue; } if (areaId(o) !== 'town' || D.roomAt(o.x, o.y)) wwBringOut(o); }
+  for (const id of ww.wolves) { const s = ww.sk.get(id); if (s?.sprinting && s.sprintUntil <= t) { s.sprinting = 0; const o = online.get(id); if (o) markMe(o); } }
+  // bites: player wolves and AI minions
+  const hunters = [...[...ww.wolves].map(id => online.get(id)).filter(o => o && !o.down && areaId(o) === 'town').map(o => [o.id, o]), ...wwMinions().map(z => [z.owner, z])];
+  for (const id of [...ww.alive]) { const o = online.get(id); if (!o || o.down) continue; const h = hunters.find(([, q]) => Math.hypot(o.x - q.x, o.y - q.y) < WW.bite); if (h) wwEat(h[0], o); }
+  // AI minions: re-aim often, vanish when their time is up
+  for (const z of wwMinions()) {
+    if (t > z.until) { npcs.splice(npcs.indexOf(z), 1); npcRosterDirty = true; continue; }
+    if (z.wait > 0) continue;
+    if (t > z.zt) { z.zt = t + 600 + Math.random() * 300; z.path = []; }
+    else if (z.tgt && Math.hypot(z.tgt.x - z.x, z.tgt.y - z.y) < 1.6) z.path = [[z.tgt.x, z.tgt.y]];
+  }
   if (t >= ww.end || !ww.alive.size) return wwEnd();
-  if (t % 5000 < 250) wwSendAll();
+  if (t % 3000 < 250) wwSendAll();
 }
 setInterval(() => { try { if (online.size || ww) wwTick(); } catch (e) { console.error('wwTick', e); } }, 250).unref?.();
 // ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
@@ -1147,7 +1196,7 @@ const comfort = a => a.hown ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
-const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1) * (wwWolf(a) ? WW.speed : 1);   // (🐺 the werewolf is faster)   // riding a vehicle outdoors
+const speedOf = a => dzProd(a, 'speed') * godSpeed(a) * (riding(a)?.speed || 1) * wwSpeed(a);   // (🐺 werewolves are faster)   // riding a vehicle outdoors
 const runMul = a => a.run && a.energy > D.RUN.minEnergy ? D.RUN.mul : 1;
 const moveCap = a => Math.max(2.5, SPEED * speedOf(a) * D.RUN.mul * 1.35 * 4);   // up to ~4 s of walking can arrive in one burst (mobile networks stall)
 function accrue(a) {
@@ -3724,7 +3773,7 @@ function npcTick(dt, ps) {
   }
 }
 const npcVisible = n => !n.worker || n.on;
-const npcInfo = n => n.bot ? botPub(n) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, ...(n.umb ? { um: 1, umb: UMB.price } : {}), name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
+const npcInfo = n => n.bot ? botPub(n) : n.wwm ? ({ id: n.id, npc: 1, wwm: 1, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, ...(n.umb ? { um: 1, umb: UMB.price } : {}), name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
   of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
 // what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
 function showOf(a) {                       // what the profile shows off (defaults: the outfit, pet and car in use)
@@ -3780,7 +3829,7 @@ function meView(a) {
   return {
     t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
-    tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * (wwWolf(a) ? WW.speed : 1), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
+    tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * wwSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], balloon: a.balloon || '',
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
@@ -4275,6 +4324,7 @@ function onMessage0(ws, raw) {
     }
     case 'decor': { a.decor = m.on && inOwnHome(a) ? 1 : 0; return; }
     case 'mission': return misAct(a, m);
+    case 'wwskill': return wwSkill(a, m);
     case 'rb': return rbAct(a, m);
     case 'rbseek': { if (a.career !== 'rider' && !allJobs(a)) return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
     case 'reset': return resetChar(a, m);
