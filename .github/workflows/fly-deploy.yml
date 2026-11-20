@@ -31,4 +31,7 @@ jobs:
           done
       - name: Deploy
         if: steps.tok.outputs.ok
-        run: flyctl deploy --remote-only --yes
+        # One machine only: the town lives in one server's memory, a second machine would split players into two towns.
+        run: |
+          flyctl deploy --remote-only --yes --ha=false
+          flyctl scale count 1 --yes
