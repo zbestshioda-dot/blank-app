@@ -158,7 +158,7 @@ function femOutfitFrame(sheet, step, lk) {
   return chPut(key, c);
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const OUTFIT_SHEET = { cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
+const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
   tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight' };   // women's versions are the 'f' + name sheets
@@ -552,8 +552,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && showTut(0), 400);
-      else if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600);
-      else setTimeout(() => me && checkNews(), 900);
+      else { if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); }
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
@@ -2028,7 +2027,7 @@ function rbResult(m) {
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
-const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider'];
+const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider', 'templeboy', 'undertaker', 'mechanic', 'thug', 'photographer', 'courier'];
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
@@ -3068,6 +3067,12 @@ function npcPatient(b, s) {
 }
 // ---- job staff: an NPC at every place that hires (plus the rod seller), each with its own talk spot next to the counter
 const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FACE): gender, hair, clothes
+  templeboy: { name: 'พี่ตุ๋ย (เด็กวัดรุ่นพี่)', short: 'พี่ตุ๋ย', lk: { hair: 'black' }, hi: 'มาช่วยงานวัดไหม ได้บุญได้เงินด้วยนะ', yes: 'หลวงพ่อฝากงานไว้ รับภารกิจได้เลย' },
+  undertaker: { name: 'ลุงสัป (สัปเหร่อประจำวัด)', short: 'ลุงสัป', lk: { hair: 'silver' }, hi: 'กลัวผีไหมหลาน? ถ้าไม่กลัว มาเป็นสัปเหร่อกับลุงสิ', yes: 'คืนนี้มีงาน เตรียมตัวให้พร้อมนะ' },
+  mechanic: { name: 'ช่างเปี๊ยก (อู่หน้าโชว์รูม)', short: 'ช่างเปี๊ยก', lk: { hair: 'black' }, hi: 'รถเสียเต็มเมือง ช่างไม่พอ มาช่วยกันหน่อย', yes: 'มีรถรอซ่อมอยู่ รับงานเลย!' },
+  thug: { name: 'เสี่ยเสือ (ลูกพี่ประจำตลาด)', short: 'เสี่ยเสือ', lk: { hair: 'black' }, hi: 'อยากเป็นนักเลงเหรอ? นักเลงจริงต้องใจดีนะเว้ย', yes: 'มีเรื่องให้เคลียร์ ไปจัดการหน่อย' },
+  photographer: { name: 'พี่โฟกัส (สตูดิโอถ่ายภาพ)', short: 'พี่โฟกัส', lk: { hair: 'brown' }, hi: 'ชอบถ่ายรูปไหม มาเป็นช่างภาพกัน', yes: 'มีลูกค้าจ้างถ่ายรูป รับงานได้เลย' },
+  courier: { name: 'พี่ด่วน (หัวหน้าส่งพัสดุ)', short: 'พี่ด่วน', g: 'f', lk: { hair: 'brown' }, hi: 'ไม่มีใบขับขี่ก็ส่งของได้ เดินส่งเอา!', yes: 'พัสดุมาลงแล้ว รีบไปส่งเลย' },
   office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', g: 'f', lk: { hair: 'brown', shirt: 'white' }, hi: 'สวัสดีค่ะ สนใจร่วมงานกับไทยเทคไหมคะ?', yes: 'ทำงานให้ตรงเวลานะคะ เข้างาน 8 โมง!' },
   farmer:   { name: 'พี่ข้าวหอม (ประธานสหกรณ์)', short: 'พี่ข้าวหอม', g: 'f', lk: { hair: 'brown', shirt: 'red' }, hi: 'มาทำไร่ด้วยกันไหม ได้กินผักสดทุกวันเลยนะ', yes: 'ดูแลแปลงดีๆ นะ' },
   fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: 'มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: 'ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
@@ -4735,9 +4740,11 @@ function newsHtml() {
 }
 function checkNews() {
   let seen = ''; try { seen = localStorage.getItem('lt_news') || ''; } catch { }
-  if (seen === NEWS[0].v) return;
+  if (seen === NEWS[0].v || !me) return;
+  const dw = $('#dailyWrap'), busy = panel || $('#payBan') || (dw && dw.offsetParent) || $('#tut')?.offsetParent && !$('#tut').classList.contains('hidden') || !$('#mg')?.classList.contains('hidden');
+  if (busy) return void setTimeout(checkNews, 2500);   // wait until nothing else is on screen (daily reward, top-up banner, a panel...)
   try { localStorage.setItem('lt_news', NEWS[0].v); } catch { }
-  if (!panel) openPanel({ kind: 'news' });
+  openPanel({ kind: 'news' });
 }
 
 // ---- gang / club panel (phone app 🏴)
