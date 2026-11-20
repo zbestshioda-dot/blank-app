@@ -2367,6 +2367,13 @@ function znWinner(m) {   // big floating winner announcement, no taps needed, fa
 // sheet: rows walk/run, columns down0-2 up0-2 side0-2) when it exists, else a big wolf drawn from the emoji
 let WW = { ph: 'off' }, WWB = null, wwImg = null;
 fetch('assets/werewolf.json?v=1').then(r => r.ok ? r.json() : null).then(j => { if (!j) return; const im = new Image(); im.onload = () => { WWB = j; wwImg = im; }; im.src = 'assets/werewolf.webp?v=1'; }).catch(() => {});
+const wwSilC = {};
+function wwSil(row, col) {   // a solid purple copy of one werewolf frame (cached) for the outline
+  const key = row * 16 + col; if (wwSilC[key]) return wwSilC[key];
+  const c = document.createElement('canvas'); c.width = WWB.w; c.height = WWB.h; const g = c.getContext('2d');
+  g.drawImage(wwImg, col * WWB.w, row * WWB.h, WWB.w, WWB.h, 0, 0, WWB.w, WWB.h); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#b44dff'; g.fillRect(0, 0, WWB.w, WWB.h);
+  return (wwSilC[key] = c);
+}
 function drawWolf(p, X, Y, t) {
   const px = Math.round(p.rx * TS + X), py = Math.round(p.ry * TS + Y + TS * .32);
   if (px < -120 || py < -160 || px > VW + 120 || py > VH + 160) return;
@@ -2374,12 +2381,13 @@ function drawWolf(p, X, Y, t) {
   p.walk = (p.walk || 0) + (moving ? .3 * FDT * 60 : 0);
   const pul = .75 + Math.sin(t / 160) * .25;
   ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(px, py, TS * .45, TS * .15, 0, 0, 7); ctx.fill();
-  ctx.strokeStyle = `rgba(255,60,30,${.7 * pul})`; ctx.lineWidth = Math.max(2, TS * .07); ctx.beginPath(); ctx.ellipse(px, py, TS * .62, TS * .22, 0, 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(180,77,255,${.8 * pul})`; ctx.lineWidth = Math.max(2, TS * .07); ctx.beginPath(); ctx.ellipse(px, py, TS * .62, TS * .22, 0, 0, 7); ctx.stroke();
   let top;
   if (wwImg) {
     const fi = moving ? [1, 0, 2, 0][Math.floor(p.walk / 1.4) % 4] : 0, col = (dir === 'down' ? 0 : dir === 'up' ? 3 : 6) + fi, row = WWB.rows?.[moving ? 'run' : 'walk'] || 0;
-    const k = TS * 1.8 / 96, w = WWB.w * k, h = WWB.h * k;
+    const k = TS * 1.6 / 96, w = WWB.w * k, h = WWB.h * k, sil = wwSil(row, col), o = Math.max(3, Math.round(TS * .08));
     ctx.save(); ctx.translate(px, py); if (dir === 'left') ctx.scale(-1, 1);
+    ctx.globalAlpha = .85 + pul * .15; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, -o], [-o, o], [o, o]]) ctx.drawImage(sil, -WWB.feet[0] * k + dx, -WWB.feet[1] * k + dy, w, h); ctx.globalAlpha = 1;   // thick purple outline: easy to spot
     ctx.drawImage(wwImg, col * WWB.w, row * WWB.h, WWB.w, WWB.h, -WWB.feet[0] * k, -WWB.feet[1] * k, w, h); ctx.restore();
     top = py - WWB.feet[1] * k;
   } else {
@@ -2403,7 +2411,7 @@ function wwMsg(m) {
     document.body.appendChild(d); setTimeout(() => d.remove(), 8200); return;
   }
   WW = { ...m, endT: performance.now() + Math.max(0, (m.end || 0) - (Date.now() + clockOff)) };
-  if (m.ph === 'warn' && was !== 'warn') { FX.play('alarm'); wwCard('<div style="font-size:64px">🌕</div><b>คืนจันทร์เต็มดวง!</b><p>อีกไม่นานจะมีใครสักคนกลายเป็นหมาป่า · ทุกคนจะถูกพาออกมาในเมือง · ประตูทุกบานปิด</p>', 'warn', 4000); }
+  if (m.ph === 'warn' && was !== 'warn') { FX.play('alarm'); wwCard('<img src="assets/wwbanner.webp?v=1" alt=""><b>คืนจันทร์เต็มดวง!</b><p>อีกไม่นานจะมีใครสักคนกลายเป็นหมาป่า · ทุกคนจะถูกพาออกมาในเมือง · ประตูทุกบานปิด</p>', 'warn', 4000); }
   if (m.ph === 'on' && was === 'warn' && m.me === 'alive') wwCard(`<div style="font-size:56px">🐺</div><b>${esc(m.wname)} คือหมาป่า!</b><p>วิ่งหนีอย่าให้โดนตัว รอดถึงเช้า = ได้รางวัลเต็ม</p>`, 'warn', 3000);
 }
 function wwHud(el) {
@@ -4427,6 +4435,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-20j', d: '20 พ.ย. (รอบ 69)', items: [
+    '🐺 หมาป่ามีรูปใหม่ วาดเต็มตัว เดิน/วิ่งได้ทุกทิศ · มี<b>เส้นขอบสีม่วง</b>รอบตัว มองเห็นง่ายแม้กลางคืน',
+    '🌕 การ์ดเตือนคืนจันทร์เต็มดวงมีภาพใหม่'] },
   { v: '2026-11-20i', d: '20 พ.ย. (รอบ 68)', items: [
     '🎈 ร้านลูกโป่งลุงโป่งย้ายไปอยู่ที่<b>สวนสนุก</b> (ถนนร้านค้าด้านใต้) · ลูกโป่งที่ซื้อแล้วยังถือได้เหมือนเดิม',
     '👗 ร้านแฟชั่นเลิกขายชุดสีพิเศษ (ใครซื้อไปแล้วยังใส่ได้จากกระเป๋า)',
