@@ -1516,3 +1516,9 @@ img.fbAv{object-fit:cover;background:#ddd}
 #specBar .nm{max-width:52vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lbB{display:inline-block;min-width:16px;padding:0 4px;border-radius:9px;background:#e8343a;color:#fff;font:700 11px/16px inherit;font-style:normal;margin-left:2px}
 .lbN.new{background:#e7f0ff;border-left:3px solid #1d6fe0}
+
+.asTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin:8px 0}
+.asTile{background:rgba(0,0,0,.05);border-radius:10px;padding:6px 9px}.asTile small{display:block;font-size:11px;opacity:.75}.asTile b{display:block;font-size:19px}.asTile em{font-style:normal;font-size:10px;opacity:.65}
+.asCard{background:rgba(0,0,0,.04);border-radius:12px;padding:8px 8px 2px;margin:8px 0}.asCard>b{display:block;font-size:14px}.asCard>small{display:block;font-size:11px;opacity:.7}
+.asLeg{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin:3px 0}.asLeg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.asTbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}.asTbl td,.asTbl th{padding:2px 4px;border-bottom:1px solid rgba(0,0,0,.08);text-align:right}.asTbl td:first-child,.asTbl th:first-child{text-align:left}

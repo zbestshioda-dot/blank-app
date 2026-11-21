@@ -640,10 +640,41 @@ function listingsTick() {
     else { sysMail(o, `🏪 ของที่คุณวางขายไว้ครบ 2 ชั่วโมงแล้ว ตลาดกลางรับซื้อให้ ${n} ชิ้น (40% ของราคาตลาด) ได้เงิน ${money(got)} เข้ากระเป๋าแล้ว`); }
   }
 }
+// 📊 which Thai calendar days each player was in town (for the admin stats: active players, retention); last 120 days kept
+const dayNum = (t = now()) => Math.floor((t + 7 * 3600e3) / 864e5);
+function markSeen(a) {
+  if (!a?.login || a.login === '__meta') return;
+  const d = dayNum(), L = a.seen || (a.seen = []);
+  if (L[L.length - 1] !== d) { L.push(d); if (L.length > 120) L.shift(); a.sd = true; }
+}
+function adminStats() {
+  const today = dayNum(), N = 30, d0 = today - N + 1, idx = d => d - d0;
+  const S = { d0, today, newN: Array(N).fill(0), active: Array(N).fill(0), d1: Array(N).fill(null), d7: Array(N).fill(null), thb: Array(N).fill(0), payers: Array(N).fill(0) };
+  const c1 = Array(N).fill(0), r1 = Array(N).fill(0), c7 = Array(N).fill(0), r7 = Array(N).fill(0);
+  let total = 0;
+  for (const a of accounts.values()) {
+    if (!a.login || a.login === '__meta' || isAdmin(a)) continue;
+    total++;
+    const cd = dayNum(a.created || 0), seen = new Set(a.seen?.length ? a.seen : [cd]);
+    if (!a.seen?.length && a.lastLogin) seen.add(dayNum(Date.parse(a.lastLogin + 'T12:00:00+07:00')));   // players from before tracking: their first and last day only
+    for (const d of seen) if (d >= d0 && d <= today) S.active[idx(d)]++;
+    if (cd < d0 || cd > today) continue;
+    S.newN[idx(cd)]++;
+    if (cd + 1 <= today) { c1[idx(cd)]++; if (seen.has(cd + 1)) r1[idx(cd)]++; }
+    if (cd + 7 <= today) { c7[idx(cd)]++; if ([...seen].some(d => d >= cd + 7)) r7[idx(cd)]++; }
+  }
+  for (let i = 0; i < N; i++) { if (c1[i]) S.d1[i] = Math.round(r1[i] / c1[i] * 100); if (c7[i]) S.d7[i] = Math.round(r7[i] / c7[i] * 100); }
+  const payDays = Array.from({ length: N }, () => new Set());
+  for (const o of Object.values(payOrders)) if (o.st === 'paid' && o.paidT) { const d = dayNum(o.paidT); if (d >= d0 && d <= today) { S.thb[idx(d)] += o.thb || 0; payDays[idx(d)].add(o.l); } }
+  S.payers = payDays.map(x => x.size);
+  S.total = total; S.online = [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length;
+  return S;
+}
 // every minute: count real play (moved in the last 2 minutes) and pay the inviter once the friend reaches REF.needMin
 function refTick() {
   const t = now();
   for (const a of online.values()) {
+    markSeen(a);
     if (!a.refPend || t - (a.lastMoveT || 0) > 120e3) continue;
     a.actMin = (a.actMin || 0) + 1; a.sd = true;
     if (a.actMin < REF.needMin) continue;
@@ -1387,7 +1418,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -4310,6 +4341,7 @@ function lkSky(a, s) {
 }
 function dailyLogin(a) {
   const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
+  markSeen(a);
   if (a.loginDays == null) a.loginDays = a.loginStreak || 0;     // older saves: start the total from the streak
   if (a.lastLogin === today) return null;
   a.loginStreak = a.lastLogin === yesterday ? (a.loginStreak || 0) + 1 : 1;
@@ -4886,6 +4918,7 @@ function godAct(a, m) {
   else if (m.op === 'plain') { a.god.plain = !a.god.plain; toast(a, a.god.plain ? 'ป้ายชื่อบนหัวเป็นแบบธรรมดาแล้ว (ไม่มีสีแอดมิน)' : 'ป้ายชื่อแอดมินบนหัวกลับมาแล้ว', '👑'); }
   else if (m.op === 'invis') { a.god.invis = !a.god.invis; toast(a, a.god.invis ? 'God mode: ล่องหน คนอื่นมองไม่เห็นคุณ' : 'ปิดล่องหน คนอื่นเห็นคุณแล้ว', '👻'); }
   else if (m.op === 'bugs') return send(a, { t: 'bugs', list: bugs.slice(-60).reverse() });
+  else if (m.op === 'stats') return send(a, { t: 'astats', s: adminStats() });
   else if (m.op === 'bugreply') {   // tell the player who reported a bug that it is fixed (a letter in their mailbox)
     const b = bugs.find(x => x.t === +m.bt && (x.login || '') === (m.login || '')); if (!b) return toast(a, 'ไม่พบรายงานนี้แล้ว', '🐞', false);
     const o = accounts.get(String(b.login || '').toLowerCase()) || [...accounts.values()].find(x => x.login === b.login || x.name === b.by);
