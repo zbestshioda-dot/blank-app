@@ -480,7 +480,8 @@ let gMode = 'login', gReady = null;
 function gLoad(gid) {
   if (gReady || !gid) return gReady;
   return gReady = new Promise(ok => { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
-    sc.onload = () => { try { google.accounts.id.initialize({ client_id: gid, callback: r => gGot(r.credential) }); ok(true); } catch { ok(false); } }; sc.onerror = () => ok(false); document.head.appendChild(sc); });
+    // redirect mode: the account picker opens in this same tab and Google posts back to /gauth (a popup on phones closed onto another tab)
+    sc.onload = () => { try { google.accounts.id.initialize({ client_id: gid, ux_mode: 'redirect', login_uri: location.origin + '/gauth', callback: r => gGot(r.credential) }); ok(true); } catch { ok(false); } }; sc.onerror = () => ok(false); document.head.appendChild(sc); });
 }
 function gGot(cred) {
   if (!cred) return;
@@ -488,12 +489,12 @@ function gGot(cred) {
   creds = { google: cred }; $('#loginErr').textContent = ''; loginBusy(true); wantLogin = true; connect();
 }
 function gButton(el, w) { try { google.accounts.id.renderButton(el, { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'th', width: Math.min(300, w || 280) }); } catch { } }
-fetch('api/gcfg').then(r => r.json()).then(j => { if (!j.gid) return; gLoad(j.gid).then(ok => { if (!ok) return; $('#gWrap').classList.remove('hidden'); gMode = 'login'; gButton($('#gBtn'), $('#loginForm').clientWidth - 40); }); }).catch(() => { });
+fetch('api/gcfg').then(r => r.json()).then(j => { if (!j.gid) return; gLoad(j.gid).then(ok => { if (!ok) return; $('#gWrap').classList.remove('hidden'); gMode = 'login'; try { sessionStorage.removeItem('lt_glink'); } catch { } gButton($('#gBtn'), $('#loginForm').clientWidth - 40); }); }).catch(() => { });
 function gLinkOpen() {
   if (!G.gid) return toast('ยังไม่เปิดใช้การผูกบัญชี Google', '🔑', false);
   gLoad(G.gid).then(ok => {
     if (!ok) return toast('โหลดระบบ Google ไม่ได้ ลองใหม่อีกครั้ง', '🔑', false);
-    gMode = 'link'; closePanel(); mgStop(); $('#mg').classList.remove('hidden');
+    gMode = 'link'; try { sessionStorage.setItem('lt_glink', '1'); } catch { } closePanel(); mgStop(); $('#mg').classList.remove('hidden');
     $('#mgBody').innerHTML = `<h2>🔑 ผูกบัญชี Google</h2><div class="sub" style="margin:8px 0 12px">กดปุ่มด้านล่างแล้วเลือกบัญชี Google ของคุณ · ครั้งหน้าที่หน้าเข้าเกม กด "ลงชื่อเข้าใช้ด้วย Google" ได้เลย ไม่ต้องจำ ID/PIN</div><div class="gLinkBtn" id="gLinkBtn"></div>`;
     gButton($('#gLinkBtn'), 300);
   });
@@ -531,7 +532,7 @@ const promo = (() => {
   if (wantSound) login.addEventListener('pointerdown', () => { v.muted = false; v.play().catch(() => { }); label(); }, { once: true });
   label();
   // phone: the form is a bottom dock, closed to a single big button until tapped (a saved account just plays on)
-  const saved = !!(creds && creds.name && creds.pin), start = $('#startBtn');
+  const saved = !!(creds && creds.name && (creds.pin || creds.tok)), start = $('#startBtn');
   const open = () => { form.classList.add('open'); setTimeout(() => $(saved && $('#inName').value ? '#inPin' : '#inName').focus(), 120); };
   if (saved) { start.textContent = `▶ เล่นต่อ · ${creds.name}`; }
   start.onclick = () => { if (saved && !form.classList.contains('open')) { loginBusy(true); creds = { name: creds.name, pin: creds.pin, tok: creds.tok }; wantLogin = true; connect(); } else open(); };
@@ -539,6 +540,16 @@ const promo = (() => {
   $('#promoPhone').onclick = () => { if (matchMedia('(max-width:860px)').matches) return; $('#inName').focus(); };   // desktop: the "enter the city" button in the video focuses the form
   return { open, stop() { v.pause(); v.removeAttribute('src'); v.load(); } };
 })();
+// back from Google's sign-in page (redirect mode): the server put the credential in the address fragment
+let gPendLink = null;
+{
+  const mm = location.hash.match(/gcred=([\w.-]+)/), ge = location.hash.match(/gerr=(\w+)/);
+  if (mm || ge) history.replaceState(null, '', location.pathname + location.search);
+  let link = false; try { link = sessionStorage.getItem('lt_glink') === '1'; sessionStorage.removeItem('lt_glink'); } catch { }
+  if (ge) setTimeout(() => { $('#loginErr').textContent = 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง'; promo.open(); }, 0);
+  else if (mm && link) { gPendLink = mm[1]; if (creds && creds.name && (creds.pin || creds.tok)) setTimeout(() => { loginBusy(true); wantLogin = true; connect(); }, 0); }   // linking: log back in, then link
+  else if (mm) setTimeout(() => { creds = { google: mm[1] }; $('#loginErr').textContent = ''; loginBusy(true); wantLogin = true; connect(); }, 0);
+}
 // ------------------------------------------------------------------ network
 let lastMsgT = 0;
 function connect() {
@@ -569,7 +580,7 @@ function handle(m) {
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
       G = m; myId = m.id; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
-      creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); promo.stop(); gMode = 'link';
+      creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); if (gPendLink) { const gc = gPendLink; gPendLink = null; setTimeout(() => send({ t: 'glink', google: gc }), 500); } promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
@@ -4510,6 +4521,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-23a', d: '23 พ.ย.', items: [
+    '🔑 ล็อกอินด้วย Google บนมือถือ: เลือกบัญชีแล้วกลับเข้าเกมในแท็บเดิม (เดิมเด้งไปแท็บอื่น) · คนที่ผูก Google แล้วกด "เล่นต่อ" ได้เลย',
     '🚜 เอาไร่ชานเมืองออกจากเกมและแผนที่แล้ว (ประตูทางไปไร่ทางซ้ายของเมืองหายไปด้วย) · ใครค้างอยู่ในไร่ เข้าเกมครั้งหน้าจะกลับมาที่เมือง',
   ]},
   { v: '2026-11-22c', d: '22 พ.ย.', items: [

@@ -4968,6 +4968,17 @@ const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
   if (url === '/ads.txt') { res.writeHead(ADS_CLIENT ? 200 : 404, { 'Content-Type': 'text/plain' }); return res.end(ADS_CLIENT ? `google.com, ${ADS_CLIENT.replace('ca-', '')}, DIRECT, f08c47fec0942fa0\n` : ''); }   // AdSense checks this file
+  if (url === '/gauth' && req.method === 'POST') {   // 🔑 Google sign-in (redirect mode) posts the credential here; hand it to the page in the fragment
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 16384) req.destroy(); });
+    req.on('end', () => {
+      const f = new URLSearchParams(body), cred = f.get('credential') || '', tok = f.get('g_csrf_token') || '';
+      const ck = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('g_csrf_token='))?.slice(13) || '';
+      const ok = tok && tok === ck && /^[\w.-]{20,4096}$/.test(cred);
+      res.writeHead(303, { Location: ok ? '/#gcred=' + cred : '/#gerr=1', 'Cache-Control': 'no-store' }); res.end();
+    });
+    return;
+  }
   if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
   if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town
   const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
