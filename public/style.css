@@ -1381,7 +1381,7 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 #card.v2 #jx label{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* HUD v2: no numbers on the stat bars, no crown before the name; the whole card sits in from the screen edge (room for the
    name badge, which is wider than the portrait) and is a little narrower, with a gap between the portrait and the bars */
-#card.v2 .bar em{display:none!important}
+#card.v2 .bar[data-bar=happy] em{display:none!important}   /* energy/hunger/health show their number again */
 #card.admin #meName::before,#card.v2.admin .pfp #meName::before{content:none!important}
 #card.v2{left:calc(26px + env(safe-area-inset-left))!important;width:min(236px,calc(100vw - 160px))!important}
 #card.v2 .sInfo{margin-left:4px!important}
@@ -1402,7 +1402,7 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .wSl{display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0}.wSl input{flex:1}
 /* HUD: bars sit right after their short labels; the card reaches toward the minimap (a gap left), the quest box keeps its size */
 #card.v2{width:min(320px,calc(100vw - 143px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important}
-#card.v2 .sInfo .bar label{width:30px!important;flex:none}
+#card.v2 .sInfo .bar label{width:50px!important;flex:none;gap:3px}
 #card.v2 .sInfo .bar{gap:6px!important}
 #card.v2 .sInfo{padding-right:10px!important}
 #card.v2 #qBox{width:min(236px,calc(100vw - 160px));box-sizing:border-box}

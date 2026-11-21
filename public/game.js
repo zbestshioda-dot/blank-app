@@ -4919,6 +4919,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ac', d: '21 พ.ย.', items: [
+    '🔢 แถบพลัง อิ่ม และเลือด กลับมามีตัวเลขบอกค่าเหมือนเดิม',
+  ] },
   { v: '2026-11-23ab', d: '21 พ.ย.', items: [
     '🪷 กระทงที่ลอยอยู่มีชื่อคนลอยติดไว้ตลอดทาง และคนที่เพิ่งเข้าเกมก็เห็นกระทงของเพื่อนที่ลอยไว้ก่อน (5 นาที)',
   ] },
