@@ -747,7 +747,17 @@ const RIDES = {
   for (const [sp, c, r] of [['tree_pink', 12.5, 2], ['tree_white', 24, 2], ['tree_pink2', 24, 6.5], ['tree_pink', 38, 9], ['tree_pink2', 38, 20.5]]) put(sp, X + c, Y + r);
   for (const [sp, c, r] of [['o_potflower', 14.4, 13.6], ['o_potflower', 29, 13.6], ['bush', 20, 21], ['bush', 24, 21], ['o_flowerbed', 1.6, 15], ['o_tulips', 1.6, 18]]) put(sp, X + c, Y + r, false);
 }
-const AREAS = [TOWN, FARM, HOUSING, PARK, TEMPLE, ...ROOMS, ...YARDS];
+// 🚜 the suburban farm is gone from the game: it is still generated above (so every other random layout stays exactly
+// as it was), then wiped here — no tiles, buildings, props, trees, stations, gates or garden lots left
+{
+  const inF = (x, y) => x >= FARM.x && x < FARM.x + FARM.w && y >= FARM.y && y < FARM.y + FARM.h;
+  rect(FARM.x, FARM.y, FARM.w, FARM.h, ' ');
+  const keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
+  keep(BUILDINGS, b => !inF(b.x, b.y)); keep(PROPS, p => !inF(p.x, p.y) && !(p.s === 'sign_walk' && Math.hypot(p.x - 4.6, p.y - 30.3) < .5));
+  keep(TREES, t => !inF(t[0], t[1])); keep(STATIONS, st => st.area !== 'farm' && st.id !== 'gate_farm');
+  LOTS.length = 0; delete GATES.farm_in; delete GATES.town_from_farm;
+}
+const AREAS = [TOWN, HOUSING, PARK, TEMPLE, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
 for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;

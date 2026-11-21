@@ -3755,7 +3755,6 @@ const areaPts = id => walkableIn(id).map(p => [p[0] + .5, p[1] + .5]);
 WORKERS.push(
   { career: 'waiter', name: 'น้องฝน (เด็กเสิร์ฟ)', area: 'r_restaurant', always: true, desc: 'เด็กเสิร์ฟร้านอาหาร เดินเสิร์ฟอาหารและเก็บโต๊ะทั้งวัน', look: { hair: 'black', shirt: 'white', pants: 'black' }, pts: () => areaPts('r_restaurant'), stay: () => rnd(1.5, 4), speed: 1.7 },
   { career: 'police', name: 'จ่าแดง (สายตรวจ)', area: 'town', always: true, cop: true, pts: () => areaPts('town').filter(() => Math.random() < .05), stay: () => rnd(4, 10), speed: 1.6 },
-  { career: 'police', name: 'ดาบเอก (สายตรวจไร่)', area: 'farm', always: true, cop: true, pts: () => areaPts('farm').filter(() => Math.random() < .08), stay: () => rnd(5, 12), speed: 1.6 },
   { career: 'police', name: 'จ่าต้น (สายตรวจหมู่บ้าน)', area: 'housing', always: true, cop: true, pts: () => areaPts('housing').filter(() => Math.random() < .08), stay: () => rnd(5, 12), speed: 1.6 },
 );
 WORKERS.forEach((w, i) => {
@@ -4034,7 +4033,6 @@ function login(ws, m, pre) {
   ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
-  if (D.areaAt(a.x, a.y)?.id === 'farm' && !isAdmin(a)) { const g = D.GATES.town_from_farm; a.x = g.x; a.y = g.y; }   // the farm is closed for renovation: back to the town gate
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
   online.set(a.id, a);
