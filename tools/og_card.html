@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@500;600&family=Noto+Sans+Thai:wght@700;800;900&family=Silkscreen:wght@700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block;width:600px;height:315px}</style>
+</head><body><canvas id="c" width="1200" height="630"></canvas>
+<script>
+// Promo video renderer: render(t) draws one frame at time t (seconds). Driven frame by frame by render.js.
+const SRV = 'http://localhost:3123/assets/';
+const W = 600, H = 315, BEAT = 60 / 128;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+let NOTEXT = false; window.setNoText = v => { NOTEXT = v; };
+g.setTransform(2, 0, 0, 2, 0, 0);
+const img = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+let A, AI, CH, CI, PIN;
+window.ready = (async () => {
+  A = await (await fetch(SRV + 'atlas.json')).json(); AI = await img(SRV + 'atlas.webp');
+  CH = await (await fetch(SRV + 'pchar.json')).json(); CI = await img(SRV + 'pchar.webp');
+  PIN = await img(SRV + 'ui/pin.png');
+  await document.fonts.load('900 40px "Noto Sans Thai"'); await document.fonts.load('600 20px Mitr'); await document.fonts.load('700 20px Silkscreen');
+  return true;
+})();
+
+// ---------- helpers
+const cl = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const eo = x => 1 - Math.pow(1 - cl(x), 3);
+const eob = x => { x = cl(x); const c1 = 2.2, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const rnd = i => { const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+function spr(name, x, y, w, alpha = 1) {   // bottom-centre anchored
+  const s = A.sprites[name]; if (!s) return 0;
+  const h = s[3] / s[2] * w; g.globalAlpha = alpha;
+  g.drawImage(AI, s[0], s[1], s[2], s[3], x - w / 2, y - h, w, h); g.globalAlpha = 1; return h;
+}
+function ground(name, x, y, size) {
+  const s = A.sprites[name]; if (!s) return; const q = A.tile, h = size / 2;
+  for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) g.drawImage(AI, s[0] + i * q, s[1] + k * q, q, q, x + i * h, y + k * h, h + .6, h + .6);
+}
+// characters: same tinting as the game (base + tinted shirt/pants/hair layers)
+const chCache = new Map();
+const LOOK = [['#e0645a', '#3b4a6b', '#3a2416'], ['#5aa0e0', '#bdbdbd', '#6e4528'], ['#7cc06a', '#5b4636', '#c9a15a'], ['#f2c14e', '#2f2f3a', '#1d1d1d'], ['#ffffff', '#6b7fe0', '#a0522d']];
+function frame(fr, lk) {
+  const key = fr + lk.join(); let c = chCache.get(key); if (c) return c;
+  const { w, h, rows } = CH, row = rows[fr] ?? 0;
+  c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.drawImage(CI, 0, row * h, w, h, 0, 0, w, h);
+  const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
+  [1, 2, 3].forEach((col, i) => {
+    t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h);
+    t.drawImage(CI, col * w, row * h, w, h, 0, 0, w, h);
+    t.globalCompositeOperation = 'multiply'; t.fillStyle = lk[i]; t.fillRect(0, 0, w, h);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(CI, col * w, row * h, w, h, 0, 0, w, h);
+    x.drawImage(tmp, 0, 0);
+  });
+  chCache.set(key, c); return c;
+}
+const WALK = { front: ['down0', 'down1', 'down0', 'down2'], side: ['left0', 'left1', 'left0', 'left2'] };
+function chara(outfit, x, y, k, view, step, faceRight, look = 0) {
+  const pre = outfit && CH.rows[outfit + ':down0'] !== undefined ? outfit + ':' : '';
+  const fr = frame(pre + WALK[view][step & 3], LOOK[look % LOOK.length]), [ax, ay] = CH.feet;
+  g.save(); g.translate(x, y); if (view === 'side' && faceRight) g.scale(-1, 1);
+  g.imageSmoothingEnabled = false; g.drawImage(fr, -ax * k, -ay * k, CH.w * k, CH.h * k); g.restore();
+}
+function shadow(x, y, rx) { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, rx, rx * .32, 0, 0, 7); g.fill(); }
+function text(s, x, y, size, opt = {}) {
+  if (NOTEXT) return;
+  g.save(); g.translate(x, y); if (opt.rot) g.rotate(opt.rot); if (opt.scale) g.scale(opt.scale, opt.scale);
+  g.font = `${opt.weight || 900} ${size}px ${opt.font || '"Noto Sans Thai"'}`; g.textAlign = opt.align || 'center'; g.textBaseline = 'middle';
+  g.lineJoin = 'round'; g.globalAlpha = opt.alpha ?? 1;
+  if (opt.stroke !== false) { g.lineWidth = size * (opt.sw || .24); g.strokeStyle = opt.strokeColor || '#3a1d0e'; g.strokeText(s, 0, 0); }
+  if (opt.grad) { const gr = g.createLinearGradient(0, -size / 2, 0, size / 2); gr.addColorStop(0, opt.grad[0]); gr.addColorStop(1, opt.grad[1]); g.fillStyle = gr; } else g.fillStyle = opt.color || '#fff';
+  g.fillText(s, 0, 0); g.restore();
+}
+function pill(x, y, w, h, fill, stroke) {
+  g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, h / 2); g.fillStyle = fill; g.fill();
+  if (stroke) { g.lineWidth = 3; g.strokeStyle = stroke; g.stroke(); }
+}
+function flash(a, color = '255,255,255') { if (a > 0) { g.fillStyle = `rgba(${color},${cl(a)})`; g.fillRect(0, 0, W, H); } }
+function rays(cx, cy, t, color, n = 14, alpha = .18) {
+  g.save(); g.translate(cx, cy); g.rotate(t * .5); g.fillStyle = color; g.globalAlpha = alpha;
+  for (let i = 0; i < n; i++) { g.rotate(Math.PI * 2 / n); g.beginPath(); g.moveTo(0, 0); g.lineTo(-60, -1200); g.lineTo(60, -1200); g.fill(); }
+  g.restore();
+}
+function confetti(t, t0, n = 70, seed = 1) {
+  const COLS = ['#ff5a7a', '#ffd23f', '#4fd1ff', '#7cff6b', '#c77dff', '#ffffff'];
+  const dt = t - t0; if (dt < 0) return;
+  for (let i = 0; i < n; i++) {
+    const r1 = rnd(i * 3 + seed), r2 = rnd(i * 7 + seed), r3 = rnd(i * 11 + seed);
+    const x = W * r1 + Math.sin(dt * 3 + i) * 20, y = -30 + (dt * (260 + r2 * 260)) - r3 * 200;
+    if (y > H + 20) continue;
+    g.save(); g.translate(x, y); g.rotate(dt * (4 + r3 * 6) + i); g.fillStyle = COLS[i % COLS.length];
+    g.fillRect(-5, -3, 10, 6); g.restore();
+  }
+}
+function sparkle(x, y, s, a) {
+  g.save(); g.translate(x, y); g.globalAlpha = a; g.fillStyle = '#fff8c8';
+  g.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? s * .25 : s; const an = i * Math.PI / 4; g.lineTo(Math.cos(an) * r, Math.sin(an) * r); } g.fill(); g.restore();
+}
+
+// ---------- the town (world coords, 48 px per tile like the game)
+const BUILD = ['b_bakery', 'b_cafe', 'b_flower', 'b_mart', 'b_police', 'b_hospital', 'b_fire', 'b_rider', 'b_market', 'b_toolshop', 'b_fishing', 'b_bank', 'b_school', 'b_office'];
+let layout = null;
+function makeLayout() {
+  layout = []; let x = 30;
+  for (let i = 0; i < 3; i++) for (const b of BUILD) { const s = A.sprites[b]; layout.push({ b, x: x + s[2] / 2, w: s[2] }); x += s[2] + 70; }
+  layout.width = x;
+}
+const CAREERS = [['office', '💼', 'พนักงานบริษัท'], ['farmer', '🌾', 'เกษตรกร'], ['fisher', '🎣', 'ชาวประมง'], ['merchant', '🏪', 'พ่อค้า'], ['chef', '🍳', 'เชฟ'],
+  ['doctor', '🩺', 'แพทย์'], ['rider', '🛵', 'ไรเดอร์'], ['police', '👮', 'ตำรวจ'], ['beggar', '🥣', 'ขอทาน'], ['thief', '🦹', 'โจร']];
+const WALKERS = Array.from({ length: 26 }, (_, i) => ({ o: CAREERS[i % 10][0], x0: rnd(i + 3) * 4200, v: (34 + rnd(i + 9) * 26) * (i % 2 ? 1 : -1), lane: i % 2, look: i }));
+const CARS = [['car_red', 1, 150, 0], ['taxi', -1, 120, 900], ['car_blue', 1, 110, 1800], ['bus', -1, 80, 2600], ['car_yellow', 1, 135, 3300], ['car_red', -1, 140, 3900]];
+const ROAD_Y = 470, ROAD_H = 140, SW = 48;
+function town(t, camX, camY, zoom) {
+  if (!layout) makeLayout();
+  g.save(); g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-camX, -camY);
+  const x0 = camX - W / zoom / 2 - 100, x1 = camX + W / zoom / 2 + 100, y0 = camY - H / zoom / 2 - 100, y1 = camY + H / zoom / 2 + 100;
+  const C = 96;
+  for (let y = Math.floor(y0 / C) * C; y < y1; y += C) for (let x = Math.floor(x0 / C) * C; x < x1; x += C) ground('g_grass', x, y, C);
+  for (let x = Math.floor(x0 / C) * C; x < x1; x += C) { ground('g_sidewalk', x, ROAD_Y - SW, C); ground('g_sidewalk', x, ROAD_Y + ROAD_H, C); }
+  g.fillStyle = '#41464e'; g.fillRect(x0, ROAD_Y, x1 - x0, ROAD_H);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x0, ROAD_Y, x1 - x0, 6);
+  g.fillStyle = '#f2d25c'; for (let x = Math.floor(x0 / 120) * 120; x < x1; x += 120) g.fillRect(x, ROAD_Y + ROAD_H / 2 - 3, 64, 6);
+  // plaza below the road: fountain, trees, benches
+  for (let i = 0; i < 30; i++) { const x = i * 300 + 140; if (x < x0 - 200 || x > x1 + 200) continue; spr(i % 3 ? (i % 2 ? 'tree' : 'tree_pink') : 'fountain', x, ROAD_Y + ROAD_H + SW + 190, i % 3 ? 134 : 173); spr('bench', x + 140, ROAD_Y + ROAD_H + SW + 120, 106); }
+  // buildings face the road
+  for (const b of layout) { if (b.x + b.w < x0 || b.x - b.w > x1) continue; shadow(b.x, ROAD_Y - SW + 4, b.w * .5); spr(b.b, b.x, ROAD_Y - SW + 6, b.w); }
+  for (const b of layout) { const lx = b.x + b.w / 2 + 35; if (lx > x0 && lx < x1) spr('lamp', lx, ROAD_Y - 6, 38); }
+  // cars
+  for (const [n, dir, v, off] of CARS) {
+    const span = 4600, x = ((off + t * v * dir) % span + span) % span - 200, y = ROAD_Y + (dir > 0 ? ROAD_H * .78 : ROAD_H * .42);
+    const s = A.sprites[n], w = n === 'bus' ? 221 : 96;
+    g.save(); g.translate(x, y); if (dir < 0) g.scale(-1, 1); shadow(0, 0, w * .45); spr(n, 0, 4, w); g.restore();
+  }
+  // walkers on both pavements
+  for (const p of WALKERS) {
+    const span = 4600, x = ((p.x0 + t * p.v) % span + span) % span - 200, y = p.lane ? ROAD_Y - 6 : ROAD_Y + ROAD_H + SW - 4;
+    if (x < x0 || x > x1) continue;
+    shadow(x, y, 20); chara(p.o, x, y, .95, 'side', Math.floor(t * 7 + p.look), p.v > 0, p.look);
+  }
+  g.restore();
+}
+function bubble(x, y, s, a, sc) {
+  if (NOTEXT) return;
+  g.save(); g.translate(x, y); g.scale(sc, sc); g.globalAlpha = a;
+  g.font = '600 24px Mitr'; const w = g.measureText(s).width + 30;
+  g.fillStyle = '#fff'; g.strokeStyle = '#3a1d0e'; g.lineWidth = 3;
+  g.beginPath(); g.roundRect(-w / 2, -50, w, 44, 16); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(-8, -7); g.lineTo(0, 6); g.lineTo(8, -7); g.fill(); g.stroke();
+  g.fillStyle = '#fff'; g.fillRect(-9, -9, 18, 4);
+  g.fillStyle = '#3a1d0e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, 0, -28); g.restore();
+}
+
+// ---------- scenes (cut on the beat: 128 bpm)
+const S1 = 3 * BEAT, S2 = 9 * BEAT, S3 = 14 * BEAT, S4 = 20 * BEAT, END = 12;
+function render(t) {
+  g.setTransform(2, 0, 0, 2, 0, 0); g.imageSmoothingEnabled = false; g.globalAlpha = 1;
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  if (t < S1) sceneHook(t);
+  else if (t < S2) sceneCareers(t, t - S1);
+  else if (t < S3) sceneCity(t, t - S2);
+  else if (t < S4) sceneMontage(t, t - S3);
+  else sceneCTA(t, t - S4);
+  // beat flash at every cut
+  for (const c of [S1, S2, S3, S3 + 1.5 * BEAT, S3 + 3 * BEAT, S3 + 4.5 * BEAT, S4]) if (t >= c) flash(.85 - (t - c) * 9);
+  // fade out at the very end
+  if (t > END - .25) flash((t - (END - .25)) / .25, '0,0,0');
+}
+function sceneHook(t) {
+  const z = 3.4 - 2.1 * eo(t / 1.1);
+  town(t, 1200 + t * 40, ROAD_Y - 20, z);
+  g.fillStyle = 'rgba(20,10,5,.35)'; g.fillRect(0, 0, W, H);
+  const sh = t > .5 ? Math.sin(t * 90) * 10 * Math.max(0, 1 - (t - .5) * 4) : 0;
+  const a1 = cl((t - .25) / .12), a2 = cl((t - .55) / .12);
+  if (a1) text('ชีวิตนี้', W / 2 + sh, 360, 86, { scale: 2.6 - 1.6 * eob((t - .25) / .25), alpha: a1, grad: ['#ffffff', '#ffe08a'], sw: .2 });
+  if (a2) text('เลือกได้!', W / 2 - sh, 470, 104, { scale: 2.8 - 1.8 * eob((t - .55) / .25), alpha: a2, grad: ['#ffe35a', '#ff8a1f'], sw: .2, rot: -.05 });
+  if (t > .7) for (let i = 0; i < 8; i++) sparkle(W / 2 + Math.cos(i * .8 + t * 3) * 230 * rnd(i), 410 + Math.sin(i * 1.3 + t * 4) * 120, 10 + rnd(i + 5) * 10, cl((t - .7) * 3) * (.5 + .5 * Math.sin(t * 12 + i)));
+  flash(1 - t * 6, '0,0,0');
+}
+function sceneCareers(t, s) {
+  town(t, 2000 + s * 30, ROAD_Y + 60, 1.1);
+  const gr = g.createRadialGradient(W / 2, 520, 60, W / 2, 520, 560); gr.addColorStop(0, 'rgba(40,20,10,.25)'); gr.addColorStop(1, 'rgba(20,8,2,.82)');
+  g.fillStyle = 'rgba(20,8,2,.45)'; g.fillRect(0, 0, W, H); g.fillStyle = gr; g.fillRect(0, 0, W, H); rays(W / 2, 560, t, '#ffe08a', 16, .1);
+  text('10 อาชีพ', W / 2, 150, 78, { scale: eob(s / .3), grad: ['#ffffff', '#ffe08a'] });
+  text('ให้คุณเลือกเป็น!', W / 2, 232, 46, { scale: eob((s - .12) / .3), grad: ['#7cf3ff', '#2aa6ff'] });
+  for (let i = 0; i < 10; i++) {
+    const [o, ic, name] = CAREERS[i], col = i % 5, row = Math.floor(i / 5);
+    const x = 70 + col * 100, y = 500 + row * 300, st = .18 + i * .14, k = eob((s - st) / .3);
+    if (k <= 0) continue;
+    const jump = s > 2.3 ? Math.abs(Math.sin((s - 2.3) * 9 + i * .5)) * 26 : Math.abs(Math.sin(s * 8 + i)) * 4;
+    g.save(); g.translate(x, y); g.scale(k, k);
+    g.fillStyle = 'rgba(255,224,138,.2)'; g.beginPath(); g.arc(0, -70, 60, 0, 7); g.fill();
+    shadow(0, 0, 30); chara(o, 0, -jump, 1.5, 'front', Math.floor(s * 6 + i), false, i);
+    g.restore();
+    if (k > .5) { pill(x, y + 44, 98, 62, 'rgba(255,248,230,.96)', '#3a1d0e'); g.font = '28px "Noto Color Emoji"'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ic, x, y + (NOTEXT ? 44 : 31));
+      g.font = '600 15px Mitr'; g.fillStyle = '#3a1d0e'; if (!NOTEXT) g.fillText(name, x, y + 60); }
+  }
+}
+function sceneCity(t, s) {
+  const camX = 600 + s * 260;
+  town(t, camX, ROAD_Y + 10, 1.28);
+  const sp = [[.15, 'ไปตกปลากัน! 🎣', 130, 310], [.55, 'ร้านเปิดแล้วจ้า 🛍️', 380, 300], [.95, 'เจอกันที่ตลาด!', 200, 640], [1.35, 'ซื้อบ้านแล้ว 🏡', 400, 660]];
+  for (const [st, msg, x, y] of sp) { const k = eob((s - st) / .25); if (k > 0) bubble(x, y, msg, cl((s - st) * 6), k); }
+  if (NOTEXT) return;
+  // live badge
+  pill(96, 70, 150, 42, 'rgba(20,10,5,.75)', '#ff5a5a');
+  g.fillStyle = Math.sin(t * 10) > 0 ? '#ff4040' : '#aa2020'; g.beginPath(); g.arc(46, 70, 7, 0, 7); g.fill();
+  g.font = '600 18px Mitr'; g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('ออนไลน์สด', 60, 71);
+  const bx = eo(s / .3);
+  g.fillStyle = 'rgba(20,10,5,.78)'; g.beginPath(); g.roundRect(30, H - 230 + (1 - bx) * 120, W - 60, 160, 24); g.fill();
+  text('เมืองจริง ผู้เล่นจริง', W / 2, H - 185 + (1 - bx) * 120, 50, { grad: ['#ffffff', '#ffe08a'] });
+  text('เล่นพร้อมเพื่อนแบบเรียลไทม์', W / 2, H - 118 + (1 - bx) * 120, 30, { color: '#7cf3ff', weight: 800, sw: .22 });
+}
+function sceneMontage(t, s) {
+  const cut = Math.min(3, Math.floor(s / (1.5 * BEAT))), u = s - cut * 1.5 * BEAT, z = 1.18 - .18 * eo(u / .35);
+  g.save(); g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-W / 2, -H / 2);
+  [cutFish, cutFarm, cutMoney, cutHouse][cut](t, u);
+  g.restore();
+  const caps = [['ตกปลา', '#7cf3ff'], ['ปลูกผัก', '#9dff7a'], ['สร้างตัว', '#ffe35a'], ['ซื้อบ้าน', '#ff9ad5']];
+  const [c, col] = caps[cut];
+  text(c, W / 2, 170, 92, { scale: eob(u / .2), grad: ['#ffffff', col], rot: -.04 });
+  // progress dots
+  for (let i = 0; i < 4; i++) { g.fillStyle = i === cut ? '#ffe35a' : 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(W / 2 - 45 + i * 30, 250, i === cut ? 8 : 6, 0, 7); g.fill(); }
+}
+function cutFish(t, u) {
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2aa6ff'); gr.addColorStop(1, '#063a7a'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.18)'; for (let i = 0; i < 12; i++) { const y = 380 + i * 50, x = ((i * 90 + t * 120) % (W + 200)) - 100; g.fillRect(x, y, 140, 6); }
+  // pier + fisher
+  g.fillStyle = '#8a5a34'; g.fillRect(0, 610, 220, 26); g.fillStyle = '#5c3a1e'; for (let i = 0; i < 4; i++) g.fillRect(20 + i * 55, 636, 14, 200);
+  chara('fisher', 120, 612, 1.6, 'side', 0, true, 2);
+  g.strokeStyle = '#3a1d0e'; g.lineWidth = 4; g.beginPath(); g.moveTo(160, 520); g.quadraticCurveTo(300, 380, 400, 470); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 2; g.beginPath(); g.moveTo(400, 470); g.lineTo(400, 560); g.stroke();
+  const fish = ['🐟', '🐠', '🦈', '🐙', '🦑', '🐡'];
+  for (let i = 0; i < 6; i++) { const st = i * .07, k = cl((u - st) / .6); if (k <= 0) continue;
+    const x = 400 + (i - 2.5) * 55 * k, y = 560 - Math.sin(k * Math.PI) * (260 + i * 25);
+    g.save(); g.translate(x, y); g.rotate(k * 6 + i); g.font = `${44 + i * 4}px "Noto Color Emoji"`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(fish[i], 0, 0); g.restore(); }
+  for (let i = 0; i < 14; i++) { const k = cl(u / .5); g.fillStyle = `rgba(255,255,255,${.8 - k * .8})`; g.beginPath(); g.arc(400 + Math.cos(i) * 90 * k, 560 - Math.abs(Math.sin(i * 2)) * 80 * k, 6, 0, 7); g.fill(); }
+}
+function cutFarm(t, u) {
+  for (let y = 0; y < H; y += 96) for (let x = 0; x < W; x += 96) ground(y > 300 ? 'g_dirt' : 'g_grass', x, y, 96);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const i = r * 3 + c, k = eob((u - i * .025) / .35);
+    if (k <= 0) continue; g.save(); g.translate(95 + c * 175, 430 + r * 130); g.scale(k, k); spr('planter_crops', 0, 0, 150); g.restore(); }
+  chara('farmer', W / 2, 900, 1.9, 'front', Math.floor(u * 8), false, 1);
+  for (let i = 0; i < 10; i++) sparkle(60 + rnd(i) * 420, 380 + rnd(i + 4) * 480, 8 + rnd(i + 2) * 8, .6 + .4 * Math.sin(t * 14 + i));
+}
+function cutMoney(t, u) {
+  const gr = g.createRadialGradient(W / 2, 520, 20, W / 2, 520, 600); gr.addColorStop(0, '#5a2f9a'); gr.addColorStop(1, '#14062e'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  rays(W / 2, 520, t * 2, '#ffd23f', 18, .16);
+  for (let i = 0; i < 40; i++) { const x = rnd(i) * W, y = ((u * (500 + rnd(i + 1) * 400) + rnd(i + 2) * H) % (H + 80)) - 40;
+    g.font = '30px "Noto Color Emoji"'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i % 3 ? '🪙' : '💰', x, y); }
+  const v = Math.floor(1000000 * eo(u / .55));
+  text('฿' + v.toLocaleString('en-US'), W / 2, 520, 60, { grad: ['#fff6a8', '#ffb400'], font: 'Silkscreen', weight: 700, sw: .18 });
+  chara('merchant', W / 2, 860, 1.9, 'front', Math.floor(u * 8), false, 3);
+}
+function cutHouse(t, u) {
+  for (let y = 0; y < H; y += 96) for (let x = 0; x < W; x += 96) ground('g_grass', x, y, 96);
+  rays(W / 2, 560, t, '#ffffff', 14, .1);
+  shadow(W / 2, 700, 170); spr('h_cottage1', W / 2, 706, 380);
+  spr('tree_pink', 70, 760, 150); spr('tree', 470, 760, 150);
+  const k = eob((u - .12) / .22);
+  if (k > 0 && !NOTEXT) { g.save(); g.translate(W / 2, 460); g.rotate(-.18); g.scale(2.2 - 1.2 * k, 2.2 - 1.2 * k); g.globalAlpha = cl(k);
+    g.strokeStyle = '#e8304a'; g.lineWidth = 7; g.beginPath(); g.roundRect(-150, -42, 300, 84, 14); g.stroke();
+    g.font = '900 46px "Noto Sans Thai"'; g.fillStyle = '#e8304a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('บ้านของฉัน!', 0, 2); g.restore(); }
+  confetti(t, S3 + 4.5 * BEAT + .1, 60, 7);
+  chara('office', W / 2 - 60, 860, 1.7, 'front', Math.floor(u * 8), false, 0);
+  chara('doctor', W / 2 + 60, 860, 1.7, 'front', Math.floor(u * 8) + 1, false, 4);
+}
+function sceneCTA(t, s) {
+  town(t, 3000 + s * 40, ROAD_Y + 40, 1.0);
+  g.fillStyle = 'rgba(20,8,2,.66)'; g.fillRect(0, 0, W, H);
+  rays(W / 2, 330, t, '#ffe08a', 16, .12);
+  const kp = eob(s / .35);
+  if (PIN) { g.save(); g.translate(W / 2, 240); g.scale(kp, kp); g.translate(0, Math.sin(t * 4) * 6); g.imageSmoothingEnabled = false; g.drawImage(PIN, -62, -70, 124, 140); g.restore(); }
+  text('เมืองชีวิตนี้', W / 2, 400, 72, { scale: eob((s - .1) / .3), grad: ['#ffffff', '#ffe08a'] });
+  text('เลือกได้', W / 2, 488, 92, { scale: eob((s - .2) / .3), grad: ['#ffe35a', '#ff8a1f'], rot: -.04 });
+  text('LIFE TOWN', W / 2, 568, 30, { font: 'Silkscreen', weight: 700, scale: eob((s - .3) / .3), color: '#ffe8c0', sw: .3 });
+  text('เล่นฟรี! บนมือถือและคอม', W / 2, 640, 34, { alpha: cl((s - .45) * 4), color: '#7cf3ff', weight: 800 });
+  // big call-to-action button
+  const kb = eob((s - .6) / .3), pulse = 1 + Math.sin(t * 9) * .045;
+  if (kb > 0) { g.save(); g.translate(W / 2, 740); g.scale(kb * pulse, kb * pulse);
+    const gr = g.createLinearGradient(0, -44, 0, 44); gr.addColorStop(0, '#ffe066'); gr.addColorStop(1, '#f0a020');
+    g.fillStyle = '#5c3a1e'; g.beginPath(); g.roundRect(-185, -38, 370, 92, 28); g.fill();
+    g.fillStyle = gr; g.beginPath(); g.roundRect(-185, -46, 370, 88, 28); g.fill();
+    g.lineWidth = 4; g.strokeStyle = '#5c3a1e'; g.stroke();
+    g.font = '900 44px "Noto Sans Thai"'; g.fillStyle = '#3a1d0e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(NOTEXT ? '▶' : 'เข้าเมืองเลย! ▶', 0, 0); g.restore(); }
+  // the whole cast cheering along the bottom
+  for (let i = 0; i < 10; i++) { const x = 30 + i * 53, k = eob((s - .3 - i * .05) / .3); if (k <= 0) continue;
+    const jy = Math.abs(Math.sin(t * 8 + i * .7)) * 18; shadow(x, 920, 18); g.save(); g.translate(x, 920); g.scale(k, k); chara(CAREERS[i][0], 0, -jy, .9, 'front', Math.floor(t * 8 + i), false, i); g.restore(); }
+  confetti(t, S4 + .05, 90, 3);
+  for (let i = 0; i < 6; i++) sparkle(W / 2 + Math.cos(i * 1.1 + t * 2) * 220, 440 + Math.sin(i * 1.7 + t * 3) * 110, 9 + rnd(i) * 9, .5 + .5 * Math.sin(t * 10 + i));
+}
+
+function ogCard(t) {
+  g.clearRect(0, 0, W, H);
+  town(t, 1500, ROAD_Y - 10, 0.56);
+  const cx = W / 2;
+  const gr = g.createRadialGradient(cx, H / 2, 40, cx, H / 2, W * .62);
+  gr.addColorStop(0, 'rgba(20,8,2,.62)'); gr.addColorStop(1, 'rgba(20,8,2,.42)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  rays(cx, 120, t, '#ffe08a', 16, .12);
+  if (PIN) { g.imageSmoothingEnabled = false; g.drawImage(PIN, cx - 30, 14, 60, 68); }
+  text('เมืองชีวิตนี้', cx, 112, 46, { grad: ['#ffffff', '#ffe08a'] });
+  text('เลือกได้', cx + 3, 166, 60, { grad: ['#ffe35a', '#ff8a1f'], rot: -.04 });
+  text('L I F E   T O W N', cx, 212, 20, { weight: 900, color: '#ffe8c0', sw: .3 });
+  text('เกมจำลองชีวิตออนไลน์ · เล่นฟรี ไม่ต้องโหลด', cx, 246, 15, { color: '#7cf3ff', weight: 800, sw: .3 });
+  g.save(); g.translate(cx, 285);
+  const bg = g.createLinearGradient(0, -18, 0, 18); bg.addColorStop(0, '#ffe066'); bg.addColorStop(1, '#f0a020');
+  g.fillStyle = '#5c3a1e'; g.beginPath(); g.roundRect(-92, -15, 184, 36, 14); g.fill();
+  g.fillStyle = bg; g.beginPath(); g.roundRect(-92, -18, 184, 35, 14); g.fill();
+  g.lineWidth = 2; g.strokeStyle = '#5c3a1e'; g.stroke();
+  g.font = '900 19px "Noto Sans Thai"'; g.fillStyle = '#3a1d0e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('เข้าเมืองเลย! ▶', 0, 0); g.restore();
+}
+window.ogCard = ogCard;
+window.render = render;
+</script></body></html>
