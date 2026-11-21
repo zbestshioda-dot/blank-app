@@ -1647,6 +1647,14 @@ const FURNITURE = {
   wlamp: { name: 'โคมไฟติดผนัง', icon: '💡', price: 1200, comfort: 0, cat: 'wall', spr: 'pw_lamp', multi: 1 },
   whooks: { name: 'ราวแขวนติดผนัง', icon: '🧥', price: 700, comfort: 0, cat: 'wall', spr: 'pw_hooks', multi: 1 },
   wmirror: { name: 'กระจกเงาติดผนัง', icon: '🪞', price: 1500, comfort: 0, cat: 'wall', spr: 'pw_mirror', multi: 1 },
+  // vertical (north-south) partitions: a 3-tile wall seen from above (tools/make_vwalls.py); vwall = its length, blocking all along it
+  vwpink: { name: 'ผนังสีชมพู (แนวตั้ง)', icon: '🧱', price: 1200, comfort: 0, cat: 'wall', spr: 'pv_pink', multi: 1, solid: 1, vwall: 3, sw: .4 },
+  vwcream: { name: 'ผนังสีครีม (แนวตั้ง)', icon: '🧱', price: 1200, comfort: 0, cat: 'wall', spr: 'pv_cream', multi: 1, solid: 1, vwall: 3, sw: .4 },
+  vwblue: { name: 'ผนังสีฟ้าเทา (แนวตั้ง)', icon: '🧱', price: 1200, comfort: 0, cat: 'wall', spr: 'pv_blue', multi: 1, solid: 1, vwall: 3, sw: .4 },
+  vwgrey: { name: 'ผนังสีเทา (แนวตั้ง)', icon: '🧱', price: 1200, comfort: 0, cat: 'wall', spr: 'pv_grey', multi: 1, solid: 1, vwall: 3, sw: .4 },
+  vwwood: { name: 'ผนังไม้ระแนง (แนวตั้ง)', icon: '🪵', price: 1800, comfort: 0, cat: 'wall', spr: 'pv_wood', multi: 1, solid: 1, vwall: 3, sw: .4 },
+  vwrail: { name: 'ราวกั้นไม้ (แนวตั้ง)', icon: '🪵', price: 1600, comfort: 0, cat: 'wall', spr: 'pv_rail', multi: 1, solid: 1, vwall: 3, sw: .4 },
+  vwglass: { name: 'ฉากกั้นกระจก (แนวตั้ง)', icon: '🪟', price: 3500, comfort: 0, cat: 'wall', spr: 'pv_glass', multi: 1, solid: 1, vwall: 3, sw: .4 },
   // garden & outdoor pieces (pixel_outdoor sheet)
   xofount: { name: 'น้ำพุหินเล็ก', icon: '⛲', price: 18000, comfort: 2, cat: 'deco', spr: 'o_fountain3' },
   xopalm: { name: 'ปาล์มกระถางใหญ่', icon: '🌴', price: 5500, comfort: 1, cat: 'deco', spr: 'o_potpalm' },

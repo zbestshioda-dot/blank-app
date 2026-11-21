@@ -5266,6 +5266,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23aw', d: '21 พ.ย.', items: [
+    '🧱 <b>ฉากกั้นแนวตั้งมาแล้ว!</b> ผนังชมพู ครีม ฟ้าเทา เทา ไม้ระแนง ราวกั้นไม้ และกระจก แบบแนวตั้ง (ยาว 3 ช่อง) ที่ร้านเฟอร์นิเจอร์ หมวดผนัง · ต่อกับผนังแนวนอนแบ่งห้องได้แล้ว',
+  ] },
   { v: '2026-11-23av', d: '21 พ.ย.', items: [
     '🎄 มุมโชว์ของรุ่นจำกัดคริสต์มาสที่ลานจัตุรัส (สนามหญ้าฝั่งตะวันตกเฉียงใต้): รถเลื่อนซานต้า + เรนเดียร์ · กด 🎄 แล้วระบบพาไปร้านได้เลย',
   ] },
@@ -6980,7 +6983,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v14').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v14'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v15').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v15'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
@@ -7785,7 +7788,8 @@ function startPlace(k) {
     placing = { flip: !!furnPos(wd.houses[r.house], k)?.[3], k, house: r.house, fl: 9, bx: [.7, r.w - .7, 1.5, r.h - .8], x: clamp(Math.round((m.x - r.x) * 2) / 2, .7, r.w - .7), y: clamp(Math.round((m.y - r.y - .8) * 2) / 2, 1.5, r.h - .8) };
     return placeBar(k);
   }
-  placing = { flip: !!furnPos(wd.houses[r.house], k)?.[3], k, house: r.house, fl: r.floor || 1, bx: [.7, 13.3, 1.2, 9.5], x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, 1.5, 9.3) };
+  const vw = G.shop.furniture[fbase(k)]?.vwall || 0, y0 = vw ? vw + 1 : 1.2;   // a vertical wall's top must stay inside the room
+  placing = { flip: !!furnPos(wd.houses[r.house], k)?.[3], k, house: r.house, fl: r.floor || 1, bx: [.7, 13.3, y0, 9.5], x: clamp(Math.round((m.x - r.x) * 2) / 2, 1, 13), y: clamp(Math.round((m.y - r.y - .6) * 2) / 2, Math.max(1.5, y0), 9.3) };
   placeBar(k);
 }
 function placeBar(k) {
@@ -7883,7 +7887,7 @@ function soilSprite(set, x, y) {
 }
 function addWall(f, sp, x, y) {               // solid pieces block a strip along their base (sw: a narrower trunk for trees, lamps...)
   if (!f?.solid) return; const a = atlas?.sprites?.[sp], hw = f.sw ? f.sw / 2 : (a ? a[2] / atlas.tile / 2 : 1.4) - .1;
-  roomWalls.push([x - hw, x + hw, y - .45, y]);
+  roomWalls.push([x - hw, x + hw, y - (f.vwall ? f.vwall + .1 : .45), y]);   // a vertical partition blocks along its whole length
 }
 function layoutFurniture() {
   roomFurniture = []; roomWalls = []; myFurnHit = [];
