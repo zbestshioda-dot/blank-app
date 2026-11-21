@@ -605,7 +605,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0 });
+        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -742,7 +742,7 @@ const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab 
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
   box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
-    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
+    : `<div class="${m.call ? 'call' : m.g ? 'g' : m.w ? 'w' : ''}">${m.call ? '📞 ' : m.g ? '🏴 ' : m.w ? '🌐 ' : ''}<b${m.adm ? ' class="admN"' : ''}>${m.adm ? '👑 ' : ''}${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('') || '<div class="sys">ยังไม่มีข้อความ</div>';
   box.scrollTop = box.scrollHeight;
   if (added && cbFolded && !added.sys) { cbUnread++; $('#cbNew').textContent = cbUnread; }
 }
@@ -1305,6 +1305,8 @@ function findNear() {
     const d = Math.hypot(s.x - m.x, s.y - m.y);
     if (d <= s.r && d < bd) { bd = d; best = s; }
   }
+  // ☂️ the umbrella man (only around while it rains): a yellow ring and the action button talk to him
+  for (const p of P.values()) if (p.umb && p.npc) { const d = Math.hypot(p.x - m.x, p.y - m.y); if (d <= 1.8 && d < bd) { bd = d; best = { id: 'umbman', type: 'umb', npc: p, label: 'คุยกับลุงชัย (ซื้อร่ม)', icon: '☂️', x: p.x, y: p.y, r: 1.8, area: here }; } }
   // vegetable fields laid out in a home yard
   const ya = AREA[here];
   if (ya?.yard) { const h = wd?.houses?.[ya.house]; if (h) for (const k of h[2]) {
@@ -1359,6 +1361,7 @@ function onAction() {
     if (me.cast.state === 'fight') return fightPress();
     return strike();
   }
+  if (near.type === 'umb') return talkToTown(near.npc);
   if (near.type === 'note') return dialog({ name: near.label, face: null, lines: [near.text], choices: [{ label: '👌 โอเค', fn: dialogClose }] });   // a plain readable sign
   if (near.type === 'wish' || near.type === 'secret') { if (t < actCd) return; actCd = t + 900; return doAct(near.id, near.type === 'wish' ? 'toss' : 'read'); }
   if (panel?.st === near.id) { closePanel(); return; }
@@ -1540,6 +1543,7 @@ function draw(t) {
     const isNear = near && near.id === s.id;
     if (isNear) { ctx.fillStyle = 'rgba(255,201,77,.35)'; ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py, TS * .85, TS * .4, 0, 0, 7); ctx.fill(); ctx.stroke(); }
   }
+  if (near?.type === 'umb') { const u = near.npc, px = (u.rx ?? u.x) * TS + X, py = (u.ry ?? u.y) * TS + Y, pr = 1 + Math.sin(t / 220) * .06; ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(px, py + TS * .05, TS * .75 * pr, TS * .38 * pr, 0, 0, 7); ctx.stroke(); }
   if (near?.type === 'deliver') { const px = near.x * TS + X, py = near.y * TS + Y; ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(px, py + TS * .2, TS * .9, TS * .45, 0, 0, 7); ctx.stroke(); }
   const ents = [];
   const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
@@ -3341,13 +3345,14 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (NAME_MODE === 'none' && !p.red) return chatOnly(p, px, top - TS * .22, t);   // player setting: characters only (chat still shows)
   if (NAME_MODE === 'name' && (p.gg || p.title)) p = { ...p, gg: null, title: '' };
   const icon = p.red ? '🦹' : p.umb ? '☂️' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
-  const label = `${p.adm ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
-  if (p.adm) premiumName(label, px, top - TS * .22, t);
+  const admTag = p.adm && !p.ap;   // an admin can switch the coloured name tag off (God panel)
+  const label = `${admTag ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
+  if (admTag) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
   // stack the labels from their real pixel sizes so they never overlap: name → gang tag → title, 3px apart
-  const nY = top - TS * .22, nFs = Math.max(10, Math.round(TS * (p.adm ? .29 : .27))), GAP = 3;
-  let yTop = nY - nFs * (p.adm ? .8 : .775);
+  const nY = top - TS * .22, nFs = Math.max(10, Math.round(TS * (admTag ? .29 : .27))), GAP = 3;
+  let yTop = nY - nFs * (admTag ? .8 : .775);
   const GT = p.gg && !p.npc;
   if (GT) { const gFs = Math.max(10, Math.round(TS * .22)), gh = gFs * 1.3, gy = yTop - GAP - gh / 2, lt = /e8c83a|e8913a/.test(p.gg[2]); sign(`${p.gg[0]} ${p.gg[1]}`, px, gy, { size: gFs, h: gh, bg: p.gg[2], color: lt ? '#2a1a05' : '#fff' }); yTop = gy - gh / 2; }
   const tFs = Math.max(10, Math.round(TS * .22)), ty = yTop - GAP - tFs * .6;
@@ -4132,7 +4137,7 @@ function worldOk(ch) {
   if (left > 0) { toast(`แชทโลกส่งได้ทุก 3 วินาที · รออีก ${left} วินาที แล้วกดส่งใหม่ได้เลย (ข้อความยังอยู่ในช่องพิมพ์)`, '💬', false); return false; }
   worldAt = Date.now(); return true;
 }
-const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b>${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b${m.adm ? ' class="admN"' : ''}>${m.adm ? '👑 ' : ''}${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
 // ---- profile photo, titles by rarity, mail
 let myPic = '', mailList = [], tradeChat = [];
 const infoCache = new Map();
@@ -4520,6 +4525,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23c', d: '23 พ.ย.', items: [
+    '❄️ ฤดูหนาวมาแล้ว! สนามหญ้าทั้งเมืองกลายเป็นหิมะ ต้นไม้และพุ่มไม้มีหิมะเกาะ',
+    '☂️ ลุงชัยขายร่มย้ายมายืนข้างเสาไฟมุมซ้ายล่างของจัตุรัส (ทางไปร้าน 24 ชม.) เดินเข้าใกล้มีวงกลมเหลือง กดปุ่มใช้งานคุยได้เลย',
+    '👑 ชื่อแอดมินในแชทเป็นสีรุ้ง · แอดมินซ่อนสีชื่อบนหัวได้ในแผง God',
+  ]},
   { v: '2026-11-23b', d: '23 พ.ย.', items: [
     '🛋️ ย้ายปุ่มจัดบ้านขึ้นไปไว้เหนือปุ่มอื่น ไม่ซ้อนปุ่มอิโมจิ/ขี่รถแล้ว (ทั้งในบ้านและในลานบ้าน)',
   ]},
@@ -5772,6 +5782,7 @@ function renderPanel(p) {
         ${g.warp ? B('🗺️ เปิดแผนที่เพื่อวาร์ป', { fn: 'map' }, 'primary big') : ''}
         <div class="setRow"><span><b>🌑 ชุดคลุมแอดมิน + ออร่า</b><small>ชุดเฉพาะแอดมิน ไม่มีขาย · ทุกคนเห็นออร่ารอบตัว</small></span>${B(g.cloak ? 'ใส่อยู่' : 'ซ่อนอยู่', { fn: 'god', op: 'cloak' }, g.cloak ? 'good' : '')}</div>
         <div class="setRow"><span><b>🚪 เข้าได้ทุกอาคาร</b><small>แม้ร้านปิด ปิดปรับปรุง หรือบ้านของคนอื่น · ไม่โดนไล่ออกตอนร้านปิด</small></span>${B(g.doors ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'doors' }, g.doors ? 'good' : '')}</div>
+        <div class="setRow"><span><b>🏷️ ซ่อนสีชื่อแอดมินบนหัว</b><small>ป้ายชื่อบนหัวเป็นแบบธรรมดา ไม่มีสีรุ้ง/มงกุฎ (คนอื่นก็เห็นแบบนี้) · ชื่อในแชทยังเป็นสีพิเศษ</small></span>${B(g.plain ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'plain' }, g.plain ? 'primary' : '')}</div>
         <div class="setRow"><span><b>👻 ล่องหน</b><small>คนอื่นมองไม่เห็นตัว ไม่ขึ้นในแผนที่/รายชื่อออนไลน์ (แชทใกล้ๆ ยังเห็นข้อความ)</small></span>${B(g.invis ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'invis' }, g.invis ? 'good' : '')}</div>
         <div class="grid2">${B('💯 สเตตัสเต็ม', { fn: 'god', op: 'fill' }, 'primary')}${B('💰 เงิน 999,999', { fn: 'god', op: 'money' }, 'primary')}</div><div class="grid2" style="margin-top:6px">${B('💎 เพชร +1,000', { fn: 'god', op: 'gems' }, 'primary')}</div>
         <div class="secT">🐞 รายงานบัคจากผู้เล่น</div><div class="grid2">${B('📥 โหลดรายงาน', { fn: 'god', op: 'bugs' })}${B('🗑️ ล้างทั้งหมด', { fn: 'god', op: 'bugclear' }, 'warn', !bugList?.length)}</div>${bl}`;
@@ -6006,7 +6017,43 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=2'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v10').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = 'assets/atlas.webp?v=v10'; });
+fetch('assets/atlas.json?v=v10').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = SNOW ? snowAtlas(im, j) : im; }; im.src = 'assets/atlas.webp?v=v10'; });
+// ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
+// so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free
+const SNOW = true;
+function snowAtlas(im, j) {
+  try {
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0);
+    const GROUND = /^(g_grass|g_grass3|g_grass_dots|g_grass_flowers|o_grass)$/, PLANT = /^(tree|tree\d|tree_\w+|pine\d?|bush\d?|hedge|hedge_flower|palm|palm_small|x_tree|o_topiary|o_hedgering|o_hedgecube|o_pottree)$/;
+    for (const [name, r] of Object.entries(j.sprites)) {
+      const ground = GROUND.test(name); if (!ground && !PLANT.test(name)) continue;
+      const [x, y, w, h] = r, im2 = g.getImageData(x, y, w, h), d = im2.data;
+      if (ground) {                       // lawn -> snow: keep the texture's light and shade, cool white-blue
+        for (let i = 0; i < d.length; i += 4) { const l = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11, v = Math.max(200, Math.min(246, 226 + (l - 110) * .45)); d[i] = v - 8; d[i + 1] = v - 2; d[i + 2] = Math.min(255, v + 8); }
+      } else {                            // leaves facing up get a snow cap (2-3 px thick), plus a few flakes caught inside
+        const op = (px, py) => px >= 0 && py >= 0 && px < w && py < h && d[(py * w + px) * 4 + 3] > 40;
+        const leaf = i => { const r0 = d[i], g0 = d[i + 1], b0 = d[i + 2]; return g0 >= r0 - 6 && g0 + 30 > b0; };   // green-ish (not the brown trunk)
+        const cap = new Uint8Array(w * h), th = Math.max(3, Math.round(h / 13));
+        const air = new Uint8Array(w * h), st = [];   // transparent pixels connected to the sprite's border = open sky (holes inside the crown are not)
+        for (let px = 0; px < w; px++) st.push(px, (h - 1) * w + px); for (let py = 0; py < h; py++) st.push(py * w, py * w + w - 1);
+        while (st.length) { const q = st.pop(); if (air[q] || d[q * 4 + 3] > 40) continue; air[q] = 1; const qx = q % w; if (qx > 0) st.push(q - 1); if (qx < w - 1) st.push(q + 1); if (q >= w) st.push(q - w); if (q < w * (h - 1)) st.push(q + w); }
+        for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+          const i = (py * w + px) * 4; if (d[i + 3] < 200 || (d[i] > d[i + 1] + 10 && d[i + 1] >= d[i + 2])) continue;   // not the brown trunk; soft ground shadows stay as they are
+          let top = py < th; for (let k = 1; k <= th && !top; k++) if (py - k >= 0 && air[(py - k) * w + px]) top = true;   // open sky just above
+          // the top of each leaf clump inside the crown: a darker shadow line just above it
+          const lum = q => d[q] * .3 + d[q + 1] * .59 + d[q + 2] * .11;
+          let clump = false; if (py > 2 && py < h * .75) for (let k = 1; k <= 2; k++) { const q = ((py - k) * w + px) * 4; if (d[q + 3] > 200 && leaf(i) && lum(q) < lum(i) - 28) { clump = true; break; } }
+          const hsh = (px * 73856093 ^ py * 19349663) >>> 0;
+          if (top || clump || hsh % 97 === 0) cap[py * w + px] = 1;
+        }
+        for (let p = 0; p < cap.length; p++) if (cap[p]) { const i = p * 4, sh = (d[i] + d[i + 1] + d[i + 2]) / 3 < 70 ? 222 : 246; d[i] = sh - 6; d[i + 1] = sh; d[i + 2] = 255; }
+      }
+      g.putImageData(im2, x, y);
+    }
+    return c;
+  } catch { return im; }
+}
 function spr(name, cx, by, X, Y, scale = 1) {
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
@@ -6207,12 +6254,12 @@ function edgeCanvas(kind) {
     g.fillStyle = 'rgba(70,60,50,.55)'; g.fillRect(0, 0, S, px * .8);
     lin(TS * .25, [[0, 'rgba(0,0,0,0)'], [.3, 'rgba(0,0,0,.08)'], [1, 'rgba(0,0,0,0)']]);
   } else if (kind === 'grassOver' || kind === 'grassSand') {   // grass spilling over a paved/sandy edge: soft, ragged
-    lin(TS * .28, kind === 'grassOver' ? [[0, 'rgba(20,50,10,.38)'], [1, 'rgba(20,50,10,0)']] : [[0, 'rgba(80,140,40,.55)'], [1, 'rgba(80,140,40,0)']]);
+    lin(TS * .28, SNOW ? [[0, 'rgba(110,130,160,.28)'], [1, 'rgba(110,130,160,0)']] : kind === 'grassOver' ? [[0, 'rgba(20,50,10,.38)'], [1, 'rgba(20,50,10,0)']] : [[0, 'rgba(80,140,40,.55)'], [1, 'rgba(80,140,40,0)']]);
     let r = 7; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
     for (let x = 0; x < S; x += px) {
       const h = px * (1 + Math.floor(rnd() * 3));
-      g.fillStyle = rnd() < .5 ? '#5da535' : '#4c912a'; g.fillRect(x, 0, px, h);
-      if (rnd() < .3) { g.fillStyle = '#76bf45'; g.fillRect(x, h - px, px, px); }
+      g.fillStyle = SNOW ? (rnd() < .5 ? '#eef3f9' : '#dfe7f1') : rnd() < .5 ? '#5da535' : '#4c912a'; g.fillRect(x, 0, px, h);
+      if (rnd() < .3) { g.fillStyle = SNOW ? '#ffffff' : '#76bf45'; g.fillRect(x, h - px, px, px); }
     }
   } else if (kind === 'shore') {        // water next to land: a light shallow band with a foam line at the edge
     lin(TS * .42, [[0, 'rgba(170,230,240,.55)'], [.35, 'rgba(120,200,230,.25)'], [1, 'rgba(120,200,230,0)']]);
@@ -6586,7 +6633,7 @@ function openMap(mapId, keepScroll) {
   // ground: flat colours, trees as soft dots, roads drawn clearly
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const ch = G.map.tiles[A.y + y][A.x + x];
-    g.fillStyle = MAP_COL[ch === 'T' || ch === 'B' || ch === 'o' ? '.' : ch] || '#8cc56f'; g.fillRect(x * k, y * k, k + .6, k + .6);
+    g.fillStyle = SNOW && '.TBomg'.includes(ch) ? '#e6edf5' : MAP_COL[ch === 'T' || ch === 'B' || ch === 'o' ? '.' : ch] || '#8cc56f'; g.fillRect(x * k, y * k, k + .6, k + .6);
     if (ch === 'T') { g.fillStyle = '#4f8f43'; g.beginPath(); g.arc((x + .5) * k, (y + .5) * k, k * .45, 0, 7); g.fill(); }
   }
   const L = (x, y) => [(x - A.x) * k, (y - A.y) * k];

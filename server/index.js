@@ -3778,7 +3778,7 @@ function npcDoctor(n) {
 }
 // ☂️ the umbrella man: when it starts raining he strolls in from the north road to the fountain and sells umbrellas;
 // when the rain stops he walks back out and leaves
-const UMB = { price: 250, from: [50, 21.5], at: [50, 31.1] };
+const UMB = { price: 250, from: [50, 21.5], at: [47.7, 37.3] };   // stands by the south-west lamp of the square, on the way to the 24h store
 function umbNpc() { return npcs.find(n => n.umb); }
 function umbTick() {
   let n = umbNpc();
@@ -3841,7 +3841,7 @@ function outfitOf(a) {
 function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || []).includes(f.id) || f.locked && isAdmin(a)) ? f.id : -1; }
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
-    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0,
+    pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0, ap: isAdmin(a) && a.god?.plain ? 1 : 0,
     of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
@@ -4639,6 +4639,7 @@ function godAct(a, m) {
     if (a.down) return; teleport(a, x, y); sendRoster(); return;
   }
   else if (m.op === 'doors') { a.god.doors = !a.god.doors; toast(a, a.god.doors ? 'God mode: เข้าได้ทุกอาคาร แม้ปิดแล้ว' : 'ปิด: เข้าได้ทุกอาคาร', '🚪'); }
+  else if (m.op === 'plain') { a.god.plain = !a.god.plain; toast(a, a.god.plain ? 'ป้ายชื่อบนหัวเป็นแบบธรรมดาแล้ว (ไม่มีสีแอดมิน)' : 'ป้ายชื่อแอดมินบนหัวกลับมาแล้ว', '👑'); }
   else if (m.op === 'invis') { a.god.invis = !a.god.invis; toast(a, a.god.invis ? 'God mode: ล่องหน คนอื่นมองไม่เห็นคุณ' : 'ปิดล่องหน คนอื่นเห็นคุณแล้ว', '👻'); }
   else if (m.op === 'bugs') return send(a, { t: 'bugs', list: bugs.slice(-60).reverse() });
   else if (m.op === 'bugreply') {   // tell the player who reported a bug that it is fixed (a letter in their mailbox)
