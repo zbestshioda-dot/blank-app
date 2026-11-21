@@ -1617,9 +1617,9 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   knight:    { name: 'ชุดอัศวินเกราะเงิน', how: 'ซื้อที่ร้านแฟชั่น', gems: 450 },
   fortune:   { name: 'ชุดแม่หมอพยากรณ์', how: 'ซื้อที่ร้านแฟชั่น', gems: 300 },
   // collection 3
-  swim:      { name: 'ชุดเล่นน้ำ กางเกงขาสั้น', nf: 'ชุดบิกินี่', how: 'ซื้อที่ร้านแฟชั่น', price: 39999 },
-  coat:      { name: 'ชุดโค้ทกันหนาว', how: 'ซื้อที่ร้านแฟชั่น', price: 69999 },
-  racer:     { name: 'ชุดเด็กแว้นสายซิ่ง', nf: 'ชุดสก๊อยสายซิ่ง', how: 'ซื้อที่ร้านแฟชั่น', price: 89999 },
+  swim:      { name: 'ชุดเล่นน้ำ กางเกงขาสั้น', nf: 'ชุดบิกินี่', how: 'ซื้อที่ร้านแฟชั่น', gems: 100 },
+  coat:      { name: 'ชุดโค้ทกันหนาว', how: 'ซื้อที่ร้านแฟชั่น', gems: 120 },
+  racer:     { name: 'ชุดเด็กแว้นสายซิ่ง', nf: 'ชุดสก๊อยสายซิ่ง', how: 'ซื้อที่ร้านแฟชั่น', gems: 180 },
   maid:      { name: 'ชุดเมดน่ารัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 150, g: 'f' },
   dino:      { name: 'ชุดไดโนเสาร์', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 } };
 // 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
