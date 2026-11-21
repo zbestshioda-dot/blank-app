@@ -659,6 +659,7 @@ function handle(m) {
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
     case 'lkv': LKV = m; lkUi(); if (panel?.kind === 'lkev' || panel?.kind === 'lk') refreshPanel(true); break;
     case 'lkf': lkSpawn(m, 0); break;
+    case 'lkfl': for (const f of m.list || []) if (!LKF.some(k => k.key === f.k)) lkSpawn(f, 0); break;   // floats already on the water when we arrived
     case 'fairgo': closePanel(); fairPlay(m); break;
     case 'lks': lkSky(m); break;
     case 'ev7': EV7 = m; ev7Ui(); if (panel?.kind === 'ev7') refreshPanel(true); break;
@@ -3868,7 +3869,7 @@ function lkEvHtml() {
 const lkWater = (x, y) => G.map.tiles[Math.floor(y)]?.[Math.floor(x)] === 'w';
 function lkSpawn(m, amb) {
   if (LKF.length > 40) LKF.splice(0, LKF.findIndex(k => k.amb) + 1 || 1);
-  LKF.push({ area: m.area || 'town', sp: m.sp, x: m.x, y: m.y, vx: (Math.random() - .5) * .22, vy: .1 + Math.random() * .12, t0: performance.now(), life: amb ? 200e3 : 300e3, name: m.name || '', wish: m.wish || '', pair: m.pair, amb, ph: Math.random() * 7 });
+  LKF.push({ key: m.k, area: m.area || 'town', sp: m.sp, x: m.x, y: m.y, vx: (Math.random() - .5) * .22, vy: .1 + Math.random() * .12, t0: performance.now() - (m.age || 0), life: amb ? 200e3 : 300e3, name: m.name || '', wish: m.wish || '', pair: m.pair, amb, ph: Math.random() * 7 });
 }
 function lkSky(m) { LKS.push({ x: m.x, y: m.y, t0: performance.now(), name: m.name || '', ph: Math.random() * 7, vx: (Math.random() - .5) * .25 }); if (LKS.length > 30) LKS.shift(); }
 let lkAmbT = 0;
@@ -3919,6 +3920,7 @@ function drawLk(e, X, Y, t) {
     lkSpr(k.sp, k.x, k.y + bob / TS + .1, X, Y, .8);
     if (night > .1) { ctx.fillStyle = `rgba(255,${200 + Math.sin(T * 9 + k.ph) * 40 | 0},90,.95)`; ctx.beginPath(); ctx.arc(px, py - TS * .66, TS * .05, 0, 7); ctx.fill(); }
     if (!k.amb && e.age < 9000) { ctx.globalAlpha = fade * Math.min(1, (9000 - e.age) / 1500); sign(`${k.pair ? '💕 ' : '🪷 '}${k.name}${k.wish ? ` · "${k.wish}"` : ''}`, px, py - TS * 1.1, { size: TS * .24, bg: 'rgba(120,60,20,.85)' }); }
+    else if (!k.amb && k.name) { ctx.globalAlpha = fade * Math.min(1, (e.age - 8500) / 800) * .9; sign(`${k.pair ? '💕' : '🪷'} ${k.name}`, px, py - TS * .98, { size: TS * .2, bg: 'rgba(120,60,20,.65)' }); }   // the name stays on the krathong while it floats
     ctx.globalAlpha = 1; return;
   }
   if (e.k === 'sky') {
@@ -4917,6 +4919,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ab', d: '21 พ.ย.', items: [
+    '🪷 กระทงที่ลอยอยู่มีชื่อคนลอยติดไว้ตลอดทาง และคนที่เพิ่งเข้าเกมก็เห็นกระทงของเพื่อนที่ลอยไว้ก่อน (5 นาที)',
+  ] },
   { v: '2026-11-23aa', d: '21 พ.ย.', items: [
     '👕 ชุด NPC หัวหน้าอาชีพตรงกับรูปอนิเมะแล้ว: เฮียชัย ลุงสัป ช่างเปี๊ยก เสี่ยเสือ พี่ด่วน พี่ต่อ พี่แนน พี่ตุ๋ย',
   ] },

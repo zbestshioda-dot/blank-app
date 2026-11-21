@@ -4057,7 +4057,7 @@ function login(ws, m, pre) {
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
-  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a));
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
@@ -4127,6 +4127,7 @@ const lkFest = () => dayKey() === D.LK.day;
 function lkOf(a) { if (!a.lk || a.lk.id !== D.LK.id) a.lk = { id: D.LK.id, days: [], n: 0, nd: '', got: 0 }; return a.lk; }
 function lkView(a) { const e = lkOf(a), d = dayKey(); return { t: 'lkv', on: lkOn() ? 1 : 0, days: e.days.length, need: D.LK.need, got: e.got, today: e.days.includes(d) ? 1 : 0, left: e.nd === d ? Math.max(0, D.LK.daily - e.n) : D.LK.daily, fest: lkFest() ? 1 : 0 }; }
 const lkRecent = [];   // the last floats (for floating together)
+const lkFloats = [];   // krathongs still on the water (5 min): players arriving later see them, with the floater's name
 const toArea = (area, msg) => { const m = JSON.stringify(msg); for (const o of online.values()) if (o.ws.readyState === 1 && areaId(o) === area) o.ws.send(m); };
 function lkFloat(a, s, m) {
   if (!lkOn()) return toast(a, 'ยังไม่ถึงช่วงเทศกาลลอยกระทง', '🏮', false);
@@ -4155,7 +4156,9 @@ function lkFloat(a, s, m) {
   lkRecent.push({ id: a.id, t, x: a.x, y: a.y }); while (lkRecent.length > 20) lkRecent.shift();
   if (mate) { const b = online.get(mate.id); joy(a, 5); joy(b, 5); feed(`💕 ${a.name} กับ ${b.name} ลอยกระทงคู่กัน`); got.push('💕 ลอยคู่'); markMe(b); }
   a.sd = true; markMe(a); stat(a, 'krathong');
-  toArea(s.area, { t: 'lkf', sp: K.sp, x, y: s.fy || 60.4, name: a.name, wish, pair: mate ? 1 : 0, area: s.area });
+  const fl = { t: 'lkf', k: t, sp: K.sp, x, y: s.fy || 60.4, name: a.name, wish, pair: mate ? 1 : 0, area: s.area };
+  lkFloats.push(fl); while (lkFloats.length > 40 || lkFloats.length && t - lkFloats[0].k > 300e3) lkFloats.shift();
+  toArea(s.area, fl);
   send(a, lkView(a));
   toast(a, `🪷 ลอย${K.name}แล้ว${wish ? ` · "${wish}"` : ''}${got.length ? ' · ได้ ' + got.join(' · ') : ' (วันนี้รับรางวัลครบแล้ว)'}`, '🪷');
 }
