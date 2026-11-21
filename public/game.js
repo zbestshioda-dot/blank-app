@@ -4883,6 +4883,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23u', d: '21 พ.ย.', items: [
+    '🎫 ลอตเตอรี่ออกตามเวลาในเกม: ทุกวันที่ 1 ของเดือนในเกม 16:00 น. (ทุก 2 ชม. จริง)',
+    '⚖️ ปรับรางวัล: 3 ตัวท้าย ฿6,000 · 2 ตัวท้าย ฿3,000 · ซื้อได้งวดละ 50 ใบ',
+  ] },
   { v: '2026-11-23t', d: '21 พ.ย.', items: [
     '🐞 แก้ความคืบหน้ากิจกรรมล็อกอิน 7 วัน และลอยกระทง หายทุกครั้งที่เข้าเกมใหม่ (ตอนนี้บันทึกถาวรแล้ว)',
   ] },
@@ -5422,12 +5426,12 @@ function invitePanel() {
 }
 function lottoPanel() {
   const L = window.__lotto; if (!L) return '<h2>🎫 ลอตเตอรี่</h2><div class="sub">กำลังโหลด…</div>';
-  const th = k => { const [y, m, d] = k.split('-').map(Number); return `${d} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][m - 1]} ${y + 543}`; };
+  const th = k => { const [y, m, d] = k.split('-').map(Number); return `${d} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][m - 1]} ${y < 2400 ? y + 543 : y}`; };
   const left = Math.max(0, L.at - Date.now()), dd = Math.floor(left / 864e5), hh = Math.floor(left / 36e5) % 24, mm = Math.floor(left / 6e4) % 60;
   const tk = n => `<span style="display:inline-block;margin:2px;padding:3px 7px;border-radius:7px;background:#fff;border:2px solid #e0404a;font:800 14px monospace;letter-spacing:2px;color:#b0202a">${n}</span>`;
   const last = L.last ? `<div class="jobbox"><b>ผลงวด ${th(L.last.key)}</b><br>🥇 รางวัลที่ 1: <b style="font:800 20px monospace;letter-spacing:3px">${L.last.first}</b><br>3 ตัวท้าย: <b>${L.last.l3.join(' , ')}</b> · 2 ตัวท้าย: <b>${L.last.l2}</b>${L.myLast && L.myLast.key === L.last.key ? `<br>คุณซื้อ ${L.myLast.n} ใบ · ${L.myLast.won ? `🎉 ถูกรางวัล ${money(L.myLast.won)} (รับที่จดหมาย ✉️)` : 'ไม่ถูกรางวัล'}` : ''}</div>` : '';
   return `<h2>🎫 ลอตเตอรี่</h2>
-    <div class="sub">ออกทุกวันที่ 1 และ 16 เวลา 16:00 น. (เวลาจริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
+    <div class="sub">ออกทุกวันที่ 1 ของเดือนในเกม เวลา 16:00 น. (ทุก 2 ชม. จริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
     <div class="jobbox">งวดถัดไป <b>${th(L.key)}</b> · อีก ${dd ? dd + ' วัน ' : ''}${hh} ชม. ${mm} นาที</div>
     <div class="grid2">${B('🎲 สุ่ม 1 ใบ', { fn: 'lotto', qty: 1 }, 'primary')}${B('🎲 สุ่ม 5 ใบ', { fn: 'lotto', qty: 5 })}${B('🎲 สุ่ม 10 ใบ', { fn: 'lotto', qty: 10 })}</div>
     <div class="rowf" style="margin-top:6px"><input id="lottoIn" inputmode="numeric" maxlength="6" placeholder="เลือกเลขเอง 6 หลัก">${B('ซื้อเลขนี้', { fn: 'lotto', pick: 1 }, 'good')}</div>

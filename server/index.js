@@ -649,17 +649,16 @@ function refTick() {
 }
 setInterval(() => { try { refTick(); } catch (e) { console.error('refTick', e); } }, 60e3).unref?.();
 setInterval(() => { try { listingsTick(); } catch (e) { console.error('listingsTick', e); } }, 60e3).unref?.();
-// ------------------------------------------------------------------ government lottery (phone app 🎫): draws on the 1st and 16th at 16:00 Bangkok time
-// a money sink: tickets cost ฿100, about 40% comes back as prizes. Prizes go out by mail (claim the gift).
-const LOTTO = { price: 100, max: 100, first: 3000000, l3: 4000, l2: 2000 };
+// ------------------------------------------------------------------ government lottery (phone app 🎫): draws on day 1 of every game month at 16:00 game time
+// (= every 2 real hours). A money sink: tickets cost ฿100, about 45% comes back as prizes. Prizes go out by mail (claim the gift).
+const LOTTO = { price: 100, max: 50, first: 3000000, l3: 6000, l2: 3000, hour: 16 };
 let lotto = { cur: '', last: null };
-function lottoNext(t = now()) {   // the next draw: [key 'YYYY-MM-DD', time]
-  const b = new Date(t + 7 * 3600e3);
-  for (let i = 0; i < 40; i++) {
-    const d = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate() + i));
-    if (d.getUTCDate() !== 1 && d.getUTCDate() !== 16) continue;
-    const at = d.getTime() + 16 * 3600e3 - 7 * 3600e3;
-    if (at > t) return [d.toISOString().slice(0, 10), at];
+function lottoNext(t = now()) {   // the next draw: [key 'Y-MM-DD' (game date, Buddhist year), real time]
+  const C = D.CLOCK, hMs = (LOTTO.hour - C.dawn) * C.dayMin / (C.dusk - C.dawn) * 60000;   // 16:00 sits in the daytime part of a cycle
+  for (let n = D.dayAt(t); ; n++) {
+    if ((n - D.YEAR0) % D.MONTH_DAYS) continue;
+    const at = n * D.DAY_MS + hMs - D.TIME_OFF;
+    if (at > t) { const g = D.dateAt(at); return [`${g.year}-${String(g.month + 1).padStart(2, '0')}-${String(g.day).padStart(2, '0')}`, at]; }
   }
 }
 const lottoNum = () => String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
@@ -683,7 +682,7 @@ function lottoOp(a, m) {
     return lottoView(a);
   }
 }
-const thDate = k => { const [y, mo, d] = k.split('-').map(Number); return `${d} ${D.MONTHS ? ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][mo - 1] : mo} ${y + 543}`; };
+const thDate = k => { const [y, mo, d] = k.split('-').map(Number); return `${d} ${D.MONTHS ? ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][mo - 1] : mo} ${y < 2400 ? y + 543 : y}`; };
 function lottoTick() {
   const [key] = lottoNext();
   if (!lotto.cur) { lotto.cur = key; gdirty(); return; }
