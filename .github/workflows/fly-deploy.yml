@@ -1,0 +1,37 @@
+# Deploys the game to fly.io on every push to this branch.
+# Player saves are in Postgres (DATABASE_URL secret on fly.io), so a deploy never touches them.
+# Needs the repo secret FLY_API_TOKEN (fly.io → app → Tokens → New Token). Without it the job is skipped.
+name: Deploy to fly.io
+on:
+  push:
+    branches: [claude/career-choice-multiplayer-game-jk4pzj]
+  workflow_dispatch:
+concurrency: fly-deploy
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Check token
+        id: tok
+        run: if [ -n "$FLY_API_TOKEN" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else echo "::warning::FLY_API_TOKEN secret not set - skipping deploy"; fi
+      - uses: actions/checkout@v4
+        if: steps.tok.outputs.ok
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.tok.outputs.ok
+      - name: Remove the unused lifetown_data volume (players are in Postgres)
+        if: steps.tok.outputs.ok
+        run: |
+          set -e
+          for row in $(flyctl volumes list --json | jq -r '.[] | select(.name=="lifetown_data") | "\(.id),\(.attached_machine_id // "")"'); do
+            vol=${row%,*}; m=${row#*,}
+            if [ -n "$m" ]; then flyctl machine stop "$m"; flyctl machine destroy "$m" --force; fi   # stop first so the game saves
+            flyctl volumes destroy "$vol" --yes
+          done
+      - name: Deploy
+        if: steps.tok.outputs.ok
+        # One machine only: the town lives in one server's memory, a second machine would split players into two towns.
+        run: |
+          flyctl deploy --remote-only --yes --ha=false
+          flyctl scale count 1 --yes
