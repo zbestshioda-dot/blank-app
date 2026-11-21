@@ -1510,3 +1510,7 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 /* quests: the giver's face gets its own column, clear of the text */
 #panel .sheet .item.qitem .em{width:52px;flex:none;margin-right:8px}
 img.fbAv{object-fit:cover;background:#ddd}
+
+#specBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 112px);transform:translateX(-50%);z-index:9;display:flex;gap:5px;align-items:center}
+#specBar button{background:rgba(20,20,30,.85);color:#fff;border:2px solid #9aa4ff;border-radius:10px;padding:5px 10px;font:700 14px inherit;font-family:inherit;min-width:38px;cursor:pointer}
+#specBar .nm{max-width:52vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

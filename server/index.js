@@ -717,7 +717,8 @@ setTimeout(() => { try { lottoTick(); } catch (e) { console.error('lottoTick', e
 // ------------------------------------------------------------------ ZOMBIE NIGHT: every 13th (Bangkok) at 20:00, the dead rise
 // 60s warning to get out of buildings -> anyone still inside is overrun (dead, back at the square); zombies come in waves
 // wherever living players are and chase them; survive to the end = a reward by mail. Buildings stay unsafe (doors sealed) all wave.
-const ZN = { day: 13, hour: 20, warn: 60e3, dur: 5 * 60e3, waveEvery: 70e3, cap: 60,
+const ZN = { day: 13, hour: 20, warn: 60e3, dur: 5 * 60e3, waveEvery: 70e3, cap: 90,
+  near: { base: 4, max: 9, r: 16 },   // between waves: keep this many zombies within r tiles of every survivor (base + wave), new ones crawl out 8-13 tiles away
   prize: { money: 5000, gems: 5 },
   kinds: { walk: { speed: 1.6, r: .7, name: 'ซอมบี้' }, girl: { speed: 1.8, r: .7, name: 'ซอมบี้สาว' }, run: { speed: 3.2, r: .7, name: 'ซอมบี้วิ่ง' }, brute: { speed: 1.3, r: 1.05, name: 'ซอมบี้ยักษ์' } },
   // edge guards: on each of the 4 sides of the map, 2 fast runners + 1 fat one patrol the edge and run down anyone hugging it
@@ -725,10 +726,11 @@ const ZN = { day: 13, hour: 20, warn: 60e3, dur: 5 * 60e3, waveEvery: 70e3, cap:
 let zn = null, znDone = '', znSeq = 0, znAnnounced = '';
 const znAlive = a => zn?.ph === 'on' && zn.alive.has(a.id);
 const zombies = () => npcs.filter(n => n.zb);
+function znId() { let id; do id = -(9000 + (znSeq++ % 900)); while (npcs.some(n => n.id === id)); return id; }   // ids recycle (cap < 900), never two at once
 function znState(a) {
   if (!zn) return { t: 'zn', ph: 'off' };
   const names = zn.ph === 'on' ? [...zn.alive].map(id => online.get(id)?.name).filter(Boolean).slice(0, 30) : [];
-  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, names, me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '' };
+  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, names, ids: zn.ph === 'on' && !zn.alive.has(a.id) ? [...zn.alive].slice(0, 60) : [], me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '' };
 }
 function znSendAll() { for (const o of online.values()) send(o, znState(o)); }
 function znStart(t, test) {
@@ -764,7 +766,7 @@ function znGuards(area, pts) {
     const band = tiles.filter(([x, y]) => { const d = znEdgeD(A, x + .5, y + .5, side); return d > 1.5 && d < 7; }); if (!band.length) continue;
     ZN.guard.side.forEach(([kind, speed, name], i) => {
       const [x, y] = pick(band);
-      const z = { id: -(9000 + (znSeq++ % 900)), zb: kind, name, area, x: x + .5, y: y + .5, f: 2, path: [], wait: 1.5 + i * .4, speed: speed * rnd(.95, 1.05), zt: 0, g: 'm', look: {}, side, band, guard: 1,
+      const z = { id: znId(), zb: kind, name, area, x: x + .5, y: y + .5, f: 2, path: [], wait: 1.5 + i * .4, speed: speed * rnd(.95, 1.05), zt: 0, g: 'm', look: {}, side, band, guard: 1,
         next: () => znGuardGoal(z), stay: () => .15 };
       npcs.push(z); pts.push([area, z.x, z.y]);
     });
@@ -799,7 +801,7 @@ function znSpawn(t) {
       if (!p) { const [x, y] = pick(tiles); if (Math.min(...ps.map(o => Math.hypot(o.x - x - .5, o.y - y - .5))) > 6) p = [x + .5, y + .5]; }
       if (!p) continue;
       const r = Math.random(), kind = last && i < 2 ? 'brute' : zn.wave >= 2 && r < .25 ? 'run' : r < .6 ? 'walk' : 'girl', K = ZN.kinds[kind];
-      const z = { id: -(9000 + (znSeq++ % 900)), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1.2, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {}, lead: i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : .6,   // some chase, some cut you off
+      const z = { id: znId(), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1.2, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {}, lead: i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : .6,   // some chase, some cut you off
         next: () => znGoal(z), stay: () => .15 };
       npcs.push(z); pts.push([area, +p[0].toFixed(1), +p[1].toFixed(1)]);
     }
@@ -807,6 +809,31 @@ function znSpawn(t) {
   npcRosterDirty = true;
   if (pts.length) broadcast({ t: 'zspawn', p: pts, wave: zn.wave });
   for (const o of online.values()) if (znAlive(o)) toast(o, `🧟 ซอมบี้ระลอก ${zn.wave}${last ? ' (ระลอกสุดท้าย! ซอมบี้ยักษ์มาแล้ว)' : ''} โผล่มาแล้ว วิ่งหนีให้รอด!`, '🧟', false);
+}
+// the map is big: between waves zombies keep crawling out close to every survivor so nobody gets to rest,
+// and the ones left far behind (no survivor within 32 tiles) sink back into the ground
+function znTrickle(t) {
+  if (!zn.wave || t < (zn.tr || 0)) return; zn.tr = t + 2500;
+  const live = [...online.values()].filter(znAlive), pts = [], N = ZN.near;
+  for (const z of zombies()) if (!z.guard && !live.some(o => areaId(o) === z.area && Math.hypot(o.x - z.x, o.y - z.y) < 32)) { npcs.splice(npcs.indexOf(z), 1); npcRosterDirty = true; }
+  const want = Math.min(N.max, N.base + zn.wave);
+  for (const o of live.sort(() => Math.random() - .5)) {
+    const area = areaId(o); if (D.AREAS.find(r => r.id === area)?.kind !== 'map') continue;
+    let n = zombies().filter(z => z.area === area && Math.hypot(o.x - z.x, o.y - z.y) < N.r).length;
+    for (let k = 0; k < 2 && n < want && zombies().length < ZN.cap; k++) {
+      let p = null;
+      for (let j = 0; j < 40 && !p; j++) {
+        const ang = rnd(0, 6.283), r = rnd(8, 13), x = Math.floor(o.x + Math.cos(ang) * r) + .5, y = Math.floor(o.y + Math.sin(ang) * r) + .5;
+        if (!D.blocked(x, y) && D.TILES[Math.floor(y)]?.[Math.floor(x)] !== 'D' && D.areaAt(x, y)?.id === area && live.every(q => Math.hypot(q.x - x, q.y - y) > 7)) p = [x, y];
+      }
+      if (!p) break;
+      const rr = Math.random(), kind = zn.wave >= 2 && rr < .2 ? 'run' : rr < .6 ? 'walk' : 'girl', K = ZN.kinds[kind];
+      const z = { id: znId(), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {}, lead: Math.random() < .4 ? 0 : 1,
+        next: () => znGoal(z), stay: () => .15 };
+      npcs.push(z); pts.push([area, +p[0].toFixed(1), +p[1].toFixed(1)]); n++;
+    }
+  }
+  if (pts.length) { npcRosterDirty = true; broadcast({ t: 'zspawn', p: pts, wave: zn.wave }); }
 }
 // who a zombie goes for: the nearest living player in its area, else it shuffles about
 function znGoal(z) {
@@ -847,6 +874,7 @@ function znTick() {
   if (!zn.alive.size && !zn.allDead) zn.allDead = t;
   if (t >= zn.end || zn.allDead && t - zn.allDead > 8000) return znEnd(t);
   if (t >= zn.next && t < zn.end - 25e3) { zn.next = t + (zn.test ? 40e3 : ZN.waveEvery); znSpawn(t); }
+  if (t < zn.end - 15e3) znTrickle(t);
   for (const o of online.values()) if (znAlive(o) && (D.areaAt(o.x, o.y)?.kind === 'room' || o.down)) znKill(o, 'in');
   for (const o of online.values()) if (znAlive(o)) znEvict(o);
   for (const o of online.values()) if (znAlive(o)) {   // each survivor's running speed (smoothed), for zombies that head them off
@@ -884,7 +912,7 @@ function wwState(a) {
   if (!ww) return { t: 'ww', ph: 'off' };
   const h = online.get(ww.wolf), on = ww.ph === 'on', s = on && ww.wolves.has(a.id) ? wwSk(a) : null;
   return { t: 'ww', ph: ww.ph, end: ww.ph === 'warn' ? ww.t0 : ww.end, alive: ww.alive?.size || 0, wolf: ww.wolf || 0, wname: h?.name || '', host: ww.host || 0,
-    wolves: on ? [...ww.wolves] : [], humans: on && ww.wolves.has(a.id) ? [...ww.alive] : [],
+    wolves: on ? [...ww.wolves] : [], humans: on && ww.wolves.has(a.id) ? [...ww.alive] : [], ids: on && !ww.wolves.has(a.id) && !ww.alive.has(a.id) ? [...ww.alive] : [],
     me: !on ? '' : ww.wolves.has(a.id) ? 'wolf' : ww.alive.has(a.id) ? 'alive' : 'out', boss: ww.wolf === a.id ? 1 : 0,
     sk: s ? { sniff: s.sniffUntil || 0, sniffCd: s.sniffCd || 0, sprint: s.sprintUntil || 0, sprintCd: s.sprintCd || 0, summonCd: s.summonCd || 0 } : null };
 }

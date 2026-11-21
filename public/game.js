@@ -1199,10 +1199,11 @@ const camRide = { x: 0, y: 0 };
 function camera() {
   const m = P.get(myId); let x = m ? (camS.on ? camS.x : m.rx + m.ox) : 50, y = m ? (camS.on ? camS.y : m.ry + m.oy) : 36;
   if (m?.pose === 'fun' && m.fn) { const fo = funPos(m); if (fo) { camRide.x += (fo.x - camRide.x) * .08; camRide.y += (fo.y - 1 - camRide.y) * .08; x = camRide.x; y = camRide.y; } } else if (m) { camRide.x = x; camRide.y = y; }   // on a ride the view follows you, gently
+  const so = specId ? P.get(specId) : null; if (so) { x = so.rx; y = so.ry; }   // 👁 watching someone else
   if (window.__camAt) { x = window.__camAt[0]; y = window.__camAt[1]; return { x: x * TS - VW / 2, y: y * TS - VH / 2 }; }   // automated screenshots only
   const target = panel && !trade && !(VW > VH && VH <= 520) ? VH * 0.24 : 0;   // landscape popups sit in the middle, no lift
   camLift += (target - camLift) * 0.18;
-  const a = m ? areaOf(m.x, m.y) : null;
+  const a = so ? areaOf(so.x, so.y) : m ? areaOf(m.x, m.y) : null;
   if (a) {   // keep the view inside the current map/room (you never see past its edge)
     const fit = (pos, lo, size, view) => size * TS + TS * 2 <= view ? lo + size / 2 : clamp(pos, lo + view / TS / 2 - 1, lo + size - view / TS / 2 + 1);
     x = fit(x, a.x, a.w, VW); y = fit(y, a.y - (a.kind === 'room' ? .6 : 0), a.h + (a.kind === 'room' ? 1.2 : 0), VH - camLift * 2);
@@ -2666,6 +2667,31 @@ function znMsg(m) {
     else znCard(`${zIcon(6, 40)}<b>โดนกัด!</b><p>คุณสลบไป ฟื้นขึ้นมาที่จัตุรัส · รอบนี้อดรางวัลผู้รอด</p>`, 'bite', 3600);
   }
 }
+// 👁 spectating: bitten on zombie night, or sitting out werewolf night, you can watch the players still running and flip to the next one
+var specId = 0, specEl = null;
+function specList() {
+  const ids = ZN.ph === 'on' && ZN.me !== 'alive' ? ZN.ids : WW.ph === 'on' && WW.me === 'out' ? WW.ids : null;
+  return ids ? ids.filter(id => id !== myId && P.has(id)) : null;
+}
+function specGo(d) {
+  const L = specList() || []; if (!L.length) return;
+  const i = L.indexOf(specId); specId = L[i < 0 ? (d > 0 ? 0 : L.length - 1) : (i + d + L.length) % L.length]; FX.play('click'); specTick();
+}
+function specTick() {
+  const L = specList();
+  if (!L?.length) { specId = 0; specEl?.remove(); specEl = null; return; }
+  if (specId && !L.includes(specId)) specId = L[0];   // the one you watched got caught: on to the next
+  if (!specEl) {
+    specEl = document.createElement('div'); specEl.id = 'specBar';
+    specEl.innerHTML = '<button data-d="-1">◀</button><button class="nm" data-d="1"></button><button data-d="1">▶</button><button class="x" data-d="0">✖</button>';
+    specEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.d === '0') { specId = 0; FX.play('click'); specTick(); } else specGo(+b.dataset.d); });
+    document.body.appendChild(specEl);
+  }
+  const p = specId && P.get(specId);
+  specEl.querySelector('.nm').textContent = p ? `👁 ${p.name || 'ผู้เล่น'} (${L.indexOf(specId) + 1}/${L.length})` : `👁 ดูผู้เล่นที่ยังรอด (${L.length})`;
+  specEl.querySelector('.x').style.display = specId ? '' : 'none';
+}
+setInterval(specTick, 300);
 // ☂️ an open umbrella held over the head: a coloured canopy (panels + scalloped rim), a shaft down to the hand, swaying a little
 const UMB_COL = [['#e8505b', '#ffd2d5'], ['#3d7be0', '#cfe0ff'], ['#f2b705', '#fff1b8'], ['#2fb36a', '#c9f5da'], ['#8a5cf0', '#e3d6ff'], ['#ff8a3d', '#ffe0c7']];
 // 🎈 a balloon on a string from the hand (or a whole bunch for the seller)
@@ -4941,6 +4967,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23aj', d: '21 พ.ย.', items: [
+    '👁 <b>ตายแล้วดูคนอื่นได้!</b> คืนปล่อยผีโดนกัด (หรือคืนหมาป่าที่ไม่ได้ร่วมเล่น) กดแถบ 👁 ด้านบนเพื่อดูผู้เล่นที่ยังรอด กด ◀ ▶ เปลี่ยนคน',
+    '🧟 ซอมบี้เยอะขึ้น! โผล่ใกล้ตัวผู้รอดตลอดเวลาไม่ใช่แค่ตอนเปลี่ยนระลอก ต้องวิ่งไม่หยุด · ตัวที่ถูกทิ้งไว้ไกลๆ จะมุดดินหายไป',
+  ] },
   { v: '2026-11-23ai', d: '21 พ.ย.', items: [
     '🎨 ปลาวัดทั้ง 6 ชนิดมีรูปของตัวเองแล้ว (ดูในสมุดปลาได้)',
     '🧘 <b>หลวงพ่อเดินตรวจสระบัวเป็นระยะ!</b> ถ้าเห็นคำเตือนต้องเก็บเบ็ดภายใน 10 วิ ไม่งั้นโดนไล่ออกไปหน้าวัด',
