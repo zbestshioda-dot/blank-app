@@ -4339,7 +4339,7 @@ function guideTalk(n) {
 function talkTo(n, st) {
   const now = performance.now(), quick = now - (talkedAt[n.id] || -1e9) < 90000; talkedAt[n.id] = now;
   const openIt = () => { dialogClose(); openPanel({ kind: STN(st)?.type || 'staff', st }); };
-  if (quick) return openIt();
+  if (quick && !(!n.keeper && MIS_CAREERS.includes(n.career) && job(n.career))) return openIt();   // mission givers always ask, so 📋 รับภารกิจ shows again right after a mission
   const key = n.id.startsWith('keep_cstore') ? 'cstore' : n.id, topics = TALK[key] || TALK.town;
   const act = n.keeper ? '🛒 ดูร้าน / ใช้บริการ' : n.career === 'fishing' ? '🎣 ดูเบ็ด' : me.career === n.career ? '📋 ดูงาน' : '📝 สมัครงาน';
   const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
@@ -4883,6 +4883,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23v', d: '21 พ.ย.', items: [
+    '🐞 แก้คุยกับ NPC อาชีพหลังจบภารกิจแล้วมีแค่ "ดูงาน" ไม่มีปุ่มรับภารกิจ (ต้องรีเฟรช) ตอนนี้ขึ้นปุ่มรับภารกิจทุกครั้ง',
+  ] },
   { v: '2026-11-23u', d: '21 พ.ย.', items: [
     '🎫 ลอตเตอรี่ออกตามเวลาในเกม: ทุกวันที่ 1 ของเดือนในเกม 16:00 น. (ทุก 2 ชม. จริง)',
     '⚖️ ปรับรางวัล: 3 ตัวท้าย ฿6,000 · 2 ตัวท้าย ฿3,000 · ซื้อได้งวดละ 50 ใบ',
