@@ -68,7 +68,13 @@ async function checkSlip(qrCode) {
     if (res.status === 401 || res.status === 403) res = await call('/api/verify-slip/qr-code/info', body, SK);   // in case the key is meant to be sent bare
   } catch (e) { return { ok: false, why: 'ติดต่อระบบตรวจสลิปไม่ได้ ' + (e.message || e), retry: true }; }
   const j = res.j || {}, code = String(j.code ?? ''), d = j.data || {};
-  if (code === '200501') return { ok: false, dup: true, why: 'สลิปนี้เคยถูกใช้แล้ว', code, raw: j };
+  // 200501 = Slip2Go has seen this slip before. That is also what a re-check of OUR OWN earlier check says (a timeout, a retry,
+  // the admin's "check again"), so when the slip's details come back the game decides itself whether one of its orders used it.
+  if (code === '200501') {
+    if (!d.transRef) return { ok: false, dup: true, why: 'สลิปนี้เคยถูกใช้แล้ว', code, raw: j };
+    const recvOk = RECV ? flat(d.receiver).includes(RECV.replace(/\s+/g, '').toLowerCase()) : null;
+    return { ok: true, dup: true, amount: +d.amount || 0, transRef: String(d.transRef), when: Date.parse(d.dateTime || d.transDate || '') || 0, recvOk, code, raw: j };
+  }
   if (code === '200404' || code === '200500') return { ok: false, bad: true, why: 'สลิปไม่ถูกต้อง หรือไม่พบรายการโอนนี้ในระบบธนาคาร', code, raw: j };
   if (!/^2000(00|01)$|^200200$/.test(code) || !d.transRef) return { ok: false, why: `ตรวจสลิปไม่ผ่าน (${code || 'HTTP ' + res.status} ${j.message || ''})`.trim(), retry: res.status >= 500 || res.status === 429, code, raw: j };
   const amount = +d.amount || 0, when = Date.parse(d.dateTime || d.transDate || '') || 0;

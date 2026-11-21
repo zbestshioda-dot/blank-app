@@ -4973,10 +4973,12 @@ async function payVerify(ref, src) {
   try {
     const r = await PAY.checkSlip(o.qr);
     if (payOrders[ref] !== o || o.st === 'paid') return;
-    if (!r.ok) { o.why = r.why; if (!r.retry && !r.bad && !r.dup) o.st = 'review'; o.code = r.code; gdirty(); console.log('pay slip', ref, src, r.code, r.why, r.raw ? JSON.stringify(r.raw).slice(0, 400) : ''); return; }
+    if (!r.ok) { o.why = r.why; if (!r.retry && !r.bad) o.st = 'review'; o.code = r.code; gdirty(); console.log('pay slip', ref, src, r.code, r.why, r.raw ? JSON.stringify(r.raw).slice(0, 400) : ''); return; }
     const used = Object.values(payOrders).find(x => x !== o && x.slip === r.transRef && x.st !== 'void');
     o.code = r.code;
     if (used) { o.why = 'สลิปนี้เคยใช้กับรายการอื่นแล้ว'; gdirty(); return; }
+    if (r.dup && Object.values(payOrders).some(x => x.st === 'paid' && x.slip === r.transRef)) { o.why = 'สลิปนี้เคยใช้เติมไปแล้ว'; gdirty(); return; }
+    if (r.dup) console.log('pay slip dup but unused here, continuing', ref, r.transRef);   // Slip2Go remembered our own earlier check
     if (r.amount + 0.001 < o.thb) { o.why = `ยอดในสลิป ฿${r.amount} ไม่ถึงราคา ฿${o.thb}`; o.st = 'review'; o.slip = r.transRef; gdirty(); return; }
     if (!r.when || r.when < o.t - 10 * 60e3) { o.why = 'สลิปนี้โอนก่อนกดสั่งซื้อ ใช้ได้เฉพาะสลิปที่โอนหลังสั่งซื้อ'; gdirty(); return; }
     o.slip = r.transRef; o.paidAmt = r.amount;
