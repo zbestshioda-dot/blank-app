@@ -1532,3 +1532,15 @@ img.fbAv{object-fit:cover;background:#ddd}
 .shareBox .row button,.shareBox .row .btn{font:600 14px var(--ui);padding:8px 12px;border-radius:10px;border:2px solid #c9a26a;background:#fff;color:#3a2208;text-decoration:none;cursor:pointer}
 .shareBox .row .primary{background:#1d6fe0;color:#fff;border-color:#1d6fe0}
 .shareBox small{font-size:11px;opacity:.75}
+
+.czReels{display:flex;justify-content:center;gap:8px;margin:10px 0 4px}.czReels>div{background:#fff;border:3px solid #c9a24a;border-radius:10px;padding:4px;box-shadow:inset 0 0 8px rgba(0,0,0,.25)}
+.czWin{text-align:center;font-weight:700;color:var(--ok);font-size:16px;margin:4px 0}.czLose{text-align:center;opacity:.75;margin:4px 0;min-height:20px}
+.czBets{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:6px 0}.czBets button{min-width:54px;padding:5px 6px}
+.czPays{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;font-size:11px;margin-top:4px}.czPays span{display:flex;align-items:center;gap:3px}
+.czDice{display:flex;justify-content:center;gap:10px;font-size:54px;line-height:1;margin:8px 0}
+.czNums{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin:6px 0}.czNums button{padding:6px 0}
+.czBall{width:64px;height:64px;border-radius:50%;margin:8px auto;display:flex;align-items:center;justify-content:center;font:700 26px var(--px);color:#fff;border:4px solid #c9a24a}
+.czBall.r{background:#c0262d}.czBall.b{background:#222}.czBall.g{background:#1d8a3a}
+.czGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.czGrid button{padding:5px 0;font-size:12px;color:#fff}.czGrid .czR{background:#c0262d}.czGrid .czK{background:#222}.czGrid .czG{background:#1d8a3a}
+.czHand{margin:6px 0}.czHand small{display:block;opacity:.8}.czHand>div{display:flex;gap:4px;flex-wrap:wrap}
+.czCard{display:inline-flex;align-items:center;justify-content:center;width:40px;height:56px;background:#fff;border:2px solid #333;border-radius:6px;font:700 15px var(--ui);color:#222}.czCard.r{color:#c0262d}.czCard.back{background:#b33;color:#fff;font-size:30px}

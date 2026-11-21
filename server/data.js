@@ -116,6 +116,8 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('fishstall', 'b_fishstall', 24, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
   B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
   B('fashion', 'b_boutique', 6, 30, { label: 'ร้านแฟชั่น', icon: '👕', st: 'fashion' });
+  // 🎰 the casino: the landmark at the head of the town square (north side, east of the north road); its door opens onto the square
+  B('casino', 'b_casino', 52, 24, { label: 'คาสิโนเมืองชีวิต', icon: '🎰', st: 'casino', layout: 'casino', late: 4 });
 
   // villagers' homes scattered around town (scenery) so it reads as a lived-in village
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
@@ -140,14 +142,16 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('o_fountain', 50, 33.6);
   rect(48, 32, 4, 2, 'o');
   for (const [x0, y0, h] of [[42, 24, 5], [53, 24, 5], [42, 36, 4], [53, 36, 4]]) rect(x0, y0, 5, h, '.');   // the four lawns
-  fenceRow('fence_white', 42, 47, 24.95); fenceRow('fence_white', 53, 58, 24.95);           // picket fence along the outer edges
+  fenceRow('fence_white', 42, 47, 24.95);                                                     // picket fence along the outer edges (the north-east one made way for the casino's forecourt)
+  rect(52, 24, 6, 2, 'k');                                                                     // 🎰 paved forecourt from the casino door into the square
+  prop('cz_palm', 52.6, 24.5); prop('cz_palm', 59.4, 24.5); prop('cz_rope', 54.3, 25.9, false); prop('cz_rope', 57.7, 25.9, false);
   fenceRow('fence_white', 42, 47, 39.95); fenceRow('fence_white', 53, 58, 39.95);
   fenceRow('hedge_flower', 42, 47, 28.95); fenceRow('hedge_flower', 53, 58, 28.95);          // flowering hedges facing the plaza
   fenceRow('hedge_flower', 42, 47, 36.95); fenceRow('hedge_flower', 53, 58, 36.95);
   for (const x of [46.4, 53.6]) { prop('o_hedgecube', x, 26.95); prop('o_hedgecube', x, 27.95); prop('o_hedgecube', x, 38.95); }   // hedge posts down the walkway side
   for (const x of [42.5, 57.5]) { prop('bush', x, 26.4); prop('bush2', x, 27.95); prop('bush2', x, 38.95); }                         // bushes along the street side
-  prop('tree_pink', 44.5, 27.6); prop('tree_oak', 55.5, 27.6);                                 // shade trees in the north lawns
-  prop('o_roses', 43.6, 25.95, false); prop('o_tulips', 45.4, 25.95, false); prop('o_tulips', 54.6, 25.95, false); prop('o_roses', 56.4, 25.95, false);
+  prop('tree_pink', 44.5, 27.6); prop('tree_oak', 46.5, 22.6);                                 // shade trees: the north-east one moved out of the casino doorway to the roadside north-west of the square
+  prop('o_roses', 43.6, 25.95, false); prop('o_tulips', 45.4, 25.95, false);   // (the north-east pair went with the old fence: the casino forecourt is there now)
   prop('o_flowerbed', 44.6, 38.6); prop('o_flowerbed', 55.4, 38.6);                           // flower beds in the south lawns
   prop('o_topiary', 46.4, 37.95, false); prop('o_topiary', 53.6, 37.95, false);
   // the plaza: lamps at its four corners, benches facing the fountain, planters at the walkway mouths
@@ -170,7 +174,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   for (const x of [16, 25, 34, 61, 70, 79, 88]) prop('o_lampball', x, 17.95, 'grass');   // between the verge trees so their crowns don't hide them
   prop('o_shelter2', 38.5, 35.2); prop('o_bikerack', 35.6, 35.9, false); prop('vending', 41.2, 29.9);
   for (const [x, y] of [[48.4, 13.95], [51.6, 13.95], [51.6, 16.95], [96.4, 30.95], [92.6, 33.95], [51.6, 75.0], [48.6, 78.95]]) prop('trafficlight', x, y); prop('postbox', 10, 33.95); prop('o_hydrant', 65.5, 33.95); prop('o_hydrant', 28, 33.95);
-  prop('o_phonebooth', 57.3, 23.9); prop('o_bin_blue', 33.8, 29.95); prop('o_bin_green', 75, 33.95); prop('o_bin', 12.2, 33.95);
+  prop('o_phonebooth', 42.7, 23.9);   // moved from the casino's spot to the square's north-west corner prop('o_bin_blue', 33.8, 29.95); prop('o_bin_green', 75, 33.95); prop('o_bin', 12.2, 33.95);
   // (no parked cars: real traffic drives the roads now)
   // parks, the lake and the beach
   prop('flowerbed', 61.5, 41.2, false); prop('flowerbed2', 70.5, 45.2, false); prop('flowerbox', 59.6, 47.5); prop('bench2', 80.5, 41.2, false); prop('flowerbed', 87.6, 47.2, false);
@@ -423,7 +427,7 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [14, 10] };
+const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['x_vending', 14.2, 2.7], ['x_drinkfridge', 12.6, 2.6], ['x_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['x_wclock', 10.2, 1.0, false], ['f_corkboard', 5.5, 1.15, false], ['x_aircon', 8, 1.0, false], ['f_extinguisher', 3.2, 2.4], ['x_coatrack', 12.6, 10.8], ['x_magrack', 3.6, 10.8], ['x_fern', 9.6, 10.8]],
@@ -472,6 +476,11 @@ const LAYOUT = {
   // a small home: bedroom (top left), living room (middle), bathroom (top right), kitchen (bottom left); bought furniture fills its own spots (client FURN_POS)
   // a new home comes empty: only the bed (plus windows and the doormat) — everything else is bought and placed by the owner
   house: [['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false], ['f_welcome', 7, 9.25]],
+  // 🎰 casino: cashier top centre under the jackpot sign, slot machines top left, bar top right, roulette / blackjack in the middle,
+  // hi-lo and poker at the bottom, a red carpet up the middle from the door (kept clear)
+  casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
+    ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
+    ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
 };
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
@@ -483,7 +492,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -544,6 +553,11 @@ for (const b of [0, 1, 2, 3].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) =
   if (kind === 'school') {
     let n = 0;
     for (const [cx, by] of SCHOOL_DESKS) for (const dx of [-.45, .45]) STATIONS.push({ id: 'sdesk' + n, type: 'sdesk', idx: n++, room: room.id, label: 'โต๊ะเรียน', icon: '📖', x: rx + cx + dx, y: ry + by + .95, r: .7 });
+  }
+  if (kind === 'casino') {             // the games: each table / the slot row is its own station
+    for (const [id, type, label, icon, dx, dy] of [['cz_slots', 'slot', 'สล็อตแมชชีน', '🎰', 3.2, 4.3], ['cz_roul', 'roul', 'รูเล็ต', '🎡', 4.0, 7.7],
+      ['cz_bjt', 'bj', 'แบล็กแจ็ก', '🃏', 12.0, 7.7], ['cz_hilot', 'hilo', 'ไฮโล', '🎲', 4.0, 10.8]])
+      STATIONS.push({ id, type, label, icon, room: room.id, x: rx + dx, y: ry + dy, r: 1.6 });
   }
   if (kind === 'office') {
     let n = 0;
@@ -1302,6 +1316,19 @@ const FISH_COL = [
   { id: 'r1', rar: 1, gems: 10, name: 'ปลาทั่วไปครบชุด' }, { id: 'r2', rar: 2, gems: 20, name: 'ปลาไม่ธรรมดาครบชุด' }, { id: 'r3', rar: 3, gems: 40, name: 'ปลาหายากครบชุด' },
   { id: 'r4', rar: 4, gems: 80, name: 'ปลามหากาพย์ครบชุด' }, { id: 'tp', temple: 1, gems: 30, name: 'ปลาวัดครบ 6 ชนิด' },
 ];
+// 🎰 casino: played with in-game baht only (never gems, never cashed out). Every game keeps a small edge for the house, so it
+// drains money from the economy. Bets 10-5,000; a player can lose at most `dayLoss` a day; big wins are announced in the feed.
+const CASINO = {
+  min: 10, max: 5000, dayLoss: 30000, announce: 20000,
+  // slots: three reels, weighted symbols; 3 alike pays P3x the bet, the first two alike P2x  (return ~94%, a win 1 spin in 5)
+  sym: [['cherry', 28], ['lemon', 24], ['bell', 18], ['bar', 13], ['seven', 8], ['diamond', 5], ['star', 4]],
+  P3: { cherry: 9, lemon: 11, bell: 19, bar: 30, seven: 60, diamond: 120, star: 250 },
+  P2: { cherry: 2, lemon: 2, bell: 2.5, bar: 3, seven: 4, diamond: 5, star: 6 },
+  // hi-lo (3 dice): high 11-17 / low 4-10 pay 2x (a triple loses), 11 exactly 7x, any triple 30x, a number pays 1x per die showing it
+  hilo: { hl: 2, eleven: 7, triple: 30 },
+  // roulette (0-36, one zero): red/black/odd/even/1-18/19-36 pay 2x, a single number 36x
+  red: [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36],
+};
 const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
 const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
 for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + (ITEMS[k].spr0 || k);
@@ -1911,6 +1938,6 @@ module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAR
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, FISH_COL, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, FISH_COL, CASINO, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

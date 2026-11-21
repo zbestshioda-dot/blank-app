@@ -646,6 +646,7 @@ function handle(m) {
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
     case 'nbstep': FX.play('levelup'); if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && S[i].go) setGuide(S[i].go, true); }, 900); break;
+    case 'cz': czMsg(m); break;
     case 'catch': catchPop(m.item, m.first); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
     case 'egg': eggFx(m); break;
@@ -1677,7 +1678,7 @@ function draw(t) {
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
   for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
-  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
+  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'town') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
   if (A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
   if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
@@ -4159,6 +4160,8 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
+  czBet(m) { czBetV = m.v; FX.play('click'); refreshPanel(true); },
+  czGo(m) { const s = STN(m.st); if (s) { panel = null; openPanel({ kind: s.type, st: s.id }); } },
   pushOn() { pushOn(true); },
   shareGo() { shareOpen(); },
   godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0) && m.op !== 'setmoney') return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: m.op || 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
@@ -4588,6 +4591,62 @@ function aStatsHtml() {
     ${asChart(S, [{ name: 'D1 กลับมาวันถัดไป', v: S.d1 }, { name: 'D7 ยังเล่นหลัง 7 วัน', v: S.d7 }], { type: 'line', max: 100, pct: 1, fmt: v => v + '%', title: '🔁 การกลับมาเล่น', sub: 'แยกตามวันที่สมัคร: กี่ % ของคนใหม่วันนั้นกลับมาเล่นอีก' })}
     ${asChart(S, [{ name: 'รายได้', v: S.thb }], { title: '💎 รายได้จากการเติมเงินต่อวัน', sub: `จ่ายเงินแล้ว 30 วัน ${sum(S.payers)} ครั้ง-คน`, fmt: v => money(v) })}
     ${tbl}`;
+}
+// 🎰 casino panels: the cashier (rules + today's tally) and four games. Results come from the server; the client only animates.
+let czBetV = 100, czLast = {}, czAnim = 0;
+const CZ_ICON = { cherry: 'ci_cherry', lemon: 'ci_lemon', bell: 'ci_bell', bar: 'ci_bar', seven: 'ci_seven', diamond: 'ci_diamond', star: 'ci_star' };
+const DICE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'], CARD = c => ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][c] || '?';
+function czMsg(m) {
+  czLast[m.g] = m; if (m.g === 'bj') { if (m.bj?.done) FX.play(m.bj.win > m.bj.bet ? 'levelup' : m.bj.win ? 'click' : 'chime'); return refreshPanel(true); }
+  czAnim = performance.now() + (m.g === 'roul' ? 1600 : 1000); FX.play('click');
+  const iv = setInterval(() => { refreshPanel(true); if (performance.now() > czAnim) { clearInterval(iv); FX.play(m.win > m.bet ? 'levelup' : m.win ? 'click' : 'chime'); if (m.win) toast(`🎉 ได้ ${money(m.win)}!`, '🎰'); refreshPanel(true); } }, 90);
+}
+function czBets() {
+  const C = G.casino; return `<div class="czBets">${[10, 50, 100, 500, 1000, 5000].filter(v => v >= C.min && v <= C.max).map(v => B(money(v), { fn: 'czBet', v }, czBetV === v ? 'primary' : '', me.money < v)).join('')}</div>`;
+}
+function czHtml(k, st) {
+  const C = G.casino, net = me.czNet || 0, spin = performance.now() < czAnim, L = czLast[k];
+  const tally = `<div class="sub">เงินในมือ <b>${money(me.money)}</b> · วันนี้${net >= 0 ? 'ได้' : 'เสีย'} <b style="color:${net >= 0 ? 'var(--ok)' : 'var(--bad)'}">${money(Math.abs(net))}</b> (เสียได้ไม่เกิน ${money(C.dayLoss)}/วัน)</div>`;
+  if (k === 'casino') {
+    const go = (id, l) => B(l, { fn: 'czGo', st: id }, 'primary');
+    return `<h2>🎰 คาสิโนเมืองชีวิต</h2>${tally}<div class="jobbox">เล่นด้วยเงินในเกมเท่านั้น (ไม่ใช้เพชร ไม่แลกเป็นเงินจริง) · แทงครั้งละ ${money(C.min)}–${money(C.max)} · ได้เกิน ${money(C.announce)} ประกาศทั้งเมือง!</div>
+      <div class="grid2">${go('cz_slots', '🎰 สล็อต')}${go('cz_hilot', '🎲 ไฮโล')}${go('cz_roul', '🎡 รูเล็ต')}${go('cz_bjt', '🃏 แบล็กแจ็ก')}</div>
+      <div class="sub" style="margin-top:8px">เดินไปที่โต๊ะ/ตู้แล้วกดปุ่มใช้งานก็เล่นได้เหมือนกัน · เล่นแต่พอดี เจ้ามือได้เปรียบเสมอนะ 😉</div>`;
+  }
+  if (k === 'slot') {
+    const r = spin ? [0, 1, 2].map(() => C.sym[Math.floor(Math.random() * C.sym.length)][0]) : L?.r || ['seven', 'seven', 'seven'];
+    const res = !spin && L ? (L.win ? `<div class="czWin">🎉 ${L.mul}x · ได้ ${money(L.win)}</div>` : '<div class="czLose">ไม่เข้า ลองอีกที!</div>') : '<div class="czLose">&nbsp;</div>';
+    const pays = Object.entries(C.P3).reverse().map(([k3, v]) => `<span><canvas class="fspr" data-spr="${CZ_ICON[k3]}" width="18" height="18"></canvas>x3 = ${v}x · x2 = ${C.P2[k3]}x</span>`).join('');
+    return `<h2>🎰 สล็อตแมชชีน</h2>${tally}<div class="czReels">${r.map(x => `<div><canvas class="fspr" data-spr="${CZ_ICON[x]}" width="64" height="64"></canvas></div>`).join('')}</div>${res}
+      ${czBets()}${B(spin ? '⏳ กำลังหมุน...' : `🎰 หมุน (${money(czBetV)})`, { t: 'act', st, a: 'spin', bet: czBetV }, 'primary big', spin || me.money < czBetV)}
+      <details class="sub"><summary>อัตราจ่าย (คิดจากเงินที่แทง)</summary><div class="czPays">${pays}</div><small>สองช่องแรกเหมือนกัน = x2 · สามช่องเหมือนกัน = x3</small></details>`;
+  }
+  if (k === 'hilo') {
+    const d = spin ? [1, 2, 3].map(() => 1 + Math.floor(Math.random() * 6)) : L?.d || [6, 6, 6], sum = d.reduce((t, x) => t + x, 0);
+    const res = !spin && L ? (L.win ? `<div class="czWin">🎉 ${L.sum} แต้ม · ได้ ${money(L.win)}</div>` : `<div class="czLose">${L.sum} แต้ม${L.d[0] === L.d[1] && L.d[1] === L.d[2] ? ' (ตอง!)' : ''} · ไม่เข้า</div>`) : '<div class="czLose">&nbsp;</div>';
+    const P = (pick, l) => B(l, { t: 'act', st, a: 'roll', bet: czBetV, pick }, '', spin || me.money < czBetV);
+    return `<h2>🎲 ไฮโล</h2>${tally}<div class="czDice">${d.map(x => `<span>${DICE[x]}</span>`).join('')}</div>${spin ? '<div class="czLose">เขย่า...</div>' : res}${czBets()}
+      <div class="grid2">${P('hi', `⬆️ สูง 11–17 (x${C.hilo.hl})`)}${P('lo', `⬇️ ต่ำ 4–10 (x${C.hilo.hl})`)}${P('eleven', `🎯 11 ไฮโล (x${C.hilo.eleven})`)}${P('triple', `🔥 ตอง (x${C.hilo.triple})`)}</div>
+      <div class="czNums">${[1, 2, 3, 4, 5, 6].map(n => P('n' + n, `${DICE[n]} ${n}`)).join('')}</div><div class="sub">ทายเลข: ออก 1 ลูก x2 · 2 ลูก x3 · 3 ลูก x4 · ออกตองแทงสูง/ต่ำเสีย</div>`;
+  }
+  if (k === 'roul') {
+    const n = spin ? Math.floor(Math.random() * 37) : L?.n ?? 0, red = C.red.includes(n);
+    const res = !spin && L ? (L.win ? `<div class="czWin">🎉 ออก ${L.n} · ได้ ${money(L.win)}</div>` : `<div class="czLose">ออก ${L.n} · ไม่เข้า</div>`) : '<div class="czLose">&nbsp;</div>';
+    const P = (pick, l, c = '') => B(l, { t: 'act', st, a: 'spin', bet: czBetV, pick: String(pick) }, c, spin || me.money < czBetV);
+    return `<h2>🎡 รูเล็ต</h2>${tally}<div class="czBall ${n === 0 ? 'g' : red ? 'r' : 'b'}">${n}</div>${spin ? '<div class="czLose">ลูกกำลังหมุน...</div>' : res}${czBets()}
+      <div class="grid2">${P('red', '🔴 แดง (x2)')}${P('black', '⚫ ดำ (x2)')}${P('odd', 'คี่ (x2)')}${P('even', 'คู่ (x2)')}${P('low', '1–18 (x2)')}${P('high', '19–36 (x2)')}</div>
+      <div class="secT">แทงเลขเดี่ยว (x36)</div><div class="czGrid">${Array.from({ length: 37 }, (_, i) => P(i, i, i === 0 ? 'czG' : C.red.includes(i) ? 'czR' : 'czK')).join('')}</div>`;
+  }
+  if (k === 'bj') {
+    const b = L?.bj, hand = (cs, v, lab) => `<div class="czHand"><small>${lab}${v != null ? ` · ${v} แต้ม` : ''}</small><div>${cs.map((c, i) => c ? `<span class="czCard ${(c + i) % 2 ? 'r' : ''}">${CARD(c)}${'♠♥♦♣'[(c + i) % 4]}</span>` : '<span class="czCard back">🂠</span>').join('')}</div></div>`;
+    const R = { bj: '🎉 แบล็กแจ็ก! (x2.5)', win: '🎉 ชนะ!', push: '🤝 เสมอ ได้เงินคืน', lose: '😢 เจ้ามือชนะ', bust: '💥 เกิน 21 แพ้' };
+    let body = '';
+    if (b) body = hand(b.d, b.dv, '🧑‍💼 เจ้ามือ') + hand(b.p, b.pv, '🙋 คุณ') + (b.done ? `<div class="${b.win > 0 ? 'czWin' : 'czLose'}">${R[b.res] || ''}${b.win ? ` · ได้ ${money(b.win)}` : ''}</div>` : '');
+    const acts = b && !b.done ? `<div class="grid2">${B('➕ จั่ว', { t: 'act', st, a: 'hit' }, 'primary')}${B('✋ พอ', { t: 'act', st, a: 'stand' }, 'good')}${b.p.length === 2 ? B(`💰 ดับเบิล (+${money(b.bet)})`, { t: 'act', st, a: 'double' }, '', me.money < b.bet) : ''}</div>`
+      : `${czBets()}${B(`🃏 แจกไพ่ (${money(czBetV)})`, { t: 'act', st, a: 'deal', bet: czBetV }, 'primary big', me.money < czBetV)}`;
+    return `<h2>🃏 แบล็กแจ็ก</h2>${tally}${body || '<div class="sub">ได้แต้มใกล้ 21 ที่สุดโดยไม่เกิน ชนะเจ้ามือได้ x2 · ไพ่ 2 ใบแรกได้ 21 (แบล็กแจ็ก) x2.5 · เจ้ามือจั่วจนถึง 17</div>'}${acts}`;
+  }
+  return '';
 }
 // 🐠 the home tank: put fish from the bag in (they swim there for visitors and add comfort), take them back out
 function aqBox() {
@@ -5168,6 +5227,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23as', d: '21 พ.ย.', items: [
+    '🎰 <b>คาสิโนเมืองชีวิตเปิดแล้ว!</b> ตึกใหม่หัวลานจัตุรัส (ทิศเหนือ) · สล็อต 🎰 ไฮโล 🎲 รูเล็ต 🎡 แบล็กแจ็ก 🃏 · เล่นด้วยเงินในเกมเท่านั้น แทงครั้งละ ฿10–5,000 · ได้เกิน ฿20,000 ประกาศทั้งเมือง!',
+    '📞 ตู้โทรศัพท์หน้าลานจัตุรัสย้ายไปมุมตะวันตก',
+  ] },
   { v: '2026-11-23aq', d: '21 พ.ย.', items: [
     '🌱 <b>ภารกิจมือใหม่ 10 นาที</b> สำหรับผู้เล่นใหม่: ซื้อเบ็ด → ตกปลา 3 ตัว → ขาย (เงินก้อนแรก) → ทักทายในแชท → ซื้อของชิ้นแรก → ส่งอีโมจิใกล้เพื่อน ทุกข้อได้รางวัลทันที ครบได้ 💎10 + 🥚 ไข่สัตว์เลี้ยง',
     '🤝 มีคนใหม่ย้ายมาเมือง จะมีประกาศ · ทักทายเขาในแชทโลกภายใน 3 นาที รับ ฿50 (วันละ 3 ครั้ง)',
@@ -5929,6 +5992,7 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'news': return newsHtml();
+    case 'casino': case 'slot': case 'hilo': case 'roul': case 'bj': return czHtml(k, st);
     case 'astats': return me.admin ? aStatsHtml() : '';
     case 'noti': return lbNotiHtml();
     case 'ev7': return ev7Html();
@@ -6866,7 +6930,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=2').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=3'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v12').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v12'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v13').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v13'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
