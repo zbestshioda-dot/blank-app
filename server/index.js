@@ -1014,19 +1014,23 @@ setInterval(() => { try { if (online.size || ww) wwTick(); } catch (e) { console
 let ideas = [], ideaSeq = 1;
 function ideaView(a, sort) {
   const me = lk(a), L = [...ideas].sort(sort === 'top' ? (x, y) => Object.keys(y.lk).length - Object.keys(x.lk).length || y.t - x.t : (x, y) => y.t - x.t).slice(0, 60);
-  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, cm: i.cm.slice(-30) })) });
+  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, img: i.img ? 1 : 0, dislikes: Object.keys(i.dl || {}).length, disliked: i.dl?.[me] ? 1 : 0, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, cm: i.cm.slice(-30) })) });
 }
 function ideaOp(a, m) {
   const me = lk(a), i = ideas.find(x => x.id === +m.id);
   if (m.op === 'post') {
-    const text = cleanText(m.text, 300); if (text.length < 5) return toast(a, 'เขียนไอเดียอย่างน้อย 5 ตัวอักษร', '💡', false);
+    const img = String(m.img || ''), text = cleanText(m.text, 300);
+    if (img && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 70000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '📸', false);
+    if (!img && text.length < 5) return toast(a, 'เขียนอย่างน้อย 5 ตัวอักษร หรือแนบรูป', '📘', false);
     const d = dayKey(); if (!a.idd || a.idd.d !== d) a.idd = { d, n: 0 };
-    if (a.idd.n >= 3 && !isAdmin(a)) return toast(a, 'วันนี้โพสต์ไอเดียครบ 3 โพสต์แล้ว พรุ่งนี้มาใหม่นะ', '💡', false);
-    a.idd.n++; a.sd = true; ideas.push({ id: ideaSeq++, l: me, n: a.name, text, t: now(), lk: {}, cm: [] }); if (ideas.length > 300) ideas.shift();
-    toast(a, 'โพสต์ไอเดียแล้ว ขอบคุณที่ช่วยออกแบบเมือง! 💡', '💡');
+    if (a.idd.n >= 5 && !isAdmin(a)) return toast(a, 'วันนี้โพสต์ครบ 5 โพสต์แล้ว พรุ่งนี้มาใหม่นะ', '📘', false);
+    a.idd.n++; a.sd = true; ideas.push({ id: ideaSeq++, l: me, n: a.name, text, t: now(), lk: {}, dl: {}, cm: [], ...(img ? { img } : {}) }); if (ideas.length > 300) ideas.shift();
+    { let k = 0; for (let j = ideas.length - 1; j >= 0; j--) if (ideas[j].img && ++k > 40) delete ideas[j].img; }   // only the newest 40 photos are kept (they live in the saved town data)
+    toast(a, 'โพสต์ลงฟีดแล้ว 📘', '📘');
     for (const o of online.values()) if (isAdmin(o) && o !== a) toast(o, `💡 ไอเดียใหม่จาก ${a.name}`, '💡');
   } else if (!i) return ideaView(a, m.sort);
-  else if (m.op === 'like') { if (i.lk[me]) delete i.lk[me]; else i.lk[me] = 1; }
+  else if (m.op === 'like') { if (i.lk[me]) delete i.lk[me]; else { i.lk[me] = 1; if (i.dl) delete i.dl[me]; } }
+  else if (m.op === 'unlike') { i.dl ||= {}; if (i.dl[me]) delete i.dl[me]; else { i.dl[me] = 1; delete i.lk[me]; } }
   else if (m.op === 'cm') {
     const text = cleanText(m.text, 150); if (text.length < 1) return;
     if (!cd(a, 'ideacm', 5000)) return;
@@ -5155,6 +5159,11 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url.startsWith('/fbimg/')) {   // 📘 LifeBook photos: served by post id so the browser caches them instead of resending with every feed refresh
+    const im = ideas.find(x => x.id === +url.slice(7))?.img, mt = im && /^data:(image\/\w+);base64,(.*)$/.exec(im);
+    if (!mt) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': mt[1], 'Cache-Control': 'public, max-age=86400' }); return res.end(Buffer.from(mt[2], 'base64'));
+  }
   if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
   if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town
   const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
@@ -5199,7 +5208,7 @@ wss.on('connection', (ws, req) => {
     if (t - winStart > 1000) { winStart = t; count = 0; }
     if (++count > 60) return;
     const str = raw.toString();
-    if (str.length > 4096 && !str.startsWith('{"t":"pic"')) return;   // only a profile photo may be large
+    if (str.length > 4096 && !str.startsWith('{"t":"pic"') && !str.startsWith('{"t":"idea","op":"post"')) return;   // only a profile photo may be large
     onMessage(ws, str);
   });
   ws.on('close', () => { if (ws.acct && ws.acct.ws === ws) detach(ws.acct); });

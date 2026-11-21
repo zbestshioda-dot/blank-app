@@ -3734,8 +3734,9 @@ function zoomPic(src) {   // a player's photo, big
 // LifeBook: the town's blue social app — ideas (and bug reports), friends and jobs in one place
 function socHead(k) {
   const t = (l, kk, on) => `<button class="${on ? 'on' : ''}" data-m='{"fn":"social","k":"${kk}"}'>${l}</button>`;
-  const sub = k === 'ideas' || k === 'bug' ? `<div class="socSub">${t('💡 ไอเดีย', 'ideas', k === 'ideas')}${t('🐞 แจ้งบัค', 'bug', k === 'bug')}</div>` : '';
-  return `<div class="socHead"><b>📘 LifeBook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('💡 ไอเดีย', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 งาน', 'career', k === 'career')}</div>${sub}`;
+  const sub = k === 'ideas' || k === 'bug' ? `<div class="socSub">${t('📰 ฟีด', 'ideas', k === 'ideas')}${t('🐞 แจ้งบัค', 'bug', k === 'bug')}</div>` : '';
+  const grp = k === 'career' ? `<div class="fbGrp"><b>💼 กลุ่มหางาน เมืองชีวิต</b><small>🌐 กลุ่มสาธารณะ · เลือกอาชีพที่ใช่ แล้วไปสมัครที่สถานที่ทำงานได้เลย</small></div>` : '';
+  return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}</div>${sub}${grp}`;
 }
 function bindPanel(root) {
   bindStocks(root); bindWall(root); bindPay(root);
@@ -4006,9 +4007,10 @@ const FN = {
     if (m.op === 'sort') { panel.sort = m.sort; return send({ t: 'idea', op: 'list', sort: m.sort }); }
     if (m.op === 'open') { panel.open = panel.open === m.id ? 0 : m.id; return refreshPanel(true); }
     const text = m.op === 'post' ? root.querySelector('#ideaIn')?.value : m.op === 'cm' ? root.querySelector('#ideaCm' + m.id)?.value : '';
-    send({ t: 'idea', op: m.op, id: m.id, text, sort: panel.sort });
-    if (m.op === 'post') { const e = root.querySelector('#ideaIn'); if (e) e.value = ''; }
+    send({ t: 'idea', op: m.op, id: m.id, text, sort: panel.sort, ...(m.op === 'post' && fbImg ? { img: fbImg } : {}) });
+    if (m.op === 'post') { const e = root.querySelector('#ideaIn'); if (e) e.value = ''; fbImg = ''; refreshPanel(true); }
   },
+  fbSnap: () => fbSnap(), fbAlbum: () => fbAlbum(), fbClr() { fbImg = ''; refreshPanel(true); },
   petName(m) { const cur = me.pnames?.[m.id] || ''; const n = prompt(`ตั้งชื่อ${G.pets[m.id]?.name || 'สัตว์เลี้ยง'} (ไม่เกิน 12 ตัวอักษร · เว้นว่าง = ลบชื่อ)`, cur); if (n === null) return; send({ t: 'pet.name', id: m.id, name: n.trim() }); },
   openMayor() { send({ t: 'mayor', op: 'view' }); openPanel({ kind: 'mayor' }); },
   mayor(m, root) {
@@ -4919,6 +4921,13 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ad', d: '21 พ.ย.', items: [
+    '📘 lifebook โฉมใหม่ ธีมฟ้าขาวแบบเฟซบุ๊ก หน้าไอเดียกลายเป็น 📰 ฟีด (โพสต์เดิมอยู่ครบ)',
+    '📸 ถ่ายรูปในเมืองหรือเลือกรูปจากเครื่อง แล้วโพสต์อวดลงฟีดได้แล้ว',
+    '👎 กดไม่ถูกใจโพสต์ได้แล้ว',
+    '💼 หน้างานเปลี่ยนชื่อเป็น กลุ่มหางาน',
+    '📜 รูปคนให้เควสต์ไม่ทับตัวหนังสือแล้ว',
+  ] },
   { v: '2026-11-23ac', d: '21 พ.ย.', items: [
     '🔢 แถบพลัง อิ่ม เลือด และสุข กลับมามีตัวเลขบอกค่าเหมือนเดิม',
   ] },
@@ -5501,18 +5510,55 @@ function lottoPanel() {
     <div class="secT">ลอตเตอรี่ของฉันงวดนี้ (${L.my.length} ใบ)</div><div>${L.my.map(tk).join('') || '<small>ยังไม่ได้ซื้อ</small>'}</div>
     ${last}<small style="opacity:.7">เล่นแต่พอดี เงินในเกมเท่านั้น</small>`;
 }
+let fbImg = '';   // 📸 the photo waiting in the LifeBook composer
+const fbAv = n => `<span class="fbAv" style="background:hsl(${[...String(n)].reduce((h, c) => h * 31 + c.charCodeAt(0) | 0, 7) % 360} 60% 52%)">${esc([...String(n)][0] || '?')}</span>`;
+function fbShrink(src, done) {   // any picture → a small JPEG/WebP (≤ ~68 KB) the server accepts
+  const W = Math.min(560, src.width), H = Math.round(src.height * W / src.width), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(src, 0, 0, W, H);
+  const fmt = c.toDataURL('image/webp', .5).startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+  let q = .85, d = c.toDataURL(fmt, q); while (d.length > 68000 && q > .25) { q -= .08; d = c.toDataURL(fmt, q); }
+  if (d.length > 68000) return toast('รูปใหญ่เกินไป ลองรูปอื่นนะ', '📸', false);
+  done(d);
+}
+function fbSnap() {   // hide the phone, count down, then photograph the town around you
+  const pn = $('#panel'); pn.style.visibility = 'hidden'; let n = 3;
+  const tick = () => {
+    if (n > 0) { toast(`📸 จัดท่าให้พร้อม… ${n}`, '📸'); n--; return setTimeout(tick, 900); }
+    const c = $('#cv'), W = c.width, H = c.height, k = W / (c.clientWidth || W), s = Math.min(W, H * 4 / 3, 640 * k), cw = s, ch = s * 3 / 4, o = document.createElement('canvas'); o.width = cw; o.height = ch;
+    const m = P.get(myId), cam = camera(), px = m ? (m.rx * TS - cam.x) * k : W / 2, py = m ? ((m.ry - .8) * TS - cam.y) * k : H / 2;   // the shot is framed on you
+    const sx = Math.max(0, Math.min(W - cw, px - cw / 2)), sy = Math.max(0, Math.min(H - ch, py - ch / 2));
+    o.getContext('2d').drawImage(c, sx, sy, cw, ch, 0, 0, cw, ch);
+    FX.play('click'); pn.style.visibility = '';
+    try { fbShrink(o, d => { fbImg = d; refreshPanel(true); }); } catch { toast('ถ่ายรูปไม่สำเร็จ', '📸', false); }
+  };
+  tick();
+}
+function fbAlbum() {
+  let inp = document.getElementById('fbIn');
+  if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.id = 'fbIn'; inp.style.display = 'none'; document.body.appendChild(inp); }
+  inp.value = '';
+  inp.onchange = () => {
+    const f = inp.files?.[0]; if (!f) return;
+    const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); fbShrink(im, d => { fbImg = d; refreshPanel(true); }); };
+    im.onerror = () => toast('เปิดรูปนี้ไม่ได้', '🖼️', false);
+    im.src = url;
+  };
+  inp.click();
+}
 function ideasPanel(p) {
   const I = window.__ideas, ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'เมื่อกี้' : m < 60 ? m + ' นาที' : m < 1440 ? Math.floor(m / 60) + ' ชม.' : Math.floor(m / 1440) + ' วัน'; };
-  const posts = !I ? '<div class="sub">กำลังโหลด…</div>' : I.list.map(i => `<div class="item" style="display:block">
-      <div style="display:flex;gap:8px;align-items:center"><b>💡 ${esc(i.n)}</b><small style="opacity:.7">${ago(i.t)}</small>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
-      <p style="margin:6px 0;white-space:pre-wrap;word-break:break-word">${esc(i.text)}</p>
-      <div class="grid2">${B(`${i.liked ? '👍 ถูกใจแล้ว' : '👍 ถูกใจ'} ${i.likes || ''}`, { fn: 'idea', op: 'like', id: i.id }, i.liked ? 'primary' : '')}${B(`💬 คอมเมนต์ ${i.cm.length || ''}`, { fn: 'idea', op: 'open', id: i.id })}</div>
-      ${p.open === i.id ? `<div style="margin-top:6px">${i.cm.map(c => `<div style="padding:4px 8px;margin:3px 0;border-radius:10px;background:rgba(0,0,0,.12)"><b>${c.a ? '👑 ' : ''}${esc(c.n)}</b> <small style="opacity:.7">${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<small>ยังไม่มีคอมเมนต์</small>'}
-        <div class="rowf" style="margin-top:4px"><input id="ideaCm${i.id}" maxlength="150" placeholder="เขียนคอมเมนต์…">${B('ส่ง', { fn: 'idea', op: 'cm', id: i.id }, 'primary')}</div></div>` : ''}
-    </div>`).join('') || '<div class="sub">ยังไม่มีไอเดีย มาเป็นคนแรกเลย!</div>';
-  return `<h2>💡 ไอเดียทำเกม</h2><div class="sub">อยากให้เมืองมีอะไรเพิ่ม เสนอได้เลย ทีมงานอ่านทุกโพสต์ · กดถูกใจไอเดียที่ชอบ ไอเดียยอดนิยมมีโอกาสได้ทำจริง</div>
-    <textarea id="ideaIn" maxlength="300" rows="3" style="width:100%;box-sizing:border-box;border-radius:10px;padding:8px;font:inherit" placeholder="เช่น อยากให้มีร้านกาแฟในสวนสนุก…"></textarea>
-    ${B('📝 โพสต์ไอเดีย', { fn: 'idea', op: 'post' }, 'primary')}
+  const posts = !I ? '<div class="sub">กำลังโหลด…</div>' : I.list.map(i => `<div class="fbPost">
+      <div class="fbTop">${fbAv(i.n)}<div><b>${esc(i.n)}</b><small>${ago(i.t)} · 🌐</small></div>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
+      ${i.text ? `<p class="fbTxt">${esc(i.text)}</p>` : ''}${i.img ? `<img class="fbPic phZoom" src="fbimg/${i.id}" alt="" loading="lazy">` : ''}
+      <div class="fbCnt"><span>${i.likes ? '👍 ' + i.likes : ''}${i.dislikes ? ' 👎 ' + i.dislikes : ''}</span><span>${i.cm.length ? i.cm.length + ' คอมเมนต์' : ''}</span></div>
+      <div class="fbAct">${B(`👍 ${i.liked ? 'ถูกใจแล้ว' : 'ถูกใจ'}`, { fn: 'idea', op: 'like', id: i.id }, i.liked ? 'on' : '')}${B(`👎 ${i.disliked ? 'ไม่ถูกใจแล้ว' : 'ไม่ถูกใจ'}`, { fn: 'idea', op: 'unlike', id: i.id }, i.disliked ? 'onN' : '')}${B('💬 คอมเมนต์', { fn: 'idea', op: 'open', id: i.id })}</div>
+      ${p.open === i.id ? `<div class="fbCms">${i.cm.map(c => `<div class="fbCm">${fbAv(c.n)}<div><b>${c.a ? '👑 ' : ''}${esc(c.n)}</b> <small>${ago(c.t)}</small><br>${esc(c.text)}</div></div>`).join('') || '<small>ยังไม่มีคอมเมนต์</small>'}
+        <div class="rowf" style="margin-top:4px"><input id="ideaCm${i.id}" maxlength="150" placeholder="เขียนความคิดเห็น…">${B('ส่ง', { fn: 'idea', op: 'cm', id: i.id }, 'primary')}</div></div>` : ''}
+    </div>`).join('') || '<div class="sub">ยังไม่มีโพสต์ มาเป็นคนแรกเลย!</div>';
+  return `<h2>📰 ฟีด</h2><div class="fbPost fbNew"><div class="fbTop">${fbAv(me.name)}<textarea id="ideaIn" maxlength="300" rows="2" placeholder="คุณคิดอะไรอยู่ ${esc(me.name)}? (อวดรูป เสนอไอเดียเมือง ได้หมด)"></textarea></div>
+    ${fbImg ? `<div class="fbPrev"><img src="${fbImg}" alt="">${B('✖', { fn: 'fbClr' })}</div>` : ''}
+    <div class="fbAct">${B('📸 ถ่ายรูป', { fn: 'fbSnap' })}${B('🖼️ รูปภาพ', { fn: 'fbAlbum' })}${B('โพสต์', { fn: 'idea', op: 'post' }, 'primary')}</div></div>
     <div class="tabs" style="margin-top:8px">${B('🆕 ล่าสุด', { fn: 'idea', op: 'sort', sort: 'new' }, p.sort !== 'top' ? 'primary' : '')}${B('🔥 ยอดนิยม', { fn: 'idea', op: 'sort', sort: 'top' }, p.sort === 'top' ? 'primary' : '')}</div>${posts}`;
 }
 function mayorPanel() {
@@ -6408,11 +6454,11 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['LifeBook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first
-const PH_GROUPS = [['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'LifeBook', 'แก๊ง']], ['เงินทอง', ['บิล', 'การเงิน', 'หุ้น', 'ลอตเตอรี่']],
+const PH_GROUPS = [['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'แก๊ง']], ['เงินทอง', ['บิล', 'การเงิน', 'หุ้น', 'ลอตเตอรี่']],
   ['ชีวิตประจำวัน', ['เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา', 'เลือกตั้ง']], ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
   ['อื่นๆ', ['เติมเงิน', 'อัปเดต', 'บทช่วยสอน', 'วอลเปเปอร์', 'ตั้งค่า', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
