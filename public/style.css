@@ -1514,3 +1514,5 @@ img.fbAv{object-fit:cover;background:#ddd}
 #specBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 112px);transform:translateX(-50%);z-index:9;display:flex;gap:5px;align-items:center}
 #specBar button{background:rgba(20,20,30,.85);color:#fff;border:2px solid #9aa4ff;border-radius:10px;padding:5px 10px;font:700 14px inherit;font-family:inherit;min-width:38px;cursor:pointer}
 #specBar .nm{max-width:52vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbB{display:inline-block;min-width:16px;padding:0 4px;border-radius:9px;background:#e8343a;color:#fff;font:700 11px/16px inherit;font-style:normal;margin-left:2px}
+.lbN.new{background:#e7f0ff;border-left:3px solid #1d6fe0}

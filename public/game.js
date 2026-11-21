@@ -3778,11 +3778,16 @@ function zoomPic(src) {   // a player's photo, big
   d.onclick = () => d.remove(); document.body.appendChild(d);
 }
 // LifeBook: the town's blue social app — ideas (and bug reports), friends and jobs in one place
+const lbUnread = () => (me?.lbn || []).filter(x => x.t > (me.lbnSeen || 0)).length;
+function lbNotiHtml() {
+  const L = me.lbn || [], seen = me.lbnSeen || 0, ago = t => { const m = Math.max(0, Math.round((Date.now() + clockOff - t) / 60e3)); return m < 1 ? 'เมื่อกี้' : m < 60 ? `${m} นาทีที่แล้ว` : m < 1440 ? `${Math.floor(m / 60)} ชม.ที่แล้ว` : `${Math.floor(m / 1440)} วันที่แล้ว`; };
+  return `<h2>🔔 แจ้งเตือน</h2>${L.length ? `<div class="list">${L.map(x => `<div class="item lbN ${x.t > seen ? 'new' : ''}"><div class="em">${x.ic}</div><div class="nm" style="font-weight:400">${esc(x.text)}<small>${ago(x.t)}</small></div></div>`).join('')}</div>` : '<div class="sub">ยังไม่มีแจ้งเตือน · มีคนถูกใจ/คอมเมนต์โพสต์ เพื่อนโพสต์ใหม่ หรือมีคนซื้อของที่คุณวางขาย จะเด้งมาที่นี่</div>'}`;
+}
 function socHead(k) {
   const t = (l, kk, on) => `<button class="${on ? 'on' : ''}" data-m='{"fn":"social","k":"${kk}"}'>${l}</button>`;
   const sub = k === 'ideas' || k === 'bug' ? `<div class="socSub">${t('📰 ฟีด', 'ideas', k === 'ideas')}${t('🐞 แจ้งบัค', 'bug', k === 'bug')}</div>` : '';
   const grp = k === 'career' ? `<div class="fbGrp"><b>💼 กลุ่มหางาน เมืองชีวิต</b><small>🌐 กลุ่มสาธารณะ · เลือกอาชีพที่ใช่ แล้วไปสมัครที่สถานที่ทำงานได้เลย</small></div>` : '';
-  return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}</div>${sub}${grp}`;
+  return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}${t(`🔔 แจ้งเตือน${lbUnread() ? ` <em class="lbB">${lbUnread()}</em>` : ''}`, 'noti', k === 'noti')}</div>${sub}${grp}`;
 }
 function bindPanel(root) {
   bindStocks(root); bindWall(root); bindPay(root);
@@ -4031,6 +4036,7 @@ const FN = {
   social(m) {
     const k = m.k || 'ideas';
     if (k === 'ideas') send({ t: 'idea', op: 'list', sort: panel?.sort || 'new' });
+    if (k === 'noti') setTimeout(() => send({ t: 'lbnseen' }), 1500);   // the new ones stay highlighted for a moment
     const next = { kind: k, soc: 1, ...(k === 'ideas' ? { sort: panel?.soc ? panel.sort || 'new' : 'new' } : {}) };
     if (panel?.soc) { for (const x of Object.keys(panel)) delete panel[x]; Object.assign(panel, next); panelSig = ''; refreshPanel(true); } else openPanel(next);
   },
@@ -4985,6 +4991,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23al', d: '21 พ.ย.', items: [
+    '🔔 <b>lifebook มีแจ้งเตือนแล้ว!</b> แท็บ 🔔 บอกเมื่อมีคนถูกใจ/คอมเมนต์โพสต์ เพื่อนโพสต์ใหม่ เพื่อนตกปลาหายากได้ มีคนซื้อของที่คุณวางขาย หรือแลกเบอร์กัน (ออฟไลน์อยู่ก็เก็บไว้ให้)',
+  ] },
   { v: '2026-11-23ak', d: '21 พ.ย.', items: [
     '📋 <b>บอร์ดออเดอร์ปลา</b> ที่สมาคมประมง! ส่งปลาตามออเดอร์ได้เงินมากกว่าขายปกติหลายเท่า (ปลาหายากแถมเพชร) · ใครส่งครบก่อนได้ก่อน ปลาไม่พอซื้อจากเพื่อนที่ตลาดได้',
     '🙏 <b>ปล่อยปลาทำบุญ</b> ที่สระบัววัด: ได้ "บุญหนุนนำ" โชคปลาหายาก x1.3 ขยะน้อยลง ยิ่งปลาแพงยิ่งได้บุญนาน (สูงสุด 3 ชม.)',
@@ -5723,6 +5732,7 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'news': return newsHtml();
+    case 'noti': return lbNotiHtml();
     case 'ev7': return ev7Html();
     case 'lkev': return lkEvHtml();
     case 'fairgame': { const g = G.fair.games[STN(st).k];
@@ -6565,7 +6575,7 @@ function phonePanel(p) {
   if (tab === 'home') {
     const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
     const app = ([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`;
-    const emApp = ([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i><small>${l}</small></button>`;
+    const emApp = ([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i>${l === 'lifebook' && lbUnread() ? '<em></em>' : ''}<small>${l}</small></button>`;
     const all = {}; for (const a of PH_APPS) all[a[0]] = app(a);
     for (const a of PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay))) all[a[0]] = emApp(a);
     const used = new Set(), sec = PH_GROUPS.map(([t, names]) => { const h = names.filter(n => all[n]).map(n => (used.add(n), all[n])).join(''); return h ? `<div class="phSec">${t}</div><div class="phApps">${h}</div>` : ''; }).join('');

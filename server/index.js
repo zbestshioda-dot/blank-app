@@ -1044,6 +1044,14 @@ function wwTick() {
   if (t % 3000 < 250) wwSendAll();
 }
 setInterval(() => { try { if (online.size || ww) wwTick(); } catch (e) { console.error('wwTick', e); } }, 250).unref?.();
+// 🔔 lifebook notifications: kept on the account (players who are away see them next time), newest first
+function lbNote(o, icon, text) {
+  if (!o || !o.login) return;
+  o.lbn = [{ t: now(), ic: icon, text: String(text).slice(0, 160) }, ...(o.lbn || [])].slice(0, 40);
+  o.sd = true; dirty = true; if (o.ws) markMe(o);
+}
+// the people who saved this player's number (their friends list on lifebook)
+const friendsOf = a => a.phone ? [...accounts.values()].filter(o => o !== a && (o.contacts || []).some(c => c.p === a.phone)) : [];
 // ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
 let ideas = [], ideaSeq = 1;
 function ideaView(a, sort) {
@@ -1061,15 +1069,17 @@ function ideaOp(a, m) {
     a.idd.n++; a.sd = true; ideas.push({ id: ideaSeq++, l: me, n: a.name, text, t: now(), lk: {}, dl: {}, cm: [], ...(img ? { img } : {}) }); if (ideas.length > 300) ideas.shift();
     { let k = 0; for (let j = ideas.length - 1; j >= 0; j--) if (ideas[j].img && ++k > 40) delete ideas[j].img; }   // only the newest 40 photos are kept (they live in the saved town data)
     toast(a, 'โพสต์ลงฟีดแล้ว 📘', '📘');
+    for (const o of friendsOf(a)) lbNote(o, '📝', `${a.name} โพสต์ใหม่: ${text || '📸 รูปภาพ'}`);
     for (const o of online.values()) if (isAdmin(o) && o !== a) toast(o, `💡 ไอเดียใหม่จาก ${a.name}`, '💡');
   } else if (!i) return ideaView(a, m.sort);
-  else if (m.op === 'like') { if (i.lk[me]) delete i.lk[me]; else { i.lk[me] = 1; if (i.dl) delete i.dl[me]; } }
+  else if (m.op === 'like') { if (i.lk[me]) delete i.lk[me]; else { i.lk[me] = 1; if (i.dl) delete i.dl[me]; if (i.l !== me) lbNote(accounts.get(i.l), '👍', `${a.name} ถูกใจโพสต์ของคุณ: ${i.text.slice(0, 40)}`); } }
   else if (m.op === 'unlike') { i.dl ||= {}; if (i.dl[me]) delete i.dl[me]; else { i.dl[me] = 1; delete i.lk[me]; } }
   else if (m.op === 'cm') {
     const text = cleanText(m.text, 150); if (text.length < 1) return;
     if (!cd(a, 'ideacm', 5000)) return;
     i.cm.push({ n: a.name, text, t: now(), a: isAdmin(a) ? 1 : 0 }); if (i.cm.length > 60) i.cm.shift();
     const o = accounts.get(i.l); if (o?.ws && o !== a) toast(o, `💬 ${a.name} คอมเมนต์ไอเดียของคุณ`, '💡');
+    if (o && o !== a) lbNote(o, '💬', `${a.name} คอมเมนต์โพสต์ของคุณ: ${text}`);
   } else if (m.op === 'del') { if (i.l !== me && !isAdmin(a)) return; ideas = ideas.filter(x => x !== i); }
   gdirty(); ideaView(a, m.sort);
 }
@@ -1356,7 +1366,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -1620,7 +1630,7 @@ function placeMarketOrder(a, m) {
   if (!pay(a, cost + fee + tip)) return;
   let left = n; const soldBy = new Map();
   for (const [L, o] of offers) { while (left > 0 && L.qty > 0) { L.qty--; left--; credit(o, Math.floor(L.price * 0.92)); soldBy.set(o, (soldBy.get(o) || 0) + 1); } if (L.qty <= 0) o.listings = o.listings.filter(x => x !== L); if (!left) break; }
-  for (const [o, k] of soldBy) { stat(o, 'psold', k); if (o.ws) { quest(o, 'sell', k); toast(o, `${a.name} สั่ง ${it.icon}${it.name} ของคุณ ${k} ชิ้น (ไรเดอร์กำลังมารับ)`, '💰'); } }
+  for (const [o, k] of soldBy) { lbNote(o, '💰', `${a.name} สั่ง ${it.icon}${it.name} ของคุณ ${k} ชิ้น`); stat(o, 'psold', k); if (o.ws) { quest(o, 'sell', k); toast(o, `${a.name} สั่ง ${it.icon}${it.name} ของคุณ ${k} ชิ้น (ไรเดอร์กำลังมารับ)`, '💰'); } }
   const o = { id: nextOrder++, cust: a, custName: a.name, item: id, qty: n, price: cost, fee, tip, state: 'open', t: now(), rider: null, src: 'market' };
   orders.set(o.id, o); markMe(a); wdAt = 0;
   const rs = ridersOnline();
@@ -2204,7 +2214,7 @@ function act(a, m) {
         if (L.qty <= 0) o.listings = o.listings.filter(x => x !== L);
         if (want <= 0 || a.money < L.price) break;
       }
-      for (const [o, n] of soldBy) { stat(o, 'psold', n); if (o.ws) { quest(o, 'sell', n); toast(o, `${a.name} ซื้อ ${it.icon}${it.name} ของคุณ ${n} ชิ้น`, '💰'); } }
+      for (const [o, n] of soldBy) { lbNote(o, '💰', `${a.name} ซื้อ ${it.icon}${it.name} ของคุณ ${n} ชิ้น`); stat(o, 'psold', n); if (o.ws) { quest(o, 'sell', n); toast(o, `${a.name} ซื้อ ${it.icon}${it.name} ของคุณ ${n} ชิ้น`, '💰'); } }
       if (!bought) return toast(a, 'เงินไม่พอ', '💸', false);
       addItem(a, id, bought); markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${it.icon}${it.name} x${bought} จากผู้เล่น รวม ${money(spent)}`, '🛍️');
@@ -2994,7 +3004,7 @@ function answerPhone(a, f, ok) {
   }
   delete f.phoneAsk[a.login];
   const add = (x, y) => { if (!(x.contacts || []).some(c => c.p === y.phone) && (x.contacts || []).length < 30) x.contacts = [...(x.contacts || []), { p: y.phone, n: y.name }]; markMe(x); };
-  add(f, a); add(a, f);
+  add(f, a); add(a, f); lbNote(f, '📇', `แลกเบอร์กับ ${a.name} แล้ว · เป็นเพื่อนกันบน lifebook`); lbNote(a, '📇', `แลกเบอร์กับ ${f.name} แล้ว · เป็นเพื่อนกันบน lifebook`);
   toast(f, `${a.name} ให้เบอร์แล้ว 📇 ${a.phone} (บันทึกในรายชื่อให้แล้ว)`, '📱'); toast(a, `แลกเบอร์กับ ${f.name} แล้ว (บันทึกในรายชื่อให้แล้ว)`, '📱');
 }
 
@@ -3007,7 +3017,7 @@ function phoneAct(a, m) {
     if (o === a) return toast(a, 'นี่เบอร์ของคุณเอง', '📱', false);
     if ((a.contacts || []).some(c => c.p === num)) return toast(a, `มี ${o.name} ในรายชื่อแล้ว`, '📇', false);
     if ((a.contacts || []).length >= 30) return toast(a, 'รายชื่อเต็มแล้ว (30)', '📇', false);
-    a.contacts = [...(a.contacts || []), { p: num, n: o.name }]; markMe(a);
+    a.contacts = [...(a.contacts || []), { p: num, n: o.name }]; markMe(a); lbNote(o, '📇', `${a.name} บันทึกเบอร์ของคุณแล้ว`);
     return toast(a, `บันทึกเบอร์ ${o.name} แล้ว`, '📇');
   }
   if (m.t === 'contact_pin') { const c = (a.contacts || []).find(c => c.p === String(m.phone)); if (c) { c.fav = !c.fav; markMe(a); } return; }
@@ -3532,6 +3542,7 @@ function giveCatch(a, id) {
   stat(a, 'fishdex', Object.keys(a.fishdex).filter(k => D.ITEMS[k]?.rar).length, true);
   if (it.legend) { eggOf(a).ld = dayKey(); stat(a, 'legendfish'); feed(`🎉 ${a.name} พบปลาในตำนาน! ${it.icon} ${it.name}`); send(a, { t: 'egg', k: 'legend' }); }
   else if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
+  if (rar >= 4 || it.legend) for (const o of friendsOf(a)) lbNote(o, '🎣', `${a.name} เพื่อนของคุณตกได้ ${it.icon}${it.name} [${rn}]!`);
 
   send(a, { t: 'catch', item: id, first });
   return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
@@ -3997,7 +4008,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4542,6 +4553,7 @@ function onMessage0(ws, raw) {
     }
     case 'god': return godAct(a, m);
     case 'fishcol': return fishCol(a, m);
+    case 'lbnseen': a.lbnSeen = now(); a.sd = true; markMe(a); return;
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
       if (!a.run0 || a.career !== 'beggar' && !allJobs(a)) return;
       const sec = (now() - a.run0) / 1000; a.run0 = 0; a.runNext = now() + 15000;
