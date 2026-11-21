@@ -4961,7 +4961,7 @@ function frameRows() {
   const own = me.frames || [], cur = me.frame ?? -1, pic = myPic || facePng();
   const card = f => { const has = own.includes(f.id), on = cur === f.id;
     const btn = f.locked && !has ? (me.admin ? B(on ? 'ใส่อยู่ ✓' : '👑 ลองใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? 'primary' : '') : '<small>🔒 เร็วๆ นี้</small>')
-      : has ? B(on ? 'ถอด' : 'ใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? '' : 'good') : B(money(f.price), { t: 'frame', op: 'buy', id: f.id }, 'good', me.money < f.price);
+      : has ? B(on ? 'ถอด' : 'ใส่', { t: 'frame', op: 'wear', id: on ? -1 : f.id }, on ? '' : 'good') : f.gem ? B(`💎${f.gem}`, { t: 'frame', op: 'buy', id: f.id }, 'primary', (me.gems || 0) < f.gem && !me.gemInf) : B(money(f.price), { t: 'frame', op: 'buy', id: f.id }, 'good', me.money < f.price);
     return `<div class="frmCard ${on ? 'on' : ''} ${f.locked && !has ? 'lock' : ''}"><div class="fprev"><img src="${pic}" alt="">${frameHtml(f.id, 64, false)}</div><b>${esc(f.name)}</b>${btn}</div>`; };
   const sec = (t, list) => `<div class="secT">${t}</div><div class="frmGrid">${list.map(card).join('')}</div>`;
   return sec('💍 กรอบโลหะและอัญมณี', G.frameDefs.slice(0, 12)) + sec('🌸 กรอบน่ารัก', G.frameDefs.slice(12, 24)) + sec('✨ กรอบพิเศษ (เรืองแสง · สายรุ้งกับนีออนวางขายแล้ว)', G.frameDefs.slice(24));

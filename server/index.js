@@ -4702,7 +4702,8 @@ function onMessage0(ws, raw) {
       if (m.op === 'buy') {
         if (!f) return; if (f.locked) return toast(a, 'กรอบพิเศษยังล็อกอยู่ เร็วๆ นี้!', '🔒', false);
         a.frames = a.frames || []; if (a.frames.includes(f.id)) return;
-        if (!pay(a, f.price)) return;
+        if (f.gem) { if (!godInf(a) && (a.gems || 0) < f.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${f.gem} (มี 💎${a.gems || 0})`, '💎', false); if (!godInf(a)) a.gems -= f.gem; }
+        else if (!pay(a, f.price)) return;
         a.frames.push(f.id); a.frame = f.id; joy(a, 4); markMe(a); return toast(a, `ได้${f.name}แล้ว! ใส่ให้แล้ว`, '🖼️');
       }
       return;

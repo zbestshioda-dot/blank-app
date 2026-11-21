@@ -1228,6 +1228,8 @@ const FRAMES = [
   ['มงกุฎราชา', 0, 1], ['ปีกเทวดา', 0, 1], ['ปีศาจ', 0, 1], ['เปลวเพลิง', 0, 1], ['คริสตัลน้ำแข็ง', 0, 1], ['สายฟ้า', 0, 1],
   ['กาแล็กซี', 0, 1], ['สายรุ้ง', 12000, 1, 1], ['นีออน', 12000, 1, 1], ['ลายไทย', 0, 1], ['ดอกบัว', 0, 1], ['สายน้ำ', 0, 1],
 ].map(([name, price, special, open], id) => ({ id, name, price, special: !!special, locked: !!special && !open }));   // 4th flag: a special frame that is on sale
+// 💎 four of the plainer special frames are sold for gems (the rest stay locked)
+for (const f of FRAMES) if (['สายฟ้า', 'ดอกบัว', 'สายน้ำ', 'ลายไทย'].includes(f.name)) { f.locked = false; f.gem = 50; }
 // pets: bought in the pet panel (the pet shops are closed for renovation), one follows you around. rar 1-5 like fish
 const PETS = {
   chick:    { name: 'ลูกเจี๊ยบ', icon: '🐤', price: 500, rar: 1, desc: 'ตัวจิ๋วเจี๊ยบๆ กระโดดตุ๊บๆ' },
