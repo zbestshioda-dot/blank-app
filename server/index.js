@@ -73,6 +73,7 @@ const cleanText = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, 
 const hourNow = () => D.hourAt(now());
 const hhmm = h => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 const areaId = a => D.areaAt(a.x, a.y)?.id;
+const zoneId = a => D.zoneAt(a.x, a.y)?.id;   // 'park' / 'field' inside the town, else the same as areaId
 
 function send(a, obj) { if (a.ws && a.ws.readyState === 1) a.ws.send(JSON.stringify(obj)); }
 function broadcast(obj) { const s = JSON.stringify(obj); for (const a of online.values()) if (a.ws.readyState === 1) a.ws.send(s); }
@@ -733,7 +734,7 @@ function znStart(t, test) {
   znSendAll();
 }
 // zombie night is fought in town: the park, the housing estate (and its yards) and the temple are closed
-const ZN_NOGO = id => id === 'park' || id === 'field' || id === 'housing' || id === 'temple' || /^yard\d+$/.test(id);
+const ZN_NOGO = id => id === 'housing' || id === 'temple' || /^yard\d+$/.test(id);
 const ZN_BACK = { field: 'town_from_field', park: 'town_from_park', housing: 'town_from_housing', temple: 'town_from_temple' };
 function znEvict(a) {
   const id = areaId(a); if (!ZN_NOGO(id)) return;
@@ -4040,7 +4041,7 @@ function login(ws, m, pre) {
   dirty = true;
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
-    t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
+    t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
@@ -4692,15 +4693,16 @@ const FB = { x: 0, y: 0, vx: 0, vy: 0, sc: [0, 0], last: null, lastName: '', res
 const FBP = D.FOOTBALL.pitch, FB_R = .22, FB_GOAL = D.FOOTBALL.goalH / 2;
 function fbCentre() { FB.x = FBP.x + FBP.w / 2; FB.y = FBP.y + FBP.h / 2; FB.vx = FB.vy = 0; FB.moved = true; }
 fbCentre();
-const fbPlayers = () => [...online.values()].filter(o => !o.down && areaId(o) === 'field');
+const fbPlayers = () => [...online.values()].filter(o => !o.down && zoneId(o) === 'field');
+const fbNear = o => areaId(o) === 'town' && Math.abs(o.x - (FBP.x + FBP.w / 2)) < 30 && Math.abs(o.y - (FBP.y + FBP.h / 2)) < 22;   // close enough to see the pitch
 function fbSend(extra) {
   const m = JSON.stringify({ t: 'ball', x: +FB.x.toFixed(2), y: +FB.y.toFixed(2), vx: +FB.vx.toFixed(2), vy: +FB.vy.toFixed(2), sc: FB.sc, ...extra });
-  for (const o of online.values()) if (o.ws.readyState === 1 && areaId(o) === 'field') o.ws.send(m);
+  for (const o of online.values()) if (o.ws.readyState === 1 && fbNear(o)) o.ws.send(m);
 }
 function fbTick(t, dt) {
   const ps = fbPlayers();
   for (const a of online.values()) { a._fbx = a._fbx ?? a.x; a._fby = a._fby ?? a.y; }
-  if (!ps.length) { for (const a of online.values()) { a._fbx = a.x; a._fby = a.y; } if (t > FB.quietAt && (FB.sc[0] || FB.sc[1] || FB.x !== FBP.x + FBP.w / 2)) { FB.sc = [0, 0]; fbCentre(); } return; }
+  if (!ps.length) { for (const a of online.values()) { a._fbx = a.x; a._fby = a.y; } if (t > FB.quietAt && (FB.sc[0] || FB.sc[1] || FB.x !== FBP.x + FBP.w / 2)) { FB.sc = [0, 0]; fbCentre(); } if (t > FB.sentAt + 2000) { FB.sentAt = t; fbSend(); } return; }   // people walking past still see the ball
   FB.quietAt = t + 5 * 60e3;   // nobody on the ground for 5 minutes: the score is wiped and the ball goes back to the spot
   if (FB.resetAt) { if (t > FB.resetAt) { FB.resetAt = 0; fbCentre(); fbSend(); } }
   else {
@@ -4738,13 +4740,13 @@ function fbEdges() {
 function fbGoal(side) {
   FB.sc[side]++; FB.vx = FB.vy = 0; FB.resetAt = now() + 2500;
   const a = FB.last && online.get(FB.last), who = a ? a.name : 'ใครสักคน';
-  if (a && areaId(a) === 'field') { joy(a, 4); stat(a, 'goals'); markMe(a); }
+  if (a && zoneId(a) === 'field') { joy(a, 4); stat(a, 'goals'); markMe(a); }
   fbSend({ goal: side, by: who });
   for (const o of fbPlayers()) toast(o, `⚽ โกล! ${who} ยิงเข้า · ${FB.sc[0]} - ${FB.sc[1]}`, '🥅', false);
   FB.last = null;
 }
 function fbKick(a, m) {
-  if (areaId(a) !== 'field' || a.down || FB.resetAt || !cd(a, 'kick', 350, true)) return;
+  if (zoneId(a) !== 'field' || a.down || FB.resetAt || !cd(a, 'kick', 350, true)) return;
   const d = Math.hypot(FB.x - a.x, FB.y - (a.y - .1)); if (d > 1.3) return;
   let dx = +m.dx || 0, dy = +m.dy || 0, l = Math.hypot(dx, dy);
   if (!l || !isFinite(l)) { dx = FB.x - a.x; dy = FB.y - (a.y - .1); l = Math.hypot(dx, dy) || 1; }
@@ -4811,7 +4813,7 @@ function tick() {
     const restMul = a.pose === 'bed' ? 2 : sitting && a.sitFor >= 10 && a.energy < 50 ? 0.56 : 0.27;
     if (a.pose === 'fun' && a.fun) {          // on a park ride: energy, health and happiness come back every second
       const R = D.RIDES[a.fun.k];
-      if (!R || D.areaAt(a.x, a.y)?.id !== 'park') standUp(a);
+      if (!R || zoneId(a) !== 'park') standUp(a);
       else if (t > a.fun.until) { rideOff(a); markMe(a); toast(a, `หมดเวลา${R.name}แล้ว กดเล่นใหม่ได้เลย (ฟรี) เพื่อเล่นต่อได้เลย`, R.icon); }
       else { a.energy = Math.min(100, a.energy + R.gain.energy * dt); if (!a.down) a.health = Math.min(100, a.health + R.gain.health * dt); a.happy = Math.min(100, (a.happy ?? 80) + R.gain.happy * dt); }
     }

@@ -126,7 +126,7 @@ const lookColor = (cat, id) => typeof id === 'string' && id[0] === '#' ? id : G?
 // one tinted frame, cached per (frame, colours)
 function charFrame(frame, lk) {
   const key = `${frame}|${lk.shirt}|${lk.pants}|${lk.hair}`; let c = chGet(key); if (c) return c;
-  const { w, h } = CH_ATLAS, S = chSrc(frame) || chSrc(frame.split(':').pop()); if (!S) return null;
+  const { w, h } = CH_ATLAS, real = chSrc(frame), S = real || chSrc(frame.split(':').pop()); if (!S) return null;
   const sy = S.y, src = S.img, bx = 0;
   c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   g.drawImage(src, bx, sy, w, h, 0, 0, w, h);
@@ -138,7 +138,7 @@ function charFrame(frame, lk) {
     t.globalCompositeOperation = 'destination-in'; t.drawImage(src, bx + col * w, sy, w, h, 0, 0, w, h);
     g.drawImage(tmp, 0, 0);
   });
-  if (S === chSrc(frame)) chPut(key, c);   // (a stand-in while the outfit sheet loads is not kept)
+  if (real) chPut(key, c);   // (a stand-in while the outfit sheet loads is not kept; chSrc makes a new object each call, so compare by 'was it found')
   return c;
 }
 // one recoloured layer (hair) of a frame on its own canvas
@@ -1099,7 +1099,8 @@ setInterval(() => { if (G && me && !afkSent && performance.now() - lastInput > 1
 
 // ------------------------------------------------------------------ areas & collision
 let AREA = {};
-const areaOf = (x, y) => G?.areas.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
+const areaOf = (x, y) => G?.areas.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;   // the town comes first: its park / football zones read as 'town'
+const zoneOf = (x, y) => G?.areas.find(r => r.in && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)?.id || areaOf(x, y)?.id;
 const roomOf = (x, y) => { const a = areaOf(x, y); return a && a.kind === 'room' ? a : null; };
 const mapOf = id => { const a = AREA[id]; return a ? (a.kind === 'room' ? a.area : a.id) : 'town'; };
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.map.w || y >= G.map.h) ? ' ' : G.map.tiles[y][x];
@@ -1297,7 +1298,7 @@ function talk() {
 
 // ------------------------------------------------------------------ ⚽ the football ground: the pitch picture, goals, stands and the shared
 // ball. The server moves the ball (10 Hz); here it glides between updates (same friction) and rolls as it goes.
-let FBJ = null, FBIMG = null, PITCHIMG = null, fbAsked = false, FBALL = null, fbAim = null;
+let FBJ = null, FBIMG = null, PITCHIMG = null, fbAsked = false, FBALL = null, fbAim = null, lastZone = null;
 function fbLoad() {
   if (fbAsked) return; fbAsked = true;
   fetch('assets/football.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { FBJ = j; FBIMG = im; }; im.src = 'assets/football.webp?v=1'; }).catch(() => { fbAsked = false; });
@@ -1331,6 +1332,7 @@ function fbKick() {
   send({ t: 'kick', dx: +dx.toFixed(3), dy: +dy.toFixed(3), p: 1 });
   FX.play('whoosh');
 }
+function pitchOnScreen(r, X, Y) { return (r.x + r.w + 2) * TS + X > 0 && (r.x - 2) * TS + X < VW && (r.y + r.h + 2) * TS + Y > 0 && (r.y - 2) * TS + Y < VH; }
 function drawPitch(X, Y) {
   fbLoad(); const P0 = G.football.pitch;
   if (!PITCHIMG) { ctx.fillStyle = 'rgba(120,170,110,.5)'; ctx.fillRect(P0.x * TS + X, P0.y * TS + Y, P0.w * TS, P0.h * TS); return; }
@@ -1397,7 +1399,7 @@ function findNear() {
   }
   // ☂️ the umbrella man (only around while it rains): a yellow ring and the action button talk to him
   for (const p of P.values()) if (p.umb && p.npc) { const d = Math.hypot(p.x - m.x, p.y - m.y); if (d <= 1.8 && d < bd) { bd = d; best = { id: 'umbman', type: 'umb', npc: p, label: 'คุยกับลุงชัย (ซื้อร่ม)', icon: '☂️', x: p.x, y: p.y, r: 1.8, area: here }; } }
-  if (here === 'field' && FBALL) { const d = Math.hypot(FBALL.rx - m.x, FBALL.ry - (m.y - .1)); if (d <= 1.25 && d < bd + .6) { bd = d; best = { id: 'fbball', type: 'ball', icon: '⚽', label: '⚽ เตะ!' }; } }   // ⚽ near the ball: the action button kicks it
+  if (here === 'town' && FBALL && zoneOf(m.x, m.y) === 'field') { const d = Math.hypot(FBALL.rx - m.x, FBALL.ry - (m.y - .1)); if (d <= 1.25 && d < bd + .6) { bd = d; best = { id: 'fbball', type: 'ball', icon: '⚽', label: '⚽ เตะ!' }; } }   // ⚽ near the ball: the action button kicks it
   // vegetable fields laid out in a home yard
   const ya = AREA[here];
   if (ya?.yard) { const h = wd?.houses?.[ya.house]; if (h) for (const k of h[2]) {
@@ -1540,7 +1542,7 @@ function frame(t) {
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
     if (autoPath) autoPath.stuck = Math.hypot(m.x - ox0, m.y - oy0) < .004 ? autoPath.stuck + dt : 0;
-    if (dx || dy) fbAim = [dx, dy, performance.now()];
+    if (dx || dy) { fbAim = [dx, dy, performance.now()]; const z = zoneOf(m.x, m.y); if (z !== lastZone) { if (z === 'park' && lastZone) adFull('enter_park'); lastZone = z; } }   // walking into the amusement park counts as entering it (ads are rate-limited inside adFull)
     // watchdog: trying to walk but not moving for a while (and not against a wall) -> clear whatever holds us and ask the server to resync
     { const tryMove = (dx || dy) && !me.down, moved = Math.hypot(m.x - ox0, m.y - oy0) > .002, wall = tryMove && blockedAt(m.x + Math.sign(dx) * .35, m.y + Math.sign(dy) * .35);
       stuckT = tryMove && !moved && !wall ? stuckT + dt : 0;
@@ -1626,7 +1628,7 @@ function draw(t) {
     if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
   }
   if (myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
-  if (A?.id === 'field') drawPitch(X, Y);
+  if (A?.id === 'town' && pitchOnScreen(G.football.pitch, X, Y)) drawPitch(X, Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
   for (const s of G.stations) {
@@ -1645,16 +1647,17 @@ function draw(t) {
   for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
-  if (A?.id === 'park') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
-  if (A?.id === 'park' || A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
-  if (A?.id === 'field') fbEnts(ents, vis);
-  if (A?.id === 'park' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
+  if (A?.id === 'town') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
+  if (A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
+  if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
+  if (A?.id === 'town' && vis(G.football.pitch.x + 9, G.football.pitch.y + 5, 22)) fbEnts(ents, vis);
+  if (A?.id === 'town' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
   if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
     ents.push([-1e8, 14, { fx: 'koi' }], [-1e8, 14, { fx: 'lotus' }], [A.y + 12.75, 14, { fx: 'incense', x: A.x + 22, y: A.y + 12.7 }], [A.y + 14, 14, { fx: 'leaves' }]); }
   { const s = A?.id === 'town' && STN('gate_temple'), F = s?.facade;   // the temple complex: one strip per tile column, each sorted by the ground's front edge there
     if (F && vis(F.cx, F.bv - 6, 16)) { loadWat(); if (WIMG) { const n = Math.ceil(F.w); for (let i = 0; i < n; i++) { const xm = F.x0 + i + .5, d = Math.min(1, Math.abs(xm - F.cx) / F.hw); ents.push([F.bv - F.lv * d + .05, 13, { s, i }]); } } else ents.push([s.y + 2.2, 13, { s }]); } }
-  for (const g of ['gate_park', 'gate_town_p']) { const s = A && STN(g); if (s && s.area === A.id && vis(s.x, s.y, 6)) ents.push([s.y + .7, 10, s]); }
+  { const g = G.parkArch; if (A?.id === 'town' && g && vis(g.x, g.y, 8)) ents.push([g.y, 10, { x: g.x, y: g.y - .7, id: 'gate_park' }]); }   // the amusement park's arch over the walk from the avenue
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) {
     if (p.ps && P.get(p.ps)?.veh) continue;   // passengers are drawn with the bike / inside the car they ride in
     const rs = p.pose === 'fun' && p.fn ? STN('ride_' + String(p.fn).split(':')[0]) : null;   // riders are drawn with their ride (in front of it; behind the shooting counter)
@@ -3006,14 +3009,14 @@ function crowdMake(A) {
     L.push({ id: 'crowd' + A.id + i, crowd: 1, npc: 1, staff: 1, c: '', of: '', g: r() < .5 ? 'f' : 'm', lk, name: '', dz: [], x: pts[j][0], y: pts[j][1], rx: pts[j][0], ry: pts[j][1], f: 6, path: pts, i: (j + 1) % pts.length, wait: r() * 3, sp: .8 + r() * .5, ...o });
   };
   if (A.id === 'park') {
-    const P0 = (c, y) => [X + c, y];   // park walks: columns from the park's left edge, rows as map rows
+    const P0 = (c, y) => [X + c, Y + y - 52];   // park walks: columns from the park's left edge, rows as map rows of the park's first home (top at row 52)
     const R = [   // the compact park: promenade (row ~63.5), two walks (cols 16 / 28) and the shopping street (row ~75)
       [P0(3, 63.5), P0(38, 63.5), P0(16, 63.5), P0(16, 75), P0(36, 75), P0(28, 75), P0(28, 63.5)],
       [P0(6, 62.8), P0(7, 62.8), P0(7, 61), P0(7, 62.8), P0(18, 62.8), P0(18, 61.8), P0(18, 62.8), P0(32, 62.8), P0(32, 61), P0(32, 62.8)],
       [P0(16, 64.2), P0(22, 64.2), P0(22, 65.6), P0(22, 64.2), P0(33, 64.2), P0(33, 65.6), P0(33, 64.2), P0(28, 64.2), P0(28, 75.2), P0(5, 75.2), P0(5, 75.6), P0(16, 75.2), P0(16, 64.2)],
       [P0(2, 63.2), P0(9, 63.2), P0(9, 65.6), P0(9, 63.2), P0(38, 63.2), P0(2, 63.2)]];
     for (let i = 0; i < 14; i++) { const kid = i % 3 === 1; person(i, R[i % R.length], kid ? { small: .72, balloon: pk(BALLOON) } : r() < .2 ? { balloon: pk(BALLOON) } : {}); }
-    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 12.5, y: 64.7, rx: X + 12.5, ry: 64.7, f: 6, path: null, seller: 1 });
+    L.push({ id: 'crowd_seller', crowd: 1, npc: 1, staff: 1, c: '', of: '', g: 'm', lk: { hair: 'black', shirt: 'red', pants: 'black' }, name: '', dz: [], x: X + 12.5, y: Y + 12.7, rx: X + 12.5, ry: Y + 12.7, f: 6, path: null, seller: 1 });
   } else if (A.id === 'town') {
     // pavements run beside every main road: people stroll along them and stop to look around
     const seg = (x0, x1, y) => [[x0, y], [x1, y]], walks = [
@@ -3051,7 +3054,7 @@ function crowdEnts(A, ents, vis) {
     ents.push([m.ry + .3, 4, m]);
     if (m.balloon || m.seller) ents.push([m.ry + .31, 14, { fx: 'balloon', m }]);
   }
-  if (A.id === 'park') ents.push([62.1, 14, { fx: 'bunting', y: 62.1 }], [65, 14, { fx: 'bunting', y: 65 }], [74.1, 14, { fx: 'bunting', y: 74.1 }], [1e5, 14, { fx: 'bubbles', x: A.x + 7, y: 60.6 }]);
+  if (A.id === 'park') { const Y0 = A.y - 52; ents.push([Y0 + 62.1, 14, { fx: 'bunting', y: Y0 + 62.1 }], [Y0 + 65, 14, { fx: 'bunting', y: Y0 + 65 }], [Y0 + 74.1, 14, { fx: 'bunting', y: Y0 + 74.1 }], [1e5, 14, { fx: 'bubbles', x: A.x + 7, y: Y0 + 60.6 }]); }
   if (A.id === 'town') {   // town critters: pigeons in the square, cats and dogs on the pavements
     for (const c of TWNC) {
       if (c.wait > 0) c.wait -= dt; else { const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy); if (d < .1) { c.wait = 2 + Math.random() * 6; c.tx = c.x + (Math.random() - .5) * 8; c.ty = c.home; c.tx = clamp(c.tx, 8, 90); } else { const st = Math.min(d, (c.e === '🐈' ? .9 : 1.3) * dt); c.x += dx / d * st; c.y += dy / d * st; c.dir = dx < 0 ? -1 : 1; } }
@@ -4082,7 +4085,7 @@ const GUIDE_TOPICS = [
   ['🎡 ที่เที่ยว / เดินทาง', ['สวนสนุกอยู่สุดถนนเส้นหลักด้านใต้ หมู่บ้านจัดสรรอยู่สุดถนนด้านเหนือ', 'ขี้เกียจเดิน? โทรเรียกแท็กซี่ 888-888 หรือกดแอพแท็กซี่ในมือถือ ไปส่งถึงหน้าประตู', 'มีเงินแล้วซื้อมอไซค์หรือรถที่โชว์รูมรถ ให้เพื่อนซ้อนท้ายได้ด้วยนะ']],
   ['📱 มือถือทำอะไรได้', ['มือถือมีทุกอย่าง: โทรหาเพื่อน แชท สั่งอาหาร ซื้อหุ้น จ่ายบิล ดูเควส', 'ขอเบอร์เพื่อนได้โดยแตะที่ตัวเพื่อนแล้วกด "ขอเบอร์"', 'เควสประจำวันทำครบได้รางวัลด้วยนะ ดูได้มุมซ้ายบน']],
 ];
-const GUIDE_GO = [['🎣 น้าเล็ก (ซื้อเบ็ด)', 'staff_fishing'], ['🎓 มหาวิทยาลัย', 'door_school'], ['🍜 ร้านอาหาร', 'door_restaurant'], ['🏦 ธนาคาร', 'door_bank'], ['🚗 โชว์รูมรถ', 'door_dealer'], ['🎡 สวนสนุก', 'gate_park']];
+const GUIDE_GO = [['🎣 น้าเล็ก (ซื้อเบ็ด)', 'staff_fishing'], ['🎓 มหาวิทยาลัย', 'door_school'], ['🍜 ร้านอาหาร', 'door_restaurant'], ['🏦 ธนาคาร', 'door_bank'], ['🚗 โชว์รูมรถ', 'door_dealer'], ['🎡 สวนสนุก', 'ride_carousel'], ['⚽ สนามฟุตบอล', 'seat_fb8_0']];
 function guideTalk(n) {
   const base = { name: n.name, npc: n.id };
   const menu = (lines) => dialog({ ...base, lines, choices: [
@@ -4621,6 +4624,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23g', d: '23 พ.ย.', items: [
+    '🏙️ เมืองขยายลงทางใต้! ถนนเส้นใหม่มีทางเท้า เสาไฟ ป้ายรถเมล์ ต่อจากถนนใหญ่ทางใต้ของเมือง',
+    '🎡 สวนสนุกกับ ⚽ สนามฟุตบอลย้ายมาอยู่ในเมืองหลักแล้ว เดินลอดซุ้มประตูเข้าไปได้เลย ไม่ต้องวาร์ป ยืนดูคนเตะบอลจากริมถนนก็ได้',
+    '🚀 เกมลื่นขึ้นมาก โดยเฉพาะที่ที่คนเยอะ (ตัวละครไม่ต้องวาดใหม่ทุกเฟรมแล้ว)',
+  ] },
   { v: '2026-11-23f', d: '23 พ.ย.', items: [
     '🏟️ อัฒจันทร์สนามบอลขึ้นไปนั่งได้แล้ว (10 ที่นั่ง) เดินเข้าใกล้เก้าอี้แล้วกดนั่ง',
     '⚽ สนามฟุตบอลเล็กลงครึ่งหนึ่ง เล่นกันสนุกขึ้น ไม่ต้องวิ่งไกล',

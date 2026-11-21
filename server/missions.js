@@ -17,7 +17,7 @@ const PLACES = {
   hospital: 'door_hospital', bank: 'door_bank', school: 'door_school', office: 'door_office', police: 'door_police', market: 'market',
   warehouse: 'door_warehouse', restaurant: 'door_restaurant', kitchen: 'door_kitchen', rider: 'door_rider', fashion: 'door_fashion',
   cstore: 'door_cstore', cstore2: 'door_cstore2', cstore3: 'door_cstore3', furnshop: 'door_furnshop', barber: 'door_barber',
-  toolshop: 'door_toolshop', dealer: 'door_dealer', pet: 'door_pet1', pet2: 'door_pet2', square: 'square', fishclub: 'fishclub', housing: 'gate_housing', temple: 'gate_temple', flower: 'door_flower', park: 'gate_park', farm: 'gate_farm',
+  toolshop: 'door_toolshop', dealer: 'door_dealer', pet: 'door_pet1', pet2: 'door_pet2', square: 'square', fishclub: 'fishclub', housing: 'gate_housing', temple: 'gate_temple', flower: 'door_flower', park: 'ride_ferris', farm: 'gate_farm',
 };
 const PAY = { templeboy: .8, undertaker: 1.05, mechanic: 1.05, thug: .95, photographer: 1, courier: 1, office: 1.1, farmer: .95, merchant: 1, chef: 1, doctor: 1.3, police: 1.05, beggar: .65, rider: 1 };
 
@@ -223,7 +223,7 @@ const M = {
       ['go', 'fishclub', 'ที่ 2: ทะเลสาบ'], ['work', 'fishclub', 5, '📸', 'ถ่ายวิวทะเลสาบ'],
       ['go', 'temple', 'ที่ 3: ประตูวัด'], ['work', 'temple', 5, '📸', 'ถ่ายซุ้มประตูวัด'],
       ['go', 'market', 'ที่ 4: ตลาดกลาง'], ['work', 'market', 5, '📸', 'ถ่ายบรรยากาศตลาด'],
-      ['go', 'park', 'ที่ 5: ทางเข้าสวนสนุก'], ['work', 'park', 5, '📸', 'ถ่ายชิงช้าสวรรค์']]],
+      ['go', 'park', 'ที่ 5: ชิงช้าสวรรค์ในสวนสนุก'], ['work', 'park', 5, '📸', 'ถ่ายชิงช้าสวรรค์']]],
     ['ถ่ายรูปงานแต่ง', '💒', 'คู่บ่าวสาวจ้างถ่ายพรีเวดดิ้งในเมือง', [['deliver', 'square', 'f:คุณแพรว (เจ้าสาว)', 'ไปเจอคู่บ่าวสาว'], ['escort', 'square', 'flower', 'f:คุณแพรว (เจ้าสาว)', 'พาไปถ่ายหน้าร้านดอกไม้'], ['work', 'flower', 10, '📸', 'ถ่ายภาพคู่']]],
     ['ล่าภาพสัตว์หายาก', '🦆', 'มีคนเห็นเป็ดสีทองแถวเมือง ต้องถ่ายให้ได้', [['chase', 'far', 'duck', 'ตามเข้าไปใกล้ๆ เป็ด'], ['work', 'here', 4, '📸', 'กดชัตเตอร์!']]],
     ['กล้องหาย!', '📷', 'เลนส์ตัวโปรดหล่นหายระหว่างทาง', [['find', 'far', '🔭', 'หาเลนส์กล้อง']]],

@@ -10,12 +10,12 @@ const SPR = name => { const s = ATLAS.sprites[name]; return { w: s[2] / ATLAS.ti
 const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, y: 0, w: 110, h: 90 };
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
-const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 40, h: 28 };   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
-const FIELD = { id: 'field', kind: 'map', name: 'สนามฟุตบอล', x: 112, y: 0, w: 30, h: 23 };   // ⚽ the public football ground, where the old farm used to be
+const PARK = { id: 'park', kind: 'zone', in: 'town', name: 'สวนสนุก', x: 4, y: 95, w: 40, h: 28 };   // a zone of the town now (its south district), walked into from the street   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
+const FIELD = { id: 'field', kind: 'zone', in: 'town', name: 'สนามฟุตบอล', x: 52, y: 96, w: 30, h: 23 };   // ⚽ the public football ground, where the old farm used to be
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
-const W = YX0 + 4 * 34, H = 90;                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
+const W = YX0 + 4 * 34, H = 125;   // rows 90+ : the town's south district (amusement park + football ground)                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
 
 // ---------------------------------------------------------------- grid helpers
 // tile codes: . grass  = road  , sidewalk  c cobble path  k plaza bricks  w water  p pier/bridge
@@ -661,18 +661,15 @@ const RIDES = {
   shop('foodtruck', 15, 3); shop('icecream', 20, 3, .8); shop('cartstall', 24.5, 2); shop('b_cafe2', 31, 4, .55);
   for (const c of [35.4, 36.6]) prop('x_vending', X + c, Y + 24.6);
   STATIONS.push({ id: 'balloon', type: 'balloon', label: 'ร้านลูกโป่ง', icon: '🎈', x: X + 27.5, y: Y + 23.4, r: 1.5, area: 'park' });   // 🎈 the balloon seller on the shopping street
-  STATIONS.push({ id: 'gate_town_p', type: 'gate', to: 'town_from_park', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.6, y: Y + 11.5, r: 1.6, area: 'park' });
   prop('signpost', X + 4.2, Y + 9.9);
   for (const [x, y] of [[X + 12, Y + 9.4], [X + 24, Y + 9.4], [X + 24, Y + 13.4], [X + 37, Y + 13.4], [X + 6, Y + 21.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_p' + x + '_' + y, type: 'seat', label: 'ม้านั่งในสวนสนุก', icon: '🪑', x, y: y + .2, r: .7, area: 'park' }); }
   for (const [x, y] of [[X + 6, Y + 9.9], [X + 14.5, Y + 9.9], [X + 26, Y + 9.9], [X + 38, Y + 9.9], [X + 14.4, Y + 14.2], [X + 29.6, Y + 14.2], [X + 1.6, Y + 22.3], [X + 38, Y + 22.3]]) prop('o_lampball', x, y);
   for (let y = P.y; y < P.y + P.h - 1; y++) for (let x = P.x; x < P.x + P.w; x++) if (grid[y][x] === 'T') TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]);
   // the way in from town: an arch at the south edge, where the main road leaves town (like the farm and the housing estate)
-  STATIONS.push({ id: 'gate_park', type: 'gate', to: 'park_in', label: 'ไปสวนสนุก', icon: '🎡', x: 54, y: 55.3, r: 1.8, area: 'town' });   // the amusement park's arch now stands just off the south avenue, a short walk from the square
   for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][0] >= 50 && TREES[i][0] <= 58 && TREES[i][1] >= 52 && TREES[i][1] <= 61) { set(TREES[i][0], TREES[i][1], '.'); TREES.splice(i, 1); }   // clear the ground in front of the arch
   for (let i = PROPS.length - 1; i >= 0; i--) if (PROPS[i].s === 'o_topiary' && PROPS[i].x === 56.4 && PROPS[i].y === 54) { set(56, 53, '.'); PROPS.splice(i, 1); }
   rect(51, 55, 6, 2, 'c');                                                            // cobblestone from the avenue to the arch
   rect(49, 76, 2, 14, '='); for (let i = TREES.length - 1; i >= 0; i--) if (TREES[i][1] >= 88 && TREES[i][0] >= 47 && TREES[i][0] <= 52) TREES.splice(i, 1);   // a gap in the tree line for the road
-  GATES.park_in = { x: X + 5, y: Y + 11.5 }; GATES.town_from_park = { x: 54, y: 57.4 };
 }
 // ================================================================= THE TEMPLE: a walled ground of sand and lawns - the ordination
 // hall (โบสถ์) with a stone courtyard, a golden chedi, an open sala by a bodhi tree, a lotus pond, the temple shop and the bell tower.
@@ -786,14 +783,39 @@ const FOOTBALL = { pitch: { x: FIELD.x + 6, y: FIELD.y + 8, w: 18, h: 10 }, goal
   deco('kiosk', X + 26, Y + 21.3, 2, 2); deco('cooler', X + 15, Y + 20.2, 1, 1); deco('trophy', X + 2.4, Y + 10.5, 1, 1);
   deco('cones', X + 3, Y + 15.8);
   for (const [fx, fy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) deco('flag', P.x + fx * P.w + (fx ? .25 : -.25), P.y + fy * P.h + (fy ? .35 : -.05));
-  STATIONS.push({ id: 'gate_town_fb', type: 'gate', to: 'town_from_field', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2, y: Y + 6.2, r: 1.5, area: 'field' });
-  STATIONS.push({ id: 'gate_field', type: 'gate', to: 'field_in', label: 'ไปสนามฟุตบอล', icon: '⚽', x: 3, y: 32, r: 1.6, area: 'town' });   // where the farm road used to leave town
-  GATES.field_in = { x: X + 4, y: Y + 6.2 }; GATES.town_from_field = { x: 5.5, y: 32 };
+}
+// ================================================================= 🏙️ THE SOUTH DISTRICT: the town carries on past its old southern tree line. A new avenue
+// with pavements, street lamps and a bus stop; off it a cobbled walk leads under the amusement park's arch (the park opens on its
+// east side, along its promenade) and on to the football ground's west gate. No more teleport gates: you just walk in.
+const PARK_ARCH = { x: 46, y: 94.6 };
+{
+  const T = TOWN, y0 = 89, xe = 96; T.h = H;
+  const keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
+  const clearTree = (x, y) => { keep(TREES, t => !(t[0] === x && t[1] === y)); };
+  for (let x = 1; x <= xe; x++) if (get(x, y0) === 'T') { clearTree(x, y0); set(x, y0, '.'); }
+  for (let y = y0; y < H; y++) for (let x = 0; x <= xe; x++) if (get(x, y) === ' ') set(x, y, '.');
+  const tree = (x, y) => { if (get(x, y) !== '.') return; set(x, y, 'T'); TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]); };
+  for (let y = y0; y < H; y++) tree(0, y);
+  for (let x = 0; x <= xe; x++) tree(x, H - 1);
+  rect(1, y0, xe, 1, ','); rect(1, 90, xe, 2, '='); rect(1, 92, xe, 1, ',');   // pavement, avenue, pavement
+  rect(49, 76, 2, 14, '=');                                                      // the road down from the old town meets it
+  rect(45, 93, 3, 15, 'c');                                                      // the cobbled walk south
+  for (let y = 105; y <= 107; y++) { clearTree(43, y); set(43, y, 'k'); } rect(44, 105, 1, 3, 'k');   // into the park's promenade (east end)
+  for (let y = 101; y <= 102; y++) { clearTree(52, y); set(52, y, 'c'); } rect(48, 101, 4, 2, 'c');   // to the football ground's west gate
+  for (const x of [6, 14, 22, 30, 38, 56, 64, 72, 80, 90]) { prop('o_lamp', x + .5, 92.95); if (x !== 56) prop('o_lamp', x + 4.5, 89.95); }
+  prop('signpost', 52.6, 89.9, false); prop('busstop', 86, 93.9, false); prop('signpost', 48.6, 94.4, false);
+  for (const x of [8, 18, 28, 38, 60, 70, 78]) prop('bush', x + .5, 94.4, false);
+  for (const [x, y] of [[86, 98], [92, 99], [89, 103], [94, 106], [85, 109], [91, 112], [87, 116], [94, 119], [85, 121], [56, 121], [66, 120], [76, 121], [47, 115], [49, 120], [2, 94]]) tree(x, y);
+  for (const [x, y] of [[84.5, 101.4], [84.5, 105.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_sd' + y, type: 'seat', label: 'ม้านั่งริมสนามบอล', icon: '🪑', x, y: y + .2, r: .7, area: 'town' }); }
+  GATES.park_in = { x: 46, y: 97 }; GATES.town_from_park = { x: 46, y: 93.6 };
+  GATES.field_in = { x: 50, y: 101.6 }; GATES.town_from_field = { x: 46, y: 93.6 };
 }
 const AREAS = [TOWN, HOUSING, PARK, TEMPLE, FIELD, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
-for (const s of STATIONS) if (!s.area) s.area = areaAt(s.x, s.y)?.id;
+const ZONES = [PARK, FIELD];   // parts of a map with their own rules (rides, the ball); areaAt still says 'town' there
+const zoneAt = (x, y) => ZONES.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || areaAt(x, y);
+for (const s of STATIONS) { if (!s.area) s.area = areaAt(s.x, s.y)?.id; const z = AREAS.find(r => r.id === s.area); if (z?.in) { s.zone = s.area; s.area = z.in; } }
 const TILES = grid.map(r => r.join(''));
 const SOLID = 'wBT# og';
 const isSolidTile = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= H || SOLID.includes(grid[ty][tx]);
@@ -1734,7 +1756,7 @@ const TAROT = {   // key order = card order in assets/tarot.webp (see tools/buil
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
-module.exports = { FIELD, FOOTBALL, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
