@@ -240,7 +240,13 @@ function drawRide(p, v, px, py, k, view, dir) {
     if (v.kind !== 'moto') return;
   }
   if (v.kind !== 'moto') return drawVeh(p.veh, view, faceLeft, px, py);          // in a car you only see the car
-  const lift = p.veh === 'escoot' ? TS * .12 : TS * .32;                          // sit on the seat / stand on the deck
+  if (p.veh === 'sleigh' && view !== 'side') {                                   // 🛷 front / back: the sleigh behind, the rider sitting in it, its lower half (panel / sack) over the legs
+    const h = vehH('sleigh', view), w = (vehSpr('sleigh', view)?.[2] || 48) / atlas.tile * TS;
+    drawVeh('sleigh', view, faceLeft, px, py); drawCharTo(ctx, p, px, py - h * .32, k, view, 0, faceLeft);
+    ctx.save(); ctx.beginPath(); ctx.rect(px - w, py - h * .5, w * 2, h * .6); ctx.clip(); drawVeh('sleigh', view, faceLeft, px, py); ctx.restore();
+    return;
+  }
+  const lift = p.veh === 'escoot' ? TS * .12 : p.veh === 'sleigh' ? TS * .55 : TS * .32;   // 🛷 sit up in the sleigh                          // sit on the seat / stand on the deck
   const pil = [...P.values()].find(o => o.ps === p.id), back = faceLeft ? 1 : -1; // someone riding pillion sits behind
   const wl = p.whlT && t < p.whlT ? Math.sin((1 - (p.whlT - t) / 1400) * Math.PI) : 0;   // a wheelie: the front wheel up for a moment
   ctx.save();
@@ -607,7 +613,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0 });
+        Object.assign(s, { mc: p.mc || 0, um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0 });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -2801,7 +2807,7 @@ function drawPlayer(p, X, Y, t) {
   const fk = fo && fo.s.k, fcol = fo && (fo.car || RIDE_COL[(+String(p.fn).split(':')[1] || 0) % RIDE_COL.length]);
   if (fo && (fk === 'ferris' || fk === 'coaster' || fk === 'bumper' || fk === 'carousel')) drawSeatProp(fk, px, py + (fk === 'carousel' ? 0 : TS * .1), fk === 'coaster' ? '#ffd45e' : fcol, fo);
   if (RV) {
-    const top0 = py - (RV.kind !== 'moto' ? vehH(p.veh, view) + TS * (RV.kind === 'heli' ? 1.35 : .15) : H * .97 + TS * (p.veh === 'escoot' ? .12 : .32));
+    const top0 = py - (RV.kind !== 'moto' ? vehH(p.veh, view) + TS * (RV.kind === 'heli' ? 1.35 : .15) : H * .97 + TS * (p.veh === 'escoot' ? .12 : p.veh === 'sleigh' ? .55 : .32));
     drawRide(p, RV, px, py, k, view, dir); nameAndBubble(p, px, top0, p.id === myId, t);
     [...P.values()].filter(o => o.ps === p.id).forEach((o, i) => nameAndBubble(o, px + (i - .5) * TS * .2, top0 - TS * (.62 + i * .5), o.id === myId, t));   // the passengers' names (and chat) over the driver's
     return;
@@ -3540,7 +3546,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (NAME_MODE === 'name' && (p.gg || p.title)) p = { ...p, gg: null, title: '' };
   const icon = p.red ? '🦹' : p.umb ? '☂️' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const admTag = p.adm && !p.ap;   // an admin can switch the coloured name tag off (God panel)
-  const label = `${admTag ? '👑 ' : ''}${icon} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
+  const label = `${admTag ? '👑 ' : ''}${icon} ${p.mc ? '💳' : ''}${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (admTag) premiumName(label, px, top - TS * .22, t);
   else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
@@ -4746,6 +4752,15 @@ setInterval(() => {
   dialog({ name: '🔔 แจ้งเตือน', face: null, lines: ['อยากให้เกมเตือนไหม? ตอนซอมบี้/หมาป่ากำลังบุก เพื่อนคอมเมนต์โพสต์ หรือสตรีคโบนัสใกล้หาย (ไม่เกินวันละ 4 ครั้ง)'],
     choices: [{ label: '🔔 เปิดแจ้งเตือน', fn: () => { dialogClose(); pushOn(true); }, cls: 'primary' }, { label: 'ไว้ก่อน', fn: dialogClose }] });
 }, 5000);
+// 💳 monthly card: a chip on screen while today's 💎20 is waiting to be claimed
+setInterval(() => {
+  const want = me?.card && !me.card.got && !panel, el = $('#cardChip');
+  if (!want) { el?.remove(); return; }
+  if (el) return;
+  const d = document.createElement('button'); d.id = 'cardChip'; d.className = 'shareChip cardChip'; d.innerHTML = '💳 รับ 💎20 วันนี้<small>บัตรรายเดือน</small>';
+  d.onclick = () => { FX.play('coin'); send({ t: 'cardclaim' }); d.remove(); };
+  document.body.appendChild(d);
+}, 1500);
 // 📤 share card: after a big moment a chip floats for 30 s; tapping it draws a square picture with your invite link to post anywhere
 let shareCur = null, shareChipEl = null;
 function shareOffer(o) {
@@ -4956,12 +4971,13 @@ function topupHtml() {
   const ofn = G.outfitDefs?.angel ? (me.gender === 'f' && G.outfitDefs.angel.nf ? G.outfitDefs.angel.nf : G.outfitDefs.angel.name) : 'ชุดเทวดา';
   const vipLeft = R.vipT > Date.now() + clockOff ? Math.ceil((R.vipT - Date.now() - clockOff) / 86400e3) : 0;
   const card = p => { const on = p.id === paySel.pack, ok = avail(p), bon = !p.kind && R.first ? Math.round(p.gems * R.bonus) : 0;
-    const head = p.kind === 'title' ? `<canvas class="ppCv" data-pp="title"></canvas><b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
+    const head = p.kind === 'card' ? `<b style="font-size:15px">💳 บัตรรายเดือน</b><b style="font-size:17px">รวม 💎${p.total}</b><small>💎${p.gems} ทันที + 💎${p.daily}/วัน × ${p.days} วัน<br>ถ้าซื้อเพชรแยก ~฿${p.worth} · <b style="color:var(--good)">คุ้มกว่า 4 เท่า!</b>${me.card ? `<br>✅ มีอยู่ เหลือ ${Math.ceil((me.card.until - Date.now() - clockOff) / 864e5)} วัน (ซื้อเพิ่มต่ออายุ)` : ''}</small>`
+      : p.kind === 'title' ? `<canvas class="ppCv" data-pp="title"></canvas><b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
       : p.kind === 'outfit' ? `<canvas class="ppCv" data-pp="angel"></canvas><b style="font-size:15px">😇 ${esc(ofn)}</b><small>${ok ? 'ชุดพิเศษ + ออร่า · ไม่มีขายในร้าน' : '✅ คุณมีชุดนี้แล้ว'}</small>`
       : `<b style="font-size:18px">💎${p.gems}</b>${bon ? `<small style="color:var(--good)">+${bon} โบนัส</small>` : ''}`;
     return `<button class="item" ${ok ? '' : 'disabled'} style="display:block;text-align:center;${on ? 'border:3px solid #2fa34a;background:#e4ffd6;box-shadow:0 0 0 2px #2fa34a' : ''}" data-m='${JSON.stringify({ fn: 'payPack', id: p.id })}'>${on ? '<small style="color:#2fa34a;font-weight:800">✓ เลือกอยู่</small>' : ''}${head}<div style="font-weight:800">฿${p.thb}</div>${p.tag && !p.kind ? `<small class="tag">${p.tag}</small>` : ''}</button>`; };
   const special = R.packs.filter(p => p.kind), gems = R.packs.filter(p => !p.kind);
-  const what = o => o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`;
+  const what = o => o.pack === 'month' ? '💳 บัตรรายเดือน' : o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`;
   const my = (R.my || []).map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
     return `<div class="item"><div class="nm">${what(o)} · ฿${o.thb}<small>${new Date(o.t).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · #${o.ref}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div><b style="color:${st[1]};white-space:nowrap">${st[0]}</b>${o.st === 'new' && o.qr && o.ref !== payOpenRef ? B('📷 ส่งสลิป', { fn: 'payShow', ref: o.ref }) : ''}</div>`; }).join('');
   const op = (R.my || []).find(o => o.ref === payOpenRef && o.st === 'new' && o.qr);
@@ -4971,7 +4987,7 @@ function topupHtml() {
       <div class="grid2" style="margin-top:6px"><button type="button" id="payQrSave">💾 บันทึกรูป QR</button>${B('✖ ปิด', { fn: 'payHide' })}</div>
       <div class="sub" style="margin-top:8px">โอนเสร็จแล้ว ส่งรูปสลิปจากแอปธนาคาร ของจะเข้าทันทีเมื่อตรวจผ่าน</div>
       <button type="button" class="primary big" id="paySlipPick">📷 อัปโหลดสลิป</button><input type="file" id="paySlip" data-ref="${op.ref}" accept="image/*" hidden></div>` : '';
-  const got = pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first ? Math.round(pk.gems * R.bonus) : 0));
+  const got = pk.kind === 'card' ? 'บัตรรายเดือน 💎700' : pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first ? Math.round(pk.gems * R.bonus) : 0));
   return `<h2>💎 ร้านเติมเงิน</h2>${R.sb ? '<div class="jobbox">🧪 โหมดทดสอบ (Sandbox) ไม่ตัดเงินจริง</div>' : ''}
     <div class="sub">คุณมี 💎${(me?.gems || 0).toLocaleString()}${R.first ? ' · 🎉 เติมเพชรครั้งแรกรับโบนัส +' + Math.round(R.bonus * 100) + '%' : ''}</div>
     <div class="secT">✨ ของพิเศษ</div><div class="grid2">${special.map(card).join('')}</div>
@@ -5227,6 +5243,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23at', d: '21 พ.ย.', items: [
+    '💳 <b>บัตรรายเดือน ฿39</b> รับ 💎100 ทันที + กดรับ 💎20 ทุกวัน 30 วัน รวม 💎700 (ถ้าซื้อเพชรแยก ~฿160) · มีป้าย 💳 ข้างชื่อ · ซื้อได้ที่ 💎 เติมเงิน',
+    '🎄 <b>ของรุ่นจำกัดคริสต์มาส</b> ขายถึง 31 ธ.ค. เท่านั้น: 🦌 เรนเดียร์จมูกแดง (💎400) ที่ร้านสัตว์เลี้ยง · 🛷 รถเลื่อนซานต้า (💎600 ไม่ต้องมีใบขับขี่) ที่โชว์รูมรถ · ใส่ชุดซานต้าคู่กันเท่สุด!',
+  ] },
   { v: '2026-11-23as', d: '21 พ.ย.', items: [
     '🎰 <b>คาสิโนเมืองชีวิตเปิดแล้ว!</b> ตึกใหม่หัวลานจัตุรัส (ทิศเหนือ) · สล็อต 🎰 ไฮโล 🎲 รูเล็ต 🎡 แบล็กแจ็ก 🃏 · เล่นด้วยเงินในเกมเท่านั้น แทงครั้งละ ฿10–5,000 · ได้เกิน ฿20,000 ประกาศทั้งเมือง!',
     '📞 ตู้โทรศัพท์หน้าลานจัตุรัสย้ายไปมุมตะวันตก',
@@ -6278,11 +6298,11 @@ function renderPanel(p) {
       return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่ย้ายไปที่โชว์รูมรถแล้ว</div><div class="list">${degRow}${rows}</div>`;
     }
     case 'pets': case 'petshop': {
-      const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => !!G.pets[a].gem - !!G.pets[b].gem || (G.pets[a].gem || G.pets[a].price) - (G.pets[b].gem || G.pets[b].price));   // 💎 aura pets last
+      const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).filter(id => !G.pets[id].until || Date.now() + clockOff < G.pets[id].until || (me.pets || []).includes(id)).sort((a, b) => !!G.pets[a].gem - !!G.pets[b].gem || (G.pets[a].gem || G.pets[a].price) - (G.pets[b].gem || G.pets[b].price));   // 💎 aura pets last
       const card = id => { const pt = G.pets[id], own = have.includes(id), on = me.pet === id;
         const btn = own ? (!shopMode || on) ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : '<small>มีแล้ว ✓</small>' : pt.gem ? B(`💎${pt.gem}`, { t: 'act', st: p.st, a: 'buy', pet: id }, 'primary', !me.gemInf && (me.gems || 0) < pt.gem) : B(money(pt.price), { t: 'act', st: p.st, a: 'buy', pet: id }, 'good', me.money < pt.price);
         const nm = me.pnames?.[id], nameBtn = own && !shopMode ? B(nm ? '✏️ เปลี่ยนชื่อ' : '✏️ ตั้งชื่อ', { fn: 'petName', id }) : '';
-        return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${nm ? `<b>"${esc(nm)}"</b><br>` : ''}${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small>${nameBtn}<span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
+        return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${nm ? `<b>"${esc(nm)}"</b><br>` : ''}${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small>${nameBtn}<span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${pt.until && !own ? '<span class="tag">🎄 รุ่นจำกัด ถึง 31 ธ.ค.</span>' : ''}${btn}</div>`; };
       const mine = ids.filter(id => have.includes(id)), shop = ids.filter(id => !have.includes(id));
       const leashRow = shopMode ? itemRowRaw('🦮', 'สายจูงสัตว์เลี้ยง', 'ใส่ให้สัตว์เลี้ยงตัวไหนก็ได้ · ใส่/ถอดได้ในแอพ 🐾 สัตว์เลี้ยง', me.leash ? '<small>มีแล้ว ✓</small>' : B(money(me.leashPrice || 800), { t: 'act', st: p.st, a: 'leash' }, 'good', me.money < (me.leashPrice || 800)))
         : me.leash ? `<div class="setRow"><span><b>🦮 สายจูง</b><small>ใส่แล้วจะเห็นสายจูงจากมือคุณถึงสัตว์เลี้ยง</small></span>${B(me.leashOn ? 'ใส่อยู่ · ถอด' : 'ถอดอยู่ · ใส่', { t: 'pet.leash' }, me.leashOn ? 'good' : '')}</div>` : '<div class="sub">🦮 ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง</div>';
@@ -6345,10 +6365,10 @@ function renderPanel(p) {
       const drive = !hasDL ? itemRowRaw('🪪', 'สอบใบขับขี่', `ค่าสอบ ${money(dl.price)} · ตอบคำถามจราจร 3 ข้อ ต้องถูกทุกข้อ · ต้องต่ออายุทุกปีในเกม (${money(dl.renew)})`, B('📝 สอบ', { t: 'act', st, a: 'dtest' }, 'good'))
         : itemRowRaw('🪪', `ใบขับขี่ ${licExp('driving') ? '<span class="tag" style="background:var(--bad)">หมดอายุ</span>' : ''}`, licExp('driving') ? 'หมดอายุแล้ว — ต่ออายุเพื่อทำงานไรเดอร์ต่อ' : `ใช้ได้อีก ${leftD} วันในเกม (1 ปี = 60 วันในเกม = 1 วันจริง)`, B(`ต่ออายุ ${money(dl.renew)}`, { t: 'act', st, a: 'renew' }, licExp('driving') ? 'primary' : '', !licExp('driving') && leftD > 15));
       const tab = ['car', 'gem'].includes(p.vtab) ? p.vtab : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
-      const cards = Object.entries(G.shop.vehicles).filter(([k, v]) => (!v.hidden || (me.vehicles || []).includes(k)) && (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
+      const cards = Object.entries(G.shop.vehicles).filter(([k, v]) => (!v.hidden && (!v.until || Date.now() + clockOff < v.until) || (me.vehicles || []).includes(k)) && (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
         const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
         const btn = has ? `<div class="col2">${B(on ? '✓ ใช้อยู่' : `${v.icon} ขี่`, { t: 'ride', v: key, on: 1 }, on ? 'primary' : 'good', on)}${v.gem ? '' : B(`ขาย ${money(Math.round(v.price * .6))}`, { t: 'act', st, a: 'sell', v: key }, 'warn')}</div>` : v.locked ? B('🔒 เร็วๆ นี้', { t: 'act', st, a: 'buy', v: key }, '', true) : B(need ? '🪪 ต้องมีใบขับขี่' : cost, { t: 'act', st, a: 'buy', v: key }, need ? '' : v.gem ? 'primary' : 'good', need || !afford);
-        return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas class="vfit" data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${btn}</div>`; }).join('');
+        return `<div class="look fcard vcard ${has ? 'on' : ''}"><canvas class="vfit" data-spr="w_${key}_s" width="150" height="80"></canvas><small>${v.icon} ${esc(v.name)}</small><em>ความเร็ว ×${v.speed}${v.license ? '' : ' · ไม่ต้องมีใบขับขี่'}${v.job ? ' · เฉพาะตำรวจ' : ''}${v.aura ? ' · ✨ออร่า' : ''}${v.fly ? ' · บินข้ามทุกอย่าง' : ''}</em>${v.until && !has ? '<span class="tag">🎄 รุ่นจำกัด ถึง 31 ธ.ค.</span>' : ''}${btn}</div>`; }).join('');
       return `<h2>🚗 โชว์รูมรถ</h2><div class="sub">${hoursTxt('dealer')} · ขี่/ขับได้ทุกที่นอกอาคาร (เร็วกว่าวิ่ง ไม่เปลืองพลังงาน) · กดปุ่ม 🛵 มุมขวาล่างเพื่อขึ้น/ลงรถ · ขายคืนได้ 60%${lic ? '' : ' · <b>รถส่วนใหญ่ต้องมีใบขับขี่</b> สอบได้ที่นี่เลย'}</div>
         <div class="list" style="margin-bottom:8px">${drive}</div><div class="tabs">${B('🏍️ มอเตอร์ไซค์', { fn: 'qtab', set: { vtab: 'moto' } }, tab === 'moto' ? 'primary' : '')}${B('🚗 รถยนต์', { fn: 'qtab', set: { vtab: 'car' } }, tab === 'car' ? 'primary' : '')}${B('💎 รุ่นพิเศษ', { fn: 'qtab', set: { vtab: 'gem' } }, tab === 'gem' ? 'primary' : '')}</div>${tab === 'gem' ? `<div class="jobbox">💎 คุณมีเพชร <b>${me.gemInf ? '∞ (แอดมิน)' : (me.gems || 0).toLocaleString()}</b> · ได้เพชรจากเข้าเกมทุกวัน (+2, ครบสัปดาห์ +10, ครบ 30 วัน +50) ความสำเร็จ (+5–15 ตามความยาก) และทำเควสต์รายสัปดาห์ครบ (+20) · รุ่นพิเศษมีออร่าเรืองแสงตอนขับ ขายคืนไม่ได้</div>` : ''}<div class="looks">${cards}</div>`;
     }
@@ -6929,8 +6949,8 @@ function sign(text, x, y, o = {}) {
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
-fetch('assets/pets.json?v=2').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=3'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v13').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v13'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
+fetch('assets/atlas.json?v=v14').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v14'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp

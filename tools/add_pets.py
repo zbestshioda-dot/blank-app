@@ -48,6 +48,8 @@ for k, ids in (('e', ['starpanda', 'moonpanda', 'crystalfox', 'holopeng', 'runet
                ('f', ['nebulapanda', 'galaxypanda', 'featherfox', 'opalpeng', 'jadeturtle', 'gemcapy', 'icedragon', 'rainbowunicorn'])):
     for r, pid in enumerate(ids):
         b = PETS[24 + r]; PETS.append((pid, k) + b[2:])
+# 🎄 limited pets drawn one direction per row (row 0 down, row 1 side, row 3 up): the row is a (down, up, side) tuple
+PETS.append(('reindeer', 'g', (0, 3, 1), [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [R, R, L, R], .95))
 def load(path):
     im = Image.open(path).convert('RGB'); a = np.asarray(im).astype(int)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
@@ -71,7 +73,7 @@ def colboxes(sub):
         if xs.max() - xs.min() >= 25: out.append((xs.min(), xs.max() + 1))
     return out
 sheets = {}
-for k in 'abcdef':
+for k in 'abcdefg':
     im, bg, fg = load(os.path.join(SH, f'pets_{k}.jpg'))
     bs = bands(fg)
     sheets[k] = (im, bg, fg, bs)
@@ -90,8 +92,9 @@ def cut(k, row, ci):
     return Image.fromarray(rgba).crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
 atlas = Image.new('RGBA', (12 * C, len(PETS) * C), (0, 0, 0, 0)); meta = {}
 for pi, (pid, k, row, down, up, side, face, sz) in enumerate(PETS):
-    d = [(cut(k, row, c), None) for c in down] if down else None
-    u = [cut(k, row, c) for c in up] if up else None
+    rd, ru, row = row if isinstance(row, tuple) else (row, row, row)
+    d = [(cut(k, rd, c), None) for c in down] if down else None
+    u = [cut(k, ru, c) for c in up] if up else None
     s = None
     if side:
         fl = face if isinstance(face, list) else [face] * len(side)

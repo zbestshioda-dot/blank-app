@@ -1245,6 +1245,8 @@ const FRAMES = [
 // 💎 four of the plainer special frames are sold for gems (the rest stay locked)
 for (const f of FRAMES) if (['สายฟ้า', 'ดอกบัว', 'สายน้ำ', 'ลายไทย'].includes(f.name)) { f.locked = false; f.gem = 50; }
 // pets: bought in the pet panel (the pet shops are closed for renovation), one follows you around. rar 1-5 like fish
+// 🎄 limited Christmas items: on sale until the end of 31 Dec 2569 (Bangkok), then gone from the shops (owners keep them)
+const XMAS_END = Date.parse('2027-01-01T00:00:00+07:00');
 const PETS = {
   chick:    { name: 'ลูกเจี๊ยบ', icon: '🐤', price: 500, rar: 1, desc: 'ตัวจิ๋วเจี๊ยบๆ กระโดดตุ๊บๆ' },
   duck:     { name: 'ลูกเป็ด', icon: '🦆', price: 600, rar: 1, desc: 'เดินส่ายก้นกุ๊กกิ๊ก' },
@@ -1294,6 +1296,7 @@ const PETS = {
   starunicorn: { name: 'ยูนิคอร์นดาวรุ้ง', icon: '🦄', gem: 600, aura: '#ffe680', rar: 5, desc: 'ออร่าทองอ่อน มีดาวที่สะโพก' },
   galaxypanda: { name: 'แพนด้ากาแล็กซี', icon: '🐼', gem: 700, aura: '#6a3cff', rar: 5, desc: 'ออร่าม่วงเข้ม ตัวดำเต็มไปด้วยดวงดาว' },
   icedragon:   { name: 'มังกรน้ำแข็ง', icon: '🐲', gem: 800, aura: '#e0f7ff', rar: 5, desc: 'ออร่าขาวน้ำแข็ง เขาคริสตัล' },
+  reindeer:    { name: 'เรนเดียร์จมูกแดง', icon: '🦌', gem: 400, aura: '#ff4d4d', rar: 5, desc: '🎄 จมูกแดงเรืองแสง กระดิ่งทองกรุ๊งกริ๊ง · ขายถึง 31 ธ.ค. เท่านั้น', until: XMAS_END },
   rainbowunicorn:{ name: 'ยูนิคอร์นสายรุ้ง', icon: '🦄', gem: 999, aura: 'rainbow', rar: 5, desc: 'ออร่าสายรุ้งเปลี่ยนสี สุดยอดตำนาน!' },
 };
 // which water a spot fishes in: the sea along the east coast, the river in the farm, any other water is "lake" (the lake, ponds)
@@ -1454,6 +1457,7 @@ const VEHICLES = {   // bought at the car showroom; ride outdoors (🛵 button) 
   porsche: { name: 'คลาสสิกเงินยวง', icon: '🚗', gem: 450, speed: 2.2, kind: 'car', license: 'driving', aura: '#cfe3ff' },
   jag:     { name: 'โรดสเตอร์เขียวมรกต', icon: '🚗', gem: 500, speed: 2.2, kind: 'car', license: 'driving', aura: '#3fe08a' },
   spider:  { name: 'สไปเดอร์ขาวทองคำ', icon: '🏎️', gem: 650, speed: 2.3, kind: 'car', license: 'driving', aura: '#ffd34d' },
+  sleigh:  { name: 'รถเลื่อนซานต้า', icon: '🛷', gem: 600, speed: 1.6, kind: 'moto', aura: '#ff4d4d', until: XMAS_END },   // 🎄 limited, no licence needed
   heli:    { name: 'เฮลิคอปเตอร์ส่วนตัว', icon: '🚁', locked: 1, gem: 10000, speed: 2.4, kind: 'heli', license: 'driving', aura: '#7fd3ff', fly: 1 },
   heli2:   { name: 'เฮลิคอปเตอร์กู้ภัยแดง', icon: '🚁', gem: 2000, speed: 2.6, kind: 'heli', license: 'driving', aura: '#ff6a8a', fly: 1, hidden: 1 },   // no longer sold (owners keep it)
   police:  { name: 'รถสายตรวจ', icon: '🚓', price: 150000, speed: 1.9, kind: 'car', license: 'driving', job: 'police' },

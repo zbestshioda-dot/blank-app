@@ -123,6 +123,15 @@ function achSweep(a) {
 const allJobs = a => isAdmin(a) && a.god?.alljobs !== false;
 const adminTitle = a => isAdmin(a) && !a.god?.notitle;
 const vipOn = a => (a.vipT || 0) > now();
+// 💳 monthly card: 💎100 when bought, then 💎20 for each day it is claimed (days not claimed are lost); buying again adds 30 days
+const MCARD = () => PAY.PACKS.find(p => p.kind === 'card');
+const cardOn = a => (a.card?.until || 0) > now();
+function cardClaim(a) {
+  const C = MCARD(); if (!C || !cardOn(a)) return toast(a, 'ยังไม่มีบัตรรายเดือน (ซื้อได้ที่ 💎 เติมเงิน)', '💳', false);
+  const d = dayKey(); if (a.card.last === d) return toast(a, 'วันนี้รับเพชรบัตรรายเดือนแล้ว พรุ่งนี้มาใหม่นะ', '💳', false);
+  a.card.last = d; a.gems = (a.gems || 0) + C.daily; a.sd = true; markMe(a);
+  return toast(a, `💳 รับเพชรบัตรรายเดือนวันนี้ +💎${C.daily} · เหลืออีก ${Math.ceil((a.card.until - now()) / 864e5)} วัน`, '💎');
+}
 const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.find(x => x.id === id) || (id === 'vip' ? D.PAY_TITLE : null);
 const myTitle = a => a.title === 'vip' && !vipOn(a) ? null : titleDef(a.title);   // the supporter title disappears when it runs out
 const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : myTitle(a)?.title || '';
@@ -1108,6 +1117,8 @@ function pushTick() {
   const y = new Date(now() + 7 * 3600e3 - 864e5).toISOString().slice(0, 10);
   for (const o of accounts.values()) if (o.push?.length && !o.ws && o.lastLogin === y && (o.loginStreak || 0) >= 2)
     PUSH.send(o, `🔥 ต่อสตรีควันที่ ${o.loginStreak + 1} กันเถอะ!`, 'เข้าเมืองวันนี้รับโบนัสเข้าเกม ก่อนสตรีคหาย', { tag: 'streak' });
+  for (const o of accounts.values()) if (o.push?.length && !o.ws && cardOn(o) && o.card.last !== today)
+    PUSH.send(o, '💳 อย่าลืมรับเพชรวันนี้!', `บัตรรายเดือน: เข้าเกมกดรับ 💎${MCARD()?.daily || 20} วันละครั้ง วันไหนไม่รับจะหายไปนะ`, { tag: 'card' });
 }
 setInterval(() => { try { pushTick(); } catch (e) { console.error('pushTick', e); } }, 60e3).unref?.();
 function lbNote(o, icon, text) {
@@ -1495,7 +1506,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -2735,6 +2746,7 @@ function act(a, m) {
     }
     case 'petshop.buy': {                                  // adopt a pet at a pet shop (kept forever) and bring it out
       m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;
+      if (P.until && now() >= P.until && !(a.pets || []).includes(m.id)) return toast(a, 'หมดเขตขายแล้ว (ของรุ่นจำกัด)', '🎄', false);
       a.pets = a.pets || [];
       if (a.pets.includes(m.id)) return toast(a, `คุณมี${P.name}แล้ว`, 'ℹ️', false);
       if (P.gem) { if (!godInf(a) && (a.gems || 0) < P.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${P.gem} (มี 💎${a.gems || 0})`, '💎', false); if (!godInf(a)) a.gems -= P.gem; feed(`💎 ${a.name} รับ${P.icon}${P.name} สัตว์เลี้ยงออร่ามาเลี้ยง!`); }
@@ -2988,6 +3000,7 @@ function act(a, m) {
         return toast(a, `ขาย${v.name}ให้โชว์รูม ได้ ${money(back)} (60%)`, '💰');
       }
       if (own) return toast(a, `มี${v.name}แล้ว`, 'ℹ️', false);
+      if (v.until && now() >= v.until) return toast(a, 'หมดเขตขายแล้ว (ของรุ่นจำกัด)', '🎄', false);
       if (v.job && a.career !== v.job) return toast(a, `${v.name} ขายเฉพาะตำรวจ`, '🚓', false);
       if (v.license && !(a.licenses || []).includes(v.license)) return toast(a, 'ต้องมีใบขับขี่ก่อน สอบได้ที่โชว์รูมรถ 🪪', '🪪', false);
       if (v.gem && isAdmin(a)) { /* admins: unlimited diamonds */ }
@@ -4179,7 +4192,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0, ap: isAdmin(a) && a.god?.plain ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, mc: cardOn(a) ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -4222,7 +4235,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4770,6 +4783,7 @@ function onMessage0(ws, raw) {
     }
     case 'god': return godAct(a, m);
     case 'fishcol': return fishCol(a, m);
+    case 'cardclaim': if (!cd(a, 'cardclaim', 1500, true)) return; cardClaim(a); return sendRoster();
     case 'aq': return aqAct(a, m);
     case 'pushsub': { if (!cd(a, 'pushsub', 3000, true)) return; const ok = PUSH.subscribe(a, m.sub); markMe(a); if (ok && m.first) PUSH.send(a, '🔔 เปิดแจ้งเตือนแล้ว!', 'เราจะเตือนตอนซอมบี้/หมาป่าบุก มีคนคอมเมนต์ หรือสตรีคใกล้หาย (ไม่เกินวันละ 4 ครั้ง)', { force: true }); return; }
     case 'pushoff': PUSH.unsubscribe(a, String(m.endpoint || '')); markMe(a); return;
@@ -5429,7 +5443,10 @@ function payCredit(o, by) {
   const x = accounts.get(o.l); if (!x) { o.st = 'review'; o.why = 'ไม่พบบัญชีผู้เล่น'; gdirty(); return; }
   const pk = PAY.PACKS.find(p => p.id === o.pack) || {};
   let got;
-  if (pk.kind === 'title') {                 // supporter title: +30 days (stacks), switched on right away
+  if (pk.kind === 'card') {                  // 💳 monthly card: 30 more days (stacks) + 💎100 now; the daily 💎20 is claimed in game
+    x.card = { until: Math.max(now(), x.card?.until || 0) + pk.days * 864e5, last: x.card?.last || '' }; x.gems = (x.gems || 0) + pk.gems; o.bonus = 0; o.gave = { gems: pk.gems, card: pk.days * 864e5 };
+    got = `บัตรรายเดือน 30 วัน + 💎${pk.gems} ทันที · กดรับ 💎${pk.daily} ทุกวันได้ถึง ${new Date(x.card.until + 7 * 3600e3).toISOString().slice(0, 10)}`;
+  } else if (pk.kind === 'title') {                 // supporter title: +30 days (stacks), switched on right away
     const T = D.PAY_TITLE; x.vipT = Math.max(now(), x.vipT || 0) + T.days * 86400e3; x.title = T.id; o.bonus = 0; o.gave = { vip: T.days * 86400e3 };
     got = `ฉายาพิเศษ «${T.title}» ใช้ได้ถึง ${new Date(x.vipT + 7 * 3600e3).toISOString().slice(0, 10)} (ใส่ให้แล้ว เปลี่ยนได้ที่ 🏅 ฉายา)`;
   } else if (pk.kind === 'outfit') {         // angel / fairy outfit by gender; if they already had it, refund as diamonds
@@ -5453,6 +5470,7 @@ function payRevoke(o, by) {
   const gave = o.gave || (pk.kind === 'title' ? { vip: D.PAY_TITLE.days * 86400e3 } : pk.kind === 'outfit' ? { of: pk.of } : { gems: (o.gems || 0) + (o.bonus || 0), fb: o.bonus ? 1 : 0 });
   let what = '';
   if (x) {
+    if (gave.card && x.card) { x.card.until = Math.max(0, x.card.until - gave.card); what = 'บัตรรายเดือน 30 วัน + '; }
     if (gave.vip) { x.vipT = Math.max(0, (x.vipT || 0) - gave.vip); if (x.vipT <= now()) { x.vipT = 0; if (x.title === D.PAY_TITLE.id) x.title = ''; } what = 'ฉายาผู้สนับสนุน 30 วัน'; }
     if (gave.of) { x.outfits = (x.outfits || []).filter(i => i !== gave.of); if (x.outfit === gave.of) x.outfit = ''; what = 'ชุดเทวดา/นางฟ้า'; }
     if (gave.gems) { const had = x.gems || 0; x.gems = Math.max(0, had - gave.gems); if (gave.fb) x.paidG = 0; what = `💎${gave.gems}` + (had < gave.gems ? ` (มีเหลือ 💎${had} จึงหักได้เท่านั้น)` : ''); }
