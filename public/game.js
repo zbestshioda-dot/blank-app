@@ -581,7 +581,7 @@ function handle(m) {
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
-      G = m; myId = m.id; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
+      G = m; myId = m.id; setTimeout(pushRefresh, 4000); pushAskAt = Date.now() + 4 * 60e3; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); if (gPendLink) { const gc = gPendLink; gPendLink = null; setTimeout(() => send({ t: 'glink', google: gc }), 500); } promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
@@ -645,7 +645,8 @@ function handle(m) {
       if (panel?.kind === 'wpray') refreshPanel(true);
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
-    case 'catch': catchPop(m.item, m.first); break;
+    case 'catch': catchPop(m.item, m.first); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
+    case 'share': shareOffer(m); break;
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'zn': case 'zspawn': case 'zdie': znMsg(m); break;
@@ -2541,6 +2542,7 @@ function znList() {   // a small, tap-to-fold survivor list on the left edge: ne
   el.innerHTML = `<b>🧍 ผู้รอด ${ZN.alive} ${znListOpen ? '▾' : '▸'}</b>` + (znListOpen ? show.map(n => `<span class="${n === myName ? 'me' : ''}">${esc(n)}</span>`).join('') + (more > 0 ? `<i>+อีก ${more} คน</i>` : '') : '');
 }
 function znWinner(m) {   // big floating winner announcement, no taps needed, fades on its own
+  if (m.won) shareOffer({ k: 'zn' });
   ZWIN = { ids: new Set(m.ids || []), until: performance.now() + 180e3 };
   document.querySelectorAll('.znWin').forEach(e => e.remove());
   const d = document.createElement('div'); d.className = 'znWin';
@@ -2590,7 +2592,7 @@ function wwMsg(m) {
   if (m.t === 'wwdie') { FX.play('zbite'); if (navigator.vibrate) navigator.vibrate([60, 40, 120]); wwCard(`<div style="font-size:56px">🐺</div><b>โดนกัด! คุณกลายเป็นหมาป่าลูกน้อง</b><p>${esc(m.by || '')} กัดคุณ · ไล่กัดมนุษย์ที่เหลือต่อ ถ้ากัดหมดเมือง หมาป่าแบ่งเงินรางวัลกัน · ใช้สกิล 👃 ⚡ 📯 ได้</p>`, 'bite', 4000); return; }
   const was = WW.ph;
   if (m.ph === 'end') {
-    WW = { ph: 'off' }; FX.play(m.won ? 'levelup' : 'chime');
+    WW = { ph: 'off' }; FX.play(m.won ? 'levelup' : 'chime'); if (m.won && !m.wolfWon) shareOffer({ k: 'ww' });
     const d = document.createElement('div'); d.className = 'znWin';
     d.innerHTML = m.wolfWon ? `<div class="t">🐺 หมาป่าชนะ! 🐺</div><div class="y">ไม่มีใครรอดถึงเช้า · โฮสหมาป่า <b>${esc(m.host)}</b> ได้ส่วนแบ่งมากที่สุด</div>`
       : `<div class="t">🌅 ผู้รอดชีวิตคืนจันทร์เต็มดวง</div><div class="n">${(m.names || []).slice(0, 10).map(n => `<span>${esc(n)}</span>`).join('')}</div>${m.won ? '<div class="y">คุณรอด! รางวัลส่งเข้าจดหมายแล้ว 📬</div>' : ''}`;
@@ -3795,7 +3797,7 @@ function zoomPic(src) {   // a player's photo, big
 const lbUnread = () => (me?.lbn || []).filter(x => x.t > (me.lbnSeen || 0)).length;
 function lbNotiHtml() {
   const L = me.lbn || [], seen = me.lbnSeen || 0, ago = t => { const m = Math.max(0, Math.round((Date.now() + clockOff - t) / 60e3)); return m < 1 ? 'เมื่อกี้' : m < 60 ? `${m} นาทีที่แล้ว` : m < 1440 ? `${Math.floor(m / 60)} ชม.ที่แล้ว` : `${Math.floor(m / 1440)} วันที่แล้ว`; };
-  return `<h2>🔔 แจ้งเตือน</h2>${L.length ? `<div class="list">${L.map(x => `<div class="item lbN ${x.t > seen ? 'new' : ''}"><div class="em">${x.ic}</div><div class="nm" style="font-weight:400">${esc(x.text)}<small>${ago(x.t)}</small></div></div>`).join('')}</div>` : '<div class="sub">ยังไม่มีแจ้งเตือน · มีคนถูกใจ/คอมเมนต์โพสต์ เพื่อนโพสต์ใหม่ หรือมีคนซื้อของที่คุณวางขาย จะเด้งมาที่นี่</div>'}`;
+  return `<h2>🔔 แจ้งเตือน</h2>${pushState() !== 'on' ? `<div class="jobbox">📲 อยากรู้ทันทีแม้ไม่ได้เปิดเกม? ${B('🔔 เปิดแจ้งเตือนบนมือถือ', { fn: 'pushOn' }, 'primary')}</div>` : ''}${L.length ? `<div class="list">${L.map(x => `<div class="item lbN ${x.t > seen ? 'new' : ''}"><div class="em">${x.ic}</div><div class="nm" style="font-weight:400">${esc(x.text)}<small>${ago(x.t)}</small></div></div>`).join('')}</div>` : '<div class="sub">ยังไม่มีแจ้งเตือน · มีคนถูกใจ/คอมเมนต์โพสต์ เพื่อนโพสต์ใหม่ หรือมีคนซื้อของที่คุณวางขาย จะเด้งมาที่นี่</div>'}`;
 }
 function socHead(k) {
   const t = (l, kk, on) => `<button class="${on ? 'on' : ''}" data-m='{"fn":"social","k":"${kk}"}'>${l}</button>`;
@@ -4137,6 +4139,8 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
+  pushOn() { pushOn(true); },
+  shareGo() { shareOpen(); },
   godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0) && m.op !== 'setmoney') return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: m.op || 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
   openTopup() { payRes = null; send({ t: 'pay', op: 'view' }); openPanel({ kind: 'topup' }); },
   payPack(m) { paySel.pack = m.id; refreshPanel(true); },
@@ -4623,6 +4627,88 @@ function bindSpr(root) {
     g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = !fish || k < 1;
     g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], (c.width - sp[2] * k) / 2, fish ? (c.height - sp[3] * k) / 2 : c.height - 3 - sp[3] * k, sp[2] * k, sp[3] * k); }; draw(); });
 }
+// 🔔 browser push: opt in from ⚙️ / lifebook / a one-time card; the subscription is refreshed on every login
+const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const pushState = () => !pushOK() ? 'no' : Notification.permission === 'granted' && (me?.pushN || 0) > 0 ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off';
+const b64u = s => { const b = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+async function pushSub(first) {
+  const reg = await navigator.serviceWorker.ready, key = b64u(G.vapid); let sub = await reg.pushManager.getSubscription();
+  const same = sub?.options?.applicationServerKey && new Uint8Array(sub.options.applicationServerKey).every((v, i) => v === key[i]);
+  if (sub && !same) { await sub.unsubscribe().catch(() => { }); sub = null; }   // the server's key changed: subscribe again
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  send({ t: 'pushsub', sub: sub.toJSON(), first: first ? 1 : 0 });
+}
+async function pushOn(first) {
+  if (!pushOK()) return toast(/iP(hone|ad|od)/.test(navigator.userAgent) ? 'บน iPhone: กดปุ่มแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนนั้น จึงเปิดแจ้งเตือนได้' : 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน', '🔔', false);
+  if (!G?.vapid) return toast('เซิร์ฟเวอร์ยังไม่เปิดระบบแจ้งเตือน', '🔔', false);
+  try { localStorage.setItem('ltPushAsk', '1'); } catch { }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return toast('ยังไม่ได้อนุญาตแจ้งเตือน · เปิดได้ที่การตั้งค่าเว็บไซต์ของเบราว์เซอร์', '🔕', false);
+  try { await pushSub(first); toast('เปิดแจ้งเตือนแล้ว 🔔', '🔔'); } catch (e) { toast('เปิดแจ้งเตือนไม่สำเร็จ ลองใหม่อีกครั้ง', '🔔', false); }
+}
+function pushRefresh() { if (pushOK() && G?.vapid && Notification.permission === 'granted') pushSub(false).catch(() => { }); }
+let pushAskAt = Infinity;   // once per device, a few minutes into the first session: invite to turn notifications on
+setInterval(() => {
+  if (Date.now() < pushAskAt || panel || !me || !pushOK() || Notification.permission !== 'default') return;
+  try { if (localStorage.getItem('ltPushAsk')) return; localStorage.setItem('ltPushAsk', '1'); } catch { return; }
+  pushAskAt = Infinity;
+  dialog({ name: '🔔 แจ้งเตือน', face: null, lines: ['อยากให้เกมเตือนไหม? ตอนซอมบี้/หมาป่ากำลังบุก เพื่อนคอมเมนต์โพสต์ หรือสตรีคโบนัสใกล้หาย (ไม่เกินวันละ 4 ครั้ง)'],
+    choices: [{ label: '🔔 เปิดแจ้งเตือน', fn: () => { dialogClose(); pushOn(true); }, cls: 'primary' }, { label: 'ไว้ก่อน', fn: dialogClose }] });
+}, 5000);
+// 📤 share card: after a big moment a chip floats for 30 s; tapping it draws a square picture with your invite link to post anywhere
+let shareCur = null, shareChipEl = null;
+function shareOffer(o) {
+  shareCur = o; if (!window.__ref) send({ t: 'refcode' });
+  shareChipEl?.remove(); const d = shareChipEl = document.createElement('button'); d.className = 'shareChip';
+  d.innerHTML = `📤 แชร์ความเท่!<small>${esc(shareText(o).title)}</small>`; d.onclick = () => { FX.play('click'); d.remove(); shareOpen(); };
+  document.body.appendChild(d); setTimeout(() => { if (shareChipEl === d) d.remove(); }, 30000);
+}
+function shareText(o) {
+  const it = o.item && G.items[o.item];
+  return o.k === 'fish' ? { title: `ตกได้ ${it.name}!`, sub: `ปลาระดับ${G.fishRarity[it.rar] || ''}${it.temple ? ' · หาได้เฉพาะในวัด' : ''} · ราคา ~${money(it.base)}`, bg: ['#0b4f7a', '#16a3c9'], em: '🎣' }
+    : o.k === 'zn' ? { title: 'รอดชีวิตคืนปล่อยผี!', sub: 'หนีซอมบี้ทั้งเมืองจนฟ้าสาง', bg: ['#2a0f2e', '#6b1d3a'], em: '🧟' }
+    : o.k === 'ww' ? { title: 'รอดคืนจันทร์เต็มดวง!', sub: 'ไม่โดนหมาป่ากัดจนถึงเช้า', bg: ['#0e1636', '#3a3f8f'], em: '🐺' }
+    : { title: `ซื้อ${o.name || 'บ้าน'}หลังใหม่!`, sub: 'มีบ้านเป็นของตัวเองในเมืองแล้ว', bg: ['#6b3a12', '#e0a040'], em: '🏡' };
+}
+const shareLink = () => location.origin + '/' + (window.__ref?.code ? '?ref=' + window.__ref.code : '');
+async function shareCard(o) {
+  try { await document.fonts.ready; } catch { }
+  const c = document.createElement('canvas'); c.width = c.height = 1080; const g = c.getContext('2d'), T = shareText(o);
+  const gr = g.createLinearGradient(0, 0, 0, 1080); gr.addColorStop(0, T.bg[0]); gr.addColorStop(1, T.bg[1]); g.fillStyle = gr; g.fillRect(0, 0, 1080, 1080);
+  const rg = g.createRadialGradient(540, 520, 40, 540, 520, 460); rg.addColorStop(0, 'rgba(255,240,180,.55)'); rg.addColorStop(1, 'rgba(255,240,180,0)'); g.fillStyle = rg; g.fillRect(0, 0, 1080, 1080);
+  g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = "600 40px Mitr, 'Noto Sans Thai', sans-serif"; g.globalAlpha = .85; g.fillText('เมืองชีวิตนี้เลือกได้', 540, 92); g.globalAlpha = 1;
+  g.font = "700 78px Mitr, 'Noto Sans Thai', sans-serif"; g.lineWidth = 10; g.strokeStyle = 'rgba(0,0,0,.35)'; g.strokeText(T.title, 540, 200, 1000); g.fillText(T.title, 540, 200, 1000);
+  g.font = "400 38px Mitr, 'Noto Sans Thai', sans-serif"; g.fillStyle = '#ffeec2'; g.fillText(T.sub, 540, 262, 1000);
+  const sp = o.k === 'fish' && atlas?.sprites[G.items[o.item].spr];
+  if (sp && atlasImg) { const k = Math.min(760 / sp[2], 440 / sp[3]); g.imageSmoothingEnabled = false; g.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], 540 - sp[2] * k / 2, 540 - sp[3] * k / 2, sp[2] * k, sp[3] * k); }
+  else {
+    g.font = '300px serif'; g.globalAlpha = .9; g.fillText(T.em, 700, 640); g.globalAlpha = 1;
+    const p = P.get(myId); if (p && CH_ATLAS?.h) try { g.imageSmoothingEnabled = false; drawCharTo(g, p, 420, 800, 430 / CH_ATLAS.h, 'front', 0); } catch { }
+  }
+  g.font = "600 44px Mitr, 'Noto Sans Thai', sans-serif"; g.fillStyle = '#fff'; g.fillText(`— ${me?.name || ''} —`, 540, 870, 1000);
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 920, 1080, 160);
+  g.fillStyle = '#ffd34d'; g.font = "700 42px Mitr, 'Noto Sans Thai', sans-serif"; g.fillText(window.__ref?.code ? `ใส่โค้ด ${window.__ref.code} รับไข่สัตว์เลี้ยงฟรี!` : 'มาเล่นด้วยกันสิ!', 540, 988, 1000);
+  g.fillStyle = '#fff'; g.font = "400 34px Mitr, 'Noto Sans Thai', sans-serif"; g.fillText(`เล่นฟรีบนเว็บ ไม่ต้องโหลด · ${location.host}`, 540, 1044, 1000);
+  return c;
+}
+async function shareOpen() {
+  const o = shareCur; if (!o) return;
+  const c = await shareCard(o), url = c.toDataURL('image/png'), blob = await new Promise(r => c.toBlob(r, 'image/png')), T = shareText(o), link = shareLink();
+  const file = blob && new File([blob], 'lifetown.png', { type: 'image/png' }), text = `${T.title} ${T.sub} · มาเล่นเมืองชีวิตนี้เลือกได้ด้วยกัน`;
+  const canFile = !!(file && navigator.canShare?.({ files: [file] }));
+  document.querySelector('.shareBox')?.remove();
+  const d = document.createElement('div'); d.className = 'shareBox';
+  d.innerHTML = `<div class="in"><img src="${url}" alt=""><div class="row">${canFile ? '<button class="primary" data-s="native">📤 แชร์รูป</button>' : ''}<a class="btn" download="lifetown.png" href="${url}">💾 บันทึกรูป</a><button data-s="fb">📘 Facebook</button><button data-s="copy">📋 คัดลอกลิงก์</button><button data-s="x">✖</button></div><small>ลิงก์มีโค้ดชวนเพื่อนของคุณ เพื่อนเล่นครบ 30 นาที คุณได้ 💎</small></div>`;
+  d.onclick = async e => {
+    const b = e.target.closest('[data-s]'); if (e.target === d) return d.remove(); if (!b) return;
+    const k = b.dataset.s;
+    if (k === 'x') d.remove();
+    else if (k === 'native') navigator.share({ files: [file], text, url: link }).catch(() => { });
+    else if (k === 'fb') window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(link), '_blank', 'noopener');
+    else if (k === 'copy') { try { await navigator.clipboard.writeText(`${text} ${link}`); toast('คัดลอกลิงก์แล้ว วางในแชท/โพสต์ได้เลย', '📋'); } catch { prompt('คัดลอกลิงก์นี้', link); } }
+  };
+  document.body.appendChild(d);
+}
 function catchPop(id, first) {
   const it = G.items[id]; if (!it?.spr) return;
   document.querySelector('.catchPop')?.remove();
@@ -5050,6 +5136,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ap', d: '21 พ.ย.', items: [
+    '🔔 <b>แจ้งเตือนบนมือถือ/คอม</b> แม้ไม่ได้เปิดเกม: ซอมบี้/หมาป่ากำลังบุก มีคนคอมเมนต์ใน lifebook สตรีคใกล้หาย (เปิดที่ ⚙️ ตั้งค่า · ไม่เกินวันละ 4 ครั้ง · iPhone ต้องเพิ่มเกมไปหน้าจอโฮมก่อน)',
+    '📤 <b>ปุ่มแชร์การ์ด</b> ตอนได้ของเด็ด: ปลามหากาพย์/ตำนาน/ปลาวัด รอดคืนซอมบี้/หมาป่า ซื้อบ้าน → ได้รูปสวยพร้อมโค้ดชวนเพื่อน แชร์ลงเฟซ/ไลน์ได้เลย',
+  ] },
   { v: '2026-11-23ao', d: '21 พ.ย.', items: [
     '📊 (แอดมิน) หน้าวัดผลใน God mode: กราฟผู้เล่นใหม่ คนเข้าเล่นต่อวัน การกลับมาเล่น D1/D7 และรายได้ 30 วัน',
   ] },
@@ -6526,6 +6616,7 @@ function renderPanel(p) {
       return `<h2>⚙️ ตั้งค่า</h2>
         <div class="secT">🏷️ ป้ายเหนือหัว</div><div class="grid2">${B(NAME_TXT[NAME_MODE], { fn: 'names' }, NAME_MODE === 'all' ? '' : 'good')}</div><div class="sub">แตะเพื่อสลับ: แสดงทั้งหมด → แค่ชื่อ → ซ่อนหมด (เหลือแต่ตัวละครกับข้อความแชท) · ตั้งแค่ในเครื่องนี้</div>
         <div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = เดินลื่น 60 เฟรม แต่ตอนยืนเฉยๆ ลดเหลือ 30 ให้เครื่องเย็น (เปิดอยู่แล้วบนมือถือ)</div>
+        <div class="secT">🔔 แจ้งเตือนบนมือถือ/คอม</div><div class="grid2">${B(pushState() === 'on' ? '🔔 แจ้งเตือน: เปิดอยู่' : '🔕 เปิดแจ้งเตือน', { fn: 'pushOn' }, pushState() === 'on' ? 'good' : 'primary')}</div><div class="sub">เตือนตอนซอมบี้/หมาป่าบุก มีคนคอมเมนต์ใน lifebook หรือสตรีคใกล้หาย (ไม่เกินวันละ 4 ครั้ง)${/iP(hone|ad|od)/.test(navigator.userAgent) ? ' · iPhone: ต้องเพิ่มเกมไปที่หน้าจอโฮมก่อน (ปุ่มแชร์ ⬆️ → เพิ่มไปยังหน้าจอโฮม)' : ''}</div>
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
         ${canFs ? '' : '<div class="sub">iPhone/iPad: กดแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ</div>'}

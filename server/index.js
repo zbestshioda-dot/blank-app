@@ -9,6 +9,8 @@ const { WebSocketServer } = require('ws');
 const D = require('./data');
 const store = require('./store');
 const Q = require('./quests');
+const PUSH = require('./push');
+let vapidKeys = null;
 const PAY = require('./pay');
 
 const PORT = process.env.PORT || 8080;
@@ -889,6 +891,7 @@ function znTick() {
     const h = bk.getUTCHours() + bk.getUTCMinutes() / 60;
     if (h >= ZN.hour - 1 && h < ZN.hour && znAnnounced !== day + (h >= ZN.hour - .5 ? 'b' : 'a')) {
       znAnnounced = day + (h >= ZN.hour - .5 ? 'b' : 'a');
+      pushAll('🧟 คืนนี้ซอมบี้บุกเมือง!', `${ZN.hour}:00 น. เข้าเกมมาเอาตัวรอด รอดถึงเช้ารับ ${money(ZN.prize.money)} + 💎${ZN.prize.gems}`, 'zn');
       feed(`🌕 คืนนี้วันที่ 13 คืนปล่อยผี! ซอมบี้จะบุกเมืองเวลา ${ZN.hour}:00 น. เตรียมตัวให้พร้อม`);
       for (const o of online.values()) toast(o, `🌕 คืนนี้ ${ZN.hour}:00 น. ซอมบี้จะบุกเมือง! อยู่นอกอาคารแล้วเอาตัวรอดให้ได้ รับรางวัลผู้รอดชีวิต`, '🧟');
     }
@@ -1041,7 +1044,7 @@ function wwTick() {
   const t = now(), bk = new Date(t + 7 * 3600e3), day = dayKey();
   if (!ww && !zn && wwDone !== day && fullMoonAt(t) && day !== D.LK.day) {   // (no werewolf night on Loy Krathong night)
     const h = bk.getUTCHours() + bk.getUTCMinutes() / 60;
-    if (h >= WW.hour - 1 && h < WW.hour && wwAnnounced !== day) { wwAnnounced = day; feed(`🌕 คืนนี้จันทร์เต็มดวง! ${WW.hour}:00 น. จะมีคนในเมืองกลายเป็นหมาป่า เตรียมตัวให้ดี`); for (const o of online.values()) toast(o, `🌕 คืนนี้ ${WW.hour}:00 น. คืนหมาป่า! ใครจะโดนคำสาป?`, '🐺'); }
+    if (h >= WW.hour - 1 && h < WW.hour && wwAnnounced !== day) { wwAnnounced = day; pushAll('🐺 คืนนี้จันทร์เต็มดวง!', `${WW.hour}:00 น. จะมีคนกลายเป็นหมาป่า เข้าเกมมาวิ่งหนีให้รอดถึงเช้า`, 'ww'); feed(`🌕 คืนนี้จันทร์เต็มดวง! ${WW.hour}:00 น. จะมีคนในเมืองกลายเป็นหมาป่า เตรียมตัวให้ดี`); for (const o of online.values()) toast(o, `🌕 คืนนี้ ${WW.hour}:00 น. คืนหมาป่า! ใครจะโดนคำสาป?`, '🐺'); }
     if (h >= WW.hour && h < WW.hour + .5) wwStart(t);
   }
   if (!ww) return;
@@ -1076,8 +1079,21 @@ function wwTick() {
 }
 setInterval(() => { try { if (online.size || ww) wwTick(); } catch (e) { console.error('wwTick', e); } }, 250).unref?.();
 // 🔔 lifebook notifications: kept on the account (players who are away see them next time), newest first
+// 🔔 push to everyone who turned notifications on and is not in the game right now
+function pushAll(title, body, tag) { for (const o of accounts.values()) if (o.push?.length && !o.ws) PUSH.send(o, title, body, { tag }); }
+// once a day at 19:00 (Bangkok): players on a login streak who have not come in today get a nudge
+let pushNudgeDay = '';
+function pushTick() {
+  const bk = new Date(now() + 7 * 3600e3), today = Q.dayKey(); if (bk.getUTCHours() !== 19 || pushNudgeDay === today) return;
+  pushNudgeDay = today;
+  const y = new Date(now() + 7 * 3600e3 - 864e5).toISOString().slice(0, 10);
+  for (const o of accounts.values()) if (o.push?.length && !o.ws && o.lastLogin === y && (o.loginStreak || 0) >= 2)
+    PUSH.send(o, `🔥 ต่อสตรีควันที่ ${o.loginStreak + 1} กันเถอะ!`, 'เข้าเมืองวันนี้รับโบนัสเข้าเกม ก่อนสตรีคหาย', { tag: 'streak' });
+}
+setInterval(() => { try { pushTick(); } catch (e) { console.error('pushTick', e); } }, 60e3).unref?.();
 function lbNote(o, icon, text) {
   if (!o || !o.login) return;
+  if (!o.ws) PUSH.send(o, '📘 lifebook', `${icon} ${String(text).slice(0, 120)}`);   // away: the phone tells them
   o.lbn = [{ t: now(), ic: icon, text: String(text).slice(0, 160) }, ...(o.lbn || [])].slice(0, 40);
   o.sd = true; dirty = true; if (o.ws) markMe(o);
 }
@@ -1418,11 +1434,12 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
   const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -1499,7 +1516,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', vapid: vapidKeys, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -2765,6 +2782,7 @@ function act(a, m) {
       a.hlv = T.floors; a.yz = [0, 2].slice(0, T.zones); a.yfree = 0; starterYard(a);
       plotGive(a); markMe(a); wdAt = 0; joy(a, 20);
       feed(`🏠 ${a.name} ซื้อ${T.name}หลังใหม่!`);
+      send(a, { t: 'share', k: 'house', name: T.name });   // 📤 offer the share card
       return toast(a, `ยินดีด้วย! ได้${T.name}แล้ว 🎉 บ้านของคุณจะตั้งอยู่ในหมู่บ้านตอนที่คุณออนไลน์ · กด "🏠 ไปบ้านฉัน" กับคุณจิ๋มได้เลย`, '🏠');
     }
     case 'estate.style': {                  // repaint the outside
@@ -4062,7 +4080,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4220,7 +4238,7 @@ function login(ws, m, pre) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, vapid: PUSH.publicKey(), pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
@@ -4609,6 +4627,8 @@ function onMessage0(ws, raw) {
     case 'god': return godAct(a, m);
     case 'fishcol': return fishCol(a, m);
     case 'aq': return aqAct(a, m);
+    case 'pushsub': { if (!cd(a, 'pushsub', 3000, true)) return; const ok = PUSH.subscribe(a, m.sub); markMe(a); if (ok && m.first) PUSH.send(a, '🔔 เปิดแจ้งเตือนแล้ว!', 'เราจะเตือนตอนซอมบี้/หมาป่าบุก มีคนคอมเมนต์ หรือสตรีคใกล้หาย (ไม่เกินวันละ 4 ครั้ง)', { force: true }); return; }
+    case 'pushoff': PUSH.unsubscribe(a, String(m.endpoint || '')); markMe(a); return;
     case 'lbnseen': a.lbnSeen = now(); a.sd = true; markMe(a); return;
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
       if (!a.run0 || a.career !== 'beggar' && !allJobs(a)) return;
