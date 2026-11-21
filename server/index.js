@@ -1928,6 +1928,21 @@ function waterSpot(a) {
   const pool = D.waterPool(a.x, a.y); if (!pool) return null;
   return { id: 'water', type: 'pier', pool, label: 'ตกปลา', icon: '🎣', x: a.x, y: a.y, r: 3, area: areaId(a) };
 }
+// the abbot's rounds: every 2-5 minutes he walks to the lotus pond; whoever is still fishing there 10 s after his warning is sent out to the temple gate
+let monkT = now() + 120e3;
+function monkTick() {
+  const t = now(); if (t < monkT) return;
+  monkT = t + 120e3 + Math.random() * 180e3;
+  if (![...online.values()].some(o => o.cast?.pool === 'temple')) return;
+  toArea('temple', { t: 'toast', msg: '🙏 หลวงพ่อเดินมาตรวจสระบัว! "ใครแอบตกปลาในวัด อาตมาจะไล่ออกนะโยม" · รีบเก็บเบ็ดภายใน 10 วิ!', icon: '🧘', ok: false });
+  setTimeout(() => {
+    const g = D.GATES.town_from_temple;
+    for (const o of online.values()) if (o.cast?.pool === 'temple' && areaId(o) === 'temple') {
+      teleport(o, g.x, g.y); toast(o, 'โดนหลวงพ่อไล่ออกไปหน้าวัด! "ปลาในวัดเขาปล่อยทำบุญนะโยม"', '🧘', false);
+    }
+  }, 10e3);
+}
+setInterval(() => { try { monkTick(); } catch (e) { console.error('monkTick', e); } }, 5e3).unref?.();
 // ------------------------------------------------------------------ easter eggs
 const dayKey = () => new Date(now() + 7 * 3600e3).toISOString().slice(0, 10);   // Thai calendar day
 const eggOf = a => { a.egg = a.egg || {}; a.egg.s = a.egg.s || []; return a.egg; };

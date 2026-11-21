@@ -4941,6 +4941,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ai', d: '21 พ.ย.', items: [
+    '🎨 ปลาวัดทั้ง 6 ชนิดมีรูปของตัวเองแล้ว (ดูในสมุดปลาได้)',
+    '🧘 <b>หลวงพ่อเดินตรวจสระบัวเป็นระยะ!</b> ถ้าเห็นคำเตือนต้องเก็บเบ็ดภายใน 10 วิ ไม่งั้นโดนไล่ออกไปหน้าวัด',
+  ] },
   { v: '2026-11-23ah', d: '21 พ.ย.', items: [
     '🪷 <b>ปลาพิเศษเฉพาะวัด!</b> ตกปลาที่สระบัวหน้าโบสถ์ได้ 6 ชนิดใหม่ที่ไม่มีที่อื่น: ตะเพียนทองสระบัว · หางนกยูงกลีบบัว · ไหลเผือกปล่อยบุญ · เต่าปล่อยวัดอายุร้อยปี · คาร์ปลายยันต์',
     '🐉 ตำนานใหม่: <b>ปลาพญานาคราช</b> ซ่อนอยู่ในสระบัววัด หายากสุดๆ ลองไปเสี่ยงดู!',
@@ -6595,7 +6599,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=2').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=3'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v11').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v11'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v12').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v12'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp

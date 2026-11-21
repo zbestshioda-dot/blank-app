@@ -1029,12 +1029,12 @@ const ITEMS = {
   goldenfish:{ name: 'ปลาทองคำ', icon: '✨', kind: 'fish', base: 5000, rar: 5 },
   mayorkoi:  { name: 'ปลาทองยักษ์นายกฯ', icon: '🐡', kind: 'fish', base: 15000, rar: 5, legend: 1 },
   // temple-only fish: they live in the lotus pond of the temple and nowhere else
-  tp_tapian: { name: 'ปลาตะเพียนทองสระบัว', icon: '🐟', kind: 'fish', base: 110, rar: 2, temple: 1, spr0: 'carp' },
-  tp_lotus:  { name: 'ปลาหางนกยูงกลีบบัว', icon: '🪷', kind: 'fish', base: 160, rar: 2, temple: 1, spr0: 'guppy' },
-  tp_merit:  { name: 'ปลาไหลเผือกปล่อยบุญ', icon: '🤍', kind: 'fish', base: 420, rar: 3, temple: 1, spr0: 'eel' },
-  tp_turtle: { name: 'เต่าปล่อยวัดอายุร้อยปี', icon: '🐢', kind: 'fish', base: 520, rar: 3, temple: 1, spr0: 'turtle' },
-  tp_koi:    { name: 'ปลาคาร์ปลายยันต์', icon: '🎏', kind: 'fish', base: 1300, rar: 4, temple: 1, spr0: 'koi' },
-  tp_naga:   { name: 'ปลาพญานาคราช', icon: '🐉', kind: 'fish', base: 7000, rar: 5, temple: 1, spr0: 'seadragon' },
+  tp_tapian: { name: 'ปลาตะเพียนทองสระบัว', icon: '🐟', kind: 'fish', base: 110, rar: 2, temple: 1 },
+  tp_lotus:  { name: 'ปลาหางนกยูงกลีบบัว', icon: '🪷', kind: 'fish', base: 160, rar: 2, temple: 1 },
+  tp_merit:  { name: 'ปลาไหลเผือกปล่อยบุญ', icon: '🤍', kind: 'fish', base: 420, rar: 3, temple: 1 },
+  tp_turtle: { name: 'เต่าปล่อยวัดอายุร้อยปี', icon: '🐢', kind: 'fish', base: 520, rar: 3, temple: 1 },
+  tp_koi:    { name: 'ปลาคาร์ปลายยันต์', icon: '🎏', kind: 'fish', base: 1300, rar: 4, temple: 1 },
+  tp_naga:   { name: 'ปลาพญานาคราช', icon: '🐉', kind: 'fish', base: 7000, rar: 5, temple: 1 },
   // second sheet: freshwater (lake/river) and sea fish, plus a few sea creatures
   bluegill:  { name: 'ปลาบลูกิล', icon: '🐟', kind: 'fish', base: 35, rar: 1, w: 'f' },
   perch:     { name: 'ปลาเพิร์ช', icon: '🐟', kind: 'fish', base: 45, rar: 1, w: 'f' },
