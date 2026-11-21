@@ -645,7 +645,7 @@ function handle(m) {
       if (panel?.kind === 'wpray') refreshPanel(true);
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
-    case 'nbstep': FX.play('levelup'); setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && S[i].go) setGuide(S[i].go, true); }, 900); break;
+    case 'nbstep': FX.play('levelup'); if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && S[i].go) setGuide(S[i].go, true); }, 900); break;
     case 'catch': catchPop(m.item, m.first); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
     case 'egg': eggFx(m); break;
@@ -729,7 +729,7 @@ function handle(m) {
     case 'reset': try { localStorage.removeItem('lt_tut2'); } catch { } guide = null; setTimeout(() => showTut(0), 600); break;
     case 'crave': FX.play('ding'); break;
     case 'ach': FX.play('levelup'); { const s = P.get(myId); if (s) { FX.burst(s.x, s.y, '#ffd34d', 24); FX.ring(s.x, s.y, '#ffd34d', 900, 1.6); } } break;
-    case 'daily': if (tutPending) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
+    case 'daily': if (dailyWait()) pendingDaily = m; else setTimeout(() => showDaily(m), 700); break;
     case 'quest': {
       const s = P.get(myId);
       if ((m.kind === 'done' || m.kind === 'wdone') && QUEST_GIVER[m.type]) questPop(m.type, m.text, QUEST_GIVER[m.type].thx, m.reward);
@@ -5159,7 +5159,7 @@ const NEWS = [
   { v: '2026-11-23aq', d: '21 พ.ย.', items: [
     '🌱 <b>ภารกิจมือใหม่ 10 นาที</b> สำหรับผู้เล่นใหม่: ซื้อเบ็ด → ตกปลา 3 ตัว → ขาย (เงินก้อนแรก) → ทักทายในแชท → ซื้อของชิ้นแรก → ส่งอีโมจิใกล้เพื่อน ทุกข้อได้รางวัลทันที ครบได้ 💎10 + 🥚 ไข่สัตว์เลี้ยง',
     '🤝 มีคนใหม่ย้ายมาเมือง จะมีประกาศ · ทักทายเขาในแชทโลกภายใน 3 นาที รับ ฿50 (วันละ 3 ครั้ง)',
-    '📖 บทแนะนำตอนเริ่มเกมสั้นลง เหลือ 4 หน้า',
+    '📖 บทแนะนำตอนเริ่มเกมสั้นลง เหลือ 4 หน้า · ผู้เล่นใหม่จะเห็นโบนัสเข้าเกมหลังทำภารกิจมือใหม่ข้อแรกเสร็จ',
   ] },
   { v: '2026-11-23ap', d: '21 พ.ย.', items: [
     '🔔 <b>แจ้งเตือนบนมือถือ/คอม</b> แม้ไม่ได้เปิดเกม: ซอมบี้/หมาป่ากำลังบุก มีคนคอมเมนต์ใน lifebook สตรีคใกล้หาย (เปิดที่ ⚙️ ตั้งค่า · ไม่เกินวันละ 4 ครั้ง · iPhone ต้องเพิ่มเกมไปหน้าจอโฮมก่อน)',
@@ -7562,6 +7562,8 @@ const TUT = () => [
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป · หางานทำได้กับ NPC เจ้าหน้าที่ 💬 ตามร้านต่างๆ'],
 ];
 let tutStep = 0, tutPending = false, pendingDaily = null;
+// the login bonus waits through the tutorial, and for newcomers until their first starter step is done (one thing at a time)
+const dailyWait = () => tutPending || !!(me?.nb && !(me.nb.p || []).some(Boolean));
 function showTut(i = 0) {
   tutStep = i; const steps = TUT(), [icon, title, body] = steps[i];
   $('#tut').classList.remove('hidden');
@@ -7571,7 +7573,7 @@ function showTut(i = 0) {
 $('#tutNext').onclick = () => { FX.play('click'); if (tutStep < TUT().length - 1) return showTut(tutStep + 1); endTut(); };
 $('#tutSkip').onclick = endTut;
 function endTut() {
-  tutPending = false; if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
+  tutPending = false; if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
   $('#tut').classList.add('hidden'); try { localStorage.setItem('lt_tut2', '1'); } catch { }
   if (me?.nb && G.nbSteps) { const p = me.nb.p || [], i = G.nbSteps.findIndex((st, j) => (p[j] || 0) < st.n); if (i >= 0 && G.nbSteps[i].go) setGuide(G.nbSteps[i].go, false, true); }
   else if (me && me.career === 'none' && !me.rod) { setGuide('staff_fishing', true); toast('ลูกศรสีเหลืองจะพาไปหาน้าเล็ก ซื้อเบ็ดแล้วตกปลาหาเงินก้อนแรก!', '🎣'); }
