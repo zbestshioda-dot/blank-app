@@ -38,7 +38,8 @@ def faces_right(rgb, m):
 # 'pink' recolours a bright blue shirt to the pink of the front frames (so the shirt does not change colour as they walk)
 SHEET_FIX = {'racer': {'frames': {'down2': (0, 0), 'left2': (2, 0)}, 'pink': 1},   # (the 3rd front / side cells carry another shirt with a beer logo)
              'fracer': {'frames': {'down2': (0, 0)}, 'pink': 1},
-             'fwinter': {'green': 1}}   # (the hat / coat come out purple in some cells, green in others)
+             'fwinter': {'green': 1},
+             'rider': {'frames': {'down1': (0, 2)}}}   # (one front cell has the polo shirt instead of the jacket)   # (the hat / coat come out purple in some cells, green in others)
 
 def greenify(im):
     r, g, b = im[..., 0], im[..., 1], im[..., 2]

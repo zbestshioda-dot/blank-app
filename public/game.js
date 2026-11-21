@@ -109,7 +109,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b4', chSheets = {};
+const CH_V = 'b5', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -4684,6 +4684,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23m', d: '23 พ.ย.', items: [
+    '👮 ชุดอาชีพโฉมใหม่ ทั้งชายและหญิง: ตำรวจ หมอ ไรเดอร์ (สาวไรเดอร์มีชุดของตัวเองแล้ว) และขอทาน',
+  ] },
   { v: '2026-11-23l', d: '23 พ.ย.', items: [
     '🎁 <b>กิจกรรมล็อกอิน 7 วัน</b> (ถึง 14 ธ.ค.) เข้าเกมวันไหนก็ได้ครบ 7 วัน รับ <b>ชุดไหมพรมกันหนาว</b> ฟรี! ระหว่างทางมีเงิน เพชร และไข่สัตว์เลี้ยง · กดไอคอน 🎁 ใต้มือถือ',
   ] },
