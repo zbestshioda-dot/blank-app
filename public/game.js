@@ -3587,7 +3587,8 @@ const MINI_COLORS = { '=': '#555a63', ',': '#b7b4a6', c: '#a89c86', w: '#4aa3d1'
 function buildMini() {
   for (const a of G.areas.filter(a => a.kind === 'map')) {
     const c = document.createElement('canvas'); c.width = a.w * 2; c.height = a.h * 2; const g = c.getContext('2d');
-    for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) { g.fillStyle = MINI_COLORS[G.map.tiles[a.y + y][a.x + x]] || '#5e9b57'; g.fillRect(x * 2, y * 2, 2, 2); }
+    for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) { const ch = G.map.tiles[a.y + y][a.x + x]; g.fillStyle = SNOW && '.om'.includes(ch) ? '#dfe7f0' : SNOW && ch === 'T' ? '#7fa58a' : MINI_COLORS[ch] || '#5e9b57'; g.fillRect(x * 2, y * 2, 2, 2); }
+    drawZonesOnMap(g, a, 2, false);
     // buildings as clean blocks in the same colours as the big map (shops/services, scenery, homes)
     for (const b of G.map.buildings) {
       if (b.x < a.x || b.x >= a.x + a.w || b.y < a.y || b.y >= a.y + a.h) continue;
@@ -3597,6 +3598,32 @@ function buildMini() {
     }
     miniBase[a.id] = c;
   }
+}
+// the football pitch and the amusement park's rides painted onto a map canvas (minimap: k = 2 px per tile; big map: k = its scale)
+function drawZonesOnMap(g, A, k, icons) {
+  if (A.id !== 'town') return;
+  const L = (x, y) => [(x - A.x) * k, (y - A.y) * k];
+  const P0 = G.football?.pitch;
+  if (P0) {
+    const [px, py] = L(P0.x, P0.y), w = P0.w * k, h = P0.h * k;
+    for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#5aa04f' : '#66ad5a'; g.fillRect(px + w * i / 6, py, w / 6 + .5, h); }
+    g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = Math.max(1, k * .18); g.strokeRect(px, py, w, h);
+    g.beginPath(); g.moveTo(px + w / 2, py); g.lineTo(px + w / 2, py + h); g.stroke();
+    g.beginPath(); g.arc(px + w / 2, py + h / 2, Math.min(w, h) * .16, 0, 7); g.stroke();
+    const gh = G.football.goalH * k; g.fillStyle = '#ffffff'; g.fillRect(px - k * .6, py + (h - gh) / 2, k * .6, gh); g.fillRect(px + w, py + (h - gh) / 2, k * .6, gh);
+    for (const d of G.football.deco) if (d[0] === 'stands' || d[0] === 'dugout' || d[0] === 'score' || d[0] === 'kiosk') {
+      const sw = d[0] === 'stands' ? 6 : d[0] === 'dugout' ? 4 : d[0] === 'score' ? 3 : 2, sh = d[0] === 'stands' ? 3 : 1.6, [x, y] = L(d[1] - sw / 2, d[2] - sh);
+      g.fillStyle = d[0] === 'stands' ? '#5f8fb0' : d[0] === 'score' ? '#34383f' : '#b07a4a'; g.fillRect(x, y, sw * k, sh * k);
+    }
+    if (icons) { g.font = `${Math.max(10, k * 2.2)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('⚽', px + w / 2, py + h / 2); }
+  }
+  const RC = { carousel: '#f29ac1', ferris: '#f7c25c', coaster: '#e0675a', pool: '#5fc2ea', bumper: '#9b86e0', shooting: '#f2a35c' };
+  for (const st of G.stations) if (st.type === 'ride' && st.w) {
+    const [x, y] = L(st.cx - st.w / 2, st.cy - st.h / 2);
+    g.fillStyle = RC[st.k] || '#f29ac1'; g.beginPath(); g.roundRect ? g.roundRect(x, y, st.w * k, st.h * k, Math.min(6, k)) : g.rect(x, y, st.w * k, st.h * k); g.fill();
+    if (icons) { g.font = `${Math.max(10, k * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(st.icon, x + st.w * k / 2, y + st.h * k / 2); }
+  }
+  if (G.parkArch) { const [x, y] = L(G.parkArch.x - 2, G.parkArch.y - .8); g.fillStyle = '#e88ab4'; g.fillRect(x, y, 4 * k, .8 * k); }
 }
 const outPos = (x, y) => { const r = roomOf(x, y); return r ? r.outside : { x, y }; };
 function drawMini() {
@@ -4624,6 +4651,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23i', d: '23 พ.ย.', items: [
+    '🗺️ มินิแมพและแผนที่ใหญ่อัปเดตแล้ว: เห็นย่านใต้ สวนสนุก (เครื่องเล่นแต่ละสี) สนามฟุตบอล และลานน้ำพุ กดหมุดในแผนที่เพื่อนำทางไปได้ · พื้นในแผนที่เป็นหิมะตามฤดู',
+  ] },
   { v: '2026-11-23h', d: '23 พ.ย.', items: [
     '⛲ ลานว่างกลางเมือง (ที่เคยเป็นซุ้มสวนสนุก) กลายเป็นลานน้ำพุ มีม้านั่งให้นั่งพัก และรถไอติม & ขนมเปิดขาย',
   ] },
@@ -6756,6 +6786,7 @@ function openMap(mapId, keepScroll) {
     g.fillStyle = SNOW && '.TBomg'.includes(ch) ? '#e6edf5' : MAP_COL[ch === 'T' || ch === 'B' || ch === 'o' ? '.' : ch] || '#8cc56f'; g.fillRect(x * k, y * k, k + .6, k + .6);
     if (ch === 'T') { g.fillStyle = '#4f8f43'; g.beginPath(); g.arc((x + .5) * k, (y + .5) * k, k * .45, 0, 7); g.fill(); }
   }
+  drawZonesOnMap(g, A, k, false);
   const L = (x, y) => [(x - A.x) * k, (y - A.y) * k];
   const places = [], dot = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
   // buildings as clean blocks
@@ -6778,6 +6809,13 @@ function openMap(mapId, keepScroll) {
     places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.renov ? '🚧 ปิดปรับปรุงชั่วคราว' : s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
   }
   if (mapId === 'town') { const [x, y] = L(50, 32); places.push({ key: 'seatb43.6', icon: '⛲', label: 'จัตุรัสกลางเมือง', sub: 'นั่งเล่น พูดคุย', x, y, kind: 'spot' }); }
+  if (mapId === 'town') {   // the south district and the fountain square
+    const pin = (key, icon, label, sub, tx, ty, kind = 'spot') => { const [x, y] = L(tx, ty); places.push({ key, icon, label, sub, x, y, kind }); };
+    const pa = AREA.park, P0 = G.football?.pitch;
+    if (pa) pin('ride_carousel', '🎡', 'สวนสนุก', 'เครื่องเล่น ร้านขนม ลูกโป่ง', pa.x + pa.w / 2, pa.y + pa.h / 2);
+    if (P0) pin('seat_fb8_0', '⚽', 'สนามฟุตบอล', 'เตะบอลกับเพื่อน นั่งดูบนอัฒจันทร์', P0.x + P0.w / 2, P0.y + P0.h / 2);
+    if (STN('pshop_sq')) pin('pshop_sq', '⛲', 'ลานน้ำพุ', 'ม้านั่ง · รถไอติม & ขนม', 56.5, 58.5);
+  }
   const staffPl = [];   // (job staff pins were taken off the map)
   // place markers: the place's own symbol on a light badge (no numbered black dots); job staff are person pins with their career's symbol
   const r = clamp(k * .95, 8, 13);
