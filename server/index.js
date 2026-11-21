@@ -733,8 +733,8 @@ function znStart(t, test) {
   znSendAll();
 }
 // zombie night is fought in town: the park, the housing estate (and its yards) and the temple are closed
-const ZN_NOGO = id => id === 'park' || id === 'housing' || id === 'temple' || /^yard\d+$/.test(id);
-const ZN_BACK = { park: 'town_from_park', housing: 'town_from_housing', temple: 'town_from_temple' };
+const ZN_NOGO = id => id === 'park' || id === 'field' || id === 'housing' || id === 'temple' || /^yard\d+$/.test(id);
+const ZN_BACK = { field: 'town_from_field', park: 'town_from_park', housing: 'town_from_housing', temple: 'town_from_temple' };
 function znEvict(a) {
   const id = areaId(a); if (!ZN_NOGO(id)) return;
   if (a.fun) rideOff(a);
@@ -1512,12 +1512,13 @@ const TAXI_DEST = [
   ...D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov).map(s => ({ id: s.id, label: s.label, icon: s.icon, x: s.x, y: s.y + .9 })),
   { id: 'park', label: 'สวนสนุก', icon: '🎡', ...D.GATES.park_in },
   { id: 'temple', label: 'วัดเมืองชีวิต', icon: '🛕', ...D.GATES.temple_in },
+  { id: 'field', label: 'สนามฟุตบอล', icon: '⚽', ...D.GATES.field_in },
   { id: 'housing', label: 'หมู่บ้านจัดสรร', icon: '🏘️', ...D.GATES.housing_in },
   { id: 'square', label: 'จัตุรัสกลางเมือง', icon: '⛲', x: 50, y: 34.5 },
 ].filter(d => d.x !== undefined);
 function taxiFee(a, d) {
   let area = areaId(a) || 'town'; if (area.startsWith('yard')) area = 'housing';
-  const OUT = { housing: { x: 50, y: 4 }, park: { x: 54, y: 57.4 }, temple: { x: 74, y: 73.8 } };
+  const OUT = { field: { x: 5.5, y: 32 }, housing: { x: 50, y: 4 }, park: { x: 54, y: 57.4 }, temple: { x: 74, y: 73.8 } };
   const here = OUT[area] || { x: a.x, y: a.y }, there = OUT[d.id] || d;
   return Math.round(TAXI.base + Math.hypot(here.x - there.x, here.y - there.y) * TAXI.perTile + (area !== 'town' ? TAXI.far : 0) + (OUT[d.id] ? TAXI.far : 0));
 }
@@ -1543,8 +1544,8 @@ function taxiCall(a, m) {
 }
 function deliveryFee(x, y) {
   let area = D.areaAt(x, y)?.id || 'town'; if (area.startsWith('yard')) area = 'housing';   // a home yard is reached through the estate street
-  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' ? { x: 3, y: 32 } : area === 'park' ? { x: 55, y: 56.6 } : area === 'temple' ? { x: 74, y: 73.8 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
-  const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' || area === 'park' || area === 'temple' ? 25 : 0);
+  const pos = area === 'town' ? { x, y } : area === 'housing' ? { x: 50, y: 4 } : area === 'farm' || area === 'field' ? { x: 3, y: 32 } : area === 'park' ? { x: 55, y: 56.6 } : area === 'temple' ? { x: 74, y: 73.8 } : D.ROOMS.find(r => r.id === area)?.outside || { x, y };
+  const d = Math.hypot(pos.x - RESTO_OUT.x, pos.y - RESTO_OUT.y) + (area === 'housing' || area === 'farm' || area === 'field' || area === 'park' || area === 'temple' ? 25 : 0);
   return Math.round(D.RIDER.baseFee + d * D.RIDER.perTile);
 }
 const ridersOnline = () => [...online.values()].filter(r => r.career === 'rider' && !r.down);
@@ -2025,7 +2026,7 @@ function act(a, m) {
       const g = D.GATES[s.to]; if (!g) return;
       if (s.renov && !(isAdmin(a) && a.god?.doors)) return toast(a, 'ไร่ชานเมืองปิดปรับปรุงชั่วคราว 🚧', '🚧', false);
       if (ww && D.areaAt(g.x, g.y)?.id !== 'town') return toast(a, '🌕 คืนหมาป่า: ออกนอกเมืองไม่ได้จนกว่าจะฟ้าสาง!', '🐺', false);
-      if (zn && ['park_in', 'housing_in', 'temple_in'].includes(s.to)) return toast(a, '🧟 คืนปล่อยผี: สวนสนุก หมู่บ้านจัดสรร และวัด ปิดชั่วคราว เอาตัวรอดในเมืองให้ได้!', '🚧', false);
+      if (zn && ['park_in', 'housing_in', 'temple_in', 'field_in'].includes(s.to)) return toast(a, '🧟 คืนปล่อยผี: สวนสนุก หมู่บ้านจัดสรร และวัด ปิดชั่วคราว เอาตัวรอดในเมืองให้ได้!', '🚧', false);
       if (!cd(a, 'door', 1200, true)) return;
       return teleport(a, g.x, g.y);
     }
@@ -4042,7 +4043,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -4179,6 +4180,7 @@ function onMessage0(ws, raw) {
   a.ledCtx = ledLabel(a, m);
   switch (m.t) {
     case 'p': return move(a, m);
+    case 'kick': return fbKick(a, m);
     case 'chat': {                          // local chat: only people near you see it (bubble over your head)
       const text = cleanText(m.text, 120); if (!text) return;
       if (isAdmin(a) && /^all(\s|$)/i.test(text)) {   // admin: "all <text>" replaces the ticker notice for everyone, "all" alone restores the CBT notice
@@ -4683,6 +4685,73 @@ function resetChar(a, m) {
 
 // ------------------------------------------------------------------ simulation
 let lastTick = now(), wdAt = 0, saveAt = 0, slowAt = 0, marketAt = 0, lastHour = hourNow();
+// ------------------------------------------------------------------ ⚽ the football ground: one shared ball, simulated here (10 Hz).
+// Walk into the ball to dribble it; the kick button (near the ball) shoots it the way you aim. Across the goal line between the
+// posts = a goal for the other side; the last player to touch it is the scorer. The ball bounces off the touchlines.
+const FB = { x: 0, y: 0, vx: 0, vy: 0, sc: [0, 0], last: null, lastName: '', resetAt: 0, quietAt: 0, sentAt: 0, moved: true };
+const FBP = D.FOOTBALL.pitch, FB_R = .22, FB_GOAL = D.FOOTBALL.goalH / 2;
+function fbCentre() { FB.x = FBP.x + FBP.w / 2; FB.y = FBP.y + FBP.h / 2; FB.vx = FB.vy = 0; FB.moved = true; }
+fbCentre();
+const fbPlayers = () => [...online.values()].filter(o => !o.down && areaId(o) === 'field');
+function fbSend(extra) {
+  const m = JSON.stringify({ t: 'ball', x: +FB.x.toFixed(2), y: +FB.y.toFixed(2), vx: +FB.vx.toFixed(2), vy: +FB.vy.toFixed(2), sc: FB.sc, ...extra });
+  for (const o of online.values()) if (o.ws.readyState === 1 && areaId(o) === 'field') o.ws.send(m);
+}
+function fbTick(t, dt) {
+  const ps = fbPlayers();
+  for (const a of online.values()) { a._fbx = a._fbx ?? a.x; a._fby = a._fby ?? a.y; }
+  if (!ps.length) { for (const a of online.values()) { a._fbx = a.x; a._fby = a.y; } if (t > FB.quietAt && (FB.sc[0] || FB.sc[1] || FB.x !== FBP.x + FBP.w / 2)) { FB.sc = [0, 0]; fbCentre(); } return; }
+  FB.quietAt = t + 5 * 60e3;   // nobody on the ground for 5 minutes: the score is wiped and the ball goes back to the spot
+  if (FB.resetAt) { if (t > FB.resetAt) { FB.resetAt = 0; fbCentre(); fbSend(); } }
+  else {
+    // dribbling: a player walking into the ball pushes it along a little faster than they walk
+    for (const a of ps) {
+      const mx = (a.x - a._fbx) / Math.max(dt, .05), my = (a.y - a._fby) / Math.max(dt, .05), sp = Math.hypot(mx, my);
+      const dx = FB.x - a.x, dy = FB.y - (a.y - .1), d = Math.hypot(dx, dy);
+      if (d < .55 && sp > .5 && sp < 15 && (mx * dx + my * dy) > 0) {
+        const k = Math.min(1.35 * sp, 8) / sp; FB.vx = mx * k; FB.vy = my * k;
+        const nx = d ? dx / d : mx / sp, ny = d ? dy / d : my / sp; FB.x = a.x + nx * .56; FB.y = a.y - .1 + ny * .56;
+        fbTouch(a);
+      }
+    }
+    const n = 4; for (let i = 0; i < n; i++) { FB.x += FB.vx * dt / n; FB.y += FB.vy * dt / n; if (fbEdges()) break; }
+    const f = Math.exp(-1.1 * dt); FB.vx *= f; FB.vy *= f;
+    if (Math.hypot(FB.vx, FB.vy) < .08) FB.vx = FB.vy = 0;
+    if (FB.vx || FB.vy) FB.moved = true;
+  }
+  for (const a of online.values()) { a._fbx = a.x; a._fby = a.y; }
+  if (FB.moved || t > FB.sentAt + 2000) { FB.moved = false; FB.sentAt = t; fbSend(); }
+}
+function fbTouch(a) { if (FB.last !== a.id) { FB.last = a.id; FB.lastName = a.name; } }
+// keep the ball on the pitch; returns true once a goal is scored
+function fbEdges() {
+  const cy = FBP.y + FBP.h / 2, inMouth = Math.abs(FB.y - cy) < FB_GOAL - FB_R;
+  if (FB.x < FBP.x + FB_R || FB.x > FBP.x + FBP.w - FB_R) {
+    if (inMouth) { if (FB.x < FBP.x - .3 || FB.x > FBP.x + FBP.w + .3) { fbGoal(FB.x < FBP.x ? 1 : 0); return true; } }
+    else { FB.x = Math.max(FBP.x + FB_R, Math.min(FBP.x + FBP.w - FB_R, FB.x)); FB.vx *= -.6; }
+  }
+  if (FB.x < FBP.x || FB.x > FBP.x + FBP.w) { const lo = cy - FB_GOAL + FB_R, hi = cy + FB_GOAL - FB_R; if (FB.y < lo || FB.y > hi) { FB.y = Math.max(lo, Math.min(hi, FB.y)); FB.vy *= -.6; } }   // inside the net
+  if (FB.y < FBP.y + FB_R || FB.y > FBP.y + FBP.h - FB_R) { FB.y = Math.max(FBP.y + FB_R, Math.min(FBP.y + FBP.h - FB_R, FB.y)); FB.vy *= -.6; }
+  return false;
+}
+// side: 0 = the blue team (attacks the right-hand goal) scored, 1 = the pink team (attacks the left-hand goal) scored
+function fbGoal(side) {
+  FB.sc[side]++; FB.vx = FB.vy = 0; FB.resetAt = now() + 2500;
+  const a = FB.last && online.get(FB.last), who = a ? a.name : 'ใครสักคน';
+  if (a && areaId(a) === 'field') { joy(a, 4); stat(a, 'goals'); markMe(a); }
+  fbSend({ goal: side, by: who });
+  for (const o of fbPlayers()) toast(o, `⚽ โกล! ${who} ยิงเข้า · ${FB.sc[0]} - ${FB.sc[1]}`, '🥅', false);
+  FB.last = null;
+}
+function fbKick(a, m) {
+  if (areaId(a) !== 'field' || a.down || FB.resetAt || !cd(a, 'kick', 350, true)) return;
+  const d = Math.hypot(FB.x - a.x, FB.y - (a.y - .1)); if (d > 1.3) return;
+  let dx = +m.dx || 0, dy = +m.dy || 0, l = Math.hypot(dx, dy);
+  if (!l || !isFinite(l)) { dx = FB.x - a.x; dy = FB.y - (a.y - .1); l = Math.hypot(dx, dy) || 1; }
+  const p = Math.max(.4, Math.min(1, +m.p || 1)), sp = 7 + 7 * p;
+  FB.vx = dx / l * sp; FB.vy = dy / l * sp; fbTouch(a); FB.moved = true;
+  fbSend({ kick: a.id });
+}
 function tick() {
   stockTick(); passTick();
   for (const a of online.values()) ledSweep(a, 'อื่นๆ');
@@ -4841,6 +4910,7 @@ function tick() {
   // bank interest
   if (slow && t % 30000 < 1000) for (const a of online.values()) if (a.bank > 0 || a.loan > 0) { accrue(a); markMe(a); }
 
+  try { fbTick(t, dt); } catch (e) { console.error('fbTick', e); }
   // positions
   const ps = [];
   for (const a of online.values()) if (a.moved) { a.moved = false; ps.push([a.id, +a.x.toFixed(2), +a.y.toFixed(2), a.f]); }

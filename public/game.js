@@ -612,6 +612,7 @@ function handle(m) {
       for (const id of [...P.keys()]) if (!ids.has(id)) P.delete(id);
       break;
     }
+    case 'ball': fbMsg(m); break;
     case 'ps': for (const [id, x, y, f] of m.p) { const s = P.get(id); if (s && id !== myId) { if (Math.hypot(x - s.x, y - s.y) > 4) { s.rx = x; s.ry = y; } s.x = x; s.y = y; s.f = f; } } break;
     case 'whl': { const o = P.get(m.id); if (o) { o.whlT = performance.now() + 1400; if (Math.hypot(o.x - (P.get(myId)?.x || 0), o.y - (P.get(myId)?.y || 0)) < 12) FX.play('rev'); } break; }
     case 'jg': jgOpen(m.k, m.seed); break;
@@ -1294,6 +1295,95 @@ function talk() {
   toast('ไม่มีใครอยู่ใกล้ๆ เดินเข้าไปใกล้คนที่อยากคุยก่อน', '💬', false);
 }
 
+// ------------------------------------------------------------------ ⚽ the football ground: the pitch picture, goals, stands and the shared
+// ball. The server moves the ball (10 Hz); here it glides between updates (same friction) and rolls as it goes.
+let FBJ = null, FBIMG = null, PITCHIMG = null, fbAsked = false, FBALL = null, fbAim = null;
+function fbLoad() {
+  if (fbAsked) return; fbAsked = true;
+  fetch('assets/football.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { FBJ = j; FBIMG = im; }; im.src = 'assets/football.webp?v=1'; }).catch(() => { fbAsked = false; });
+  const p = new Image(); p.onload = () => { PITCHIMG = p; }; p.src = 'assets/pitch.webp?v=1';
+}
+function fbMsg(m) {
+  const b = FBALL || (FBALL = { rx: m.x, ry: m.y, rot: 0 });
+  Object.assign(b, { x: m.x, y: m.y, vx: m.vx, vy: m.vy, t0: performance.now(), sc: m.sc });
+  if (Math.hypot(b.rx - m.x, b.ry - m.y) > 3) { b.rx = m.x; b.ry = m.y; }
+  if (m.kick) FX.play(m.kick === myId ? 'pop' : 'click');
+  if (m.goal !== undefined) {
+    const P0 = G.football.pitch, gx = m.goal ? P0.x - .6 : P0.x + P0.w + .6, gy = P0.y + P0.h / 2;
+    FX.burst(gx, gy - .5, m.goal ? '#ff8fc4' : '#7cc4ff', 30); FX.burst(gx, gy - 1, '#ffe27a', 20); FX.play('levelup');
+    FX.float(gx, gy - 1.6, `⚽ โกล! ${m.by}`, '#fff', .9);
+  }
+}
+function fbStep(dt) {
+  const b = FBALL; if (!b) return;
+  const P0 = G.football.pitch, tau = (performance.now() - b.t0) / 1000, k = (1 - Math.exp(-1.1 * tau)) / 1.1;
+  let px = b.x + b.vx * k, py = b.y + b.vy * k;
+  if (Math.abs(py - (P0.y + P0.h / 2)) > G.football.goalH / 2) px = clamp(px, P0.x + .22, P0.x + P0.w - .22);
+  py = clamp(py, P0.y + .22, P0.y + P0.h - .22);
+  const ox = b.rx, oy = b.ry, a = Math.min(1, dt * 12); b.rx += (px - b.rx) * a; b.ry += (py - b.ry) * a;
+  b.rot += Math.hypot(b.rx - ox, b.ry - oy) * 4 * (b.rx >= ox ? 1 : -1);
+}
+function fbKick() {
+  const m = P.get(myId); if (!m || !FBALL) return;
+  const t = performance.now(); if (t < actCd) return; actCd = t + 350;
+  let dx = FBALL.rx - m.x, dy = FBALL.ry - (m.y - .1);
+  if (fbAim && t - fbAim[2] < 400) { dx = fbAim[0]; dy = fbAim[1]; }   // running: shoot the way you run
+  send({ t: 'kick', dx: +dx.toFixed(3), dy: +dy.toFixed(3), p: 1 });
+  FX.play('whoosh');
+}
+function drawPitch(X, Y) {
+  fbLoad(); const P0 = G.football.pitch;
+  if (!PITCHIMG) { ctx.fillStyle = 'rgba(120,170,110,.5)'; ctx.fillRect(P0.x * TS + X, P0.y * TS + Y, P0.w * TS, P0.h * TS); return; }
+  const W = P0.w / .955, H = P0.h / .9408;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(PITCHIMG, Math.round((P0.x - .0225 * W) * TS + X), Math.round((P0.y - .0296 * H) * TS + Y), Math.round(W * TS), Math.round(H * TS));
+}
+function fbEnts(ents, vis) {
+  const P0 = G.football.pitch, cy = P0.y + P0.h / 2, gh = G.football.goalH / 2;
+  for (const d of G.football.deco) if (vis(d[1], d[2], 8)) ents.push([d[2], 15, { k: 'deco', s: d[0], x: d[1], y: d[2] }]);
+  ents.push([cy + gh, 15, { k: 'goal', side: 0 }], [cy + gh, 15, { k: 'goal', side: 1 }]);
+  if (FBALL) { fbStep(Math.min(.1, (performance.now() - (FBALL.ft || performance.now())) / 1000)); FBALL.ft = performance.now(); if (vis(FBALL.rx, FBALL.ry, 2)) ents.push([FBALL.ry + .05, 15, { k: 'ball' }]); }
+}
+function fbSpr(name, x, y, X, Y, sc = 1) {
+  const s = FBJ?.sprites[name]; if (!s) return null;
+  const w = s[4] * TS * sc, h = w * s[3] / s[2], px = Math.round(x * TS + X - w / 2), py = Math.round(y * TS + Y - h);
+  ctx.drawImage(FBIMG, s[0], s[1], s[2], s[3], px, py, Math.round(w), Math.round(h)); return { px, py, w, h };
+}
+function drawFb(e, X, Y, t) {
+  if (e.k === 'deco') {
+    const r = fbSpr(e.s, e.x, e.y, X, Y); if (!r || e.s !== 'score') return;
+    const sc = FBALL?.sc || [0, 0], cx = r.px + r.w / 2, cy = r.py + r.h * .32;
+    ctx.font = `bold ${Math.round(TS * .62)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#7cc4ff'; ctx.fillText(sc[0], cx - r.w * .24, cy); ctx.fillStyle = '#ff8fc4'; ctx.fillText(sc[1], cx + r.w * .24, cy);
+    ctx.fillStyle = '#ffe27a'; ctx.font = `bold ${Math.round(TS * .4)}px sans-serif`; ctx.fillText('-', cx, cy);
+    ctx.font = `bold ${Math.round(TS * .22)}px sans-serif`; ctx.fillStyle = '#cfd8e3'; ctx.fillText('ฟ้า      ชมพู', cx, cy + TS * .5);
+    return;
+  }
+  if (e.k === 'goal') {   // seen from the side: two posts, a crossbar and a net that slopes back
+    const P0 = G.football.pitch, cy = P0.y + P0.h / 2, gh = G.football.goalH / 2, dir = e.side ? 1 : -1;
+    const gx = (e.side ? P0.x + P0.w : P0.x) * TS + X, bx = gx + dir * 1.3 * TS, y0 = (cy - gh) * TS + Y, y1 = (cy + gh) * TS + Y, z = 1.35 * TS, zb = .7 * TS;
+    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(gx, y0 - z); ctx.lineTo(bx, y0 - zb); ctx.lineTo(bx, y1 - zb); ctx.lineTo(gx, y1 - z); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.13)'; ctx.fillRect(Math.min(gx, bx), y0, Math.abs(bx - gx), y1 - y0);
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 1; i < 10; i++) { const yy = y0 + (y1 - y0) * i / 10; ctx.moveTo(gx, yy - z); ctx.lineTo(bx, yy - zb); ctx.lineTo(bx, yy); }
+    for (let i = 1; i < 4; i++) { const xx = gx + (bx - gx) * i / 4, zz = z + (zb - z) * i / 4; ctx.moveTo(xx, y0 - zz); ctx.lineTo(xx, y1 - zz); }
+    ctx.stroke();
+    ctx.strokeStyle = '#f4f6fa'; ctx.lineWidth = Math.max(2, TS * .09); ctx.lineCap = 'round'; ctx.beginPath();
+    ctx.moveTo(gx, y0); ctx.lineTo(gx, y0 - z); ctx.lineTo(gx, y1 - z); ctx.lineTo(gx, y1);
+    ctx.moveTo(gx, y0 - z); ctx.lineTo(bx, y0 - zb); ctx.lineTo(bx, y0); ctx.moveTo(gx, y1 - z); ctx.lineTo(bx, y1 - zb); ctx.lineTo(bx, y1); ctx.moveTo(bx, y0 - zb); ctx.lineTo(bx, y1 - zb);
+    ctx.stroke(); ctx.lineCap = 'butt';
+    return;
+  }
+  if (e.k === 'ball') {
+    const b = FBALL, px = b.rx * TS + X, py = b.ry * TS + Y, r = TS * .26;
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(px, py + r * .15, r * 1.05, r * .45, 0, 0, 7); ctx.fill();
+    const s = FBJ?.sprites.ball;
+    ctx.save(); ctx.translate(px, py - r); ctx.rotate(b.rot);
+    if (s) ctx.drawImage(FBIMG, s[0], s[1], s[2], s[3], -r, -r, r * 2, r * 2);
+    else { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(0, 0, r * .35, 0, 7); ctx.fill(); }
+    ctx.restore();
+  }
+}
 // ------------------------------------------------------------------ interaction
 let near = null, actCd = 0;
 function findNear() {
@@ -1307,6 +1397,7 @@ function findNear() {
   }
   // ☂️ the umbrella man (only around while it rains): a yellow ring and the action button talk to him
   for (const p of P.values()) if (p.umb && p.npc) { const d = Math.hypot(p.x - m.x, p.y - m.y); if (d <= 1.8 && d < bd) { bd = d; best = { id: 'umbman', type: 'umb', npc: p, label: 'คุยกับลุงชัย (ซื้อร่ม)', icon: '☂️', x: p.x, y: p.y, r: 1.8, area: here }; } }
+  if (here === 'field' && FBALL) { const d = Math.hypot(FBALL.rx - m.x, FBALL.ry - (m.y - .1)); if (d <= 1.25 && d < bd + .6) { bd = d; best = { id: 'fbball', type: 'ball', icon: '⚽', label: '⚽ เตะ!' }; } }   // ⚽ near the ball: the action button kicks it
   // vegetable fields laid out in a home yard
   const ya = AREA[here];
   if (ya?.yard) { const h = wd?.houses?.[ya.house]; if (h) for (const k of h[2]) {
@@ -1334,6 +1425,7 @@ function onAction() {
   if (me.pass) return send({ t: 'hopoff' });
   if (!near && onBike()) { const t0 = performance.now(); if (t0 < actCd) return; actCd = t0 + 1800; return send({ t: 'wheelie' }); }
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
+  if (near.type === 'ball') return fbKick();
   const t = performance.now();
   const master = me.admin && me.god?.doors;
   if (near.type === 'door' && near.renov && !master) return toast(`${near.label} ปิดปรับปรุงชั่วคราว 🚧`, '🚧', false);
@@ -1448,6 +1540,7 @@ function frame(t) {
       if (stepAcc > 0.62) { stepAcc = 0; FX.play('step', tileAt(Math.floor(m.x), Math.floor(m.y))); if (Math.random() < .5) FX.dust(m.x, m.y); }
     }
     if (autoPath) autoPath.stuck = Math.hypot(m.x - ox0, m.y - oy0) < .004 ? autoPath.stuck + dt : 0;
+    if (dx || dy) fbAim = [dx, dy, performance.now()];
     // watchdog: trying to walk but not moving for a while (and not against a wall) -> clear whatever holds us and ask the server to resync
     { const tryMove = (dx || dy) && !me.down, moved = Math.hypot(m.x - ox0, m.y - oy0) > .002, wall = tryMove && blockedAt(m.x + Math.sign(dx) * .35, m.y + Math.sign(dy) * .35);
       stuckT = tryMove && !moved && !wall ? stuckT + dt : 0;
@@ -1533,6 +1626,7 @@ function draw(t) {
     if (!myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawEdges(tx, ty, tx * TS + X, ty * TS + Y);
   }
   if (myRoom) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if ('io'.includes(G.map.tiles[ty][tx])) for (let d = 0; d < 4; d++) if (tileAt(tx + SIDES[d][0], ty + SIDES[d][1]) === '#') edgeDraw('curbShadow', d, tx * TS + X, ty * TS + Y);
+  if (A?.id === 'field') drawPitch(X, Y);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const night = nightLevel();
   for (const s of G.stations) {
@@ -1553,6 +1647,7 @@ function draw(t) {
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'park') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
   if (A?.id === 'park' || A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
+  if (A?.id === 'field') fbEnts(ents, vis);
   if (A?.id === 'park' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
   if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
@@ -1600,6 +1695,7 @@ function draw(t) {
     else if (k === 11) drawWat(e, X, Y, t);
     else if (k === 12) drawWatWall(e, X, Y);
     else if (k === 13) drawWatTownGate(e, X, Y);
+    else if (k === 15) drawFb(e, X, Y, t);
     else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
     else drawPlayer(e, X, Y, t);
   }
@@ -4525,6 +4621,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23e', d: '23 พ.ย.', items: [
+    '⚽ เปิดสนามฟุตบอลสาธารณะ! ทางเข้าอยู่ริมถนนฝั่งซ้ายของเมือง (ทางไปไร่เก่า) หรือเรียกแท็กซี่ไปก็ได้',
+    '🥅 เตะบอลได้จริง ทุกคนในสนามเห็นลูกเดียวกัน เดินชนบอลเพื่อเลี้ยง เข้าใกล้แล้วกดปุ่ม ⚽ เตะ (ยิงไปทางที่วิ่งอยู่)',
+    '📺 ป้ายสกอร์ ฟ้า - ชมพู ยิงเข้าประตูขวา = ทีมฟ้าได้แต้ม ประตูซ้าย = ทีมชมพู คนยิงได้ความสุขเพิ่ม',
+  ] },
   { v: '2026-11-23d', d: '23 พ.ย.', items: [
     '📱 แก้ iPhone/iPad จอดำและขึ้น "กำลังเชื่อมต่อใหม่" วนไม่หยุด หลังอัปเดตหิมะ (ตอนนี้โหลดเบาลงมาก)',
   ] },
@@ -6544,7 +6645,7 @@ function drawLights(X, Y, dark) {
 }
 
 // ------------------------------------------------------------------ navigation across maps
-const GATE_TO = { temple_in: 'temple', town_from_temple: 'town', farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
+const GATE_TO = { field_in: 'field', town_from_field: 'town', temple_in: 'temple', town_from_temple: 'town', farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
 function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
