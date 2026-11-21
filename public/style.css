@@ -1446,3 +1446,29 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .wwSk{background:linear-gradient(#9b4dff,#5a1fa8)!important;box-shadow:0 0 0 3px #d6a8ff inset,0 0 14px rgba(180,77,255,.8)!important;color:#fff}.wwSk small{color:#fff!important}.wwSk.wwCd{filter:grayscale(.7) brightness(.75)}
 /* 👑 admin names in the chat: a moving rainbow, so players can tell the team apart */
 .admN{background:linear-gradient(90deg,#ff5e5e,#ffbd3d,#5fe07a,#45c2ff,#b06bff,#ff5e5e);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:admName 3s linear infinite;font-weight:800;filter:drop-shadow(0 0 2px rgba(255,220,120,.55))}
+
+/* 🎁 7-day login event: a glowing gift tile under the phone, and its panel (banner + 7 reward cells) */
+#ev7Btn{position:relative;background:linear-gradient(#fff3c4,#f0a63a)!important;border:2px solid #8a4a12!important;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 3px 0 #8a4a12,0 0 12px rgba(255,200,90,.9)!important;animation:ev7Glow 1.4s ease-in-out infinite}
+#ev7Btn b.q{font-size:22px;display:inline-block;animation:ev7Wig 2.4s ease-in-out infinite}
+#ev7Btn em{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);font:700 10px/1 sans-serif;font-style:normal;color:#fff;background:#b43a2a;border:1.5px solid #fff;border-radius:8px;padding:2px 5px;white-space:nowrap}
+#ev7Btn.has::after{content:'';position:absolute;right:-3px;top:-3px;width:12px;height:12px;border-radius:50%;background:#e04a35;border:2px solid #fff}
+@keyframes ev7Glow{50%{box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 3px 0 #8a4a12,0 0 22px rgba(255,220,120,1)}}
+@keyframes ev7Wig{0%,70%,100%{transform:rotate(0)}76%{transform:rotate(-14deg)}84%{transform:rotate(12deg)}92%{transform:rotate(-6deg)}}
+.ev7Ban{position:relative;overflow:hidden;border-radius:14px;padding:14px 12px 10px;margin:4px 0 10px;min-height:120px;display:flex;align-items:flex-end;gap:6px;
+  background:radial-gradient(circle at 80% 10%,rgba(255,255,255,.55),transparent 40%),linear-gradient(160deg,#3d6fb0,#7fb2e0 55%,#e8f2fb);border:3px solid #2b4f80;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.ev7Ban::before{content:'❄ ❅ ❆ ❄ ❅ ❆ ❄ ❅';position:absolute;inset:-4px 0 auto 0;color:rgba(255,255,255,.55);font-size:15px;letter-spacing:14px;white-space:nowrap;animation:ev7Fall 6s linear infinite}
+.ev7Ban::after{content:'';position:absolute;left:0;right:0;bottom:0;height:22px;background:#f4f8fc;border-radius:50% 50% 0 0/100% 100% 0 0}
+@keyframes ev7Fall{to{transform:translateY(26px)}}
+.ev7Txt{position:relative;z-index:1;flex:1;align-self:center;color:#fff;text-shadow:0 2px 0 #1e3a63,0 0 6px rgba(0,0,0,.35)}
+.ev7Txt small{display:block;font-size:12px;opacity:.95}.ev7Txt b{display:block;font-size:26px;line-height:1.1;color:#fff3a8}.ev7Txt span{display:block;font-size:14px;font-weight:700}
+.ev7Ban canvas{position:relative;z-index:1;width:72px;height:96px;image-rendering:pixelated;filter:drop-shadow(0 3px 2px rgba(0,0,0,.3))}
+.ev7Grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 10px}
+.ev7Cell{position:relative;border-radius:10px;padding:8px 4px 6px;text-align:center;background:#fff8ea;border:2px solid #d9c3a0;font-size:12px;line-height:1.25}
+.ev7Cell i{display:block;font-style:normal;font-size:22px;margin:2px 0}.ev7Cell small{display:block;font-weight:700;color:#7a5a36}
+.ev7Cell.ready{border-color:#e0952a;background:#fff1c9;box-shadow:0 0 10px rgba(255,190,70,.8);animation:ev7Glow2 1.2s ease-in-out infinite}
+.ev7Cell.got{opacity:.55}.ev7Cell.got::after{content:'✔';position:absolute;right:5px;top:3px;color:#2f8a3e;font-weight:900}
+.ev7Cell.lock{filter:grayscale(.6);opacity:.8}
+.ev7Cell.big{grid-column:span 2;background:linear-gradient(#e9f3ff,#cfe4fb);border-color:#5b8fd0}
+.ev7Cell.big canvas{width:40px;height:54px;image-rendering:pixelated;vertical-align:middle}
+@keyframes ev7Glow2{50%{box-shadow:0 0 18px rgba(255,200,90,1)}}
+.ev7Cell.big.lock{filter:none;opacity:1}

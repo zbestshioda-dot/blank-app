@@ -37,7 +37,15 @@ def faces_right(rgb, m):
 # per-sheet fixes for generated sheets that are not consistent: 'frames' re-points a frame to another cell (r, c),
 # 'pink' recolours a bright blue shirt to the pink of the front frames (so the shirt does not change colour as they walk)
 SHEET_FIX = {'racer': {'frames': {'down2': (0, 0), 'left2': (2, 0)}, 'pink': 1},   # (the 3rd front / side cells carry another shirt with a beer logo)
-             'fracer': {'frames': {'down2': (0, 0)}, 'pink': 1}}
+             'fracer': {'frames': {'down2': (0, 0)}, 'pink': 1},
+             'fwinter': {'green': 1}}   # (the hat / coat come out purple in some cells, green in others)
+
+def greenify(im):
+    r, g, b = im[..., 0], im[..., 1], im[..., 2]
+    lum = r * .3 + g * .59 + b * .11
+    m = (((b > g + 6) & (r > g + 6)) | ((r > g + 10) & (b >= g - 3))) & (lum < 150)
+    for i, c in enumerate((.72, 1.12, .92)): im[..., i] = np.where(m, np.clip(lum * c, 0, 255), im[..., i])
+    return im
 
 def pinkify(im):
     r, g, b = im[..., 0], im[..., 1], im[..., 2]
@@ -50,6 +58,7 @@ def cut(src):
     im = np.array(Image.open(src).convert('RGB')).astype(int); H, W = im.shape[:2]
     fix = SHEET_FIX.get(os.path.basename(src)[8:-4], {})
     if fix.get('pink'): im = pinkify(im)
+    if fix.get('green'): im = greenify(im)
     bg = np.median(np.concatenate([im[:20, :20].reshape(-1, 3), im[-20:, -20:].reshape(-1, 3), im[:20, -20:].reshape(-1, 3)]), 0)
     fg = np.sqrt(((im - bg) ** 2).sum(2)) > 38
     fg = ndi.binary_opening(fg, iterations=2)

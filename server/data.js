@@ -1621,7 +1621,11 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   coat:      { name: 'ชุดโค้ทกันหนาว', how: 'ซื้อที่ร้านแฟชั่น', gems: 120 },
   racer:     { name: 'ชุดเด็กแว้นสายซิ่ง', nf: 'ชุดสก๊อยสายซิ่ง', how: 'ซื้อที่ร้านแฟชั่น', gems: 180 },
   maid:      { name: 'ชุดเมดน่ารัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 150, g: 'f' },
-  dino:      { name: 'ชุดไดโนเสาร์', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 } };
+  dino:      { name: 'ชุดไดโนเสาร์', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 },
+  winter:    { name: 'ชุดไหมพรมกันหนาว', nf: 'ชุดไหมพรมกันหนาวสาว', how: 'กิจกรรมล็อกอิน 7 วัน (แจกฟรี ไม่มีขาย)' } };
+// 🎁 a login event: log in on 7 different days between start and end; each day unlocks the next reward, day 7 is the outfit
+const EV7 = { id: 'winter26', title: 'ล็อกอิน 7 วัน รับชุดกันหนาวฟรี', start: Date.parse('2026-11-21T00:00:00+07:00'), end: Date.parse('2026-12-14T23:59:59+07:00'),
+  days: [{ money: 1000 }, { gems: 10 }, { money: 2000 }, { gems: 15 }, { egg: 1 }, { gems: 25 }, { outfit: 'winter' }] };
 // 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
 const DYES = { red: ['แดง', 0], orange: ['ส้ม', 28], yellow: ['เหลือง', 52], green: ['เขียว', 125], sky: ['ฟ้า', 195], blue: ['น้ำเงิน', 228], purple: ['ม่วง', 275], pink: ['ชมพู', 325] };
 const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songkran: ['pink', 'purple'], bunny: ['sky', 'purple'], chinese: ['blue', 'purple'],
@@ -1771,7 +1775,7 @@ const TAROT = {   // key order = card order in assets/tarot.webp (see tools/buil
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
-module.exports = { FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

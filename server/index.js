@@ -4031,7 +4031,7 @@ function login(ws, m, pre) {
     a.garden = null; a.money += back; a.sd = true;
     setTimeout(() => a.ws === ws && toast(a, `ไร่ชานเมืองปิดแล้ว คืนค่าสวนของคุณเต็มจำนวน ${money(back)} 💰`, '🌾'), 6000);
   }
-  const daily = dailyLogin(a);
+  const daily = dailyLogin(a); ev7Mark(a);
   ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
@@ -4049,7 +4049,7 @@ function login(ws, m, pre) {
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
-  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] });
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a));
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
@@ -4082,6 +4082,36 @@ function loginView(a) {
   const nb = bigReward(a, Math.floor(days / BIG_EVERY) + 1);
   return { streak: s, days, today: a.lastLogin === Q.dayKey() ? loginReward(Math.max(1, s)) : 0, tomorrow: loginReward(s + 1), toBig: next === BIG_EVERY && a.lastLogin === Q.dayKey() && days ? BIG_EVERY : next,
     big: { cash: nb.cash, item: nb.item }, table: LOGIN_BONUS, every: BIG_EVERY, keep: a.keep || [] };
+}
+// ------------------------------------------------------------------ 🎁 the 7-day login event (D.EV7): every new day logged in while it runs counts
+// (they need not be in a row); each counted day unlocks one reward, collected from the event panel; day 7 is a free outfit.
+const ev7On = (t = now()) => t >= D.EV7.start && t <= D.EV7.end;
+function ev7Of(a) { if (!a.ev7 || a.ev7.id !== D.EV7.id) a.ev7 = { id: D.EV7.id, days: [], got: 0 }; return a.ev7; }
+function ev7Mark(a) {
+  if (!ev7On()) return; const e = ev7Of(a), d = dayKey();
+  if (e.days.length < 7 && !e.days.includes(d)) { e.days.push(d); a.sd = true; dirty = true; }
+}
+function ev7View(a) {
+  const e = ev7Of(a);
+  return { t: 'ev7', on: ev7On() ? 1 : 0, id: D.EV7.id, title: D.EV7.title, start: D.EV7.start, end: D.EV7.end, days: D.EV7.days, n: e.days.length, got: e.got, today: e.days.includes(dayKey()) ? 1 : 0 };
+}
+function ev7Claim(a) {
+  const e = ev7Of(a); if (!ev7On() && now() > D.EV7.end) return toast(a, 'กิจกรรมนี้หมดเวลาแล้ว', '⌛', false);
+  if (e.got >= e.days.length) return toast(a, e.got >= 7 ? 'รับรางวัลครบทั้ง 7 วันแล้ว 🎉' : 'รับรางวัลของวันนี้ไปแล้ว พรุ่งนี้เข้ามาใหม่นะ', '🎁', false);
+  const got = [];
+  while (e.got < e.days.length) {
+    const r = D.EV7.days[e.got]; e.got++;
+    if (r.money) { a.money += r.money; a.earned = (a.earned || 0) + r.money; got.push(money(r.money)); }
+    if (r.gems) { a.gems = (a.gems || 0) + r.gems; got.push('💎' + r.gems); }
+    if (r.egg) { addItem(a, 'petegg', r.egg); got.push('🥚 ไข่สัตว์เลี้ยงปริศนา'); }
+    if (r.outfit && D.OUTFITS[r.outfit]) {
+      const O = D.OUTFITS[r.outfit], nm = a.gender === 'f' && O.nf ? O.nf : O.name;
+      if ((a.outfits || []).includes(r.outfit)) { a.gems = (a.gems || 0) + 100; got.push(`💎100 (มี${nm}อยู่แล้ว)`); }
+      else { a.outfits = [...(a.outfits || []), r.outfit]; a.outfit = r.outfit; got.push(`🎽 ${nm} (ใส่ให้แล้ว)`); sendRoster(); feed(`🎁 ${a.name} ล็อกอินครบ 7 วัน ได้${nm}!`); }
+    }
+  }
+  a.sd = true; dirty = true; markMe(a); send(a, ev7View(a));
+  toast(a, 'รับรางวัลกิจกรรมแล้ว: ' + got.join(' · '), '🎁');
 }
 function dailyLogin(a) {
   const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
@@ -4235,6 +4265,7 @@ function onMessage0(ws, raw) {
     case 'refcode': return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: !a.refBy && now() - (a.created || 0) < REF.newHours * 3600e3 ? 1 : 0, gems: REF.gems });
     case 'refuse': { if (!cd(a, 'refuse', 2000, true)) return; refUse(a, m.code); return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: 0, gems: REF.gems }); }
     case 'lotto': { if (!cd(a, 'lotto', 400, true)) return; return lottoOp(a, m); }
+    case 'ev7': { if (!cd(a, 'ev7', 600, true)) return; ev7Mark(a); if (m.op === 'claim') return ev7Claim(a); return send(a, ev7View(a)); }   // (view also counts today for players who stayed online past midnight)
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
     case 'pay': { if (!cd(a, 'pay', 800, true)) return; return payOp(a, m); }

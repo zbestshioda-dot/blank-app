@@ -109,7 +109,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b3', chSheets = {};
+const CH_V = 'b4', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -173,7 +173,7 @@ function femOutfitFrame(sheet, step, lk) {
 const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
-  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer' };   // women's versions are the 'f' + name sheets
+  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -655,6 +655,7 @@ function handle(m) {
     case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
+    case 'ev7': EV7 = m; ev7Ui(); if (panel?.kind === 'ev7') refreshPanel(true); break;
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
     case 'hatch': { const pt = G.pets[m.id], q = P.get(myId); FX.play('pop'); if (q) { FX.burst(q.x, q.y - .6, '#fff3c4', 24); FX.sparkle(q.x, q.y - .8, '#ffe27a', 18); FX.column(q.x, q.y, m.rar >= 4 ? '#ffd34d' : '#bfe8ff'); } flashScreen(m.rar >= 4 ? '255,220,120' : '255,255,255', .3); if (pt) { const d = document.createElement('div'); d.className = 'hatchPop'; d.innerHTML = `<div><small>🐣 ไข่ฟักแล้ว!</small><canvas data-pet="${m.id}" width="120" height="120"></canvas><b>${pt.icon} ${esc(pt.name)}</b><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><small>ตั้งชื่อได้ในแอพ 🐾 สัตว์เลี้ยง · แตะเพื่อปิด</small></div>`; d.onclick = () => d.remove(); document.body.appendChild(d); try { drawPetIcon(d.querySelector('canvas'), m.id); } catch { } setTimeout(() => d.remove(), 7000); } break; }
     case 'refcode': window.__ref = m; if (panel?.kind === 'invite') refreshPanel(true); break;
@@ -3743,10 +3744,42 @@ function bindPanel(root) {
   root.querySelectorAll('[data-pet]').forEach(c => { const draw = () => { if (!PET_AT || !petImg) return setTimeout(draw, 300); drawPetIcon(c, c.dataset.pet); }; draw(); });
   if (root.querySelector('canvas[data-pp]')) ppStart();
   root.querySelectorAll('[data-show]').forEach(c => drawShow(c));
-  root.querySelectorAll('[data-of]').forEach(c => whenChars(() => {
-    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: me.gender, lk: me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
+  root.querySelectorAll('[data-of]').forEach(c => whenChars(function draw() {
+    const sh = OUTFIT_SHEET[c.dataset.of], fs = sh && (c.dataset.og || me.gender) === 'f' && CH_ATLAS.rows[`f${sh}:down0`] !== undefined ? 'f' + sh : sh;
+    if (fs && !chSrc(fs + ':down0')) { if (c.isConnected) setTimeout(draw, 300); return; }   // its outfit sheet is still loading: draw it once it is there
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawCharTo(g, { g: c.dataset.og || me.gender, lk: c.dataset.og ? {} : me.look || {}, of: c.dataset.of }, 36, 92, 86 / CH_ATLAS.h, 'front', 0);
   }));
   const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); }; const mq = root.querySelector('#mqIn'); if (mq) mq.oninput = () => { panel.mq = mq.value; refreshPanel(true); };
+}
+// ------------------------------------------------------------------ 🎁 the 7-day login event: a gift tile under the phone and its panel
+let EV7 = null;
+const ev7Ready = () => !!EV7 && EV7.n > EV7.got && Date.now() <= EV7.end;
+function ev7Ui() {
+  const b = $('#ev7Btn'); if (!b || !EV7) return;
+  b.classList.toggle('hidden', !(EV7.on && EV7.got < 7 || ev7Ready()));
+  b.classList.toggle('has', ev7Ready());
+  $('#ev7N').textContent = ev7Ready() ? 'รับเลย!' : `${EV7.n}/7`;
+  b.onclick = () => { openPanel({ kind: 'ev7' }); send({ t: 'ev7' }); };
+  if (ev7Ready()) { const k = 'lt_ev7t_' + new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); let seen = false; try { seen = !!localStorage.getItem(k); localStorage.setItem(k, '1'); } catch { }
+    if (!seen) setTimeout(() => toast('🎁 กิจกรรมล็อกอิน 7 วัน: มีรางวัลรอรับ! กดไอคอน 🎁 ใต้มือถือ', '🎁', true), 6000); }
+}
+setInterval(() => { if (G && EV7?.on) send({ t: 'ev7' }); }, 10 * 60e3);   // still online after midnight: the new day counts too
+function ev7Html() {
+  const e = EV7; if (!e) { send({ t: 'ev7' }); return '<h2>🎁 กิจกรรม</h2><div class="sub">กำลังโหลด…</div>'; }
+  const end = new Date(e.end + 7 * 3600e3), ends = `${end.getUTCDate()} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][end.getUTCMonth()]}`;
+  const leftD = Math.max(0, Math.ceil((e.end - Date.now()) / 86400e3));
+  const cell = (r, i) => {
+    const s = i < e.got ? 'got' : i < e.n ? 'ready' : 'lock';
+    const what = r.money ? ['💰', `฿${r.money.toLocaleString()}`] : r.gems ? ['💎', `${r.gems} เพชร`] : r.egg ? ['🥚', 'ไข่สัตว์เลี้ยง'] : ['🎽', 'ชุดกันหนาว'];
+    if (r.outfit) return `<div class="ev7Cell big ${s}"><small>วันที่ 7 · รางวัลใหญ่</small><canvas data-of="${r.outfit}" data-og="m" width="72" height="96"></canvas><canvas data-of="${r.outfit}" data-og="f" width="72" height="96"></canvas><br><b>ชุดไหมพรมกันหนาว</b></div>`;
+    return `<div class="ev7Cell ${s}"><small>วันที่ ${i + 1}</small><i>${what[0]}</i>${what[1]}</div>`;
+  };
+  const can = ev7Ready(), done = e.got >= 7, over = Date.now() > e.end;
+  return `<h2>🎁 ${esc(e.title)}</h2>
+    <div class="ev7Ban"><div class="ev7Txt"><small>❄️ กิจกรรมฤดูหนาว · ถึง ${ends}</small><b>ล็อกอิน 7 วัน</b><span>รับชุดไหมพรมกันหนาวฟรี!</span></div><canvas data-of="winter" data-og="m" width="72" height="96"></canvas><canvas data-of="winter" data-og="f" width="72" height="96"></canvas></div>
+    <div class="sub">เข้าเกมวันไหนก็ได้ ไม่ต้องติดกัน ครบ 7 วันรับชุดเลย · ล็อกอินแล้ว <b>${e.n}/7</b> วัน${e.today ? ' (วันนี้นับแล้ว ✔)' : ''} · ${over ? '⌛ หมดเวลาแล้ว' : `เหลือเวลาอีก ${leftD} วัน`}</div>
+    <div class="ev7Grid">${e.days.map(cell).join('')}</div>
+    ${done ? '<div class="sub">🎉 รับรางวัลครบแล้ว ใส่/ถอดชุดได้ที่ ⚙️ ตั้งค่า</div>' : B(can ? '🎁 รับรางวัล' : over ? 'หมดเวลากิจกรรม' : 'พรุ่งนี้เข้ามารับรางวัลถัดไปนะ', { t: 'ev7', op: 'claim' }, can ? 'primary big' : 'big', !can)}`;
 }
 const B = (label, m, cls = '', dis = false) => `<button class="${cls}" data-m="${esc(JSON.stringify(m))}" ${dis ? 'disabled' : ''}>${label}</button>`;
 const FN = {
@@ -4651,6 +4684,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23l', d: '23 พ.ย.', items: [
+    '🎁 <b>กิจกรรมล็อกอิน 7 วัน</b> (ถึง 14 ธ.ค.) เข้าเกมวันไหนก็ได้ครบ 7 วัน รับ <b>ชุดไหมพรมกันหนาว</b> ฟรี! ระหว่างทางมีเงิน เพชร และไข่สัตว์เลี้ยง · กดไอคอน 🎁 ใต้มือถือ',
+  ] },
   { v: '2026-11-23k', d: '23 พ.ย.', items: [
     '👗 ชุดใหม่ 6 แบบที่ร้านแฟชั่น (ซื้อด้วยเพชร 💎): 🦖 ชุดไดโนเสาร์, 🩳 ชุดเล่นน้ำ (สาวๆ เป็นบิกินี่), 🧥 โค้ทกันหนาว, 🏍️ ชุดเด็กแว้น (สาวๆ เป็นสก๊อยสายซิ่ง), 🎀 ชุดเมด',
   ] },
@@ -5258,6 +5294,7 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'news': return newsHtml();
+    case 'ev7': return ev7Html();
     case 'fbpost': {
       const n = Math.max(1, Math.min(NEWS.length, p.n || fbNewCount())), txt = fbText(n);
       return `<h2>📣 โพสต์ข่าวลงเฟส</h2><div class="sub">กดคัดลอก แล้วไปวางในกลุ่มเฟส · เลือกจำนวนรอบอัปเดตที่จะรวมในโพสต์ได้</div>
