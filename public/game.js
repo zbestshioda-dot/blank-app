@@ -4883,6 +4883,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23w', d: '21 พ.ย.', items: [
+    '🎣 กระเป๋า (แท็บทั้งหมด) แสดงเบ็ดตกปลาที่มี และกดเปลี่ยนเบ็ดที่ถือได้',
+  ] },
   { v: '2026-11-23v', d: '21 พ.ย.', items: [
     '🐞 แก้คุยกับ NPC อาชีพหลังจบภารกิจแล้วมีแค่ "ดูงาน" ไม่มีปุ่มรับภารกิจ (ต้องรีเฟรช) ตอนนี้ขึ้นปุ่มรับภารกิจทุกครั้ง',
   ] },
@@ -5839,7 +5842,7 @@ function renderPanel(p) {
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
       const job = me.career !== 'none' && G.careers[me.career]?.where;
       const outfits = (me.outfits || []).length ? `<div class="looks">${me.outfits.map(id => { const on = me.outfit === id; return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(G.outfitDefs[id]) || id)}</small>${B(on ? 'ถอด' : 'ใส่', { fn: 'look', set: { outfit: on ? '' : id } }, on ? '' : 'good')}</div>`; }).join('')}</div>` : '';
-      if (gtab === 'items') return `<h2>🎒 กระเป๋า</h2>${gtabs}${ctabs}<div class="sub">${shown.length} อย่าง · มูลค่าประมาณ ${money(totalV)}</div><div class="list">${rows || '<div class="sub">ไม่มีของในหมวดนี้</div>'}</div>`;
+      if (gtab === 'items') return `<h2>🎒 กระเป๋า</h2>${gtabs}${ctabs}<div class="sub">${shown.length} อย่าง · มูลค่าประมาณ ${money(totalV)}</div><div class="list">${rows || '<div class="sub">ไม่มีของในหมวดนี้</div>'}</div>${gcat === 'all' && (me.rods || []).length ? `<div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>` : ''}`;
       if (gtab === 'info') return `<h2>🎒 กระเป๋า</h2>${gtabs}<div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}`;
       return `<h2>🎒 กระเป๋า</h2>${gtabs}
         <div class="secT">👕 ชุด</div>
