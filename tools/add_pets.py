@@ -43,6 +43,11 @@ PETS = [
  ('dragon','d',6,[0,1,2],[3,4,5],[6,7],[L,R],1.0),
  ('unicorn','d',7,[0,1],[3,4,5],[6,7],R,1.1),
 ]
+# 💎 aura pets: tools/sheets/pets_e.jpg / pets_f.jpg have the same layout as pets_d.jpg
+for k, ids in (('e', ['starpanda', 'moonpanda', 'crystalfox', 'holopeng', 'runeturtle', 'goldcapy', 'skydragon', 'starunicorn']),
+               ('f', ['nebulapanda', 'galaxypanda', 'featherfox', 'opalpeng', 'jadeturtle', 'gemcapy', 'icedragon', 'rainbowunicorn'])):
+    for r, pid in enumerate(ids):
+        b = PETS[24 + r]; PETS.append((pid, k) + b[2:])
 def load(path):
     im = Image.open(path).convert('RGB'); a = np.asarray(im).astype(int)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
@@ -66,7 +71,7 @@ def colboxes(sub):
         if xs.max() - xs.min() >= 25: out.append((xs.min(), xs.max() + 1))
     return out
 sheets = {}
-for k in 'abcd':
+for k in 'abcdef':
     im, bg, fg = load(os.path.join(SH, f'pets_{k}.jpg'))
     bs = bands(fg)
     sheets[k] = (im, bg, fg, bs)
@@ -116,4 +121,4 @@ json.dump({'cell': C, 'pets': meta}, open(os.path.join(ROOT, 'public/assets/pets
 print(len(PETS), 'pets', atlas.size, os.path.getsize(os.path.join(ROOT, 'public/assets/pets.webp')))
 # contact sheet for checking
 cs = Image.new('RGBA', atlas.size, (90, 150, 90, 255)); cs.alpha_composite(atlas)
-cs.save('/tmp/claude-0/-home-user-blank-app/05ecec07-c061-54e9-8d72-633cf2a62269/scratchpad/pets_contact.png')
+cs.save(os.environ.get('PETS_CONTACT', '/tmp/pets_contact.png'))

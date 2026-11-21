@@ -578,7 +578,7 @@ function santaGift(a) {
 // a mystery egg: hatches into a pet you do not have yet (rarer ones less often)
 function hatchEgg(a) {
   if (!(a.inv.petegg > 0)) return;
-  const pool = Object.entries(D.PETS).filter(([k]) => !(a.pets || []).includes(k));
+  const pool = Object.entries(D.PETS).filter(([k, p]) => !p.gem && !(a.pets || []).includes(k));   // 💎 aura pets are never in eggs
   addItem(a, 'petegg', -1);
   if (!pool.length) { a.gems = (a.gems || 0) + 30; markMe(a); return toast(a, 'คุณมีสัตว์เลี้ยงครบทุกตัวแล้ว! ไข่กลายเป็น 💎30', '💎'); }
   const W = { 1: 50, 2: 25, 3: 12, 4: 5, 5: 1.5 }, tot = pool.reduce((t, [, p]) => t + (W[p.rar] || 1), 0);
@@ -2419,7 +2419,8 @@ function act(a, m) {
       m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;
       a.pets = a.pets || [];
       if (a.pets.includes(m.id)) return toast(a, `คุณมี${P.name}แล้ว`, 'ℹ️', false);
-      if (!pay(a, P.price)) return;
+      if (P.gem) { if (!godInf(a) && (a.gems || 0) < P.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${P.gem} (มี 💎${a.gems || 0})`, '💎', false); if (!godInf(a)) a.gems -= P.gem; feed(`💎 ${a.name} รับ${P.icon}${P.name} สัตว์เลี้ยงออร่ามาเลี้ยง!`); }
+      else if (!pay(a, P.price)) return;
       a.pets.push(m.id); a.pet = m.id; markMe(a); joy(a, 6 + P.rar * 3); sendRoster();
       return toast(a, `${P.icon} รับ${P.name}มาเลี้ยงแล้ว! มันเดินตามคุณไปทุกที่ — แตะที่ตัวมันเพื่อเล่นด้วย`, '🐾');
     }
@@ -3937,7 +3938,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).slice(0, 150) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).filter(k => !h.fpos?.[k] || h.fpos[k][0]).slice(0, 600) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(),
   };

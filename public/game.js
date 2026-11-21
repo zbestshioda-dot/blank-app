@@ -1910,7 +1910,8 @@ function shopPets(room) {
   return a;
 }
 const PET_VOICE = { shiba: 'dog', golden: 'bigdog', corgi: 'dog', pug: 'dog', husky: 'bigdog', dalmatian: 'bigdog', poodle: 'dog', pom: 'dog', chihuahua: 'dog', tabby: 'cat', blackcat: 'cat', whitecat: 'cat', siamese: 'cat', calico: 'cat', britcat: 'cat', oddeye: 'cat',
-  chick: 'bird', duck: 'duck', penguin: 'duck', rabbit: 'squeak', lop: 'squeak', hamster: 'squeak', guinea: 'squeak', hedgehog: 'squeak', squirrel: 'squeak', fox: 'dog', redpanda: 'squeak', panda: 'low', capybara: 'low', turtle: 'low', dragon: 'roar', unicorn: 'magic' };
+  chick: 'bird', duck: 'duck', penguin: 'duck', rabbit: 'squeak', lop: 'squeak', hamster: 'squeak', guinea: 'squeak', hedgehog: 'squeak', squirrel: 'squeak', fox: 'dog', redpanda: 'squeak', panda: 'low', capybara: 'low', turtle: 'low', dragon: 'roar', unicorn: 'magic',
+  starpanda: 'squeak', nebulapanda: 'squeak', moonpanda: 'low', galaxypanda: 'low', crystalfox: 'dog', featherfox: 'dog', holopeng: 'duck', opalpeng: 'duck', runeturtle: 'low', jadeturtle: 'low', goldcapy: 'low', gemcapy: 'low', skydragon: 'roar', icedragon: 'roar', starunicorn: 'magic', rainbowunicorn: 'magic' };
 // ---- cooking battle: what each station holds, the timers, what is in your hands, and the big button's hint
 let ckLive = null;
 const OPN = { chop: ['🔪', 'สับ'], fry: ['🍳', 'ผัด'], boil: ['🍲', 'ต้ม'], grill: ['🔥', 'ย่าง'] };
@@ -2392,7 +2393,9 @@ function drawPet(q, X, Y, t) {
   const fr = q.moving ? Math.floor(q.phase * 1.5) % Math.max(1, nf) : 0;   // idle = frame 0
   const sw = size * sx, sh = size * sy;
   const legend = G.pets?.[q.id]?.rar >= 5;
-  if (legend) petGlow(px, py - h - sh * .45, size, now0);
+  const aura = G.pets?.[q.id]?.aura;
+  if (aura) petAura(px, py, h, sh, size, now0, aura);
+  else if (legend) petGlow(px, py - h - sh * .45, size, now0);
   const ow = P.get(q.owner);
   if (ow?.pl && !ow.veh && !ow.pose) {                       // 🦮 the lead: from the owner's hand to the pet's collar, sagging a little
     const hx = Math.round(ow.rx * TS + X) + (q.x < ow.rx ? -TS * .18 : TS * .18), hy = Math.round(ow.ry * TS + Y) - TS * .1, nx = px, ny = py - h - sh * .5;
@@ -2416,6 +2419,22 @@ function petGlow(cx, cy, size, t) {
     const ph = (t / 1100 + i / 6) % 1, a = i * 2.4 + t / 2500, r = size * (.28 + .3 * ((i * 37) % 10) / 10), x = cx + Math.cos(a) * r, y = cy - ph * size * .6 + Math.sin(a) * r * .5, s = size * .09 * Math.sin(ph * Math.PI);
     ctx.fillStyle = `hsla(${(hue + i * 55) % 360},100%,${i % 2 ? 90 : 75}%,${Math.sin(ph * Math.PI)})`;
     ctx.beginPath(); ctx.moveTo(x, y - s * 2); ctx.quadraticCurveTo(x, y, x + s * 2, y); ctx.quadraticCurveTo(x, y, x, y + s * 2); ctx.quadraticCurveTo(x, y, x - s * 2, y); ctx.quadraticCurveTo(x, y, x, y - s * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+// 💎 aura pets: a coloured glow ring on the ground, a soft halo around the body and sparks rising in the pet's own colour ('rainbow' cycles)
+function petAura(px, py, h, sh, size, t, col) {
+  const rb = col === 'rainbow', hue = (t / 8) % 360, c = (a, l = 0) => rb ? `hsla(${(hue + l * 40) % 360},100%,70%,${a})` : col + Math.round(a * 255).toString(16).padStart(2, '0');
+  const pulse = .85 + .15 * Math.sin(t / 300), cy = py - h - sh * .45;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  let g = ctx.createRadialGradient(px, cy, 0, px, cy, size * .8 * pulse);
+  g.addColorStop(0, c(.5)); g.addColorStop(.6, c(.25)); g.addColorStop(1, c(0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, cy, size * .8 * pulse, 0, 7); ctx.fill();
+  ctx.strokeStyle = c(.9 * pulse); ctx.lineWidth = Math.max(2, size * .06);
+  ctx.beginPath(); ctx.ellipse(px, py, size * .42 * pulse, size * .14 * pulse, 0, 0, 7); ctx.stroke();
+  for (let i = 0; i < 9; i++) {
+    const ph = (t / 1400 + i / 7) % 1, a = i * 2.1, x = px + Math.cos(a + t / 900) * size * .38, y = py - ph * size * 1.1, s = size * .07 * Math.sin(ph * Math.PI);
+    ctx.fillStyle = c(Math.min(1, Math.sin(ph * Math.PI) * 1.2), i); ctx.beginPath(); ctx.arc(x, y, Math.max(.8, s), 0, 7); ctx.fill();
   }
   ctx.restore();
 }
@@ -4921,6 +4940,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23af', d: '21 พ.ย.', items: [
+    '🐠 ปลาทะเลใหม่ 32 ชนิด! ฉลามวาฬ กระเบนราหู นาร์วาล หอยงวงช้าง มังกรทะเลใบไม้ กั้งนกยูง และอีกเพียบ (ตกได้ที่ทะเล)',
+    '💎 สัตว์เลี้ยงออร่า 16 ตัว ราคา 💎300–999 มีออร่าเรืองแสงรอบตัวคนละสี (ยูนิคอร์นสายรุ้งออร่าเปลี่ยนสีได้!) ซื้อที่ร้านสัตว์เลี้ยง',
+    '🟫 แก้แปลงดินในสวนที่วางแล้วไม่ขึ้น (สวนที่มีของเยอะมาก)',
+  ] },
   { v: '2026-11-23ae', d: '21 พ.ย.', items: [
     '📘 รูปคนโพสต์ในฟีด lifebook ใช้รูปโปรไฟล์ที่ผู้เล่นใช้อยู่ตอนนี้',
   ] },
@@ -5917,9 +5941,9 @@ function renderPanel(p) {
       return `<h2>🎓 มหาวิทยาลัย</h2><div class="sub">${hoursTxt('school')} · ลงทะเบียนที่นี่ แล้ว<b>นั่งเรียนที่โต๊ะเรียน</b>ตามเวลา · สอบใบขับขี่ย้ายไปที่โชว์รูมรถแล้ว</div><div class="list">${degRow}${rows}</div>`;
     }
     case 'pets': case 'petshop': {
-      const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => G.pets[a].price - G.pets[b].price);
+      const shopMode = p.kind === 'petshop', have = me.pets || [], ids = Object.keys(G.pets).sort((a, b) => !!G.pets[a].gem - !!G.pets[b].gem || (G.pets[a].gem || G.pets[a].price) - (G.pets[b].gem || G.pets[b].price));   // 💎 aura pets last
       const card = id => { const pt = G.pets[id], own = have.includes(id), on = me.pet === id;
-        const btn = own ? (!shopMode || on) ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : '<small>มีแล้ว ✓</small>' : B(money(pt.price), { t: 'act', st: p.st, a: 'buy', pet: id }, 'good', me.money < pt.price);
+        const btn = own ? (!shopMode || on) ? B(on ? '📦 เก็บเข้า' : '🐾 เรียกออกมา', { t: 'pet.call', id: on ? '' : id }, on ? '' : 'good') : '<small>มีแล้ว ✓</small>' : pt.gem ? B(`💎${pt.gem}`, { t: 'act', st: p.st, a: 'buy', pet: id }, 'primary', !me.gemInf && (me.gems || 0) < pt.gem) : B(money(pt.price), { t: 'act', st: p.st, a: 'buy', pet: id }, 'good', me.money < pt.price);
         const nm = me.pnames?.[id], nameBtn = own && !shopMode ? B(nm ? '✏️ เปลี่ยนชื่อ' : '✏️ ตั้งชื่อ', { fn: 'petName', id }) : '';
         return `<div class="look fcard petcard ${on ? 'on' : ''}"><canvas data-pet="${id}" width="84" height="84"></canvas><small>${nm ? `<b>"${esc(nm)}"</b><br>` : ''}${pt.icon} ${esc(pt.name)}${on ? ' ✓' : ''}</small>${nameBtn}<span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><em>${esc(pt.desc)}</em>${btn}</div>`; };
       const mine = ids.filter(id => have.includes(id)), shop = ids.filter(id => !have.includes(id));
@@ -6562,8 +6586,8 @@ function sign(text, x, y, o = {}) {
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
-fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=2'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v10').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v10'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/pets.json?v=2').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=3'; }, 3500); }).catch(() => { });
+fetch('assets/atlas.json?v=v11').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v11'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
