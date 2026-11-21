@@ -975,7 +975,7 @@ function wwEnd() {
 }
 function wwTick() {
   const t = now(), bk = new Date(t + 7 * 3600e3), day = dayKey();
-  if (!ww && !zn && wwDone !== day && fullMoonAt(t)) {
+  if (!ww && !zn && wwDone !== day && fullMoonAt(t) && day !== D.LK.day) {   // (no werewolf night on Loy Krathong night)
     const h = bk.getUTCHours() + bk.getUTCMinutes() / 60;
     if (h >= WW.hour - 1 && h < WW.hour && wwAnnounced !== day) { wwAnnounced = day; feed(`🌕 คืนนี้จันทร์เต็มดวง! ${WW.hour}:00 น. จะมีคนในเมืองกลายเป็นหมาป่า เตรียมตัวให้ดี`); for (const o of online.values()) toast(o, `🌕 คืนนี้ ${WW.hour}:00 น. คืนหมาป่า! ใครจะโดนคำสาป?`, '🐺'); }
     if (h >= WW.hour && h < WW.hour + .5) wwStart(t);
@@ -1997,6 +1997,8 @@ function act(a, m) {
   if (m.a === 'apply') { if (s.type !== 'staff' && D.CAREERS[m.career]?.where !== s.type || s.type === 'staff' && s.career !== m.career) return; return apply(a, m.career); }
   switch (key) {
     // ---------------- 🎈 balloon seller: buy a colour once, then hold whichever you like (or none)
+    case 'lk.float': return lkFloat(a, s, m);
+    case 'lksky.go': case 'lksky.release': return lkSky(a, s);
     case 'balloon.buy': {
       const B = D.BALLOONS[m.id]; if (!B) return; a.balloons = a.balloons || [];
       if (a.balloons.includes(m.id)) return toast(a, 'มีลูกโป่งสีนี้แล้ว', '🎈', false);
@@ -4044,12 +4046,12 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
-  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a));
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a));
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
@@ -4112,6 +4114,54 @@ function ev7Claim(a) {
   }
   a.sd = true; dirty = true; markMe(a); send(a, ev7View(a));
   toast(a, 'รับรางวัลกิจกรรมแล้ว: ' + got.join(' · '), '🎁');
+}
+// ------------------------------------------------------------------ 🏮 Loy Krathong (D.LK)
+const lkOn = (t = now()) => t >= D.LK.start && t <= D.LK.end;
+const lkFest = () => dayKey() === D.LK.day;
+function lkOf(a) { if (!a.lk || a.lk.id !== D.LK.id) a.lk = { id: D.LK.id, days: [], n: 0, nd: '', got: 0 }; return a.lk; }
+function lkView(a) { const e = lkOf(a), d = dayKey(); return { t: 'lkv', on: lkOn() ? 1 : 0, days: e.days.length, need: D.LK.need, got: e.got, today: e.days.includes(d) ? 1 : 0, left: e.nd === d ? Math.max(0, D.LK.daily - e.n) : D.LK.daily, fest: lkFest() ? 1 : 0 }; }
+const lkRecent = [];   // the last floats (for floating together)
+const toArea = (area, msg) => { const m = JSON.stringify(msg); for (const o of online.values()) if (o.ws.readyState === 1 && areaId(o) === area) o.ws.send(m); };
+function lkFloat(a, s, m) {
+  if (!lkOn()) return toast(a, 'ยังไม่ถึงช่วงเทศกาลลอยกระทง', '🏮', false);
+  const K = D.LK.kinds[m.kind]; if (!K) return;
+  if (!cd(a, 'lkf', 4000)) return;
+  if (!pay(a, K.price)) return;
+  const e = lkOf(a), d = dayKey(), x2 = lkFest() ? 2 : 1, wish = cleanText(m.wish || '', 40);
+  if (e.nd !== d) { e.nd = d; e.n = 0; }
+  const got = [];
+  if (e.n < D.LK.daily) {
+    e.n++;
+    const cash = rint(30, 150) * x2; a.money += cash; a.earned = (a.earned || 0) + cash; got.push(money(cash));
+    if (Math.random() < .15) { a.gems = (a.gems || 0) + 2 * x2; got.push('💎' + 2 * x2); }
+    if (Math.random() < .01) { addItem(a, 'petegg', 1); got.push('🥚 ไข่สัตว์เลี้ยง!'); }
+  }
+  joy(a, 6);
+  if (!e.days.includes(d)) e.days.push(d);
+  if (e.days.length >= D.LK.need && !e.got) {
+    e.got = 1; const O = D.OUTFITS[D.LK.outfit], nm = a.gender === 'f' && O.nf ? O.nf : O.name;
+    if ((a.outfits || []).includes(D.LK.outfit)) { a.gems = (a.gems || 0) + 100; got.push('💎100'); }
+    else { a.outfits = [...(a.outfits || []), D.LK.outfit]; a.outfit = D.LK.outfit; got.push(`🎽 ${nm} (ใส่ให้แล้ว)`); sendRoster(); }
+    feed(`🏮 ${a.name} ลอยกระทงครบ ${D.LK.need} วัน ได้${nm}!`);
+  }
+  const t = now(), x = +(s.x + rnd(-2.5, 2.5)).toFixed(2);
+  const mate = lkRecent.find(r => r.id !== a.id && t - r.t < 15000 && Math.hypot(r.x - a.x, r.y - a.y) < 6 && online.get(r.id));
+  lkRecent.push({ id: a.id, t, x: a.x, y: a.y }); while (lkRecent.length > 20) lkRecent.shift();
+  if (mate) { const b = online.get(mate.id); joy(a, 5); joy(b, 5); feed(`💕 ${a.name} กับ ${b.name} ลอยกระทงคู่กัน`); got.push('💕 ลอยคู่'); markMe(b); }
+  a.sd = true; markMe(a); stat(a, 'krathong');
+  toArea('town', { t: 'lkf', sp: K.sp, x, y: 60.4, name: a.name, wish, pair: mate ? 1 : 0 });
+  send(a, lkView(a));
+  toast(a, `🪷 ลอย${K.name}แล้ว${wish ? ` · "${wish}"` : ''}${got.length ? ' · ได้ ' + got.join(' · ') : ' (วันนี้รับรางวัลครบแล้ว)'}`, '🪷');
+}
+function lkSky(a, s) {
+  if (!lkOn()) return toast(a, 'ยังไม่ถึงช่วงเทศกาลลอยกระทง', '🏮', false);
+  if (!cd(a, 'lks', 5000)) return;
+  const e = lkOf(a), free = lkFest() && e.skyFree !== dayKey();
+  if (!free && !pay(a, D.LK.sky)) return;
+  if (free) e.skyFree = dayKey();
+  joy(a, 4); a.sd = true; markMe(a);
+  toArea('temple', { t: 'lks', x: +(s.x + rnd(-1.5, 1.5)).toFixed(2), y: s.y - .5, name: a.name });
+  toast(a, `🏮 ปล่อยโคมลอยแล้ว${free ? ' (ฟรีในวันลอยกระทง)' : ''} ขอให้ทุกข์โศกลอยไปกับโคม`, '🏮');
 }
 function dailyLogin(a) {
   const today = Q.dayKey(), yesterday = Q.dayKey(now() - 86400e3);
@@ -4265,6 +4315,7 @@ function onMessage0(ws, raw) {
     case 'refcode': return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: !a.refBy && now() - (a.created || 0) < REF.newHours * 3600e3 ? 1 : 0, gems: REF.gems });
     case 'refuse': { if (!cd(a, 'refuse', 2000, true)) return; refUse(a, m.code); return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: 0, gems: REF.gems }); }
     case 'lotto': { if (!cd(a, 'lotto', 400, true)) return; return lottoOp(a, m); }
+    case 'lkv': { if (!cd(a, 'lkv', 600, true)) return; return send(a, lkView(a)); }
     case 'ev7': { if (!cd(a, 'ev7', 600, true)) return; ev7Mark(a); if (m.op === 'claim') return ev7Claim(a); return send(a, ev7View(a)); }   // (view also counts today for players who stayed online past midnight)
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }

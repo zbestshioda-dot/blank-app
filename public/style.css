@@ -1448,10 +1448,10 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .admN{background:linear-gradient(90deg,#ff5e5e,#ffbd3d,#5fe07a,#45c2ff,#b06bff,#ff5e5e);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:admName 3s linear infinite;font-weight:800;filter:drop-shadow(0 0 2px rgba(255,220,120,.55))}
 
 /* 🎁 7-day login event: a glowing gift tile under the phone, and its panel (banner + 7 reward cells) */
-#ev7Btn{position:relative;background:linear-gradient(#fff3c4,#f0a63a)!important;border:2px solid #8a4a12!important;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 3px 0 #8a4a12,0 0 12px rgba(255,200,90,.9)!important;animation:ev7Glow 1.4s ease-in-out infinite}
-#ev7Btn b.q{font-size:22px;display:inline-block;animation:ev7Wig 2.4s ease-in-out infinite}
-#ev7Btn em{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);font:700 10px/1 sans-serif;font-style:normal;color:#fff;background:#b43a2a;border:1.5px solid #fff;border-radius:8px;padding:2px 5px;white-space:nowrap}
-#ev7Btn.has::after{content:'';position:absolute;right:-3px;top:-3px;width:12px;height:12px;border-radius:50%;background:#e04a35;border:2px solid #fff}
+#ev7Btn,#lkBtn{position:relative;background:linear-gradient(#fff3c4,#f0a63a)!important;border:2px solid #8a4a12!important;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 3px 0 #8a4a12,0 0 12px rgba(255,200,90,.9)!important;animation:ev7Glow 1.4s ease-in-out infinite}
+#ev7Btn b.q,#lkBtn b.q{font-size:22px;display:inline-block;animation:ev7Wig 2.4s ease-in-out infinite}
+#ev7Btn em,#lkBtn em{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);font:700 10px/1 sans-serif;font-style:normal;color:#fff;background:#b43a2a;border:1.5px solid #fff;border-radius:8px;padding:2px 5px;white-space:nowrap}
+#ev7Btn.has::after,#lkBtn.has::after{content:'';position:absolute;right:-3px;top:-3px;width:12px;height:12px;border-radius:50%;background:#e04a35;border:2px solid #fff}
 @keyframes ev7Glow{50%{box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 3px 0 #8a4a12,0 0 22px rgba(255,220,120,1)}}
 @keyframes ev7Wig{0%,70%,100%{transform:rotate(0)}76%{transform:rotate(-14deg)}84%{transform:rotate(12deg)}92%{transform:rotate(-6deg)}}
 .ev7Ban{position:relative;overflow:hidden;border-radius:14px;padding:14px 12px 10px;margin:4px 0 10px;min-height:120px;display:flex;align-items:flex-end;gap:6px;
@@ -1472,3 +1472,4 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 .ev7Cell.big canvas{width:40px;height:54px;image-rendering:pixelated;vertical-align:middle}
 @keyframes ev7Glow2{50%{box-shadow:0 0 18px rgba(255,200,90,1)}}
 .ev7Cell.big.lock{filter:none;opacity:1}
+#lkBtn{background:linear-gradient(#ffd9a0,#e0603a)!important;border-color:#6a2010!important}

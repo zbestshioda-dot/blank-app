@@ -109,7 +109,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b5', chSheets = {};
+const CH_V = 'b6', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -173,7 +173,7 @@ function femOutfitFrame(sheet, step, lk) {
 const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
-  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter' };   // women's versions are the 'f' + name sheets
+  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -655,6 +655,9 @@ function handle(m) {
     case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
+    case 'lkv': LKV = m; lkUi(); if (panel?.kind === 'lkev' || panel?.kind === 'lk') refreshPanel(true); break;
+    case 'lkf': lkSpawn(m, 0); break;
+    case 'lks': lkSky(m); break;
     case 'ev7': EV7 = m; ev7Ui(); if (panel?.kind === 'ev7') refreshPanel(true); break;
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
     case 'hatch': { const pt = G.pets[m.id], q = P.get(myId); FX.play('pop'); if (q) { FX.burst(q.x, q.y - .6, '#fff3c4', 24); FX.sparkle(q.x, q.y - .8, '#ffe27a', 18); FX.column(q.x, q.y, m.rar >= 4 ? '#ffd34d' : '#bfe8ff'); } flashScreen(m.rar >= 4 ? '255,220,120' : '255,255,255', .3); if (pt) { const d = document.createElement('div'); d.className = 'hatchPop'; d.innerHTML = `<div><small>🐣 ไข่ฟักแล้ว!</small><canvas data-pet="${m.id}" width="120" height="120"></canvas><b>${pt.icon} ${esc(pt.name)}</b><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><small>ตั้งชื่อได้ในแอพ 🐾 สัตว์เลี้ยง · แตะเพื่อปิด</small></div>`; d.onclick = () => d.remove(); document.body.appendChild(d); try { drawPetIcon(d.querySelector('canvas'), m.id); } catch { } setTimeout(() => d.remove(), 7000); } break; }
@@ -1394,7 +1397,7 @@ function findNear() {
   const here = areaOf(m.x, m.y)?.id;
   let best = null, bd = 1e9;
   for (const s of G.stations) {
-    if (s.area !== here || s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
+    if (s.area !== here || s.type === 'yzone' && yzOpen(s.idx, s.z) || (s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
     const d = Math.hypot(s.x - m.x, s.y - m.y);
     if (d <= s.r && d < bd) { bd = d; best = s; }
   }
@@ -1652,6 +1655,7 @@ function draw(t) {
   if (A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
   if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
   if (A?.id === 'town' && vis(G.football.pitch.x + 9, G.football.pitch.y + 5, 22)) fbEnts(ents, vis);
+  if ((A?.id === 'town' || A?.id === 'temple') && lkOnC()) lkEnts(A, ents, vis);
   if (A?.id === 'town' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
   if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
@@ -1700,6 +1704,7 @@ function draw(t) {
     else if (k === 12) drawWatWall(e, X, Y);
     else if (k === 13) drawWatTownGate(e, X, Y);
     else if (k === 15) drawFb(e, X, Y, t);
+    else if (k === 17) drawLk(e, X, Y, t);
     else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
     else drawPlayer(e, X, Y, t);
   }
@@ -1711,6 +1716,7 @@ function draw(t) {
     if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
     const isNear = near && near.id === s.id;
     if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note)$/.test(s.type) && !isNear) continue;
+    if ((s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
@@ -3752,6 +3758,7 @@ function bindPanel(root) {
   root.querySelectorAll('[data-pet]').forEach(c => { const draw = () => { if (!PET_AT || !petImg) return setTimeout(draw, 300); drawPetIcon(c, c.dataset.pet); }; draw(); });
   if (root.querySelector('canvas[data-pp]')) ppStart();
   root.querySelectorAll('[data-show]').forEach(c => drawShow(c));
+  root.querySelectorAll('[data-lk]').forEach(c => { const draw = () => { if (!lkImgReady()) { lkLoad(); if (c.isConnected) setTimeout(draw, 300); return; } const s = LKJ.sprites[c.dataset.lk], g = c.getContext('2d'), k = Math.min(c.width / s[2], c.height / s[3]); g.imageSmoothingEnabled = false; g.clearRect(0, 0, c.width, c.height); g.drawImage(LKIMG, s[0], s[1], s[2], s[3], (c.width - s[2] * k) / 2, (c.height - s[3] * k) / 2, s[2] * k, s[3] * k); }; draw(); });
   root.querySelectorAll('[data-of]').forEach(c => whenChars(function draw() {
     const sh = OUTFIT_SHEET[c.dataset.of], fs = sh && (c.dataset.og || me.gender) === 'f' && CH_ATLAS.rows[`f${sh}:down0`] !== undefined ? 'f' + sh : sh;
     if (fs && !chSrc(fs + ':down0')) { if (c.isConnected) setTimeout(draw, 300); return; }   // its outfit sheet is still loading: draw it once it is there
@@ -3759,6 +3766,93 @@ function bindPanel(root) {
   }));
   const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); }; const mq = root.querySelector('#mqIn'); if (mq) mq.oninput = () => { panel.mq = mq.value; refreshPanel(true); };
 }
+// ------------------------------------------------------------------ 🏮 Loy Krathong: krathongs drifting on the lake (yours, other players' and
+// the town's own), Lanna lanterns and string lights by the landing, sky lanterns rising over the temple; event tile + panels
+let LKV = null, LKJ = null, LKIMG = null, lkAsked = false;
+const LKF = [], LKS = [];
+const lkOnC = () => !!G?.lk && Date.now() >= G.lk.start && Date.now() <= G.lk.end;
+const lkImgReady = () => !!(LKJ && LKIMG);
+function lkLoad() { if (lkAsked) return; lkAsked = true; fetch('assets/loykrathong.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { LKJ = j; LKIMG = im; }; im.src = 'assets/loykrathong.webp?v=1'; }).catch(() => { lkAsked = false; }); }
+function lkUi() {
+  const b = $('#lkBtn'); if (!b) return; const on = lkOnC();
+  b.classList.toggle('hidden', !on);
+  b.classList.toggle('has', on && LKV && !LKV.today);
+  $('#lkN').textContent = LKV?.got ? '✔ ได้ชุดแล้ว' : `${Math.min(LKV?.days || 0, 3)}/3 วัน`;
+  b.onclick = () => { openPanel({ kind: 'lkev' }); send({ t: 'lkv' }); };
+}
+function lkEvHtml() {
+  const v = LKV || {}, need = v.need || 3, d = Math.min(v.days || 0, need);
+  const cells = Array.from({ length: need }, (_, i) => `<div class="ev7Cell ${i < d ? 'got' : i === d && !v.today ? 'ready' : 'lock'}"><small>วันที่ ${i + 1}</small><i>🪷</i>${i === need - 1 ? 'รับชุดฟรี' : 'ลอยกระทง'}</div>`).join('');
+  return `<h2>🏮 เทศกาลลอยกระทง 2569</h2>
+    <img src="assets/lkbanner.webp?v=1" alt="" style="width:100%;border-radius:12px;display:block;margin:4px 0 8px">
+    <div class="sub">📅 21–30 พ.ย. · 🌕 คืนลอยกระทงจริง <b>อังคาร 24 พ.ย.</b> รางวัล x2 + ปล่อยโคมฟรี 1 ลูก<br>
+    🪷 ไปที่ <b>ท่าลอยกระทง ริมทะเลสาบ</b> (ระหว่างสะพานท่าน้ำ 2 อัน) ซื้อกระทง เขียนคำอธิษฐาน แล้วลอย · ได้เงิน/เพชรสุ่ม วันละ 3 ครั้ง<br>
+    💕 ลอยพร้อมเพื่อนที่ยืนข้างกัน = ลอยคู่ ประกาศให้ทั้งเมืองรู้ · 🏮 ปล่อยโคมลอยได้ที่ลานหน้าโบสถ์ในวัด<br>
+    🎽 ลอยกระทงครบ <b>3 วัน</b> (วันไหนก็ได้) รับ <b>ชุดไทยลอยกระทง</b> ฟรี! ไม่มีขาย</div>
+    <div class="ev7Grid" style="grid-template-columns:repeat(3,1fr)">${cells}</div>
+    <div class="ev7Ban" style="min-height:0;padding:8px 12px"><div class="ev7Txt"><b style="font-size:18px">รางวัล: ชุดไทยลอยกระทง</b><span>${v.got ? '✔ ได้รับแล้ว ใส่/ถอดที่ ⚙️ ตั้งค่า' : `ลอยแล้ว ${d}/${need} วัน${v.today ? ' (วันนี้ลอยแล้ว ✔)' : ''}`}</span></div><canvas data-of="loykrathong" data-og="m" width="72" height="96"></canvas><canvas data-of="loykrathong" data-og="f" width="72" height="96"></canvas></div>
+    ${B('🧭 พาไปท่าลอยกระทง', { fn: 'lkGo' }, 'primary big')}`;
+}
+const lkWater = (x, y) => G.map.tiles[Math.floor(y)]?.[Math.floor(x)] === 'w';
+function lkSpawn(m, amb) {
+  if (LKF.length > 40) LKF.splice(0, LKF.findIndex(k => k.amb) + 1 || 1);
+  LKF.push({ sp: m.sp, x: m.x, y: m.y, vx: (Math.random() - .5) * .22, vy: .1 + Math.random() * .12, t0: performance.now(), life: amb ? 200e3 : 300e3, name: m.name || '', wish: m.wish || '', pair: m.pair, amb, ph: Math.random() * 7 });
+}
+function lkSky(m) { LKS.push({ x: m.x, y: m.y, t0: performance.now(), name: m.name || '', ph: Math.random() * 7, vx: (Math.random() - .5) * .25 }); if (LKS.length > 30) LKS.shift(); }
+let lkAmbT = 0;
+function lkEnts(A, ents, vis) {
+  lkLoad(); if (!lkImgReady()) return;
+  const tn = performance.now(), dt = Math.min(.1, (tn - (lkEnts.t || tn)) / 1000); lkEnts.t = tn;
+  const night = nightLevel() > .2, fest = !!LKV?.fest;
+  if (A.id === 'town') {
+    for (const d of G.lk.deco) if (vis(d[1], d[2], 4)) ents.push([d[2], 17, { k: 'deco', s: d[0], x: d[1], y: d[2], z: d[3] }]);
+    if (tn > lkAmbT && LKF.filter(k => k.amb).length < (fest ? 26 : 14)) { lkAmbT = tn + (fest ? 2500 : 5000) + Math.random() * 3000; const sp = ['kr_leaf', 'kr_leaf', 'kr_bread', 'kr_lotus'][Math.random() * 4 | 0]; lkSpawn({ sp, x: 18 + Math.random() * 17, y: 60.4 + Math.random() * 1.2 }, 1); }
+    for (let i = LKF.length - 1; i >= 0; i--) {
+      const k = LKF[i], age = tn - k.t0; if (age > k.life) { LKF.splice(i, 1); continue; }
+      const nx = k.x + k.vx * dt, ny = k.y + k.vy * dt;
+      if (lkWater(nx + Math.sign(k.vx) * .4, k.y)) k.x = nx; else k.vx = -k.vx;
+      if (lkWater(k.x, ny + .3)) k.y = ny; else { k.vy = -Math.abs(k.vy) * .4; if (Math.abs(k.vy) < .02) k.vy = 0; }
+      if (vis(k.x, k.y, 2)) ents.push([-1e7 + k.y, 17, { k: 'kr', e: k, age }]);   // on the water: under people standing on the shore
+    }
+  } else {
+    if (night && tn > lkAmbT && LKS.length < (fest ? 16 : 9)) { lkAmbT = tn + 1800 + Math.random() * 2500; lkSky({ x: A.x + 6 + Math.random() * (A.w - 12), y: A.y + 14 + Math.random() * 12 }); }
+    for (let i = LKS.length - 1; i >= 0; i--) { const l = LKS[i], age = (tn - l.t0) / 1000; if (age > 40) { LKS.splice(i, 1); continue; } ents.push([1e7, 17, { k: 'sky', e: l, age }]); }
+  }
+}
+function lkSpr(name, x, y, X, Y, sc = 1) {
+  const s = LKJ.sprites[name]; if (!s) return null;
+  const w = s[4] * TS * sc, h = w * s[3] / s[2], px = Math.round(x * TS + X - w / 2), py = Math.round(y * TS + Y - h);
+  ctx.drawImage(LKIMG, s[0], s[1], s[2], s[3], px, py, Math.round(w), Math.round(h)); return { px, py, w, h };
+}
+function lkGlow(px, py, r, a) { const g = ctx.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, `rgba(255,200,110,${a})`); g.addColorStop(1, 'rgba(255,170,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill(); }
+function drawLk(e, X, Y, t) {
+  ctx.imageSmoothingEnabled = false; const night = nightLevel(), T = t / 1000;
+  if (e.k === 'deco') {
+    const sw = e.s === 'lanna' ? Math.sin(T * 1.3 + e.x) * .05 : 0;
+    if (e.s === 'lanna') { ctx.strokeStyle = 'rgba(70,45,25,.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(e.x * TS + X, (e.y - e.z - 1.2) * TS + Y); ctx.lineTo(e.x * TS + X, (e.y - e.z - .9) * TS + Y); ctx.stroke(); }
+    ctx.save(); ctx.translate(e.x * TS + X, (e.y - e.z) * TS + Y); ctx.rotate(sw); const r = lkSpr(e.s, 0, 0, 0, 0); ctx.restore();
+    if (night > .15 && r) lkGlow(e.x * TS + X, (e.y - e.z) * TS + Y - r.h / 2, TS * (e.s === 'lights' ? 1.6 : .9), night * 1.1);
+    return;
+  }
+  if (e.k === 'kr') {
+    const k = e.e, bob = Math.sin(T * 1.6 + k.ph) * TS * .03, fade = Math.min(1, (k.life - e.age) / 5000), px = k.x * TS + X, py = k.y * TS + Y + bob;
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; const rr = (T * .8 + k.ph) % 1; ctx.beginPath(); ctx.ellipse(px, py, TS * (.35 + rr * .35), TS * (.12 + rr * .12), 0, 0, 7); ctx.stroke();
+    if (night > .1) lkGlow(px, py - TS * .45, TS * .9, .5 + night);
+    lkSpr(k.sp, k.x, k.y + bob / TS + .1, X, Y, .8);
+    if (night > .1) { ctx.fillStyle = `rgba(255,${200 + Math.sin(T * 9 + k.ph) * 40 | 0},90,.95)`; ctx.beginPath(); ctx.arc(px, py - TS * .66, TS * .05, 0, 7); ctx.fill(); }
+    if (!k.amb && e.age < 9000) { ctx.globalAlpha = fade * Math.min(1, (9000 - e.age) / 1500); sign(`${k.pair ? '💕 ' : '🪷 '}${k.name}${k.wish ? ` · "${k.wish}"` : ''}`, px, py - TS * 1.1, { size: TS * .24, bg: 'rgba(120,60,20,.85)' }); }
+    ctx.globalAlpha = 1; return;
+  }
+  if (e.k === 'sky') {
+    const l = e.e, x = l.x + Math.sin(e.age * .6 + l.ph) * .5 + l.vx * e.age, y = l.y - e.age * .55, a = Math.min(1, e.age / 1.5, (40 - e.age) / 6), px = x * TS + X, py = y * TS + Y;
+    if (py < -TS * 2) return; ctx.globalAlpha = Math.max(0, a);
+    lkGlow(px, py - TS * .4, TS * 1.2, .55 + night * .6); lkSpr('skylantern', x, y, X, Y, .9 - Math.min(.4, e.age * .012));
+    if (l.name && e.age < 6) sign(`🏮 ${l.name}`, px, py - TS * 1.3, { size: TS * .22, bg: 'rgba(120,60,20,.85)' });
+    ctx.globalAlpha = 1;
+  }
+}
+setInterval(() => { if (G && lkOnC()) { lkUi(); } }, 60e3);
 // ------------------------------------------------------------------ 🎁 the 7-day login event: a gift tile under the phone and its panel
 let EV7 = null;
 const ev7Ready = () => !!EV7 && EV7.n > EV7.got && Date.now() <= EV7.end;
@@ -3798,6 +3892,8 @@ const FN = {
   showEd: () => { panel.showEd = !panel.showEd; panel.titles = panel.frames = false; refreshPanel(true); const b = document.querySelector('#panelBody'); if (b) b.scrollTop = 0; },
   showAch(m) { const cur = me.show?.ach || [], has = cur.includes(m.id); if (!has && cur.length >= 3) return toast('เลือกโชว์ได้สูงสุด 3 อัน กดเอาอันเดิมออกก่อน', '🏅'); send({ t: 'show', ach: has ? cur.filter(x => x !== m.id) : [...cur, m.id] }); },
   photo: () => pickPhoto(),
+  lkFloat: m => { send({ t: 'act', st: m.st, a: 'float', kind: m.kind, wish: ($('#lkWish')?.value || '').trim() }); closePanel(); },
+  lkGo: () => { closePanel(); setGuide('lk_float'); },
   place: m => startPlace(m.k),
   decoPick: () => startPick(),
   photoDel: () => send({ t: 'pic', data: '' }),
@@ -4692,6 +4788,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23o', d: '21 พ.ย.', items: [
+    '🏮 <b>เทศกาลลอยกระทง</b> 21–30 พ.ย.! ลอยกระทงที่ท่าน้ำทะเลสาบ เขียนคำอธิษฐาน ลอยคู่กับเพื่อน ปล่อยโคมลอยที่วัด · ลอยครบ 3 วันรับ <b>ชุดไทยลอยกระทง</b> ฟรี · 🌕 อังคาร 24 พ.ย. คืนลอยกระทงจริง รางวัล x2 · กดไอคอน 🏮 ใต้มือถือ',
+  ] },
   { v: '2026-11-23n', d: '23 พ.ย.', items: [
     '🗺️ มินิแมพซูมใกล้ขึ้นและเลื่อนตามตัวเรา เห็นจุดคนชัดขึ้น ใครกำลังเดินอยู่จะมีวงกระเพื่อมรอบจุด (กดมินิแมพเพื่อดูแผนที่ทั้งเมือง)',
   ] },
@@ -5309,6 +5408,16 @@ function renderPanel(p) {
   switch (k) {
     case 'news': return newsHtml();
     case 'ev7': return ev7Html();
+    case 'lkev': return lkEvHtml();
+    case 'lk': {
+      const v = LKV || {}, K = G.lk.kinds;
+      return `<h2>🪷 ท่าลอยกระทง</h2><div class="sub">เลือกกระทง เขียนคำอธิษฐาน แล้วลอยลงทะเลสาบ · ทุกคนในเมืองเห็นกระทงของคุณ · ลอยพร้อมเพื่อนข้างๆ = ลอยคู่ 💕<br>
+        วันนี้ได้รางวัลอีก <b>${v.left ?? 3}</b> ครั้ง${v.fest ? ' · <b>🌕 วันลอยกระทง รางวัล x2!</b>' : ''} · ความคืบหน้าชุดฟรี <b>${Math.min(v.days || 0, v.need || 3)}/${v.need || 3}</b> วัน</div>
+        <input id="lkWish" maxlength="40" placeholder="คำอธิษฐาน (ไม่บังคับ)" style="width:100%;margin:6px 0 8px">
+        <div class="looks">${Object.entries(K).map(([k, o]) => `<div class="look"><canvas data-lk="${o.sp}" width="72" height="64"></canvas><small>${esc(o.name)}</small>${B(money(o.price), { fn: 'lkFloat', st, kind: k }, 'good', me.money < o.price)}</div>`).join('')}</div>`;
+    }
+    case 'lksky': return `<h2>🏮 ปล่อยโคมลอย</h2><div class="sub">ปล่อยโคมลอยขึ้นฟ้า ขอให้ทุกข์โศกลอยไปกับโคม · ทุกคนในวัดเห็นโคมของคุณ${LKV?.fest ? ' · <b>วันนี้วันลอยกระทง ปล่อยโคมแรกฟรี!</b>' : ''}</div>
+      <div class="looks"><div class="look"><canvas data-lk="skylantern" width="72" height="72"></canvas><small>โคมลอย</small>${B(money(G.lk.sky), { t: 'act', st, a: 'release' }, 'primary')}</div></div>`;
     case 'fbpost': {
       const n = Math.max(1, Math.min(NEWS.length, p.n || fbNewCount())), txt = fbText(n);
       return `<h2>📣 โพสต์ข่าวลงเฟส</h2><div class="sub">กดคัดลอก แล้วไปวางในกลุ่มเฟส · เลือกจำนวนรอบอัปเดตที่จะรวมในโพสต์ได้</div>

@@ -819,6 +819,15 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   GATES.park_in = { x: 46, y: 97 }; GATES.town_from_park = { x: 46, y: 93.6 };
   GATES.field_in = { x: 50, y: 101.6 }; GATES.town_from_field = { x: 46, y: 93.6 };
 }
+// 🏮 Loy Krathong 2569 (the festival night is Tue 24 Nov 2569): float a krathong at the lake landing, release a sky lantern at the
+// temple. Floating on 3 different days during the event gives the Thai festival outfit; the festival day pays double.
+const LK = { id: 'lk2569', start: Date.parse('2026-11-21T00:00:00+07:00'), end: Date.parse('2026-11-30T23:59:59+07:00'), day: '2026-11-24', need: 3, outfit: 'loykrathong',
+  kinds: { leaf: { name: 'กระทงใบตอง', price: 40, sp: 'kr_leaf' }, bread: { name: 'กระทงขนมปัง (ปลากินได้)', price: 40, sp: 'kr_bread' }, lotus: { name: 'กระทงดอกบัว', price: 120, sp: 'kr_lotus' } },
+  daily: 3, sky: 30,   // rewarded floats per day; sky lantern price (the first one on the festival day is free)
+  deco: [['lights', 26.5, 57.7, 1.7], ['lanna', 19.5, 57.4, 1.5], ['lanna', 22.5, 57.4, 1.5], ['lanna', 30.5, 57.4, 1.5], ['lanna', 33.5, 57.4, 1.5],
+    ['lanna', 19.5, 61.2, 1.3], ['lanna', 22.5, 61.2, 1.3], ['lanna', 30.5, 61.2, 1.3], ['lanna', 33.5, 61.2, 1.3]] };
+STATIONS.push({ id: 'lk_float', type: 'lk', label: 'ท่าลอยกระทง', icon: '🪷', x: 26.5, y: 58.6, r: 2.2, area: 'town' });
+STATIONS.push({ id: 'lk_sky', type: 'lksky', label: 'ปล่อยโคมลอย', icon: '🏮', x: TEMPLE.x + 22, y: TEMPLE.y + 15.2, r: 2, area: 'temple' });
 const AREAS = [TOWN, HOUSING, PARK, TEMPLE, FIELD, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
@@ -1622,6 +1631,7 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   racer:     { name: 'ชุดเด็กแว้นสายซิ่ง', nf: 'ชุดสก๊อยสายซิ่ง', how: 'ซื้อที่ร้านแฟชั่น', gems: 180 },
   maid:      { name: 'ชุดเมดน่ารัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 150, g: 'f' },
   dino:      { name: 'ชุดไดโนเสาร์', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 },
+  loykrathong: { name: 'ชุดไทยลอยกระทง', nf: 'ชุดไทยลอยกระทงสาว', how: 'กิจกรรมลอยกระทง 2569 (แจกฟรี ไม่มีขาย)' },
   winter:    { name: 'ชุดไหมพรมกันหนาว', nf: 'ชุดไหมพรมกันหนาวสาว', how: 'กิจกรรมล็อกอิน 7 วัน (แจกฟรี ไม่มีขาย)' } };
 // 🎁 a login event: log in on 7 different days between start and end; each day unlocks the next reward, day 7 is the outfit
 const EV7 = { id: 'winter26', title: 'ล็อกอิน 7 วัน รับชุดกันหนาวฟรี', start: Date.parse('2026-11-21T00:00:00+07:00'), end: Date.parse('2026-12-14T23:59:59+07:00'),
@@ -1775,7 +1785,7 @@ const TAROT = {   // key order = card order in assets/tarot.webp (see tools/buil
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
-module.exports = { EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

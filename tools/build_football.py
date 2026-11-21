@@ -1,4 +1,5 @@
-"""Cut the football park props from tools/sheets/football.jpg into public/assets/football.webp (+ .json), and shrink the
+"""(generic prop-sheet cutter, see build_loykrathong.py)
+Cut the football park props from tools/sheets/football.jpg into public/assets/football.webp (+ .json), and shrink the
 pitch picture (tools/sheets/football_pitch.jpg) to public/assets/pitch.webp.
 
     python3 tools/build_football.py
