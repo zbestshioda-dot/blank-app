@@ -13,6 +13,8 @@ const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจ
 const PARK = { id: 'park', kind: 'zone', in: 'town', name: 'สวนสนุก', x: 4, y: 95, w: 40, h: 28 };   // a zone of the town now (its south district), walked into from the street   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
 const FIELD = { id: 'field', kind: 'zone', in: 'town', name: 'สนามฟุตบอล', x: 52, y: 96, w: 30, h: 23 };   // ⚽ the public football ground, where the old farm used to be
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
+// 🎄 limited Christmas items (reindeer, sleigh) and their showcase in the square: until the end of 31 Dec 2569 (Bangkok)
+const XMAS_END = Date.parse('2027-01-01T00:00:00+07:00');
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
 const W = YX0 + 4 * 34, H = 125;   // rows 90+ : the town's south district (amusement park + football ground)                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
@@ -148,12 +150,17 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   fenceRow('fence_white', 42, 47, 39.95); fenceRow('fence_white', 53, 58, 39.95);
   fenceRow('hedge_flower', 42, 47, 28.95); fenceRow('hedge_flower', 53, 58, 28.95);          // flowering hedges facing the plaza
   fenceRow('hedge_flower', 42, 47, 36.95); fenceRow('hedge_flower', 53, 58, 36.95);
-  for (const x of [46.4, 53.6]) { prop('o_hedgecube', x, 26.95); prop('o_hedgecube', x, 27.95); prop('o_hedgecube', x, 38.95); }   // hedge posts down the walkway side
+  for (const x of [46.4, 53.6]) { prop('o_hedgecube', x, 26.95); prop('o_hedgecube', x, 27.95); if (x > 50 || Date.now() >= XMAS_END) prop('o_hedgecube', x, 38.95); }   // hedge posts down the walkway side (🎄 the south-west one steps aside for the Christmas showcase)
   for (const x of [42.5, 57.5]) { prop('bush', x, 26.4); prop('bush2', x, 27.95); prop('bush2', x, 38.95); }                         // bushes along the street side
   prop('tree_pink', 44.5, 27.6); prop('tree_oak', 46.5, 22.6);                                 // shade trees: the north-east one moved out of the casino doorway to the roadside north-west of the square
   prop('o_roses', 43.6, 25.95, false); prop('o_tulips', 45.4, 25.95, false);   // (the north-east pair went with the old fence: the casino forecourt is there now)
-  prop('o_flowerbed', 44.6, 38.6); prop('o_flowerbed', 55.4, 38.6);                           // flower beds in the south lawns
-  prop('o_topiary', 46.4, 37.95, false); prop('o_topiary', 53.6, 37.95, false);
+  if (Date.now() < XMAS_END) {   // 🎄 the Christmas showcase on the south-west lawn, beside the spawn point (the client stops drawing it after XMAS_END)
+    const put = (s, x, y, sc, solid) => { PROPS.push({ s, x, y, sc, until: XMAS_END }); if (solid) set(Math.floor(x), Math.floor(y - .5), 'o'); };
+    put('i_gift2', 44.2, 37.5, .8); put('i_gift1', 45.6, 37.45, .85); put('w_sleigh_s', 45.1, 38.95, .85, true); set(44, 38, 'o'); set(46, 38, 'o');
+    STATIONS.push({ id: 'xmas_show', type: 'xmasshow', label: 'ของรุ่นจำกัดคริสต์มาส', icon: '🎄', x: 47.6, y: 38.3, r: 1.9, area: 'town', until: XMAS_END });
+  } else prop('o_flowerbed', 44.6, 38.6);
+  prop('o_flowerbed', 55.4, 38.6);                           // flower beds in the south lawns
+  if (Date.now() >= XMAS_END) prop('o_topiary', 46.4, 37.95, false); prop('o_topiary', 53.6, 37.95, false);
   // the plaza: lamps at its four corners, benches facing the fountain, planters at the walkway mouths
   for (const [x, y] of [[47.3, 29.95], [52.7, 29.95], [47.3, 35.95], [52.7, 35.95]]) prop('o_lamp', x, y);
   // benches sit against the lawn hedges on both sides, off the walkways (the first keeps its old id: quests and the map point at it)
@@ -1245,8 +1252,6 @@ const FRAMES = [
 // 💎 four of the plainer special frames are sold for gems (the rest stay locked)
 for (const f of FRAMES) if (['สายฟ้า', 'ดอกบัว', 'สายน้ำ', 'ลายไทย'].includes(f.name)) { f.locked = false; f.gem = 50; }
 // pets: bought in the pet panel (the pet shops are closed for renovation), one follows you around. rar 1-5 like fish
-// 🎄 limited Christmas items: on sale until the end of 31 Dec 2569 (Bangkok), then gone from the shops (owners keep them)
-const XMAS_END = Date.parse('2027-01-01T00:00:00+07:00');
 const PETS = {
   chick:    { name: 'ลูกเจี๊ยบ', icon: '🐤', price: 500, rar: 1, desc: 'ตัวจิ๋วเจี๊ยบๆ กระโดดตุ๊บๆ' },
   duck:     { name: 'ลูกเป็ด', icon: '🦆', price: 600, rar: 1, desc: 'เดินส่ายก้นกุ๊กกิ๊ก' },
@@ -1942,6 +1947,6 @@ module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAR
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, FISH_COL, CASINO, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, FISH_COL, CASINO, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

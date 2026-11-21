@@ -1431,6 +1431,7 @@ function findNear() {
   const here = areaOf(m.x, m.y)?.id;
   let best = null, bd = 1e9;
   for (const s of G.stations) {
+    if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.area !== here || s.type === 'yzone' && yzOpen(s.idx, s.z) || (s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
     const d = Math.hypot(s.x - m.x, s.y - m.y);
     if (d <= s.r && d < bd) { bd = d; best = s; }
@@ -1682,7 +1683,8 @@ function draw(t) {
   const ents = [];
   const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
-  for (const p of G.props) if (vis(p.x, p.y, 4)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);   // manholes, puddles, grass tufts lie flat
+  for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);
+  if (Date.now() + clockOff < (G.xmasEnd || 0) && vis(XMAS_DEER.x, XMAS_DEER.y, 3)) ents.push([XMAS_DEER.y + .3, 6, XMAS_DEER]);   // 🎄 the showcase reindeer pulling the sleigh   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'town') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
@@ -1753,6 +1755,7 @@ function draw(t) {
     const isNear = near && near.id === s.id;
     if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note)$/.test(s.type) && !isNear) continue;
     if ((s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
+    if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
@@ -4166,6 +4169,7 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
+  xmasGo(m) { closePanel(); setGuide(m.key, false, true); },
   czBet(m) { czBetV = m.v; FX.play('click'); refreshPanel(true); },
   czGo(m) { const s = STN(m.st); if (s) { panel = null; openPanel({ kind: s.type, st: s.id }); } },
   pushOn() { pushOn(true); },
@@ -4654,6 +4658,25 @@ function czHtml(k, st) {
   }
   return '';
 }
+// 🎄 Christmas limited items: the showcase in the square (a reindeer in front of the sleigh), its panel, and a once-a-day popup
+const XMAS_DEER = { id: 'reindeer', x: 43.25, y: 38.6, hop: -1e9, hopDur: 1, big: 1, moving: false, view: 'side', flip: true, owner: 0 };
+const xmasLeft = () => Math.max(0, Math.ceil(((G?.xmasEnd || 0) - Date.now() - clockOff) / 864e5));
+function xmasHtml() {
+  const left = xmasLeft(); if (!left) return '<h2>🎄 ของรุ่นจำกัดคริสต์มาส</h2><div class="sub">หมดเขตขายแล้ว แล้วพบกันใหม่เทศกาลหน้า!</div>';
+  const pt = G.pets.reindeer, v = G.shop.vehicles.sleigh, hasP = (me.pets || []).includes('reindeer'), hasV = (me.vehicles || []).includes('sleigh');
+  const card = (cv, name, gem, has, go, where) => `<div class="look fcard ${has ? 'on' : ''}">${cv}<small>${name}</small><em>💎${gem}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(`พาไป${where}`, { fn: 'xmasGo', key: go }, 'primary')}</div>`;
+  return `<h2>🎄 ของรุ่นจำกัดคริสต์มาส</h2><div class="jobbox" style="text-align:center">⏰ ขายถึง <b>31 ธ.ค.</b> เท่านั้น · เหลืออีก <b>${left} วัน</b><br><small>หลังจากนั้นเลิกขายถาวร (คนที่ซื้อไปแล้วได้เก็บไว้ตลอด)</small></div>
+    <div class="looks">${card(`<canvas data-pet="reindeer" width="84" height="84"></canvas>`, `${pt.icon} ${esc(pt.name)}`, pt.gem, hasP, 'petshop1', 'ร้านสัตว์เลี้ยง')}${card(`<canvas class="vfit" data-spr="w_sleigh_s" width="150" height="84"></canvas>`, `${v.icon} ${esc(v.name)} · ไม่ต้องมีใบขับขี่`, v.gem, hasV, 'dealer', 'โชว์รูมรถ')}</div>
+    <div class="sub">💡 ใส่ 🎅 ชุดซานต้า (ของขวัญปีใหม่ในจดหมาย) ขี่รถเลื่อน จูงเรนเดียร์ ครบชุดเท่สุดในเมือง!${(me.gems || 0) < pt.gem ? ' · เพชรไม่พอ? 💳 บัตรรายเดือนคุ้มสุด' : ''}</div>`;
+}
+setTimeout(function xmasDaily() {
+  setTimeout(xmasDaily, 30000);
+  if (!me || !G || panel || tutPending || me.nb || !xmasLeft() || document.querySelector('#daily')?.offsetParent || document.querySelector('#tut:not(.hidden)')) return;
+  if ((me.pets || []).includes('reindeer') && (me.vehicles || []).includes('sleigh')) return;
+  const d = new Date(Date.now() + clockOff + 7 * 3600e3).toISOString().slice(0, 10);
+  try { if (localStorage.getItem('ltXmasDay') === d) return; localStorage.setItem('ltXmasDay', d); } catch { return; }
+  FX.play('chime'); openPanel({ kind: 'xmasshow' });
+}, 12000);
 // 🐠 the home tank: put fish from the bag in (they swim there for visitors and add comfort), take them back out
 function aqBox() {
   const n = me.aqSlots || 0, aq = me.aq || [], cf = [0, 0, 1, 2, 3, 5];
@@ -5243,6 +5266,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23av', d: '21 พ.ย.', items: [
+    '🎄 มุมโชว์ของรุ่นจำกัดคริสต์มาสที่ลานจัตุรัส (สนามหญ้าฝั่งตะวันตกเฉียงใต้): รถเลื่อนซานต้า + เรนเดียร์ · กด 🎄 แล้วระบบพาไปร้านได้เลย',
+  ] },
   { v: '2026-11-23au', d: '21 พ.ย.', items: [
     '🎈 แก้ป้ายชื่อบังลูกโป่ง: ลูกโป่งลอยสูงขึ้นเหนือชื่อแล้ว',
   ] },
@@ -6015,6 +6041,7 @@ function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
     case 'news': return newsHtml();
+    case 'xmasshow': return xmasHtml();
     case 'casino': case 'slot': case 'hilo': case 'roul': case 'bj': return czHtml(k, st);
     case 'astats': return me.admin ? aStatsHtml() : '';
     case 'noti': return lbNotiHtml();
