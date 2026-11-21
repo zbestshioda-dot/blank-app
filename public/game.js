@@ -1659,7 +1659,7 @@ function draw(t) {
   if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
   if (A?.id === 'town' && vis(G.football.pitch.x + 9, G.football.pitch.y + 5, 22)) fbEnts(ents, vis);
   if ((A?.id === 'town' || A?.id === 'temple') && lkOnC()) lkEnts(A, ents, vis);
-  if (A?.id === 'temple' && G.fair?.on && vis(G.fair.x + G.fair.w / 2, G.fair.y + 8, 30)) fairEnts(ents, vis);
+  if (A?.id === 'temple' && G.fair?.on) fairEnts(ents, vis);
   if (A?.id === 'town' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
   if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
@@ -4883,14 +4883,17 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23t', d: '21 พ.ย.', items: [
+    '🐞 แก้ความคืบหน้ากิจกรรมล็อกอิน 7 วัน และลอยกระทง หายทุกครั้งที่เข้าเกมใหม่ (ตอนนี้บันทึกถาวรแล้ว)',
+  ] },
   { v: '2026-11-23s', d: '21 พ.ย.', items: [
-    '🎪 ย้ายงานวัดเข้าไปในวัดแล้ว! ลานวัดขยายใหญ่ขึ้น เดินผ่านสระบัวลงไปทางใต้ ลอดซุ้มแดง มีร้านของกินและเกมงานวัดครบ',
+    '🎪 ย้ายงานวัดเข้าไปในวัดแล้ว! ลานข้างโบสถ์: ลอดซุ้มแดงจากทางเดินหลัก มีร้านเรียง 2 แถว เกมงานวัด และร้านขนม 2 ข้างบันไดโบสถ์',
   ] },
   { v: '2026-11-23r', d: '21 พ.ย.', items: [
     '🪷 ลอยกระทงที่วัดได้แล้ว! ท่าลอยกระทงสระบัวหน้าโบสถ์ ประดับโคมล้านนารอบสระ (นับรวมภารกิจชุดฟรีเหมือนท่าน้ำทะเลสาบ)',
   ] },
   { v: '2026-11-23q', d: '21 พ.ย.', items: [
-    '🎪 <b>งานวัดมาแล้ว!</b> ลานงานวัดในวัด เดินผ่านสระบัวลงไปทางใต้ ลอดซุ้มแดง มีของกินใหม่: ลูกชิ้นปิ้ง ไส้กรอกอีสาน ขนมครก ไข่นกกระทา ไอติมกะทิ ลูกชุบ ชาเย็น',
+    '🎪 <b>งานวัดมาแล้ว!</b> ลานหน้าโบสถ์ในวัด มีของกินใหม่: ลูกชิ้นปิ้ง ไส้กรอกอีสาน ขนมครก ไข่นกกระทา ไอติมกะทิ ลูกชุบ ชาเย็น',
     '🎈 เกมงานวัดเล่นได้จริง: ปาเป้าลูกโป่ง · ปาห่วงขวด · ตกเป็ดน้อย ครั้งละ ฿20 ได้เงินรางวัลตามคะแนน คะแนนเต็มได้ตุ๊กตา + 💎',
   ] },
   { v: '2026-11-23p', d: '21 พ.ย.', items: [

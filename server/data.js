@@ -831,43 +831,45 @@ STATIONS.push({ id: 'lk_float_t', type: 'lk', label: 'ท่าลอยกร�
 LK.decoT = [['lanna', TEMPLE.x + 16, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 16, TEMPLE.y + 27.6, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 27.6, 1.4], ['lights', TEMPLE.x + 21.5, TEMPLE.y + 18.9, 2]];
 LK.ponds = { town: [18, 60.4, 35, 61.6], temple: [TEMPLE.x + 18, TEMPLE.y + 20.6, TEMPLE.x + 25, TEMPLE.y + 21.4] };
 STATIONS.push({ id: 'lk_sky', type: 'lksky', label: 'ปล่อยโคมลอย', icon: '🏮', x: TEMPLE.x + 22, y: TEMPLE.y + 15.2, r: 2, area: 'temple' });
-// 🎪 the temple fair (งานวัด) for the Loy Krathong weeks, inside the temple grounds: the grounds now run 14 rows further south (a
-// fairground behind the lotus pond, the old south wall gone). Food stalls sell real food; the game stalls (balloon darts, ring toss,
-// duck fishing) are mini-games. The stalls are built only when the server starts before the festival ends (the fairground stays).
-const FAIR = { on: Date.now() < LK.end, x: TEMPLE.x, y: TEMPLE.y + 31, w: TEMPLE.w, h: 15, deco: [], games: {
+// 🎪 the temple fair (งานวัด) for the Loy Krathong weeks, in the temple grounds in front of the ordination hall: a food court on the
+// west lawn (stalls round a ring of tables, under a red arch), game stalls along the main walk, more snacks east of the courtyard.
+// Food stalls sell real food; the game stalls (balloon darts, ring toss, duck fishing) are mini-games.
+// Built only when the server starts before the festival ends (the next deploy after it takes them down).
+const FAIR = { on: Date.now() < LK.end, x: TEMPLE.x, y: TEMPLE.y, w: TEMPLE.w, h: TEMPLE.h, deco: [], games: {
   darts: { name: 'ปาเป้าลูกโป่ง', price: 20, min: 3, max: 6, pay: [0, 10, 20, 35, 50, 80, 120] },
   ring: { name: 'ปาห่วงขวด', price: 20, min: 3, max: 3, pay: [0, 25, 60, 150] },
   fish: { name: 'ตกเป็ดน้อย', price: 20, min: 18, max: 10, pay: [0, 8, 16, 24, 32, 42, 54, 66, 80, 95, 110] } } };
-{
-  const T = TEMPLE, X = T.x, Y = T.y, H0 = T.h; T.h = H0 + 14;
-  rect(X + 1, Y + H0 - 1, T.w - 2, 15, 's');                                        // the new ground (and the old south wall taken down)
-  for (let x = X; x < X + T.w; x++) set(x, Y + T.h - 1, 'o');
-  for (let y = Y + H0 - 1; y < Y + T.h; y++) { set(X, y, 'o'); set(X + T.w - 1, y, 'o'); }
-  rect(X + 20, Y + 29, 3, 8, 'c'); rect(X + 1, Y + 37, T.w - 2, 3, 'c');               // from the pond walk down to the fair's long walk
-  rect(X + 1, Y + 41, 6, 3, '.'); rect(X + 37, Y + 41, 6, 3, '.');                   // a little lawn at each end
-  if (FAIR.on) {
-    const F = FAIR, deco = (s, x, y, z = 0) => F.deco.push([s, x, y, z]);
-    deco('f_arch', X + 21.5, Y + 33.6); set(X + 19, Y + 33, 'o'); set(X + 23, Y + 33, 'o');
-    const stall = (sp, x, y, st, sy) => { deco(sp, x, y); rect(Math.round(x - 1.5), Math.ceil(y) - 2, 3, 2, 'o'); STATIONS.push({ area: 'temple', x, y: sy ?? y + .95, r: 1.6, fair: 1, ...st }); };
-    const food = (sp, x, y, id, label, icon, items, sy) => stall(sp, x, y, { id, type: 'pshop', label, icon, items }, sy);
-    const game = (sp, x, y, k, icon, sy) => stall(sp, x, y, { id: 'fair_' + k, type: 'fairgame', k, label: F.games[k].name, icon }, sy);
-    // north row: counters open onto the long walk
-    food('s_cotton', X + 4.5, Y + 36.6, 'fair_cotton', 'ร้านสายไหม', '🍭', ['cottoncandy', 'popcorn']);
-    food('s_grill', X + 9, Y + 36.6, 'fair_grill', 'ลูกชิ้นปิ้ง ไส้กรอกอีสาน', '🍢', ['meatball', 'sausage']);
-    food('s_coconut', X + 13.5, Y + 36.6, 'fair_coconut', 'ไอติมกะทิมะพร้าว', '🥥', ['coconutice']);
-    food('s_kanomkrok', X + 29.5, Y + 36.6, 'fair_krok', 'ขนมครกหอมๆ', '🥞', ['kanomkrok', 'thaitea']);
-    food('s_eggs', X + 34, Y + 36.6, 'fair_eggs', 'ไข่นกกระทา', '🍳', ['quaileggs', 'sausage']);
-    food('s_glass', X + 38.5, Y + 36.6, 'fair_glass', 'ตู้ขนมหวาน', '🍰', ['luukchup', 'kanomthai', 'coconutice']);
-    // south row: you stand on the walk side to play / buy
-    game('s_darts', X + 10.5, Y + 44.2, 'darts', '🎈', Y + 40.5);
-    game('s_ring', X + 15, Y + 44.2, 'ring', '⭕', Y + 40.5);
-    game('s_fish', X + 19.5, Y + 44.2, 'fish', '🦆', Y + 40.5);
-    food('s_dessert', X + 24, Y + 44.2, 'fair_dessert', 'ขนมไทยงานวัด', '🍡', ['kanomthai', 'luukchup', 'thaitea'], Y + 40.5);
-    food('s_sweets', X + 28.5, Y + 44.2, 'fair_sweets', 'ของว่างงานวัด', '🥟', ['meatball', 'quaileggs', 'thaitea'], Y + 40.5);
-    for (const x of [7, 15, 28, 36]) deco('f_lights', X + x, Y + 38.6, 2.2);
-    for (const [x, y] of [[17.2, 36.9], [25.8, 36.9], [2.2, 41.2], [41.8, 41.2]]) { deco('f_pole', X + x, Y + y); set(Math.floor(X + x), Math.floor(Y + y - .5), 'o'); }
-    deco('f_balloons', X + 18.2, Y + 34.6); deco('f_speaker', X + 24.8, Y + 34.4); deco('f_bin', X + 42.2, Y + 36.4); deco('f_teddy', X + 6.5, Y + 43.4); deco('f_table', X + 33.5, Y + 43.6); deco('f_table', X + 39.5, Y + 43.6);
-  }
+if (FAIR.on) {
+  const F = FAIR, X = TEMPLE.x, Y = TEMPLE.y, deco = (sp, x, y, z = 0) => F.deco.push([sp, X + x, Y + y, z]);
+  const keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
+  // the west lawn becomes the fairground: two lanes of stalls behind a red arch on the main walk
+  const inW = (x, y) => x >= X + 1 && x <= X + 12 && y >= Y + 1 && y <= Y + 15.99;
+  keep(TREES, t => !inW(t[0], t[1])); keep(PROPS, p => !inW(p.x, p.y - .5));
+  keep(PROPS, p => !(['bush2', 'o_potflower', 'flowerbed'].includes(p.s) && p.y > Y + 10 && p.y < Y + 13.5 && p.x > X + 14 && p.x < X + 30));   // clear the hall's front corners
+  for (let y = Y + 1; y <= Y + 13; y++) for (let x = X + 1; x <= X + 12; x++) set(x, y, 's');   // a sand fairground
+  rect(X + 1, Y + 14, 12, 2, 's'); rect(X + 1, Y + 5, 12, 3, 's'); rect(X + 1, Y + 10, 12, 3, 's'); rect(X + 5, Y + 13, 4, 1, 's');   // trodden sand lanes
+  const stall = (sp, x, y, st) => { deco(sp, x, y); rect(Math.round(X + x - 1.5), Math.ceil(Y + y) - 2, 3, 2, 'o'); STATIONS.push({ area: 'temple', x: X + x, y: Y + y + .95, r: 1.6, fair: 1, ...st }); };
+  const food = (sp, x, y, id, label, icon, items) => stall(sp, x, y, { id, type: 'pshop', label, icon, items });
+  const game = (sp, x, y, k, icon) => stall(sp, x, y, { id: 'fair_' + k, type: 'fairgame', k, label: F.games[k].name, icon });
+  // back lane: snacks (4 stalls shoulder to shoulder)
+  food('s_cotton', 2.5, 4.4, 'fair_cotton', 'ร้านสายไหม', '🍭', ['cottoncandy', 'popcorn']);
+  food('s_grill', 5.5, 4.4, 'fair_grill', 'ลูกชิ้นปิ้ง ไส้กรอกอีสาน', '🍢', ['meatball', 'sausage']);
+  food('s_kanomkrok', 8.5, 4.4, 'fair_krok', 'ขนมครกหอมๆ', '🥞', ['kanomkrok', 'thaitea']);
+  food('s_coconut', 11.5, 4.4, 'fair_coconut', 'ไอติมกะทิมะพร้าว', '🥥', ['coconutice']);
+  // middle lane: a game between two food stalls (gaps between them join the lanes)
+  food('s_eggs', 2.5, 9.4, 'fair_eggs', 'ไข่นกกระทา', '🍳', ['quaileggs', 'sausage']);
+  game('s_ring', 6.5, 9.4, 'ring', '⭕');
+  food('s_dessert', 10.5, 9.4, 'fair_dessert', 'ขนมไทยงานวัด', '🍡', ['kanomthai', 'luukchup', 'thaitea']);
+  // front, on the main walk: the arch in the middle, a game stall each side
+  game('s_darts', 2.5, 14.4, 'darts', '🎈'); game('s_fish', 11, 14.4, 'fish', '🦆');
+  deco('f_arch', 6.5, 14.6); set(X + 4, Y + 14, 'o'); set(X + 9, Y + 14, 'o');
+  // either side of the hall steps
+  food('s_glass', 15, 10.4, 'fair_glass', 'ตู้ขนมหวาน', '🍰', ['luukchup', 'kanomthai', 'coconutice']);
+  food('s_sweets', 28, 10.4, 'fair_sweets', 'ของว่างงานวัด', '🥟', ['meatball', 'quaileggs', 'thaitea']);
+  // lights over both lanes, lantern poles, balloons, a few tables to eat at
+  deco('f_lights', 4.5, 7.6, 2.4); deco('f_lights', 9, 7.6, 2.4); deco('f_lights', 4.5, 12.6, 2.4); deco('f_lights', 9, 12.6, 2.4);
+  for (const [x, y] of [[1.6, 1.9], [12.4, 1.9]]) { deco('f_pole', x, y); set(X + Math.floor(x), Y + Math.floor(y - .5), 'o'); }
+  deco('f_balloons', 4.2, 13.2); deco('f_speaker', 12.4, 12.6); deco('f_teddy', 8.7, 13.4); deco('f_bin', 1.6, 12.6);
 }
 const AREAS = [TOWN, HOUSING, PARK, TEMPLE, FIELD, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
