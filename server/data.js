@@ -826,7 +826,10 @@ const LK = { id: 'lk2569', start: Date.parse('2026-11-21T00:00:00+07:00'), end: 
   daily: 3, sky: 30,   // rewarded floats per day; sky lantern price (the first one on the festival day is free)
   deco: [['lights', 26.5, 57.7, 1.7], ['lanna', 19.5, 57.4, 1.5], ['lanna', 22.5, 57.4, 1.5], ['lanna', 30.5, 57.4, 1.5], ['lanna', 33.5, 57.4, 1.5],
     ['lanna', 19.5, 61.2, 1.3], ['lanna', 22.5, 61.2, 1.3], ['lanna', 30.5, 61.2, 1.3], ['lanna', 33.5, 61.2, 1.3]] };
-STATIONS.push({ id: 'lk_float', type: 'lk', label: 'ท่าลอยกระทง', icon: '🪷', x: 26.5, y: 58.6, r: 2.2, area: 'town' });
+STATIONS.push({ id: 'lk_float', type: 'lk', label: 'ท่าลอยกระทง', icon: '🪷', x: 26.5, y: 58.6, r: 2.2, area: 'town', fy: 60.4, fw: 2.5 });
+STATIONS.push({ id: 'lk_float_t', type: 'lk', label: 'ท่าลอยกระทงสระบัววัด', icon: '🪷', x: TEMPLE.x + 21.5, y: TEMPLE.y + 19.6, r: 2, area: 'temple', fy: TEMPLE.y + 20.7, fw: 1.5 });   // the temple's lotus pond
+LK.decoT = [['lanna', TEMPLE.x + 16, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 16, TEMPLE.y + 27.6, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 27.6, 1.4], ['lights', TEMPLE.x + 21.5, TEMPLE.y + 18.9, 2]];
+LK.ponds = { town: [18, 60.4, 35, 61.6], temple: [TEMPLE.x + 18, TEMPLE.y + 20.6, TEMPLE.x + 25, TEMPLE.y + 21.4] };
 STATIONS.push({ id: 'lk_sky', type: 'lksky', label: 'ปล่อยโคมลอย', icon: '🏮', x: TEMPLE.x + 22, y: TEMPLE.y + 15.2, r: 2, area: 'temple' });
 // 🎪 the temple fair (งานวัด) for the Loy Krathong weeks: a fairground east of the football ground in the south district, under a red
 // Thai arch from the avenue. Food stalls sell real food; the game stalls (balloon darts, ring toss, duck fishing) are mini-games.

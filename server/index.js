@@ -4151,12 +4151,12 @@ function lkFloat(a, s, m) {
     else { a.outfits = [...(a.outfits || []), D.LK.outfit]; a.outfit = D.LK.outfit; got.push(`🎽 ${nm} (ใส่ให้แล้ว)`); sendRoster(); }
     feed(`🏮 ${a.name} ลอยกระทงครบ ${D.LK.need} วัน ได้${nm}!`);
   }
-  const t = now(), x = +(s.x + rnd(-2.5, 2.5)).toFixed(2);
+  const t = now(), x = +(s.x + rnd(-(s.fw || 2.5), s.fw || 2.5)).toFixed(2);
   const mate = lkRecent.find(r => r.id !== a.id && t - r.t < 15000 && Math.hypot(r.x - a.x, r.y - a.y) < 6 && online.get(r.id));
   lkRecent.push({ id: a.id, t, x: a.x, y: a.y }); while (lkRecent.length > 20) lkRecent.shift();
   if (mate) { const b = online.get(mate.id); joy(a, 5); joy(b, 5); feed(`💕 ${a.name} กับ ${b.name} ลอยกระทงคู่กัน`); got.push('💕 ลอยคู่'); markMe(b); }
   a.sd = true; markMe(a); stat(a, 'krathong');
-  toArea('town', { t: 'lkf', sp: K.sp, x, y: 60.4, name: a.name, wish, pair: mate ? 1 : 0 });
+  toArea(s.area, { t: 'lkf', sp: K.sp, x, y: s.fy || 60.4, name: a.name, wish, pair: mate ? 1 : 0, area: s.area });
   send(a, lkView(a));
   toast(a, `🪷 ลอย${K.name}แล้ว${wish ? ` · "${wish}"` : ''}${got.length ? ' · ได้ ' + got.join(' · ') : ' (วันนี้รับรางวัลครบแล้ว)'}`, '🪷');
 }

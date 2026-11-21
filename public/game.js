@@ -3858,7 +3858,7 @@ function lkEvHtml() {
   return `<h2>🏮 เทศกาลลอยกระทง 2569</h2>
     <img src="assets/lkbanner.webp?v=1" alt="" style="width:100%;border-radius:12px;display:block;margin:4px 0 8px">
     <div class="sub">📅 21–30 พ.ย. · 🌕 คืนลอยกระทงจริง <b>อังคาร 24 พ.ย.</b> รางวัล x2 + ปล่อยโคมฟรี 1 ลูก<br>
-    🪷 ไปที่ <b>ท่าลอยกระทง ริมทะเลสาบ</b> (ระหว่างสะพานท่าน้ำ 2 อัน) ซื้อกระทง เขียนคำอธิษฐาน แล้วลอย · ได้เงิน/เพชรสุ่ม วันละ 3 ครั้ง<br>
+    🪷 ไปที่ <b>ท่าลอยกระทง ริมทะเลสาบ</b> (ระหว่างสะพานท่าน้ำ 2 อัน) หรือ <b>สระบัวในวัด</b> ซื้อกระทง เขียนคำอธิษฐาน แล้วลอย · ได้เงิน/เพชรสุ่ม วันละ 3 ครั้ง<br>
     💕 ลอยพร้อมเพื่อนที่ยืนข้างกัน = ลอยคู่ ประกาศให้ทั้งเมืองรู้ · 🏮 ปล่อยโคมลอยได้ที่ลานหน้าโบสถ์ในวัด<br>
     🎽 ลอยกระทงครบ <b>3 วัน</b> (วันไหนก็ได้) รับ <b>ชุดไทยลอยกระทง</b> ฟรี! ไม่มีขาย</div>
     <div class="ev7Grid" style="grid-template-columns:repeat(3,1fr)">${cells}</div>
@@ -3868,7 +3868,7 @@ function lkEvHtml() {
 const lkWater = (x, y) => G.map.tiles[Math.floor(y)]?.[Math.floor(x)] === 'w';
 function lkSpawn(m, amb) {
   if (LKF.length > 40) LKF.splice(0, LKF.findIndex(k => k.amb) + 1 || 1);
-  LKF.push({ sp: m.sp, x: m.x, y: m.y, vx: (Math.random() - .5) * .22, vy: .1 + Math.random() * .12, t0: performance.now(), life: amb ? 200e3 : 300e3, name: m.name || '', wish: m.wish || '', pair: m.pair, amb, ph: Math.random() * 7 });
+  LKF.push({ area: m.area || 'town', sp: m.sp, x: m.x, y: m.y, vx: (Math.random() - .5) * .22, vy: .1 + Math.random() * .12, t0: performance.now(), life: amb ? 200e3 : 300e3, name: m.name || '', wish: m.wish || '', pair: m.pair, amb, ph: Math.random() * 7 });
 }
 function lkSky(m) { LKS.push({ x: m.x, y: m.y, t0: performance.now(), name: m.name || '', ph: Math.random() * 7, vx: (Math.random() - .5) * .25 }); if (LKS.length > 30) LKS.shift(); }
 let lkAmbT = 0;
@@ -3878,15 +3878,20 @@ function lkEnts(A, ents, vis) {
   const night = nightLevel() > .2, fest = !!LKV?.fest;
   if (A.id === 'town') {
     for (const d of G.lk.deco) if (vis(d[1], d[2], 4)) ents.push([d[2], 17, { k: 'deco', s: d[0], x: d[1], y: d[2], z: d[3] }]);
-    if (tn > lkAmbT && LKF.filter(k => k.amb).length < (fest ? 26 : 14)) { lkAmbT = tn + (fest ? 2500 : 5000) + Math.random() * 3000; const sp = ['kr_leaf', 'kr_leaf', 'kr_bread', 'kr_lotus'][Math.random() * 4 | 0]; lkSpawn({ sp, x: 18 + Math.random() * 17, y: 60.4 + Math.random() * 1.2 }, 1); }
+  }
+  {   // krathongs on the water here (the town lake or the temple's lotus pond)
+    const P0 = G.lk.ponds?.[A.id] || [18, 60.4, 35, 61.6], here = LKF.filter(k => k.area === A.id), small = A.id === 'temple';
+    if (tn > (lkEnts['a' + A.id] || 0) && here.filter(k => k.amb).length < (small ? (fest ? 8 : 5) : fest ? 26 : 14)) { lkEnts['a' + A.id] = tn + (fest ? 2500 : 5000) + Math.random() * 3000; const sp = ['kr_leaf', 'kr_leaf', 'kr_bread', 'kr_lotus'][Math.random() * 4 | 0]; lkSpawn({ sp, x: P0[0] + Math.random() * (P0[2] - P0[0]), y: P0[1] + Math.random() * (P0[3] - P0[1]), area: A.id }, 1); if (small) { const q = LKF[LKF.length - 1]; q.vx *= .5; q.vy *= .4; } }
     for (let i = LKF.length - 1; i >= 0; i--) {
-      const k = LKF[i], age = tn - k.t0; if (age > k.life) { LKF.splice(i, 1); continue; }
+      const k = LKF[i], age = tn - k.t0; if (age > k.life) { LKF.splice(i, 1); continue; } if (k.area !== A.id) continue;
       const nx = k.x + k.vx * dt, ny = k.y + k.vy * dt;
       if (lkWater(nx + Math.sign(k.vx) * .4, k.y)) k.x = nx; else k.vx = -k.vx;
       if (lkWater(k.x, ny + .3)) k.y = ny; else { k.vy = -Math.abs(k.vy) * .4; if (Math.abs(k.vy) < .02) k.vy = 0; }
       if (vis(k.x, k.y, 2)) ents.push([-1e7 + k.y, 17, { k: 'kr', e: k, age }]);   // on the water: under people standing on the shore
     }
-  } else {
+  }
+  if (A.id === 'temple') {
+    for (const d of G.lk.decoT || []) if (vis(d[1], d[2], 4)) ents.push([d[2], 17, { k: 'deco', s: d[0], x: d[1], y: d[2], z: d[3] }]);
     if (night && tn > lkAmbT && LKS.length < (fest ? 16 : 9)) { lkAmbT = tn + 1800 + Math.random() * 2500; lkSky({ x: A.x + 6 + Math.random() * (A.w - 12), y: A.y + 14 + Math.random() * 12 }); }
     for (let i = LKS.length - 1; i >= 0; i--) { const l = LKS[i], age = (tn - l.t0) / 1000; if (age > 40) { LKS.splice(i, 1); continue; } ents.push([1e7, 17, { k: 'sky', e: l, age }]); }
   }
@@ -4878,6 +4883,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23r', d: '21 พ.ย.', items: [
+    '🪷 ลอยกระทงที่วัดได้แล้ว! ท่าลอยกระทงสระบัวหน้าโบสถ์ ประดับโคมล้านนารอบสระ (นับรวมภารกิจชุดฟรีเหมือนท่าน้ำทะเลสาบ)',
+  ] },
   { v: '2026-11-23q', d: '21 พ.ย.', items: [
     '🎪 <b>งานวัดมาแล้ว!</b> ลานงานวัดข้างสนามฟุตบอล (ลอดซุ้มแดงจากถนนใหม่) มีของกินใหม่: ลูกชิ้นปิ้ง ไส้กรอกอีสาน ขนมครก ไข่นกกระทา ไอติมกะทิ ลูกชุบ ชาเย็น',
     '🎈 เกมงานวัดเล่นได้จริง: ปาเป้าลูกโป่ง · ปาห่วงขวด · ตกเป็ดน้อย ครั้งละ ฿20 ได้เงินรางวัลตามคะแนน คะแนนเต็มได้ตุ๊กตา + 💎',
