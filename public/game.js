@@ -645,6 +645,7 @@ function handle(m) {
       if (panel?.kind === 'wpray') refreshPanel(true);
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
+    case 'nbstep': FX.play('levelup'); setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && S[i].go) setGuide(S[i].go, true); }, 900); break;
     case 'catch': catchPop(m.item, m.first); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
     case 'egg': eggFx(m); break;
@@ -893,8 +894,27 @@ function paintCardClock(h) {
   $('#cWx').textContent = wd?.ev?.id === 'rain' ? '🌧️' : h >= 19 || h < 6 ? '🌙' : h < 8 || h >= 17 ? '⛅' : '☀️';
 }
 // today's quests listed in the card: tap one and you walk there by yourself
+// 🌱 starter path in the quest card (new players until it is done): tap a step to be walked there
+function nbTap(i) {
+  const st = G.nbSteps[i]; FX.play('click');
+  if (st.go) return setGuide(st.go, false, true);
+  if (i === 3) { const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
+  toast('เดินไปใกล้ผู้เล่นคนอื่น แล้วกดปุ่มอีโมจิ 😄 (มุมขวาล่าง) · หรือขอแลกเบอร์จากโปรไฟล์ของเขา', '👋');
+}
+function paintNb(box) {
+  if (!paintNb.opened) { paintNb.opened = 1; if ($('#card')?.classList.contains('mini')) setCard(false); }   // newcomers see the list open (once; they can fold it)
+  const S = G.nbSteps, p = me.nb.p || [], done = S.filter((st, i) => (p[i] || 0) >= st.n).length, first = S.findIndex((st, i) => (p[i] || 0) < st.n);
+  $('#qCount').textContent = `${done}/${S.length}`; const hd = $('#qBox .qHead span'); if (hd) hd.textContent = '🌱 ภารกิจมือใหม่';
+  const html = S.map((st, i) => { const ok = (p[i] || 0) >= st.n; return `<button class="qRow ${ok ? 'done' : ''} ${i === first ? 'cur' : ''}" data-nb="${ok ? '' : i}"><i>${ok ? '☑' : i === first ? '◆' : '☐'}</i><span>${esc(st.text)} <small>${st.n > 1 ? `(${Math.min(p[i] || 0, st.n)}/${st.n}) ` : ''}${st.money ? '+' + money(st.money) : '+💎' + st.gems}</small></span></button>`; }).join('')
+    + `<div class="qRow rew"><i>🎁</i><span>ครบ ${S.length} ข้อ: 💎${G.nbEnd.gems} + 🥚 ไข่สัตว์เลี้ยง</span></div>`;
+  if (box.dataset.h === html) return; box.dataset.h = html; box.innerHTML = html;
+  box.querySelectorAll('[data-nb]').forEach(b => b.onclick = () => { if (b.dataset.nb !== '') nbTap(+b.dataset.nb); });
+}
 function paintQuestBox() {
-  const q = me.quests, box = $('#qList'); if (!q || !box) return;
+  const q = me.quests, box = $('#qList'); if (!box) return;
+  if (me.nb && G.nbSteps) return paintNb(box);
+  { const hd = $('#qBox .qHead span'); if (hd && hd.textContent !== '📜 เควสต์วันนี้') { hd.textContent = '📜 เควสต์วันนี้'; box.dataset.h = ''; } }
+  if (!q) return;
   const done = q.list.filter(x => x.done).length; $('#qCount').textContent = `${done}/3`;
   const first = q.list.findIndex(x => !x.done);
   const html = q.list.map((x, i) => {
@@ -5136,6 +5156,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23aq', d: '21 พ.ย.', items: [
+    '🌱 <b>ภารกิจมือใหม่ 10 นาที</b> สำหรับผู้เล่นใหม่: ซื้อเบ็ด → ตกปลา 3 ตัว → ขาย (เงินก้อนแรก) → ทักทายในแชท → ซื้อของชิ้นแรก → ส่งอีโมจิใกล้เพื่อน ทุกข้อได้รางวัลทันที ครบได้ 💎10 + 🥚 ไข่สัตว์เลี้ยง',
+    '🤝 มีคนใหม่ย้ายมาเมือง จะมีประกาศ · ทักทายเขาในแชทโลกภายใน 3 นาที รับ ฿50 (วันละ 3 ครั้ง)',
+    '📖 บทแนะนำตอนเริ่มเกมสั้นลง เหลือ 4 หน้า',
+  ] },
   { v: '2026-11-23ap', d: '21 พ.ย.', items: [
     '🔔 <b>แจ้งเตือนบนมือถือ/คอม</b> แม้ไม่ได้เปิดเกม: ซอมบี้/หมาป่ากำลังบุก มีคนคอมเมนต์ใน lifebook สตรีคใกล้หาย (เปิดที่ ⚙️ ตั้งค่า · ไม่เกินวันละ 4 ครั้ง · iPhone ต้องเพิ่มเกมไปหน้าจอโฮมก่อน)',
     '📤 <b>ปุ่มแชร์การ์ด</b> ตอนได้ของเด็ด: ปลามหากาพย์/ตำนาน/ปลาวัด รอดคืนซอมบี้/หมาป่า ซื้อบ้าน → ได้รูปสวยพร้อมโค้ดชวนเพื่อน แชร์ลงเฟซ/ไลน์ได้เลย',
@@ -7531,27 +7556,25 @@ function closeMap() { $('#mapView').classList.add('hidden'); }
 
 // first-time tutorial
 const TUT = () => [
-  ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือตัวละครที่มีป้ายชื่อ<b>สีเหลือง</b> ผู้เล่นคนอื่นก็อยู่ในเมืองเดียวกัน'],
-  ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b><br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร'],
-  ['🚪', 'เข้าอาคาร', 'เดินไปหน้าประตู แล้วกด<b>ปุ่มกลมสีเหลือง</b> (คอม: E) · ร้านต่างๆ มี<b>เวลาเปิด-ปิด</b> ดูได้ที่ป้าย'],
-  ['🎣', 'หาเงินก้อนแรก', 'แนะนำให้<b>ตกปลา</b>ก่อน! ซื้อเบ็ดกับ<b>น้าเล็ก</b>ที่สมาคมประมง (ริมทะเลสาบ) แล้วไปท่าตกปลา · ยืนริมน้ำแล้วกดปุ่มใหญ่เหวี่ยงเบ็ด พอ<b>ทุ่นจมกดตวัด</b> กดค้างเย่อปลาเข้าฝั่ง แล้ว<b>ยกตอนปลาโผล่</b> · เอาปลาไปขายได้เลย'],
-  ['💼', 'หางานทำ', 'คุณเริ่มต้น<b>ว่างงาน</b> · คุยกับ <b>NPC เจ้าหน้าที่ 💬</b> ที่ยืนข้างเคาน์เตอร์ เช่น พ่อค้า (คลังสินค้า), เกษตรกร (สหกรณ์ในไร่) · งานบริษัท/หมอต้องเรียนจบที่มหาวิทยาลัยก่อน'],
-  ['❤️', 'ดูแลตัวเอง', 'กินให้อิ่ม ป่วยต้องหาหมอ · พลังงานหมดไป <b>สวนสนุก</b> 🎡 หรือ<b>นอนที่เตียงในบ้าน</b> 🛏️ · <b>แตะแถบสถานะ</b>เพื่อดูวิธีเพิ่ม · 💬 ปุ่ม<b>คุย</b>ไว้คุยกับคนใกล้ๆ'],
-  ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป (ยกเลิกได้ที่ปุ่มใต้สถานะ) · เมนู 💼 บอกว่าแต่ละงานสมัครที่ไหน'],
+  ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือตัวละครที่มีป้ายชื่อ<b>สีเหลือง</b> คนอื่นในเมืองเป็นผู้เล่นจริงทั้งนั้น ทักทายกันได้เลย!'],
+  ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b><br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร · ใช้งาน/เข้าประตู: <b>ปุ่มกลมสีเหลือง</b> (คอม: E)'],
+  ['🌱', 'ภารกิจมือใหม่ 10 นาที', 'ทำตามรายการ<b>ภารกิจมือใหม่</b>มุมซ้ายบน: ซื้อเบ็ด → ตกปลา → ขาย = <b>เงินก้อนแรก</b> → ซื้อของ → ทักทายเพื่อน<br>ทุกข้อได้รางวัลทันที ครบได้ 🥚 <b>ไข่สัตว์เลี้ยง</b> · แตะแต่ละข้อ ตัวละครจะเดินไปเอง'],
+  ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป · หางานทำได้กับ NPC เจ้าหน้าที่ 💬 ตามร้านต่างๆ'],
 ];
 let tutStep = 0, tutPending = false, pendingDaily = null;
 function showTut(i = 0) {
   tutStep = i; const steps = TUT(), [icon, title, body] = steps[i];
   $('#tut').classList.remove('hidden');
   $('#tutBody').innerHTML = `<div class="tutIcon">${icon}</div><h2>${esc(title)}</h2><p>${body}</p><div class="dots">${steps.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
-  $('#tutNext').textContent = i === steps.length - 1 ? '🚀 เริ่มเล่น! (ไปซื้อเบ็ดตกปลา)' : 'ถัดไป →';
+  $('#tutNext').textContent = i === steps.length - 1 ? '🚀 เริ่มเลย! (พาไปซื้อเบ็ด)' : 'ถัดไป →';
 }
 $('#tutNext').onclick = () => { FX.play('click'); if (tutStep < TUT().length - 1) return showTut(tutStep + 1); endTut(); };
 $('#tutSkip').onclick = endTut;
 function endTut() {
   tutPending = false; if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
   $('#tut').classList.add('hidden'); try { localStorage.setItem('lt_tut2', '1'); } catch { }
-  if (me && me.career === 'none' && !me.rod) { setGuide('staff_fishing', true); toast('ลูกศรสีเหลืองจะพาไปหาน้าเล็ก ซื้อเบ็ดแล้วตกปลาหาเงินก้อนแรก!', '🎣'); }
+  if (me?.nb && G.nbSteps) { const p = me.nb.p || [], i = G.nbSteps.findIndex((st, j) => (p[j] || 0) < st.n); if (i >= 0 && G.nbSteps[i].go) setGuide(G.nbSteps[i].go, false, true); }
+  else if (me && me.career === 'none' && !me.rod) { setGuide('staff_fishing', true); toast('ลูกศรสีเหลืองจะพาไปหาน้าเล็ก ซื้อเบ็ดแล้วตกปลาหาเงินก้อนแรก!', '🎣'); }
   else if (me && me.career === 'none') openPanel({ kind: 'career' });
 }
 function showDaily(d) {

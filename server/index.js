@@ -1320,8 +1320,50 @@ function accrue(a) {
   if (a.bank > 0 && days > 0) a.bank += Math.min(a.bank, D.BANK.cap) * (Math.pow(1 + D.BANK.rate, days) - 1);
   if (a.loan > 0 && days > 0) a.loan += a.loan * (Math.pow(1 + D.BANK.loanRate, days) - 1);
 }
+// 🌱 starter path: six small steps for the first ten minutes (first money, first thing bought, first hello), each paid at once;
+// all six = a pet egg. Shown in place of today's quests until done. Players who started before this keep playing as they were.
+const NB = [
+  { id: 'rod', ev: 'rod', n: 1, text: 'ซื้อเบ็ดกับน้าเล็ก (สมาคมประมง)', go: 'staff_fishing', money: 100 },
+  { id: 'fish', ev: 'fish', n: 3, text: 'ตกปลา 3 ตัว (ยืนริมน้ำ กดปุ่มใหญ่)', go: 'fishclub', money: 150 },
+  { id: 'sell', ev: 'sell', n: 1, text: 'ขายปลาที่สมาคมประมง = เงินก้อนแรก!', go: 'fishclub', money: 200 },
+  { id: 'chat', ev: 'chat', n: 1, text: 'ทักทายเพื่อนในแชท', money: 100 },
+  { id: 'buy', ev: 'buy', n: 1, text: 'ซื้อของกิน/ของใช้ชิ้นแรก (ร้านสะดวกซื้อ)', go: 'cstore3', gems: 5 },
+  { id: 'social', ev: 'social', n: 1, text: 'ส่งอีโมจิใกล้ผู้เล่นอื่น หรือแลกเบอร์', gems: 5 },
+];
+const NB_END = { gems: 10, item: 'petegg' };
+function nbEv(a, ev, n = 1) {
+  const S = a.nb; if (!S || S.done) return;
+  let changed = false;
+  NB.forEach((st, i) => {
+    if (st.ev !== ev || (S.p[i] || 0) >= st.n) return;
+    S.p[i] = Math.min(st.n, (S.p[i] || 0) + n); changed = true;
+    if (S.p[i] < st.n) return;
+    if (st.money) earn(a, st.money); if (st.gems) a.gems = (a.gems || 0) + st.gems;
+    toast(a, `🌱 ภารกิจมือใหม่สำเร็จ: ${st.text} · ได้ ${st.money ? money(st.money) : `💎${st.gems}`}`, '🌱');
+    send(a, { t: 'nbstep', i });
+  });
+  if (!changed) return;
+  if (NB.every((st, i) => (S.p[i] || 0) >= st.n)) {
+    S.done = now(); a.gems = (a.gems || 0) + NB_END.gems; addItem(a, NB_END.item, 1);
+    toast(a, `🎉 ผ่านภารกิจมือใหม่ครบแล้ว! ได้ 💎${NB_END.gems} + 🥚 ไข่สัตว์เลี้ยงปริศนา (เปิดในกระเป๋า)`, '🎉');
+    feed(`🌱 ${a.name} ผ่านภารกิจมือใหม่ครบแล้ว ยินดีต้อนรับสู่เมือง!`);
+  }
+  a.sd = true; markMe(a);
+}
+// a newcomer arrives: the town is told, and the first few who say hello in town chat within 3 minutes get a small thank-you
+let nbArrivals = [];
+function nbWelcomeChat(a) {
+  const t = now(); nbArrivals = nbArrivals.filter(x => t - x.t < 180e3);
+  if (!nbArrivals.length || a.nb && !a.nb.done || !cd(a, 'nbwelcome', 60e3, true)) return;
+  const d = dayKey(); if (!a.nbw || a.nbw.d !== d) a.nbw = { d, n: 0 };
+  if (a.nbw.n >= 3) return;
+  const who = nbArrivals.find(x => x.id !== a.id && !x.by.has(a.id)); if (!who) return;
+  who.by.add(a.id); a.nbw.n++; earn(a, 50); a.sd = true;
+  toast(a, `🤝 ขอบคุณที่ทักทาย ${who.name} ชาวเมืองใหม่! +${money(50)}`, '🤝');
+}
 function quest(a, type, n = 1) {
   ledSweep(a);
+  nbEv(a, type === 'eat' ? 'buy' : type, n);
   const evs = Q.progress(a, type, n); ledSweep(a, '📜 รางวัลเควสต์');
   for (const e of evs) {
     send(a, { t: 'quest', ...e });
@@ -1434,7 +1476,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -2611,7 +2653,7 @@ function act(a, m) {
       a.rods = a.rods || [];
       if (a.rods.includes(id)) return toast(a, `คุณมี${r.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, r.price)) return;
-      a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4);
+      a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4); nbEv(a, 'rod');
       return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่มใหญ่เพื่อเหวี่ยงเบ็ด`, '🎣');
     }
     case 'wish.toss': {                    // the wishing fountain: a ฿10 coin, a fortune, and once a day maybe ฿1,000 back
@@ -3076,7 +3118,7 @@ function answerPhone(a, f, ok) {
   }
   delete f.phoneAsk[a.login];
   const add = (x, y) => { if (!(x.contacts || []).some(c => c.p === y.phone) && (x.contacts || []).length < 30) x.contacts = [...(x.contacts || []), { p: y.phone, n: y.name }]; markMe(x); };
-  add(f, a); add(a, f); lbNote(f, '📇', `แลกเบอร์กับ ${a.name} แล้ว · เป็นเพื่อนกันบน lifebook`); lbNote(a, '📇', `แลกเบอร์กับ ${f.name} แล้ว · เป็นเพื่อนกันบน lifebook`);
+  add(f, a); add(a, f); nbEv(f, 'social'); nbEv(a, 'social'); lbNote(f, '📇', `แลกเบอร์กับ ${a.name} แล้ว · เป็นเพื่อนกันบน lifebook`); lbNote(a, '📇', `แลกเบอร์กับ ${f.name} แล้ว · เป็นเพื่อนกันบน lifebook`);
   toast(f, `${a.name} ให้เบอร์แล้ว 📇 ${a.phone} (บันทึกในรายชื่อให้แล้ว)`, '📱'); toast(a, `แลกเบอร์กับ ${f.name} แล้ว (บันทึกในรายชื่อให้แล้ว)`, '📱');
 }
 
@@ -4080,7 +4122,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4209,7 +4251,7 @@ function login(ws, m, pre) {
     const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
     a = hydrate({ v: VERSION, login: name, name: cname, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
-    accounts.set(lname, a); isNew = true;
+    accounts.set(lname, a); isNew = true; a.nb = { p: [], t0: now() };
   }
   Q.ensure(a); santaGift(a); achSweep(a);
   if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) {   // a career that has been closed
@@ -4232,13 +4274,14 @@ function login(ws, m, pre) {
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
   online.set(a.id, a);
   dirty = true;
+  if (isNew) { nbArrivals.push({ id: a.id, name: a.name, t: now(), by: new Set() }); feed(`🎉 ${a.name} เพิ่งย้ายมาเมืองนี้ครั้งแรก! ทักทายในแชทโลกหน่อย 👋`); }
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, vapid: PUSH.publicKey(), pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
@@ -4476,7 +4519,7 @@ function onMessage0(ws, raw) {
         if (!cd(a, 'wchat', 3000)) return;
         const wm = { t: 'chat', w: 1, id: a.id, name: a.name, c: a.career, text, ts: now(), ...(isAdmin(a) ? { adm: 1 } : {}) };
         chatLog.push(wm); if (chatLog.length > 40) chatLog.shift();
-        broadcast(wm); botHear(a, text, true);
+        broadcast(wm); botHear(a, text, true); nbWelcomeChat(a);
         return quest(a, 'chat');            // the chat box has no 'near' tab now, so town chat counts for the chat quests
       }
       if (!cd(a, 'chat', 800)) return;
@@ -4599,7 +4642,8 @@ function onMessage0(ws, raw) {
     case 'emo': {                           // an emoji over your head for everyone nearby
       const e = EMOJIS.includes(m.e) ? m.e : null; if (!e || !cd(a, 'emo', 1500, true)) return;
       const msg = { t: 'emo', id: a.id, e }, here = areaId(a);
-      for (const o of online.values()) if (areaId(o) === here && dist(o, a) <= 16) send(o, msg);
+      let near = 0; for (const o of online.values()) if (areaId(o) === here && dist(o, a) <= 16) { send(o, msg); if (o !== a && dist(o, a) <= 8) near++; }
+      if (near || bots().some(n => n.area === here && dist(n, a) <= 8)) nbEv(a, 'social');   // the town's AI folk count too (a quiet server must not block a newcomer)
       if (a.afk) { a.afk = false; sendRoster(); }
       return;
     }
