@@ -1014,7 +1014,7 @@ setInterval(() => { try { if (online.size || ww) wwTick(); } catch (e) { console
 let ideas = [], ideaSeq = 1;
 function ideaView(a, sort) {
   const me = lk(a), L = [...ideas].sort(sort === 'top' ? (x, y) => Object.keys(y.lk).length - Object.keys(x.lk).length || y.t - x.t : (x, y) => y.t - x.t).slice(0, 60);
-  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, img: i.img ? 1 : 0, dislikes: Object.keys(i.dl || {}).length, disliked: i.dl?.[me] ? 1 : 0, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, cm: i.cm.slice(-30) })) });
+  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, img: i.img ? 1 : 0, av: (accounts.get(i.l)?.pic || '').length, dislikes: Object.keys(i.dl || {}).length, disliked: i.dl?.[me] ? 1 : 0, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, cm: i.cm.slice(-30) })) });
 }
 function ideaOp(a, m) {
   const me = lk(a), i = ideas.find(x => x.id === +m.id);
@@ -5158,6 +5158,11 @@ const server = http.createServer((req, res) => {
       res.writeHead(303, { Location: ok ? '/#gcred=' + cred : '/#gerr=1', 'Cache-Control': 'no-store' }); res.end();
     });
     return;
+  }
+  if (url.startsWith('/fbav/')) {   // 📘 the poster's current profile photo (the URL carries its size, so a new photo is a new URL)
+    const l = ideas.find(x => x.id === +url.slice(6))?.l, im = l && accounts.get(l)?.pic, mt = im && /^data:(image\/\w+);base64,(.*)$/.exec(im);
+    if (!mt) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': mt[1], 'Cache-Control': 'public, max-age=86400' }); return res.end(Buffer.from(mt[2], 'base64'));
   }
   if (url.startsWith('/fbimg/')) {   // 📘 LifeBook photos: served by post id so the browser caches them instead of resending with every feed refresh
     const im = ideas.find(x => x.id === +url.slice(7))?.img, mt = im && /^data:(image\/\w+);base64,(.*)$/.exec(im);

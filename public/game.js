@@ -4921,6 +4921,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ae', d: '21 พ.ย.', items: [
+    '📘 รูปคนโพสต์ในฟีด lifebook ใช้รูปโปรไฟล์ที่ผู้เล่นใช้อยู่ตอนนี้',
+  ] },
   { v: '2026-11-23ad', d: '21 พ.ย.', items: [
     '📘 lifebook โฉมใหม่ ธีมฟ้าขาวแบบเฟซบุ๊ก หน้าไอเดียกลายเป็น 📰 ฟีด (โพสต์เดิมอยู่ครบ)',
     '📸 ถ่ายรูปในเมืองหรือเลือกรูปจากเครื่อง แล้วโพสต์อวดลงฟีดได้แล้ว',
@@ -5549,14 +5552,14 @@ function fbAlbum() {
 function ideasPanel(p) {
   const I = window.__ideas, ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'เมื่อกี้' : m < 60 ? m + ' นาที' : m < 1440 ? Math.floor(m / 60) + ' ชม.' : Math.floor(m / 1440) + ' วัน'; };
   const posts = !I ? '<div class="sub">กำลังโหลด…</div>' : I.list.map(i => `<div class="fbPost">
-      <div class="fbTop">${fbAv(i.n)}<div><b>${esc(i.n)}</b><small>${ago(i.t)} · 🌐</small></div>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
+      <div class="fbTop">${i.av ? `<img class="fbAv" src="fbav/${i.id}?v=${i.av}" alt="">` : fbAv(i.n)}<div><b>${esc(i.n)}</b><small>${ago(i.t)} · 🌐</small></div>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
       ${i.text ? `<p class="fbTxt">${esc(i.text)}</p>` : ''}${i.img ? `<img class="fbPic phZoom" src="fbimg/${i.id}" alt="" loading="lazy">` : ''}
       <div class="fbCnt"><span>${i.likes ? '👍 ' + i.likes : ''}${i.dislikes ? ' 👎 ' + i.dislikes : ''}</span><span>${i.cm.length ? i.cm.length + ' คอมเมนต์' : ''}</span></div>
       <div class="fbAct">${B(`👍 ${i.liked ? 'ถูกใจแล้ว' : 'ถูกใจ'}`, { fn: 'idea', op: 'like', id: i.id }, i.liked ? 'on' : '')}${B(`👎 ${i.disliked ? 'ไม่ถูกใจแล้ว' : 'ไม่ถูกใจ'}`, { fn: 'idea', op: 'unlike', id: i.id }, i.disliked ? 'onN' : '')}${B('💬 คอมเมนต์', { fn: 'idea', op: 'open', id: i.id })}</div>
       ${p.open === i.id ? `<div class="fbCms">${i.cm.map(c => `<div class="fbCm">${fbAv(c.n)}<div><b>${c.a ? '👑 ' : ''}${esc(c.n)}</b> <small>${ago(c.t)}</small><br>${esc(c.text)}</div></div>`).join('') || '<small>ยังไม่มีคอมเมนต์</small>'}
         <div class="rowf" style="margin-top:4px"><input id="ideaCm${i.id}" maxlength="150" placeholder="เขียนความคิดเห็น…">${B('ส่ง', { fn: 'idea', op: 'cm', id: i.id }, 'primary')}</div></div>` : ''}
     </div>`).join('') || '<div class="sub">ยังไม่มีโพสต์ มาเป็นคนแรกเลย!</div>';
-  return `<h2>📰 ฟีด</h2><div class="fbPost fbNew"><div class="fbTop">${fbAv(me.name)}<textarea id="ideaIn" maxlength="300" rows="2" placeholder="คุณคิดอะไรอยู่ ${esc(me.name)}? (อวดรูป เสนอไอเดียเมือง ได้หมด)"></textarea></div>
+  return `<h2>📰 ฟีด</h2><div class="fbPost fbNew"><div class="fbTop">${myPic ? `<img class="fbAv" src="${myPic}" alt="">` : fbAv(me.name)}<textarea id="ideaIn" maxlength="300" rows="2" placeholder="คุณคิดอะไรอยู่ ${esc(me.name)}? (อวดรูป เสนอไอเดียเมือง ได้หมด)"></textarea></div>
     ${fbImg ? `<div class="fbPrev"><img src="${fbImg}" alt="">${B('✖', { fn: 'fbClr' })}</div>` : ''}
     <div class="fbAct">${B('📸 ถ่ายรูป', { fn: 'fbSnap' })}${B('🖼️ รูปภาพ', { fn: 'fbAlbum' })}${B('โพสต์', { fn: 'idea', op: 'post' }, 'primary')}</div></div>
     <div class="tabs" style="margin-top:8px">${B('🆕 ล่าสุด', { fn: 'idea', op: 'sort', sort: 'new' }, p.sort !== 'top' ? 'primary' : '')}${B('🔥 ยอดนิยม', { fn: 'idea', op: 'sort', sort: 'top' }, p.sort === 'top' ? 'primary' : '')}</div>${posts}`;

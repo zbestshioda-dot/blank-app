@@ -1509,3 +1509,4 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 
 /* quests: the giver's face gets its own column, clear of the text */
 #panel .sheet .item.qitem .em{width:52px;flex:none;margin-right:8px}
+img.fbAv{object-fit:cover;background:#ddd}
