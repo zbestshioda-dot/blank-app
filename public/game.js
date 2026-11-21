@@ -3630,8 +3630,13 @@ const outPos = (x, y) => { const r = roomOf(x, y); return r ? r.outside : { x, y
 function drawMini() {
   const m = P.get(myId); if (!m) return;
   const mapId = mapOf(areaOf(m.x, m.y)?.id), A = AREA[mapId], base = miniBase[mapId]; if (!base) return;
-  const mini = $('#mini'); if (mini.width !== base.width) { mini.width = base.width; mini.height = base.height; }
-  const g = mini.getContext('2d'); g.drawImage(base, 0, 0);
+  // a window that follows you (the town grew too big to show whole): 70 x 52 tiles around you, clamped to the map
+  const MW = 140, MH = 104, mini = $('#mini'); if (mini.width !== MW || mini.height !== MH) { mini.width = MW; mini.height = MH; }
+  const g = mini.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#1b2a1e'; g.fillRect(0, 0, MW, MH);
+  { const q = outPos(m.rx, m.ry), fit = (c, size, view) => size <= view ? (size - view) / 2 : clamp(c - view / 2, 0, size - view);
+    const ox = Math.round(fit((q.x - A.x) * 2, base.width, MW)), oy = Math.round(fit((q.y - A.y) * 2, base.height, MH)); g.setTransform(1, 0, 0, 1, -ox, -oy); }
+  g.drawImage(base, 0, 0);
+  const tNow = performance.now();
   const wwOnMap = WW.ph === 'on', sniff = wwSniffing(), wolfMe = wwIsWolf();
   for (const p of P.values()) {
     if (wwOnMap) {   // 🌕 werewolf night: humans see nobody; wolves see their pack (purple), and humans (red) while sniffing
@@ -3646,6 +3651,8 @@ function drawMini() {
     if (p.npc || p.id === myId) continue;
     const q = outPos(p.rx, p.ry); if (mapOf(areaOf(q.x, q.y)?.id) !== mapId) continue;
     const s = 5, mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2;
+    if (Math.hypot(q.x - (p._mmx ?? q.x), q.y - (p._mmy ?? q.y)) > .004) p._mmt = tNow; p._mmx = q.x; p._mmy = q.y;
+    if (tNow - (p._mmt || 0) < 600) { const k = ((tNow + Math.abs(p.id) * 137) % 900) / 900; g.strokeStyle = `rgba(255,255,255,${.85 * (1 - k)})`; g.lineWidth = 1.5; g.beginPath(); g.arc(mx, my, 3 + k * 7, 0, 7); g.stroke(); }   // walking right now: a ripple
     g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2);
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
@@ -3662,6 +3669,7 @@ function drawMini() {
     g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 9, 0, 7); g.fill();
     g.fillStyle = '#ff2a10'; g.beginPath(); g.arc(mx, my, 6.5, 0, 7); g.fill();
   }
+  g.setTransform(1, 0, 0, 1, 0, 0);
   $('#miniName').textContent = `🗺️ ${A.yard && wd?.houses?.[A.house]?.[0] ? 'บ้าน' + wd.houses[A.house][0] : A.name}`;
 }
 
@@ -4684,6 +4692,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23n', d: '23 พ.ย.', items: [
+    '🗺️ มินิแมพซูมใกล้ขึ้นและเลื่อนตามตัวเรา เห็นจุดคนชัดขึ้น ใครกำลังเดินอยู่จะมีวงกระเพื่อมรอบจุด (กดมินิแมพเพื่อดูแผนที่ทั้งเมือง)',
+  ] },
   { v: '2026-11-23m', d: '23 พ.ย.', items: [
     '👮 ชุดอาชีพโฉมใหม่ ทั้งชายและหญิง: ตำรวจ หมอ ไรเดอร์ (สาวไรเดอร์มีชุดของตัวเองแล้ว) และขอทาน',
   ] },
