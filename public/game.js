@@ -895,7 +895,7 @@ function paintQuestBox() {
   const done = q.list.filter(x => x.done).length; $('#qCount').textContent = `${done}/3`;
   const first = q.list.findIndex(x => !x.done);
   const html = q.list.map((x, i) => {
-    const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
+    const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : questTgt(x.type);
     return `<button class="qRow ${x.done ? 'done' : ''} ${i === first ? 'cur' : ''}" data-q="${x.done ? '' : tgt || ''}"><i>${x.done ? '☑' : i === first ? '◆' : '☐'}</i><span>${esc(x.text)} <small>(${Math.min(x.p, x.n)}/${x.n})</small>${i === first && tgt ? '<em>› แตะเพื่อเดินไปอัตโนมัติ</em>' : ''}</span></button>`;
   }).join('') + `<button class="qRow rew" data-open-r="1"><i>🎁</i><span>รางวัลความคืบหน้า${achTodo().length ? ' <i class="dot"></i>' : ''} <small>เข้าเกม ${me.login?.streak || 0} วันติด</small></span></button><button class="qRow more" data-open-q="1"><span>ดูเควสต์ทั้งหมด ›</span></button>`;
   if (box.dataset.h === html) return; box.dataset.h = html; box.innerHTML = html;
@@ -4883,6 +4883,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23x', d: '21 พ.ย.', items: [
+    '💰 เควสต์หาเงินประจำอาชีพครบทุกอาชีพแล้ว: ตำรวจ ขอทาน พระ แคชเชียร์ เด็กวัด สัปเหร่อ ช่างซ่อมรถ นักเลง ช่างภาพ พนักงานส่งของ',
+    '🗓️ เควสต์รายสัปดาห์ก็มีเป้าหมายประจำอาชีพเหล่านี้ด้วย (เริ่มสัปดาห์หน้า / เควสต์รายวันเริ่มพรุ่งนี้)',
+  ] },
   { v: '2026-11-23w', d: '21 พ.ย.', items: [
     '🎣 กระเป๋า (แท็บทั้งหมด) แสดงเบ็ดตกปลาที่มี และกดเปลี่ยนเบ็ดที่ถือได้',
   ] },
@@ -6063,7 +6067,7 @@ function renderPanel(p) {
       const rows = q.list.map((x, i) => {
         const c = x.career ? G.careers[x.career] : null, wrong = c && me.career !== x.career;
         const icon = x.done ? '✅' : c ? c.icon : { trade: '🤝', chat: '💬', eat: '🍛', sell: '🏪', earn: '💰', sit: '🪑' }[x.type] || '📜';
-        const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : QUEST_TARGET[x.type];
+        const tgt = x.type === 'earn' ? CAREER_TARGET[me.career] : questTgt(x.type);
         const btn = x.done ? '<span class="tag">สำเร็จ</span>' : `<div class="col2">${tgt ? B('📍 ไป', { fn: 'guide', key: tgt }, 'good') : ''}${B('🔄', { t: 'quest_reroll', i }, '', q.rerolled)}</div>`;
         const g = QUEST_GIVER[x.type];
         return `<div class="item qitem ${x.done ? 'done' : ''}"><div class="em" ${QUEST_GIVER[x.type] ? `data-m='${JSON.stringify({ fn: 'qtalk', type: x.type })}'` : ''}>${faceHtml(x.type) || icon}</div><div class="nm">${g ? `<span class="qgiver">${esc(g.name)}</span><span class="qsay">“${esc(x.done ? g.thx : g.ask)}”</span>` : ''}${x.done ? '✅ ' : ''}${esc(x.text)}<small>${x.p.toLocaleString()}/${x.n.toLocaleString()} · รางวัล <b style="color:var(--acc)">${money(x.reward)}</b>${wrong ? ` · ต้องเป็น${c.name}` : ''}</small><div class="qbar"><i style="width:${Math.round(x.p / x.n * 100)}%"></i></div></div>${btn}</div>`;
@@ -6988,6 +6992,7 @@ function targetOf(key) {
 }
 const CAREER_TARGET = { monk: 'wat_pray', cashier: 'cstore', police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', doctor: 'hospital', rider: 'rider' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
+const questTgt = t => QUEST_TARGET[t] || (t.startsWith('job_') ? CAREER_TARGET[t.slice(4)] || G.careers?.[t.slice(4)]?.where : null);
 function setGuide(key, quiet, auto) {
   const g = targetOf(key); if (!g) return;
   guide = g; autoNav = !!auto; autoPath = null;
