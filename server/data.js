@@ -827,6 +827,7 @@ const LK = { id: 'lk2569', start: Date.parse('2026-11-21T00:00:00+07:00'), end: 
   deco: [['lights', 26.5, 57.7, 1.7], ['lanna', 19.5, 57.4, 1.5], ['lanna', 22.5, 57.4, 1.5], ['lanna', 30.5, 57.4, 1.5], ['lanna', 33.5, 57.4, 1.5],
     ['lanna', 19.5, 61.2, 1.3], ['lanna', 22.5, 61.2, 1.3], ['lanna', 30.5, 61.2, 1.3], ['lanna', 33.5, 61.2, 1.3]] };
 STATIONS.push({ id: 'lk_float', type: 'lk', label: 'ท่าลอยกระทง', icon: '🪷', x: 26.5, y: 58.6, r: 2.2, area: 'town', fy: 60.4, fw: 2.5 });
+STATIONS.push({ id: 'merit_t', type: 'merit', pool: 'temple', label: 'ปล่อยปลาทำบุญ', icon: '🙏', x: TEMPLE.x + 21.5, y: TEMPLE.y + 28.6, r: 2, area: 'temple' });   // south side of the lotus pond: let fish go for merit (no rod needed)
 STATIONS.push({ id: 'lk_float_t', type: 'lk', label: 'ท่าลอยกระทงสระบัววัด', icon: '🪷', x: TEMPLE.x + 21.5, y: TEMPLE.y + 19.6, r: 2, area: 'temple', fy: TEMPLE.y + 20.7, fw: 1.5 });   // the temple's lotus pond
 LK.decoT = [['lanna', TEMPLE.x + 16, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 16, TEMPLE.y + 27.6, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 27.6, 1.4], ['lights', TEMPLE.x + 21.5, TEMPLE.y + 18.9, 2]];
 LK.ponds = { town: [18, 60.4, 35, 61.6], temple: [TEMPLE.x + 18, TEMPLE.y + 20.6, TEMPLE.x + 25, TEMPLE.y + 21.4] };
@@ -1641,6 +1642,9 @@ const FURNITURE = {
   xmoto: { name: 'มอเตอร์ไซค์โชว์', icon: '🏍️', price: 80000, comfort: 2, cat: 'fun', spr: 'x_moto' },
   xtoolbox: { name: 'ตู้เครื่องมือช่าง', icon: '🧰', price: 6500, comfort: 0, cat: 'fun', spr: 'x_toolbox' },
 };
+// 💎 premium pieces: bought with gems only (one extra comfort each); no money back when the house is sold
+const FURN_GEM = { xmoto: 150, xpool: 120, xupiano: 100, jacuzzi: 100, xarcade: 80, xphonebooth: 50, xoarch: 40, xofount: 40 };
+for (const [k, g] of Object.entries(FURN_GEM)) if (FURNITURE[k]) { FURNITURE[k].gem = g; FURNITURE[k].comfort = (FURNITURE[k].comfort || 0) + 1; }
 // rates are per game day (24 real minutes): savings earn 0.5%/day, a loan costs a 2% fee up front plus 1%/day on what is still owed
 // (the bank always charges more than it pays, so borrowing to save never pays off); at most 3 game days accrue while you are offline
 const BANK = { rate: 0.005, cap: 200000, loanMax: 30000, loanFee: 0.02, loanRate: 0.01, repayShare: 0.25, offlineDays: 3 };

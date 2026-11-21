@@ -4536,13 +4536,13 @@ function fishGoals(all, dex) {
   }).join('');
 }
 // 🙏 merit: at the temple pond, let fish go for luck; anywhere else just show how long the blessing lasts
-function meritBox(s, st) {
+function meritBox(s, st, open) {
   const left = Math.max(0, Math.ceil(((me.merit || 0) - (Date.now() + clockOff)) / 60e3));
   const on = left ? `<div class="jobbox">🙏 <b>บุญหนุนนำ</b> โชคปลาหายาก x1.3 · ขยะน้อยลง · เหลืออีก ${left} นาที</div>` : '';
   if (s.pool !== 'temple') return on;
   const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id]?.kind === 'fish').sort((a, b) => G.items[a[0]].base - G.items[b[0]].base);
   const rows = fish.map(([id, q]) => { const mins = Math.min(60, Math.max(2, Math.round(G.items[id].base / 10))); return itemRow(id, B(`🙏 ปล่อย (+${mins} น.)`, { t: 'act', st, a: 'release', item: id }, 'good'), `มี ${q}`); }).join('');
-  return `${on}<details class="sub" style="margin:8px 0"><summary><b>🙏 ปล่อยปลาทำบุญ</b> · ปลายิ่งแพงยิ่งได้บุญนาน (สูงสุด 3 ชม.)</summary>${rows ? `<div class="list">${rows}</div>` : 'ยังไม่มีปลาในกระเป๋า'}</details>`;
+  return `${on}<details class="sub" style="margin:8px 0" ${open ? 'open' : ''}><summary><b>🙏 ปล่อยปลาทำบุญ</b> · ปลายิ่งแพงยิ่งได้บุญนาน (สูงสุด 3 ชม.)</summary>${rows ? `<div class="list">${rows}</div>` : 'ยังไม่มีปลาในกระเป๋า'}</details>`;
 }
 // rods: the shop list at the fishing club (st) or the bag list (no st): stats, buy, hold
 function rodRows(st) {
@@ -5014,6 +5014,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23an', d: '21 พ.ย.', items: [
+    '🙏 จุด <b>ปล่อยปลาทำบุญ</b> แยกต่างหากที่ริมสระบัวด้านใต้ (ในวัด) ไม่ต้องมีเบ็ดก็ปล่อยได้',
+    '💎 ร้านเฟอร์นิเจอร์มีของพรีเมียมขายเป็นเพชร: มอเตอร์ไซค์โชว์ โต๊ะพูล เปียโนตั้งพื้น จากุซซี่ ตู้เกมอาเขต ตู้โทรศัพท์วินเทจ ซุ้มกุหลาบ น้ำพุหินเล็ก (ความสบาย +1 จากเดิม)',
+  ] },
   { v: '2026-11-23am', d: '21 พ.ย.', items: [
     '🐠 <b>ตู้ปลาที่บ้านเลี้ยงปลาจริงได้แล้ว!</b> ซื้อตู้ปลาที่ร้านเฟอร์นิเจอร์ แล้วเปิด 📱 → สมุดปลา → ใส่ตู้ ปลาจะว่ายโชว์ในบ้านให้เพื่อนที่มาเยี่ยมเห็น',
     '🛋️ ปลาในตู้เพิ่มความสบายบ้าน (ไม่ธรรมดา +1 · หายาก +2 · มหากาพย์ +3 · ตำนาน +5 รวมสูงสุด +10 เกินเพดานเดิมได้) → นอนที่บ้านได้พลังงานมากขึ้น',
@@ -6148,6 +6152,7 @@ function renderPanel(p) {
       else btn = `<div class="fishHelp"><b>‼️ ปลากินเบ็ด!</b> กดตอนขีดขาวอยู่ใน<b style="color:var(--ok)">แถบเขียว</b></div><div class="fbar" id="fBar"><div class="zone" id="fZone"></div><div class="mark" id="fMark"></div></div>${B('🎣 ดึง!', { fn: 'reel' }, 'primary big pulse')}`;
       return `${head}${meritBox(s, st)}${btn}<div class="sub" style="margin-top:8px">ปุ่มใหญ่สีเหลือง (มุมขวาล่าง) ใช้ดึงเบ็ดได้เหมือนกัน · ตกปลาจน Lv.${G.fishing.maxLv} ได้รางวัล 🎽 ชุดนักตกปลา</div>`;
     }
+    case 'merit': return `<h2>🙏 ปล่อยปลาทำบุญ · สระบัววัด</h2><div class="sub">ปล่อยปลาจากกระเป๋าคืนสระ ได้ "บุญหนุนนำ" โชคปลาหายาก x1.3 ขยะน้อยลง ทุกที่ที่ตกปลา · ปลายิ่งแพงยิ่งได้บุญนาน (2–60 นาที/ตัว สะสมสูงสุด 3 ชม.) · ไม่ต้องมีเบ็ด</div>${meritBox(STN(st), st, true)}`;
     case 'fishclub': {
       const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id].kind === 'fish');
       const fo = (wd?.fo || []).map(o => { const it = G.items[o.item], h = me.inv[o.item] || 0, left = Math.max(0, Math.ceil((o.until - (Date.now() + clockOff)) / 60e3));
@@ -6235,9 +6240,9 @@ function renderPanel(p) {
         return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ${fl ? 'พื้นบ้าน' : 'วอลเปเปอร์'}ซื้อครั้งเดียว ใช้ได้ทุกชั้น · เปลี่ยนได้ที่ 🛋️ จัดบ้าน › แท็บ 🟫 พื้น/ผนัง</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อน</div>'}
           <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
       }
-      const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => a[1].price - b[1].price);
+      const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => !!a[1].gem - !!b[1].gem || a[1].price - b[1].price);   // 💎 pieces last
       const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
-        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
+        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : f.gem ? B(`💎${f.gem}`, { t: 'act', st, a: 'buy', item: k }, own ? 'primary' : '', !own || (me.gems || 0) < f.gem && !me.gemInf) : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
       return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งเข้าคลังที่บ้าน จัดวางเองด้วยปุ่ม 🛋️ จัดบ้าน · ความสบายรวมสูงสุด ⭐30${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
@@ -6246,7 +6251,7 @@ function renderPanel(p) {
       const tab = cats.some(c => c[0] === p.ptab) ? p.ptab : 'garden';
       const list = Object.entries(G.shop.furniture).filter(([k, f]) => !f.gift && (tab === 'garden' ? f.cat === 'garden' : G.shop.plantIndoor.includes(k))).sort((a, b) => a[1].price - b[1].price);
       const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
-        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
+        return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : f.gem ? B(`💎${f.gem}`, { t: 'act', st, a: 'buy', item: k }, own ? 'primary' : '', !own || (me.gems || 0) < f.gem && !me.gemInf) : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
       return `<h2>🌳 ร้านต้นไม้</h2><div class="sub">${hoursTxt('flower')} · ต้นไม้ใหญ่ พุ่มไม้ ดอกไม้ และไม้ประดับ ซื้อแล้วส่งเข้าคลังที่บ้าน วางเองด้วยปุ่ม 🛋️ จัดบ้าน · 🌱 อยากปลูกผัก? ซื้อ 🟫 แปลงดิน ที่ร้านเฟอร์นิเจอร์ (แท็บสวน)</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อต้นไม้ได้</div>'}
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ptab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }

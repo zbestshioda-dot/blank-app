@@ -2533,8 +2533,8 @@ function act(a, m) {
       feed(`📋 ${a.name} ส่งออเดอร์ ${it.icon}${it.name} x${o.qty} ให้สมาคมประมง รับ ${money(o.pay)}${o.gems ? ` + 💎${o.gems}` : ''}`);
       return toast(a, `📋 ส่งออเดอร์สำเร็จ! ได้ ${money(o.pay)}${o.gems ? ` + 💎${o.gems}` : ''}`, '💰');
     }
-    case 'pier.release': {                   // 🙏 let a fish go in the temple's lotus pond: merit = better fishing luck for a while
-      if (s.pool !== 'temple') return toast(a, 'ปล่อยปลาทำบุญได้ที่สระบัวในวัดเท่านั้น', '🙏', false);
+    case 'pier.release': case 'merit.release': {                   // 🙏 let a fish go in the temple's lotus pond: merit = better fishing luck for a while
+      if (s.pool !== 'temple' && s.type !== 'merit') return toast(a, 'ปล่อยปลาทำบุญได้ที่สระบัวในวัดเท่านั้น', '🙏', false);
       const id = m.item, it = D.ITEMS[id];
       if (it?.kind !== 'fish' || !(a.inv[id] > 0)) return toast(a, 'ไม่มีปลาตัวนี้ในกระเป๋า', '⚠️', false);
       if (!cd(a, 'release', 800)) return;
@@ -2720,7 +2720,7 @@ function act(a, m) {
     case 'house.sell': case 'estate.sell': {
       if (!a.hown) return toast(a, 'คุณยังไม่มีบ้าน', '🏠', false);
       if (m.a === 'sell' && s.type !== 'estate' && houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
-      const back = Math.round(D.HOME_TIERS[a.hown.tier || 0].price * 0.6 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
+      const back = Math.round(D.HOME_TIERS[a.hown.tier || 0].price * 0.6 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.gem ? 0 : D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
       if (a.house >= 0 && houses[a.house] === a) { const r = D.roomAt(a.x, a.y), y = D.areaAt(a.x, a.y); if (r?.house === a.house || y?.yard && y.house === a.house) teleport(a, D.GATES.housing_in.x, D.GATES.housing_in.y); houses[a.house] = null; }
       for (const id of a.aq || []) addItem(a, id, 1); a.aq = [];   // the fish come back to the bag
       a.hown = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.money += back; markMe(a); wdAt = 0;
@@ -2779,7 +2779,8 @@ function act(a, m) {
         a.furniture = [...a.furniture, ...add]; joy(a, 1); markMe(a); wdAt = 0;
         return toast(a, `ซื้อ ${f.icon}${f.name} x${q} แล้ว (มี ${have + q} ชิ้น) · วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
       } else if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
-      if (!pay(a, f.price)) return;
+      if (f.gem) { if (!godInf(a) && (a.gems || 0) < f.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${f.gem} (มี 💎${a.gems || 0})`, '💎', false); if (!godInf(a)) a.gems -= f.gem; }
+      else if (!pay(a, f.price)) return;
       a.furniture = [...a.furniture, key]; joy(a, 5); markMe(a); wdAt = 0;
       return toast(a, `ซื้อ ${f.icon}${f.name} ส่งไปที่บ้านเลขที่ ${a.house + 1} แล้ว · ความสบาย +${f.comfort} (รวม ${comfort(a)}) · จัดวางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
     }
