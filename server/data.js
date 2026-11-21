@@ -807,6 +807,15 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   for (const x of [8, 18, 28, 38, 60, 70, 78]) prop('bush', x + .5, 94.4, false);
   for (const [x, y] of [[86, 98], [92, 99], [89, 103], [94, 106], [85, 109], [91, 112], [87, 116], [94, 119], [85, 121], [56, 121], [66, 120], [76, 121], [47, 115], [49, 120], [2, 94]]) tree(x, y);
   for (const [x, y] of [[84.5, 101.4], [84.5, 105.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_sd' + y, type: 'seat', label: 'ม้านั่งริมสนามบอล', icon: '🪑', x, y: y + .2, r: .7, area: 'town' }); }
+  // ⛲ the old park-arch lawn in mid-town (off the south road) becomes a small fountain square with benches and an ice-cream stall
+  rect(51, 55, 12, 7, 'k');
+  PROPS.push({ s: 'o_fountain', x: 56.5, y: 60.2 }); rect(55, 58, 4, 2, 'o');
+  prop('cartstall', 62.2, 58.1); rect(61, 57, 3, 1, 'o');
+  for (const [x, y] of [[57, 62], [57, 63], [59, 63]]) { keep(TREES, t => !(t[0] === x && t[1] === y)); set(x, y, '.'); }   // open the square's south side
+  STATIONS.push({ id: 'pshop_sq', type: 'pshop', label: 'รถไอติม & ขนม ลานน้ำพุ', icon: '🍦', x: 62.2, y: 58.8, r: 1.6, area: 'town' });
+  for (const [x, y] of [[52.6, 58.2], [52.6, 61.2]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_fq' + y, type: 'seat', label: 'ม้านั่งลานน้ำพุ', icon: '🪑', x, y: y + .2, r: .7, area: 'town' }); }
+  for (const [x, y] of [[51.4, 61.9], [62.6, 61.9]]) prop('o_lampball', x, y);
+  for (const x of [55.2, 58.2]) prop('o_flowerbed', x, 61.95, false);
   GATES.park_in = { x: 46, y: 97 }; GATES.town_from_park = { x: 46, y: 93.6 };
   GATES.field_in = { x: 50, y: 101.6 }; GATES.town_from_field = { x: 46, y: 93.6 };
 }

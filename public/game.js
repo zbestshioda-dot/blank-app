@@ -4624,6 +4624,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23h', d: '23 พ.ย.', items: [
+    '⛲ ลานว่างกลางเมือง (ที่เคยเป็นซุ้มสวนสนุก) กลายเป็นลานน้ำพุ มีม้านั่งให้นั่งพัก และรถไอติม & ขนมเปิดขาย',
+  ] },
   { v: '2026-11-23g', d: '23 พ.ย.', items: [
     '🏙️ เมืองขยายลงทางใต้! ถนนเส้นใหม่มีทางเท้า เสาไฟ ป้ายรถเมล์ ต่อจากถนนใหญ่ทางใต้ของเมือง',
     '🎡 สวนสนุกกับ ⚽ สนามฟุตบอลย้ายมาอยู่ในเมืองหลักแล้ว เดินลอดซุ้มประตูเข้าไปได้เลย ไม่ต้องวาร์ป ยืนดูคนเตะบอลจากริมถนนก็ได้',
@@ -5316,7 +5319,7 @@ function renderPanel(p) {
       const rows = (G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
         return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
           [e.hunger && `อิ่ม +${e.hunger}`, e.happy && `สุข +${e.happy}`, !it.eat && 'ของฝาก ขายต่อได้', `มีอยู่ ${me.inv[id] || 0}`].filter(Boolean).join(' · ')); }).join('');
-      return `<h2>🍿 ร้านขนม & ของฝากสวนสนุก</h2><div class="sub">ป๊อปคอร์น สายไหม ฮอตดอก น้ำเย็นๆ ลูกโป่ง และตุ๊กตาของฝาก · ซื้อแล้วเก็บในกระเป๋า กดใช้ได้ทุกเมื่อ</div><div class="list">${rows}</div>`;
+      return `<h2>${STN(st).icon} ${STN(st).label}</h2><div class="sub">ป๊อปคอร์น สายไหม ฮอตดอก น้ำเย็นๆ ลูกโป่ง และตุ๊กตาของฝาก · ซื้อแล้วเก็บในกระเป๋า กดใช้ได้ทุกเมื่อ</div><div class="list">${rows}</div>`;
     }
     case 'tshop': {
       const rows = (G.tshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.tshop.markup), e = it.eat || {};
