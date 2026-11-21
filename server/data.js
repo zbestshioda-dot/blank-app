@@ -831,38 +831,43 @@ STATIONS.push({ id: 'lk_float_t', type: 'lk', label: 'ท่าลอยกร�
 LK.decoT = [['lanna', TEMPLE.x + 16, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 19.4, 1.4], ['lanna', TEMPLE.x + 16, TEMPLE.y + 27.6, 1.4], ['lanna', TEMPLE.x + 27, TEMPLE.y + 27.6, 1.4], ['lights', TEMPLE.x + 21.5, TEMPLE.y + 18.9, 2]];
 LK.ponds = { town: [18, 60.4, 35, 61.6], temple: [TEMPLE.x + 18, TEMPLE.y + 20.6, TEMPLE.x + 25, TEMPLE.y + 21.4] };
 STATIONS.push({ id: 'lk_sky', type: 'lksky', label: 'ปล่อยโคมลอย', icon: '🏮', x: TEMPLE.x + 22, y: TEMPLE.y + 15.2, r: 2, area: 'temple' });
-// 🎪 the temple fair (งานวัด) for the Loy Krathong weeks: a fairground east of the football ground in the south district, under a red
-// Thai arch from the avenue. Food stalls sell real food; the game stalls (balloon darts, ring toss, duck fishing) are mini-games.
-// Built only when the server starts before the festival ends (the next deploy after it takes it down).
-const FAIR = { on: Date.now() < LK.end, x: 82, y: 93, w: 15, h: 31, deco: [], games: {
+// 🎪 the temple fair (งานวัด) for the Loy Krathong weeks, inside the temple grounds: the grounds now run 14 rows further south (a
+// fairground behind the lotus pond, the old south wall gone). Food stalls sell real food; the game stalls (balloon darts, ring toss,
+// duck fishing) are mini-games. The stalls are built only when the server starts before the festival ends (the fairground stays).
+const FAIR = { on: Date.now() < LK.end, x: TEMPLE.x, y: TEMPLE.y + 31, w: TEMPLE.w, h: 15, deco: [], games: {
   darts: { name: 'ปาเป้าลูกโป่ง', price: 20, min: 3, max: 6, pay: [0, 10, 20, 35, 50, 80, 120] },
   ring: { name: 'ปาห่วงขวด', price: 20, min: 3, max: 3, pay: [0, 25, 60, 150] },
   fish: { name: 'ตกเป็ดน้อย', price: 20, min: 18, max: 10, pay: [0, 8, 16, 24, 32, 42, 54, 66, 80, 95, 110] } } };
-if (FAIR.on) {
-  const F = FAIR, keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
-  const inF = (x, y) => x >= F.x && x < F.x + F.w && y > F.y && y < F.y + F.h;
-  keep(TREES, t => { if (inF(t[0], t[1])) { set(t[0], t[1], '.'); return false; } return true; });
-  keep(STATIONS, st => !(st.id || '').startsWith('seat_sd')); keep(PROPS, p => !(p.s === 'o_bench' && inF(p.x, p.y)));
-  rect(88, 93, 3, 30, 'c');                                                   // the fairground walk
-  const deco = (s, x, y, z = 0) => F.deco.push([s, x, y, z]);
-  deco('f_arch', 89.5, 95.6); set(87, 95, 'o'); set(91, 95, 'o');
-  const stall = (sp, x, y, st) => { deco(sp, x, y); rect(Math.round(x - 1.5), Math.ceil(y) - 2, 3, 2, 'o'); STATIONS.push({ area: 'town', x, y: y + .65, r: 1.5, fair: 1, ...st }); };
-  const food = (sp, x, y, id, label, icon, items) => stall(sp, x, y, { id, type: 'pshop', label, icon, items });
-  const game = (sp, x, y, k, icon) => stall(sp, x, y, { id: 'fair_' + k, type: 'fairgame', k, label: F.games[k].name, icon });
-  food('s_cotton', 84.6, 100, 'fair_cotton', 'ร้านสายไหม', '🍭', ['cottoncandy', 'popcorn']);
-  food('s_grill', 84.6, 105.5, 'fair_grill', 'ลูกชิ้นปิ้ง ไส้กรอกอีสาน', '🍢', ['meatball', 'sausage']);
-  game('s_darts', 84.6, 111, 'darts', '🎈');
-  game('s_fish', 84.6, 116.5, 'fish', '🦆');
-  food('s_dessert', 84.6, 122, 'fair_dessert', 'ขนมไทยงานวัด', '🍡', ['kanomthai', 'luukchup', 'thaitea']);
-  food('s_kanomkrok', 94.4, 100, 'fair_krok', 'ขนมครกหอมๆ', '🥞', ['kanomkrok', 'thaitea']);
-  food('s_eggs', 94.4, 105.5, 'fair_eggs', 'ไข่นกกระทา', '🍳', ['quaileggs', 'sausage']);
-  game('s_ring', 94.4, 111, 'ring', '⭕');
-  food('s_glass', 94.4, 116.5, 'fair_glass', 'ตู้ขนมหวาน', '🍰', ['luukchup', 'kanomthai', 'coconutice']);
-  food('s_sweets', 94.4, 122, 'fair_sweets', 'ของว่างงานวัด', '🥟', ['meatball', 'quaileggs', 'thaitea']);
-  food('s_coconut', 84.4, 96.6, 'fair_coconut', 'ไอติมกะทิมะพร้าว', '🥥', ['coconutice']);
-  for (const y of [98.6, 104.1, 109.6, 115.1, 120.6]) deco('f_lights', 89.5, y, 2.2);
-  for (const [x, y] of [[87.3, 102.6], [91.7, 102.6], [87.3, 113.6], [91.7, 113.6]]) { deco('f_pole', x, y); set(Math.floor(x), Math.floor(y - .5), 'o'); }
-  deco('f_balloons', 92.6, 96.3); deco('f_speaker', 86.4, 95.9); deco('f_bin', 87.4, 121.8); deco('f_teddy', 92.6, 108.8); deco('f_table', 95.2, 96.9);
+{
+  const T = TEMPLE, X = T.x, Y = T.y, H0 = T.h; T.h = H0 + 14;
+  rect(X + 1, Y + H0 - 1, T.w - 2, 15, 's');                                        // the new ground (and the old south wall taken down)
+  for (let x = X; x < X + T.w; x++) set(x, Y + T.h - 1, 'o');
+  for (let y = Y + H0 - 1; y < Y + T.h; y++) { set(X, y, 'o'); set(X + T.w - 1, y, 'o'); }
+  rect(X + 20, Y + 29, 3, 8, 'c'); rect(X + 1, Y + 37, T.w - 2, 3, 'c');               // from the pond walk down to the fair's long walk
+  rect(X + 1, Y + 41, 6, 3, '.'); rect(X + 37, Y + 41, 6, 3, '.');                   // a little lawn at each end
+  if (FAIR.on) {
+    const F = FAIR, deco = (s, x, y, z = 0) => F.deco.push([s, x, y, z]);
+    deco('f_arch', X + 21.5, Y + 33.6); set(X + 19, Y + 33, 'o'); set(X + 23, Y + 33, 'o');
+    const stall = (sp, x, y, st, sy) => { deco(sp, x, y); rect(Math.round(x - 1.5), Math.ceil(y) - 2, 3, 2, 'o'); STATIONS.push({ area: 'temple', x, y: sy ?? y + .95, r: 1.6, fair: 1, ...st }); };
+    const food = (sp, x, y, id, label, icon, items, sy) => stall(sp, x, y, { id, type: 'pshop', label, icon, items }, sy);
+    const game = (sp, x, y, k, icon, sy) => stall(sp, x, y, { id: 'fair_' + k, type: 'fairgame', k, label: F.games[k].name, icon }, sy);
+    // north row: counters open onto the long walk
+    food('s_cotton', X + 4.5, Y + 36.6, 'fair_cotton', 'ร้านสายไหม', '🍭', ['cottoncandy', 'popcorn']);
+    food('s_grill', X + 9, Y + 36.6, 'fair_grill', 'ลูกชิ้นปิ้ง ไส้กรอกอีสาน', '🍢', ['meatball', 'sausage']);
+    food('s_coconut', X + 13.5, Y + 36.6, 'fair_coconut', 'ไอติมกะทิมะพร้าว', '🥥', ['coconutice']);
+    food('s_kanomkrok', X + 29.5, Y + 36.6, 'fair_krok', 'ขนมครกหอมๆ', '🥞', ['kanomkrok', 'thaitea']);
+    food('s_eggs', X + 34, Y + 36.6, 'fair_eggs', 'ไข่นกกระทา', '🍳', ['quaileggs', 'sausage']);
+    food('s_glass', X + 38.5, Y + 36.6, 'fair_glass', 'ตู้ขนมหวาน', '🍰', ['luukchup', 'kanomthai', 'coconutice']);
+    // south row: you stand on the walk side to play / buy
+    game('s_darts', X + 10.5, Y + 44.2, 'darts', '🎈', Y + 40.5);
+    game('s_ring', X + 15, Y + 44.2, 'ring', '⭕', Y + 40.5);
+    game('s_fish', X + 19.5, Y + 44.2, 'fish', '🦆', Y + 40.5);
+    food('s_dessert', X + 24, Y + 44.2, 'fair_dessert', 'ขนมไทยงานวัด', '🍡', ['kanomthai', 'luukchup', 'thaitea'], Y + 40.5);
+    food('s_sweets', X + 28.5, Y + 44.2, 'fair_sweets', 'ของว่างงานวัด', '🥟', ['meatball', 'quaileggs', 'thaitea'], Y + 40.5);
+    for (const x of [7, 15, 28, 36]) deco('f_lights', X + x, Y + 38.6, 2.2);
+    for (const [x, y] of [[17.2, 36.9], [25.8, 36.9], [2.2, 41.2], [41.8, 41.2]]) { deco('f_pole', X + x, Y + y); set(Math.floor(X + x), Math.floor(Y + y - .5), 'o'); }
+    deco('f_balloons', X + 18.2, Y + 34.6); deco('f_speaker', X + 24.8, Y + 34.4); deco('f_bin', X + 42.2, Y + 36.4); deco('f_teddy', X + 6.5, Y + 43.4); deco('f_table', X + 33.5, Y + 43.6); deco('f_table', X + 39.5, Y + 43.6);
+  }
 }
 const AREAS = [TOWN, HOUSING, PARK, TEMPLE, FIELD, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
