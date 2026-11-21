@@ -2747,13 +2747,13 @@ function balloonShape(x, y, r, col, sh) {
   ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(x - r * .3, y - r * .35, r * .18, r * .28, -.5, 0, 7); ctx.fill();
   if (!sh) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + r * .95); ctx.lineTo(x - r * .14, y + r * 1.15); ctx.lineTo(x + r * .14, y + r * 1.15); ctx.fill(); }
 }
-function drawBalloon(id, px, top, H, pid, t) {
+function drawBalloon(id, px, top, H, pid, t, lift = 0) {   // lift: float higher on a longer string, clear of the name tag
   const hx = px + TS * .32, hy = top + H * .5, r = TS * .26;
   const list = id === 'bunch' ? ['red', 'blue', 'yellow', 'green', 'pink', 'heart', 'purple'] : [id];
   list.forEach((k, i) => {
     const B = G.balloons?.[k]; if (!B) return;
     const sw = Math.sin(t / 700 + (+pid || 0) % 13 + i * 1.7) * TS * .12, n = list.length;
-    const bx = hx + sw + (n > 1 ? (i - (n - 1) / 2) * r * 1.1 : TS * .08), by = top - TS * (n > 1 ? .55 + (i % 3) * .3 : .45);
+    const bx = hx + sw + (n > 1 ? (i - (n - 1) / 2) * r * 1.1 : TS * .08), by = top - lift - TS * (n > 1 ? .55 + (i % 3) * .3 : .45);
     ctx.strokeStyle = 'rgba(60,60,60,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + sw * .3, (hy + by) / 2, bx, by + r); ctx.stroke();
     balloonShape(bx, by, r, B.c, B.sh);
   });
@@ -2826,7 +2826,7 @@ function drawPlayer(p, X, Y, t) {
   const umb = !lying && !fo && wd?.ev?.id === 'rain' && (p.id === myId ? (me?.inv?.umbrella || 0) > 0 : p.um) && !roomOf(p.x, p.y);
   if (umb) drawUmbrella(px, py - H * .97 - bob + (sitting ? H * .19 : 0), H, p.id, now0);   // ☂️ in the rain (the name tag moves up above it)
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
-  if (p.bl && !lying && !fo?.swim) drawBalloon(p.bl, px, top + (umb ? -TS * .3 : 0), H, p.id, now0);
+  if (p.bl && !lying && !fo?.swim) drawBalloon(p.bl, px, top + (umb ? -TS * .3 : 0), H, p.id, now0, p.crowd || NAME_MODE === 'none' ? 0 : TS * (p.title && NAME_MODE === 'all' ? .9 : .55));
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
@@ -5243,6 +5243,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23au', d: '21 พ.ย.', items: [
+    '🎈 แก้ป้ายชื่อบังลูกโป่ง: ลูกโป่งลอยสูงขึ้นเหนือชื่อแล้ว',
+  ] },
   { v: '2026-11-23at', d: '21 พ.ย.', items: [
     '💳 <b>บัตรรายเดือน ฿39</b> รับ 💎100 ทันที + กดรับ 💎20 ทุกวัน 30 วัน รวม 💎700 (ถ้าซื้อเพชรแยก ~฿160) · มีป้าย 💳 ข้างชื่อ · ซื้อได้ที่ 💎 เติมเงิน',
     '🎄 <b>ของรุ่นจำกัดคริสต์มาส</b> ขายถึง 31 ธ.ค. เท่านั้น: 🦌 เรนเดียร์จมูกแดง (💎400) ที่ร้านสัตว์เลี้ยง · 🛷 รถเลื่อนซานต้า (💎600 ไม่ต้องมีใบขับขี่) ที่โชว์รูมรถ · ใส่ชุดซานต้าคู่กันเท่สุด!',
