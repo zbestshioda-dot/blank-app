@@ -828,6 +828,39 @@ const LK = { id: 'lk2569', start: Date.parse('2026-11-21T00:00:00+07:00'), end: 
     ['lanna', 19.5, 61.2, 1.3], ['lanna', 22.5, 61.2, 1.3], ['lanna', 30.5, 61.2, 1.3], ['lanna', 33.5, 61.2, 1.3]] };
 STATIONS.push({ id: 'lk_float', type: 'lk', label: 'ท่าลอยกระทง', icon: '🪷', x: 26.5, y: 58.6, r: 2.2, area: 'town' });
 STATIONS.push({ id: 'lk_sky', type: 'lksky', label: 'ปล่อยโคมลอย', icon: '🏮', x: TEMPLE.x + 22, y: TEMPLE.y + 15.2, r: 2, area: 'temple' });
+// 🎪 the temple fair (งานวัด) for the Loy Krathong weeks: a fairground east of the football ground in the south district, under a red
+// Thai arch from the avenue. Food stalls sell real food; the game stalls (balloon darts, ring toss, duck fishing) are mini-games.
+// Built only when the server starts before the festival ends (the next deploy after it takes it down).
+const FAIR = { on: Date.now() < LK.end, x: 82, y: 93, w: 15, h: 31, deco: [], games: {
+  darts: { name: 'ปาเป้าลูกโป่ง', price: 20, min: 3, max: 6, pay: [0, 10, 20, 35, 50, 80, 120] },
+  ring: { name: 'ปาห่วงขวด', price: 20, min: 3, max: 3, pay: [0, 25, 60, 150] },
+  fish: { name: 'ตกเป็ดน้อย', price: 20, min: 18, max: 10, pay: [0, 8, 16, 24, 32, 42, 54, 66, 80, 95, 110] } } };
+if (FAIR.on) {
+  const F = FAIR, keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
+  const inF = (x, y) => x >= F.x && x < F.x + F.w && y > F.y && y < F.y + F.h;
+  keep(TREES, t => { if (inF(t[0], t[1])) { set(t[0], t[1], '.'); return false; } return true; });
+  keep(STATIONS, st => !(st.id || '').startsWith('seat_sd')); keep(PROPS, p => !(p.s === 'o_bench' && inF(p.x, p.y)));
+  rect(88, 93, 3, 30, 'c');                                                   // the fairground walk
+  const deco = (s, x, y, z = 0) => F.deco.push([s, x, y, z]);
+  deco('f_arch', 89.5, 95.6); set(87, 95, 'o'); set(91, 95, 'o');
+  const stall = (sp, x, y, st) => { deco(sp, x, y); rect(Math.round(x - 1.5), Math.ceil(y) - 2, 3, 2, 'o'); STATIONS.push({ area: 'town', x, y: y + .65, r: 1.5, fair: 1, ...st }); };
+  const food = (sp, x, y, id, label, icon, items) => stall(sp, x, y, { id, type: 'pshop', label, icon, items });
+  const game = (sp, x, y, k, icon) => stall(sp, x, y, { id: 'fair_' + k, type: 'fairgame', k, label: F.games[k].name, icon });
+  food('s_cotton', 84.6, 100, 'fair_cotton', 'ร้านสายไหม', '🍭', ['cottoncandy', 'popcorn']);
+  food('s_grill', 84.6, 105.5, 'fair_grill', 'ลูกชิ้นปิ้ง ไส้กรอกอีสาน', '🍢', ['meatball', 'sausage']);
+  game('s_darts', 84.6, 111, 'darts', '🎈');
+  game('s_fish', 84.6, 116.5, 'fish', '🦆');
+  food('s_dessert', 84.6, 122, 'fair_dessert', 'ขนมไทยงานวัด', '🍡', ['kanomthai', 'luukchup', 'thaitea']);
+  food('s_kanomkrok', 94.4, 100, 'fair_krok', 'ขนมครกหอมๆ', '🥞', ['kanomkrok', 'thaitea']);
+  food('s_eggs', 94.4, 105.5, 'fair_eggs', 'ไข่นกกระทา', '🍳', ['quaileggs', 'sausage']);
+  game('s_ring', 94.4, 111, 'ring', '⭕');
+  food('s_glass', 94.4, 116.5, 'fair_glass', 'ตู้ขนมหวาน', '🍰', ['luukchup', 'kanomthai', 'coconutice']);
+  food('s_sweets', 94.4, 122, 'fair_sweets', 'ของว่างงานวัด', '🥟', ['meatball', 'quaileggs', 'thaitea']);
+  food('s_coconut', 84.4, 96.6, 'fair_coconut', 'ไอติมกะทิมะพร้าว', '🥥', ['coconutice']);
+  for (const y of [98.6, 104.1, 109.6, 115.1, 120.6]) deco('f_lights', 89.5, y, 2.2);
+  for (const [x, y] of [[87.3, 102.6], [91.7, 102.6], [87.3, 113.6], [91.7, 113.6]]) { deco('f_pole', x, y); set(Math.floor(x), Math.floor(y - .5), 'o'); }
+  deco('f_balloons', 92.6, 96.3); deco('f_speaker', 86.4, 95.9); deco('f_bin', 87.4, 121.8); deco('f_teddy', 92.6, 108.8); deco('f_table', 95.2, 96.9);
+}
 const AREAS = [TOWN, HOUSING, PARK, TEMPLE, FIELD, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 const roomAt = (x, y) => { const a = areaAt(x, y); return a && a.kind === 'room' ? a : null; };
@@ -1060,6 +1093,13 @@ const ITEMS = {
   bento:  { name: 'ข้าวกล่องเวฟ', icon: '🍱', kind: 'goods', base: 55, eat: { hunger: 32, energy: 4 } },
   petegg: { name: 'ไข่สัตว์เลี้ยงปริศนา', icon: '🥚', kind: 'goods', base: 0, egg: 1 },   // from inviting friends: open it in the bag to hatch a random pet
   popcorn: { name: 'ป๊อปคอร์นคาราเมล', icon: '🍿', kind: 'goods', base: 45, eat: { hunger: 8, happy: 5 } },
+  meatball: { name: 'ลูกชิ้นปิ้ง', icon: '🍢', kind: 'goods', base: 25, eat: { hunger: 10, happy: 3 } },
+  sausage: { name: 'ไส้กรอกอีสาน', icon: '🌭', kind: 'goods', base: 30, eat: { hunger: 12, happy: 3 } },
+  coconutice: { name: 'ไอติมกะทิมะพร้าว', icon: '🥥', kind: 'goods', base: 25, eat: { hunger: 4, happy: 8 } },
+  kanomkrok: { name: 'ขนมครก', icon: '🥞', kind: 'goods', base: 20, eat: { hunger: 8, happy: 4 } },
+  quaileggs: { name: 'ไข่นกกระทา', icon: '🍳', kind: 'goods', base: 20, eat: { hunger: 7, happy: 3 } },
+  thaitea: { name: 'ชาเย็น', icon: '🧋', kind: 'goods', base: 25, eat: { hunger: 2, happy: 6 } },
+  luukchup: { name: 'ลูกชุบ', icon: '🍡', kind: 'goods', base: 25, eat: { hunger: 5, happy: 6 } },
   cottoncandy: { name: 'สายไหมสีชมพู', icon: '🍭', kind: 'goods', base: 35, eat: { hunger: 3, happy: 7 } },
   soda: { name: 'น้ำอัดลมเย็นเจี๊ยบ', icon: '🥤', kind: 'goods', base: 25, eat: { hunger: 2, happy: 3 } },
   hotdog: { name: 'ฮอตดอกจัมโบ้', icon: '🌭', kind: 'goods', base: 60, eat: { hunger: 22, happy: 2 } },
@@ -1785,7 +1825,7 @@ const TAROT = {   // key order = card order in assets/tarot.webp (see tools/buil
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
-module.exports = { LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

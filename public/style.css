@@ -1481,3 +1481,8 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 #lkBan .pbX{position:absolute;top:-10px;right:-10px;width:36px;height:36px;padding:0;border-radius:50%;font-size:18px;background:#fff;border:3px solid #5a3510;color:#5a3510;z-index:1}
 @keyframes lkIn{from{transform:scale(.85);opacity:0}}
 @keyframes lkPulse{50%{transform:scale(1.05)}}
+#fairG{position:fixed;inset:0;z-index:420;display:flex;align-items:center;justify-content:center;background:rgba(10,8,25,.65);padding:10px}
+#fairG .fgBox{width:min(360px,94vw);border-radius:16px;padding:8px;background:linear-gradient(#ffe7b0,#f3b45a);border:3px solid #6a3a12;box-shadow:0 0 0 3px #fff6dc,0 10px 30px rgba(0,0,0,.4);text-align:center}
+#fairG .fgH{font-weight:700;color:#5a2a08;margin:2px 0 6px;font-size:17px}#fairG .fgH span{margin-left:6px;color:#b4361e}
+#fairG canvas{width:100%;height:auto;border-radius:10px;touch-action:none;display:block;background:#222}
+#fairG .fgTip{font-size:13px;color:#5a2a08;margin-top:6px}

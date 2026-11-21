@@ -659,6 +659,7 @@ function handle(m) {
     case 'mailsent': { const ta = $('#mailText'); if (ta) ta.value = ''; FX.play('chime'); if (panel?.kind === 'mail') { panel.sent = m.to; panel.to = m.to; panel.sentT = Date.now(); refreshPanel(true); setTimeout(() => { if (panel?.kind === 'mail' && Date.now() - panel.sentT >= 3900) { panel.sent = ''; refreshPanel(true); } }, 4000); } break; }
     case 'lkv': LKV = m; lkUi(); if (panel?.kind === 'lkev' || panel?.kind === 'lk') refreshPanel(true); break;
     case 'lkf': lkSpawn(m, 0); break;
+    case 'fairgo': closePanel(); fairPlay(m); break;
     case 'lks': lkSky(m); break;
     case 'ev7': EV7 = m; ev7Ui(); if (panel?.kind === 'ev7') refreshPanel(true); break;
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
@@ -1658,6 +1659,7 @@ function draw(t) {
   if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
   if (A?.id === 'town' && vis(G.football.pitch.x + 9, G.football.pitch.y + 5, 22)) fbEnts(ents, vis);
   if ((A?.id === 'town' || A?.id === 'temple') && lkOnC()) lkEnts(A, ents, vis);
+  if (A?.id === 'town' && G.fair?.on && vis(G.fair.x + 7, G.fair.y + 15, 24)) fairEnts(ents, vis);
   if (A?.id === 'town' && RIDE_IMG()) { const c = STN('ride_carousel'); if (c && vis(c.cx, rideBottom(c), 12)) ents.push([rideBottom(c) + .5, 9, c]); }   // the carousel roof goes over its riders
   if (A?.id === 'temple') { for (const st of G.stations) if (st.type === 'wat' && vis(st.cx, st.cy + st.h / 2, 12)) ents.push([st.k === 'sala' ? st.cy - st.h / 2 + .3 : st.cy + st.h / 2, 11, st]); ents.push([A.y + 1, 12, 'top'], [A.y + A.h, 12, 'bot']);
     { const t0 = performance.now(); watMonks(A, Math.min(.1, (t0 - (window.__watT || t0)) / 1000)); window.__watT = t0; for (const n of WATM) if (vis(n.rx, n.ry, 3)) ents.push([n.ry + .3, 4, n]); }
@@ -1707,6 +1709,7 @@ function draw(t) {
     else if (k === 13) drawWatTownGate(e, X, Y);
     else if (k === 15) drawFb(e, X, Y, t);
     else if (k === 17) drawLk(e, X, Y, t);
+    else if (k === 18) drawFair(e, X, Y, t);
     else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
     else drawPlayer(e, X, Y, t);
   }
@@ -3768,6 +3771,73 @@ function bindPanel(root) {
   }));
   const ms = root.querySelector('#mSearch'); if (ms) ms.oninput = () => { panel.q = ms.value; refreshPanel(true); }; const mq = root.querySelector('#mqIn'); if (mq) mq.oninput = () => { panel.mq = mq.value; refreshPanel(true); };
 }
+// ------------------------------------------------------------------ 🎪 the temple fair: stalls and lights drawn from assets/fair.webp, and the
+// three stall games played in a small overlay (the server checks the time it took and pays by score)
+let FAJ = null, FAIMG = null, faAsked = false;
+function faLoad() { if (faAsked) return; faAsked = true; fetch('assets/fair.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { FAJ = j; FAIMG = im; }; im.src = 'assets/fair.webp?v=1'; }).catch(() => { faAsked = false; }); }
+function fairEnts(ents, vis) {
+  faLoad(); if (!FAIMG) return;
+  for (const d of G.fair.deco) if (vis(d[1], d[2], 6)) ents.push([d[3] ? d[2] + 3 : d[2], 18, { s: d[0], x: d[1], y: d[2], z: d[3] }]);   // light strings hang over everyone
+}
+function drawFair(e, X, Y, t) {
+  const s = FAJ.sprites[e.s]; if (!s) return;
+  const w = s[4] * TS, h = w * s[3] / s[2], px = Math.round(e.x * TS + X - w / 2), py = Math.round((e.y - e.z) * TS + Y - h);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(FAIMG, s[0], s[1], s[2], s[3], px, py, Math.round(w), Math.round(h));
+  const night = nightLevel();
+  if (night > .15 && (e.s === 'f_lights' || e.s === 'f_pole' || e.s.startsWith('s_'))) { const g = ctx.createRadialGradient(px + w / 2, py + h * .4, 0, px + w / 2, py + h * .4, w * .7); g.addColorStop(0, `rgba(255,210,130,${night * .55})`); g.addColorStop(1, 'rgba(255,180,80,0)'); ctx.fillStyle = g; ctx.fillRect(px - w * .2, py - h * .3, w * 1.4, h * 1.4); }
+}
+function fairPlay(m) {
+  const W = 340, H = 400, el = document.createElement('div'); el.id = 'fairG';
+  el.innerHTML = `<div class="fgBox"><div class="fgH">🎪 ${esc(m.name)} <span id="fgInfo"></span></div><canvas width="${W}" height="${H}"></canvas><div class="fgTip"></div></div>`;
+  document.body.appendChild(el);
+  const c = el.querySelector('canvas'), g = c.getContext('2d'), info = el.querySelector('#fgInfo'), tip = el.querySelector('.fgTip');
+  const t0 = performance.now(); let score = 0, done = false, raf = 0, ptr = { x: W / 2, y: H / 2 };
+  const finish = () => { if (done) return; done = true; cancelAnimationFrame(raf); setTimeout(() => { send({ t: 'fair', op: 'end', id: m.id, score }); el.remove(); }, 1100); };
+  const pos = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
+  const COL = ['#ff5a6e', '#ffd23a', '#4fb3ff', '#7ee07a', '#c88cff', '#ff9a3c'];
+  let tap = null;
+  c.onpointerdown = e => { e.preventDefault(); ptr = pos(e); tap = { ...ptr }; };
+  c.onpointermove = e => { ptr = pos(e); };
+  // ---- the three games
+  const G1 = {
+    darts: () => { const balls = []; for (let r = 0; r < 4; r++) for (let q = 0; q < 5; q++) balls.push({ x: 50 + q * 60, y: 70 + r * 62, c: COL[(r * 5 + q) % 6], pop: 0 }); let darts = 6, fx = [];
+      tip.textContent = 'กดเพื่อปาลูกดอก — เล็งตอนเป้าอยู่บนลูกโป่ง';
+      return tt => {
+        g.fillStyle = '#7a5230'; g.fillRect(0, 0, W, H); g.fillStyle = '#9a6a3e'; g.fillRect(14, 30, W - 28, 280);
+        for (const b of balls) { if (b.pop) continue; g.fillStyle = b.c; g.beginPath(); g.ellipse(b.x, b.y, 22, 26, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.arc(b.x - 7, b.y - 9, 5, 0, 7); g.fill(); }
+        const ax = W / 2 + Math.sin(tt * 1.7) * 130 + Math.sin(tt * 4.3) * 18, ay = 170 + Math.sin(tt * 2.3 + 1) * 110;
+        g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(ax, ay, 14, 0, 7); g.moveTo(ax - 22, ay); g.lineTo(ax + 22, ay); g.moveTo(ax, ay - 22); g.lineTo(ax, ay + 22); g.stroke();
+        for (const f of fx) { const k = (tt - f.t) * 3; if (k < 1) { g.strokeStyle = `rgba(255,255,255,${1 - k})`; g.beginPath(); g.arc(f.x, f.y, 10 + k * 30, 0, 7); g.stroke(); } }
+        g.fillStyle = '#fff'; g.font = 'bold 20px sans-serif'; g.textAlign = 'left'; g.fillText('🎯'.repeat(darts), 16, 350);
+        if (tap && darts > 0) { darts--; const hit = balls.find(b => !b.pop && Math.hypot(b.x - ax, b.y - ay) < 26); if (hit) { hit.pop = 1; score++; FX.play('pop'); } else FX.play('click'); fx.push({ x: ax, y: ay, t: tt }); if (!darts) finish(); }
+        info.textContent = `แตก ${score} ลูก`;
+      }; },
+    ring: () => { let rings = 3, phase = 0, res = []; tip.textContent = 'กดตอนเข็มอยู่ในช่องสีเขียว';
+      return tt => {
+        g.fillStyle = '#3a2a4e'; g.fillRect(0, 0, W, H); g.fillStyle = '#7a5230'; g.fillRect(20, 200, W - 40, 30);
+        for (let i = 0; i < 3; i++) { const x = 80 + i * 90; g.fillStyle = ['#7ee07a', '#4fb3ff', '#ffd23a'][i]; g.fillRect(x - 9, 130, 18, 70); g.fillRect(x - 5, 110, 10, 22); if (res[i] === 1) { g.strokeStyle = '#ff5a6e'; g.lineWidth = 6; g.beginPath(); g.ellipse(x, 176, 22, 8, 0, 0, 7); g.stroke(); } else if (res[i] === 0) { g.fillStyle = '#fff'; g.font = '26px sans-serif'; g.textAlign = 'center'; g.fillText('✗', x, 100); } }
+        const lvl = 3 - rings, sp = 2.2 + lvl * 1.3, zw = 0.22 - lvl * .05, zc = .5 + Math.sin(lvl * 2.1) * .2, k = (Math.sin(tt * sp) + 1) / 2;
+        g.fillStyle = '#222'; g.fillRect(30, 290, W - 60, 30); g.fillStyle = '#5ed17a'; g.fillRect(30 + (W - 60) * (zc - zw / 2), 290, (W - 60) * zw, 30);
+        g.fillStyle = '#fff'; g.fillRect(30 + (W - 60) * k - 3, 280, 6, 50);
+        g.font = 'bold 20px sans-serif'; g.textAlign = 'left'; g.fillText('⭕'.repeat(rings), 16, 370);
+        if (tap && rings > 0) { const ok = Math.abs(k - zc) < zw / 2; res.push(ok ? 1 : 0); if (ok) { score++; FX.play('coin'); } else FX.play('fail'); rings--; if (!rings) finish(); }
+        info.textContent = `ลง ${score} ห่วง`;
+      }; },
+    fish: () => { const ducks = Array.from({ length: 6 }, (_, i) => ({ a: i, r: 60 + (i % 3) * 40, sp: .5 + (i % 2) * .4, ph: i * 1.1 })); let hookUp = 0;
+      tip.textContent = 'ลากเบ็ดไปเหนือเป็ด แล้วกดเพื่อเกี่ยว · 20 วินาที';
+      return tt => {
+        const left = Math.max(0, 20 - tt); g.fillStyle = '#5aa8e0'; g.fillRect(0, 0, W, H); g.fillStyle = '#8fd0f5'; g.beginPath(); g.ellipse(W / 2, 190, 160, 160, 0, 0, 7); g.fill();
+        for (const d of ducks) { const ang = d.ph + tt * d.sp * (d.a % 2 ? 1 : -1); d.x = W / 2 + Math.cos(ang) * d.r; d.y = 190 + Math.sin(ang) * d.r * .8;
+          g.fillStyle = '#ffd23a'; g.beginPath(); g.ellipse(d.x, d.y, 18, 13, 0, 0, 7); g.fill(); g.beginPath(); g.arc(d.x + (Math.sin(ang) > 0 ? -12 : 12), d.y - 10, 8, 0, 7); g.fill(); g.fillStyle = '#ff8a3c'; g.fillRect(d.x + (Math.sin(ang) > 0 ? -22 : 18), d.y - 11, 6, 4); }
+        g.strokeStyle = '#333'; g.lineWidth = 2; g.beginPath(); g.moveTo(ptr.x, 0); g.lineTo(ptr.x, ptr.y - 8); g.stroke(); g.strokeStyle = '#c0c0c0'; g.lineWidth = 3; g.beginPath(); g.arc(ptr.x, ptr.y, 7, 0, Math.PI); g.stroke();
+        if (tap) { const d = ducks.find(q => Math.hypot(q.x - ptr.x, q.y - ptr.y) < 22); if (d) { score++; d.ph += 2 + Math.random() * 2; d.r = 50 + Math.random() * 100; FX.play('coin'); } else FX.play('click'); }
+        g.fillStyle = '#fff'; g.font = 'bold 22px sans-serif'; g.textAlign = 'left'; g.fillText(`⏱ ${left.toFixed(1)}`, 14, 380);
+        info.textContent = `ได้ ${score} ตัว`; if (!left) finish();
+      }; },
+  }[m.k]();
+  const loop = () => { if (done) return; G1((performance.now() - t0) / 1000); tap = null; raf = requestAnimationFrame(loop); };
+  loop();
+}
 // ------------------------------------------------------------------ 🏮 Loy Krathong: krathongs drifting on the lake (yours, other players' and
 // the town's own), Lanna lanterns and string lights by the landing, sky lanterns rising over the temple; event tile + panels
 let LKV = null, LKJ = null, LKIMG = null, lkAsked = false;
@@ -4808,6 +4878,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23q', d: '21 พ.ย.', items: [
+    '🎪 <b>งานวัดมาแล้ว!</b> ลานงานวัดข้างสนามฟุตบอล (ลอดซุ้มแดงจากถนนใหม่) มีของกินใหม่: ลูกชิ้นปิ้ง ไส้กรอกอีสาน ขนมครก ไข่นกกระทา ไอติมกะทิ ลูกชุบ ชาเย็น',
+    '🎈 เกมงานวัดเล่นได้จริง: ปาเป้าลูกโป่ง · ปาห่วงขวด · ตกเป็ดน้อย ครั้งละ ฿20 ได้เงินรางวัลตามคะแนน คะแนนเต็มได้ตุ๊กตา + 💎',
+  ] },
   { v: '2026-11-23p', d: '21 พ.ย.', items: [
     '🏮 หน้าเข้าเกมเปลี่ยนเป็นโปสเตอร์ลอยกระทงช่วงเทศกาล และมีประกาศ "เร็วๆ นี้" ตอนเข้าเกม (วันละครั้ง)',
   ] },
@@ -5432,6 +5506,10 @@ function renderPanel(p) {
     case 'news': return newsHtml();
     case 'ev7': return ev7Html();
     case 'lkev': return lkEvHtml();
+    case 'fairgame': { const g = G.fair.games[STN(st).k];
+      const how = { darts: 'เป้าเล็งจะส่ายไปมา กดเพื่อปาลูกดอก มี 6 ดอก ยิ่งลูกโป่งแตกมากยิ่งได้มาก', ring: 'เข็มพลังจะวิ่งไปมา กดตอนเข็มอยู่ในช่องสีเขียว ห่วงจะลงขวด มี 3 ห่วง ยิ่งเล่นยิ่งยาก', fish: 'ลากเบ็ดไปเหนือเป็ด แล้วกดเพื่อเกี่ยว มีเวลา 20 วินาที ตกให้ได้มากที่สุด' }[STN(st).k];
+      return `<h2>${STN(st).icon} ${esc(g.name)}</h2><div class="sub">🎪 เกมงานวัด · เล่นครั้งละ ${money(g.price)}<br>${how}<br>🏆 คะแนนเต็ม: เงินรางวัล ${money(g.pay[g.pay.length - 1])} + 💎1 + 🧸 ตุ๊กตารางวัลใหญ่</div>
+        <div class="sub">รางวัลตามคะแนน: ${g.pay.map((v, i) => `${i}=${v ? money(v) : '-'}`).join(' · ')}</div>${B(`🎮 เล่นเลย (${money(g.price)})`, { t: 'act', st, a: 'start' }, 'primary big', me.money < g.price)}`; }
     case 'lk': {
       const v = LKV || {}, K = G.lk.kinds;
       return `<h2>🪷 ท่าลอยกระทง</h2><div class="sub">เลือกกระทง เขียนคำอธิษฐาน แล้วลอยลงทะเลสาบ · ทุกคนในเมืองเห็นกระทงของคุณ · ลอยพร้อมเพื่อนข้างๆ = ลอยคู่ 💕<br>
@@ -5535,7 +5613,7 @@ function renderPanel(p) {
         ${f.paid ? `<div class="jobbox ok">🍀 ไพ่ดี! แม่หมอแถมโชคให้ ${money(f.paid)}</div>` : ''}<div class="sub" style="text-align:center">พรุ่งนี้มาเปิดไพ่ใหม่ได้อีกนะ</div>`;
     }
     case 'pshop': {
-      const rows = (G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
+      const rows = (STN(st)?.items || G.pshop?.items || []).map(id => { const it = G.items[id], u = Math.ceil(it.base * G.pshop.markup), e = it.eat || {};
         return itemRow(id, `<div>${B(money(u), { t: 'act', st, a: 'buy', item: id, qty: 1 }, 'good', me.money < u)}${B('x5', { t: 'act', st, a: 'buy', item: id, qty: 5 }, '', me.money < u * 5)}</div>`,
           [e.hunger && `อิ่ม +${e.hunger}`, e.happy && `สุข +${e.happy}`, !it.eat && 'ของฝาก ขายต่อได้', `มีอยู่ ${me.inv[id] || 0}`].filter(Boolean).join(' · ')); }).join('');
       return `<h2>${STN(st).icon} ${STN(st).label}</h2><div class="sub">ป๊อปคอร์น สายไหม ฮอตดอก น้ำเย็นๆ ลูกโป่ง และตุ๊กตาของฝาก · ซื้อแล้วเก็บในกระเป๋า กดใช้ได้ทุกเมื่อ</div><div class="list">${rows}</div>`;

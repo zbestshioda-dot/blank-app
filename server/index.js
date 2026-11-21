@@ -1998,6 +1998,13 @@ function act(a, m) {
   switch (key) {
     // ---------------- 🎈 balloon seller: buy a colour once, then hold whichever you like (or none)
     case 'lk.float': return lkFloat(a, s, m);
+    case 'fairgame.start': {             // 🎪 a temple-fair game: pay, play the mini-game on the phone, then 'fair' op 'end' with the score
+      const G0 = D.FAIR.games[s.k]; if (!G0) return;
+      if (!cd(a, 'fairg', 1500)) return;
+      if (!pay(a, G0.price)) return;
+      a.fairG = { k: s.k, t: now(), id: crypto.randomBytes(6).toString('hex') };
+      return send(a, { t: 'fairgo', k: s.k, id: a.fairG.id, name: G0.name });
+    }
     case 'lksky.go': case 'lksky.release': return lkSky(a, s);
     case 'balloon.buy': {
       const B = D.BALLOONS[m.id]; if (!B) return; a.balloons = a.balloons || [];
@@ -2564,7 +2571,7 @@ function act(a, m) {
       return;
     }
     case 'pshop.buy': {
-      const id = m.item, it = D.ITEMS[id]; if (!it || !D.PSHOP.items.includes(id)) return;
+      const id = m.item, it = D.ITEMS[id]; if (!it || !(s.items || D.PSHOP.items).includes(id)) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 20), unit = Math.ceil(it.base * D.PSHOP.markup);
       if (!pay(a, unit * q)) return;
       addItem(a, id, q); markMe(a); quest(a, 'buy', q); joy(a, 1);
@@ -4046,7 +4053,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
@@ -4315,6 +4322,16 @@ function onMessage0(ws, raw) {
     case 'refcode': return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: !a.refBy && now() - (a.created || 0) < REF.newHours * 3600e3 ? 1 : 0, gems: REF.gems });
     case 'refuse': { if (!cd(a, 'refuse', 2000, true)) return; refUse(a, m.code); return send(a, { t: 'refcode', code: refCode(a), n: a.refN || 0, paid: a.refPaid || 0, max: REF.max, need: REF.needMin, by: a.refBy ? 1 : 0, canUse: 0, gems: REF.gems }); }
     case 'lotto': { if (!cd(a, 'lotto', 400, true)) return; return lottoOp(a, m); }
+    case 'fair': {                       // the end of a fair mini-game: the score is checked against how long the game took
+      const g = a.fairG; if (!g || m.op !== 'end' || m.id !== g.id) return; a.fairG = null;
+      const G0 = D.FAIR.games[g.k], secs = (now() - g.t) / 1000;
+      const sc = Math.max(0, Math.min(G0.max, Math.floor(+m.score) || 0)), ok = secs >= G0.min && secs < 180, cash = ok ? G0.pay[Math.min(sc, G0.pay.length - 1)] || 0 : 0;
+      const got = [];
+      if (cash) { a.money += cash; a.earned = (a.earned || 0) + cash; got.push(money(cash)); }
+      if (ok && sc >= G0.max) { a.gems = (a.gems || 0) + 1; addItem(a, 'parkplush', 1); got.push('💎1', '🧸 ตุ๊กตารางวัลใหญ่'); feed(`🎪 ${a.name} เล่น${G0.name}ได้คะแนนเต็ม!`); }
+      joy(a, 5); markMe(a); stat(a, 'fairgame');
+      return toast(a, `${G0.name}: ได้ ${sc} คะแนน${got.length ? ' · รางวัล ' + got.join(' · ') : ' · เสียดายจัง ลองใหม่นะ'}`, '🎪', !!got.length);
+    }
     case 'lkv': { if (!cd(a, 'lkv', 600, true)) return; return send(a, lkView(a)); }
     case 'ev7': { if (!cd(a, 'ev7', 600, true)) return; ev7Mark(a); if (m.op === 'claim') return ev7Claim(a); return send(a, ev7View(a)); }   // (view also counts today for players who stayed online past midnight)
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
