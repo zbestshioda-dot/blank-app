@@ -429,12 +429,18 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
     for (const [s, dx, dy, flat] of kit) prop(s, x + .5 + dx, y + .95 + dy, !flat);
     n++;
   }
+  // 3) 🕹️ the amusement park's game centre (on its east lawn, door onto the park), a claw-machine booth and a photo booth in the park,
+  //    and a soft-play house beside the game centre. Their ground is cleared at the end of the map (after the park is built).
+  B('arcade', 'b_arcade', 44, 115, { label: 'เกมเซ็นเตอร์', icon: '🕹️', st: 'arcade', layout: 'arcade', late: 5, clr: 1 });
+  B('playland', 'b_playland', 44, 122, { label: 'บ้านบอลเด็กเล่น', icon: '🧒', deco: true, clr: 1 });
+  B('clawbooth', 'b_clawbooth', 39, 111, { label: 'ตู้คีบตุ๊กตา', icon: '🧸', st: 'clawst', stype: 'claw', noSlot: true, clr: 1 });
+  B('photobooth', 'b_photobooth', 26, 103, { label: 'ตู้ถ่ายรูป', icon: '📸', deco: true, clr: 1 });
 }
 
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12] };
+const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['x_vending', 14.2, 2.7], ['x_drinkfridge', 12.6, 2.6], ['x_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['x_wclock', 10.2, 1.0, false], ['f_corkboard', 5.5, 1.15, false], ['x_aircon', 8, 1.0, false], ['f_extinguisher', 3.2, 2.4], ['x_coatrack', 12.6, 10.8], ['x_magrack', 3.6, 10.8], ['x_fern', 9.6, 10.8]],
@@ -485,6 +491,11 @@ const LAYOUT = {
   house: [['f_window', 6.9, 1.1], ['f_window_flower', 11.2, 1.15, false], ['f_welcome', 7, 9.25]],
   // 🎰 casino: cashier top centre under the jackpot sign, slot machines top left, bar top right, roulette / blackjack in the middle,
   // hi-lo and poker at the bottom, a red carpet up the middle from the door (kept clear)
+  // 🕹️ game centre: claw machines top left, prize counter top centre, racing seats top right; hoops, dance pad, pinball,
+  // whack-a-mole and air hockey across the middle; a ball pit, slide and play mat for kids at the bottom; the aisle from the door is kept clear
+  arcade: [['ad_claw', 1.5, 3.2], ['ad_claw', 3.0, 3.2], ['ad_claw', 4.5, 3.2], ['ad_counter', 8, 3.0], ['ad_token', 10.4, 2.8], ['ad_race', 12.4, 3.6], ['ad_race', 14.2, 3.6],
+    ['ad_neon', 8, 6.2, false], ['ad_hoop', 1.3, 7.2], ['ad_hoop', 2.7, 7.2], ['ad_dance', 4.9, 7.0], ['ad_pinball', 10.0, 7.2], ['ad_mole', 11.3, 7.0], ['ad_hockey', 13.4, 7.0],
+    ['ad_ballpit', 2.5, 10.9], ['ad_slide', 5.4, 10.8], ['ad_mat', 12.2, 11.0, false], ['ad_blocks', 11.6, 10.5, false], ['ad_cannon', 10.0, 10.8, false], ['ad_bench', 13.9, 11.0]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
@@ -499,7 +510,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4, 5].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -560,6 +571,12 @@ for (const b of [0, 1, 2, 3, 4].flatMap(L => BUILDINGS.filter(b => +(b.late || 0
   if (kind === 'school') {
     let n = 0;
     for (const [cx, by] of SCHOOL_DESKS) for (const dx of [-.45, .45]) STATIONS.push({ id: 'sdesk' + n, type: 'sdesk', idx: n++, room: room.id, label: 'โต๊ะเรียน', icon: '📖', x: rx + cx + dx, y: ry + by + .95, r: .7 });
+  }
+  if (kind === 'arcade') {             // every machine is its own station; the main counter (prize exchange) stands below the prize shelf
+    s.y = ry + 3.9; s.r = 1.4; s.label = 'เคาน์เตอร์แลกรางวัล';
+    for (const [id, type, k, label, icon, dx, dy, r] of [['ad_clawm', 'claw', '', 'ตู้คีบตุ๊กตา', '🧸', 3.0, 4.1, 1.9], ['ad_racem', 'arcm', 'race', 'เกมแข่งรถซิ่ง', '🏎️', 13.3, 4.4, 1.7], ['ad_hoopm', 'arcm', 'hoop', 'ชู้ตบาสเกตบอล', '🏀', 2.0, 7.9, 1.3], ['ad_dancem', 'arcm', 'dance', 'เต้นตามลูกศร', '💃', 4.9, 7.9, 1.1],
+      ['ad_molem', 'arcm', 'mole', 'ทุบตัวตุ่น', '🔨', 11.0, 7.8, 1.0], ['ad_hockeym', 'arcm', 'hockey', 'แอร์ฮอกกี้', '🏒', 13.6, 7.9, 1.3]])
+      STATIONS.push({ id, type, k, label, icon, room: room.id, x: rx + dx, y: ry + dy, r });
   }
   if (kind === 'casino') {             // the games: each table / the slot row is its own station
     for (const [id, type, label, icon, dx, dy] of [['cz_slots', 'slot', 'สล็อตแมชชีน', '🎰', 3.2, 4.3], ['cz_roul', 'roul', 'รูเล็ต', '🎡', 4.0, 7.7],
@@ -839,6 +856,15 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   for (const x of [55.2, 58.2]) prop('o_flowerbed', x, 61.95, false);
   GATES.park_in = { x: 46, y: 97 }; GATES.town_from_park = { x: 46, y: 93.6 };
   GATES.field_in = { x: 50, y: 101.6 }; GATES.town_from_field = { x: 46, y: 93.6 };
+  // 🕹️ the game centre and booths (declared with the town): clear trees / props under them, then pave the game centre's doorstep
+  // through a gap in the park's east hedge of trees onto the park's south lawn
+  for (const b of BUILDINGS) if (b.clr) {
+    for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { clearTree(i, j); set(i, j, 'B'); }
+    keep(PROPS, q => !(q.x > b.x - .6 && q.x < b.x + b.w + .6 && q.y - .5 >= b.y - .5 && q.y - .5 < b.y + b.h + 1));
+  }
+  for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
+  for (let y = 107; y <= 114; y++) if (get(43, y) === 'T') { clearTree(43, y); set(43, y, '.'); }   // the park's hedge of trees would hide the game centre's sign
+  keep(PROPS, q => !(q.x > 40.5 && q.x < 50 && q.y > 114.6 && q.y < 117.2));
 }
 // 🏮 Loy Krathong 2569 (the festival night is Tue 24 Nov 2569): float a krathong at the lake landing, release a sky lantern at the
 // temple. Floating on 3 different days during the event gives the Thai festival outfit; the festival day pays double.
@@ -1177,6 +1203,16 @@ const ITEMS = {
   hotdog: { name: 'ฮอตดอกจัมโบ้', icon: '🌭', kind: 'goods', base: 60, eat: { hunger: 22, happy: 2 } },
   balloon: { name: 'ลูกโป่งสวนสนุก', icon: '🎈', kind: 'goods', base: 50, eat: { happy: 10 } },
   parkplush: { name: 'ตุ๊กตาของฝากสวนสนุก', icon: '🧸', kind: 'goods', base: 250 },
+  // 🧸 game-centre plush toys (claw machine / prize counter)
+  py_duck: { name: 'ตุ๊กตาเป็ดเหลือง', icon: '🐤', kind: 'goods', base: 40, spr: 'py_duck', plush: 1 },
+  py_cub: { name: 'ตุ๊กตาหมีน้อย', icon: '🧸', kind: 'goods', base: 40, spr: 'py_cub', plush: 1 },
+  py_bunny: { name: 'ตุ๊กตากระต่ายถือแครอท', icon: '🐰', kind: 'goods', base: 60, spr: 'py_bunny', plush: 1 },
+  py_cat: { name: 'ตุ๊กตาแมวลาย', icon: '🐱', kind: 'goods', base: 60, spr: 'py_cat', plush: 1 },
+  py_bear: { name: 'ตุ๊กตาหมีสีน้ำตาล', icon: '🧸', kind: 'goods', base: 80, spr: 'py_bear', plush: 1 },
+  py_panda: { name: 'ตุ๊กตาแพนด้า', icon: '🐼', kind: 'goods', base: 100, spr: 'py_panda', plush: 1 },
+  py_dino: { name: 'ตุ๊กตาไดโนเขียว', icon: '🦕', kind: 'goods', base: 100, spr: 'py_dino', plush: 1 },
+  py_star: { name: 'ตุ๊กตาดาวยิ้ม', icon: '⭐', kind: 'goods', base: 130, spr: 'py_star', plush: 1 },
+  py_gold: { name: 'ตุ๊กตาหมีทองคำ', icon: '🏅', kind: 'goods', base: 600, spr: 'py_gold', plush: 1 },
   icecream: { name: 'ไอศกรีมแท่ง', icon: '🍦', kind: 'goods', base: 25, eat: { hunger: 6, happy: 4 } },
   snack:  { name: 'ขนม', icon: '🍪', kind: 'goods', base: 30, eat: { hunger: 10 }, wholesale: 18, stock: 80, refill: 8 },
   drink:  { name: 'เครื่องดื่มชูกำลัง', icon: '🥤', kind: 'goods', base: 400, eat: { energy: 20 }, keepEnergy: 1, dayMax: 3, wholesale: 280, stock: 12, refill: 25 },   // the one drink that still gives energy: pricey, 3 a day
@@ -1336,6 +1372,20 @@ const CASINO = {
   hilo: { hl: 2, eleven: 7, triple: 30 },
   // roulette (0-36, one zero): red/black/odd/even/1-18/19-36 pay 2x, a single number 36x
   red: [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36],
+};
+// 🕹️ game centre: arcade machines cost a coin and pay tickets by score; tickets buy plush toys at the counter. The claw machine
+// sells a straight try at a toy: aim the claw over one, then it holds on (or slips) with the toy's grip chance.
+const ARCADE = {
+  games: {   // min = shortest real game (s), max = score cap, rate = most points per second, per = tickets per point
+    hoop: { name: 'ชู้ตบาสเกตบอล', icon: '🏀', price: 20, min: 4, max: 6, rate: 2, per: 2.5 },
+    mole: { name: 'ทุบตัวตุ่น', icon: '🔨', price: 20, min: 14, max: 30, rate: 2.5, per: .6 },
+    dance: { name: 'เต้นตามลูกศร', icon: '💃', price: 20, min: 19, max: 40, rate: 2.5, per: .45 },
+    race: { name: 'แข่งรถซิ่ง', icon: '🏎️', price: 20, min: 3, max: 40, rate: 2, per: .5 },
+    hockey: { name: 'แอร์ฮอกกี้', icon: '🏒', price: 20, min: 3, max: 40, rate: 1.6, per: .5 },
+  },
+  claw: { price: 30, n: 5, gold: .12, hold: { py_gold: .15, py_star: .3 }, holdDef: .45, aim: .085 },
+  prizes: { py_duck: 60, py_cub: 60, py_bunny: 90, py_cat: 90, py_bear: 120, py_panda: 150, py_dino: 150, py_star: 200, py_gold: 900 },
+  setGems: 20,   // a full set of all nine toys, once
 };
 const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
 const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
@@ -1955,6 +2005,6 @@ module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAR
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, FISH_COL, CASINO, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, FISH_COL, CASINO, ARCADE, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

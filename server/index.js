@@ -1511,7 +1511,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -2215,6 +2215,33 @@ function czAct(a, s, m) {
     markMe(a); return send(a, { t: 'cz', g: 'bj', bj: bjView(a) });
   }
 }
+// ------------------------------------------------------------------ 🕹️ game centre (tickets, plush toys)
+function plushGot(a, id) {
+  addItem(a, id, 1); a.pyd = a.pyd || [];
+  if (a.pyd.includes(id)) return;
+  a.pyd.push(id);
+  if (Object.keys(D.ARCADE.prizes).every(k => a.pyd.includes(k)) && !a.pydSet) {
+    a.pydSet = 1; a.gems = (a.gems || 0) + D.ARCADE.setGems;
+    feed(`🧸 ${a.name} สะสมตุ๊กตาเกมเซ็นเตอร์ครบทั้ง 9 ตัว!`); toast(a, `🧸 สะสมตุ๊กตาครบชุด! รับ 💎${D.ARCADE.setGems}`, '💎');
+  }
+}
+function arcEnd(a, g, m) {
+  const secs = (now() - g.t) / 1000;
+  if (g.k === 'claw') {                 // m.score = index of the toy under the claw (-1: missed), m.x = where the claw dropped (0..1)
+    const i = Math.floor(+m.score), t = g.toys[i], x = +m.x;
+    const ok = t && g.hold[i] && Number.isFinite(x) && Math.abs(x - t.x) <= D.ARCADE.claw.aim && secs >= 2 && secs < 120;
+    joy(a, 3); stat(a, 'claw'); markMe(a);
+    if (!ok) return toast(a, t && Math.abs(x - t.x) <= D.ARCADE.claw.aim ? 'โอ๊ย! ตุ๊กตาหลุดก้ามคีบ ลองอีกทีนะ' : 'คีบพลาด ลองเล็งใหม่นะ', '🧸', false);
+    plushGot(a, t.id); markMe(a);
+    if (t.id === 'py_gold') feed(`🏅 ${a.name} คีบได้ตุ๊กตาหมีทองคำจากตู้คีบ!!`);
+    return toast(a, `🎉 คีบได้${D.ITEMS[t.id].name}!`, '🧸');
+  }
+  const G0 = D.ARCADE.games[g.k]; if (!G0) return;
+  const sc = Math.max(0, Math.min(G0.max, Math.floor(G0.rate * secs) + 1, Math.floor(+m.score) || 0)), ok = secs >= G0.min && secs < 180;
+  const tix = ok ? Math.round(sc * G0.per) : 0;
+  a.tix = (a.tix || 0) + tix; joy(a, 4); stat(a, 'arcade'); markMe(a);
+  return toast(a, `${G0.icon} ${G0.name}: ${sc} คะแนน · ได้ตั๋ว 🎟️${tix} (มีทั้งหมด ${a.tix})`, '🎟️', tix > 0);
+}
 // fishing from any water's edge: a spot made on the fly where the player stands
 function waterSpot(a) {
   const pool = D.waterPool(a.x, a.y); if (!pool) return null;
@@ -2321,6 +2348,30 @@ function act(a, m) {
       if (!pay(a, G0.price)) return;
       a.fairG = { k: s.k, t: now(), id: crypto.randomBytes(6).toString('hex') };
       return send(a, { t: 'fairgo', k: s.k, id: a.fairG.id, name: G0.name });
+    }
+    case 'arcm.start': {                 // 🕹️ an arcade machine: pay a coin, play on the phone, tickets by score ('fair' op 'end')
+      const G0 = D.ARCADE.games[s.k]; if (!G0) return;
+      if (!cd(a, 'fairg', 1500)) return;
+      if (!pay(a, G0.price)) return;
+      a.fairG = { k: s.k, t: now(), id: crypto.randomBytes(6).toString('hex'), arc: 1 };
+      return send(a, { t: 'fairgo', k: s.k, id: a.fairG.id, name: G0.name, icon: G0.icon });
+    }
+    case 'claw.start': {                 // 🧸 claw machine: the toys and whether each one would hold are fixed now; the aim is the player's
+      const C = D.ARCADE.claw, P = Object.keys(D.ARCADE.prizes).filter(k => k !== 'py_gold');
+      if (!cd(a, 'fairg', 1500)) return;
+      if (!pay(a, C.price)) return;
+      const toys = Array.from({ length: C.n }, (_, i) => ({ id: P[Math.floor(Math.random() * P.length)], x: +((i + .5) / C.n + (Math.random() - .5) * .06).toFixed(3) }));
+      if (Math.random() < C.gold) toys[Math.floor(Math.random() * C.n)].id = 'py_gold';
+      const hold = toys.map(t => Math.random() < (C.hold[t.id] ?? C.holdDef) ? 1 : 0);
+      a.fairG = { k: 'claw', t: now(), id: crypto.randomBytes(6).toString('hex'), arc: 1, toys, hold };
+      return send(a, { t: 'fairgo', k: 'claw', id: a.fairG.id, name: 'ตู้คีบตุ๊กตา', icon: '🧸', toys, hold });
+    }
+    case 'arcade.buy': {                 // 🎟️ prize counter: tickets -> a plush toy
+      const cost = D.ARCADE.prizes[m.id]; if (!cost) return;
+      if (!cd(a, 'aprize', 500, true)) return;
+      if ((a.tix || 0) < cost) return toast(a, `ตั๋วไม่พอ (ต้องใช้ 🎟️${cost})`, '🎟️', false);
+      a.tix -= cost; plushGot(a, m.id); markMe(a);
+      return toast(a, `🎉 แลกได้${D.ITEMS[m.id].name}แล้ว! อยู่ในกระเป๋า`, '🧸');
     }
     case 'lksky.go': case 'lksky.release': return lkSky(a, s);
     case 'balloon.buy': {
@@ -4243,7 +4294,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4402,7 +4453,7 @@ function login(ws, m, pre) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
@@ -4676,6 +4727,7 @@ function onMessage0(ws, raw) {
     case 'lotto': { if (!cd(a, 'lotto', 400, true)) return; return lottoOp(a, m); }
     case 'fair': {                       // the end of a fair mini-game: the score is checked against how long the game took
       const g = a.fairG; if (!g || m.op !== 'end' || m.id !== g.id) return; a.fairG = null;
+      if (g.arc) return arcEnd(a, g, m);
       const G0 = D.FAIR.games[g.k], secs = (now() - g.t) / 1000;
       const sc = Math.max(0, Math.min(G0.max, Math.floor(+m.score) || 0)), ok = secs >= G0.min && secs < 180, cash = ok ? G0.pay[Math.min(sc, G0.pay.length - 1)] || 0 : 0;
       const got = [];

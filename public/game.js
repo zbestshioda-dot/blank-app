@@ -1686,7 +1686,7 @@ function draw(t) {
   for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);
   if (Date.now() + clockOff < (G.xmasEnd || 0) && vis(XMAS_DEER.x, XMAS_DEER.y, 3)) ents.push([XMAS_DEER.y + .3, 6, XMAS_DEER]);   // 🎄 the showcase reindeer pulling the sleigh   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
-  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
+  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|ad_mat|ad_neon|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'town') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
   if (A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
   if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
@@ -3887,11 +3887,13 @@ function drawFair(e, X, Y, t) {
 }
 function fairPlay(m) {
   const W = 340, H = 400, el = document.createElement('div'); el.id = 'fairG';
-  el.innerHTML = `<div class="fgBox"><div class="fgH">🎪 ${esc(m.name)} <span id="fgInfo"></span></div><canvas width="${W}" height="${H}"></canvas><div class="fgTip"></div></div>`;
+  el.innerHTML = `<div class="fgBox"><div class="fgH">${m.icon || '🎪'} ${esc(m.name)} <span id="fgInfo"></span></div><canvas width="${W}" height="${H}"></canvas><div class="fgTip"></div></div>`;
   document.body.appendChild(el);
   const c = el.querySelector('canvas'), g = c.getContext('2d'), info = el.querySelector('#fgInfo'), tip = el.querySelector('.fgTip');
-  const t0 = performance.now(); let score = 0, done = false, raf = 0, ptr = { x: W / 2, y: H / 2 };
-  const finish = () => { if (done) return; done = true; cancelAnimationFrame(raf); setTimeout(() => { send({ t: 'fair', op: 'end', id: m.id, score }); el.remove(); }, 1100); };
+  const t0 = performance.now(); let score = 0, done = false, raf = 0, ptr = { x: W / 2, y: H / 2 }, dropX = 0;
+  const finish = () => { if (done) return; done = true; cancelAnimationFrame(raf); setTimeout(() => { send({ t: 'fair', op: 'end', id: m.id, score, x: dropX }); el.remove(); }, 1100); };
+  const spr = (name, cx, by, w, a = 1) => { const s = atlas?.sprites?.[name]; if (!s || !atlasImg) return; const h = w * s[3] / s[2]; g.globalAlpha = a; g.drawImage(atlasImg, s[0], s[1], s[2], s[3], cx - w / 2, by - h, w, h); g.globalAlpha = 1; };
+  const txt = (t, x, y, sz = 20, c = '#fff', al = 'left') => { g.fillStyle = c; g.font = `bold ${sz}px sans-serif`; g.textAlign = al; g.fillText(t, x, y); };
   const pos = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
   const COL = ['#ff5a6e', '#ffd23a', '#4fb3ff', '#7ee07a', '#c88cff', '#ff9a3c'];
   let tap = null;
@@ -3932,6 +3934,90 @@ function fairPlay(m) {
         if (tap) { const d = ducks.find(q => Math.hypot(q.x - ptr.x, q.y - ptr.y) < 22); if (d) { score++; d.ph += 2 + Math.random() * 2; d.r = 50 + Math.random() * 100; FX.play('coin'); } else FX.play('click'); }
         g.fillStyle = '#fff'; g.font = 'bold 22px sans-serif'; g.textAlign = 'left'; g.fillText(`⏱ ${left.toFixed(1)}`, 14, 380);
         info.textContent = `ได้ ${score} ตัว`; if (!left) finish();
+      }; },
+    // ---- 🕹️ game centre
+    claw: () => { const toys = m.toys || [], L = 40, R = W - 40, FL = 330; let st = 0, t1 = 0, cx = W / 2, cy = 56, pick = -1, toyY = 0, drop = 0;
+      tip.textContent = 'ก้ามคีบเลื่อนไปมา — กดปล่อยตอนอยู่เหนือตุ๊กตา';
+      score = -1;
+      return tt => {
+        g.fillStyle = '#2b2140'; g.fillRect(0, 0, W, H); g.fillStyle = '#cfe9ff'; g.fillRect(16, 30, W - 32, FL - 10); g.fillStyle = '#f3b6d0'; g.fillRect(16, FL + 10, W - 32, 50);
+        g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(26, 40, 14, FL - 40);
+        g.fillStyle = '#888'; g.fillRect(16, 26, W - 32, 8);
+        if (st === 0) { cx = L + (R - L) * (.5 + .5 * Math.sin(tt * 1.7)); info.textContent = `⏱ ${Math.max(0, 15 - tt).toFixed(0)}`; if (tap || tt > 15) { st = 1; t1 = tt; dropX = +((cx - L) / (R - L)).toFixed(3); let best = 1; toys.forEach((q, i) => { const d = Math.abs(q.x - dropX); if (d < best) { best = d; pick = i; } }); if (best > .085) pick = -1; FX.play('click'); } }
+        else if (st === 1) { cy = 56 + Math.min(1, (tt - t1) / 1.1) * (FL - 120); if (tt - t1 > 1.3) { st = 2; t1 = tt; } }
+        else if (st === 2) { const k = Math.min(1, (tt - t1) / 1.2); cy = FL - 64 - k * (FL - 120); const hold = pick >= 0 && m.hold[pick];
+          if (pick >= 0) { if (hold || k < .45) toyY = FL - cy - 64; else { drop = Math.min(1, drop + .08); toyY = (FL - (56 + (FL - 120) * .55) - 64) * (1 - drop * drop); } }
+          if (k >= 1) { st = 3; t1 = tt; if (pick >= 0 && !hold) FX.play('fail'); } }
+        else if (st === 3) { const hold = pick >= 0 && m.hold[pick]; if (hold) { cx += (R + 10 - cx) * .08; if (tt - t1 > 1) { score = pick; FX.play('levelup'); info.textContent = '🎉 ได้แล้ว!'; finish(); } } else { if (!done) info.textContent = pick >= 0 ? 'หลุดซะได้!' : 'พลาด!'; finish(); } }
+        toys.forEach((q, i) => { const x = L + q.x * (R - L); if (i === pick && st >= 2) spr(q.id, st === 3 && m.hold[pick] ? cx : x, FL - toyY, q.id === 'py_gold' ? 62 : 50); else spr(q.id, x, FL, q.id === 'py_gold' ? 62 : 50); });
+        g.strokeStyle = '#666'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, 30); g.lineTo(cx, cy); g.stroke();
+        const open = st === 1 || st === 0 ? 1 : 0; g.fillStyle = '#c9c9c9'; g.fillRect(cx - 14, cy, 28, 10); g.strokeStyle = '#aaa'; g.lineWidth = 5;
+        g.beginPath(); g.moveTo(cx - 12, cy + 10); g.lineTo(cx - 14 - open * 10, cy + 34); g.lineTo(cx - 4, cy + 44); g.moveTo(cx + 12, cy + 10); g.lineTo(cx + 14 + open * 10, cy + 34); g.lineTo(cx + 4, cy + 44); g.stroke();
+        txt('🧸 คีบได้ไปเลย!', W / 2, 385, 18, '#5a2340', 'center');
+      }; },
+    hoop: () => { let balls = 6, res = [], fly = null; tip.textContent = 'กดตอนเข็มอยู่ในช่องสีเขียว เพื่อชู้ตลงห่วง';
+      return tt => {
+        g.fillStyle = '#1d2a55'; g.fillRect(0, 0, W, H); g.fillStyle = '#c98a4b'; g.fillRect(40, 250, W - 80, 60);
+        g.fillStyle = '#fff'; g.fillRect(W / 2 - 50, 40, 100, 70); g.strokeStyle = '#e0473a'; g.lineWidth = 3; g.strokeRect(W / 2 - 22, 70, 44, 30);
+        g.strokeStyle = '#ff7a2e'; g.lineWidth = 4; g.beginPath(); g.ellipse(W / 2, 112, 26, 6, 0, 0, 7); g.stroke();
+        const lvl = 6 - balls, sp = 2.4 + lvl * .5, zw = .24 - lvl * .025, k = (Math.sin(tt * sp) + 1) / 2;
+        g.fillStyle = '#222'; g.fillRect(30, 330, W - 60, 24); g.fillStyle = '#5ed17a'; g.fillRect(30 + (W - 60) * (.5 - zw / 2), 330, (W - 60) * zw, 24); g.fillStyle = '#fff'; g.fillRect(30 + (W - 60) * k - 3, 322, 6, 40);
+        if (fly) { const q = Math.min(1, (tt - fly.t) / .7), x = W / 2 + fly.off * q, y = 290 - Math.sin(q * Math.PI) * 220 - q * 160; g.fillStyle = '#f08a24'; g.beginPath(); g.arc(x, Math.max(y, 100), 14, 0, 7); g.fill(); if (q >= 1) fly = null; }
+        txt('🏀'.repeat(balls), 16, 385, 18);
+        if (tap && balls > 0 && !fly) { const ok = Math.abs(k - .5) < zw / 2; fly = { t: tt, off: ok ? 0 : (k - .5) * 160 }; res.push(ok); if (ok) { score++; FX.play('coin'); } else FX.play('fail'); balls--; if (!balls) setTimeout(finish, 700); }
+        info.textContent = `ลง ${score} ลูก`;
+      }; },
+    mole: () => { const holes = Array.from({ length: 9 }, (_, i) => ({ x: 70 + (i % 3) * 100, y: 110 + Math.floor(i / 3) * 95, up: 0, until: 0 })); let next = 0;
+      tip.textContent = 'แตะตัวตุ่นที่โผล่ขึ้นมา · 15 วินาที';
+      return tt => {
+        const left = Math.max(0, 15 - tt); g.fillStyle = '#4c8a3a'; g.fillRect(0, 0, W, H);
+        if (tt > next) { const h = holes[Math.floor(Math.random() * 9)]; if (!h.up) { h.up = 1; h.until = tt + .7 + Math.random() * .5; } next = tt + .35 + Math.random() * .35; }
+        for (const h of holes) { if (h.up && tt > h.until) h.up = 0;
+          g.fillStyle = '#2b1d12'; g.beginPath(); g.ellipse(h.x, h.y + 22, 36, 12, 0, 0, 7); g.fill();
+          if (h.up) { g.fillStyle = h.up === 2 ? '#a36' : '#8a5a3a'; g.beginPath(); g.ellipse(h.x, h.y, 24, 28, 0, Math.PI, 0); g.fill(); g.fillRect(h.x - 24, h.y, 48, 20); g.fillStyle = '#000'; g.fillRect(h.x - 10, h.y - 8, 5, 5); g.fillRect(h.x + 5, h.y - 8, 5, 5); g.fillStyle = '#f9a'; g.fillRect(h.x - 4, h.y, 8, 5); } }
+        if (tap) { const h = holes.find(q => q.up === 1 && Math.hypot(q.x - tap.x, q.y - tap.y) < 38); if (h) { h.up = 2; h.until = tt + .15; score++; FX.play('pop'); } else FX.play('click'); }
+        txt(`⏱ ${left.toFixed(1)}`, 14, 385, 22); info.textContent = `ทุบได้ ${score} ตัว`; if (!left) finish();
+      }; },
+    dance: () => { const lanes = ['⬅️', '⬇️', '⬆️', '➡️'], arrows = []; let next = .5; const HY = 320, lw = (W - 40) / 4;
+      tip.textContent = 'แตะช่องของลูกศรตอนมันถึงเส้นเรืองแสง · 20 วินาที';
+      return tt => {
+        const left = Math.max(0, 20 - tt); g.fillStyle = '#1a1030'; g.fillRect(0, 0, W, H);
+        for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#24183f' : '#2c1d4d'; g.fillRect(20 + i * lw, 0, lw, H); }
+        g.fillStyle = `rgba(120,220,255,${.5 + .3 * Math.sin(tt * 8)})`; g.fillRect(20, HY - 4, W - 40, 8);
+        if (tt > next && left > 1) { arrows.push({ l: Math.floor(Math.random() * 4), t: tt }); next = tt + Math.max(.38, .8 - tt * .02); }
+        const sp = 170 + tt * 4;
+        for (let i = arrows.length - 1; i >= 0; i--) { const a = arrows[i]; a.y = (tt - a.t) * sp; if (a.y > HY + 40) { arrows.splice(i, 1); continue; } g.font = '30px sans-serif'; g.textAlign = 'center'; g.fillText(lanes[a.l], 20 + a.l * lw + lw / 2, a.y + 10); }
+        for (let i = 0; i < 4; i++) { g.font = '26px sans-serif'; g.textAlign = 'center'; g.globalAlpha = .45; g.fillText(lanes[i], 20 + i * lw + lw / 2, HY + 52); g.globalAlpha = 1; }
+        if (tap) { const l = Math.floor((tap.x - 20) / lw), i = arrows.findIndex(a => a.l === l && Math.abs(a.y - HY) < 34); if (i >= 0) { arrows.splice(i, 1); score++; FX.play('coin'); } else FX.play('click'); }
+        txt(`⏱ ${left.toFixed(1)}`, 14, 30, 18); info.textContent = `${score} ครั้ง`; if (!left) finish();
+      }; },
+    race: () => { let lane = 1, cars = [], next = .8, crash = 0; const lx = l => 80 + l * 90, CY = 330;
+      tip.textContent = 'แตะซ้าย/ขวาของจอเพื่อเปลี่ยนเลน หลบรถ';
+      return tt => {
+        g.fillStyle = '#3a3a3a'; g.fillRect(0, 0, W, H); g.fillStyle = '#5a9a3a'; g.fillRect(0, 0, 30, H); g.fillRect(W - 30, 0, 30, H);
+        g.fillStyle = '#fff'; for (let i = 0; i < 2; i++) for (let y = ((tt * 300) % 60) - 60; y < H; y += 60) g.fillRect(122 + i * 90, y, 6, 30);
+        if (!crash) { if (tap) { lane = Math.max(0, Math.min(2, lane + (tap.x < W / 2 ? -1 : 1))); FX.play('click'); }
+          if (tt > next) { cars.push({ l: Math.floor(Math.random() * 3), y: -60, c: ['#4fb3ff', '#ffd23a', '#7ee07a', '#c88cff'][Math.floor(Math.random() * 4)] }); next = tt + Math.max(.45, 1.1 - tt * .03); }
+          const sp = 4 + tt * .12;
+          for (let i = cars.length - 1; i >= 0; i--) { const c = cars[i]; c.y += sp; if (c.y > H + 40) { cars.splice(i, 1); score++; continue; } if (c.l === lane && Math.abs(c.y - CY) < 56) { crash = tt; FX.play('fail'); } }
+          if (tt > 40) crash = tt; }
+        for (const c of cars) { g.fillStyle = c.c; g.fillRect(lx(c.l) - 22, c.y - 34, 44, 68); g.fillStyle = '#223'; g.fillRect(lx(c.l) - 16, c.y - 20, 32, 14); }
+        g.fillStyle = '#e0473a'; g.fillRect(lx(lane) - 22, CY - 34, 44, 68); g.fillStyle = '#223'; g.fillRect(lx(lane) - 16, CY - 24, 32, 14);
+        if (crash) { txt('💥 ชน!', W / 2, 200, 40, '#fff', 'center'); finish(); }
+        info.textContent = `หลบได้ ${score} คัน`;
+      }; },
+    hockey: () => { let px = W / 2, py = 120, vx = 2.4, vy = 3.2, lives = 3; const PY = 350;
+      tip.textContent = 'ลากนิ้วซ้าย-ขวา ใช้ไม้ตีรับลูกพัค';
+      return tt => {
+        g.fillStyle = '#e8f4ff'; g.fillRect(0, 0, W, H); g.strokeStyle = '#e0473a'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke(); g.beginPath(); g.arc(W / 2, H / 2, 40, 0, 7); g.stroke();
+        g.fillStyle = '#333'; g.fillRect(W / 2 - 50, 0, 100, 8);
+        px += vx; py += vy; if (px < 14 || px > W - 14) { vx = -vx; px = Math.max(14, Math.min(W - 14, px)); } if (py < 14) { vy = Math.abs(vy); FX.play('click'); }
+        const mx = Math.max(30, Math.min(W - 30, ptr.x));
+        if (vy > 0 && py > PY - 26 && py < PY + 6 && Math.abs(px - mx) < 42) { vy = -Math.abs(vy) * 1.05; vx += (px - mx) / 12; score++; FX.play('coin'); }
+        if (py > H + 20) { lives--; FX.play('fail'); px = W / 2; py = 120; vy = 3.2 + score * .1; vx = (Math.random() - .5) * 5; if (!lives) finish(); }
+        g.fillStyle = '#222'; g.beginPath(); g.arc(px, py, 13, 0, 7); g.fill();
+        g.fillStyle = '#e0473a'; g.beginPath(); g.arc(mx, PY, 26, 0, 7); g.fill(); g.fillStyle = '#b02a20'; g.beginPath(); g.arc(mx, PY, 12, 0, 7); g.fill();
+        txt('❤️'.repeat(lives), 14, 30, 18); info.textContent = `ตีรับได้ ${score} ครั้ง`;
       }; },
   }[m.k]();
   const loop = () => { if (done) return; G1((performance.now() - t0) / 1000); tap = null; raf = requestAnimationFrame(loop); };
@@ -4677,6 +4763,25 @@ setTimeout(function xmasDaily() {
   try { if (localStorage.getItem('ltXmasDay') === d) return; localStorage.setItem('ltXmasDay', d); } catch { return; }
   FX.play('chime'); openPanel({ kind: 'xmasshow' });
 }, 12000);
+// 🕹️ game centre panels: the prize counter (tickets -> plush toys, the toy collection), the arcade machines and the claw machine
+function arcHtml(k, st) {
+  const A = G.arcade, tix = me.tix || 0, got = me.pyd || [];
+  if (k === 'arcade') {
+    const rows = Object.entries(A.prizes).map(([id, c]) => `<div class="row"><div class="ic">${itemIco(id, 44, 38)}</div><div class="grow"><b>${esc(G.items[id].name)}</b>${got.includes(id) ? ' <small>✔ เคยได้</small>' : ''}<br><small>🎟️ ${c} ตั๋ว</small></div>${B('แลก', { t: 'act', st, a: 'buy', id }, 'good', tix < c)}</div>`).join('');
+    return `<h2>🎟️ เคาน์เตอร์แลกรางวัล</h2><div class="sub">ตั๋วของคุณ <b>🎟️ ${tix}</b> · เล่นตู้เกม (ครั้งละ ${money(20)}) ได้ตั๋วตามคะแนน แล้วเอามาแลกตุ๊กตา<br>🧸 สะสมตุ๊กตาครบ 9 ตัว (${got.length}/9) รับ 💎${A.setGems}${me.pydSet ? '' : ''}</div><div class="list">${rows}</div>`;
+  }
+  if (k === 'claw') {
+    const C = A.claw;
+    return `<h2>🧸 ตู้คีบตุ๊กตา</h2><div class="sub">ก้ามคีบจะเลื่อนไปมา กดปล่อยตอนอยู่เหนือตุ๊กตา · ถ้าก้ามจับแน่นก็ได้ตุ๊กตาไปเลย!<br>มีลุ้น 🏅 ตุ๊กตาหมีทองคำ (หายากมาก) · สะสมแล้ว ${got.length}/9</div>
+      <div class="czPays">${Object.keys(A.prizes).map(id => `<span>${itemIco(id, 34, 30)}</span>`).join('')}</div>${B(`🕹️ หยอดเหรียญ (${money(C.price)})`, { t: 'act', st, a: 'start' }, 'primary big', me.money < C.price)}`;
+  }
+  const g = A.games[STN(st)?.k]; if (!g) return '';
+  const how = { hoop: 'เข็มพลังจะวิ่งไปมา กดตอนอยู่ในช่องเขียวเพื่อชู้ตลงห่วง · 6 ลูก', mole: 'ตัวตุ่นโผล่จากรู แตะให้ทันก่อนมันมุดหนี · 15 วินาที',
+    dance: 'ลูกศรเลื่อนลงมา แตะช่องของลูกศรนั้นตอนถึงเส้นเรืองแสง · 20 วินาที', race: 'แตะซ้าย/ขวาเพื่อเปลี่ยนเลน หลบรถคันอื่น ยิ่งหลบได้มากยิ่งได้ตั๋วเยอะ · ชนแล้วจบ',
+    hockey: 'ลากไม้ตีรับลูกพัคไม่ให้ผ่านไปได้ · พลาด 3 ครั้งจบเกม' }[STN(st).k];
+  return `<h2>${g.icon} ${esc(g.name)}</h2><div class="sub">🕹️ เกมเซ็นเตอร์ · เล่นครั้งละ ${money(g.price)}<br>${how}<br>🎟️ ได้ตั๋วตามคะแนน เอาไปแลกตุ๊กตาที่เคาน์เตอร์ · ตอนนี้มี 🎟️ ${me.tix || 0}</div>
+    ${B(`🎮 เล่นเลย (${money(g.price)})`, { t: 'act', st, a: 'start' }, 'primary big', me.money < g.price)}`;
+}
 // 🐠 the home tank: put fish from the bag in (they swim there for visitors and add comfort), take them back out
 function aqBox() {
   const n = me.aqSlots || 0, aq = me.aq || [], cf = [0, 0, 1, 2, 3, 5];
@@ -5266,6 +5371,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ax', d: '21 พ.ย.', items: [
+    '🕹️ <b>เกมเซ็นเตอร์เปิดแล้วในสวนสนุก!</b> ตึกใหม่มุมตะวันออกของสวนสนุก · ตู้ชู้ตบาส 🏀 ทุบตัวตุ่น 🔨 เต้นตามลูกศร 💃 แข่งรถ 🏎️ แอร์ฮอกกี้ 🏒 ครั้งละ ฿20 ได้ตั๋วตามคะแนน',
+    '🎟️ เอาตั๋วไปแลก <b>ตุ๊กตา 9 แบบ</b> ที่เคาน์เตอร์ · 🧸 <b>ตู้คีบตุ๊กตา</b> ครั้งละ ฿30 คีบติดได้เลย (มีลุ้นหมีทองคำ 🏅) · สะสมครบ 9 ตัวรับ 💎20',
+    '📸 ตู้ถ่ายรูป ตู้คีบริมทาง และบ้านบอลเด็กเล่นในสวนสนุก',
+  ] },
   { v: '2026-11-23aw', d: '21 พ.ย.', items: [
     '🧱 <b>ฉากกั้นแนวตั้งมาแล้ว!</b> ผนังชมพู ครีม ฟ้าเทา เทา ไม้ระแนง ราวกั้นไม้ และกระจก แบบแนวตั้ง (ยาว 3 ช่อง) ที่ร้านเฟอร์นิเจอร์ หมวดผนัง · ต่อกับผนังแนวนอนแบ่งห้องได้แล้ว',
   ] },
@@ -6046,6 +6156,7 @@ function renderPanel(p) {
     case 'news': return newsHtml();
     case 'xmasshow': return xmasHtml();
     case 'casino': case 'slot': case 'hilo': case 'roul': case 'bj': return czHtml(k, st);
+    case 'arcade': case 'arcm': case 'claw': return arcHtml(k, st);
     case 'astats': return me.admin ? aStatsHtml() : '';
     case 'noti': return lbNotiHtml();
     case 'ev7': return ev7Html();
@@ -6983,7 +7094,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v15').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v15'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v16').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v16'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
