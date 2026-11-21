@@ -4525,6 +4525,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23d', d: '23 พ.ย.', items: [
+    '📱 แก้ iPhone/iPad จอดำและขึ้น "กำลังเชื่อมต่อใหม่" วนไม่หยุด หลังอัปเดตหิมะ (ตอนนี้โหลดเบาลงมาก)',
+  ] },
   { v: '2026-11-23c', d: '23 พ.ย.', items: [
     '❄️ ฤดูหนาวมาแล้ว! สนามหญ้าทั้งเมืองกลายเป็นหิมะ ต้นไม้และพุ่มไม้มีหิมะเกาะ',
     '☂️ ลุงชัยขายร่มย้ายมายืนข้างเสาไฟมุมซ้ายล่างของจัตุรัส (ทางไปร้าน 24 ชม.) เดินเข้าใกล้มีวงกลมเหลือง กดปุ่มใช้งานคุยได้เลย',
@@ -6017,9 +6020,10 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=1').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=2'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v10').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = SNOW ? snowAtlas(im, j) : im; }; im.src = 'assets/atlas.webp?v=v10'; });
+fetch('assets/atlas.json?v=v10').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v10'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
-// so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free
+// so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
+// Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
 const SNOW = true;
 function snowAtlas(im, j) {
   try {
