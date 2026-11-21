@@ -1028,6 +1028,13 @@ const ITEMS = {
   shark:     { name: 'ฉลาม', icon: '🦈', kind: 'fish', base: 1200, rar: 4 },
   goldenfish:{ name: 'ปลาทองคำ', icon: '✨', kind: 'fish', base: 5000, rar: 5 },
   mayorkoi:  { name: 'ปลาทองยักษ์นายกฯ', icon: '🐡', kind: 'fish', base: 15000, rar: 5, legend: 1 },
+  // temple-only fish: they live in the lotus pond of the temple and nowhere else
+  tp_tapian: { name: 'ปลาตะเพียนทองสระบัว', icon: '🐟', kind: 'fish', base: 110, rar: 2, temple: 1, spr0: 'carp' },
+  tp_lotus:  { name: 'ปลาหางนกยูงกลีบบัว', icon: '🪷', kind: 'fish', base: 160, rar: 2, temple: 1, spr0: 'guppy' },
+  tp_merit:  { name: 'ปลาไหลเผือกปล่อยบุญ', icon: '🤍', kind: 'fish', base: 420, rar: 3, temple: 1, spr0: 'eel' },
+  tp_turtle: { name: 'เต่าปล่อยวัดอายุร้อยปี', icon: '🐢', kind: 'fish', base: 520, rar: 3, temple: 1, spr0: 'turtle' },
+  tp_koi:    { name: 'ปลาคาร์ปลายยันต์', icon: '🎏', kind: 'fish', base: 1300, rar: 4, temple: 1, spr0: 'koi' },
+  tp_naga:   { name: 'ปลาพญานาคราช', icon: '🐉', kind: 'fish', base: 7000, rar: 5, temple: 1, spr0: 'seadragon' },
   // second sheet: freshwater (lake/river) and sea fish, plus a few sea creatures
   bluegill:  { name: 'ปลาบลูกิล', icon: '🐟', kind: 'fish', base: 35, rar: 1, w: 'f' },
   perch:     { name: 'ปลาเพิร์ช', icon: '🐟', kind: 'fish', base: 45, rar: 1, w: 'f' },
@@ -1188,11 +1195,12 @@ const COOK = { chop: 4, fry: 5, boil: 7, grill: 6, window: { boil: 9, grill: 6 }
 const FISH = {
   river: [['sfish', 48], ['carp', 26], ['catfish', 24], ['tilapia', 10], ['snakehead', 4], ['eel', 3], ['guppy', 2.5], ['goldfish', 1], ['koi', 0.2], ['goldenfish', 0.02]],
   lake:  [['sfish', 34], ['carp', 20], ['tilapia', 24], ['snakehead', 9], ['seabass', 4], ['trout', 4], ['guppy', 3], ['goldfish', 2], ['salmon', 1.2], ['koi', 0.45], ['chest', 0.1], ['goldenfish', 0.03]],
+  temple:[['sfish', 30], ['carp', 22], ['tilapia', 16], ['goldfish', 3], ['tp_tapian', 9], ['tp_lotus', 6], ['tp_merit', 1.6], ['tp_turtle', 1.2], ['tp_koi', 0.35], ['tp_naga', 0.03]],
   sea:   [['sardine', 26], ['mackerel', 18], ['herring', 14], ['shrimp', 9], ['crab', 6], ['squid', 9], ['puffer', 3], ['snapper', 3], ['seabass', 4],
           ['clownfish', 1.2], ['angelfish', 1.2], ['octopus', 1.2], ['grouper', 1.2], ['tuna', 1.6], ['stingray', 0.8], ['lionfish', 0.3], ['seahorse', 0.25], ['swordfish', 0.25], ['hammerhead', 0.2], ['shark', 0.35], ['chest', 0.15], ['goldenfish', 0.025]],
 };
 {
-  const RW = [0, 9, 3.5, 1.1, 0.22, 0.02], TARGET = { river: 38, lake: 56, sea: 72 };
+  const RW = [0, 9, 3.5, 1.1, 0.22, 0.02], TARGET = { river: 38, lake: 56, sea: 72, temple: 60 };
   for (const [k, it] of Object.entries(ITEMS)) if (it.w) for (const pool of it.w === 'f' ? ['river', 'lake'] : ['sea']) FISH[pool].push([k, RW[it.rar]]);
   for (const pool in FISH) {
     const wsum = FISH[pool].reduce((t, [, w]) => t + w, 0), vsum = FISH[pool].reduce((t, [id, w]) => t + w * ITEMS[id].base, 0);
@@ -1282,11 +1290,11 @@ function waterPool(x, y) {
   if (!best) return null;
   const a = AREAS.find(r => best[0] >= r.x && best[0] < r.x + r.w && best[1] >= r.y && best[1] < r.y + r.h);
   if (!a || a.kind !== 'map') return null;
-  return a.id === 'farm' ? 'river' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
+  return a.id === 'farm' ? 'river' : a.id === 'temple' ? 'temple' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
 }
 const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
 const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
-for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + k;
+for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + (ITEMS[k].spr0 || k);
 for (const k of ['rice', 'corn', 'chili', 'durian']) ITEMS[k].spr = 'ic_' + k;   // real pictures for the first four crops (the rest use their emoji)
 ITEMS.chest.spr = null;
 const FISHING = { rod: 150, xpPerLv: 8, maxLv: 10, zone: [0.2, 0.26, 0.32, 0.4] };   // zone = width of the timing window per rod tier

@@ -4491,10 +4491,10 @@ function waterPoolAt(x, y) {
   }
   if (!best) return null;
   const a = areaOf(best[0] + .5, best[1] + .5); if (!a || a.kind !== 'map') return null;
-  return a.id === 'farm' ? 'river' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
+  return a.id === 'farm' ? 'river' : a.id === 'temple' ? 'temple' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
 }
 let waterNear = null;
-const POOL_NAME = { sea: '🌊 ทะเล', lake: '🏞️ น้ำจืด (ทะเลสาบ/บ่อ)', river: '🐟 แม่น้ำ' };
+const POOL_NAME = { sea: '🌊 ทะเล', lake: '🏞️ น้ำจืด (ทะเลสาบ/บ่อ)', river: '🐟 แม่น้ำ', temple: '🪷 สระบัววัด' };
 // draws atlas sprites into <canvas data-spr> (furniture/vehicles stand on the bottom edge, fish (.fspr) are centred and can scale up)
 // 🪪 profile showcase: the car at the back, the character always in front of it, the pet beside
 function drawShow(c) {
@@ -4941,6 +4941,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ah', d: '21 พ.ย.', items: [
+    '🪷 <b>ปลาพิเศษเฉพาะวัด!</b> ตกปลาที่สระบัวหน้าโบสถ์ได้ 6 ชนิดใหม่ที่ไม่มีที่อื่น: ตะเพียนทองสระบัว · หางนกยูงกลีบบัว · ไหลเผือกปล่อยบุญ · เต่าปล่อยวัดอายุร้อยปี · คาร์ปลายยันต์',
+    '🐉 ตำนานใหม่: <b>ปลาพญานาคราช</b> ซ่อนอยู่ในสระบัววัด หายากสุดๆ ลองไปเสี่ยงดู!',
+  ] },
   { v: '2026-11-23ag', d: '21 พ.ย.', items: [
     '🏅 แก้ฉายา/ความสำเร็จที่ทำครบแล้วแต่ไม่มีปุ่มกดรับ — เปิดหน้าความสำเร็จแล้วจะปลดล็อกให้เอง',
   ] },
