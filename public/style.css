@@ -755,6 +755,9 @@ body.hasEvent #topBar{top:146px!important}
 #dlg.hidden{display:none}
 @keyframes dlgIn{from{transform:translate(-50%,30px);opacity:0}}
 .dlgPic{flex:none;border-radius:14px!important;box-shadow:0 0 0 3px var(--wood),0 3px 8px rgba(0,0,0,.3)}
+/* anime portrait: the bust stands on the dialog box, its face changes with each line's mood */
+.dlgAni{position:absolute;left:6px;bottom:calc(100% - 6px);border-radius:0!important;box-shadow:none!important;filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));pointer-events:none;animation:aniPop .22s ease-out}
+@keyframes aniPop{from{transform:translateY(6px) scale(.97);opacity:.6}to{transform:none;opacity:1}}
 .dlgPix{background:radial-gradient(circle at 50% 35%,#fff,#e9d6b2);image-rendering:pixelated}
 .dlgBody{flex:1;min-width:0;position:relative}
 .dlgName{display:inline-block;background:var(--wood);color:#fff;font-size:13px;padding:2px 10px;border-radius:8px;margin-bottom:4px}

@@ -3344,18 +3344,18 @@ function npcPatient(b, s) {
 // ---- job staff: an NPC at every place that hires (plus the rod seller), each with its own talk spot next to the counter
 const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FACE): gender, hair, clothes
   templeboy: { name: 'พี่ตุ๋ย (เด็กวัดรุ่นพี่)', short: 'พี่ตุ๋ย', lk: { hair: 'black' }, hi: 'มาช่วยงานวัดไหม ได้บุญได้เงินด้วยนะ', yes: 'หลวงพ่อฝากงานไว้ รับภารกิจได้เลย' },
-  undertaker: { name: 'ลุงสัป (สัปเหร่อประจำวัด)', short: 'ลุงสัป', lk: { hair: 'silver' }, hi: 'กลัวผีไหมหลาน? ถ้าไม่กลัว มาเป็นสัปเหร่อกับลุงสิ', yes: 'คืนนี้มีงาน เตรียมตัวให้พร้อมนะ' },
-  mechanic: { name: 'ช่างเปี๊ยก (อู่หน้าโชว์รูม)', short: 'ช่างเปี๊ยก', lk: { hair: 'black' }, hi: 'รถเสียเต็มเมือง ช่างไม่พอ มาช่วยกันหน่อย', yes: 'มีรถรอซ่อมอยู่ รับงานเลย!' },
-  thug: { name: 'เสี่ยเสือ (ลูกพี่ประจำตลาด)', short: 'เสี่ยเสือ', lk: { hair: 'black' }, hi: 'อยากเป็นนักเลงเหรอ? นักเลงจริงต้องใจดีนะเว้ย', yes: 'มีเรื่องให้เคลียร์ ไปจัดการหน่อย' },
-  photographer: { name: 'พี่โฟกัส (สตูดิโอถ่ายภาพ)', short: 'พี่โฟกัส', lk: { hair: 'brown' }, hi: 'ชอบถ่ายรูปไหม มาเป็นช่างภาพกัน', yes: 'มีลูกค้าจ้างถ่ายรูป รับงานได้เลย' },
-  courier: { name: 'พี่ด่วน (หัวหน้าส่งพัสดุ)', short: 'พี่ด่วน', g: 'f', lk: { hair: 'brown' }, hi: 'ไม่มีใบขับขี่ก็ส่งของได้ เดินส่งเอา!', yes: 'พัสดุมาลงแล้ว รีบไปส่งเลย' },
-  office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', g: 'f', lk: { hair: 'brown', shirt: 'white' }, hi: 'สวัสดีค่ะ สนใจร่วมงานกับไทยเทคไหมคะ?', yes: 'ทำงานให้ตรงเวลานะคะ เข้างาน 8 โมง!' },
-  farmer:   { name: 'พี่ข้าวหอม (ประธานสหกรณ์)', short: 'พี่ข้าวหอม', g: 'f', lk: { hair: 'brown', shirt: 'red' }, hi: 'มาทำไร่ด้วยกันไหม ได้กินผักสดทุกวันเลยนะ', yes: 'ดูแลแปลงดีๆ นะ' },
-  fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: 'มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: 'ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
-  merchant: { name: 'เฮียชัย (เจ้าของโรงประมูล)', short: 'เฮียชัย', lk: { hair: 'brown' }, hi: 'มาประมูลของกันไหม ล็อตใหม่ขึ้นเวทีตลอด', yes: 'ซื้อถูกขายแพง จำไว้!' },
-  doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: 'โรงพยาบาลขาดหมอ ถ้าเรียนจบแพทย์แล้วมาช่วยกันนะคะ', yes: 'อยู่ในโรงพยาบาลช่วงเวรได้เงินเดือนทุกชั่วโมงนะคะ' },
-  rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', lk: { hair: 'black' }, hi: 'มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน', yes: 'ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
-  police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: 'เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ', yes: 'ถ้ามีแจ้งเหตุ 191 รีบไปนะ' },
+  undertaker: { name: 'ลุงสัป (สัปเหร่อประจำวัด)', short: 'ลุงสัป', lk: { hair: 'silver' }, hi: '[n] กลัวผีไหมหลาน? ถ้าไม่กลัว... มาเป็นสัปเหร่อกับลุงสิ', yes: '[h] คืนนี้มีงาน เตรียมตัวให้พร้อมนะ ผีแถวนี้ใจดีกันทั้งนั้นแหละ' },
+  mechanic: { name: 'ช่างเปี๊ยก (อู่หน้าโชว์รูม)', short: 'ช่างเปี๊ยก', lk: { hair: 'black' }, hi: '[h] โย่! รถเสียเต็มเมืองเลย ช่างไม่พอ มาช่วยพี่หน่อยดิ', yes: '[h] มีรถรอซ่อมอยู่ คว้าประแจแล้วลุยเลย!' },
+  thug: { name: 'เสี่ยเสือ (ลูกพี่ประจำตลาด)', short: 'เสี่ยเสือ', lk: { hair: 'black' }, hi: '[n] อยากเป็นนักเลงเหรอ? นักเลงจริงต้องใจดีนะเว้ย', yes: '[h] มีเรื่องให้เคลียร์ ไปจัดการหน่อย ใช้ปากนะ อย่าใช้มือ' },
+  photographer: { name: 'พี่โฟกัส (สตูดิโอถ่ายภาพ)', short: 'พี่โฟกัส', of: 'photog', lk: { hair: 'brown' }, hi: '[h] ชอบถ่ายรูปไหม? มาเป็นช่างภาพกัน... ว่าแต่ยิ้มอีกทีสิ แสงกำลังสวยเลย', yes: '[h] มีลูกค้าจ้างถ่ายรูป รับงานได้เลย ไปเก็บความทรงจำให้คนอื่นกัน' },
+  courier: { name: 'พี่ด่วน (หัวหน้าส่งพัสดุ)', short: 'พี่ด่วน', g: 'f', lk: { hair: 'brown' }, hi: '[h] ไม่มีใบขับขี่ก็ส่งของได้นะ เดินส่งเอา! ได้เงินแถมหุ่นดี', yes: '[h] พัสดุมาลงแล้ว ไปๆ ส่งให้ไวกว่าพี่ให้ได้!' },
+  office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', g: 'f', lk: { hair: 'brown', shirt: 'white' }, hi: '[h] สวัสดีค่ะ~ ไทยเทคกำลังรับคนเก่งๆ อยู่นะคะ สนใจมาเป็นเพื่อนร่วมงานกับนภาไหม?', yes: '[n] เข้างาน 8 โมงตรงนะคะ... ถ้ามาสาย นภาจะงอนจริงๆ ด้วย' },
+  farmer:   { name: 'พี่ข้าวหอม (ประธานสหกรณ์)', short: 'พี่ข้าวหอม', g: 'f', lk: { hair: 'brown', shirt: 'red' }, hi: '[h] มาทำไร่ด้วยกันไหม ได้กินผักสดทุกวัน ผิวดีด้วยนะ', yes: '[h] ดูแลแปลงดีๆ นะ ผักมันรู้ว่าใครรักมัน' },
+  fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: '[h] มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: '[n] ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
+  merchant: { name: 'เฮียชัย (เจ้าของโรงประมูล)', short: 'เฮียชัย', lk: { hair: 'brown' }, hi: '[h] อ้าว ลื้อมาแล้ว! มาประมูลของกับเฮียไหม ล็อตใหม่ขึ้นเวทีตลอดเลยนะ', yes: '[n] ซื้อถูกขายแพง แต่อย่าโลภนะ เฮียเจ็บมาแล้ว' },
+  doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: '[n] สวัสดีค่ะ โรงพยาบาลยังขาดหมออยู่ ถ้าเรียนจบแพทย์แล้ว มาช่วยกันนะคะ', yes: '[h] อยู่เวรได้เงินเดือนทุกชั่วโมงค่ะ... แต่อย่าลืมพักด้วยนะ หมอเป็นห่วง' },
+  rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', lk: { hair: 'black' }, hi: '[n] มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน ลมเย็นๆ ตอนกลางคืนนี่ดีสุดๆ', yes: '[h] ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
+  police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: '[n] เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ ผมจะรอ', yes: '[h] มีแจ้งเหตุ 191 เมื่อไหร่ รีบไปเลย ผมเชื่อใจคุณ' },
   cashier:  { name: 'พี่แนน (ผู้จัดการร้าน)', short: 'พี่แนน', g: 'f', lk: { hair: 'brown', shirt: 'green' }, hi: 'ร้านเรารับพนักงานแคชเชียร์อยู่นะ ไม่ต้องมีวุฒิ สนใจไหม?', yes: 'ถึงกะแล้ว! ไปยืนแคชเชียร์ คิดเงินทอนให้ถูกนะ' },
   monk:     { name: 'หลวงพ่อเย็น (เจ้าอาวาส)', short: 'หลวงพ่อเย็น', lk: {}, hi: 'เจริญพร โยม · อยากบวชเรียนศึกษาธรรมไหม ชีวิตเรียบง่ายแต่อิ่มใจนะ', yes: 'ตื่นเช้าออกบิณฑบาต แล้วอย่าฉันหลังเที่ยงนะ' },
   beggar:   { name: 'ลุงจุก (ศาลาประชาคม)', short: 'ลุงจุก', lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: 'ไม่มีงานทำก็มาเป็นขอทานกับลุงได้นะ วิ่งเก็บขยะที่ถังขยะ หรือนั่งขอทานก็ได้ เก็บให้เกิน 2,000 บาทก็พ้นแล้ว', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะ' },
@@ -3366,8 +3366,8 @@ function buildStaff() {
   for (const s of G.stations.filter(x => x.type === 'staff')) {
     const d = STAFF_DEF[s.career]; if (!d) continue;
     const x = s.x, y = s.y - 0.35;
-    const n = { id: 'staff_' + s.career, staff: 1, career: s.career, c: s.career, of: s.career, g: d.g || 'm', name: d.name, short: d.short, st: s.id, at: s.at, lk: { hair: 'brown', shirt: 'white', pants: 'gray', ...(d.lk || {}) },
-      x, y, rx: x, ry: y, f: 6, dz: [], line: m => (m.career === s.career || s.career === 'fishing' && m.rod) ? ` ${d.yes}` : ` ${d.hi}`, greetT: 0 };
+    const n = { id: 'staff_' + s.career, staff: 1, career: s.career, c: s.career, of: d.of || s.career, g: d.g || 'm', name: d.name, short: d.short, st: s.id, at: s.at, lk: { hair: 'brown', shirt: 'white', pants: 'gray', ...(d.lk || {}) },
+      x, y, rx: x, ry: y, f: 6, dz: [], lineRaw: m => (m.career === s.career || s.career === 'fishing' && m.rod) ? d.yes : d.hi, line: m => ` ${unmood(n.lineRaw(m))}`, greetT: 0 };
     STAFF.push(n); STAFF_AT[s.id] = n;
   }
   { const s = G.stations.find(x => x.type === 'guide');   // the town guide by the fountain
@@ -4115,11 +4115,29 @@ const QUEST_GIVER = {
   dailyall: { f: 'elder_m',   name: 'ผอ.ประเสริฐ (ผู้อำนวยการ)', ask: 'ช่วยเหลือชาวเมืองให้ครบทุกวัน เมืองเราจะน่าอยู่ขึ้น', thx: 'เมืองนี้โชคดีที่มีเธอ!' },
 };
 let FACES = null;
+// 🎎 anime dialogue portraits (tools/build_anime.py): 4 moods each — n normal, h happy, s surprised, a angry/pouting
+let ANI = null;
+const ANI_OF = { staff_office: 'office', staff_merchant: 'merchant', staff_doctor: 'doctor', staff_police: 'police', staff_undertaker: 'undertaker', staff_mechanic: 'mechanic',
+  staff_thug: 'thug', staff_photographer: 'photographer', staff_courier: 'courier', staff_rider: 'rider', staff_farmer: 'farmer', staff_fishing: 'fishing' };
+const ANI_FACE = { office_f: 'office', farmer_f: 'farmer', fisher_m: 'fishing', doctor_f: 'doctor', rider_m: 'rider', police_m: 'police' };   // painted face id -> anime head
+const aniCell = (k, m) => { const w = ANI?.who?.[k]; return w ? w[m] ?? w.n : undefined; };
+// background style showing one anime cell: whole bust (zoom 1) or the head, zoomed in for round faces
+function aniBg(k, m, px, zoom = 1, dy = 0) {
+  const i = aniCell(k, m); if (i === undefined) return '';
+  const c = px * zoom, col = i % ANI.cols, row = Math.floor(i / ANI.cols);
+  return `background:url(assets/anime.webp?v=${ANI.v || 1}) no-repeat;background-size:${ANI.cols * c}px ${ANI.rows * c}px;background-position:-${Math.round(col * c + (c - px) / 2)}px -${Math.round(row * c + c * dy)}px`;
+}
+// a round painted face (quest givers, login cast): the anime head when that person has one
+function faceStyle(f, px) {
+  if (ANI && ANI_FACE[f]) return `width:${px}px;height:${px}px;${aniBg(ANI_FACE[f], 'h', px, 1.9, .06)};background-color:#fff3dc`;
+  const i = FACES?.faces?.[f]; if (i === undefined) return null; const n = Object.keys(FACES.faces).length;
+  return `width:${px}px;height:${px}px;background-size:${n * px}px ${px}px;background-position:-${i * px}px 0`;
+}
 // ---- login screen: townsfolk to meet, falling petals, live online count
 function buildCast() {
   const box = document.getElementById('heroCast'); if (!box || !FACES) return;
   const cast = [['office_f', 'นภา'], ['fisher_m', 'น้าเล็ก'], ['doctor_f', 'หมอแพร'], ['chef_m', 'เชฟหมี'], ['mprang_happy', 'มะปราง'], ['rider_m', 'พี่ต่อ'], ['farmer_f', 'ข้าวหอม'], ['police_f', 'ดาบสมศรี']], n = Object.keys(FACES.faces).length, px = innerWidth <= 860 ? 42 : 58;
-  box.innerHTML = cast.map(([f, nm]) => { const i = FACES.faces[f]; return i === undefined ? '' : `<div class="cm"><i class="qface" style="background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>${nm}</div>`; }).join('');
+  box.innerHTML = cast.map(([f, nm]) => { const st = faceStyle(f, px); return st ? `<div class="cm"><i class="qface" style="${st}"></i>${nm}</div>` : ''; }).join('');
 }
 (function loginFx() {
   const cv = document.getElementById('petals'), login = document.getElementById('login'); if (!cv || !login) return;
@@ -4144,8 +4162,8 @@ function buildCast() {
   online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
 })();
 fetch('assets/portraits.json?v=3').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
-const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], i = FACES?.faces?.[alt || g?.f]; if (i === undefined) return ''; const n = Object.keys(FACES.faces).length;
-  return `<i class="qface" style="width:${px}px;height:${px}px;background-size:${n * px}px ${px}px;background-position:-${i * px}px 0"></i>`; };
+fetch('assets/anime.json?v=1').then(r => r.json()).then(j => { ANI = j; buildCast(); }).catch(() => { });
+const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], st = faceStyle(alt || g?.f, px) || faceStyle(g?.f, px); return st ? `<i class="qface" style="${st}"></i>` : ''; };
 function questPop(type, title, line, reward) {
   const g = QUEST_GIVER[type]; if (!g || !FACES) return;
   document.querySelector('.questPop')?.remove();
@@ -4238,15 +4256,20 @@ const NPC_FACE = { staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer:
   keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
+  staff_courier: [['[n] วันๆ พี่เดินสองหมื่นก้าว', '[h] ไม่ต้องเข้ายิมเลยค่ะ งานนี้ได้ทั้งเงินได้ทั้งหุ่น'], ['[s] กล่องนี้ขยับได้!?', '[h] อ๋อ ลูกแมวที่ลูกค้าสั่งจากร้านสัตว์เลี้ยงนี่เอง น่ารักมาก'], ['[a] เมื่อวานมีหมาไล่พี่สามซอย!', '[h] ...แต่พี่วิ่งชนะนะ ฮ่าๆ']],
+  staff_photographer: [['[n] ภาพที่ดีไม่ใช่ภาพที่ชัดที่สุด', '[h] แต่เป็นภาพที่ดูแล้วหัวใจเต้นแรงที่สุด'], ['[a] เดี๋ยว! อย่าขยับ!', '[h] ...แค่อยากจำมุมนี้ไว้ คุณขึ้นกล้องกว่าที่คิดนะ'], ['[n] พี่เคยรอถ่ายพระอาทิตย์ตกที่ริมหาดสามวันติด', '[a] ฝนตกทั้งสามวัน!', '[h] วันที่สี่สวยจนลืมเหนื่อยเลย']],
+  staff_thug: [['[n] ป้าๆ แม่ค้าในตลาดนี่ พี่ดูแลทุกคน', '[h] ใครมารังแกป้าแก้วร้านส้มตำ เจอพี่แน่!'], ['[n] เมื่อคืนพี่ดูละครหลังข่าว', '[a] ...ไม่ได้ร้องไห้นะเว้ย ฝุ่นเข้าตา!'], ['[h] เสื้อลายดอกตัวนี้ แม่พี่ซื้อให้', '[n] ใส่ทุกวัน เวลาคิดถึงแม่จะได้อุ่นใจ']],
+  staff_mechanic: [['[n] เสียงเครื่องยนต์บอกทุกอย่างนะ', '[h] ฟังดีๆ มันคุยกับเราได้ ...คนอื่นว่าพี่บ้า แต่พี่ว่ามันโรแมนติก'], ['[s] เฮ้ย มือเปื้อนน้ำมันอีกแล้ว!', '[a] อาบน้ำสามรอบก็ไม่ออก แฟนเก่าบอกว่าตัวพี่มีแต่กลิ่นเครื่องยนต์...', '[h] ช่างมัน! ใครจะรักพี่ ต้องรักกลิ่นน้ำมันด้วย'], ['[n] ซ่อมรถได้ทุกยี่ห้อ', '[h] ยกเว้นซ่อมใจคน อันนั้นพี่ยังฝึกอยู่']],
+  staff_undertaker: [['[n] คนเรามักกลัวความตาย', '[n] ลุงอยู่กับมันมาทั้งชีวิต ลุงว่ามันก็แค่การเดินทางอีกครั้ง', '[h] เพราะงั้นตอนยังหายใจอยู่ ใช้ชีวิตให้คุ้มนะหลาน'], ['[s] หลานเห็นอะไรข้างหลังลุงหรือเปล่า?', '[h] ฮ่าๆ ล้อเล่น! หน้าซีดเลยนะเนี่ย'], ['[n] ทุกเย็นลุงจุดเทียนให้คนที่ไม่มีญาติมาไหว้', '[h] จะได้ไม่เหงากันไง... ลุงเองก็ไม่เหงาเหมือนกัน'], ['[n] ลุงชอบกาแฟดำ ไม่ใส่น้ำตาล', '[h] ขมเหมือนชีวิต แต่หอมจนติดใจ เหมือนกันเลย']],
   staff_monk: [['วัดนี้สร้างมาตั้งแต่ก่อตั้งเมือง', 'ตีระฆังได้นะโยม เสียงดังกังวานไปทั้งวัด'], ['เขย่าเซียมซีหน้าโบสถ์ดูสิ', 'ใบละสิบบาท ทำบุญเข้าวัดด้วย'], ['ไหว้พระแล้วใจสงบ', 'ทำงานอะไรก็ราบรื่นขึ้น เจริญพร']],
-  staff_office: [['บริษัทเราส่งเอกสารไปทั่วเมืองทุกวันเลยค่ะ', 'ยิ่งส่งไกล ค่าส่งยิ่งเยอะนะคะ', 'หลังห้าโมงเย็นยังทำโอทีได้ถึงสามทุ่ม ได้เงินเพิ่มอีกด้วย'], ['ใครอยากเข้ามาทำงานที่นี่ต้องจบปริญญาตรีก่อนนะคะ', 'ไปเรียนที่มหาวิทยาลัยได้ นั่งเรียนครบชั่วโมงก็ได้หนึ่งคาบ'], ['ช่วงนี้ดิฉันอยากได้เก้าอี้ทำงานตัวใหม่จัง', 'ตัวเก่านั่งแล้วปวดหลังมากเลยค่ะ 😅']],
-  staff_fishing: [['ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', 'ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', 'ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วย'], ['สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['สมุดภาพปลาเปิดดูในมือถือได้นะ', 'ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย']],
+  staff_office: [['[n] บริษัทเราส่งเอกสารไปทั่วเมืองทุกวันเลยค่ะ', '[h] ยิ่งส่งไกล ค่าส่งยิ่งเยอะนะคะ', '[n] หลังห้าโมงเย็นยังทำโอทีได้ถึงสามทุ่ม ได้เงินเพิ่มอีกด้วย'], ['[n] ใครอยากเข้ามาทำงานที่นี่ต้องจบปริญญาตรีก่อนนะคะ', '[h] ไปเรียนที่มหาวิทยาลัยได้ นั่งเรียนครบชั่วโมงก็ได้หนึ่งคาบ'], ['[n] ช่วงนี้นภาอยากได้เก้าอี้ทำงานตัวใหม่จัง', '[a] ตัวเก่านั่งแล้วปวดหลังมาก ขอเบิกไปสามรอบแล้ว ยังไม่อนุมัติ!'], ['[s] เอ๊ะ! มาตอนนภากำลังแอบกินขนมพอดีเลย', '[h] ...อย่าบอกหัวหน้านะคะ แบ่งให้ครึ่งนึงก็ได้ 🍪'], ['[n] เวลามีคนมาสัมภาษณ์งาน นภาตื่นเต้นกว่าผู้สมัครอีกค่ะ', '[h] แต่ถ้าเป็นคุณล่ะก็... ผ่านตั้งแต่ยิ้มแรกแล้วค่ะ']],
+  staff_fishing: [['[n] ตกปลาได้ทุกที่ที่มีน้ำนะ ทะเลสาบ บ่อ ชายหาด', '[h] ทะเลกับน้ำจืดมีปลาไม่เหมือนกัน ลองไปทั้งสองแบบสิ'], ['[n] เบ็ดดีขึ้น แถบเขียวก็กว้างขึ้น', '[s] ปลาหายากอย่างปลาทองคำกับโลมาก็กินเบ็ดบ่อยขึ้นด้วยนะ!'], ['[n] สมัยหนุ่มๆ น้าเคยตกฉลามได้ด้วยมือเปล่านะ', '[h] ...ล้อเล่นน่า ใช้เบ็ดคาร์บอนต่างหาก ฮ่าๆ'], ['[n] สมุดภาพปลาเปิดดูในมือถือได้นะ', '[h] ลองตกให้ครบทุกชนิดดูสิ ได้ฉายาด้วย'], ['[a] ป้าเขาบ่นทุกวันว่าน้าตกปลาไม่ยอมกลับบ้าน', '[h] แต่พอได้ปลาตัวโตกลับไป ป้าก็ทำต้มยำรอทุกที']],
   staff_chef: [['อาหารดีเริ่มที่วัตถุดิบดี', 'ปลาสดจากชาวประมง ผักจากชาวไร่ ทำอะไรก็อร่อย'], ['อยากเป็นเชฟต้องมีใบรับรองเชฟก่อนนะ', 'ซื้อได้ที่มหาวิทยาลัย'], ['ต้มยำหม้อนี้ใส่พริกไปสามกำมือ', 'ใครกินไม่ไหวไม่ใช่ความผิดฉันนะ 🌶️']],
-  staff_rider: [['ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', 'ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['ใบขับขี่ต้องต่ออายุทุกปีนะ', 'หมดอายุแล้วรับงานไม่ได้ ไปต่อที่โชว์รูมรถ'], ['ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', 'แต่ระวังเป็นหวัดด้วยล่ะ']],
-  staff_merchant: [['ที่นี่เป็นโรงประมูลแล้ว ล็อตขึ้นเวทีทีละล็อต', 'ยื่นซองเดาราคาแข่งกับเสี่ยเฮง เจ๊หมวย พวกนั้น'], ['ซื้อได้ต่ำกว่ามูลค่าจริงก็กำไร', 'แต่ถ้าใจร้อนเสนอสูงเกินก็ขาดทุนนะ'], ['ฟังผู้ประเมินไว้บ้าง', 'แต่สภาพของก็สำคัญ ของมีตำหนิราคาตกเยอะ']],
-  staff_police: [['ตามหาหมาที่หายไปได้ที่นี่ ค่าตอบแทนดี', 'รับเคสได้ตลอด 24 ชม.'], ['อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', 'ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['เมืองนี้สงบสุขได้ เพราะทุกคนช่วยกันดูแล']],
-  staff_doctor: [['ป่วยแล้วอย่าฝืน มาโรงพยาบาลนะ', 'บอกอาการให้ชัดๆ หมอจะได้รักษาถูก'], ['กินให้ครบ นอนให้พอ', 'ภูมิคุ้มกันจะดีขึ้นเอง']],
-  staff_farmer: [['ไร่ชานเมืองปิดปรับปรุงอยู่นะ', 'อีกไม่นานคงได้กลับไปปลูกผักกันอีก'], ['ทุเรียนปลูกนานหน่อย แต่ราคาดีมาก', 'ข้าวโตเร็ว ขายได้ทุกวัน']],
+  staff_rider: [['[n] ออเดอร์เข้ามาเรื่อยๆ ดูในแอพมือถือนะ', '[n] ไปรับอาหารที่ร้าน แล้วไปส่งถึงตัวลูกค้า'], ['[n] ใบขับขี่ต้องต่ออายุทุกปีนะ', '[s] หมดอายุแล้วรับงานไม่ได้! ไปต่อที่โชว์รูมรถ'], ['[n] ฝนตกก็ต้องวิ่งนะ ลูกค้ารออยู่', '[h] แต่ระวังเป็นหวัดด้วยล่ะ'], ['[n] พี่ส่งเงินให้แม่ที่ต่างจังหวัดทุกเดือน', '[h] แม่บอกไม่ต้องส่งเยอะ ขอแค่โทรหาทุกวันก็พอ'], ['[s] ลูกค้าเมื่อกี้ให้ทิปร้อยนึง!', '[h] วันนี้ดีใจทั้งวันเลย เดี๋ยวพี่เลี้ยงชานมนะ']],
+  staff_merchant: [['[n] ที่นี่เป็นโรงประมูลแล้ว ล็อตขึ้นเวทีทีละล็อต', '[h] ยื่นซองเดาราคาแข่งกับเสี่ยเฮง เจ๊หมวย พวกนั้น'], ['[n] ซื้อได้ต่ำกว่ามูลค่าจริงก็กำไร', '[s] แต่ถ้าใจร้อนเสนอสูงเกินก็ขาดทุนนะ!'], ['[n] ฟังผู้ประเมินไว้บ้าง', '[n] แต่สภาพของก็สำคัญ ของมีตำหนิราคาตกเยอะ'], ['[n] สมัยเฮียเริ่มค้าขาย มีแค่แผงผ้าใบกับใจสู้ๆ', '[h] ทุกวันนี้ก็ยังใจสู้เหมือนเดิม แค่แผงใหญ่ขึ้นหน่อย ฮ่าๆ'], ['[s] อะไรนะ ลื้อยังไม่ได้กินข้าว?!', '[h] ไปๆ กินก่อน ค้าขายต้องมีแรง หิวแล้วตาลาย ประมูลพลาดนะเว้ย']],
+  staff_police: [['[n] ตามหาหมาที่หายไปได้ที่นี่ ค่าตอบแทนดี', '[h] รับเคสได้ตลอด 24 ชม.'], ['[n] อยากเป็นตำรวจต้องจบ ม.6 และสอบนายสิบตำรวจก่อน', '[n] ไปเรียนและสอบได้ที่มหาวิทยาลัย'], ['[n] ภายนอกผมอาจดูดุ', '[s] ...แต่เวลาตามหาหมาหลงทีไร ใจอ่อนยวบทุกที', '[h] เห็นน้องหมากลับถึงอ้อมกอดเจ้าของ คุ้มกว่าเงินเดือนอีก'], ['[a] ใครขับรถเร็วในเขตชุมชน ผมไม่ปล่อยแน่!', '[h] ...ยกเว้นรถไอติม อันนั้นผมวิ่งตามไปซื้อเอง']],
+  staff_doctor: [['[n] ป่วยแล้วอย่าฝืน มาโรงพยาบาลนะคะ', '[n] บอกอาการให้ชัดๆ หมอจะได้รักษาถูก'], ['[n] กินให้ครบ นอนให้พอ', '[h] ภูมิคุ้มกันจะดีขึ้นเองค่ะ'], ['[n] เมื่อคืนหมอได้นอนแค่สองชั่วโมงเองค่ะ', '[h] แต่พอเห็นคนไข้ยิ้มกลับบ้านได้ ก็หายเหนื่อยเลย'], ['[n] หน้าคุณดูเหนื่อยๆ นะคะ', '[h] พักบ้างนะ ร่างกายเป็นของเรา... แต่ความเป็นห่วงเป็นของหมอค่ะ']],
+  staff_farmer: [['[n] ไร่ชานเมืองปิดปรับปรุงอยู่นะ', '[h] อีกไม่นานคงได้กลับไปปลูกผักกันอีก'], ['[n] ทุเรียนปลูกนานหน่อย แต่ราคาดีมาก', '[h] ข้าวโตเร็ว ขายได้ทุกวัน'], ['[n] พี่คุยกับต้นผักทุกเช้านะ', '[a] ไม่ได้บ้านะ!', '[h] มันโตไวจริงๆ ลองดูสิ'], ['[h] เก็บผักได้เยอะเมื่อไหร่ แวะมาแบ่งกันนะ', '[n] ผักที่ปลูกเองหวานกว่าที่ซื้อเสมอแหละ']],
   staff_beggar: [['ลุงไม่มีอะไรเลย มีแต่ใจ', 'แต่คนในเมืองนี้ใจดีนะ'], ['นั่งตรงที่คนพลุกพล่าน', 'ได้เศษเงินบ่อยกว่า']],
   keep_market: [['ตลาดเปิดยี่สิบสี่ชั่วโมงจ้า', 'ซื้อจากผู้เล่นถูกกว่าร้าน NPC นะ ลองดูก่อน'], ['วางขายของได้นะ ตั้งราคาเองเลย', 'แต่อย่าตั้งแพงเกิน เดี๋ยวไม่มีคนซื้อ'], ['ทุเรียนวันนี้หอมมาก', 'เจ๊แอบกินไปลูกนึงแล้ว 🤫']],
   keep_bank: [['ฝากเงินได้ดอกเบี้ยทุกวันเกมนะคะ'], ['ที่นี่มีตลาดหุ้นด้วยนะคะ', 'ซื้อตอนถูก ขายตอนแพง... พูดง่ายทำยากค่ะ 😅'], ['กู้เงินได้ แต่ระหว่างเป็นหนี้ รายได้ส่วนหนึ่งจะถูกหักไปใช้หนี้นะคะ']],
@@ -4271,12 +4294,20 @@ const TALK = {
 let dlgQ = null;
 function dlgFace(face, npc) {
   const z = innerWidth <= 600 ? 64 : 84;
+  if (typeof face === 'string' && face.startsWith('an:') && ANI) { const [, k, m] = face.split(':'), b = innerWidth <= 600 ? 150 : 200; return `<i class="dlgPic dlgAni" style="width:${b}px;height:${b}px;${aniBg(k, m, b)}"></i>`; }
   if (face && FACES?.faces?.[face] !== undefined) { const i = FACES.faces[face], n = Object.keys(FACES.faces).length; return `<i class="qface dlgPic" style="width:${z}px;height:${z}px;background-size:${n * z}px ${z}px;background-position:-${i * z}px 0"></i>`; }
   return npc ? `<canvas class="dlgPic dlgPix" data-dlg="${esc(npc)}" width="84" height="84"></canvas>` : '';
 }
 // opts: { name, face (painted face id), npc (staff id or player id for the pixel portrait), lines: [], choices: [{ label, fn, cls }] }
+const MOOD = /^\[([nhsa])\]\s*/;
+const unmood = t => String(t || '').replace(MOOD, '');
 function dialog(opts) {
   closePanel();
+  if (opts.lines) {   // lines may start with a mood: [n] normal [h] happy [s] surprised [a] angry — the anime portrait follows it
+    const k = opts.ani || ANI_OF[opts.npc] || ANI_FACE[opts.face], moods = opts.lines.map(l => (String(l).match(MOOD) || [])[1]);
+    opts = { ...opts, lines: opts.lines.map(unmood) };
+    if (k && aniCell(k, 'n') !== undefined) { let cur = 'n'; opts.faces = moods.map(m => 'an:' + k + ':' + (cur = m || cur)); opts.face = opts.faces[0]; }
+  }
   dlgQ = { ...opts, i: 0, shown: 0, t0: performance.now() };
   let d = $('#dlg');
   if (!d) { d = document.createElement('div'); d.id = 'dlg'; document.body.appendChild(d); d.onclick = e => { if (e.target.closest('button')) return; dlgTap(); }; }
@@ -4347,7 +4378,7 @@ function talkTo(n, st) {
   const misOk = !n.keeper && MIS_CAREERS.includes(n.career) && job(n.career);
   const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' }] : [];
   const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
-  const hi = (n.line ? n.line(me) : '').trim() || 'สวัสดี';
+  const hi = (n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '').trim() || 'สวัสดี';
   dialog({ ...base, lines: [hi], choices });
 }
 // tapping a townsperson NPC: a short chat (with their portrait), the profile one tap away
@@ -4883,6 +4914,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23y', d: '21 พ.ย.', items: [
+    '🎎 หัวหน้าอาชีพ 12 คนมีรูปอนิเมะครึ่งตัวตอนคุย หน้าเปลี่ยนตามอารมณ์ (ยิ้ม ตกใจ งอน)',
+    '💬 บทพูดใหม่ เผยนิสัยแต่ละคน: หมอแพร ผู้กองเอก ลุงสัป เสี่ยเสือ พี่โฟกัส ฯลฯ กด "คุยต่อ" ดูสิ',
+    '📷 พี่โฟกัสใส่ชุดช่างภาพสะพายกล้องแล้ว',
+  ] },
   { v: '2026-11-23x', d: '21 พ.ย.', items: [
     '💰 เควสต์หาเงินประจำอาชีพครบทุกอาชีพแล้ว: ตำรวจ ขอทาน พระ แคชเชียร์ เด็กวัด สัปเหร่อ ช่างซ่อมรถ นักเลง ช่างภาพ พนักงานส่งของ',
     '🗓️ เควสต์รายสัปดาห์ก็มีเป้าหมายประจำอาชีพเหล่านี้ด้วย (เริ่มสัปดาห์หน้า / เควสต์รายวันเริ่มพรุ่งนี้)',
