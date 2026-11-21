@@ -111,6 +111,12 @@ function stat(a, key, n = 1, absolute = false) {
   }
   markMe(a);
 }
+// catch up achievements whose stat was already past the goal (added later, or a goal lowered): stat() only checks when the number goes up
+function achSweep(a) {
+  if (!a.stats) return;
+  const st = a.stats, ks = new Set(D.ACHIEVEMENTS.filter(ac => !(a.ach || []).includes(ac.id) && (st[ac.stat] || 0) >= ac.n).map(ac => ac.stat));
+  for (const k of ks) stat(a, k, st[k], true);
+}
 // admins: every job unlocked unless they switch it off; the mayor title can be switched off too (then their own title shows)
 const allJobs = a => isAdmin(a) && a.god?.alljobs !== false;
 const adminTitle = a => isAdmin(a) && !a.god?.notitle;
@@ -4031,7 +4037,7 @@ function login(ws, m, pre) {
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
     accounts.set(lname, a); isNew = true;
   }
-  Q.ensure(a); santaGift(a);
+  Q.ensure(a); santaGift(a); achSweep(a);
   if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) {   // a career that has been closed
     const was = a.career; a.career = 'none'; a.cook = null;
     const msg = was === 'farmer' ? 'อาชีพเกษตรกรปิดแล้ว คุณกลับมาว่างงาน เลือกอาชีพใหม่ได้เลย · ตอนนี้ทุกคนปลูกผักในสวนบ้านได้ (ร้านเฟอร์นิเจอร์ › สวน › แปลงดิน) 🌱'
@@ -4358,6 +4364,7 @@ function onMessage0(ws, raw) {
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
+    case 'achsync': return achSweep(a);
     case 'minigame': {                      // (mini-games were removed from the game)
       return;
       const max = { math: 40, mail: 45, memo: 30 }[m.game]; if (!max) return;

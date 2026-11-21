@@ -3709,6 +3709,7 @@ let panelOpenT = 0;
 function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
+  if (p.kind === 'achv' || p.kind === 'profile') send({ t: 'achsync' });   // unlock goals already reached (the server only checks when a number goes up)
   panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); $('#panel').classList.toggle('soc', !!p.soc); refreshPanel(true);
   if (p.kind === 'chat' && !TOUCH_UI) setTimeout(() => $('#chatIn')?.focus(), 50);   // phones: no keyboard until they tap the box (it would push the sheet up)
 }
@@ -4940,6 +4941,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ag', d: '21 พ.ย.', items: [
+    '🏅 แก้ฉายา/ความสำเร็จที่ทำครบแล้วแต่ไม่มีปุ่มกดรับ — เปิดหน้าความสำเร็จแล้วจะปลดล็อกให้เอง',
+  ] },
   { v: '2026-11-23af', d: '21 พ.ย.', items: [
     '🐠 ปลาทะเลใหม่ 32 ชนิด! ฉลามวาฬ กระเบนราหู นาร์วาล หอยงวงช้าง มังกรทะเลใบไม้ กั้งนกยูง และอีกเพียบ (ตกได้ที่ทะเล)',
     '💎 สัตว์เลี้ยงออร่า 16 ตัว ราคา 💎300–999 มีออร่าเรืองแสงรอบตัวคนละสี (ยูนิคอร์นสายรุ้งออร่าเปลี่ยนสีได้!) ซื้อที่ร้านสัตว์เลี้ยง',
