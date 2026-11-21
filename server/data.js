@@ -1615,7 +1615,13 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   thairoyal: { name: 'ชุดไทยราชสำนัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 250 },
   martial:   { name: 'ชุดจอมยุทธ์มังกรแดง', nf: 'ชุดจอมยุทธ์หญิงมังกรแดง', how: 'ซื้อที่ร้านแฟชั่น', gems: 350 },
   knight:    { name: 'ชุดอัศวินเกราะเงิน', how: 'ซื้อที่ร้านแฟชั่น', gems: 450 },
-  fortune:   { name: 'ชุดแม่หมอพยากรณ์', how: 'ซื้อที่ร้านแฟชั่น', gems: 300 } };
+  fortune:   { name: 'ชุดแม่หมอพยากรณ์', how: 'ซื้อที่ร้านแฟชั่น', gems: 300 },
+  // collection 3
+  swim:      { name: 'ชุดเล่นน้ำ กางเกงขาสั้น', nf: 'ชุดบิกินี่', how: 'ซื้อที่ร้านแฟชั่น', price: 39999 },
+  coat:      { name: 'ชุดโค้ทกันหนาว', how: 'ซื้อที่ร้านแฟชั่น', price: 69999 },
+  racer:     { name: 'ชุดเด็กแว้นสายซิ่ง', nf: 'ชุดสก๊อยสายซิ่ง', how: 'ซื้อที่ร้านแฟชั่น', price: 89999 },
+  maid:      { name: 'ชุดเมดน่ารัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 150, g: 'f' },
+  dino:      { name: 'ชุดไดโนเสาร์', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 } };
 // 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
 const DYES = { red: ['แดง', 0], orange: ['ส้ม', 28], yellow: ['เหลือง', 52], green: ['เขียว', 125], sky: ['ฟ้า', 195], blue: ['น้ำเงิน', 228], purple: ['ม่วง', 275], pink: ['ชมพู', 325] };
 const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songkran: ['pink', 'purple'], bunny: ['sky', 'purple'], chinese: ['blue', 'purple'],
@@ -1623,9 +1629,9 @@ const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songk
   surf: ['pink', 'purple'], hiphop: ['blue', 'green'], martial: ['blue', 'purple'], knight: ['blue', 'red'] };
 const DYE_WHITE = ['catsuit', 'chicken', 'knight'];   // white / silver cloth also takes a soft tint
 // shop tabs
-const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop'],
+const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop', 'swim', 'coat', 'racer'],
   thai: ['songkran', 'lanna', 'phasin', 'muaythai', 'lukthung', 'chinese', 'chakri', 'thai', 'thairoyal'],
-  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune'] };
+  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune', 'maid', 'dino'] };
 for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
   OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', nosale: 1, ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }

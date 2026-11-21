@@ -109,7 +109,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b2', chSheets = {};
+const CH_V = 'b3', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -152,7 +152,7 @@ function charLayer(frame, col, cat, lk) {
 }
 // women wearing an outfit that only exists as a men's sheet: her own head on the outfit's body ('head'), or her hair showing
 // under the outfit's hat ('hair'); hoods, masks and helmets that cover everything keep the outfit as drawn
-const FEM_HEAD = { office: 'head', merchant: 'head', thai: 'head', tuxedo: 'head', hoodie: 'head', pajama: 'head', tracksuit: 'head',
+const FEM_HEAD = { coat: 'head', office: 'head', merchant: 'head', thai: 'head', tuxedo: 'head', hoodie: 'head', pajama: 'head', tracksuit: 'head',
   chef: 'hair', farmer: 'hair', fisher: 'hair', rider: 'hair', cowboy: 'hair', magician: 'hair', beggar: 'hair', pilot: 'hair', devil: 'hair' };
 const FEM_NECK = 52, FEM_HAT = 30;   // atlas rows: where her head ends / where her hair may show below a hat
 function femOutfitFrame(sheet, step, lk) {
@@ -173,7 +173,7 @@ function femOutfitFrame(sheet, step, lk) {
 const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
-  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune' };   // women's versions are the 'f' + name sheets
+  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -4651,6 +4651,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23k', d: '23 พ.ย.', items: [
+    '👗 ชุดใหม่ 6 แบบที่ร้านแฟชั่น: 🦖 ชุดไดโนเสาร์, 🩳 ชุดเล่นน้ำ (สาวๆ เป็นบิกินี่), 🧥 โค้ทกันหนาว, 🏍️ ชุดเด็กแว้น (สาวๆ เป็นสก๊อยสายซิ่ง), 🎀 ชุดเมด',
+  ] },
   { v: '2026-11-23j', d: '23 พ.ย.', items: [
     '💎 แก้เติมเพชรด้วยสลิปแล้วค้าง "รอชำระ" / ขึ้นว่าสลิปเคยถูกใช้แล้ว ทั้งที่เพิ่งส่งครั้งแรก ตอนนี้ส่งสลิปซ้ำได้ ของเข้าตามปกติ',
   ] },

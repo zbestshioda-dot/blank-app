@@ -34,13 +34,27 @@ def faces_right(rgb, m):
     if len(xs) < 30: return True
     return xs.mean() > (hx.min() + hx.max()) / 2
 
+# per-sheet fixes for generated sheets that are not consistent: 'frames' re-points a frame to another cell (r, c),
+# 'pink' recolours a bright blue shirt to the pink of the front frames (so the shirt does not change colour as they walk)
+SHEET_FIX = {'racer': {'frames': {'down2': (0, 0), 'left2': (2, 0)}, 'pink': 1},   # (the 3rd front / side cells carry another shirt with a beer logo)
+             'fracer': {'frames': {'down2': (0, 0)}, 'pink': 1}}
+
+def pinkify(im):
+    r, g, b = im[..., 0], im[..., 1], im[..., 2]
+    m = (b > 195) & (g > 115) & (r < 140)
+    lum = (r * .3 + g * .59 + b * .11) / 175.0
+    for i, c in enumerate((238, 78, 150)): im[..., i] = np.where(m, np.clip(c * lum, 0, 255), im[..., i])
+    return im
+
 def cut(src):
     im = np.array(Image.open(src).convert('RGB')).astype(int); H, W = im.shape[:2]
+    fix = SHEET_FIX.get(os.path.basename(src)[8:-4], {})
+    if fix.get('pink'): im = pinkify(im)
     bg = np.median(np.concatenate([im[:20, :20].reshape(-1, 3), im[-20:, -20:].reshape(-1, 3), im[:20, -20:].reshape(-1, 3)]), 0)
     fg = np.sqrt(((im - bg) ** 2).sum(2)) > 38
     fg = ndi.binary_opening(fg, iterations=2)
     out = {}
-    for fname, (ry, cx) in FRAMES.items():
+    for fname, (ry, cx) in {**FRAMES, **fix.get('frames', {})}.items():
         y0, y1, x0, x1 = ry * H // 3, (ry + 1) * H // 3, cx * W // 3, (cx + 1) * W // 3
         win = fg[y0:y1, x0:x1]; lab, n = ndi.label(win)
         sz = ndi.sum(win, lab, range(1, n + 1)); big = sz.max()
