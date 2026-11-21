@@ -1356,7 +1356,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -1936,7 +1936,8 @@ function resign(a) {
 
 // ------------------------------------------------------------------ fishing
 function rollFish(a, pool) {
-  const l = fishLv(a), rod = rodOf(a) || D.RODS.bamboo;
+  const l = fishLv(a), rod0 = rodOf(a) || D.RODS.bamboo, blessed = (a.merit || 0) > now();
+  const rod = blessed ? { ...rod0, luck: rod0.luck * 1.3, junk: rod0.junk * .8 } : rod0;   // 🙏 merit from releasing fish at the temple
   const table = D.FISH[pool] || D.FISH.lake;
   const ws = table.map(([id, w]) => {
     if (id === null) return Math.max(5, w - l) * rod.junk;
@@ -1951,6 +1952,32 @@ function rollFish(a, pool) {
 }
 
 // ------------------------------------------------------------------ station actions
+// 📋 fish orders at the fishing club: a few open contracts for the whole town (first to deliver wins) paying about 4-5x the club's
+// buying price, so anglers buy from each other on the market to fill them
+const FO = { n: 4, life: 4 * 3600e3 };
+let fishOrders = [], foSeq = 1;
+const FO_POOL = [...new Set(Object.values(D.FISH).flat().map(x => x[0]))].filter(id => id && D.ITEMS[id]?.kind === 'fish' && (D.ITEMS[id].rar || 1) <= 3);
+function foMake(t) {
+  const id = pick(FO_POOL), it = D.ITEMS[id], r = it.rar || 1, qty = r === 1 ? rint(5, 10) : r === 2 ? rint(2, 4) : rint(1, 2);
+  return { id: foSeq++, item: id, qty, pay: Math.max(50, Math.round(it.base * qty * rnd(1.8, 2.3) / 10) * 10), gems: r >= 3 ? 2 : 0, until: t + Math.round(FO.life * rnd(.6, 1.2)) };
+}
+function foTick() { const t = now(); fishOrders = fishOrders.filter(o => o.until > t); while (fishOrders.length < FO.n) fishOrders.push(foMake(t)); }
+foTick(); setInterval(() => { try { foTick(); } catch (e) { console.error('foTick', e); } }, 60e3).unref?.();
+// 📖 fish book goals: claim gems once each
+function fishColDone(a, g) {
+  const dex = a.fishdex || {}, all = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].kind === 'fish' && D.ITEMS[k].rar);
+  if (g.n) return all.filter(k => dex[k]).length >= g.n;
+  const set = all.filter(k => g.temple ? D.ITEMS[k].temple : D.ITEMS[k].rar === g.rar);
+  return set.length > 0 && set.every(k => dex[k]);
+}
+function fishCol(a, m) {
+  const g = D.FISH_COL.find(x => x.id === m.id); if (!g) return;
+  a.fcol = a.fcol || []; if (a.fcol.includes(g.id)) return toast(a, 'รับรางวัลนี้ไปแล้ว', '📖', false);
+  if (!fishColDone(a, g)) return toast(a, `ยังไม่ครบ: ${g.name}`, '📖', false);
+  a.fcol.push(g.id); a.gems = (a.gems || 0) + g.gems; a.sd = true; dirty = true; markMe(a);
+  if (g.gems >= 40) feed(`📖 ${a.name} สะสม${g.name}! รับ 💎${g.gems}`);
+  return toast(a, `📖 ${g.name} · ได้ 💎${g.gems}!`, '💎');
+}
 // fishing from any water's edge: a spot made on the fly where the player stands
 function waterSpot(a) {
   const pool = D.waterPool(a.x, a.y); if (!pool) return null;
@@ -2464,6 +2491,27 @@ function act(a, m) {
     }
     case 'icu.quit': { if (a.mis?.kind === 'icu') { a.mis = null; a.icuNext = now() + D.ICU.next / 2; markMe(a); toast(a, 'ส่งต่อเคสให้หมอคนอื่นแล้ว', '🚑', false); } return; }
     case 'fishclub.info': return;
+    case 'fishclub.order': {                 // deliver a fish order: first one in gets the pay
+      foTick(); const o = fishOrders.find(x => x.id === +m.id), it = o && D.ITEMS[o.item];
+      if (!o) return toast(a, 'ออเดอร์นี้มีคนส่งไปแล้ว หรือหมดเวลาแล้ว', '📋', false);
+      if ((a.inv[o.item] || 0) < o.qty) return toast(a, `ต้องมี ${it.icon}${it.name} ${o.qty} ตัว (มี ${a.inv[o.item] || 0})`, '📋', false);
+      if (!cd(a, 'sell', 500)) return;
+      fishOrders = fishOrders.filter(x => x !== o); foTick();
+      addItem(a, o.item, -o.qty); credit(a, o.pay); if (o.gems) a.gems = (a.gems || 0) + o.gems;
+      stat(a, 'fishorder'); markMe(a); wdAt = 0;
+      feed(`📋 ${a.name} ส่งออเดอร์ ${it.icon}${it.name} x${o.qty} ให้สมาคมประมง รับ ${money(o.pay)}${o.gems ? ` + 💎${o.gems}` : ''}`);
+      return toast(a, `📋 ส่งออเดอร์สำเร็จ! ได้ ${money(o.pay)}${o.gems ? ` + 💎${o.gems}` : ''}`, '💰');
+    }
+    case 'pier.release': {                   // 🙏 let a fish go in the temple's lotus pond: merit = better fishing luck for a while
+      if (s.pool !== 'temple') return toast(a, 'ปล่อยปลาทำบุญได้ที่สระบัวในวัดเท่านั้น', '🙏', false);
+      const id = m.item, it = D.ITEMS[id];
+      if (it?.kind !== 'fish' || !(a.inv[id] > 0)) return toast(a, 'ไม่มีปลาตัวนี้ในกระเป๋า', '⚠️', false);
+      if (!cd(a, 'release', 800)) return;
+      const t = now(), mins = Math.min(60, Math.max(2, Math.round(it.base / 10)));
+      addItem(a, id, -1); a.merit = Math.min(t + 3 * 3600e3, Math.max(a.merit || 0, t) + mins * 60e3);
+      stat(a, 'merit'); a.sd = true; markMe(a);
+      return toast(a, `🙏 ปล่อย ${it.icon}${it.name} คืนสระบัว ได้บุญ +${mins} นาที · โชคปลาหายากดีขึ้น (เหลือ ${Math.ceil((a.merit - t) / 60e3)} นาที)`, '🙏');
+    }
     case 'petshop.buy': {                                  // adopt a pet at a pet shop (kept forever) and bring it out
       m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;
       a.pets = a.pets || [];
@@ -3949,7 +3997,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -3989,7 +4037,7 @@ function worldView() {
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
     houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).filter(k => !h.fpos?.[k] || h.fpos[k][0]).slice(0, 600) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}]),
     chairs: chairs.map(c => c ? c.name : ''),
-    ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(),
+    ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(), fo: fishOrders,
   };
 }
 function marketView() {
@@ -4107,7 +4155,7 @@ function login(ws, m, pre) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...chatLog.filter(m => !(m.id < 0)).slice(-25), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
@@ -4493,6 +4541,7 @@ function onMessage0(ws, raw) {
       place(a, a.x, a.y); markMe(a); return;
     }
     case 'god': return godAct(a, m);
+    case 'fishcol': return fishCol(a, m);
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
       if (!a.run0 || a.career !== 'beggar' && !allJobs(a)) return;
       const sec = (now() - a.run0) / 1000; a.run0 = 0; a.runNext = now() + 15000;

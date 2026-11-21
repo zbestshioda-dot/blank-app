@@ -4495,7 +4495,25 @@ function fishBook() {
   const cell = ([id, it]) => `<div class="fbook ${dex[id] ? 'got' : ''} r${it.rar}" title="${esc(it.name)}"><canvas class="fspr" data-spr="${it.spr}" width="56" height="40"></canvas><small>${dex[id] ? esc(it.name) : '???'}</small>${dex[id] ? `<em>x${dex[id]}</em>` : ''}</div>`;
   const cells = [...new Set(all.map(([, it]) => it.rar))].map(r => { const g = all.filter(([, it]) => it.rar === r); return `<div class="fbookH"><span class="rtag r${r}">${G.fishRarity[r] || RAR[r]}</span> <small>${g.filter(([id]) => dex[id]).length}/${g.length}</small></div><div class="fbookGrid">${g.map(cell).join('')}</div>`; }).join('');
   return `<div class="secT" style="margin-top:14px">📖 สมุดภาพปลา ${got}/${all.length}</div>
-    <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div>${cells}`;
+    <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div>
+    <div class="secT" style="margin-top:10px">🏆 เป้าสะสมปลา (ได้เพชร)</div><div class="list">${fishGoals(all, dex)}</div>${cells}`;
+}
+// 📖 collection goals under the fish book: tick off species counts and full sets for gems
+function fishGoals(all, dex) {
+  const got = all.filter(([id]) => dex[id]).length, claimed = me.fcol || [];
+  return (G.fishCol || []).map(g => {
+    const set = g.n ? null : all.filter(([, it]) => g.temple ? it.temple : it.rar === g.rar), have = g.n ? got : set.filter(([id]) => dex[id]).length, need = g.n || set.length, done = have >= need, own = claimed.includes(g.id);
+    return itemRowRaw(own ? '✅' : done ? '🎁' : '📖', esc(g.name), `${Math.min(have, need)}/${need} · รางวัล 💎${g.gems}`, own ? '<span class="tag">รับแล้ว</span>' : B(done ? `รับ 💎${g.gems}` : 'ยังไม่ครบ', { t: 'fishcol', id: g.id }, done ? 'primary' : '', !done));
+  }).join('');
+}
+// 🙏 merit: at the temple pond, let fish go for luck; anywhere else just show how long the blessing lasts
+function meritBox(s, st) {
+  const left = Math.max(0, Math.ceil(((me.merit || 0) - (Date.now() + clockOff)) / 60e3));
+  const on = left ? `<div class="jobbox">🙏 <b>บุญหนุนนำ</b> โชคปลาหายาก x1.3 · ขยะน้อยลง · เหลืออีก ${left} นาที</div>` : '';
+  if (s.pool !== 'temple') return on;
+  const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id]?.kind === 'fish').sort((a, b) => G.items[a[0]].base - G.items[b[0]].base);
+  const rows = fish.map(([id, q]) => { const mins = Math.min(60, Math.max(2, Math.round(G.items[id].base / 10))); return itemRow(id, B(`🙏 ปล่อย (+${mins} น.)`, { t: 'act', st, a: 'release', item: id }, 'good'), `มี ${q}`); }).join('');
+  return `${on}<details class="sub" style="margin:8px 0"><summary><b>🙏 ปล่อยปลาทำบุญ</b> · ปลายิ่งแพงยิ่งได้บุญนาน (สูงสุด 3 ชม.)</summary>${rows ? `<div class="list">${rows}</div>` : 'ยังไม่มีปลาในกระเป๋า'}</details>`;
 }
 // rods: the shop list at the fishing club (st) or the bag list (no st): stats, buy, hold
 function rodRows(st) {
@@ -4967,6 +4985,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23ak', d: '21 พ.ย.', items: [
+    '📋 <b>บอร์ดออเดอร์ปลา</b> ที่สมาคมประมง! ส่งปลาตามออเดอร์ได้เงินมากกว่าขายปกติหลายเท่า (ปลาหายากแถมเพชร) · ใครส่งครบก่อนได้ก่อน ปลาไม่พอซื้อจากเพื่อนที่ตลาดได้',
+    '🙏 <b>ปล่อยปลาทำบุญ</b> ที่สระบัววัด: ได้ "บุญหนุนนำ" โชคปลาหายาก x1.3 ขยะน้อยลง ยิ่งปลาแพงยิ่งได้บุญนาน (สูงสุด 3 ชม.)',
+    '🏆 <b>เป้าสะสมปลา</b> ในสมุดภาพปลา: ครบ 10/25/40/60/80/100 ชนิด และครบชุดตามความหายาก/ปลาวัด รับเพชรสูงสุด 💎80!',
+  ] },
   { v: '2026-11-23aj', d: '21 พ.ย.', items: [
     '👁 <b>ตายแล้วดูคนอื่นได้!</b> คืนปล่อยผีโดนกัด (หรือคืนหมาป่าที่ไม่ได้ร่วมเล่น) กดแถบ 👁 ด้านบนเพื่อดูผู้เล่นที่ยังรอด กด ◀ ▶ เปลี่ยนคน',
     '🧟 ซอมบี้เยอะขึ้น! โผล่ใกล้ตัวผู้รอดตลอดเวลาไม่ใช่แค่ตอนเปลี่ยนระลอก ต้องวิ่งไม่หยุด · ตัวที่ถูกทิ้งไว้ไกลๆ จะมุดดินหายไป',
@@ -6086,13 +6109,16 @@ function renderPanel(p) {
       if (!c) btn = B('🎣 เหวี่ยงเบ็ด (⚡8)', { t: 'act', st, a: 'cast' }, 'primary big');
       else if (c.state === 'wait') btn = `<div class="fishHelp" style="font-size:16px;margin:14px 0">⏳ รอปลากินเบ็ด... อย่าเพิ่งดึง!</div>${B('ดึงเบ็ด (เร็วไปปลาหนี)', { t: 'act', st, a: 'reel', pos: -1 }, 'big')}`;
       else btn = `<div class="fishHelp"><b>‼️ ปลากินเบ็ด!</b> กดตอนขีดขาวอยู่ใน<b style="color:var(--ok)">แถบเขียว</b></div><div class="fbar" id="fBar"><div class="zone" id="fZone"></div><div class="mark" id="fMark"></div></div>${B('🎣 ดึง!', { fn: 'reel' }, 'primary big pulse')}`;
-      return `${head}${btn}<div class="sub" style="margin-top:8px">ปุ่มใหญ่สีเหลือง (มุมขวาล่าง) ใช้ดึงเบ็ดได้เหมือนกัน · ตกปลาจน Lv.${G.fishing.maxLv} ได้รางวัล 🎽 ชุดนักตกปลา</div>`;
+      return `${head}${meritBox(s, st)}${btn}<div class="sub" style="margin-top:8px">ปุ่มใหญ่สีเหลือง (มุมขวาล่าง) ใช้ดึงเบ็ดได้เหมือนกัน · ตกปลาจน Lv.${G.fishing.maxLv} ได้รางวัล 🎽 ชุดนักตกปลา</div>`;
     }
     case 'fishclub': {
       const fish = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id].kind === 'fish');
+      const fo = (wd?.fo || []).map(o => { const it = G.items[o.item], h = me.inv[o.item] || 0, left = Math.max(0, Math.ceil((o.until - (Date.now() + clockOff)) / 60e3));
+        return itemRow(o.item, B(h >= o.qty ? 'ส่งเลย' : `มี ${h}/${o.qty}`, { t: 'act', st, a: 'order', id: o.id }, 'good', h < o.qty), `ต้องการ <b>${o.qty} ตัว</b> · ค่าจ้าง <b style="color:var(--ok)">${money(o.pay)}</b>${o.gems ? ` + 💎${o.gems}` : ''} · เหลือ ${left >= 60 ? Math.floor(left / 60) + ' ชม. ' : ''}${left % 60} นาที`); }).join('');
+      const foBox = fo ? `<div class="secT" style="margin-top:10px">📋 บอร์ดออเดอร์ปลา</div><div class="sub">ส่งครบก่อนได้ก่อน! จ่ายแพงกว่ารับซื้อปกติหลายเท่า · ปลาไม่พอซื้อจากผู้เล่นอื่นที่ตลาดได้</div><div class="list">${fo}</div>` : '';
       const rows = fish.map(([id, q]) => itemRow(id, B(`ขาย ${money((wd?.mk[id]?.farm || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' }, 'good'), `มี ${q} · รับซื้อ ${money(wd?.mk[id]?.farm || 0)}/ตัว`)).join('');
-      return `<h2>🎣 สมาคมประมง · ร้านขายปลา</h2><div class="sub">${hoursTxt('fishclub')} · แหล่งตกปลา: 🏞️ ทะเลสาบ (ใต้เมือง) · 🌊 ทะเล (ฝั่งตะวันออก)</div>
-        <div class="jobbox">💬 ซื้อเบ็ด/อัปเกรดเบ็ด คุยกับ <b>น้าเล็ก</b> ที่ยืนอยู่ข้างๆ</div>
+      return `<h2>🎣 สมาคมประมง · ร้านขายปลา</h2><div class="sub">${hoursTxt('fishclub')} · แหล่งตกปลา: 🏞️ ทะเลสาบ (ใต้เมือง) · 🌊 ทะเล (ฝั่งตะวันออก) · 🪷 สระบัววัด</div>
+        <div class="jobbox">💬 ซื้อเบ็ด/อัปเกรดเบ็ด คุยกับ <b>น้าเล็ก</b> ที่ยืนอยู่ข้างๆ</div>${foBox}
         ${fish.length ? `<div class="sub" style="margin-top:10px"><b>รับซื้อปลา</b> (ดีกว่าร้าน NPC ในตลาด แต่ถูกกว่าขายให้ผู้เล่น)</div><div class="list">${rows}</div>` : '<div class="sub">ยังไม่มีปลาในกระเป๋า</div>'}<div class="sub" style="margin-top:10px">📖 ดูสมุดภาพปลาได้ในมือถือ (แอปสมุดปลา)</div>`;
     }
     case 'balloon': {

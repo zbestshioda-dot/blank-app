@@ -1292,6 +1292,13 @@ function waterPool(x, y) {
   if (!a || a.kind !== 'map') return null;
   return a.id === 'farm' ? 'river' : a.id === 'temple' ? 'temple' : a.id === 'town' && best[0] >= 100 ? 'sea' : 'lake';
 }
+// 📖 fish collection goals in the fish book: species caught (count) and full sets; each pays gems once
+const FISH_COL = [
+  { id: 'c10', n: 10, gems: 5, name: 'ครบ 10 ชนิด' }, { id: 'c25', n: 25, gems: 10, name: 'ครบ 25 ชนิด' }, { id: 'c40', n: 40, gems: 15, name: 'ครบ 40 ชนิด' },
+  { id: 'c60', n: 60, gems: 25, name: 'ครบ 60 ชนิด' }, { id: 'c80', n: 80, gems: 40, name: 'ครบ 80 ชนิด' }, { id: 'c100', n: 100, gems: 60, name: 'ครบ 100 ชนิด' },
+  { id: 'r1', rar: 1, gems: 10, name: 'ปลาทั่วไปครบชุด' }, { id: 'r2', rar: 2, gems: 20, name: 'ปลาไม่ธรรมดาครบชุด' }, { id: 'r3', rar: 3, gems: 40, name: 'ปลาหายากครบชุด' },
+  { id: 'r4', rar: 4, gems: 80, name: 'ปลามหากาพย์ครบชุด' }, { id: 'tp', temple: 1, gems: 30, name: 'ปลาวัดครบ 6 ชนิด' },
+];
 const BIG_FISH = Object.keys(ITEMS).filter(k => ITEMS[k].kind === 'fish' && ITEMS[k].rar >= 3);   // better rods and fish blooms make these bite more
 const FISH_RARITY = ['', 'ทั่วไป', 'ไม่ธรรมดา', 'หายาก', 'มหากาพย์', 'ตำนาน'];
 for (const k in ITEMS) if (ITEMS[k].kind === 'fish') ITEMS[k].spr = 'fish_' + (ITEMS[k].spr0 || k);
@@ -1898,6 +1905,6 @@ module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAR
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, FISH_COL, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };
