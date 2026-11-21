@@ -11,7 +11,7 @@ const TOWN = { id: 'town', kind: 'map', name: 'ตัวเมือง', x: 0, 
 const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง', x: 112, y: 0, w: 70, h: 50 };
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
 const PARK = { id: 'park', kind: 'map', name: 'สวนสนุก', x: 112, y: 52, w: 40, h: 28 };   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
-const FIELD = { id: 'field', kind: 'map', name: 'สนามฟุตบอล', x: 112, y: 0, w: 48, h: 34 };   // ⚽ the public football ground, where the old farm used to be
+const FIELD = { id: 'field', kind: 'map', name: 'สนามฟุตบอล', x: 112, y: 0, w: 30, h: 23 };   // ⚽ the public football ground, where the old farm used to be
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
@@ -758,28 +758,37 @@ const RIDES = {
   keep(TREES, t => !inF(t[0], t[1])); keep(STATIONS, st => st.area !== 'farm' && st.id !== 'gate_farm');
   LOTS.length = 0; delete GATES.farm_in; delete GATES.town_from_farm;
 }
-// ================================================================= ⚽ THE FOOTBALL GROUND (in the farm's empty space): a 36 x 20 pitch with a goal at each
-// end, stands and a scoreboard along the north, dugouts and a snack kiosk along the south. The ball is simulated by the server.
+// ================================================================= ⚽ THE FOOTBALL GROUND (in the farm's empty space): an 18 x 10 pitch with a goal at each
+// end, stands (you can sit on them) and a scoreboard along the north, dugouts and a snack kiosk along the south. The ball is simulated by the server.
 // deco: [sprite in football.webp, x, y of the bottom centre] (drawn by the client); solid footprints are 'o' tiles here.
-const FOOTBALL = { pitch: { x: FIELD.x + 6, y: FIELD.y + 8, w: 36, h: 20 }, goalH: 4.4, deco: [] };
+const FBJ = require('../public/assets/football.json');
+const FOOTBALL = { pitch: { x: FIELD.x + 6, y: FIELD.y + 8, w: 18, h: 10 }, goalH: 3, deco: [] };
 {
   const X = FIELD.x, Y = FIELD.y, F = FIELD, P = FOOTBALL.pitch;
   rect(F.x, F.y, F.w, F.h, '.');
   const tree = (x, y) => { set(x, y, 'T'); TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]); };
   for (let x = F.x; x < F.x + F.w; x++) { tree(x, F.y); tree(x, F.y + F.h - 1); }
   for (let y = F.y + 1; y < F.y + F.h - 1; y++) { tree(F.x, y); tree(F.x + F.w - 1, y); }
-  rect(X + 1, Y + 5, 5, 2, 'c'); rect(X + 1, Y + 7, 46, 1, 'c'); rect(X + 1, Y + 28, 46, 1, 'c');   // the way in (north-west) and walks along both touchlines
+  rect(X + 1, Y + 5, 3, 2, 'c'); rect(X + 1, Y + 7, F.w - 2, 1, 'c'); rect(X + 1, Y + 18, F.w - 2, 1, 'c');   // the way in (north-west) and walks along both touchlines
   const deco = (s, x, y, w = 0, d = 0) => { FOOTBALL.deco.push([s, x, y]); if (w) rect(Math.round(x - w / 2), Math.ceil(y) - d, w, d, 'o'); };
-  for (const cx of [12, 19, 29, 36]) deco('stands', X + cx, Y + 6.9, 6, 2);
-  deco('score', X + 24, Y + 6.9, 3, 1);
-  for (const [cx, cy] of [[4.2, 7.9], [43.8, 7.9], [4.2, 30.6], [43.8, 30.6]]) deco('light', X + cx, Y + cy, 1, 1);
-  for (const cx of [17, 31]) deco('dugout', X + cx, Y + 31.8, 4, 2);
-  deco('kiosk', X + 40, Y + 32, 2, 2); deco('cooler', X + 24, Y + 31, 1, 1); deco('trophy', X + 2.6, Y + 11, 1, 1);
-  deco('cones', X + 8.5, Y + 30.8); deco('cones', X + 3, Y + 24);
+  // the stands are open (walk up onto them): every seat is a place to sit and watch
+  const sw = FBJ.sprites.stands, SW = sw[4], SH = SW * sw[3] / sw[2];
+  for (const cx of [8, 22]) {
+    const x0 = X + cx - SW / 2, by = Y + 6.9;
+    deco('stands', X + cx, by);
+    [[.19, .38], [.41, .38], [.62, .38], [.84, .38], [.19, .81]].forEach(([fx, fy], k) =>
+      STATIONS.push({ id: `seat_fb${cx}_${k}`, type: 'seat', label: 'นั่งดูบอลบนอัฒจันทร์', icon: '🏟️', x: +(x0 + SW * fx).toFixed(2), y: +(by - SH + SH * fy + .15).toFixed(2), r: .6, area: 'field' }));
+  }
+  FOOTBALL.standTop = +(Y + 6.9 - SH + SH * .38).toFixed(2);   // the client draws the stands under anyone sitting on them
+  deco('score', X + 15, Y + 6.9, 3, 1);
+  for (const [cx, cy] of [[3.6, 7.9], [26.4, 7.9], [3.6, 19.6], [26.4, 19.6]]) deco('light', X + cx, Y + cy, 1, 1);
+  for (const cx of [10, 20]) deco('dugout', X + cx, Y + 20.8, 4, 2);
+  deco('kiosk', X + 26, Y + 21.3, 2, 2); deco('cooler', X + 15, Y + 20.2, 1, 1); deco('trophy', X + 2.4, Y + 10.5, 1, 1);
+  deco('cones', X + 3, Y + 15.8);
   for (const [fx, fy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) deco('flag', P.x + fx * P.w + (fx ? .25 : -.25), P.y + fy * P.h + (fy ? .35 : -.05));
-  STATIONS.push({ id: 'gate_town_fb', type: 'gate', to: 'town_from_field', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2.4, y: Y + 6.2, r: 1.6, area: 'field' });
+  STATIONS.push({ id: 'gate_town_fb', type: 'gate', to: 'town_from_field', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 2, y: Y + 6.2, r: 1.5, area: 'field' });
   STATIONS.push({ id: 'gate_field', type: 'gate', to: 'field_in', label: 'ไปสนามฟุตบอล', icon: '⚽', x: 3, y: 32, r: 1.6, area: 'town' });   // where the farm road used to leave town
-  GATES.field_in = { x: X + 4.6, y: Y + 6.2 }; GATES.town_from_field = { x: 5.5, y: 32 };
+  GATES.field_in = { x: X + 4, y: Y + 6.2 }; GATES.town_from_field = { x: 5.5, y: 32 };
 }
 const AREAS = [TOWN, HOUSING, PARK, TEMPLE, FIELD, ...ROOMS, ...YARDS];
 const areaAt = (x, y) => AREAS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;

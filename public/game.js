@@ -1340,7 +1340,7 @@ function drawPitch(X, Y) {
 }
 function fbEnts(ents, vis) {
   const P0 = G.football.pitch, cy = P0.y + P0.h / 2, gh = G.football.goalH / 2;
-  for (const d of G.football.deco) if (vis(d[1], d[2], 8)) ents.push([d[2], 15, { k: 'deco', s: d[0], x: d[1], y: d[2] }]);
+  for (const d of G.football.deco) if (vis(d[1], d[2], 8)) ents.push([d[0] === 'stands' ? G.football.standTop - .2 : d[2], 15, { k: 'deco', s: d[0], x: d[1], y: d[2] }]);
   ents.push([cy + gh, 15, { k: 'goal', side: 0 }], [cy + gh, 15, { k: 'goal', side: 1 }]);
   if (FBALL) { fbStep(Math.min(.1, (performance.now() - (FBALL.ft || performance.now())) / 1000)); FBALL.ft = performance.now(); if (vis(FBALL.rx, FBALL.ry, 2)) ents.push([FBALL.ry + .05, 15, { k: 'ball' }]); }
 }
@@ -4621,6 +4621,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23f', d: '23 พ.ย.', items: [
+    '🏟️ อัฒจันทร์สนามบอลขึ้นไปนั่งได้แล้ว (10 ที่นั่ง) เดินเข้าใกล้เก้าอี้แล้วกดนั่ง',
+    '⚽ สนามฟุตบอลเล็กลงครึ่งหนึ่ง เล่นกันสนุกขึ้น ไม่ต้องวิ่งไกล',
+  ] },
   { v: '2026-11-23e', d: '23 พ.ย.', items: [
     '⚽ เปิดสนามฟุตบอลสาธารณะ! ทางเข้าอยู่ริมถนนฝั่งซ้ายของเมือง (ทางไปไร่เก่า) หรือเรียกแท็กซี่ไปก็ได้',
     '🥅 เตะบอลได้จริง ทุกคนในสนามเห็นลูกเดียวกัน เดินชนบอลเพื่อเลี้ยง เข้าใกล้แล้วกดปุ่ม ⚽ เตะ (ยิงไปทางที่วิ่งอยู่)',

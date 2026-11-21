@@ -4709,7 +4709,7 @@ function fbTick(t, dt) {
       const mx = (a.x - a._fbx) / Math.max(dt, .05), my = (a.y - a._fby) / Math.max(dt, .05), sp = Math.hypot(mx, my);
       const dx = FB.x - a.x, dy = FB.y - (a.y - .1), d = Math.hypot(dx, dy);
       if (d < .55 && sp > .5 && sp < 15 && (mx * dx + my * dy) > 0) {
-        const k = Math.min(1.35 * sp, 8) / sp; FB.vx = mx * k; FB.vy = my * k;
+        const k = Math.min(1.3 * sp, 7) / sp; FB.vx = mx * k; FB.vy = my * k;
         const nx = d ? dx / d : mx / sp, ny = d ? dy / d : my / sp; FB.x = a.x + nx * .56; FB.y = a.y - .1 + ny * .56;
         fbTouch(a);
       }
@@ -4748,7 +4748,7 @@ function fbKick(a, m) {
   const d = Math.hypot(FB.x - a.x, FB.y - (a.y - .1)); if (d > 1.3) return;
   let dx = +m.dx || 0, dy = +m.dy || 0, l = Math.hypot(dx, dy);
   if (!l || !isFinite(l)) { dx = FB.x - a.x; dy = FB.y - (a.y - .1); l = Math.hypot(dx, dy) || 1; }
-  const p = Math.max(.4, Math.min(1, +m.p || 1)), sp = 7 + 7 * p;
+  const p = Math.max(.4, Math.min(1, +m.p || 1)), sp = 5 + 5 * p;
   FB.vx = dx / l * sp; FB.vy = dy / l * sp; fbTouch(a); FB.moved = true;
   fbSend({ kick: a.id });
 }
