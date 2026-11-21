@@ -1240,7 +1240,28 @@ function starterYard(a) {
 }
 const yardOpen = (a, z) => D.YARD.start.includes(z) || (a.yz || []).includes(z);   // bought furniture + login-reward pieces (kept even without a house)
 const COMFORT_MAX = 30;   // a big catalogue: comfort stops adding up past this
-const comfort = a => a.hown ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) : 0;
+// 🐠 home aquarium: fish put into your tanks swim there for visitors to see and add comfort on top of the furniture cap
+const AQ = { slots: { aqua: 4, xaquarium: 6 }, max: 10, comfort: [0, 0, 1, 2, 3, 5], cmax: 10 };
+const aqSlots = a => a.hown ? Math.min(AQ.max, furnOf(a).reduce((t, k) => t + (AQ.slots[fbase(k)] || 0), 0)) : 0;
+const aqShown = a => (a.aq || []).slice(0, aqSlots(a));
+const aqComfort = a => Math.min(AQ.cmax, aqShown(a).reduce((t, id) => t + (AQ.comfort[D.ITEMS[id]?.rar || 1] || 0), 0));
+const comfort = a => a.hown ? Math.min(COMFORT_MAX, furnOf(a).reduce((s, k) => s + (D.FURNITURE[fbase(k)]?.comfort || 0), 0)) + aqComfort(a) : 0;
+function aqAct(a, m) {
+  a.aq = a.aq || [];
+  if (m.op === 'put') {
+    const id = m.item, it = D.ITEMS[id], n = aqSlots(a);
+    if (!n) return toast(a, 'ต้องมีบ้านและซื้อ 🐠 ตู้ปลา ที่ร้านเฟอร์นิเจอร์ก่อน', '🐠', false);
+    if (it?.kind !== 'fish' || !(a.inv[id] > 0)) return toast(a, 'ไม่มีปลาตัวนี้ในกระเป๋า', '⚠️', false);
+    if (a.aq.length >= n) return toast(a, `ตู้ปลาเต็มแล้ว (${n} ช่อง) ซื้อตู้เพิ่มได้สูงสุด ${AQ.max} ช่อง`, '🐠', false);
+    addItem(a, id, -1); a.aq.push(id); a.sd = true; markMe(a); wdAt = 0;
+    return toast(a, `ปล่อย ${it.icon}${it.name} ลงตู้ปลาที่บ้านแล้ว${AQ.comfort[it.rar || 1] ? ` · ความสบาย +${AQ.comfort[it.rar || 1]}` : ''}`, '🐠');
+  }
+  if (m.op === 'take') {
+    const i = Math.floor(+m.i); if (!(i >= 0 && i < a.aq.length)) return;
+    const [id] = a.aq.splice(i, 1); addItem(a, id, 1); a.sd = true; markMe(a); wdAt = 0;
+    return toast(a, `เอา ${D.ITEMS[id]?.icon || '🐟'}${D.ITEMS[id]?.name || id} ออกจากตู้ใส่กระเป๋าแล้ว`, '🐠');
+  }
+}
 const godSpeed = a => isAdmin(a) && a.god?.speed > 1 ? Math.min(5, a.god.speed) : 1;
 const hidden = a => isAdmin(a) && !!a.god?.invis;     // god mode: invisible to everyone else
 const riding = a => a.ride && (a.vehicles || []).includes(a.ride) && !a.pose && !a.down && D.areaAt(a.x, a.y)?.kind !== 'room' ? D.VEHICLES[a.ride] : null;
@@ -1366,7 +1387,7 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -2701,6 +2722,7 @@ function act(a, m) {
       if (m.a === 'sell' && s.type !== 'estate' && houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
       const back = Math.round(D.HOME_TIERS[a.hown.tier || 0].price * 0.6 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
       if (a.house >= 0 && houses[a.house] === a) { const r = D.roomAt(a.x, a.y), y = D.areaAt(a.x, a.y); if (r?.house === a.house || y?.yard && y.house === a.house) teleport(a, D.GATES.housing_in.x, D.GATES.housing_in.y); houses[a.house] = null; }
+      for (const id of a.aq || []) addItem(a, id, 1); a.aq = [];   // the fish come back to the bag
       a.hown = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.money += back; markMe(a); wdAt = 0;
       return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
     }
@@ -4008,7 +4030,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4046,7 +4068,7 @@ function worldView() {
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
-    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).filter(k => !h.fpos?.[k] || h.fpos[k][0]).slice(0, 600) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}]),
+    houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).filter(k => !h.fpos?.[k] || h.fpos[k][0]).slice(0, 600) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}, h ? aqShown(h) : []]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(), fo: fishOrders,
   };
@@ -4553,6 +4575,7 @@ function onMessage0(ws, raw) {
     }
     case 'god': return godAct(a, m);
     case 'fishcol': return fishCol(a, m);
+    case 'aq': return aqAct(a, m);
     case 'lbnseen': a.lbnSeen = now(); a.sd = true; markMe(a); return;
     case 'trashrun.end': {                  // the run is over (crashed or quit): pay for what was picked up, if it is plausible
       if (!a.run0 || a.career !== 'beggar' && !allJobs(a)) return;

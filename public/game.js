@@ -598,7 +598,7 @@ function handle(m) {
       if ('ann' in m && (m.ann || '') !== tickerAnn) setTicker(m.ann);
       wd = m.d && wd ? { ...wd, ...m } : m; clockOff = m.now - Date.now(); paintEvent();
       if (!m.d || Object.keys(m).some(k => k !== 't' && k !== 'd' && k !== 'now' && k !== 'on')) refreshPanel();
-      if (m.houses) { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9]])); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } }
+      if (m.houses) { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9], h[15]])); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } }
       break; }
     case 'roster': {
       const ids = new Set();
@@ -1698,7 +1698,7 @@ function draw(t) {
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
       else if (e[3] === 'ghost') { const bad = !!placeBad(); ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; if (bad) ctx.filter = 'sepia(1) saturate(6) hue-rotate(-50deg)'; sprF(e[0], e[1], e[2], X, Y, e[5]); ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.strokeStyle = bad ? '#ff4a4a' : '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); if (e[4]?.spk) drawSprinkler(e, X, Y, t); }
-      else { sprF(e[0], e[1], e[2], X, Y, e[5]); if (e[4]) drawYardCrop(e, X, Y, t); }
+      else { sprF(e[0], e[1], e[2], X, Y, e[5]); if (e[4]?.aq) drawAqFish(e, X, Y, t); else if (e[4]) drawYardCrop(e, X, Y, t); }
     }
     else if (k === 5) drawCar(e, X, Y);
     else if (k === 6) drawPet(e, X, Y, t);
@@ -1775,6 +1775,19 @@ function drawYardLocks(A, X, Y, t) {
     ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .9)}px serif`; ctx.fillText('🔒', x0 + w / 2, y0 + h / 2 - TS * .4 + Math.sin(t / 500 + z) * 2);
     if (A.house === me.house && price) sign(`ปลดล็อก ${money(price)}`, x0 + w / 2, y0 + h / 2 + TS * .55, { size: TS * .3 });
   }
+}
+// 🐠 fish swimming to and fro behind the glass of a home tank
+const AQ_SLOTS = { aqua: 4, xaquarium: 6 };
+function drawAqFish(e, X, Y, t) {
+  const s = atlas?.sprites[e[0]]; if (!s || !atlasImg) return;
+  const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS, cx = e[1] * TS + X, top = e[2] * TS + Y - h, y0 = top + h * .25, y1 = top + h * .5, hw = w * .36;
+  e[4].aq.forEach((id, i) => {
+    const f = atlas.sprites[G.items[id]?.spr]; if (!f) return;
+    const fw = w * (G.items[id].rar >= 4 ? .26 : .2), fh = fw * f[3] / f[2], sp = .00045 * (.7 + (i % 3) * .15), ph = i * 1.9 + e[1];
+    const x = cx + Math.sin(t * sp + ph) * (hw - fw / 2), right = Math.cos(t * sp + ph) > 0, y = y0 + (y1 - y0) * ((i * .37 + .15) % 1) + Math.sin(t / 650 + i) * h * .015;
+    ctx.save(); ctx.translate(Math.round(x), Math.round(y)); if (!right) ctx.scale(-1, 1);
+    ctx.drawImage(atlasImg, f[0], f[1], f[2], f[3], -fw / 2, -fh / 2, fw, fh); ctx.restore();
+  });
 }
 // a vegetable field in a home yard: seedlings that grow, then the ripe crop bobbing on top
 function drawYardCrop(e, X, Y, t) {
@@ -4502,7 +4515,17 @@ function fishBook() {
   const cells = [...new Set(all.map(([, it]) => it.rar))].map(r => { const g = all.filter(([, it]) => it.rar === r); return `<div class="fbookH"><span class="rtag r${r}">${G.fishRarity[r] || RAR[r]}</span> <small>${g.filter(([id]) => dex[id]).length}/${g.length}</small></div><div class="fbookGrid">${g.map(cell).join('')}</div>`; }).join('');
   return `<div class="secT" style="margin-top:14px">📖 สมุดภาพปลา ${got}/${all.length}</div>
     <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div>
-    <div class="secT" style="margin-top:10px">🏆 เป้าสะสมปลา (ได้เพชร)</div><div class="list">${fishGoals(all, dex)}</div>${cells}`;
+    ${aqBox()}<div class="secT" style="margin-top:10px">🏆 เป้าสะสมปลา (ได้เพชร)</div><div class="list">${fishGoals(all, dex)}</div>${cells}`;
+}
+// 🐠 the home tank: put fish from the bag in (they swim there for visitors and add comfort), take them back out
+function aqBox() {
+  const n = me.aqSlots || 0, aq = me.aq || [], cf = [0, 0, 1, 2, 3, 5];
+  if (!n) return `<div class="secT" style="margin-top:10px">🐠 ตู้ปลาที่บ้าน</div><div class="sub">ซื้อ 🐠 ตู้ปลา (4 ช่อง) หรือตู้ปลาพร้อมฐาน (6 ช่อง) ที่ร้านเฟอร์นิเจอร์ แล้วเอาปลามาเลี้ยงโชว์เพื่อนได้ · ปลาหายากเพิ่มความสบายบ้าน</div>`;
+  const inTank = aq.map((id, i) => itemRow(id, B('เอาออก', { t: 'aq', op: 'take', i }), i >= n ? 'ตู้ไม่พอ (ไม่โชว์)' : cf[G.items[id]?.rar || 1] ? `ความสบาย +${cf[G.items[id].rar]}` : '')).join('');
+  const bag = Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id]?.kind === 'fish').sort((a, b) => G.items[b[0]].base - G.items[a[0]].base)
+    .map(([id, q]) => itemRow(id, B('ใส่ตู้', { t: 'aq', op: 'put', item: id }, 'good', aq.length >= n), `มี ${q}${cf[G.items[id].rar || 1] ? ` · ความสบาย +${cf[G.items[id].rar]}` : ''}`)).join('');
+  return `<div class="secT" style="margin-top:10px">🐠 ตู้ปลาที่บ้าน ${Math.min(aq.length, n)}/${n}</div><div class="sub">ปลาในตู้ว่ายโชว์ในบ้าน · ปลาไม่ธรรมดาขึ้นไปเพิ่มความสบาย (รวมสูงสุด +10 เกินเพดานเฟอร์นิเจอร์ได้)</div>
+    ${inTank ? `<div class="list">${inTank}</div>` : ''}${bag ? `<details class="sub"><summary><b>➕ เลือกปลาจากกระเป๋าใส่ตู้</b></summary><div class="list">${bag}</div></details>` : ''}`;
 }
 // 📖 collection goals under the fish book: tick off species counts and full sets for gems
 function fishGoals(all, dex) {
@@ -4991,6 +5014,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23am', d: '21 พ.ย.', items: [
+    '🐠 <b>ตู้ปลาที่บ้านเลี้ยงปลาจริงได้แล้ว!</b> ซื้อตู้ปลาที่ร้านเฟอร์นิเจอร์ แล้วเปิด 📱 → สมุดปลา → ใส่ตู้ ปลาจะว่ายโชว์ในบ้านให้เพื่อนที่มาเยี่ยมเห็น',
+    '🛋️ ปลาในตู้เพิ่มความสบายบ้าน (ไม่ธรรมดา +1 · หายาก +2 · มหากาพย์ +3 · ตำนาน +5 รวมสูงสุด +10 เกินเพดานเดิมได้) → นอนที่บ้านได้พลังงานมากขึ้น',
+  ] },
   { v: '2026-11-23al', d: '21 พ.ย.', items: [
     '🔔 <b>lifebook มีแจ้งเตือนแล้ว!</b> แท็บ 🔔 บอกเมื่อมีคนถูกใจ/คอมเมนต์โพสต์ เพื่อนโพสต์ใหม่ เพื่อนตกปลาหายากได้ มีคนซื้อของที่คุณวางขาย หรือแลกเบอร์กัน (ออฟไลน์อยู่ก็เก็บไว้ให้)',
   ] },
@@ -7593,10 +7620,12 @@ function layoutFurniture() {
     if (r.rk === 'house') {
       const h = wd?.houses?.[r.house], fl = r.floor || 1; if (!h) continue;
       if (fl === 1) { const bs = G.stations.find(x => x.id === 'hbed' + r.house), bp = h[0] ? furnPos(h, 'sbed') : null; if (bs) { if (!h[0]) { bs.x = r.x + 3.4; bs.y = r.y + 3.7; } else if (bp && bp[0] === 1) { bs.x = r.x + bp[1]; bs.y = r.y + bp[2] + .4; } } }
+      let aqi = 0;   // 🐠 the owner's fish fill the tanks in order
       for (const k of h[2]) {
+        const aqn = AQ_SLOTS[fbase(k)] || 0, aqf = aqn ? (h[15] || []).slice(aqi, aqi += aqn) : null;
         if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
         const pos = furnPos(h, k), sp = furnSpr(k); if (!(pos && pos[0] === fl && sp)) continue;
-        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, null, pos[3]]); hitAdd(r, k, sp, pos);
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, aqf?.length ? { aq: aqf } : null, pos[3]]); hitAdd(r, k, sp, pos);
         addWall(G.shop.furniture[fbase(k)], sp, r.x + pos[1], r.y + pos[2]);
       }
       if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', null, placing.flip]);
