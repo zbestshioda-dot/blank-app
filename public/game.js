@@ -522,7 +522,9 @@ const promo = (() => {
   let wantSound = false; try { wantSound = localStorage.getItem('lt_snd') === '1'; } catch { }
   const off = () => login.classList.remove('hasVid');
   const label = () => { snd.textContent = v.muted ? '🔇' : '🔊'; $('#sndHint')?.classList.toggle('hidden', !v.muted); };
-  if (lite) { v.removeAttribute('autoplay'); login.classList.add('posterOnly'); }
+  const EVBAN = Date.now() < Date.parse('2026-11-30T23:59:59+07:00') ? 'assets/lkbanner_tall.webp?v=1' : '';   // 🏮 festival weeks: the event poster replaces the video
+  if (EVBAN) { v.removeAttribute('autoplay'); v.removeAttribute('poster'); v.style.display = 'none'; login.classList.add('posterOnly', 'evBan'); $('#promoPhone').style.background = `#0b1230 url(${EVBAN}) center/cover`; snd.style.display = 'none'; $('#sndHint')?.classList.add('hidden'); }
+  else if (lite) { v.removeAttribute('autoplay'); login.classList.add('posterOnly'); }
   else {
     v.src = 'assets/ui/login_promo.mp4?v=3'; v.addEventListener('error', off); v.play().catch(() => { });
     v.addEventListener('playing', () => login.classList.add('vidOn'), { once: true });
@@ -530,7 +532,7 @@ const promo = (() => {
   snd.onclick = e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => { }); try { localStorage.setItem('lt_snd', v.muted ? '0' : '1'); } catch { } label(); };
   // browsers only allow sound after a tap: if the player liked sound last time, turn it on at their first tap
   if (wantSound) login.addEventListener('pointerdown', () => { v.muted = false; v.play().catch(() => { }); label(); }, { once: true });
-  label();
+  if (!EVBAN) label();
   // phone: the form is a bottom dock, closed to a single big button until tapped (a saved account just plays on)
   const saved = !!(creds && creds.name && (creds.pin || creds.tok)), start = $('#startBtn');
   const open = () => { form.classList.add('open'); setTimeout(() => $(saved && $('#inName').value ? '#inPin' : '#inName').focus(), 120); };
@@ -586,7 +588,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && showTut(0), 400);
-      else { if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); }
+      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); }
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
@@ -4491,11 +4493,29 @@ function ppLoop() {
 const ppStart = () => whenChars(() => { if (!ppRaf) ppRaf = requestAnimationFrame(ppLoop); });
 const hasAngel = () => (me?.outfits || []).includes('angel'), vipOnC = () => (me?.vipT || 0) > Date.now() + clockOff;
 // banner shown after entering the game (once a day at most if the player ticks "not today"); the ✕ closes it
+// 🏮 the festival poster after entering the game, once a day while the event runs ("coming soon" until the night itself)
+function lkBanner() {
+  if (!me || !lkOnC() || $('#lkBan')) return;
+  const day = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); let seen = ''; try { seen = localStorage.getItem('lt_lkban') || ''; } catch { }
+  if (seen === day) return;
+  const dw = $('#dailyWrap'); if ((dw && dw.offsetParent) || !$('#tut')?.classList.contains('hidden') && $('#tut')?.offsetParent) return void setTimeout(lkBanner, 1500);
+  try { localStorage.setItem('lt_lkban', day); } catch { }
+  const fest = day === G.lk.day, past = day > G.lk.day;
+  const el = document.createElement('div'); el.id = 'lkBan';
+  el.innerHTML = `<div class="lkBox"><button class="pbX" title="ปิด">✕</button><img src="assets/lkbanner.webp?v=1" alt="">
+    <div class="lkSoon">${fest ? '🌕 คืนนี้! คืนลอยกระทง รางวัล x2' : past ? '🏮 เทศกาลลอยกระทง ถึง 30 พ.ย.' : '✨ เร็วๆ นี้! คืนลอยกระทง อังคาร 24 พ.ย. ✨'}</div>
+    <p>ลอยกระทงที่ท่าน้ำทะเลสาบได้แล้ววันนี้ · ลอยครบ 3 วัน รับ <b>ชุดไทยลอยกระทง</b> ฟรี!</p>
+    <button class="primary big lkGo">🏮 ดูกิจกรรม</button></div>`;
+  const close = () => el.remove();
+  el.querySelector('.pbX').onclick = close; el.onclick = e => { if (e.target === el) close(); };
+  el.querySelector('.lkGo').onclick = () => { close(); openPanel({ kind: 'lkev' }); send({ t: 'lkv' }); };
+  document.body.appendChild(el); FX.play('chime');
+}
 function payBanner() {
   if (!G?.pay?.on || !me || $('#payBan')) return;
   let skip = ''; try { skip = localStorage.getItem('lt_payban') || ''; } catch { }
   if (skip === new Date().toDateString()) return;
-  const dw = $('#dailyWrap'); if ((dw && dw.offsetParent) || !$('#tut')?.classList.contains('hidden') && $('#tut')?.offsetParent) return void setTimeout(payBanner, 1500);   // wait for the daily reward / tutorial to close first
+  const dw = $('#dailyWrap'); if ((dw && dw.offsetParent) || $('#lkBan') || !$('#tut')?.classList.contains('hidden') && $('#tut')?.offsetParent) return void setTimeout(payBanner, 1500);   // wait for the daily reward / tutorial to close first
   const showT = !vipOnC(), showA = !hasAngel(); if (!showT && !showA) return;
   const ofn = G.outfitDefs?.angel ? (me.gender === 'f' && G.outfitDefs.angel.nf ? G.outfitDefs.angel.nf : G.outfitDefs.angel.name) : 'ชุดเทวดา';
   const el = document.createElement('div'); el.id = 'payBan';
@@ -4788,6 +4808,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-23p', d: '21 พ.ย.', items: [
+    '🏮 หน้าเข้าเกมเปลี่ยนเป็นโปสเตอร์ลอยกระทงช่วงเทศกาล และมีประกาศ "เร็วๆ นี้" ตอนเข้าเกม (วันละครั้ง)',
+  ] },
   { v: '2026-11-23o', d: '21 พ.ย.', items: [
     '🏮 <b>เทศกาลลอยกระทง</b> 21–30 พ.ย.! ลอยกระทงที่ท่าน้ำทะเลสาบ เขียนคำอธิษฐาน ลอยคู่กับเพื่อน ปล่อยโคมลอยที่วัด · ลอยครบ 3 วันรับ <b>ชุดไทยลอยกระทง</b> ฟรี · 🌕 อังคาร 24 พ.ย. คืนลอยกระทงจริง รางวัล x2 · กดไอคอน 🏮 ใต้มือถือ',
   ] },

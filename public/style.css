@@ -1473,3 +1473,11 @@ body:has(#fishCue:not(.hidden)) #notices{top:28%}
 @keyframes ev7Glow2{50%{box-shadow:0 0 18px rgba(255,200,90,1)}}
 .ev7Cell.big.lock{filter:none;opacity:1}
 #lkBtn{background:linear-gradient(#ffd9a0,#e0603a)!important;border-color:#6a2010!important}
+#lkBan{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:rgba(8,12,35,.6);padding:12px}
+#lkBan .lkBox{position:relative;width:min(560px,94vw);border-radius:18px;padding:10px 10px 12px;text-align:center;color:#fff;background:linear-gradient(170deg,#1d2a5e,#0f1838);border:3px solid #f3c85a;box-shadow:0 0 0 3px #5a3510,0 0 40px rgba(255,190,80,.5);animation:lkIn .4s ease-out}
+#lkBan img{display:block;width:100%;border-radius:12px}
+#lkBan .lkSoon{margin:10px auto 4px;display:inline-block;padding:6px 18px;border-radius:999px;background:linear-gradient(#fff3a8,#f3b02a);color:#5a2a08;font-weight:700;font-size:18px;border:3px solid #5a3510;box-shadow:0 3px 0 #5a3510;animation:lkPulse 1.6s ease-in-out infinite}
+#lkBan p{margin:6px 8px 10px;font-size:14px;color:#e9f0ff}#lkBan p b{color:#ffd77a}
+#lkBan .pbX{position:absolute;top:-10px;right:-10px;width:36px;height:36px;padding:0;border-radius:50%;font-size:18px;background:#fff;border:3px solid #5a3510;color:#5a3510;z-index:1}
+@keyframes lkIn{from{transform:scale(.85);opacity:0}}
+@keyframes lkPulse{50%{transform:scale(1.05)}}
