@@ -649,6 +649,25 @@ function markSeen(a) {
   const d = dayNum(), L = a.seen || (a.seen = []);
   if (L[L.length - 1] !== d) { L.push(d); if (L.length > 120) L.shift(); a.sd = true; }
 }
+// 📈 how many real players are online, sampled every 5 minutes, last 14 days (kept with the town data)
+let onLog = [];
+function onSample() {
+  const n = [...online.values()].filter(o => o.login && !hidden(o) && !isAdmin(o)).length, t = now();
+  onLog.push([Math.round(t / 1000), n]); const cut = t / 1000 - 14 * 86400; while (onLog.length && onLog[0][0] < cut) onLog.shift(); gdirty();
+}
+setInterval(() => { try { onSample(); } catch (e) { console.error('onSample', e); } }, 5 * 60e3).unref?.();
+function onlineStats() {
+  const t7 = now() / 1000 - 7 * 86400, H = Array.from({ length: 24 }, () => ({ s: 0, c: 0, max: 0 })), days = {};
+  let top = null;
+  for (const [ts, n] of onLog) {
+    const bk = new Date(ts * 1000 + 7 * 3600e3), h = bk.getUTCHours(), dk = bk.toISOString().slice(0, 10);
+    if (!days[dk] || n > days[dk][0]) days[dk] = [n, h, bk.getUTCMinutes()];
+    if (ts < t7) continue;
+    H[h].s += n; H[h].c++; H[h].max = Math.max(H[h].max, n);
+    if (!top || n > top[0]) top = [n, ts];
+  }
+  return { avg: H.map(x => x.c ? +(x.s / x.c).toFixed(1) : null), max: H.map(x => x.c ? x.max : null), top, days: Object.entries(days).slice(-14), since: onLog[0]?.[0] || 0 };
+}
 function adminStats() {
   const today = dayNum(), N = 30, d0 = today - N + 1, idx = d => d - d0;
   const S = { d0, today, newN: Array(N).fill(0), active: Array(N).fill(0), d1: Array(N).fill(null), d7: Array(N).fill(null), thb: Array(N).fill(0), payers: Array(N).fill(0) };
@@ -669,7 +688,7 @@ function adminStats() {
   const payDays = Array.from({ length: N }, () => new Set());
   for (const o of Object.values(payOrders)) if (o.st === 'paid' && o.paidT) { const d = dayNum(o.paidT); if (d >= d0 && d <= today) { S.thb[idx(d)] += o.thb || 0; payDays[idx(d)].add(o.l); } }
   S.payers = payDays.map(x => x.size);
-  S.total = total; S.online = [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length;
+  S.on = onlineStats(); S.total = total; S.online = [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length;
   return S;
 }
 // every minute: count real play (moved in the last 2 minutes) and pay the inviter once the friend reaches REF.needMin
@@ -1482,6 +1501,7 @@ async function load() {
   const rows = await store.loadAll();
   const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
+  if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
@@ -1558,7 +1578,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', vapid: vapidKeys, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', vapid: vapidKeys, onLog, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });

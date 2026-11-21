@@ -4547,21 +4547,32 @@ let aStats = null;
 const AS_C = ['#2a78d6', '#eb6834'];   // series 1 blue, series 2 orange
 function asDay(d) { const t = new Date(d * 864e5); return `${t.getUTCDate()}/${t.getUTCMonth() + 1}`; }
 function asChart(S, series, opt = {}) {
-  const W = 320, H = 130, L = 30, R = 6, T = 8, B = 20, N = S.newN.length, pw = W - L - R, ph = H - T - B;
+  const W = 320, H = 130, L = 30, R = 6, T = 8, B = 20, N = series[0].v.length, xl = opt.xl || (i => asDay(S.d0 + i)), pw = W - L - R, ph = H - T - B;
   const all = series.flatMap(x => x.v).filter(v => v != null), max = opt.max || Math.max(1, ...all), nice = opt.max || (() => { const q = max / 4, p = 10 ** Math.floor(Math.log10(q)), k = [1, 2, 3, 4, 5, 6, 8, 10].find(k => k * p >= q); return Math.max(4, k * p * 4); })();   // 4 round steps
   const y = v => T + ph - v / nice * ph, bw = pw / N, fmt = opt.fmt || (v => v.toLocaleString());
   let g = '';
   for (let i = 0; i <= 4; i++) { const v = nice * i / 4, yy = y(v); g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="currentColor" stroke-opacity="${i ? .12 : .35}" stroke-width="1"/><text x="${L - 4}" y="${yy + 3}" text-anchor="end" font-size="8" fill="currentColor" opacity=".7">${opt.pct ? v + '%' : v >= 1000 ? (v / 1000) + 'k' : v}</text>`; }
-  for (let i = 0; i < N; i += 5) g += `<text x="${L + bw * (i + .5)}" y="${H - 6}" text-anchor="middle" font-size="8" fill="currentColor" opacity=".7">${asDay(S.d0 + i)}</text>`;
+  for (let i = 0; i < N; i += opt.xStep || 5) g += `<text x="${L + bw * (i + .5)}" y="${H - 6}" text-anchor="middle" font-size="8" fill="currentColor" opacity=".7">${xl(i)}</text>`;
   let marks = '';
   if (opt.type === 'line') series.forEach((sr, k) => {
     const pts = sr.v.map((v, i) => v == null ? null : [L + bw * (i + .5), y(v), v, i]).filter(Boolean);
     if (pts.length > 1) marks += `<polyline points="${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="none" stroke="${AS_C[k]}" stroke-width="2" stroke-linejoin="round"/>`;
-    marks += pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${AS_C[k]}" stroke="var(--panel,#fff)" stroke-width="1"><title>${asDay(S.d0 + p[3])} · ${sr.name} ${fmt(p[2])}</title></circle>`).join('');
+    marks += pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${AS_C[k]}" stroke="var(--panel,#fff)" stroke-width="1"><title>${xl(p[3])} · ${sr.name} ${fmt(p[2])}</title></circle>`).join('');
   });
-  else { const sr = series[0]; marks += sr.v.map((v, i) => { const x = L + bw * i + 1, h = Math.max(0, ph - (y(v) - T)); return `<g><rect x="${x}" y="${T}" width="${bw - 2}" height="${ph}" fill="transparent"/><rect x="${x}" y="${T + ph - h}" width="${Math.max(1, bw - 2)}" height="${h}" rx="${Math.min(3, (bw - 2) / 2)}" fill="${AS_C[0]}"/><title>${asDay(S.d0 + i)} · ${sr.name} ${fmt(v)}</title></g>`; }).join(''); }
+  else { const sr = series[0]; marks += sr.v.map((v, i) => { const x = L + bw * i + 1, h = Math.max(0, ph - (y(v || 0) - T)); return `<g><rect x="${x}" y="${T}" width="${bw - 2}" height="${ph}" fill="transparent"/><rect x="${x}" y="${T + ph - h}" width="${Math.max(1, bw - 2)}" height="${h}" rx="${Math.min(3, (bw - 2) / 2)}" fill="${AS_C[0]}"/><title>${xl(i)} · ${sr.name} ${fmt(v || 0)}${sr.tip ? sr.tip(i) : ''}</title></g>`; }).join(''); }
   const legend = series.length > 1 ? `<div class="asLeg">${series.map((sr, k) => `<span><i style="background:${AS_C[k]}"></i>${sr.name}</span>`).join('')}</div>` : '';
   return `<div class="asCard"><b>${opt.title}</b>${opt.sub ? `<small>${opt.sub}</small>` : ''}${legend}<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${opt.title}">${g}${marks}</svg></div>`;
+}
+// 🕗 when the town is busiest: average players online per hour of day (last 7 days), the best hour and each day's peak
+function onlineBlock(S) {
+  const O = S.on; if (!O || !O.since) return '<div class="asCard"><b>🕗 ช่วงเวลาที่คนออนไลน์เยอะสุด</b><small>เริ่มเก็บข้อมูลแล้ว (ทุก 5 นาที) · กลับมาดูอีกสักวันจะเห็นกราฟ</small></div>';
+  const hh = h => `${String(h).padStart(2, '0')}:00`, best = O.avg.reduce((b, v, h) => v != null && (b < 0 || v > O.avg[b]) ? h : b, -1);
+  const top = O.top ? (() => { const d = new Date(O.top[1] * 1000 + 7 * 3600e3); return `${d.getUTCDate()}/${d.getUTCMonth() + 1} เวลา ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; })() : '';
+  const days = O.days.slice().reverse().map(([dk, [n, h, m]]) => `<tr><td>${+dk.slice(8)}/${+dk.slice(5, 7)}</td><td>${n} คน</td><td>${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}</td></tr>`).join('');
+  const since = new Date(O.since * 1000 + 7 * 3600e3);
+  return `<div class="asTiles"><div class="asTile"><small>ชั่วโมงที่คนเยอะสุด (เฉลี่ย 7 วัน)</small><b>${best >= 0 ? `${hh(best)}–${hh((best + 1) % 24)}` : '–'}</b>${best >= 0 ? `<em>เฉลี่ย ${O.avg[best]} คน</em>` : ''}</div><div class="asTile"><small>ออนไลน์พร้อมกันสูงสุด 7 วัน</small><b>${O.top ? O.top[0] + ' คน' : '–'}</b><em>${top}</em></div></div>
+    ${asChart(S, [{ name: 'ออนไลน์เฉลี่ย', v: O.avg, tip: i => O.max[i] != null ? ` (สูงสุด ${O.max[i]})` : '' }], { title: '🕗 คนออนไลน์เฉลี่ยแต่ละชั่วโมง', sub: `เวลาไทย · 7 วันล่าสุด · เริ่มเก็บ ${since.getUTCDate()}/${since.getUTCMonth() + 1}`, xl: i => hh(i), xStep: 3, fmt: v => v + ' คน' })}
+    <details class="sub"><summary>ยอดสูงสุดรายวัน</summary><table class="asTbl"><tr><th>วัน</th><th>สูงสุด</th><th>เวลา</th></tr>${days}</table></details>`;
 }
 function aStatsHtml() {
   const S = aStats; if (!S) return '<h2>📊 วัดผล</h2><div class="sub">กำลังโหลด…</div>';
@@ -4571,6 +4582,7 @@ function aStatsHtml() {
   const tbl = `<details class="sub"><summary>ดูเป็นตาราง</summary><table class="asTbl"><tr><th>วัน</th><th>ใหม่</th><th>เข้าเล่น</th><th>D1</th><th>D7</th><th>รายได้</th></tr>${S.newN.map((_, i) => N - 1 - i).map(i => `<tr><td>${asDay(S.d0 + i)}</td><td>${S.newN[i]}</td><td>${S.active[i]}</td><td>${S.d1[i] ?? '–'}${S.d1[i] != null ? '%' : ''}</td><td>${S.d7[i] ?? '–'}${S.d7[i] != null ? '%' : ''}</td><td>${money(S.thb[i])}</td></tr>`).join('')}</table></details>`;
   return `<h2>📊 วัดผล 30 วัน</h2><div class="sub">เริ่มเก็บวันที่เข้าเล่นละเอียดตั้งแต่อัปเดตนี้ ข้อมูลก่อนหน้านับได้แค่วันสมัครกับวันล่าสุดที่เข้า (กราฟเข้าเล่น/D1/D7 ย้อนหลังจึงต่ำกว่าจริง) · ไม่นับแอดมิน ${B('🔄 โหลดใหม่', { fn: 'god', op: 'stats' })}</div>
     <div class="asTiles">${tile('ผู้เล่นทั้งหมด', S.total.toLocaleString())}${tile('ออนไลน์ตอนนี้', S.online)}${tile('เข้าเล่นวันนี้', last(S.active))}${tile('ใหม่วันนี้', last(S.newN), `30 วัน: ${sum(S.newN)}`)}${tile('กลับมาวันถัดไป (D1)', avg(S.d1), 'เป้า 30%+')}${tile('ยังเล่นหลัง 7 วัน (D7)', avg(S.d7), 'เป้า 10%+')}${tile('รายได้ 30 วัน', money(sum(S.thb)), `วันนี้ ${money(last(S.thb))}`)}</div>
+    ${onlineBlock(S)}
     ${asChart(S, [{ name: 'ผู้เล่นใหม่', v: S.newN }], { title: '🆕 ผู้เล่นใหม่ต่อวัน', sub: 'สมัครใหม่วันละกี่คน' })}
     ${asChart(S, [{ name: 'เข้าเล่น', v: S.active }], { title: '👥 คนเข้าเล่นต่อวัน', sub: 'คนที่ออนไลน์อย่างน้อย 1 ครั้งในวันนั้น' })}
     ${asChart(S, [{ name: 'D1 กลับมาวันถัดไป', v: S.d1 }, { name: 'D7 ยังเล่นหลัง 7 วัน', v: S.d7 }], { type: 'line', max: 100, pct: 1, fmt: v => v + '%', title: '🔁 การกลับมาเล่น', sub: 'แยกตามวันที่สมัคร: กี่ % ของคนใหม่วันนั้นกลับมาเล่นอีก' })}
