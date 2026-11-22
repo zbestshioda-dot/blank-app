@@ -9,7 +9,8 @@ const { WebSocketServer } = require('ws');
 const D = require('./data');
 const store = require('./store');
 const Q = require('./quests');
-const CR = require('./craft');   // 🔨 crafting rules (drops, recipes, gem shards)
+const CR = require('./craft');
+const HM = require('./homes');   // 🏡 house contest (hearts, weekly prizes)   // 🔨 crafting rules (drops, recipes, gem shards)
 const PUSH = require('./push');
 let vapidKeys = null;
 const PAY = require('./pay');
@@ -136,9 +137,10 @@ function cardClaim(a) {
 }
 const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.find(x => x.id === id) || (id === 'vip' ? D.PAY_TITLE : null);
 const myTitle = a => a.title === 'vip' && !vipOn(a) ? null : titleDef(a.title);   // the supporter title disappears when it runs out
-const fcKing = a => (a.fcKing || 0) > now();   // 🎣 yesterday's fishing contest winner wears the title for a day
-const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : myTitle(a)?.title || '';
-const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) ? 5 : myTitle(a)?.r || 0;
+const fcKing = a => (a.fcKing || 0) > now();
+const homeKing = a => (a.homeKing || 0) > now();   // 🏡 last week's most-liked home wears the title for 7 days   // 🎣 yesterday's fishing contest winner wears the title for a day
+const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : homeKing(a) ? '🏡 บ้านสวยที่สุดในเมือง' : myTitle(a)?.title || '';
+const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) || homeKing(a) ? 5 : myTitle(a)?.r || 0;
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -223,7 +225,7 @@ function enterRoom(a, m) {
   if (s.house !== undefined) {
     const i = s.house, o = houses[i], tn = null;
     if (!o && !master) return toast(a, 'ที่ดินแปลงนี้ว่างอยู่ · อยากมีบ้าน ซื้อได้ที่คุณจิ๋ม สำนักงานอสังหาฯ 🏡', '🌱', false);
-    if (o !== a && !master && friendOf(o, a)) { if (!cd(a, 'door', 1200, true)) return; if (s.yspawn) return teleport(a, s.yspawn.x, s.yspawn.y); return teleport(a, room.spawn.x, room.spawn.y); }   // friends may come in
+    if (o && o !== a && !master) { if (!cd(a, 'door', 1200, true)) return; if (s.yspawn) return teleport(a, s.yspawn.x, s.yspawn.y); return teleport(a, room.spawn.x, room.spawn.y); }   // friends may come in
     if (o === a && tn && tn !== a && !master) return toast(a, `บ้านของคุณปล่อยให้ ${tn.name} เช่าอยู่ เข้าได้อีกครั้งเมื่อหมดสัญญาเช่า`, '🔑', false);
     if (o !== a && tn !== a && !master) return toast(a, o || tn ? `บ้านหลังนี้เป็นของ${tn ? 'ผู้เช่า' : ''} ${(tn || o).name} เข้าได้เฉพาะเจ้าของบ้านและผู้เช่า` : 'บ้านว่าง ห้ามเข้า — ซื้อหรือเช่าก่อนถึงจะเข้าได้', '🔒', false);
   }
@@ -796,6 +798,16 @@ function lottoTick() {
   feed(`🎫 ผลลอตเตอรี่งวด ${thDate(k)} · รางวัลที่ 1: ${first} · 3 ตัวท้าย: ${l3.join(', ')} · 2 ตัวท้าย: ${l2}${firstBy.length ? ` · 🎉 ${firstBy.join(', ')} ถูกรางวัลที่ 1!` : ''}`);
 }
 setInterval(() => { try { lottoTick(); } catch (e) { console.error('lottoTick', e); } }, 60e3).unref?.();
+// 🏡 house contest prizes: any finished week not paid yet (restart-safe: each week is marked paid on the accounts)
+function homeTick() {
+  const wk = weekKey(), due = [...accounts.values()].filter(a => [a.hl, a.hlp].some(e => e && e.w < wk && e.n > 0 && !e.paid)); if (!due.length) return;
+  const wins = HM.awards(due, wk); for (const a of due) a.sd = true; dirty = true;
+  for (const x of wins) {
+    sysMail(x.a, `🏡 ยินดีด้วย! บ้านของคุณได้อันดับ ${x.rank} ประกวดบ้านสวยประจำสัปดาห์ (${x.n} ❤️) รับ ${money(x.prize.money)} + 💎 ชิ้นส่วนเพชร x${x.prize.gshard}${x.rank === 1 ? ' + ฉายา 🏡 บ้านสวยที่สุดในเมือง 7 วัน' : ''}`, { money: x.prize.money, items: { gshard: x.prize.gshard } });
+    if (x.rank === 1) { x.a.homeKing = now() + 7 * 864e5; feed(`🏡 บ้านสวยที่สุดในเมืองสัปดาห์นี้: ${x.a.name} (${x.n} ❤️)!`); if (x.a.ws) markMe(x.a); sendRoster(); }
+  }
+}
+setInterval(() => { try { homeTick(); } catch (e) { console.error('homeTick', e); } }, 60e3).unref?.();
 setTimeout(() => { try { lottoTick(); } catch (e) { console.error('lottoTick', e); } }, 5000);
 // ------------------------------------------------------------------ ZOMBIE NIGHT: every 13th (Bangkok) at 20:00, the dead rise
 // 60s warning to get out of buildings -> anyone still inside is overrun (dead, back at the square); zombies come in waves
@@ -1753,7 +1765,7 @@ const tenants = D.HOUSE_PRICES.map(() => null);   // (renting was removed; kept 
 const PLOT_AREAS = D.HOUSE_PRICES.map((_, i) => new Set([...D.ROOMS.filter(r => r.rk === 'house' && r.house === i).map(r => r.id), 'yard' + i]));
 const plotBusy = (i, but) => [...online.values()].some(o => o !== but && o.ws && PLOT_AREAS[i].has(areaId(o)));
 const friendOf = (o, a) => !!o && (o.contacts || []).some(c => c.p === a.phone);
-const canVisit = (a, i) => houses[i] === a || isAdmin(a) && a.god?.doors || friendOf(houses[i], a);
+const canVisit = (a, i) => !!houses[i] || isAdmin(a) && a.god?.doors;   // 🏡 every home is open to visitors (house contest)
 const inVillage = o => { const id = areaId(o); return id === 'housing' || PLOT_AREAS.some(S => S.has(id)); };
 // force: the player is in the village or going home: when every plot is taken, borrow one from an owner who is offline
 // (kept a few minutes after a disconnect) or away from the village the longest — their home comes back on another plot later
@@ -3265,7 +3277,7 @@ function act(a, m) {
         toast(a, `สร้างชั้น ${to} เสร็จแล้ว! ขึ้นบันไดไปจัดห้องใหม่ได้เลย`, '🏗️');
       }
       if (!s.down) {
-        if (!master && o !== a && !friendOf(o, a)) return toast(a, 'ขึ้นชั้นบนได้เฉพาะเจ้าของบ้านและเพื่อน', '🔒', false);
+        if (!master && o !== a && !o) return toast(a, 'ขึ้นชั้นบนได้เฉพาะเจ้าของบ้านและเพื่อน', '🔒', false);
         if (!master && to > 1 + ((o && o.hlv) || 0)) return toast(a, o === a ? `ยังไม่มีชั้น ${to} — ต่อเติมได้ ${money(D.FLOOR_PRICE[to])}` : `บ้านหลังนี้ยังไม่มีชั้น ${to}`, '🏗️', false);
       }
       const r = D.floorRoom(i, to); if (!r) return;
@@ -5240,6 +5252,21 @@ function onMessage0(ws, raw) {
       addItem(a, 'fcbait', 5); markMe(a); return toast(a, 'ได้เหยื่อแข่งตกปลา 🪱 x5 · ใช้เองตอนแข่ง ปลาที่ตกได้หนักขึ้น 20–50%', '🪱');
     }
     case 'frecs': return send(a, recView());
+    case 'homelike': {                       // ❤️ like the home you are standing in (house contest)
+      if (!cd(a, 'homelike', 1500)) return;
+      const i = PLOT_AREAS.findIndex(set => set.has(areaId(a))), o = i >= 0 ? houses[i] : null;
+      if (!o) return toast(a, 'ต้องอยู่ในบ้านหรือสวนของคนอื่นก่อนถึงจะกดถูกใจได้', '🏡', false);
+      const r = HM.like(o, a, { day: dayKey(), week: weekKey(), now: now() }); if (!r.ok) return toast(a, r.msg, '❤️', false);
+      o.sd = true; dirty = true;
+      if (r.counted && o.ws) toast(o, `❤️ ${a.name} ถูกใจบ้านคุณ! (สัปดาห์นี้ ${o.hl.n} ❤️)`, '❤️');
+      return toast(a, r.msg, '❤️');
+    }
+    case 'homes': {                          // 🏡 phone app: homes open right now + this week's ranking
+      const wk = weekKey();
+      return send(a, { t: 'homes', open: [...online.values()].filter(o => o.ws && o.hown && o.house >= 0 && !hidden(o)).map(o => ({ id: o.id, n: o.name, h: o.hl?.w === wk ? o.hl.n : 0, c: comfort(o), me: o === a ? 1 : 0 })).sort((x, y) => y.h - x.h),
+        board: HM.board([...accounts.values()], wk), prizes: HM.PRIZES, mine: a.hl?.w === wk ? a.hl.n : 0 });
+    }
+    case 'homevisit': { const o = online.get(+m.id); if (!o || !o.hown) return toast(a, 'ไม่พบบ้านของคนนี้ตอนนี้', '🏘️', false); return goHome(a, o); }
     case 'fishcol': return fishCol(a, m);
     case 'cardclaim': if (!cd(a, 'cardclaim', 1500, true)) return; cardClaim(a); return sendRoster();
     case 'aq': return aqAct(a, m);
