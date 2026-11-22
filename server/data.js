@@ -865,6 +865,19 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
   for (let y = 107; y <= 114; y++) if (get(43, y) === 'T') { clearTree(43, y); set(43, y, '.'); }   // the park's hedge of trees would hide the game centre's sign
   keep(PROPS, q => !(q.x > 40.5 && q.x < 50 && q.y > 114.6 && q.y < 117.2));
+  // 🥊 the boxing gym that never opened (east park, by the rose arch) is gone, with the flower box beside it: a little rest garden
+  //    sits on its lot instead (removed here, last, so every older random layout stays as it was)
+  {
+    const gb = BUILDINGS.find(b => b.id === 'gym2');
+    if (gb) {
+      for (let j = gb.y; j < gb.y + gb.h; j++) for (let i = gb.x; i < gb.x + gb.w; i++) if (get(i, j) === 'B') set(i, j, '.');
+      for (let j = gb.y + gb.h; j <= gb.y + gb.h + 1; j++) for (let i = gb.x; i < gb.x + gb.w; i++) if (get(i, j) === 'c') set(i, j, '.');
+      keep(BUILDINGS, b => b.id !== 'gym2');
+      keep(PROPS, q => !(q.s === 'flowerbed' && q.x === 61.5 && q.y === 41.2));
+      prop('tree_pink', 60.8, 42.6); prop('o_flowerbed', 63, 42.4, false); prop('o_lampball', 59.4, 41.9);
+      prop('bench2', 62.6, 44.2, false); prop('o_tulips', 60.6, 44.7, false); prop('o_roses', 64.6, 44.7, false);
+    }
+  }
 }
 // 🏮 Loy Krathong 2569 (the festival night is Tue 24 Nov 2569): float a krathong at the lake landing, release a sky lantern at the
 // temple. Floating on 3 different days during the event gives the Thai festival outfit; the festival day pays double.
