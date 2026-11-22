@@ -874,6 +874,7 @@ const PARK_ARCH = { x: 46, y: 94.6 };
       for (let j = gb.y + gb.h; j <= gb.y + gb.h + 1; j++) for (let i = gb.x; i < gb.x + gb.w; i++) if (get(i, j) === 'c') set(i, j, '.');
       keep(BUILDINGS, b => b.id !== 'gym2');
       keep(PROPS, q => !(q.s === 'flowerbed' && q.x === 61.5 && q.y === 41.2));
+      keep(PROPS, q => !(q.s === 'b_pavilion' && q.x === 66 && q.y === 44)); if (get(66, 43) === 'o') set(66, 43, 'c');   // and the wooden pavilion beside it
       prop('tree_pink', 60.8, 42.6); prop('o_flowerbed', 63, 42.4, false); prop('o_lampball', 59.4, 41.9);
       prop('bench2', 62.6, 44.2, false); prop('o_tulips', 60.6, 44.7, false); prop('o_roses', 64.6, 44.7, false);
     }
