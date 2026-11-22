@@ -1933,6 +1933,7 @@ function draw(t) {
     if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
+    if (s.type === 'craft') sign('🔨 โรงช่างคราฟ', px, py - TS * 2.6, { size: TS * .3, bg: 'rgba(150,90,30,.92)' });   // floating sign over the workshop
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
@@ -3702,6 +3703,7 @@ function buildStaff() {
   }
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
+  { st: 'workshop', name: 'ช่างโต (โรงช่างคราฟ)', short: 'ช่างโต', icon: '🔨', dx: 1.5, dy: -.3, lk: { hair: 'black', shirt: 'black', pants: 'jeans' }, hi: ['มาคราฟของที่ร้านไหนก็ไม่มีขายกัน! 🔨', 'ไม้ ผ้า เปลือกหอย คริสตัล... ได้ตอนตกปลา เก็บผัก ทำงานนะ', 'ซุ้มเพชรเรืองแสงน่ะ ทั้งเมืองยังมีไม่กี่คนหรอก ✨', 'ไม่มีบ้านก็คราฟได้ ลุงเก็บไว้ให้ก่อน'] },
   { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: 1, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ปุ้ง! 🎈', 'สีไหนดีหลาน ลุงมีครบ... ยกเว้นสีที่แตกไปแล้ว', 'ลูกโป่งหัวใจ เอาไปให้คนที่ชอบสิ ลุงเชียร์!'] },
   { st: 'fortune', name: 'แม่หมอจันทรา (แม่หมอพยากรณ์)', short: 'แม่หมอจันทรา', icon: '🔮', g: 'f', of: 'fortune', dx: -1.6, dy: .3, lk: { hair: 'brown' }, hi: ['ดวงชะตาเรียกเธอมาที่นี่... มานั่งสิลูก 🔮', 'ไพ่บอกว่า... เธอกำลังจะเดินมาหาแม่หมอ ...ถูกไหมล่ะ', 'การเงิน การงาน หรือความรัก ใจเธอถามเรื่องไหนอยู่?'] },
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ~ เหมียว! เอ้ย สวัสดีค่ะ 🐱', 'น้องๆ ทุกตัวสุขภาพดี ลูบได้นะคะ', 'แมวดีกว่าหมานะคะ... อย่าบอกพี่ภูผานะ'] },
@@ -4755,7 +4757,7 @@ function icuDraw() {
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
 const NPC_FACE = { staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
-  keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
+  keep_workshop: 'worker_m', keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
   staff_templeboy: [['พี่อยู่วัดนี้มาตั้งแต่เด็ก หลวงพ่อเลี้ยงมาเหมือนลูก', 'เลยอยากตอบแทน กวาดลานวัดตั้งแต่ตีห้าทุกวัน ฟึ่บ ฟึ่บ'], ['จริงนะ! ต้นโพธิ์ข้างโบสถ์ตอนดึกๆ มีเสียงกระซิบ', 'ลุงสัปบอกว่าเป็นเสียงลม...', 'แต่ลุงสัปพูดแล้วยิ้ม พี่เลยยิ่งกลัว!'], ['หมาวัดคาบรองเท้าพี่ไปอีกแล้ว!', 'ข้างละตัว... ตอนนี้พี่ใส่รองเท้าคนละสีอยู่ อย่ามองนะ'], ['หลวงพ่อจับได้ว่าพี่แอบงีบใต้ต้นโพธิ์', 'ท่านไม่ดุ แค่บอกว่า \'ตุ๋ย ฝันดีไหม\'', '...พี่ละอายมากกว่าโดนดุอีก'], ['งานวัดคืนนี้ไปปาลูกโป่งด้วยกันไหม', 'พี่ปาแม่นนะ ได้ตุ๊กตามาสามตัว เอาไปให้เด็กที่ศาลาหมดเลย']],
@@ -5833,8 +5835,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26f', d: '23 พ.ย.', items: [
+    '🔨 โรงช่างคราฟหาง่ายขึ้น: มีป้ายลอยเหนือโต๊ะช่าง มีหมุดในแผนที่ และมี <b>ช่างโต</b> ยืนเฝ้า คุยกับช่างโตเพื่อเปิดหน้าคราฟได้เลย',
+  ] },
   { v: '2026-11-26e', d: '22 พ.ย.', items: [
-    '🔨 <b>โรงช่างคราฟเปิดแล้ว!</b> โต๊ะช่างบนสนามหญ้าทางตะวันออกของลานกลางเมือง คราฟเฟอร์นิเจอร์ที่ร้านไหนก็ไม่มีขาย 6 แบบ',
+    '🔨 <b>โรงช่างคราฟเปิดแล้ว!</b> โต๊ะช่างข้างน้ำพุกลางเมือง (ใกล้จุดเกิด) คราฟเฟอร์นิเจอร์ที่ร้านไหนก็ไม่มีขาย 6 แบบ',
     '🧰 วัตถุดิบใหม่ 🪵ไม้ 🧵ผ้า 🐚เปลือกหอยมุก 💠เศษคริสตัล ได้แบบสุ่มระหว่างตกปลา เก็บผัก และทำงาน',
     '✨ ของระดับตำนาน "ซุ้มประตูเพชรเรืองแสง" เรืองแสงในบ้าน ใช้ 💎 ชิ้นส่วนเพชร (ซื้อที่โรงช่าง หรือได้จากอันดับ 1–3 แข่งตกปลา)',
     '🏡 ยังไม่มีบ้านก็คราฟได้ ของจะเก็บไว้ให้ มีบ้านเมื่อไหร่วางได้เลย',
@@ -8533,7 +8538,7 @@ function openMap(mapId, keepScroll) {
       x: bx + b.w * k / 2, y: by + b.h * k / 2, hl: mineHouse, kind: b.house !== undefined ? 'home' : 'bld' });
   }
   for (const s of G.stations) {
-    if (s.area !== A.id || !/^(pier|gate|coop|farmbuy|estate|fishclub|lot|square)$/.test(s.type)) continue;
+    if (s.area !== A.id || !/^(pier|gate|coop|farmbuy|estate|fishclub|lot|square|craft)$/.test(s.type)) continue;
     if (s.type === 'lot' && !(me.garden?.lot === s.lot) && !(!wd?.lots?.[s.lot] && job('farmer'))) continue;
     const [x, y] = L(s.x, s.y);
     places.push({ key: s.id, icon: s.icon, label: s.type === 'lot' ? (me.garden?.lot === s.lot ? 'สวนของฉัน' : `สวนว่าง #${s.lot + 1}`) : s.label, sub: s.renov ? '🚧 ปิดปรับปรุงชั่วคราว' : s.type === 'gate' ? 'ทางไปแผนที่อื่น' : s.type === 'pier' ? 'จุดตกปลา' : '', x, y, hl: me.garden?.lot === s.lot, kind: s.type === 'gate' ? 'gate' : 'spot' });
