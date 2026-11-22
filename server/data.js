@@ -2103,9 +2103,9 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
   const want = [...Object.entries(CAREERS).filter(([, c]) => c.where).map(([k, c]) => [k, c.where]), ['fishing', 'fishclub']];
   for (const [key, where] of want) {
     const s = STATIONS.find(x => x.id === where); if (!s) continue;
-    const fixed = { chef: [330, 22.2] }[key];   // Chef Mee: on the open kitchen floor (behind the counter the chopping board took the button)
+    const fixed = { chef: [18, 46.6] }[key];   // Chef Mee: outside, right of the big kitchen's door (easy to find; inside the counter and stations got in the way)
     const ok = fixed || spots.map(([dx, dy]) => [s.x + dx, s.y + dy]).find(([x, y]) => areaAt(x, y)?.id === s.area && !blocked(x, y, 0.36) && !near(s, x, y)) || [s.x + 1.5, s.y];
-    STATIONS.push({ id: 'staff_' + key, type: 'staff', career: key, at: where, label: 'เจ้าหน้าที่', icon: '💬', x: ok[0], y: ok[1], r: 1.3, area: s.area });
+    STATIONS.push({ id: 'staff_' + key, type: 'staff', career: key, at: where, label: 'เจ้าหน้าที่', icon: '💬', x: ok[0], y: ok[1], r: 1.3, area: fixed ? areaAt(ok[0], ok[1]).id : s.area });
   }
 }
 

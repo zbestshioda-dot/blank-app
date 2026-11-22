@@ -3607,7 +3607,7 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   fishing:  { name: 'น้าเล็ก (สมาคมประมง)', short: 'น้าเล็ก', lk: { hair: 'silver' }, hi: '[h] มือใหม่ยังไม่มีเงิน? ซื้อเบ็ดคันละ ฿150 ไปตกปลาขายสิ หาเงินง่ายสุดแล้ว!', yes: '[n] ทุ่นจมเมื่อไหร่ ตวัดเลยนะ! แล้วค่อยๆ เย่อมันเข้ามา' },
   merchant: { name: 'เฮียชัย (เจ้าของโรงประมูล)', short: 'เฮียชัย', of: '-', lk: { hair: 'brown', shirt: '#2f7d50', pants: '#3a3a3a' }, hi: '[h] อ้าว ลื้อมาแล้ว! มาประมูลของกับเฮียไหม ล็อตใหม่ขึ้นเวทีตลอดเลยนะ', yes: '[n] ซื้อถูกขายแพง แต่อย่าโลภนะ เฮียเจ็บมาแล้ว' },
   doctor:   { name: 'หมอแพร (ผอ.โรงพยาบาล)', short: 'หมอแพร', g: 'f', lk: { hair: 'brown' }, hi: '[n] สวัสดีค่ะ โรงพยาบาลยังขาดหมออยู่ ถ้าเรียนจบแพทย์แล้ว มาช่วยกันนะคะ', yes: '[h] อยู่เวรได้เงินเดือนทุกชั่วโมงค่ะ... แต่อย่าลืมพักด้วยนะ หมอเป็นห่วง' },
-  chef:     { name: 'เชฟหมี (หัวหน้าครัวใหญ่)', short: 'เชฟหมี', of: 'chef', lk: { hair: 'black' }, hi: '[h] รักการทำอาหารไหม? มาเป็นเชฟกับพี่ ทำอาหารขายได้ราคาดีกว่าคนทั่วไปนะ' },
+  chef:     { name: 'เชฟหมี (หัวหน้าครัวใหญ่)', short: 'เชฟหมี', of: 'chef', lk: { hair: 'black' }, hi: '[h] รักการทำอาหารไหม? มาเป็นเชฟกับพี่ ทำอาหารขายได้ราคาดีกว่าคนทั่วไปนะ', yes: '[h] มาแล้วเหรอเชฟ! วันนี้มีงานให้ช่วยเพียบ รับภารกิจได้เลย' },
   rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', of: '-', lk: { hair: 'black', shirt: '#237040', pants: '#222222' }, hi: '[n] มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน ลมเย็นๆ ตอนกลางคืนนี่ดีสุดๆ', yes: '[h] ออเดอร์เข้าเยอะ ดูแอพด้วยนะ! ใบขับขี่ต้องต่ออายุทุกปีด้วย' },
   police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: '[n] เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ ผมจะรอ', yes: '[h] มีแจ้งเหตุ 191 เมื่อไหร่ รีบไปเลย ผมเชื่อใจคุณ' },
   cashier:  { name: 'พี่แนน (ผู้จัดการร้าน)', short: 'พี่แนน', of: '-', g: 'f', lk: { hair: 'brown', shirt: '#2f8f55', pants: '#333333' }, hi: '[h] สวัสดีค่า~ ร้านเรารับแคชเชียร์อยู่นะ ไม่ต้องมีวุฒิ มาทำงานกับพี่แนนไหม?', yes: '[n] ถึงกะแล้ว! ไปยืนแคชเชียร์ คิดเงินทอนให้ถูกนะ พี่แนนเชื่อมือ' },
@@ -4804,7 +4804,7 @@ function talkTo(n, st) {
   const misOk = !n.keeper && MIS_CAREERS.includes(n.career) && job(n.career);
   const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' }] : [];
   const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
-  const hi = (n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '').trim() || 'สวัสดี';
+  const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
   dialog({ ...base, lines: [hi], choices });
 }
 // tapping a townsperson NPC: a short chat (with their portrait), the profile one tap away
@@ -5606,6 +5606,9 @@ function applyBox(career, st) {
   return `<div class="jobbox"><b>📝 รับสมัคร ${c.icon} ${c.name}</b><div class="sub">${c.desc}</div>
     ${miss.length ? `<div class="sub" style="color:var(--bad)">ต้องมี: ${miss.join(', ')}</div>` : ''}${wait}
     ${me.career !== 'none' ? `<div class="sub">ตอนนี้คุณเป็น${G.careers[me.career].name} สมัครงานนี้ = ลาออกจากงานเดิม</div>` : ''}
+  { v: '2026-11-25n', d: '22 พ.ย.', items: [
+    '👨‍🍳 แก้คุยกับเชฟหมีไม่ได้ (คนที่เป็นเชฟแล้วกดคุยแล้วค้าง) · ย้ายเชฟหมีมายืนข้างนอก ขวาประตูครัวใหญ่ คุยได้ตลอดแม้ครัวปิด',
+  ] },
   { v: '2026-11-25m', d: '22 พ.ย.', items: [
     '👆 แตะที่ตัวเจ้าหน้าที่ (เชฟหมี คนขายของ ฯลฯ) บนจอเพื่อคุยได้เลย ถ้าอยู่ไกลจะเดินเข้าไปหาให้',
   ] },
