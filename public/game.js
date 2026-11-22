@@ -363,6 +363,72 @@ function skinFix(fr, tone) {
   }
   t.putImageData(im, 0, 0); return (m[tone] = c);
 }
+// 😊 facial expressions (assets/faces.webp, tools/build_faces.py): on a front-view frame the old eyes, brows and mouth are found
+// (the two dark eye blobs either side of the face's middle), painted over with the face's own skin, and the expression's
+// features are drawn on, lined up on the eyes. Cached per frame canvas and expression.
+let EXPR = null;
+{ const im = new Image(); fetch('assets/faces.json?v=2').then(r => r.json()).then(j => { im.onload = () => { EXPR = { ...j, im }; }; im.src = 'assets/faces.webp?v=2'; }).catch(() => { }); }
+const EMO_FACE = { '😀': 'happy', '😂': 'laugh', '😍': 'love', '❤️': 'love', '😎': 'wink', '😭': 'cry', '😡': 'angry', '😱': 'surprised', '💤': 'sleepy', '🎉': 'laugh', '👍': 'happy', '👋': 'happy', '🙏': 'happy', '🔥': 'angry', '🤔': 'shy' };
+function exprOf(p) {
+  if (!p || p.zb) return '';
+  if (p.face && performance.now() < (p.faceT || 0)) return p.face;
+  if (p.emo && performance.now() < p.emoT && EMO_FACE[p.emo]) return EMO_FACE[p.emo];
+  const pose = p.pose;
+  if (pose === 'bed' || pose === 'hosp' || pose === 'veg') return 'sleepy';
+  if ((p.dz || []).length) return 'sick';
+  if (pose === 'fun') return 'laugh';
+  if (pose === 'seat' || pose === 'rest') return 'happy';
+  if (p.id != null && p.id === myId && me) { if (me.health < 25) return 'sick'; if (me.energy < 12) return 'sleepy'; if (me.happy < 20) return 'cry'; if (me.happy < 40 || me.hunger < 15) return 'sad'; }
+  return '';
+}
+const faceMemo = new WeakMap();
+function faceFind(fr) {   // where the eyes are on this frame (null: none found, e.g. a mask or a helmet)
+  const X0 = 44, Y0 = 26, w = 40, h = 28, c = fr.getContext ? fr.getContext('2d', { willReadFrequently: true }) : null; if (!c) return null;
+  const d = c.getImageData(X0, Y0, w, h).data, px = (x, y) => (y * w + x) * 4;
+  // the skin: the commonest warm colour on the face
+  const cnt = new Map(); let skin = null, best = 0;
+  for (let y = 6; y < h; y++) for (let x = 6; x < w - 6; x++) { const i = px(x, y); if (d[i + 3] < 220) continue; const r = d[i], g2 = d[i + 1], b = d[i + 2]; if (r < 120 || r < g2 || g2 < b) continue; const key = (r >> 3) << 10 | (g2 >> 3) << 5 | b >> 3, n = (cnt.get(key) || 0) + 1; cnt.set(key, n); if (n > best) { best = n; skin = [r, g2, b]; } }
+  if (!skin || best < 25) return null;
+  // the dark blobs on the face, by 4-neighbour flood fill
+  const dark = (x, y) => { const i = px(x, y); return d[i + 3] > 200 && d[i] + d[i + 1] + d[i + 2] < 240; }, seen = new Uint8Array(w * h), blobs = [];
+  for (let y = 8; y < h - 4; y++) for (let x = 3; x < w - 3; x++) {
+    if (seen[y * w + x] || !dark(x, y)) continue;
+    const st = [[x, y]]; seen[y * w + x] = 1; let n = 0, sx = 0, sy = 0, x0 = x, x1 = x, y0 = y, y1 = y;
+    while (st.length) { const [a, b] = st.pop(); n++; sx += a; sy += b; x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b);
+      for (const [q, r] of [[a + 1, b], [a - 1, b], [a, b + 1], [a, b - 1]]) if (q >= 3 && q < w - 3 && r >= 8 && r < h - 4 && !seen[r * w + q] && dark(q, r)) { seen[r * w + q] = 1; st.push([q, r]); } }
+    if (n >= 10 && y1 - y0 >= 3 && x1 - x0 <= 9) blobs.push({ n, cx: sx / n, cy: sy / n, x0, x1, y0, y1 });
+  }
+  const mid = w / 2 - .5, L = blobs.filter(b => b.cx < mid && b.cx > mid - 16).sort((a, b) => b.n - a.n)[0], R = blobs.filter(b => b.cx > mid && b.cx < mid + 16).sort((a, b) => b.n - a.n)[0];
+  if (!L || !R || Math.abs(L.cy - R.cy) > 2.5 || R.cx - L.cx < 14 || R.cx - L.cx > 26) return null;
+  return { X0, Y0, w, h, skin, lx: L.cx, rx: R.cx, ey: (L.cy + R.cy) / 2, top: Math.min(L.y0, R.y0), bot: Math.max(L.y1, R.y1), ex0: L.x0, ex1: R.x1 };
+}
+function faceFrame(fr, ex) {
+  if (!ex || ex === 'neutral') return fr;
+  let m = faceMemo.get(fr); if (!m) { m = { info: faceFind(fr) }; faceMemo.set(fr, m); }
+  if (!m.info) return fr;
+  if (m[ex]) return m[ex];
+  const F = EXPR, k = F.names.indexOf(ex); if (k < 0) return fr;
+  const I = m.info, c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(fr, 0, 0);
+  const W = c.width, im = g.getImageData(0, 0, W, c.height), d = im.data, o = new Uint8ClampedArray(d), [sr, sg, sb] = I.skin;
+  const near = i => Math.abs(o[i] - sr) + Math.abs(o[i + 1] - sg) + Math.abs(o[i + 2] - sb);
+  // paint the face's skin over the old eyes, brows and mouth (anything not skin-coloured in that box)
+  const bx0 = I.X0 + Math.max(2, I.ex0 - 3), bx1 = I.X0 + Math.min(I.w - 3, I.ex1 + 3), by0 = I.Y0 + Math.max(0, I.top - 6), by1 = I.Y0 + Math.min(I.h - 1, I.bot + 7);
+  const inBox = (x, y) => x >= bx0 && x <= bx1 && y >= by0 && y <= by1;
+  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) { const i = (y * W + x) * 4; if (o[i + 3] >= 200 && near(i) > 40) { d[i] = sr; d[i + 1] = sg; d[i + 2] = sb; } }
+  // the new features, only where the face is (skin, or the old features' box): never on the hair, the outline or the collar
+  const t = document.createElement('canvas'); t.width = EXPR.w; t.height = EXPR.h; const tg = t.getContext('2d', { willReadFrequently: true });
+  tg.drawImage(EXPR.im, k * EXPR.w, 0, EXPR.w, EXPR.h, 0, 0, EXPR.w, EXPR.h); const td = tg.getImageData(0, 0, EXPR.w, EXPR.h).data;
+  const ox = Math.round(I.X0 + (I.lx + I.rx) / 2 + .5 - EXPR.ax), oy = Math.round(I.Y0 + I.ey + .5 - EXPR.ay);
+  for (let y = 0; y < EXPR.h; y++) for (let x = 0; x < EXPR.w; x++) {
+    const s = (y * EXPR.w + x) * 4; if (td[s + 3] < 128) continue;
+    const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= W || Y >= c.height) continue;
+    const i = (Y * W + X) * 4; if (o[i + 3] < 200 || !(inBox(X, Y) || near(i) <= 60)) continue;
+    d[i] = td[s]; d[i + 1] = td[s + 1]; d[i + 2] = td[s + 2];
+  }
+  g.putImageData(im, 0, 0);
+  return (m[ex] = c);
+}
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const ofd = G?.outfitDefs?.[p.of], sheet0 = OUTFIT_SHEET[ofd?.base || p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
@@ -373,14 +439,15 @@ function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   const fr0 = fem ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
   const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WALK[view][step % 4], p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
   const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : ofd?.hue !== undefined ? outfitDye(frS, outfit + WALK[view][step % 4], ofd.hue, ofd.wt, fem && FEM_HEAD[sheet] === 'head' ? FEM_NECK : 0) : frS);
+  const frx = view === 'front' && EXPR ? faceFrame(fr, exprOf(p)) : fr;   // 😊 the face's expression (front view only)
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
     // sitting, seen from the front: the body as is, the legs (hips to feet) folded to under half their height (knees towards you)
     const hip = Math.round(ay - (ay - 4) * .34), legH = (CH_ATLAS.h - hip) * k * SEAT_LEGS, sh = CH_ATLAS.h - hip;
-    g.drawImage(fr, 0, 0, CH_ATLAS.w, hip, -ax * k, -(ay - hip) * k * SEAT_LEGS - hip * k, CH_ATLAS.w * k, hip * k);
-    g.drawImage(fr, 0, hip, CH_ATLAS.w, sh, -ax * k, -(ay - hip) * k * SEAT_LEGS, CH_ATLAS.w * k, legH);
-  } else g.drawImage(fr, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
+    g.drawImage(frx, 0, 0, CH_ATLAS.w, hip, -ax * k, -(ay - hip) * k * SEAT_LEGS - hip * k, CH_ATLAS.w * k, hip * k);
+    g.drawImage(frx, 0, hip, CH_ATLAS.w, sh, -ax * k, -(ay - hip) * k * SEAT_LEGS, CH_ATLAS.w * k, legH);
+  } else g.drawImage(frx, -ax * k, -ay * k, CH_ATLAS.w * k, CH_ATLAS.h * k);
   g.restore();
 }
 paintSw();
@@ -5406,6 +5473,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24b', d: '22 พ.ย.', items: [
+    '😊 <b>ตัวละครมีสีหน้าแล้ว!</b> กดอิโมจิ 😀 😂 😍 😭 😡 😱 💤 😎 หน้าตัวละครเปลี่ยนตาม (คนอื่นเห็นด้วย) · ป่วยหน้าซีด ง่วงตาปรือ เล่นเครื่องเล่นหัวเราะ เศร้าหรือหิวหน้าเศร้า',
+  ] },
   { v: '2026-11-24a', d: '22 พ.ย.', items: [
     '🕹️ <b>ตู้เกมในเกมเซ็นเตอร์โฉมใหม่</b> ภาพสวยทุกตู้: แข่งรถ 🏎️ ชู้ตบาส 🏀 ทุบตัวตุ่น 🔨 (มีตัวทองได้ 3 แต้ม) เต้นตามลูกศร 💃 แอร์ฮอกกี้ 🏒 และตู้คีบตุ๊กตา 🧸',
     '🏎️ แก้เกมแข่งรถ: รถจะไม่ขวางเต็มถนนอีกแล้ว มีเลนให้หลบเสมอ',
