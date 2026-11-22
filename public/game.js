@@ -5623,7 +5623,7 @@ function caseBook() {
   const rows = cs.slice().reverse().map(c => `<div class="item" style="display:block"><b>${c.i || '🔎'} ${esc(c.t)}</b> <span class="tag">ปิดคดีแล้ว</span>
     <div class="sub">${new Date(c.d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}${(c.c || []).length ? ' · เบาะแส: ' + c.c.map(esc).join(' → ') : ''}</div></div>`).join('');
   return `<div class="jobbox"><b>📓 สมุดคดี</b> · ปิดคดีแล้ว ${cs.length} คดี${cs.length >= 40 ? ' (แสดง 40 คดีล่าสุด)' : ''}
-    ${rows ? `<div class="list" style="max-height:260px;overflow:auto">${rows}</div>` : '<div class="sub">ยังไม่มีคดี · ไปรับคดีแรกกับผู้กองเดชหน้าห้องสมุดเมือง</div>'}</div>`;
+    ${rows ? `<div class="list" style="max-height:260px;overflow:auto">${rows}</div>` : '<div class="sub">ยังไม่มีคดี · ไปรับคดีแรกกับผู้กองเดชในหอสมุดเมือง</div>'}</div>`;
 }
 // "apply for this job here" block, shown in every building that hires
 function applyBox(career, st) {
@@ -5640,6 +5640,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25s', d: '22 พ.ย.', items: [
+    '📚 <b>หอสมุดเมืองเปิดแล้ว!</b> (06:00–22:00) ชั้นหนังสือ โต๊ะอ่านหนังสือ มุมนั่งเล่นโซฟา · ยืมหนังสืออ่านที่เคาน์เตอร์ได้สุข +6 ทุก 10 นาที',
+    '🕵️ สำนักงานนักสืบย้ายเข้าไปอยู่มุมขวาในหอสมุด ผู้กองเดชรอรับสมัครและแจกคดีอยู่ที่โต๊ะทำงาน',
+  ] },
   { v: '2026-11-25r', d: '22 พ.ย.', items: [
     '🕵️ <b>อาชีพใหม่: นักสืบเอกชน</b> สมัครกับผู้กองเดชหน้าห้องสมุดเมือง (ไม่ต้องมีวุฒิ) · 20 คดี: ค้นหาของหาย ตามหาคนและสัตว์เลี้ยง ไขปริศนา สอบปากคำพยานแล้วชี้ตัวคนร้าย',
     '🧥 ชุดนักสืบ (โค้ท หมวก แว่นขยาย) ทั้งชายและหญิง ใส่อัตโนมัติเมื่อเป็นนักสืบ',
@@ -6871,6 +6875,12 @@ function renderPanel(p) {
     case 'hbed': {
       const s = STN(st), h = wd?.houses?.[s.idx], own = me.house === s.idx && !(h && h[5]), rent = me.rent && me.rent.idx === s.idx;
       return own || rent ? `<h2>🛏️ เตียงนอน</h2><div class="sub">นอนแล้วได้พลังงาน หายง่วง หายอ่อนเพลีย (ทุก 2 นาที)</div>${B(`😴 นอนพัก (+${50 + (own ? me.comfort * 2 : 0)}⚡)`, { t: 'act', st, a: 'sleep' }, 'primary big')}` : '<h2>🛏️ เตียงนอน</h2><div class="sub">นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า</div>';
+    }
+    case 'library': {
+      return `<h2>📚 หอสมุดเมือง</h2><div class="sub">${hoursTxt('library')} · เงียบๆ หน่อยนะ มีคนอ่านหนังสืออยู่</div>
+        <div class="jobbox">📖 <b>ยืมหนังสืออ่าน</b> นั่งอ่านเงียบๆ ช่วยให้ใจสงบ (สุข +6 · อ่านได้ทุก 10 นาที)<br>${B('📖 อ่านหนังสือ', { t: 'act', st, a: 'read' }, 'primary big')}</div>
+        <div class="jobbox">🕵️ <b>สำนักงานนักสืบ</b> อยู่มุมขวาของหอสมุด · คุยกับ<b>ผู้กองเดช</b>เพื่อสมัครเป็นนักสืบเอกชนหรือรับคดี</div>
+        <div class="sub">🪑 มุมอ่านหนังสือด้านล่าง: นั่งพักที่โซฟาหรืออาร์มแชร์ได้</div>`;
     }
     case 'school': {
       const L = G.licenses;

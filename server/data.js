@@ -108,7 +108,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('fire', 'b_fire2', 26, 13, { label: 'สถานีดับเพลิง', icon: '🚒', deco: true, renov: true });
   B('furnshop', 'b_furnshop', 27, 30, { label: 'ร้านเฟอร์นิเจอร์', icon: '🛋️', st: 'furnshop', late: 2 });   // walk-in showroom (its room is laid out after the convenience stores)
   B('barber', 'b_salon', 35, 30, { label: 'ร้านทำผม', icon: '💈', st: 'barber', late: 2 });   // walk-in salon
-  B('inn', 'b_library', 58, 13, { label: 'ห้องสมุดเมือง', icon: '📚', deco: true, renov: true });
+  B('inn', 'b_library', 58, 13, { label: 'หอสมุดเมือง', icon: '📚', st: 'library', layout: 'library', late: 6 });   // open again: reading room + the private detective's office (its room is laid out last)
   // south-west lane: services and trade (doors on row 45)
   B('warehouse', 'b_factory', 5, 45, { label: 'โรงประมูล (คลังสินค้า)', icon: '🔨', st: 'warehouse' });
   B('restaurant', 'b_cafe2', 20, 30, { label: 'ร้านอาหาร', icon: '🍜', st: 'restaurant' });
@@ -440,7 +440,7 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12] };
+const ROOM_SIZE = { inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['x_vending', 14.2, 2.7], ['x_drinkfridge', 12.6, 2.6], ['x_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['x_wclock', 10.2, 1.0, false], ['f_corkboard', 5.5, 1.15, false], ['x_aircon', 8, 1.0, false], ['f_extinguisher', 3.2, 2.4], ['x_coatrack', 12.6, 10.8], ['x_magrack', 3.6, 10.8], ['x_fern', 9.6, 10.8]],
@@ -496,6 +496,13 @@ const LAYOUT = {
   arcade: [['ad_claw', 1.5, 3.2], ['ad_claw', 3.0, 3.2], ['ad_claw', 4.5, 3.2], ['ad_counter', 8, 3.0], ['ad_token', 10.4, 2.8], ['ad_race', 12.4, 3.6], ['ad_race', 14.2, 3.6],
     ['ad_neon', 8, 6.2, false], ['ad_hoop', 1.3, 7.2], ['ad_hoop', 2.7, 7.2], ['ad_dance', 4.9, 7.0], ['ad_pinball', 10.0, 7.2], ['ad_mole', 11.3, 7.0], ['ad_hockey', 13.4, 7.0],
     ['ad_ballpit', 2.5, 10.9], ['ad_slide', 5.4, 10.8], ['ad_mat', 12.2, 11.0, false], ['ad_blocks', 11.6, 10.5, false], ['ad_cannon', 10.0, 10.8, false], ['ad_bench', 13.9, 11.0]],
+  // 📚 town library: the librarian's desk top centre between tall bookcases, bookcase rows down the left, two reading tables on a red rug,
+  // a reading corner with armchairs and a sofa at the bottom; the private detective's office in the right half (desk, files, notice board, coat rack)
+  library: [['f_window', 3.4, 1.1], ['f_window', 12.6, 1.1], ['x_wclock', 8, 0.95, false], ['x_cashdesk', 8, 2.5],
+    ['f_bookshelf_wide', 1.9, 2.7], ['x_bookshelf', 4.3, 2.7], ['x_bookshelf', 5.8, 2.7], ['f_bookshelf', 10.3, 2.7],
+    ['f_bookshelf', 1.3, 5.6], ['x_bookshelf', 1.3, 8.4], ['f_rug_red', 5.2, 7.6, false], ['f_table_chairs', 5.2, 6.9], ['f_table_chairs2', 5.2, 9.6],
+    ['i_corkboard', 13.4, 1.2, false], ['x_pdesk', 13.2, 4.4], ['x_dlamp', 12.4, 3.5, false], ['f_filing_grey', 15.0, 4.6], ['x_coatrack', 11.4, 4.6], ['f_rug_blue', 13.2, 7.0, false],
+    ['f_armchair', 3.0, 11.2, false], ['x_alamp', 1.5, 11.2], ['x_lsofa', 12.8, 11.2, false], ['x_globe', 10.4, 11.0], ['x_plant', 14.9, 9.3], ['f_plant', 6.0, 11.2], ['f_welcome', 8, 11.55, false]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
@@ -510,7 +517,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4, 5].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4, 5, 6].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -1085,7 +1092,7 @@ const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', '
 const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit', 'umbrella'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
-  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21] };
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21], inn: [6, 22], library: [6, 22] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
@@ -1510,7 +1517,7 @@ const CAREERS = {
   mechanic: { name: 'ช่างซ่อมรถ', icon: '🔧', where: 'door_dealer', need: [], desc: 'ตระเวนซ่อมรถเสียทั่วเมือง ปะยาง เปลี่ยนแบต ตรวจรถโชว์รูม · รับภารกิจที่ช่างเปี๊ยกหน้าโชว์รูมรถ' },
   thug: { name: 'นักเลง', icon: '😎', where: 'market', need: [], desc: 'นักเลงใจดีประจำตลาด: ไกล่เกลี่ยวัยรุ่น ตามหนี้ คุ้มกันเสี่ย (ใช้ปากมากกว่ามือ) · รับภารกิจที่เสี่ยเสือในตลาด' },
   photographer: { name: 'ช่างภาพ', icon: '📷', where: 'square', need: [], desc: 'รับจ้างถ่ายภาพสถานที่ งานแต่ง สัตว์หายาก ทั่วเมือง · รับภารกิจที่พี่โฟกัสที่จัตุรัส' },
-  detective: { name: 'นักสืบเอกชน', icon: '🕵️', where: 'staff_detective', need: [], desc: 'รับคดีค้นหาของหาย ตามหาคนและสัตว์เลี้ยง และไขปริศนา: เก็บเบาะแส สอบปากคำพยาน แล้วชี้ตัวคนร้าย (ตอบผิดเสียเวลา) · คดีที่ปิดได้จะถูกบันทึกในสมุดคดี · รับคดีที่ผู้กองเดชหน้าห้องสมุดเมือง' },
+  detective: { name: 'นักสืบเอกชน', icon: '🕵️', where: 'staff_detective', need: [], desc: 'รับคดีค้นหาของหาย ตามหาคนและสัตว์เลี้ยง และไขปริศนา: เก็บเบาะแส สอบปากคำพยาน แล้วชี้ตัวคนร้าย (ตอบผิดเสียเวลา) · คดีที่ปิดได้จะถูกบันทึกในสมุดคดี · รับคดีที่ผู้กองเดชในหอสมุดเมือง (มุมขวา)' },
   courier: { name: 'พนักงานส่งของ', icon: '📦', where: 'door_warehouse', need: [], desc: 'เดินส่งพัสดุตามบ้าน (ไม่ต้องมีใบขับขี่) ส่งครบเร็วได้โบนัส · รับภารกิจที่พี่ด่วนหน้าคลังสินค้า' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: [], desc: 'ทำอาหารที่ครัวใหญ่: ซื้อวัตถุดิบ หั่น ผัด ต้ม ย่าง แล้วจัดจาน · อาหารที่เชฟทำขายให้ร้านอาหารได้ราคาดีกว่าคนทั่วไป (ยิ่งเลเวลสูงยิ่งได้มาก) · รับภารกิจเชฟที่เชฟหมีในครัว' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
@@ -2109,7 +2116,9 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
     STATIONS.push({ id: 'staff_' + key, type: 'staff', career: key, at: where, label: 'เจ้าหน้าที่', icon: '💬', x: ok[0], y: ok[1], r: 1.3, area: fixed ? areaAt(ok[0], ok[1]).id : s.area });
   }
   // the private detective's office: in front of the town library (a closed building), so the officer stands outside
-  STATIONS.push({ id: 'staff_detective', type: 'staff', career: 'detective', at: 'staff_detective', label: 'สำนักงานนักสืบ (หน้าห้องสมุด)', icon: '🕵️', x: 61, y: 13.9, r: 1.3, area: 'town' });
+  { const r = ROOMS.find(q => q.id === 'r_inn');   // in the library, in front of the office desk
+    STATIONS.push({ id: 'staff_detective', type: 'staff', career: 'detective', at: 'staff_detective', label: 'สำนักงานนักสืบ (ในหอสมุดเมือง)', icon: '🕵️', x: r.x + 13.2, y: r.y + 5.4, r: 1.3, area: r.id });
+    for (const [i, dx, dy] of [[1, 3.0, 11.3], [2, 12.3, 11.4], [3, 13.3, 11.4]]) STATIONS.push({ id: 'seat_lib' + i, type: 'seat', label: 'ที่นั่งอ่านหนังสือ', icon: '📖', room: r.id, x: r.x + dx, y: r.y + dy - .25, r: 1.1 }); }
 }
 
 // easter eggs: the wishing fountain, the disguised mayor, the legendary fish and the secret signs
