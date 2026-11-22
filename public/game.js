@@ -1903,7 +1903,8 @@ function draw(t) {
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
       else if (e[3] === 'ghost') { const bad = !!placeBad(); ctx.globalAlpha = .6 + Math.sin(t / 200) * .2; if (bad) ctx.filter = 'sepia(1) saturate(6) hue-rotate(-50deg)'; sprF(e[0], e[1], e[2], X, Y, e[5]); ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.strokeStyle = bad ? '#ff4a4a' : '#ffd770'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(e[1] * TS + X, e[2] * TS + Y, TS * .55, TS * .2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); if (e[4]?.spk) drawSprinkler(e, X, Y, t); }
-      else { sprF(e[0], e[1], e[2], X, Y, e[5]); if (e[4]?.aq) drawAqFish(e, X, Y, t); else if (e[4]) drawYardCrop(e, X, Y, t); }
+      else { if (e[3]) { ctx.save(); ctx.shadowColor = e[3]; ctx.shadowBlur = TS * (.35 + Math.sin(t / 300) * .15); }   // ✨ legend crafted pieces glow
+        sprF(e[0], e[1], e[2], X, Y, e[5]); if (e[3]) ctx.restore(); if (e[4]?.aq) drawAqFish(e, X, Y, t); else if (e[4]) drawYardCrop(e, X, Y, t); }
     }
     else if (k === 5) drawCar(e, X, Y);
     else if (k === 6) drawPet(e, X, Y, t);
@@ -5832,6 +5833,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26e', d: '22 พ.ย.', items: [
+    '🔨 <b>โรงช่างคราฟเปิดแล้ว!</b> โต๊ะช่างบนสนามหญ้าทางตะวันออกของลานกลางเมือง คราฟเฟอร์นิเจอร์ที่ร้านไหนก็ไม่มีขาย 6 แบบ',
+    '🧰 วัตถุดิบใหม่ 🪵ไม้ 🧵ผ้า 🐚เปลือกหอยมุก 💠เศษคริสตัล ได้แบบสุ่มระหว่างตกปลา เก็บผัก และทำงาน',
+    '✨ ของระดับตำนาน "ซุ้มประตูเพชรเรืองแสง" เรืองแสงในบ้าน ใช้ 💎 ชิ้นส่วนเพชร (ซื้อที่โรงช่าง หรือได้จากอันดับ 1–3 แข่งตกปลา)',
+    '🏡 ยังไม่มีบ้านก็คราฟได้ ของจะเก็บไว้ให้ มีบ้านเมื่อไหร่วางได้เลย',
+  ] },
   { v: '2026-11-26d', d: '22 พ.ย.', items: [
     '🏘️ <b>หมู่บ้านจัดสรรขยายแล้ว!</b> เพิ่มฝั่งตะวันตกอีก 12 แปลง รวมเป็น 24 หลัง (เดินต่อจากถนนหมู่บ้านไปทางซ้าย มีลานน้ำพุใหม่) · คนออนไลน์เยอะแค่ไหนบ้านก็ไม่ค่อยหายแล้ว',
   ] },
@@ -6836,6 +6843,18 @@ function gangPanel(p) {
   }
   return `<h2>${g ? `<span style="color:${g.color}">${g.icon} ${esc(g.name)}</span>` : '🏴 แก๊ง / ชมรม'}</h2><div class="tabs">${tabs}</div>${body}`;
 }
+// 🔨 the crafting workshop: craft-only furniture from materials (dropped while fishing, harvesting, working)
+function craftHtml(st) {
+  const inv = me.inv || {}, own = [...(me.furniture || []), ...(me.keep || [])];
+  const rows = (G.crafts || []).map(r => {
+    const f = G.shop.furniture[r.id]; if (!f) return '';
+    const ok = Object.entries(r.in).every(([k, q]) => (inv[k] || 0) >= q);
+    const need = Object.entries(r.in).map(([k, q]) => `<span style="${(inv[k] || 0) >= q ? '' : 'color:#e05555'}">${G.items[k]?.icon || ''}${esc(G.items[k]?.name || k)} ${inv[k] || 0}/${q}</span>`).join(' · ');
+    return `<div class="item"><div class="em">${f.icon}</div><div class="nm"><b>${esc(f.name)}</b>${f.glow ? ' ✨ <small>ตำนาน เรืองแสง</small>' : ''}<small>ความสบาย +${f.comfort} · ${need}</small></div>${own.includes(r.id) ? '<small>✅ มีแล้ว</small>' : B('🔨 คราฟ', { t: 'act', st, a: 'make', rid: r.id }, 'primary', !ok)}</div>`;
+  }).join('');
+  return `<h2>🔨 โรงช่างคราฟ</h2><div class="sub">ของที่นี่ร้านไหนก็ไม่มีขาย · วัตถุดิบ 🪵🧵🐚💠 ได้ระหว่างตกปลา เก็บผัก และทำงาน · 💎 ชิ้นส่วนเพชรซื้อที่นี่หรือได้จากอันดับ 1–3 แข่งตกปลา · ของที่คราฟส่งไปบ้าน (ยังไม่มีบ้านก็เก็บไว้ให้)</div><div class="list">${rows}</div>
+    <div class="grid2" style="margin-top:8px">${B(`💎 ชิ้นส่วนเพชร x1 (💎${G.shardGems})`, { t: 'act', st, a: 'shard', n: 1 }, '', (me.gems || 0) < G.shardGems)}${B(`💎 x5 (💎${G.shardGems * 5})`, { t: 'act', st, a: 'shard', n: 5 }, '', (me.gems || 0) < G.shardGems * 5)}</div>`;
+}
 function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
@@ -6843,6 +6862,7 @@ function renderPanel(p) {
     case 'xmasshow': return xmasHtml();
     case 'casino': case 'slot': case 'hilo': case 'roul': case 'bj': return czHtml(k, st);
     case 'arcade': case 'arcm': case 'claw': return arcHtml(k, st);
+    case 'craft': return craftHtml(st);
     case 'astats': return me.admin ? aStatsHtml() : '';
     case 'noti': return lbNotiHtml();
     case 'ev7': return ev7Html();
@@ -7359,7 +7379,7 @@ function renderPanel(p) {
         return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ${fl ? 'พื้นบ้าน' : 'วอลเปเปอร์'}ซื้อครั้งเดียว ใช้ได้ทุกชั้น · เปลี่ยนได้ที่ 🛋️ จัดบ้าน › แท็บ 🟫 พื้น/ผนัง</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อน</div>'}
           <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ftab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
       }
-      const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && (f.cat || 'basic') === tab).sort((a, b) => !!a[1].gem - !!b[1].gem || a[1].price - b[1].price);   // 💎 pieces last
+      const list = Object.entries(G.shop.furniture).filter(([, f]) => !f.gift && !f.craft && (f.cat || 'basic') === tab).sort((a, b) => !!a[1].gem - !!b[1].gem || a[1].price - b[1].price);   // 💎 pieces last
       const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
         return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : f.gem ? B(`💎${f.gem}`, { t: 'act', st, a: 'buy', item: k }, own ? 'primary' : '', !own || (me.gems || 0) < f.gem && !me.gemInf) : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
       return `<h2>🛋️ ร้านเฟอร์นิเจอร์</h2><div class="sub">${hoursTxt('furnshop')} · ซื้อแล้วส่งเข้าคลังที่บ้าน จัดวางเองด้วยปุ่ม 🛋️ จัดบ้าน · ความสบายรวมสูงสุด ⭐30${own ? ` · บ้านเลขที่ ${me.house + 1} ความสบาย ⭐ <b>${me.comfort}</b>` : ''}</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อเฟอร์นิเจอร์ได้</div>'}
@@ -7368,7 +7388,7 @@ function renderPanel(p) {
     case 'plantshop': {
       const own = !!me.hown, cats = [['garden', '🌳 ต้นไม้ & สวน'], ['indoor', '🪴 ต้นไม้ในบ้าน']];
       const tab = cats.some(c => c[0] === p.ptab) ? p.ptab : 'garden';
-      const list = Object.entries(G.shop.furniture).filter(([k, f]) => !f.gift && (tab === 'garden' ? f.cat === 'garden' : G.shop.plantIndoor.includes(k))).sort((a, b) => a[1].price - b[1].price);
+      const list = Object.entries(G.shop.furniture).filter(([k, f]) => !f.gift && !f.craft && (tab === 'garden' ? f.cat === 'garden' : G.shop.plantIndoor.includes(k))).sort((a, b) => a[1].price - b[1].price);
       const cards = list.map(([k, f]) => { const cnt = me.furniture.filter(x => fbase(x) === k).length, has = !f.multi && cnt > 0;
         return `<div class="look fcard ${has ? 'on' : ''}"><canvas data-spr="${furnSpr(k)}" width="96" height="80"></canvas><small>${f.icon} ${esc(f.name)}</small><em>${f.multi ? (cnt ? `มีแล้ว ${cnt} ชิ้น` : f.solid ? 'กั้นทางเดิน' : 'เดินผ่านได้') : f.comfort ? `ความสบาย +${f.comfort}` : 'ของแต่ง'}</em>${has ? '<span class="tag">มีแล้ว ✓</span>' : f.gem ? B(`💎${f.gem}`, { t: 'act', st, a: 'buy', item: k }, own ? 'primary' : '', !own || (me.gems || 0) < f.gem && !me.gemInf) : B(money(f.price), { t: 'act', st, a: 'buy', item: k }, own ? 'good' : '', !own || me.money < f.price) + (f.multi && f.price * 10 <= 20000 ? B(`x10 ${money(f.price * 10)}`, { t: 'act', st, a: 'buy', item: k, qty: 10 }, '', !own || me.money < f.price * 10) : '')}</div>`; }).join('');
       return `<h2>🌳 ร้านต้นไม้</h2><div class="sub">${hoursTxt('flower')} · ต้นไม้ใหญ่ พุ่มไม้ ดอกไม้ และไม้ประดับ ซื้อแล้วส่งเข้าคลังที่บ้าน วางเองด้วยปุ่ม 🛋️ จัดบ้าน · 🌱 อยากปลูกผัก? ซื้อ 🟫 แปลงดิน ที่ร้านเฟอร์นิเจอร์ (แท็บสวน)</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อต้นไม้ได้</div>'}
@@ -7842,7 +7862,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v22').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v22'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v23').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v23'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
@@ -8834,7 +8854,7 @@ function layoutFurniture() {
         const pos = furnPos(h, k); let sp = furnSpr(k); if (!(pos && pos[0] === 9 && sp)) continue;
         const f = G.shop.furniture[fbase(k)];
         if (f?.tile) sp = soilSprite(soil, Math.floor(pos[1]), Math.round(pos[2]) - 1);   // joins up with the soil next to it
-        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, f?.field ? { k, house: r.house, tile: !!f.tile } : f?.sprk ? { k, house: r.house, spk: f.sprk } : null, pos[3]]); hitAdd(r, k, sp, pos);
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], f?.glow || null, f?.field ? { k, house: r.house, tile: !!f.tile } : f?.sprk ? { k, house: r.house, spk: f.sprk } : null, pos[3]]); hitAdd(r, k, sp, pos);
         addWall(f, sp, r.x + pos[1], r.y + pos[2]);
       }
       if (placing && placing.house === r.house && placing.fl === 9) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', G.shop.furniture[fbase(placing.k)]?.sprk ? { spk: G.shop.furniture[fbase(placing.k)].sprk, ghost: 1 } : null, placing.flip]);
@@ -8850,7 +8870,7 @@ function layoutFurniture() {
         const aqn = AQ_SLOTS[fbase(k)] || 0, aqf = aqn ? (h[15] || []).slice(aqi, aqi += aqn) : null;
         if (placing && placing.house === r.house && placing.k === k) continue;   // the piece being moved is drawn at the cursor
         const pos = furnPos(h, k), sp = furnSpr(k); if (!(pos && pos[0] === fl && sp)) continue;
-        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], null, aqf?.length ? { aq: aqf } : null, pos[3]]); hitAdd(r, k, sp, pos);
+        roomFurniture.push([sp, r.x + pos[1], r.y + pos[2], G.shop.furniture[fbase(k)]?.glow || null, aqf?.length ? { aq: aqf } : null, pos[3]]); hitAdd(r, k, sp, pos);
         addWall(G.shop.furniture[fbase(k)], sp, r.x + pos[1], r.y + pos[2]);
       }
       if (placing && placing.house === r.house && placing.fl === fl) roomFurniture.push([furnSpr(placing.k), r.x + placing.x, r.y + placing.y, 'ghost', null, placing.flip]);
