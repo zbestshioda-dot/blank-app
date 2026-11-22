@@ -1650,7 +1650,9 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
   #login.saved #loginForm:not(.open) .linkBtn{color:#fff;opacity:.75;font-size:11px;padding:2px;text-shadow:0 1px 4px #000}
   #login.saved #loginForm:not(.open) .lfApps{justify-content:center;gap:10px;margin-top:2px}
   #login.saved #loginForm:not(.open) .lfApps button{flex:none;width:40px;height:40px;padding:0;border-radius:50%;font-size:18px;background:rgba(255,243,220,.88)!important;border:1px solid #d9a94f!important;box-shadow:none!important}
-  #login.saved #loginForm:not(.open) .lfApps button span{display:none}
+  #login.saved #loginForm:not(.open) .lfApps button span:not(.pxi){display:none}
   #login.saved #loginForm:not(.open) .lfApps button.hidden{display:none}
 }
 @keyframes tapBlink{0%,100%{opacity:1}50%{opacity:.35}}
+/* login screen: no "players online" badge */
+#promoOnline,.promoOnline,#heroOnline{display:none!important}
