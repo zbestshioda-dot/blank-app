@@ -552,7 +552,7 @@ function gangOp(a, m) {
   if (op === 'rest') {
     const L = GANG.lv[g.lvl - 1];
     if (!cd(a, 'gangrest', GANG.restMs)) return;
-    a.energy = Math.min(100, a.energy + L.rest); markMe(a);
+    enLog(a, Math.min(100, a.energy + L.rest) - a.energy, 'พักที่บ้านแก๊ง'); a.energy = Math.min(100, a.energy + L.rest); markMe(a);
     return toast(a, `พักที่${L.n}แก๊ง พลังงาน +${L.rest}`, '🛋️');
   }
   if (op === 'upgrade') {
@@ -1460,10 +1460,21 @@ function tradePrices(a) {
   const out = {}; for (const id in a.inv) if (a.inv[id] > 0 && D.ITEMS[id]?.kind === kind) out[id] = Math.round(npcBuyPrice(a, id, NPC_BUY) * msat(a, id)[0] * jobPay(a));
   return out;
 }
+// ⚡ energy history for the admins (last hour, in memory): what used it and where it came back from
+function enLog(a, d, why) {
+  if (!d) return; const t = now(), L = a.enLog || (a.enLog = []);
+  const last = L[L.length - 1]; if (last && last[2] === why && t - last[0] < 60000) { last[1] += d; last[3]++; return; }   // one row a minute per reason
+  L.push([t, d, why, 1]); while (L.length && t - L[0][0] > 3600e3) L.shift(); if (L.length > 300) L.shift();
+}
+function enSum(a) {
+  const L = (a.enLog || []).filter(r => now() - r[0] < 3600e3), by = {};
+  for (const [, d, why, n] of L) { const k = d < 0 ? '-' + why : why; const o = by[k] || (by[k] = [k, 0, 0]); o[1] += d; o[2] += n; }
+  return { now: Math.round(a.energy), rows: Object.values(by).map(([k, d, n]) => [k, Math.round(d * 10) / 10, n]).sort((p, q) => Math.abs(q[1]) - Math.abs(p[1])).slice(0, 8) };
+}
 function spend(a, e) {
   e = Math.ceil(e * D.ENERGY_MUL);   // work and quests tire you more: the amusement park is where you get it back
   if (a.energy < e) { toast(a, `พลังงานไม่พอ (ต้องใช้ ${e}) ไปเล่นสวนสนุก 🎡 หรือนอนพักที่เตียงในบ้าน 🛏️`, '😴', false); return false; }
-  a.energy -= e;
+  a.energy -= e; enLog(a, -e, 'ใช้ทำงาน/ภารกิจ');
   a.hunger = Math.max(0, a.hunger - e * 0.12);
   if (a.energy < 20) infect(a, 'exhaust', 0.1);
   return true;
@@ -2043,7 +2054,7 @@ function classroomFun(a, id) {
   if (e === 0) { joy(a, 2); toast(a, 'นกบินเข้ามาในห้องเรียน เพื่อนๆ หัวเราะกันใหญ่', '🐦'); }
   else if (e === 1) { earn(a, 20); toast(a, 'เจอเหรียญใต้โต๊ะเรียน +฿20', '🪙'); }
   else if (e === 2) { joy(a, 3); toast(a, 'เพื่อนส่งโน้ตตลกมาให้ ยิ้มออกเลย', '📝'); }
-  else { a.energy = Math.min(100, a.energy + 6); toast(a, 'เพื่อนข้างๆ แบ่งขนมให้ พลังงานเพิ่มขึ้น', '🍪'); }
+  else { enLog(a, Math.min(100, a.energy + 6) - a.energy, 'เพื่อนแบ่งขนม'); a.energy = Math.min(100, a.energy + 6); toast(a, 'เพื่อนข้างๆ แบ่งขนมให้ พลังงานเพิ่มขึ้น', '🍪'); }
   markMe(a);
 }
 function studyTick(a, h, dt) {
@@ -3247,7 +3258,7 @@ function act(a, m) {
       if (a.utilOff) return toast(a, 'ถูกตัดน้ำตัดไฟเพราะค้างค่าน้ำค่าไฟ! จ่ายบิลที่ธนาคารหรือในแอพมือถือก่อน', '🔌', false);
       if (!cd(a, 'homesleep', 120000)) return;
       const e = 50 + (own ? comfort(a) * 2 : 0);
-      a.energy = Math.min(100, a.energy + e); a.health = Math.min(100, a.health + 5); sleepWell(a);
+      enLog(a, Math.min(100, a.energy + e) - a.energy, 'นอนที่บ้าน'); a.energy = Math.min(100, a.energy + e); a.health = Math.min(100, a.health + 5); sleepWell(a);
       a.usage = { sleep: (a.usage?.sleep || 0) + 1 }; joy(a, 6 + (own ? comfort(a) : 0));
       markMe(a);
       return toast(a, `นอนหลับสบาย พลังงาน +${e} หายง่วงแล้ว 😊`, '😴');
@@ -3270,7 +3281,7 @@ function useItem(a, id) {
   addItem(a, id, -1);
   const e = it.eat;
   if (e.hunger) { a.hunger = Math.min(100, a.hunger + e.hunger); quest(a, 'eat'); }
-  if (e.energy) a.energy = Math.min(100, a.energy + e.energy);
+  if (e.energy) { enLog(a, Math.min(100, a.energy + e.energy) - a.energy, 'กิน/ใช้ ' + it.name); a.energy = Math.min(100, a.energy + e.energy); }
   if (e.health) a.health = Math.min(100, a.health + e.health);
   if (e.happy) joy(a, e.happy);
   const healed = (it.cures || []).filter(d => cure(a, d));
@@ -5267,7 +5278,7 @@ function onMessage0(ws, raw) {
       if (a.adDay !== day) { a.adDay = day; a.adN = 0; }
       if (a.adN >= ADS.daily) return toast(a, `วันนี้รับรางวัลจากโฆษณาครบ ${ADS.daily} ครั้งแล้ว พรุ่งนี้มาใหม่นะ`, '🎁', false);
       if (!cd(a, 'adrw', ADS.gap)) return;
-      a.adN++; a.gems = (a.gems || 0) + ADS.gems; a.energy = Math.min(100, a.energy + ADS.energy); markMe(a); stat(a, 'adsWatched');
+      a.adN++; a.gems = (a.gems || 0) + ADS.gems; enLog(a, Math.min(100, a.energy + ADS.energy) - a.energy, 'ดูโฆษณา'); a.energy = Math.min(100, a.energy + ADS.energy); markMe(a); stat(a, 'adsWatched');
       return toast(a, `🎁 ขอบคุณที่ดูโฆษณา! ได้ 💎${ADS.gems} และพลังงาน +${ADS.energy} (วันนี้ ${a.adN}/${ADS.daily})`, '🎁');
     }
     case 'alms_give': {                     // put food in a monk's bowl
@@ -5440,7 +5451,7 @@ function godAct(a, m) {
     const hits = [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
     return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
-      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x) })) });
+      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x) })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
@@ -5719,9 +5730,9 @@ function tick() {
       const R = D.RIDES[a.fun.k];
       if (!R || zoneId(a) !== 'park') standUp(a);
       else if (t > a.fun.until) { rideOff(a); markMe(a); toast(a, `หมดเวลา${R.name}แล้ว กดเล่นใหม่ได้เลย (ฟรี) เพื่อเล่นต่อได้เลย`, R.icon); }
-      else { a.energy = Math.min(100, a.energy + R.gain.energy * dt); if (!a.down) a.health = Math.min(100, a.health + R.gain.health * dt); a.happy = Math.min(100, (a.happy ?? 80) + R.gain.happy * dt); }
+      else { enLog(a, Math.min(100, a.energy + R.gain.energy * dt) - a.energy, 'เครื่องเล่นสวนสนุก'); a.energy = Math.min(100, a.energy + R.gain.energy * dt); if (!a.down) a.health = Math.min(100, a.health + R.gain.health * dt); a.happy = Math.min(100, (a.happy ?? 80) + R.gain.happy * dt); }
     }
-    if (a.pose !== 'chair' && a.pose !== 'study') a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt);
+    if (a.pose !== 'chair' && a.pose !== 'study') { const e0 = a.energy; a.energy = Math.min(100, a.energy + 0.15 * (depressed(a) ? 0.6 : 1) * restMul * (1 + 0.03 * comfort(a)) * dzProd(a, 'regen') * dt); enLog(a, a.energy - e0, a.pose === 'bed' || a.pose === 'hosp' ? 'นอนพัก' : 'ฟื้นเองตามเวลา'); }
     a.hunger = Math.max(0, a.hunger - 0.045 * (a.career === 'monk' ? .55 : 1) * dzProd(a, 'hunger') * (flu ? 1.3 : 1) * (a.down ? 0.2 : 1) * dt);
     if (!a.down) {
       if (a.hunger < 15) { a.lowFood = (a.lowFood || 0) + dt; if (a.lowFood > 60) a.health -= 0.08 * dt; } else a.lowFood = 0;

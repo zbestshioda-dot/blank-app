@@ -5619,7 +5619,7 @@ function godFindHtml() {
   if (!godFindRes.list.length) return `<div class="sub">ไม่พบผู้เล่นที่ตรงกับ "${esc(godFindRes.q)}"</div>`;
   const d = t => t ? new Date(t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
-    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.doc ? `<br>${x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
+    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.en ? `<br>⚡ พลังงานตอนนี้ ${x.en.now} · 1 ชม.ล่าสุด: ${x.en.rows.length ? x.en.rows.map(([k, d, n]) => `${esc(k.replace(/^-/, ''))} ${d > 0 ? '+' : ''}${d} (${n})`).join(' · ') : 'ยังไม่มีข้อมูล'}` : ''}${x.doc ? `<br>${x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
     <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>
     <div class="rowf" style="margin-top:4px"><input id="godGem_${esc(x.login)}" type="text" inputmode="numeric" maxlength="7" placeholder="💎 จำนวน (ติดลบ = หัก)"><input id="godGemW_${esc(x.login)}" type="text" maxlength="80" placeholder="เหตุผล (ผู้เล่นเห็น)">${B('💎 ส่งเพชร', { fn: 'godGem', login: x.login }, 'good')}</div>${B('💸 ดูประวัติการเงิน', { fn: 'godLedger', login: x.login })}<div class="grid2" style="margin-top:4px">${B('💳 ให้บัตรรายเดือน + 💎', { fn: 'godCard', login: x.login, gems: 1 }, 'good')}${B('💳 ต่อบัตรอย่างเดียว', { fn: 'godCard', login: x.login })}</div>${x.cardTo ? `<small>💳 บัตรรายเดือนใช้ได้ถึง ${d(x.cardTo)}</small>` : ''}${x.buys?.length ? `<div class="rowf" style="margin-top:4px"><select id="godRf_${esc(x.login)}">${x.buys.map(([k, n, p, g]) => `<option value="${esc(k)}">${esc(n)} · ${g ? '💎' + g : money(p)}</option>`).join('')}</select>${B('↩️ คืนชุด+คืนเงิน', { fn: 'godRefund', login: x.login }, 'warn')}</div>` : ''}</div>`).join('')}</div>`;
 }
@@ -5836,6 +5836,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26h', d: '23 พ.ย.', items: [
+    '🛡️ แอดมินตรวจสอบรายงานผู้เล่นได้ละเอียดขึ้น (ประวัติพลังงานและสถิติการรักษาของหมอ) เพื่อความแฟร์ของทุกคน',
+  ] },
   { v: '2026-11-26g', d: '23 พ.ย.', items: [
     '🩺 หมอ: ต้องยืนตรวจอาการข้างเตียง 2.5 วินาทีก่อนเลือกการรักษา · อาการสลับลำดับทุกครั้ง และคนไข้อาจบ่นอาการที่ไม่เกี่ยวมา 1 อย่าง ต้องอ่านให้ดี',
     '🤒 ไอคอนป่วยบนหัวคนอื่นเป็นแบบเดียวกันหมดแล้ว (ไม่บอกชื่อโรค หมอต้องวินิจฉัยเอง)',
