@@ -1567,6 +1567,7 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 .bagSlots .bslot{position:relative;aspect-ratio:1;min-height:0;padding:2px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,235,200,.16);border-radius:6px;font-size:26px;color:#fff;box-shadow:none}
 .bagSlots .bslot canvas{max-width:88%;height:auto}
 .bagSlots .bslot i{position:absolute;right:3px;bottom:1px;font-style:normal;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000,0 0 2px #000}
+.bagSlots .bslot .bstar{position:absolute;left:2px;top:0;font-size:12px;line-height:1;filter:drop-shadow(0 1px 1px #000)}
 .bagSlots .bslot.empty{background:rgba(255,255,255,.025);border-style:dashed}
 .bagSlots .bslot.on{border:2px solid #f2c14e;box-shadow:0 0 0 2px rgba(242,193,78,.35) inset}
 .bagSlots .bslot.r2{border-color:#2e9e3a}.bagSlots .bslot.r3{border-color:#1d7fd6}.bagSlots .bslot.r4{border-color:#9a45d6}.bagSlots .bslot.r5{border-color:#e07b00}

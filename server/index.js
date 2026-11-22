@@ -1700,20 +1700,30 @@ const PLOT_AREAS = D.HOUSE_PRICES.map((_, i) => new Set([...D.ROOMS.filter(r => 
 const plotBusy = (i, but) => [...online.values()].some(o => o !== but && o.ws && PLOT_AREAS[i].has(areaId(o)));
 const friendOf = (o, a) => !!o && (o.contacts || []).some(c => c.p === a.phone);
 const canVisit = (a, i) => houses[i] === a || isAdmin(a) && a.god?.doors || friendOf(houses[i], a);
-function plotGive(a) {
+const inVillage = o => { const id = areaId(o); return id === 'housing' || PLOT_AREAS.some(S => S.has(id)); };
+// force: the player is in the village or going home: when every plot is taken, borrow one from an owner who is offline
+// (kept a few minutes after a disconnect) or away from the village the longest — their home comes back on another plot later
+function plotGive(a, force) {
   if (!a.hown || a.house >= 0) return a.house;
-  const free = houses.map((h, i) => i).filter(i => !houses[i] && !plotBusy(i));
+  let free = houses.map((h, i) => i).filter(i => !houses[i] && !plotBusy(i));
+  if (!free.length && force) {
+    const cand = houses.map((o, i) => [o, i]).filter(([o, i]) => o && o !== a && !plotBusy(i) && !(o.ws && inVillage(o)))
+      .sort(([p], [q]) => (p.ws ? 1 : 0) - (q.ws ? 1 : 0) || (p.homeT || 0) - (q.homeT || 0));
+    if (cand.length) { const [o, i] = cand[0]; houses[i] = null; o.house = -1; if (o.ws) markMe(o); free = [i]; }
+  }
   if (!free.length) return -1;
   const i = pick(free); houses[i] = a; a.house = i; a.fixYard = 1; markMe(a); wdAt = 0;
   return i;
 }
 function plotTick() {
-  houses.forEach((o, i) => { if (o && (!o.ws || !o.hown) && !plotBusy(i, o)) { houses[i] = null; o.house = -1; wdAt = 0; } });
-  for (const a of online.values()) if (a.ws && a.hown && a.house < 0 && plotGive(a) >= 0 && a.wakeHome) { a.wakeHome = 0; const y = D.YARDS[a.house]; if (y) teleport(a, y.spawn.x, y.spawn.y); }
+  // a plot is kept 5 minutes after its owner disconnects (a phone dropping off the network no longer loses the house)
+  houses.forEach((o, i) => { if (o && (!o.hown || !o.ws && now() - (o.lastOff || 0) > 5 * 60e3) && !plotBusy(i, o)) { houses[i] = null; o.house = -1; wdAt = 0; } });
+  for (const a of online.values()) if (a.ws && a.house >= 0 && PLOT_AREAS[a.house].has(areaId(a))) a.homeT = now();   // last time at home
+  for (const a of online.values()) if (a.ws && a.hown && a.house < 0 && plotGive(a, inVillage(a)) >= 0 && a.wakeHome) { a.wakeHome = 0; const y = D.YARDS[a.house]; if (y) teleport(a, y.spawn.x, y.spawn.y); }
 }
 function goHome(a, o = a) {
   if (o !== a && !canVisit(a, o.house)) return toast(a, `${o.name} ยังไม่ได้บันทึกเบอร์คุณเป็นเพื่อน เข้าบ้านไม่ได้`, '🔒', false);
-  const i = o === a ? plotGive(a) : o.house;
+  const i = o === a ? plotGive(a, true) : o.house;
   if (i < 0) return toast(a, o === a ? 'หมู่บ้านเต็มชั่วคราว รอสักครู่จะมีที่ว่าง' : `${o.name} ยังไม่มีบ้านตั้งในหมู่บ้านตอนนี้`, '🏘️', false);
   const y = D.YARDS[i]; if (!y) return;
   if (!cd(a, 'door', 1200, true)) return;
@@ -3084,7 +3094,7 @@ function act(a, m) {
       if (!pay(a, T.price)) return;
       a.hown = { style: st, tier: +m.tier }; a.furniture = (a.furniture || []).filter(k => !D.FURNITURE[fbase(k)]?.field); a.fpos = {}; a.ycrops = {};
       a.hlv = T.floors; a.yz = [0, 2].slice(0, T.zones); a.yfree = 0; starterYard(a);
-      plotGive(a); markMe(a); wdAt = 0; joy(a, 20);
+      plotGive(a, true); markMe(a); wdAt = 0; joy(a, 20);
       feed(`🏠 ${a.name} ซื้อ${T.name}หลังใหม่!`);
       send(a, { t: 'share', k: 'house', name: T.name });   // 📤 offer the share card
       return toast(a, `ยินดีด้วย! ได้${T.name}แล้ว 🎉 บ้านของคุณจะตั้งอยู่ในหมู่บ้านตอนที่คุณออนไลน์ · กด "🏠 ไปบ้านฉัน" กับคุณจิ๋มได้เลย`, '🏠');

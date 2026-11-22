@@ -4457,6 +4457,7 @@ const FN = {
   mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); },   // the text stays until the server confirms (mailsent)
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  star(m) { const id = m.item; STARS.has(id) ? STARS.delete(id) : STARS.add(id); try { localStorage.setItem('lt_star', JSON.stringify([...STARS])); } catch { } FX.play('click'); refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); $('#panel').classList.toggle('bagMode', panel.kind === 'bag' && (panel.gtab || 'items') === 'items'); refreshPanel(true); },
   social(m) {
     const k = m.k || 'ideas';
@@ -5353,10 +5354,13 @@ function folksPanel() {
   const open = FOLKS.filter(f => f.req && !f.req.done).length;
   return `<h2>💞 ชาวเมือง</h2>${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
 }
+// ⭐ starred bag items (this device): always listed first in the bag and in the gift list, so a gift is found before the NPC walks off
+const STARS = new Set((() => { try { return JSON.parse(localStorage.getItem('lt_star') || '[]'); } catch { return []; } })());
+const starFirst = (a, b) => (STARS.has(b[0]) ? 1 : 0) - (STARS.has(a[0]) ? 1 : 0);
 function folkGiftPanel(p) {
   const f = FOLKS?.find(x => x.id === p.fid), skip = new Set(['petegg', 'fcbait']);
-  const inv = Object.entries(me.inv || {}).filter(([id, n]) => n > 0 && G.items[id] && !skip.has(id)).sort((a, b) => (G.items[b[0]].base || 0) - (G.items[a[0]].base || 0));
-  const rows = inv.map(([id, n]) => { const tag = f?.love === id ? ' 💖' : f?.likes?.includes(id) ? ' ❤️' : ''; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(G.items[id].name)}${tag}<small>มี ${n}</small></div>${B('ให้', { fn: 'folkGive', npc: p.npc, item: id }, 'good')}</div>`; }).join('') || '<div class="sub">กระเป๋าว่าง ลองซื้อขนมหรือของฝากมาให้ดูนะ</div>';
+  const inv = Object.entries(me.inv || {}).filter(([id, n]) => n > 0 && G.items[id] && !skip.has(id)).sort((a, b) => starFirst(a, b) || (G.items[b[0]].base || 0) - (G.items[a[0]].base || 0));
+  const rows = inv.map(([id, n]) => { const tag = (STARS.has(id) ? ' ⭐' : '') + (f?.love === id ? ' 💖' : f?.likes?.includes(id) ? ' ❤️' : ''); return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(G.items[id].name)}${tag}<small>มี ${n}</small></div>${B('ให้', { fn: 'folkGive', npc: p.npc, item: id }, 'good')}</div>`; }).join('') || '<div class="sub">กระเป๋าว่าง ลองซื้อขนมหรือของฝากมาให้ดูนะ</div>';
   return `<h2>🎁 ให้ของขวัญ${f ? ' · ' + esc(f.name) : ''}</h2><div class="sub">ให้ได้วันละ 1 ชิ้น · ❤️ ของที่ชอบ +3 · 💖 ของโปรด +6 · อย่างอื่น +1${f?.today ? ' · 🎂 วันนี้วันเกิด แต้ม x2!' : ''}</div><div class="list">${rows}</div>`;
 }
 const openRecs = () => { send({ t: 'frecs' }); openPanel({ kind: 'fishrecs' }); };
@@ -5828,6 +5832,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25x', d: '22 พ.ย.', items: [
+    '⭐ ติดดาวของในกระเป๋าได้ (กดที่ของ → ☆ ติดดาว): ของติดดาวขึ้นก่อนเสมอ ทั้งในกระเป๋าและตอนเลือกของขวัญให้ชาวเมือง',
+    '🏡 แก้บ้านหาย: เน็ตหลุดแป๊บเดียวบ้านยังอยู่ (เก็บที่ไว้ 5 นาที) · เข้าหมู่บ้านตอนที่เต็ม จะได้ที่ของคนที่ออฟไลน์หรืออยู่นอกหมู่บ้านนานสุดแทน (บ้านเขาไม่หาย แค่ย้ายแปลงตอนกลับมา)',
+    '🟫 แตะเลือกแปลงดิน/แปลงผักเพื่อย้ายหรือเก็บง่ายขึ้น (แตะโดนต้นผักก็ได้ แตะพลาดนิดหน่อยก็เลือกชิ้นที่ใกล้สุดให้)',
+  ] },
   { v: '2026-11-26a', d: '22 พ.ย.', items: [
     '🟫 แก้แล้ว: แปลงดินที่วางในสวนแล้ว ย้ายหรือเก็บทีละช่องได้ (จัดบ้าน → ✋ แตะของ → แตะแปลงดิน → แตะช่องใหม่ ✓ วาง หรือ 📦 เก็บ)',
     '💬 <b>ตัวละครทั้งเมืองมีนิสัยของตัวเองแล้ว!</b> คำพูดใหม่ทั้ง 50 คน มีมุก มีคำติดปาก แถมรู้จักกันเอง ลองคุยหลายๆ รอบดูสิ (ต้มยำร้านไหนอร่อยกว่า? 🌶️)',
@@ -7167,11 +7176,11 @@ function renderPanel(p) {
       const outfits = (me.outfits || []).length ? `<div class="looks">${me.outfits.map(id => { const on = me.outfit === id; return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(G.outfitDefs[id]) || id)}</small>${B(on ? 'ถอด' : 'ใส่', { fn: 'look', set: { outfit: on ? '' : id } }, on ? '' : 'good')}</div>`; }).join('')}</div>` : '';
       if (gtab === 'items') {   // 🎒 a grid of slots (like a proper RPG bag): categories down the left, the picked item's card on the right
         const sort = ['cat', 'value', 'qty', 'name'].includes(p.gsort) ? p.gsort : 'cat';
-        const list = [...shown].sort(sort === 'value' ? (a, b) => G.items[b[0]].base * b[1] - G.items[a[0]].base * a[1] : sort === 'qty' ? (a, b) => b[1] - a[1] : sort === 'name' ? (a, b) => G.items[a[0]].name.localeCompare(G.items[b[0]].name, 'th') : () => 0);
+        const list = [...shown].sort(sort === 'value' ? (a, b) => G.items[b[0]].base * b[1] - G.items[a[0]].base * a[1] : sort === 'qty' ? (a, b) => b[1] - a[1] : sort === 'name' ? (a, b) => G.items[a[0]].name.localeCompare(G.items[b[0]].name, 'th') : () => 0).sort(starFirst);
         const sel = list.some(([id]) => id === p.gsel) ? p.gsel : list[0]?.[0];
         const cats = `<div class="bagCats">${CATS.map(([k, l]) => { const n = k === 'all' ? ents.length : ents.filter(([id]) => catOf(id) === k).length, [ic, ...nm] = l.split(' ');
           return B(`<span>${ic}</span><small>${nm.join(' ')}</small>${n ? `<i>${n}</i>` : ''}`, { fn: 'qtab', set: { gcat: k, gsel: '' } }, 'bcat' + (gcat === k ? ' on' : '')); }).join('')}</div>`;
-        const slots = list.map(([id, q]) => { const it = G.items[id]; return B(`${itemIco(id, 44, 34)}<i>${q > 999 ? '999+' : q}</i>`, { fn: 'qtab', set: { gsel: id } }, `bslot${it.rar ? ' r' + it.rar : ''}${id === sel ? ' on' : ''}`); }).join('')
+        const slots = list.map(([id, q]) => { const it = G.items[id]; return B(`${itemIco(id, 44, 34)}<i>${q > 999 ? '999+' : q}</i>${STARS.has(id) ? '<b class="bstar">⭐</b>' : ''}`, { fn: 'qtab', set: { gsel: id } }, `bslot${it.rar ? ' r' + it.rar : ''}${id === sel ? ' on' : ''}`); }).join('')
           + '<span class="bslot empty"></span>'.repeat(Math.max(0, 20 - list.length) || (5 - list.length % 5) % 5);
         const CATNM = { use: 'กิน/ใช้ได้', fish: 'ปลา', crop: 'ผลผลิต', goods: 'ของทั่วไป' };
         let det = '<div class="sub">เลือกของในช่องเพื่อดูรายละเอียด</div>';
@@ -7180,7 +7189,7 @@ function renderPanel(p) {
           det = `<div class="bdHead">${itemIco(sel, 84, 64)}<div><b>${esc(it.name)}</b>${rarTag(sel)}<small>${CATNM[catOf(sel)]} · มี ${q.toLocaleString()} ชิ้น</small></div></div>
             <div class="bdRows"><span>ราคากลาง</span><b>${money(it.base)} / ชิ้น</b><span>มูลค่ารวม</span><b>${money(it.base * q)}</b>${it.eat ? `<span>เมื่อกิน</span><b>${eatText(it.eat)}</b>` : ''}</div>
             ${it.desc ? `<div class="sub">${esc(it.desc)}</div>` : ''}${it.egg ? '<div class="sub">ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)</div>' : ''}
-            <div class="bdAct">${act}${B('📍 ไปขายที่ตลาด', { fn: 'guide', key: 'market' })}</div>`; }
+            <div class="bdAct">${act}${B(STARS.has(sel) ? '⭐ เลิกติดดาว' : '☆ ติดดาว (ขึ้นก่อนเสมอ)', { fn: 'star', item: sel })}${B('📍 ไปขายที่ตลาด', { fn: 'guide', key: 'market' })}</div>`; }
         const sorts = [['cat', 'หมวด'], ['value', 'มูลค่า'], ['qty', 'จำนวน'], ['name', 'ชื่อ']].map(([k, l]) => B(l, { fn: 'qtab', set: { gsort: k } }, sort === k ? 'primary' : '')).join('');
         return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}
           <div class="bagG">${cats}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
@@ -8648,7 +8657,10 @@ function pickTap(wx, wy) {
   const m = P.get(myId), r = m && areaOf(m.x, m.y); if (!r) return;
   const fl = r.yard ? 9 : r.floor || 1;
   // the piece whose picture is under your finger (front-most first: the one standing lowest on screen)
-  const hit = myFurnHit.filter(o => o.fl === fl && wx >= o.x - o.w / 2 && wx <= o.x + o.w / 2 && wy <= o.y + .15 && wy >= o.y - o.h).sort((a, b) => b.y - a.y)[0];
+  // garden plots count their crop too (it grows above the soil: tapping the plant used to miss a 1-tile soil cell), and a near miss on a phone picks the closest piece
+  const tall = o => G.shop.furniture[fbase(o.k)]?.field ? o.h + 1.2 : o.h;
+  const hit = myFurnHit.filter(o => o.fl === fl && wx >= o.x - o.w / 2 - .1 && wx <= o.x + o.w / 2 + .1 && wy <= o.y + .25 && wy >= o.y - tall(o)).sort((a, b) => b.y - a.y)[0]
+    || myFurnHit.filter(o => o.fl === fl).map(o => [o, Math.hypot(o.x - wx, o.y - o.h / 2 - wy)]).filter(([, d]) => d < 1).sort((a, b) => a[1] - b[1])[0]?.[0];
   if (!hit) return toast('แตะที่ตัวเฟอร์นิเจอร์ที่ต้องการย้าย', '✋', false);
   FX.play('click'); picking = false; startPlace(hit.k);
 }
