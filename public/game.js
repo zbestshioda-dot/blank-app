@@ -3891,7 +3891,10 @@ function refreshPanel(force) {
   const scroll = body.parentElement.scrollTop;
   const keepSc = [...body.querySelectorAll('*')].filter(e => e.scrollTop > 0 || e.scrollLeft > 0).map(e => { const k = scKey(e); return [k, [...body.querySelectorAll(k)].indexOf(e), e.scrollTop, e.scrollLeft]; });
   const drafts = [...body.querySelectorAll('input[id]:not([type=checkbox]):not([type=range]),textarea[id]')].filter(e => e.value).map(e => [e.id, e.value]);   // typed text survives a refresh (mobile keyboard closed = not focused)
-  body.innerHTML = html; bindPanel(body); body.parentElement.scrollTop = scroll;
+  const openD = [...body.querySelectorAll('details[open] > summary')].map(e => e.textContent.trim());   // sections the player opened stay open (they used to snap shut on every refresh)
+  body.innerHTML = html; bindPanel(body);
+  if (openD.length) for (const sm of body.querySelectorAll('details > summary')) if (openD.includes(sm.textContent.trim())) sm.parentElement.open = true;
+  body.parentElement.scrollTop = scroll;
   for (const [id, v] of drafts) { const n = document.getElementById(id); if (n && !n.value && (n.tagName === 'TEXTAREA' || n.type === 'text' || !n.type || n.type === 'search')) n.value = v; }
   for (const [k, i, t, l] of keepSc) { const e = body.querySelectorAll(k)[i]; if (e) { e.scrollTop = t; e.scrollLeft = l; } }
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch { } } }
@@ -5503,6 +5506,7 @@ const NEWS = [
   { v: '2026-11-24c', d: '22 พ.ย.', items: [
     '📕 <b>เรื่องเล่าคนทำเกม</b> หนังสือเปิดอ่านทีละหน้า จากเกมซอมบี้เกมแรก สู่เมืองวันนี้ (ล้มมาแล้ว 6 ครั้ง ❤️) · เปิดได้ที่ 📱 โทรศัพท์ → เรื่องเล่า หรือแชร์ลิงก์ให้เพื่อน',
     '😊 สีหน้าตัวละครเนียนขึ้น: วาดอยู่ในกรอบหน้าพอดี ไม่ล้นออกนอกหน้าแล้ว',
+    '🐠 แก้บั๊ก: เมนูใส่ปลาลงตู้ กด ➕ เลือกปลาแล้วไม่เด้งปิดอีกแล้ว ใส่ได้ทีละหลายตัว (หมวดที่กางไว้ในทุกเมนูจะค้างอยู่)',
     '💌 เรื่องเล่าคนทำเกม เพิ่มบท "ติดเกมนี้แล้ว" ข้อความจากผู้เล่นที่ทำให้ไม่ยอมแพ้',
   ] },
   { v: '2026-11-24b', d: '22 พ.ย.', items: [
