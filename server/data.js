@@ -796,6 +796,17 @@ const RIDES = {
   for (let y = 20; y <= 85; y += 8) if (get(97, y) !== ',') prop('o_lampball', 96.5, y + .95, false);
   for (let x = 55; x <= 91; x += 6) if (x < 63 || x > 84) { if (get(x, 79) === '.' && !occupied(x, 79)) prop(x % 12 === 7 ? 'o_lampball' : 'tree2', x + .5, 79.95, 'grass'); }
 }
+// ================================================================= town centre, round 2: the east park reads as a city park (flower
+// borders along the street, lamps by its paths, a kiosk), bus stops on the main road either side of the square
+{
+  const free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !PROPS.some(q => Math.hypot(q.x - x, q.y - y) < 1.3) && !STATIONS.some(q => q.area === 'town' && Math.hypot(q.x - x, q.y - y) < 1.5);
+  const put = (s, x, y, solid = true) => { if (free(x, y)) prop(s, x, y, solid); };
+  put('o_shelter2', 76.5, 35.2); put('busstop', 78.7, 35.0, false); put('busstop', 36.4, 35.0, false);
+  for (let x = 57; x <= 92; x += 3.5) put('o_flowerbed', x, 36.0, false);
+  for (const [x, y] of [[66.6, 41.9], [70.6, 41.9], [71.4, 45.9], [76.6, 45.9], [83.4, 42.9], [87.4, 38.9], [90.4, 41.9]]) put('o_lampball', x, y, 'grass');
+  for (const [x, y] of [[68.6, 41.6], [74.6, 45.6], [86.5, 40.0]]) put('bench', x, y, false);
+  put('kiosk', 81.5, 38.95); put('o_bin_green', 83.4, 39.95); put('o_bikerack', 61.5, 39.9, false);
+}
 // ================================================================= the park, dressed up: a food court on the south lawn, café tables,
 // flowerbeds along the main walk and more blossom trees (added after everything else, so nothing older moves)
 {
