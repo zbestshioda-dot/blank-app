@@ -1789,7 +1789,7 @@ function draw(t) {
   const ents = [];
   const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
-  for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.y, 1, p]);
+  for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.sy ?? p.y, 1, p]);
   if (Date.now() + clockOff < (G.xmasEnd || 0) && vis(XMAS_DEER.x, XMAS_DEER.y, 3)) ents.push([XMAS_DEER.y + .3, 6, XMAS_DEER]);   // 🎄 the showcase reindeer pulling the sleigh   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|ad_mat|ad_neon|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
@@ -2903,7 +2903,7 @@ function drawPlayer(p, X, Y, t) {
   let dir = CARD[f8] || (DIAG[f8].includes(p.view) ? p.view : DIAG[f8].find(d => d === 'up' || d === 'down'));
   if (CARD[f8] && p.view && p.view !== dir && performance.now() - (p.viewT || 0) < 120) dir = p.view;   // tiny debounce
   if (dir !== p.view) { p.view = dir; p.viewT = performance.now(); }
-  if (sitting || lying) dir = 'down';
+  if (sitting || lying) dir = (pose === 'seat' && seatFace(p)) || 'down';
   if (fo?.back) dir = 'up';
   const moving = !sitting && !lying && (p.id === myId ? meMoving : Math.hypot(p.x - p.rx, p.y - p.ry) > .02);
   p.walk = (p.walk || 0) + (moving ? (p.id === myId && running ? .34 : .2) * FDT * 60 : 0);
@@ -2926,7 +2926,7 @@ function drawPlayer(p, X, Y, t) {
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
   else if (fo?.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, p, px, py + Math.sin(t / 380 + p.id) * TS * .05, k, 'front', 0); }   // swimming: only head and shoulders above the water
-  else if (sitting) drawCharTo(ctx, p, px, py, k, 'front', 0, false, true);   // seated: whole body, legs folded
+  else if (sitting) drawCharTo(ctx, p, px, py, k, view, 0, dir === 'left', true);   // seated: whole body, legs folded (facing the way the bench does)
   else { if (!moving) { const br = 1 + Math.sin(now0 / 650 + ((+p.id || 0) % 97)) * .012; ctx.translate(px, py); ctx.scale(2 - br, br); ctx.translate(-px, -py); } drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left'); }   // standing still: a soft breath
   ctx.restore();
   if (fo?.swim) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(px, py - H * .42, TS * .45 + Math.sin(t / 300) * 2, TS * .13, 0, 0, 7); ctx.stroke(); swimFx(p.id, fo.x, fo.y - .42 * H / TS, t); }
@@ -5552,6 +5552,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24w', d: '22 พ.ย.', items: [
+    '🪑 ม้านั่งใหม่ทั้งเมือง! ม้านั่งไม้และม้านั่งหิน นั่งได้ตัวละ 2 คน นั่งหันตามม้านั่ง (หันหน้า หันหลัง หันข้าง) · ริมทะเลสาบหันหน้าเข้าน้ำ ลานน้ำพุหันเข้าหาน้ำพุ',
+    '🧹 เก็บของรกออก: กระบะดอกไม้ตัวแอลในจัตุรัส กระถางและน้ำพุเล็กในสวนกลางเมือง รถไอติมลานน้ำพุ',
+  ] },
   { v: '2026-11-24v', d: '22 พ.ย.', items: [
     '🪑 ม้านั่งทุกตัวในเมืองนั่งได้แล้ว (ริมทะเลสาบ สวนกลางเมือง หมู่บ้าน ชายหาด) เดินไปใกล้ๆ แล้วกดปุ่ม นั่ง',
   ] },
@@ -7423,10 +7427,27 @@ function snowAtlas(im, j) {
   } catch { return im; }
 }
 function spr(name, cx, by, X, Y, scale = 1) {
+  if (name[0] === 'b' && name[1] === 'n' && name[2] === '_') return benchSpr(name, cx, by, X, Y);
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
   ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
   return true;
+}
+// 🪑 the benches (assets/benches.webp): wood / stone, seen from the front, the back and both sides
+let BNJ = null, BNIMG = null, bnAsked = false;
+function benchSpr(name, cx, by, X, Y) {
+  if (!bnAsked) { bnAsked = true; fetch('assets/benches.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { BNJ = j; BNIMG = im; }; im.src = 'assets/benches.webp?v=1'; }).catch(() => { }); }
+  const s = BNJ?.s[name]; if (!s) return false;
+  const w = s[2] / BNJ.tile * TS, h = s[3] / BNJ.tile * TS;
+  ctx.drawImage(BNIMG, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
+  return true;
+}
+// which way someone on a bench faces: the seat station under them says (worked out once per spot)
+const SEATF = new Map();
+function seatFace(p) {
+  const key = Math.round(p.x * 20) + ':' + Math.round(p.y * 20);
+  if (!SEATF.has(key)) { const st = G?.stations?.find(q => q.type === 'seat' && q.face && Math.abs(q.x - p.x) < .2 && Math.abs(q.y - p.y) < .2); SEATF.set(key, st?.face || ''); }
+  return SEATF.get(key);
 }
 function sprF(name, cx, by, X, Y, flip) {   // a sprite, mirrored left-right when flip is set (turned furniture)
   if (!flip) return spr(name, cx, by, X, Y);

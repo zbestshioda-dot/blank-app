@@ -2045,9 +2045,52 @@ const ACHIEVEMENTS = [
 // title rarity: common → legendary (colour on the name tag)
 const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: 'ไม่ธรรมดา', col: '#7be07b' }, { name: 'หายาก', col: '#62b8ff' }, { name: 'มหากาพย์', col: '#d08cff' }, { name: 'ตำนาน', col: '#ffb43c' }];
 
-// 🪑 every bench is a seat: benches without a seat of their own get one (id from its spot, so it stays the same across restarts)
-for (const p of PROPS) if (/^(bench|bench2|bench_stone|o_bench|o_stonebench|x_bench|x_bench2)$/.test(p.s) && !STATIONS.some(s => s.type === 'seat' && Math.hypot(s.x - p.x, s.y - p.y) < 1.2)) {
-  const ar = areaAt(p.x, p.y)?.id; if (ar) STATIONS.push({ id: `seat_b${p.x.toFixed(1)}_${p.y.toFixed(1)}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x: p.x, y: p.y - .25, r: 1.1, area: ar });
+// 🪑 benches, redone: every old bench in town (park and football ground too) is replaced by the new wooden / stone benches, drawn
+// from four sides (assets/benches.webp). Each seats two, and whoever sits faces the way the bench does: 'down' (front view),
+// 'up' (seen from behind: they sit looking away, the backrest in front of them), 'left' / 'right' (seen from the side).
+// Old seat ids are handed on to the bench that replaces them (quests and the map point at some).
+{
+  const OLD = /^(bench|bench2|bench_stone|o_bench|o_stonebench)$/, gone = [];
+  for (let i = PROPS.length - 1; i >= 0; i--) {
+    const p = PROPS[i]; if (!OLD.test(p.s) || areaAt(p.x, p.y)?.id !== 'town') continue;
+    const ids = []; let ar = null;
+    for (let j = STATIONS.length - 1; j >= 0; j--) { const st = STATIONS[j]; if (st.type === 'seat' && Math.hypot(st.x - p.x, st.y - p.y) < 1.6) { ids.unshift(st.id); ar = st.area; STATIONS.splice(j, 1); } }
+    gone.push({ s: p.s, x: p.x, y: p.y, ids, ar }); PROPS.splice(i, 1);
+  }
+  // cleared at the players' request: the L-shaped planters in the square, the pots and the little fountain in the east park, the bench
+  // and the ice-cream cart by the fountain square
+  const drop = (s, x, y, floor = '.') => { const i = PROPS.findIndex(q => q.s === s && Math.abs(q.x - x) < .3 && Math.abs(q.y - y) < .3); if (i < 0) return; const q = PROPS[i]; PROPS.splice(i, 1); if (get(Math.floor(q.x), Math.floor(q.y - .5)) === 'o') set(Math.floor(q.x), Math.floor(q.y - .5), floor); };
+  drop('o_lplanter', 47.4, 31.4); drop('o_lplanter', 52.6, 31.4);
+  for (const [s1, x, y] of [['o_tulips', 60.6, 44.7], ['o_roses', 64.6, 44.7], ['flowerbox', 59.6, 47.5], ['bush2', 63.5, 50.05], ['o_tulips', 64.5, 49.95], ['o_tulips', 65.2, 50.1], ['o_roses', 66, 49.95], ['o_topiary', 56.4, 54], ['o_topiary', 61.6, 54], ['flowerbed2', 70.5, 45.2]]) drop(s1, x, y);
+  drop('o_fountain2', 59, 53.9); for (let y = 52; y < 54; y++) for (let x = 58; x < 61; x++) if (get(x, y) === 'o') set(x, y, '.');
+  drop('cartstall', 62.2, 58.1, 'k'); for (let x = 61; x < 64; x++) if (get(x, 57) === 'o') set(x, 57, 'k');
+  { const k = STATIONS.findIndex(st => st.id === 'pshop_sq'); if (k >= 0) STATIONS.splice(k, 1); }
+  const SIDE_H = 3.6;
+  const bench = (mat, v, x, by, ids = [], ar = null) => {
+    PROPS.push({ s: `bn_${mat}_${v}`, x, y: by, ...(v === 'l' || v === 'r' ? { sy: by - SIDE_H } : {}) });
+    for (let i = 0; i < 2; i++) {
+      const sx = v === 'f' || v === 'b' ? x + (i ? .55 : -.55) : x + (v === 'r' ? .15 : -.15);
+      const sy = v === 'f' ? by - .25 : v === 'b' ? by - 1.25 : by - (i ? 2.3 : 1.1);
+      STATIONS.push({ id: ids[i] || `seat_n${x}_${by}_${i}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x: +sx.toFixed(2), y: +sy.toFixed(2), r: .9, area: ar || areaAt(sx, sy)?.id || 'town', face: { f: 'down', b: 'up', l: 'left', r: 'right' }[v] });
+    }
+    for (let yy = Math.floor(by - (v === 'l' || v === 'r' ? SIDE_H : 1)); yy <= Math.floor(by - .1); yy++) for (const xx of [Math.floor(x - 1), Math.floor(x), Math.floor(x + 1)]) {   // no tree growing through it
+      const t = TREES.findIndex(q => q[0] === xx && q[1] === yy); if (t >= 0) { TREES.splice(t, 1); if (get(xx, yy) === 'T') set(xx, yy, '.'); }
+    }
+  };
+  // where an old bench stood, a new one takes its place, turned to face what is worth looking at
+  const at = (x, y) => gone.find(g => Math.abs(g.x - x) < .4 && Math.abs(g.y - y) < .4);
+  const used = new Set(), take = (x, y) => { const g = at(x, y); if (g) used.add(g); return g?.ids || []; };
+  bench('wood', 'f', 44.6, 30.1, take(44.6, 29.95)); bench('wood', 'f', 55.4, 30.1, take(55.4, 29.95));     // the square: north side looks down at the fountain
+  bench('stone', 'b', 44.6, 36.3, take(44.6, 35.95)); bench('stone', 'b', 55.4, 36.3, take(55.4, 35.95));   // south side: their backs to us, facing it
+  bench('wood', 'r', 52.4, 61.9, [...take(52.6, 58.2), ...take(52.6, 61.2)]); bench('wood', 'l', 60.8, 61.9);   // fountain square: both sides face the fountain
+  take(59, 56.9);                                                                                              // (taken out)
+  bench('wood', 'f', 62.6, 44.4, take(62.6, 44.2)); bench('wood', 'f', 74.6, 45.8, take(74.6, 45.6)); take(72, 47); bench('stone', 'f', 80.5, 41.4, take(80.5, 41.2)); take(86.5, 40);   // east park
+  bench('stone', 'b', 86, 59.6, take(86, 59.3));                                                              // looking out over the pond
+  bench('stone', 'r', 98.4, 61, take(98.6, 59.2));                                                            // on the beach, facing the sea
+  for (const [x, y] of [[9.5, 65.9], [10.5, 72.9], [15.5, 76.9], [20.5, 77.9], [24.5, 78.9], [42.5, 68.9]]) take(x, y);   // the lake gets its own set:
+  bench('wood', 'r', 8.2, 69.2); bench('wood', 'l', 43.8, 69.6);                                              // west and east shores facing the water
+  bench('wood', 'b', 21.5, 80.4); bench('wood', 'b', 30.5, 80.4);                                             // south shore, looking north over it
+  for (const g of gone) if (!used.has(g)) bench(/stone/.test(g.s) ? 'stone' : 'wood', 'f', g.x, +(g.y + .2).toFixed(2), g.ids, g.ar);   // anywhere else: same spot, facing front
 }
 // trash bins beggars can dig through (one station in front of each bin in town)
 PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p, i) => STATIONS.push({ id: 'trash' + i, type: 'trash', label: 'ถังขยะ', icon: '🗑️', x: p.x, y: p.y + .7, r: 1.1, area: 'town' }));
