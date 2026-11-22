@@ -781,6 +781,7 @@ function handle(m) {
     case 'catch': catchPop(m.item, m.first, m.kg, m.pb); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
     case 'fc': fcMsg(m); break;
+    case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'folksay': { const o = P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
@@ -1239,6 +1240,19 @@ document.addEventListener('fullscreenchange', () => { if (panel?.kind === 'setti
 $('#mapX').onclick = closeMap;
 $('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapView') closeMap(); });
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
+// 🏡 house contest: the ❤️ button shows while you stand in someone else's home or yard
+let HOMES = null;
+function homesPanel() {
+  const H = HOMES; if (!H) return '<h2>🏡 บ้านสวย</h2><div class="sub">กำลังโหลด...</div>';
+  const pz = H.prizes.map((p, i) => `${['🥇', '🥈', '🥉'][i]} ${money(p.money)} + 💎x${p.gshard}`).join(' · ');
+  const open = H.open.length ? H.open.map(o => `<div class="item"><div class="em">🏠</div><div class="nm"><b>${esc(o.n)}</b><small>❤️ ${o.h} สัปดาห์นี้ · ความสบาย ${o.c}</small></div>${o.me ? '<small>บ้านฉัน</small>' : B('ไปเยี่ยม', { fn: 'homeVisit', id: o.id }, 'primary')}</div>`).join('') : '<div class="sub">ตอนนี้ยังไม่มีบ้านเปิดอยู่</div>';
+  const top = H.board.length ? H.board.map((x, i) => `<div class="item"><div class="em">${['🥇', '🥈', '🥉'][i] || i + 1}</div><div class="nm"><b>${esc(x.n)}</b></div><small>❤️ ${x.hearts}</small></div>`).join('') : '<div class="sub">ยังไม่มีใครได้หัวใจสัปดาห์นี้</div>';
+  return `<h2>🏡 ประกวดบ้านสวย</h2><div class="sub">เข้าไปเยี่ยมบ้านคนอื่นแล้วกด ❤️ ได้บ้านละ 1 ครั้งต่อวัน (ไอดีอายุ 3 วันขึ้นไปถึงนับคะแนน) · รีเซ็ตทุกวันจันทร์ · รางวัล ${pz} · อันดับ 1 ได้ฉายา 🏡 บ้านสวยที่สุดในเมือง 7 วัน · บ้านคุณสัปดาห์นี้ ❤️ ${H.mine}</div>
+    <div class="secT">🏆 อันดับสัปดาห์นี้</div><div class="list">${top}</div><div class="secT" style="margin-top:10px">🏠 บ้านที่เปิดอยู่ตอนนี้</div><div class="list">${open}</div>`;
+}
+const homeHere = () => { const A = me && areaOf(me.x, me.y); if (!A) return null; const y = /^yard(\d+)$/.exec(A.id || ''); return y ? +y[1] : A.house ?? null; };
+setInterval(() => { const i = homeHere(); $('#likeBtn')?.classList.toggle('hidden', i == null || i === me?.house); }, 1000);
+$('#likeBtn').onclick = () => { FX.play('click'); send({ t: 'homelike' }); };
 $('#restBtn').onclick = () => { if (!me || me.down) return; FX.play('click'); send({ t: 'rest', on: me.pose !== 'rest' }); };
 // running: toggle with the 🏃 button, or hold Shift on a keyboard
 let running = false, shiftRun = false, runSetT = 0;
@@ -3710,7 +3724,7 @@ function buildStaff() {
   }
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
-  { st: 'workshop', name: 'ช่างโต (โรงช่างคราฟ)', short: 'ช่างโต', icon: '🔨', dx: 1.5, dy: -.3, lk: { hair: 'black', shirt: 'black', pants: 'jeans' }, hi: ['มาคราฟของที่ร้านไหนก็ไม่มีขายกัน! 🔨', 'ไม้ ผ้า เปลือกหอย คริสตัล... ได้ตอนตกปลา เก็บผัก ทำงานนะ', 'ซุ้มเพชรเรืองแสงน่ะ ทั้งเมืองยังมีไม่กี่คนหรอก ✨', 'ไม่มีบ้านก็คราฟได้ ลุงเก็บไว้ให้ก่อน'] },
+  { st: 'workshop', name: 'ช่างโต (โรงช่างคราฟ)', short: 'ช่างโต', icon: '🔨', dx: 2.5, dy: -.3, lk: { hair: 'black', shirt: 'black', pants: 'jeans' }, hi: ['มาคราฟของที่ร้านไหนก็ไม่มีขายกัน! 🔨', 'ไม้ ผ้า เปลือกหอย คริสตัล... ได้ตอนตกปลา เก็บผัก ทำงานนะ', 'ซุ้มเพชรเรืองแสงน่ะ ทั้งเมืองยังมีไม่กี่คนหรอก ✨', 'ไม่มีบ้านก็คราฟได้ ลุงเก็บไว้ให้ก่อน'] },
   { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: 1, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ปุ้ง! 🎈', 'สีไหนดีหลาน ลุงมีครบ... ยกเว้นสีที่แตกไปแล้ว', 'ลูกโป่งหัวใจ เอาไปให้คนที่ชอบสิ ลุงเชียร์!'] },
   { st: 'fortune', name: 'แม่หมอจันทรา (แม่หมอพยากรณ์)', short: 'แม่หมอจันทรา', icon: '🔮', g: 'f', of: 'fortune', dx: -1.6, dy: .3, lk: { hair: 'brown' }, hi: ['ดวงชะตาเรียกเธอมาที่นี่... มานั่งสิลูก 🔮', 'ไพ่บอกว่า... เธอกำลังจะเดินมาหาแม่หมอ ...ถูกไหมล่ะ', 'การเงิน การงาน หรือความรัก ใจเธอถามเรื่องไหนอยู่?'] },
   { st: 'petshop1', name: 'น้องมะลิ (ร้านสัตว์เลี้ยง)', short: 'น้องมะลิ', icon: '🐾', g: 'f', dx: .7, dy: -1.15, lk: { hair: 'brown', shirt: 'red' }, hi: ['ยินดีต้อนรับค่ะ~ เหมียว! เอ้ย สวัสดีค่ะ 🐱', 'น้องๆ ทุกตัวสุขภาพดี ลูบได้นะคะ', 'แมวดีกว่าหมานะคะ... อย่าบอกพี่ภูผานะ'] },
@@ -4479,6 +4493,8 @@ const FN = {
   },
   fcBait() { send({ t: 'fcbait' }); },
   openFolks() { send({ t: 'folks' }); openPanel({ kind: 'folks' }); },
+  openHomes() { send({ t: 'homes' }); openPanel({ kind: 'homes' }); },
+  homeVisit: m => { send({ t: 'homevisit', id: m.id }); closePanel(); },
   openJournal() { send({ t: 'folks' }); openPanel({ kind: 'journal' }); },
   jOpen(m) { if (panel) { panel.open = m.id; refreshPanel(true); } },
   folkGive(m) { send({ t: 'folkgift', id: m.npc, item: m.item }); closePanel(); },
@@ -5847,6 +5863,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26i', d: '23 พ.ย.', items: [
+    '🏡 <b>ประกวดบ้านสวยประจำสัปดาห์!</b> ทุกบ้านเปิดให้เยี่ยมแล้ว (ไม่ต้องเป็นเพื่อนกัน) เข้าบ้านใครแล้วกดปุ่ม ❤️ ได้บ้านละ 1 ครั้งต่อวัน',
+    '📱 แอปใหม่ 🏡 บ้านสวย ในมือถือ: ดูบ้านที่เปิดอยู่ตอนนี้ กดไปเยี่ยมได้เลย และดูอันดับหัวใจของสัปดาห์',
+    '🏆 รีเซ็ตทุกวันจันทร์ 🥇 ฿10,000 + 💎x3 + ฉายา 🏡 บ้านสวยที่สุดในเมือง 7 วัน 🥈 ฿5,000 + 💎x2 🥉 ฿2,500 + 💎x1 (ส่งทางจดหมาย)',
+  ] },
   { v: '2026-11-26h', d: '23 พ.ย.', items: [
     '🛡️ แอดมินตรวจสอบรายงานผู้เล่นได้ละเอียดขึ้น (ประวัติพลังงานและสถิติการรักษาของหมอ) เพื่อความแฟร์ของทุกคน',
   ] },
@@ -7425,6 +7446,7 @@ function renderPanel(p) {
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ptab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
     case 'fishcomp': return fishCompPanel();
+    case 'homes': return homesPanel();
     case 'folks': return folksPanel();
     case 'journal': return journalPanel(p);
     case 'folkgift': return folkGiftPanel(p);
@@ -7775,7 +7797,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first
