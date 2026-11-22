@@ -9,6 +9,7 @@ const { WebSocketServer } = require('ws');
 const D = require('./data');
 const store = require('./store');
 const Q = require('./quests');
+const CR = require('./craft');   // 🔨 crafting rules (drops, recipes, gem shards)
 const PUSH = require('./push');
 let vapidKeys = null;
 const PAY = require('./pay');
@@ -101,6 +102,7 @@ function stat(a, key, n = 1, absolute = false) {
   a.stats = a.stats || {};
   a.stats[key] = absolute ? Math.max(a.stats[key] || 0, n) : (a.stats[key] || 0) + n;
   if (!absolute) try { repFrom(a, key, n); } catch {}
+  if (!absolute && D.MAT_DROPS[key] && a.inv) { const got = CR.drop(a, key, D); if (got.length) toast(a, 'ได้วัตถุดิบคราฟ ' + got.map(k => D.ITEMS[k].icon + D.ITEMS[k].name).join(' ') + ' · ไปคราฟที่โรงช่าง 🔨', '🧰'); }
   for (const ac of D.ACHIEVEMENTS) {
     if (ac.stat !== key || (a.ach || []).includes(ac.id) || a.stats[key] < ac.n) continue;
     a.ach = [...(a.ach || []), ac.id];
@@ -582,9 +584,10 @@ function mailClaim(a, id) {
   if (g.eggs) addItem(a, 'petegg', g.eggs);
   if (g.gems) a.gems = (a.gems || 0) + g.gems;
   if (g.money) credit(a, g.money);
+  if (g.items) for (const [k, q] of Object.entries(g.items)) if (D.ITEMS[k] && q > 0) addItem(a, k, q);
   if (g.outfit && D.OUTFITS[g.outfit] && !(a.outfits || []).includes(g.outfit)) { a.outfits = [...(a.outfits || []), g.outfit]; a.outfit = g.outfit; sendRoster(); }
   a.sd = true; markMe(a); send(a, { t: 'mail', list: a.mail });
-  toast(a, `รับของขวัญแล้ว:${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.outfit ? ` 🎽 ${a.gender === 'f' && D.OUTFITS[g.outfit]?.nf || D.OUTFITS[g.outfit]?.name} (ใส่ให้แล้ว)` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
+  toast(a, `รับของขวัญแล้ว:${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.items ? Object.entries(g.items).map(([k, q]) => ` ${D.ITEMS[k]?.icon || ''}${D.ITEMS[k]?.name || k} x${q}`).join('') : ''}${g.outfit ? ` 🎽 ${a.gender === 'f' && D.OUTFITS[g.outfit]?.nf || D.OUTFITS[g.outfit]?.name} (ใส่ให้แล้ว)` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
 }
 // New Year 2570 gift: everyone who joined by 31 Dec 2569 (Bangkok) gets the Santa outfit by mail, once
 const SANTA_END = Date.parse('2027-01-01T00:00:00+07:00');
@@ -2452,6 +2455,17 @@ function act(a, m) {
       a.fairG = { k: s.k, t: now(), id: crypto.randomBytes(6).toString('hex'), arc: 1 };
       return send(a, { t: 'fairgo', k: s.k, id: a.fairG.id, name: G0.name, icon: G0.icon });
     }
+    case 'craft.make': {                  // 🔨 workshop: make a craft-only piece from materials
+      if (!cd(a, 'craft', 800)) return;
+      const r = CR.craft(a, String(m.rid || ''), D); if (!r.ok) return toast(a, r.msg, '🔨', false);
+      joy(a, 5); stat(a, 'crafted'); markMe(a); wdAt = 0;
+      return toast(a, r.msg + (a.hown ? ' ส่งไปที่บ้านแล้ว · จัดวางได้ด้วย 🛋️ จัดบ้าน' : ' เก็บไว้ให้ก่อน มีบ้านเมื่อไหร่วางได้เลย'), r.f.icon);
+    }
+    case 'craft.shard': {                 // 💎 gem shards for the legend recipes
+      if (!cd(a, 'craft', 800)) return;
+      const r = CR.buyShard(a, m.n, D); if (!r.ok) return toast(a, r.msg, '💎', false);
+      markMe(a); wdAt = 0; return toast(a, r.msg, '💎');
+    }
     case 'claw.start': {                 // 🧸 claw machine: the toys and whether each one would hold are fixed now; the aim is the player's
       const C = D.ARCADE.claw, P = Object.keys(D.ARCADE.prizes).filter(k => k !== 'py_gold');
       if (!cd(a, 'fairg', 1500)) return;
@@ -2617,6 +2631,7 @@ function act(a, m) {
       const have = a.inv[id] || 0;
       let q = m.qty === 'all' ? have : Math.floor(+m.qty);
       if (!it || !(q > 0)) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
+      if (it.nosell) return toast(a, `${it.name}ขายไม่ได้ เก็บไว้คราฟที่โรงช่าง 🔨`, '🚫', false);
       q = Math.min(q, have, 500);
       if (q <= 0) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
       if (!cd(a, 'sell', 300)) return;
@@ -3116,7 +3131,7 @@ function act(a, m) {
     }
     case 'house.furnish': {
       if (houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
-      const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
+      const f = D.FURNITURE[m.item]; if (!f || f.gift || f.craft) return;
       if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, f.price)) return;
       a.furniture = [...a.furniture, m.item]; markMe(a); wdAt = 0;
@@ -3131,7 +3146,7 @@ function act(a, m) {
         a[key] = [...(a[key] || []), id]; joy(a, 3); markMe(a);
         return toast(a, `ซื้อ${fl ? 'พื้น' : 'วอลเปเปอร์'} "${def.name}" แล้ว · เปลี่ยนได้ที่ 🛋️ จัดบ้าน › แท็บพื้น/ผนัง`, fl ? '🟫' : '🎨');
       }
-      const f = D.FURNITURE[m.item]; if (!f || f.gift) return;
+      const f = D.FURNITURE[m.item]; if (!f || f.gift || f.craft) return;   // craft-only pieces come from the workshop
       if (s.type === 'plantshop' && f.cat !== 'garden' && !D.PLANT_INDOOR.includes(m.item)) return toast(a, 'ร้านต้นไม้ขายแต่ต้นไม้และของแต่งสวนนะ', '🌳', false);
       let key = m.item;
       if (f.multi) {                        // walls, doors, screens, garden pieces: buy as many as you need (up to 20 at a time)
@@ -4043,7 +4058,7 @@ function fcEnd() {
     const o = accounts.get(e.l); if (!o) return;
     const prize = FC.prizes[i] || FC.join, it = D.ITEMS[e.id];
     sysMail(o, i < 3 ? `🏆 ยินดีด้วย! คุณได้อันดับ ${i + 1} การแข่งตกปลา ด้วย ${it?.icon || '🐟'}${it?.name || ''} หนัก ${kgTxt(e.kg)} รับรางวัล ${money(prize)}`
-      : `🎣 ขอบคุณที่ร่วมแข่งตกปลา! ปลาตัวหนักสุดของคุณ ${it?.icon || '🐟'}${it?.name || ''} ${kgTxt(e.kg)} (อันดับ ${i + 1}) รับรางวัลร่วมสนุก ${money(prize)}`, { money: prize });
+      : `🎣 ขอบคุณที่ร่วมแข่งตกปลา! ปลาตัวหนักสุดของคุณ ${it?.icon || '🐟'}${it?.name || ''} ${kgTxt(e.kg)} (อันดับ ${i + 1}) รับรางวัลร่วมสนุก ${money(prize)}`, { money: prize, ...(i < 3 ? { items: { gshard: 3 - i } } : {}) });   // top 3 also get 💎 shards for crafting
     if (i === 0) { stat(o, 'fcwin'); o.fcKing = now() + 24 * 3600e3; o.sd = true; dirty = true; if (o.ws) markMe(o); sendRoster(); }
   });
   const w = top[0], it = D.ITEMS[w.id];
@@ -4762,7 +4777,7 @@ function login(ws, m, pre) {
   send(a, {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
-    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
+    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },

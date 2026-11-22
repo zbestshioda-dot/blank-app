@@ -205,6 +205,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
+  // 🔨 the crafting workshop: an open-air workbench on the lawn east of the plaza (craft-only furniture, see CRAFTS)
+  prop('x_wbench', 66, 45.6); prop('x_toolbox', 67.7, 45.6, false);
+  STATIONS.push({ id: 'workshop', type: 'craft', label: 'โรงช่างคราฟ', icon: '🔨', x: 66, y: 46.3, r: 1.5, area: 'town' });
   STATIONS.push({ id: 'wish', type: 'wish', label: 'โยนเหรียญ ฿10', icon: '⛲', x: 50, y: 34.7, r: 1.4, area: 'town' });
   // five little signs in corners nobody walks to
   [[67, 25.3], [1.6, 38.5], [1.6, 87.6], [92.5, 1.6], [98, 88]].forEach(([x, y], n) => { prop('signpost', x, y - .15, false); STATIONS.push({ id: 'secret' + n, type: 'secret', n, label: 'ป้ายเล็กๆ', icon: '🪧', x, y: y + .1, r: .9, area: 'town' }); });
@@ -1332,6 +1335,12 @@ const ITEMS = {
   water:  { name: 'น้ำดื่ม', icon: '💧', kind: 'goods', base: 12, eat: { energy: 3, hunger: 2 } },
   bread:  { name: 'ขนมปังไส้หมูหยอง', icon: '🥐', kind: 'goods', base: 30, eat: { hunger: 18 } },
   coffee: { name: 'กาแฟกระป๋อง', icon: '☕', kind: 'goods', base: 35, eat: { energy: 12 } },
+  // 🧰 crafting materials (dropped while fishing / harvesting / working; gshard only from the workshop for 💎 or contest prizes)
+  wood:     { name: 'ไม้', icon: '🪵', kind: 'mat', base: 15 },
+  cloth:    { name: 'ผ้า', icon: '🧵', kind: 'mat', base: 20 },
+  shell:    { name: 'เปลือกหอยมุก', icon: '🐚', kind: 'mat', base: 25 },
+  crystal:  { name: 'เศษคริสตัล', icon: '💠', kind: 'mat', base: 120 },
+  gshard:   { name: 'ชิ้นส่วนเพชร', icon: '💎', kind: 'mat', base: 0, nosell: 1 },
   fcbait:   { name: 'เหยื่อแข่งตกปลา', icon: '🪱', kind: 'goods', base: 50, fcb: 1 },   // sold only during the fishing contest: each catch in the contest uses one, the fish comes out heavier
   umbrella: { name: 'ร่มกันฝน', icon: '☂️', kind: 'goods', base: 180, umb: 1 },   // sold only by the umbrella man who walks into the square when it rains · kept in the bag: opens by itself when it rains outdoors, keeps you dry (no cold from the rain)
   bento:  { name: 'ข้าวกล่องเวฟ', icon: '🍱', kind: 'goods', base: 55, eat: { hunger: 32, energy: 4 } },
@@ -1370,7 +1379,7 @@ const ITEMS = {
   painkiller: { name: 'ยาแก้ปวด/ยาบำรุง', icon: '💊', kind: 'goods', pharmacy: true, base: 150, eat: { health: 20 } },
   medkit: { name: 'ชุดปฐมพยาบาล', icon: '🩹', kind: 'goods', pharmacy: true, cures: ['injury'], base: 250, eat: { health: 30 }, wholesale: 180, stock: 10, refill: 40 },
 };
-const CATEGORIES = { crop: '🌾 พืชผล', fish: '🐟 ปลา', meal: '🍱 อาหาร', goods: '📦 สินค้า' };
+const CATEGORIES = { crop: '🌾 พืชผล', fish: '🐟 ปลา', meal: '🍱 อาหาร', goods: '📦 สินค้า', mat: '🧰 วัตถุดิบ' };
 
 const CROPS = {
   rice:   { seed: 15,  grow: 240, min: 3, max: 5 },
@@ -1391,6 +1400,18 @@ const RECIPES = [
   { id: 'tomyum',       in: { tilapia: 1, chili: 1, corn: 1 }, ops: { tilapia: ['chop', 'boil'], chili: ['chop'], corn: ['chop', 'boil'] } },
   { id: 'durian_sweet', in: { durian: 1, rice: 1 }, ops: { durian: ['chop'], rice: ['boil'] } },
 ];
+// 🔨 crafting at the town workshop: in = items used up; out = the craft-only furniture of the same id
+const CRAFTS = [
+  { id: 'cr_rocker', in: { wood: 8, cloth: 2 } },
+  { id: 'cr_quilt',  in: { cloth: 10, sunflower: 3 } },
+  { id: 'cr_shelf',  in: { wood: 6, shell: 8 } },
+  { id: 'cr_bonsai', in: { wood: 5, crystal: 2, tomato: 5 } },
+  { id: 'cr_tank',   in: { shell: 10, crystal: 4, koi: 1 } },
+  { id: 'cr_arch',   in: { wood: 20, crystal: 6, gshard: 3 } },   // legend: glows
+];
+// chance per stat event (one roll per material)
+const MAT_DROPS = { fish: [['shell', .12], ['crystal', .03]], harvest: [['wood', .25], ['crystal', .03]], shifts: [['wood', .3], ['cloth', .25], ['crystal', .03]] };
+const SHARD_GEMS = 20;
 const COOK = { chop: 2.5, fry: 3, boil: 5, grill: 4, window: { boil: 20, grill: 15 }, grillMax: 3 };   // made easier: quicker chop/fry, much longer before boil/grill burns
 // fishing pools: [id, weight]. null = junk
 // what bites where. The first sheet's fish keep their hand-set weights; the second sheet's join every water of their kind
@@ -1885,6 +1906,13 @@ const FURNITURE = {
   xvending: { name: 'ตู้กดน้ำ', icon: '🥫', price: 25000, comfort: 1, cat: 'fun', spr: 'x_vending' },
   xphonebooth: { name: 'ตู้โทรศัพท์วินเทจ', icon: '☎️', price: 30000, comfort: 1, cat: 'fun', spr: 'x_phonebooth' },
   xmoto: { name: 'มอเตอร์ไซค์โชว์', icon: '🏍️', price: 80000, comfort: 2, cat: 'fun', spr: 'x_moto' },
+  // 🔨 craft-only pieces (never sold in a shop; made at the workshop). Art: tools/sheets/craft_furn.jpg via tools/add_craft_furn.py
+  cr_rocker:  { name: 'เก้าอี้โยกไม้แกะสลัก', icon: '🪑', price: 0, comfort: 3, cat: 'fun', spr: 'xc_rocker', craft: 1 },
+  cr_quilt:   { name: 'ผ้าห่มปะชุนลายเมือง', icon: '🧵', price: 0, comfort: 2, cat: 'fun', spr: 'xc_quilt', craft: 1 },
+  cr_shelf:   { name: 'ชั้นโชว์เปลือกหอย', icon: '🐚', price: 0, comfort: 3, cat: 'fun', spr: 'xc_shelf', craft: 1 },
+  cr_bonsai:  { name: 'บอนไซคริสตัล', icon: '🌳', price: 0, comfort: 4, cat: 'garden', spr: 'xc_bonsai', craft: 1 },
+  cr_tank:    { name: 'ตู้ปลามุกคริสตัล', icon: '🐠', price: 0, comfort: 5, cat: 'fun', spr: 'xc_tank', craft: 1 },
+  cr_arch:    { name: 'ซุ้มประตูเพชรเรืองแสง', icon: '✨', price: 0, comfort: 6, cat: 'garden', spr: 'xc_arch', craft: 1, glow: '#7ff5ff' },
   xtoolbox: { name: 'ตู้เครื่องมือช่าง', icon: '🧰', price: 6500, comfort: 0, cat: 'fun', spr: 'x_toolbox' },
 };
 // 💎 premium pieces: bought with gems only (one extra comfort each); no money back when the house is sold
@@ -2239,7 +2267,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
