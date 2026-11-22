@@ -5508,6 +5508,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24j', d: '22 พ.ย.', items: [
+    '💬 เอาแท็บ <b>ใกล้ๆ</b> กลับมาในกล่องแชท (ข้อความของคนที่อยู่ใกล้คุณ พิมพ์ในแท็บนี้ = คุยกับคนใกล้ๆ)',
+  ] },
   { v: '2026-11-24i', d: '22 พ.ย.', items: [
     '👋 แก้ปัดปิดแอปแล้วตัวละครยังค้างอยู่ในเมือง ตอนนี้ออกจากแผนที่ภายในไม่ถึงนาที',
   ] },
