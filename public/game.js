@@ -3897,11 +3897,13 @@ addEventListener('focusout', () => setTimeout(() => { if (!document.activeElemen
 // a finger on the panel (tap or scroll): hold redraws until it lifts, so taps are not lost and lists do not jump back
 let panelTouchT = 0;
 addEventListener('pointerdown', e => { if (e.target.closest?.('#panel')) panelTouchT = Infinity; }, true);
-for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { if (panelTouchT === Infinity) panelTouchT = performance.now() + 450; }, true);
+let panelLate = false;   // an update arrived while a finger was on the panel: draw it as soon as the finger lifts (it used to be dropped → stale shop cards)
+for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { if (panelTouchT === Infinity) { panelTouchT = performance.now() + 450; setTimeout(() => { if (panelLate && performance.now() >= panelTouchT) { panelLate = false; refreshPanel(); } }, 470); } }, true);
 const scKey = e => e.id ? '#' + e.id : e.tagName + [...e.classList].map(c => '.' + CSS.escape(c)).join('');
 function refreshPanel(force) {
   if (!panel || !me) return;
-  if (!force && performance.now() < panelTouchT) return;
+  if (!force && performance.now() < panelTouchT) { panelLate = true; return; }
+  panelLate = false;
   let html = renderPanel(panel);
   if (panel.soc) html = socHead(panel.kind) + html.replace(/<h2>[\s\S]*?<\/h2>/, '');
   const stf = panel.st && STAFF_AT[panel.st];
@@ -5537,6 +5539,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-24o', d: '22 พ.ย.', items: [
     '🛒 ร้านค้ากดง่ายขึ้น: แตะตรงไหนของการ์ดสินค้าก็ซื้อ/ใช้ได้ ปุ่มยุบให้เห็นทันทีที่แตะ ไม่ต้องรอ',
+    '🐾 แก้ซื้อของแล้วหน้าร้านไม่อัปเดต (ซื้อแล้วการ์ดยังขึ้นราคาอยู่หลายวินาที) ตอนนี้เปลี่ยนทันที',
   ] },
   { v: '2026-11-24n', d: '22 พ.ย.', items: [
     '💬 แท็บ "รวม" แสดงข้อความระบบด้วยแล้ว',
