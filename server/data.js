@@ -499,10 +499,11 @@ const LAYOUT = {
   // 📚 town library: the librarian's desk top centre between tall bookcases, bookcase rows down the left, two reading tables on a red rug,
   // a reading corner with armchairs and a sofa at the bottom; the private detective's office in the right half (desk, files, notice board, coat rack)
   library: [['f_window', 3.4, 1.1], ['f_window', 12.6, 1.1], ['x_wclock', 8, 0.95, false], ['x_cashdesk', 8, 2.5],
-    ['f_bookshelf_wide', 1.9, 2.7], ['x_bookshelf', 4.3, 2.7], ['x_bookshelf', 5.8, 2.7], ['f_bookshelf', 10.3, 2.7],
-    ['f_bookshelf', 1.3, 5.6], ['x_bookshelf', 1.3, 8.4], ['f_rug_red', 5.2, 7.6, false], ['f_table_chairs', 5.2, 6.9], ['f_table_chairs2', 5.2, 9.6],
-    ['i_corkboard', 13.4, 1.2, false], ['x_pdesk', 13.2, 4.4], ['x_dlamp', 12.4, 3.5, false], ['f_filing_grey', 15.0, 4.6], ['x_coatrack', 11.4, 4.6], ['f_rug_blue', 13.2, 7.0, false],
-    ['f_armchair', 3.0, 11.2, false], ['x_alamp', 1.5, 11.2], ['x_lsofa', 12.8, 11.2, false], ['x_globe', 10.4, 11.0], ['x_plant', 14.9, 9.3], ['f_plant', 6.0, 11.2], ['f_welcome', 8, 11.55, false]],
+    ['f_bookshelf_wide', 1.9, 2.7], ['l_ladder', 4.6, 2.75], ['l_catalog', 10.2, 2.7], ['l_board', 12.6, 2.75], ['l_safe', 14.35, 2.75],
+    ['f_bookshelf', 1.3, 5.6], ['x_bookshelf', 1.3, 8.4], ['l_rug', 5.0, 9.4, false], ['f_table_chairs', 5.0, 8.9], ['l_lectern', 9.4, 5.4],
+    ['l_typedesk', 13.0, 5.0], ['x_coatrack', 14.7, 5.1], ['f_rug_blue', 13.0, 7.2, false], ['l_case', 13.2, 9.0], ['l_news', 9.9, 8.6],
+    ['x_alamp', 1.4, 11.2], ['f_armchair', 2.6, 11.2, false], ['l_books', 4.3, 11.25, false], ['f_plant', 6.0, 11.2], ['l_gramo', 10.2, 11.1],
+    ['x_lsofa', 12.8, 11.2, false], ['x_plant', 14.9, 11.2], ['f_welcome', 8, 11.55, false]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
@@ -2116,9 +2117,10 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
     STATIONS.push({ id: 'staff_' + key, type: 'staff', career: key, at: where, label: 'เจ้าหน้าที่', icon: '💬', x: ok[0], y: ok[1], r: 1.3, area: fixed ? areaAt(ok[0], ok[1]).id : s.area });
   }
   // the private detective's office: in front of the town library (a closed building), so the officer stands outside
+  { const b = BUILDINGS.find(q => q.id === 'inn'); prop('l_sign', b.x + b.w - .3, b.y + b.h + 1.0, false); }   // the detective office's sign by the library door
   { const r = ROOMS.find(q => q.id === 'r_inn');   // in the library, in front of the office desk
-    STATIONS.push({ id: 'staff_detective', type: 'staff', career: 'detective', at: 'staff_detective', label: 'สำนักงานนักสืบ (ในหอสมุดเมือง)', icon: '🕵️', x: r.x + 13.2, y: r.y + 5.4, r: 1.3, area: r.id });
-    for (const [i, dx, dy] of [[1, 3.0, 11.3], [2, 12.3, 11.4], [3, 13.3, 11.4]]) STATIONS.push({ id: 'seat_lib' + i, type: 'seat', label: 'ที่นั่งอ่านหนังสือ', icon: '📖', room: r.id, x: r.x + dx, y: r.y + dy - .25, r: 1.1 }); }
+    STATIONS.push({ id: 'staff_detective', type: 'staff', career: 'detective', at: 'staff_detective', label: 'สำนักงานนักสืบ (ในหอสมุดเมือง)', icon: '🕵️', x: r.x + 13.0, y: r.y + 6.1, r: 1.3, area: r.id });
+    for (const [i, dx, dy] of [[1, 2.6, 11.3], [2, 12.3, 11.4], [3, 13.3, 11.4]]) STATIONS.push({ id: 'seat_lib' + i, type: 'seat', label: 'ที่นั่งอ่านหนังสือ', icon: '📖', room: r.id, x: r.x + dx, y: r.y + dy - .25, r: 1.1 }); }
 }
 
 // easter eggs: the wishing fountain, the disguised mayor, the legendary fish and the secret signs
