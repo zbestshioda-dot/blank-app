@@ -4661,7 +4661,7 @@ function buildCast() {
   const online = () => fetch('/api/status').then(r => r.json()).then(j => { for (const id of ['heroOnline', 'promoOnline']) { const e = document.getElementById(id); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; } }).catch(() => { });
   online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
 })();
-fetch('assets/portraits.json?v=4').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
+fetch('assets/portraits.json?v=5').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
 fetch('assets/anime.json?v=2').then(r => r.json()).then(j => { ANI = j; buildCast(); }).catch(() => { });
 const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], st = faceStyle(alt || g?.f, px) || faceStyle(g?.f, px); return st ? `<i class="qface" style="${st}"></i>` : ''; };
 function questPop(type, title, line, reward) {
@@ -4797,6 +4797,7 @@ const TALK = {
 let dlgQ = null;
 function dlgFace(face, npc) {
   const z = innerWidth <= 600 ? 64 : 84;
+  if (typeof face === 'string' && face.startsWith('pic:')) { const b = innerWidth <= 600 ? 120 : 150; return `<i class="dlgPic dlgImg" style="width:${b}px;height:${b}px;background-image:url(assets/pics.webp?v=${PICS_V});${picPos(face.slice(4), b)}"></i>`; }
   if (typeof face === 'string' && face.startsWith('an:') && ANI) { const [, k, m] = face.split(':'), b = innerWidth <= 600 ? 150 : 200; return `<i class="dlgPic dlgAni" style="width:${b}px;height:${b}px;${aniBg(k, m, b)}"></i>`; }
   if (face && FACES?.faces?.[face] !== undefined) { const i = FACES.faces[face], n = Object.keys(FACES.faces).length; return `<i class="qface dlgPic" style="width:${z}px;height:${z}px;background-size:${n * z}px ${z}px;background-position:-${i * z}px 0"></i>`; }
   return npc ? `<canvas class="dlgPic dlgPix" data-dlg="${esc(npc)}" width="84" height="84"></canvas>` : '';
@@ -4804,9 +4805,24 @@ function dlgFace(face, npc) {
 // opts: { name, face (painted face id), npc (staff id or player id for the pixel portrait), lines: [], choices: [{ label, fn, cls }] }
 const MOOD = /^\[([nhsa])\]\s*/;
 const unmood = t => String(t || '').replace(MOOD, '');
+// 🎨 painted manhwa portraits, one picture per character (assets/pic_<key>.webp), found by the name before the brackets
+const PICS = { 'พี่โจ้': 'joe', 'คุณเมย์': 'may', 'ป้าสมใจ': 'somjai', 'พี่ดำ': 'dam', 'ต้นกล้า': 'tonkla', 'น้องมะปราง': 'mprang', 'ป้านวล': 'nuan', 'ตาเฉย': 'choei', 'น้องเจมส์': 'james',
+  'คุณนภา': 'napa', 'คุณแพรว': 'praew', 'คุณนิด': 'nid', 'ผอ.ประเสริฐ': 'prasert', 'คุณจิ๋ม': 'jim', 'คุณโอม': 'om', 'พี่ฟ้า': 'fah',
+  'ผู้กองเอก': 'ek', 'ดาบหญิงสมศรี': 'somsri', 'ผู้กองเดช': 'det', 'หมอแพร': 'prae', 'หลวงพ่อเย็น': 'yen', 'พี่ตุ๋ย': 'tui', 'ลุงสัป': 'sap', 'แม่หมอจันทรา': 'chantra', 'พี่แนน': 'nan', 'น้องฝน': 'fon',
+  'น้องภูมิ': 'poom', 'น้องแพร': 'praeshop', 'ยายบุญ': 'boon', 'เจ๊ศรี': 'sri', 'เสี่ยเสือ': 'suea', 'เฮียชัย': 'chai', 'น้องมุก': 'muk', 'ช่างโอ๋': 'oh', 'ป้าสายใจ': 'saijai', 'น้องเก่ง': 'keng',
+  'ป้าแดง': 'daeng', 'เชฟหมี': 'mee', 'พี่ต่อ': 'tor', 'พี่แบงค์': 'bank', 'พี่ด่วน': 'duan', 'พี่ข้าวหอม': 'khaohom', 'น้าเล็ก': 'lek', 'พี่โฟกัส': 'focus', 'ลุงจุก': 'juk', 'ลุงชัย': 'umbrella',
+  'น้องมะลิ': 'mali', 'พี่ภูผา': 'phupha', 'ลุงโป่ง': 'pong', 'ช่างเปี๊ยก': 'piak' };
+const PICS_V = 3;
+const PICS_ORDER = ['joe', 'may', 'somjai', 'dam', 'tonkla', 'mprang', 'nuan', 'choei', 'james', 'napa', 'praew', 'nid', 'prasert', 'jim', 'om', 'fah', 'ek', 'somsri', 'det', 'prae', 'yen', 'tui', 'sap', 'chantra', 'nan', 'fon', 'poom', 'praeshop', 'boon', 'sri', 'suea', 'chai', 'muk', 'oh', 'saijai', 'keng', 'daeng', 'mee', 'tor', 'bank', 'duan', 'khaohom', 'lek', 'focus', 'juk', 'umbrella', 'mali', 'phupha', 'pong', 'piak'];
+const PICS_COLS = 10, PICS_ROWS = 5;
+
+const picPos = (k, b) => { const i = Math.max(0, PICS_ORDER.indexOf(k)); return `background-size:${PICS_COLS * b}px ${PICS_ROWS * b}px;background-position:-${(i % PICS_COLS) * b}px -${Math.floor(i / PICS_COLS) * b}px`; };
+const picOf = name => PICS[String(name || '').replace(/\s*\(.*$/, '').trim()];
 function dialog(opts) {
   closePanel();
-  if (opts.lines) {   // lines may start with a mood: [n] normal [h] happy [s] surprised [a] angry — the anime portrait follows it
+  const pk = picOf(opts.name);
+  if (pk) opts = { ...opts, face: 'pic:' + pk, faces: null, ani: null, lines: opts.lines && opts.lines.map(unmood) };   // a painted picture replaces the anime / pixel face
+  if (opts.lines && !pk) {   // lines may start with a mood: [n] normal [h] happy [s] surprised [a] angry — the anime portrait follows it
     const k = opts.ani || ANI_OF[opts.npc] || ANI_FACE[opts.face], moods = opts.lines.map(l => (String(l).match(MOOD) || [])[1]);
     opts = { ...opts, lines: opts.lines.map(unmood) };
     if (k && aniCell(k, 'n') !== undefined) { let cur = 'n'; opts.faces = moods.map(m => 'an:' + k + ':' + (cur = m || cur)); opts.face = opts.faces[0]; }
@@ -5796,6 +5812,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26a', d: '22 พ.ย.', items: [
+    '🎨 <b>ภาพวาดตัวละครใหม่!</b> คุยกับชาวเมืองและพนักงาน 50 คนจะเห็นรูปวาดสไตล์มังฮวาเต็มกรอบ (ตำรวจ วัด ร้านค้า ตลาด และอีกเพียบ)',
+  ] },
   { v: '2026-11-25z', d: '22 พ.ย.', items: [
     '💞 <b>ชาวเมืองมีชีวิตแล้ว!</b> แต่ละคนมีตารางของตัวเอง ไปทำงาน พักเที่ยง เดินเล่น และกลับบ้านตอนกลางคืน',
     '💬 ชาวเมืองจำคุณได้: คุยวันละครั้ง ให้ของขวัญวันละชิ้น (ของที่ชอบ ❤️ ของโปรด 💖) ยิ่งสนิทยิ่งทักทายเป็นกันเอง ขึ้นระดับได้เงินรางวัล',
