@@ -807,6 +807,37 @@ const RIDES = {
   for (const [x, y] of [[68.6, 41.6], [74.6, 45.6], [86.5, 40.0]]) put('bench', x, y, false);
   put('kiosk', 81.5, 38.95); put('o_bin_green', 83.4, 39.95); put('o_bikerack', 61.5, 39.9, false);
 }
+// ================================================================= lakeside, round 3: a stone promenade all the way round the town lake,
+// lamps and benches along it, a ring of shade trees outside it (the stray trees on the lawns go), a path down to the homes,
+// a pavilion and a picnic spot on the west shore
+{
+  const near = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ('sw'.includes(get(x + dx, y + dy))) return true; return false; };
+  const taken = (x, y) => PROPS.some(q => Math.floor(q.x) === x && Math.floor(q.y - .5) === y) || STATIONS.some(q => q.area === 'town' && Math.floor(q.x) === x && Math.floor(q.y) === y);
+  for (let i = TREES.length - 1; i >= 0; i--) { const [x, y] = TREES[i]; if (x >= 2 && x <= 46 && y >= 56 && y <= 79) { set(x, y, '.'); TREES.splice(i, 1); } }
+  for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (q.s === 'tuft' && q.x < 47 && q.y > 56 && q.y < 80) PROPS.splice(i, 1); }
+  const walk = [];
+  for (let y = 57; y <= 79; y++) for (let x = 7; x <= 44; x++) if (get(x, y) === '.' && near(x, y) && !taken(x, y)) { set(x, y, 'c'); walk.push([x, y]); }
+  rect(25, 79, 2, 6, 'c');                                                   // down to the lane past the homes
+  // shade trees two steps outside the promenade, every few steps round the lake
+  const out = (x, y) => { let n = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (get(x + dx, y + dy) === 'c') n++; return n; };
+  const kinds = ['tree_oak', 'tree_pink', 'tree3', 'tree_white', 'tree2', 'tree_pink2'];
+  let k = 0;
+  for (let y = 56; y <= 80; y++) for (let x = 4; x <= 46; x++) {
+    if (get(x, y) !== '.' || taken(x, y) || near(x, y) || out(x, y) === 0) continue;
+    let adj = false; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (get(x + dx, y + dy) === 'c') adj = true;
+    if (adj) continue;                                                       // keep the verge right by the path clear
+    if (!TREES.some(t => Math.abs(t[0] - x) < 3 && Math.abs(t[1] - y) < 3) && (y > 62 || x < 12 || x > 38)) { set(x, y, 'T'); TREES.push([x, y, kinds[k++ % kinds.length]]); }
+  }
+  // lamps and benches on the lake side of the walk
+  walk.forEach(([x, y], i) => {
+    if (y < 60) return;                                                      // the fishing club's own shore stays as it is
+    if (i % 9 === 0) prop('o_lampball', x + .5, y + .95, false);
+    else if (i % 9 === 4 && (y > 74 || x < 12 || x > 38)) prop('bench', x + .5, y + .9, false);
+  });
+  const free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !PROPS.some(q => Math.hypot(q.x - x, q.y - y) < 1.5) && !TREES.some(t => Math.hypot(t[0] + .5 - x, t[1] + .5 - y) < 1.6);
+  if (free(5, 68)) prop('b_pavilion', 5, 68);
+  for (const [s1, x, y, sol] of [['o_woodtable', 5, 73.9, true], ['o_woodtable', 42.5, 76.9, true]]) if (free(x, y)) { prop(s1, x, y, sol); prop(x > 20 ? 'o_parasol2' : 'o_parasol', x, y + .4, false); }
+}
 // ================================================================= the park, dressed up: a food court on the south lawn, café tables,
 // flowerbeds along the main walk and more blossom trees (added after everything else, so nothing older moves)
 {
