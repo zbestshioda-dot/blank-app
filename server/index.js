@@ -1520,7 +1520,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -2100,7 +2100,7 @@ function apply(a, career) {
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
     police: 'ที่สถานีตำรวจ: รับเคสหมาหาย เคสตามจับโจร เล่นจับผิดภาพหาโจร และซ้อมยิงเป้า · ได้รถสายตรวจขับฟรี',
     templeboy: 'คุยกับพี่ตุ๋ยหน้าประตูวัดเพื่อรับภารกิจช่วยงานวัด', undertaker: 'คุยกับลุงสัปหน้าประตูวัดเพื่อรับงานพิธี', mechanic: 'คุยกับช่างเปี๊ยกหน้าโชว์รูมรถ รับงานซ่อมรถทั่วเมือง',
-    thug: 'คุยกับเสี่ยเสือในตลาด รับงานนักเลง (ใจดีๆ นะ)', photographer: 'คุยกับพี่โฟกัสที่จัตุรัส รับงานถ่ายภาพ', courier: 'คุยกับพี่ด่วนหน้าคลังสินค้า รับพัสดุไปส่ง',
+    detective: 'คุยกับผู้กองเดชหน้าห้องสมุดเมือง รับคดีค้นหาของหายและไขปริศนา', thug: 'คุยกับเสี่ยเสือในตลาด รับงานนักเลง (ใจดีๆ นะ)', photographer: 'คุยกับพี่โฟกัสที่จัตุรัส รับงานถ่ายภาพ', courier: 'คุยกับพี่ด่วนหน้าคลังสินค้า รับพัสดุไปส่ง',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
   };
   toast(a, `ยินดีด้วย! ได้งานเป็น ${c.icon} ${c.name} · ${tips[career]}`, c.icon);
@@ -3653,7 +3653,7 @@ function misBuild(a, car, force) {
       st.who = misLook(r[3]); st.label = r[4]; const to = misPlace(r[2], pl); st.to = { x: to.x, y: to.y }; st.fx = pl.x; st.fy = pl.y; st.phase = 0;
       est += (to.d || Math.hypot(to.x - pl.x, to.y - pl.y) * 1.4) / 2.4 * 2 + 10; prev = to; steps.push(st); continue;
     }
-    else if (k === 'talk') { st.who = misLook(r[2]); st.q = r[3]; st.ans = r[4]; st.right = r[5]; st.label = `คุยกับ${st.who.name}`; est += 20; }
+    else if (k === 'talk') { st.who = misLook(r[2]); st.q = r[3]; const ord = r[4].map((_, i) => i).sort(() => Math.random() - .5); st.ans = ord.map(i => r[4][i]); st.right = ord.indexOf(r[5]); st.label = `คุยกับ${st.who.name}`; est += 20; }   // answers in random order (the right one is written first)
     steps.push(st); prev = { x: st.x, y: st.y };
   }
   const limit = Math.round(clamp(est, 120, 720) * 1000), t = now();
@@ -3688,7 +3688,7 @@ function misNext(a) {
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
   const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((80 + 55 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
-  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); } earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
+  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); if (m.car === 'detective') a.cases = [...(a.cases || []), { t: m.title, i: m.icon, d: t, c: m.steps.filter(s => s.k === 'talk' || s.k === 'find').map(s => s.label).slice(0, 4) }].slice(-40); }   // 🕵️ the case notebook earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(pay)}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
 }
@@ -4329,7 +4329,7 @@ function meView(a) {
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
-    jobWait: jobCooldown(a), misAt: a.misNext || 0, stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
+    jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
   };
 }

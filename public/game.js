@@ -110,7 +110,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b6', chSheets = {};
+const CH_V = 'b7', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -171,7 +171,7 @@ function femOutfitFrame(sheet, step, lk) {
   return chPut(key, c);
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
+const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
   tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong' };   // women's versions are the 'f' + name sheets
@@ -289,7 +289,7 @@ function sheetHasHair(sheet) {
   let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
   return HAIR_MASKED[sheet] = n > 50;
 }
-const HAIR_HAT = { farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
+const HAIR_HAT = { detective: 1, farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
 function hairFix(fr, outfit, step, gender, lk) {
   const sh = outfit.slice(0, -1).replace(/^f(?=[a-z]{3})/, m => CH_ATLAS.rows[outfit.slice(1) + 'down0'] !== undefined ? '' : m);
   if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh]) return fr;
@@ -2377,7 +2377,7 @@ function rbResult(m) {
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
-const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider', 'chef', 'templeboy', 'undertaker', 'mechanic', 'thug', 'photographer', 'courier'];
+const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider', 'chef', 'templeboy', 'undertaker', 'mechanic', 'thug', 'photographer', 'detective', 'courier'];
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
@@ -3604,6 +3604,7 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   undertaker: { name: 'ลุงสัป (สัปเหร่อประจำวัด)', short: 'ลุงสัป', of: '-', lk: { hair: 'silver', shirt: '#262626', pants: '#262626' }, hi: '[n] กลัวผีไหมหลาน? ถ้าไม่กลัว... มาเป็นสัปเหร่อกับลุงสิ', yes: '[h] คืนนี้มีงาน เตรียมตัวให้พร้อมนะ ผีแถวนี้ใจดีกันทั้งนั้นแหละ' },
   mechanic: { name: 'ช่างเปี๊ยก (อู่หน้าโชว์รูม)', short: 'ช่างเปี๊ยก', of: '-', lk: { hair: 'black', shirt: '#2d3d66', pants: '#2d3d66' }, hi: '[h] โย่! รถเสียเต็มเมืองเลย ช่างไม่พอ มาช่วยพี่หน่อยดิ', yes: '[h] มีรถรอซ่อมอยู่ คว้าประแจแล้วลุยเลย!' },
   thug: { name: 'เสี่ยเสือ (ลูกพี่ประจำตลาด)', short: 'เสี่ยเสือ', of: 'songkran', lk: { hair: 'black' }, hi: '[n] อยากเป็นนักเลงเหรอ? นักเลงจริงต้องใจดีนะเว้ย', yes: '[h] มีเรื่องให้เคลียร์ ไปจัดการหน่อย ใช้ปากนะ อย่าใช้มือ' },
+  detective: { name: 'ผู้กองเดช (สำนักงานนักสืบ)', short: 'ผู้กองเดช', of: 'detective', lk: { hair: 'black' }, hi: '[n] เมืองนี้มีเรื่องลึกลับเยอะกว่าที่คิด... สนใจมาเป็นนักสืบกับผมไหม?', yes: '[h] มีคดีใหม่เข้ามาพอดี หยิบแว่นขยายแล้วไปกันเลย' },
   photographer: { name: 'พี่โฟกัส (สตูดิโอถ่ายภาพ)', short: 'พี่โฟกัส', of: 'photog', lk: { hair: 'brown' }, hi: '[h] ชอบถ่ายรูปไหม? มาเป็นช่างภาพกัน... ว่าแต่ยิ้มอีกทีสิ แสงกำลังสวยเลย', yes: '[h] มีลูกค้าจ้างถ่ายรูป รับงานได้เลย ไปเก็บความทรงจำให้คนอื่นกัน' },
   courier: { name: 'พี่ด่วน (หัวหน้าส่งพัสดุ)', short: 'พี่ด่วน', of: '-', g: 'f', lk: { hair: 'brown', shirt: '#2b3552', pants: '#2b3552' }, hi: '[h] ไม่มีใบขับขี่ก็ส่งของได้นะ เดินส่งเอา! ได้เงินแถมหุ่นดี', yes: '[h] พัสดุมาลงแล้ว ไปๆ ส่งให้ไวกว่าพี่ให้ได้!' },
   office:   { name: 'คุณนภา (ฝ่ายบุคคล)', short: 'คุณนภา', g: 'f', lk: { hair: 'brown', shirt: 'white' }, hi: '[h] สวัสดีค่ะ~ ไทยเทคกำลังรับคนเก่งๆ อยู่นะคะ สนใจมาเป็นเพื่อนร่วมงานกับนภาไหม?', yes: '[n] เข้างาน 8 โมงตรงนะคะ... ถ้ามาสาย นภาจะงอนจริงๆ ด้วย' },
@@ -4589,7 +4590,7 @@ function buildCast() {
   const online = () => fetch('/api/status').then(r => r.json()).then(j => { for (const id of ['heroOnline', 'promoOnline']) { const e = document.getElementById(id); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; } }).catch(() => { });
   online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
 })();
-fetch('assets/portraits.json?v=3').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
+fetch('assets/portraits.json?v=4').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
 fetch('assets/anime.json?v=2').then(r => r.json()).then(j => { ANI = j; buildCast(); }).catch(() => { });
 const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], st = faceStyle(alt || g?.f, px) || faceStyle(g?.f, px); return st ? `<i class="qface" style="${st}"></i>` : ''; };
 function questPop(type, title, line, reward) {
@@ -4679,7 +4680,7 @@ function icuDraw() {
 // ------------------------------------------------------------------ dialog box (talking to people)
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
-const NPC_FACE = { staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
+const NPC_FACE = { staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
   keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
@@ -4687,6 +4688,7 @@ const TALK = {
   staff_templeboy: [['[n] พี่อยู่วัดนี้มาตั้งแต่เด็ก หลวงพ่อเลี้ยงมาเหมือนลูก', '[h] เลยอยากตอบแทน ช่วยงานวัดทุกอย่างเลย'], ['[s] จริงนะ! ต้นโพธิ์ข้างโบสถ์ตอนดึกๆ มีเสียงกระซิบ', '[h] ...ลุงสัปบอกว่าเป็นเสียงลม แต่พี่ว่าต้นไม้มันคุยกัน'], ['[a] หมาวัดคาบรองเท้าพี่ไปอีกแล้ว!', '[h] ช่างมันเถอะ มันคงอยากเล่นด้วย'], ['[h] งานวัดคืนนี้ไปปาลูกโป่งด้วยกันไหม', '[n] พี่ปาแม่นนะ ได้ตุ๊กตามาแล้วสามตัว เอาไปให้น้องที่ศาลาหมดเลย']],
   staff_cashier: [['[n] ร้านเราเปิดยี่สิบสี่ชั่วโมง พนักงานผลัดกันเข้ากะนะ', '[h] คิดเงินทอนเร็ว ลูกค้าก็ยิ้ม พี่แนนก็ยิ้ม'], ['[s] เมื่อคืนมีลูกค้าซื้อมาม่ายี่สิบห่อ!', '[h] พี่แนนเลยแถมไข่ให้ฟองนึง อิ่มท้องอุ่นใจ'], ['[a] ใครเติมของแล้วไม่หันป้ายราคาออก พี่แนนงอนนะ!', '[h] ...แต่ถ้าเป็นเธอ พี่ยกโทษให้ก็ได้'], ['[n] พี่แนนเก็บเงินอยากเปิดร้านกาแฟเล็กๆ ของตัวเอง', '[h] ถึงวันนั้น แก้วแรกพี่เลี้ยงเธอเลย']],
   staff_courier: [['[n] วันๆ พี่เดินสองหมื่นก้าว', '[h] ไม่ต้องเข้ายิมเลยค่ะ งานนี้ได้ทั้งเงินได้ทั้งหุ่น'], ['[s] กล่องนี้ขยับได้!?', '[h] อ๋อ ลูกแมวที่ลูกค้าสั่งจากร้านสัตว์เลี้ยงนี่เอง น่ารักมาก'], ['[a] เมื่อวานมีหมาไล่พี่สามซอย!', '[h] ...แต่พี่วิ่งชนะนะ ฮ่าๆ']],
+  staff_detective: [['[n] นักสืบที่ดีไม่ได้เดาเก่ง', '[h] แต่สังเกตเก่ง รอยเท้า กลิ่น เศษดิน ทุกอย่างพูดได้'], ['[s] รู้ไหม ของหายครึ่งหนึ่งไม่ได้ถูกขโมย', '[n] แค่เจ้าของลืมไว้เอง ฮ่าๆ'], ['[a] อย่าเชื่อคำให้การแรกเสมอไป', '[n] ฟังให้ครบทุกคนก่อนค่อยชี้ตัว']],
   staff_photographer: [['[n] ภาพที่ดีไม่ใช่ภาพที่ชัดที่สุด', '[h] แต่เป็นภาพที่ดูแล้วหัวใจเต้นแรงที่สุด'], ['[a] เดี๋ยว! อย่าขยับ!', '[h] ...แค่อยากจำมุมนี้ไว้ คุณขึ้นกล้องกว่าที่คิดนะ'], ['[n] พี่เคยรอถ่ายพระอาทิตย์ตกที่ริมหาดสามวันติด', '[a] ฝนตกทั้งสามวัน!', '[h] วันที่สี่สวยจนลืมเหนื่อยเลย']],
   staff_thug: [['[n] ป้าๆ แม่ค้าในตลาดนี่ พี่ดูแลทุกคน', '[h] ใครมารังแกป้าแก้วร้านส้มตำ เจอพี่แน่!'], ['[n] เมื่อคืนพี่ดูละครหลังข่าว', '[a] ...ไม่ได้ร้องไห้นะเว้ย ฝุ่นเข้าตา!'], ['[h] เสื้อลายดอกตัวนี้ แม่พี่ซื้อให้', '[n] ใส่ทุกวัน เวลาคิดถึงแม่จะได้อุ่นใจ']],
   staff_mechanic: [['[n] เสียงเครื่องยนต์บอกทุกอย่างนะ', '[h] ฟังดีๆ มันคุยกับเราได้ ...คนอื่นว่าพี่บ้า แต่พี่ว่ามันโรแมนติก'], ['[s] เฮ้ย มือเปื้อนน้ำมันอีกแล้ว!', '[a] อาบน้ำสามรอบก็ไม่ออก แฟนเก่าบอกว่าตัวพี่มีแต่กลิ่นเครื่องยนต์...', '[h] ช่างมัน! ใครจะรักพี่ ต้องรักกลิ่นน้ำมันด้วย'], ['[n] ซ่อมรถได้ทุกยี่ห้อ', '[h] ยกเว้นซ่อมใจคน อันนั้นพี่ยังฝึกอยู่']],
@@ -5615,6 +5617,14 @@ function staffHint(career) {
   if (me.career === career) return `<div class="jobbox ok">${c.icon} คุณทำงานเป็น<b>${c.name}</b> · Lv.${me.lv}</div>`;
   return `<div class="jobbox">💬 อยากเป็น ${c.icon} <b>${c.name}</b>? คุยกับ <b>${esc(n?.name || 'เจ้าหน้าที่')}</b> ที่ยืนอยู่ข้างๆ เพื่อสมัครงาน</div>`;
 }
+// 🕵️ the detective's case notebook: every closed case with its clues (newest first)
+function caseBook() {
+  const cs = me.cases || []; if (me.career !== 'detective' && !cs.length) return '';
+  const rows = cs.slice().reverse().map(c => `<div class="item" style="display:block"><b>${c.i || '🔎'} ${esc(c.t)}</b> <span class="tag">ปิดคดีแล้ว</span>
+    <div class="sub">${new Date(c.d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}${(c.c || []).length ? ' · เบาะแส: ' + c.c.map(esc).join(' → ') : ''}</div></div>`).join('');
+  return `<div class="jobbox"><b>📓 สมุดคดี</b> · ปิดคดีแล้ว ${cs.length} คดี${cs.length >= 40 ? ' (แสดง 40 คดีล่าสุด)' : ''}
+    ${rows ? `<div class="list" style="max-height:260px;overflow:auto">${rows}</div>` : '<div class="sub">ยังไม่มีคดี · ไปรับคดีแรกกับผู้กองเดชหน้าห้องสมุดเมือง</div>'}</div>`;
+}
 // "apply for this job here" block, shown in every building that hires
 function applyBox(career, st) {
   const c = G.careers[career];
@@ -5630,6 +5640,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25r', d: '22 พ.ย.', items: [
+    '🕵️ <b>อาชีพใหม่: นักสืบเอกชน</b> สมัครกับผู้กองเดชหน้าห้องสมุดเมือง (ไม่ต้องมีวุฒิ) · 20 คดี: ค้นหาของหาย ตามหาคนและสัตว์เลี้ยง ไขปริศนา สอบปากคำพยานแล้วชี้ตัวคนร้าย',
+    '🧥 ชุดนักสืบ (โค้ท หมวก แว่นขยาย) ทั้งชายและหญิง ใส่อัตโนมัติเมื่อเป็นนักสืบ',
+    '📓 สมุดคดี: คดีที่ปิดได้บันทึกไว้พร้อมเบาะแส ดูได้ที่ 💼 งานของฉัน',
+    '🔀 ตัวเลือกตอนคุยในภารกิจทุกอาชีพสลับลำดับแล้ว (คำตอบที่ถูกไม่อยู่ข้อแรกเสมอ)',
+  ] },
   { v: '2026-11-25q', d: '22 พ.ย.', items: [
     '⏳ ปุ่มรอภารกิจใหม่นับถอยหลังจริงทุกวินาที ครบแล้วเปลี่ยนเป็นปุ่มรับภารกิจเอง',
     '✨ ของที่ต้องเก็บในภารกิจเห็นชัดขึ้น: ใหญ่ขึ้น มีวงแสงสีทอง ลูกศรชี้ และไม่โดนกำแพง/ต้นไม้บัง',
@@ -6945,7 +6961,7 @@ function renderPanel(p) {
         <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(+me.jx.cur).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
         ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
-        ${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;
+        ${caseBook()}${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;
     }
     case 'toolshop': {
       const order = [me.career, ...Object.keys(G.shop.tools).filter(c => c !== me.career)].filter(c => G.shop.tools[c]);

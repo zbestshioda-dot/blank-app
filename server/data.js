@@ -1510,6 +1510,7 @@ const CAREERS = {
   mechanic: { name: 'ช่างซ่อมรถ', icon: '🔧', where: 'door_dealer', need: [], desc: 'ตระเวนซ่อมรถเสียทั่วเมือง ปะยาง เปลี่ยนแบต ตรวจรถโชว์รูม · รับภารกิจที่ช่างเปี๊ยกหน้าโชว์รูมรถ' },
   thug: { name: 'นักเลง', icon: '😎', where: 'market', need: [], desc: 'นักเลงใจดีประจำตลาด: ไกล่เกลี่ยวัยรุ่น ตามหนี้ คุ้มกันเสี่ย (ใช้ปากมากกว่ามือ) · รับภารกิจที่เสี่ยเสือในตลาด' },
   photographer: { name: 'ช่างภาพ', icon: '📷', where: 'square', need: [], desc: 'รับจ้างถ่ายภาพสถานที่ งานแต่ง สัตว์หายาก ทั่วเมือง · รับภารกิจที่พี่โฟกัสที่จัตุรัส' },
+  detective: { name: 'นักสืบเอกชน', icon: '🕵️', where: 'staff_detective', need: [], desc: 'รับคดีค้นหาของหาย ตามหาคนและสัตว์เลี้ยง และไขปริศนา: เก็บเบาะแส สอบปากคำพยาน แล้วชี้ตัวคนร้าย (ตอบผิดเสียเวลา) · คดีที่ปิดได้จะถูกบันทึกในสมุดคดี · รับคดีที่ผู้กองเดชหน้าห้องสมุดเมือง' },
   courier: { name: 'พนักงานส่งของ', icon: '📦', where: 'door_warehouse', need: [], desc: 'เดินส่งพัสดุตามบ้าน (ไม่ต้องมีใบขับขี่) ส่งครบเร็วได้โบนัส · รับภารกิจที่พี่ด่วนหน้าคลังสินค้า' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: [], desc: 'ทำอาหารที่ครัวใหญ่: ซื้อวัตถุดิบ หั่น ผัด ต้ม ย่าง แล้วจัดจาน · อาหารที่เชฟทำขายให้ร้านอาหารได้ราคาดีกว่าคนทั่วไป (ยิ่งเลเวลสูงยิ่งได้มาก) · รับภารกิจเชฟที่เชฟหมีในครัว' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
@@ -2107,6 +2108,8 @@ PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p
     const ok = fixed || spots.map(([dx, dy]) => [s.x + dx, s.y + dy]).find(([x, y]) => areaAt(x, y)?.id === s.area && !blocked(x, y, 0.36) && !near(s, x, y)) || [s.x + 1.5, s.y];
     STATIONS.push({ id: 'staff_' + key, type: 'staff', career: key, at: where, label: 'เจ้าหน้าที่', icon: '💬', x: ok[0], y: ok[1], r: 1.3, area: fixed ? areaAt(ok[0], ok[1]).id : s.area });
   }
+  // the private detective's office: in front of the town library (a closed building), so the officer stands outside
+  STATIONS.push({ id: 'staff_detective', type: 'staff', career: 'detective', at: 'staff_detective', label: 'สำนักงานนักสืบ (หน้าห้องสมุด)', icon: '🕵️', x: 61, y: 13.9, r: 1.3, area: 'town' });
 }
 
 // easter eggs: the wishing fountain, the disguised mayor, the legendary fish and the secret signs
