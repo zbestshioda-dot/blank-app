@@ -5671,6 +5671,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25v', d: '22 พ.ย.', items: [
+    '💾 ภารกิจอาชีพและคดีนักสืบที่ทำค้างอยู่ไม่หายแล้วตอนเกมอัปเดต (เวลาหยุดนับระหว่างเซิร์ฟเวอร์ปิด)',
+  ] },
   { v: '2026-11-25u', d: '22 พ.ย.', items: [
     '🔎 เกมนักสืบ: จุดเบาะแสและผู้ต้องสงสัยอยู่ในที่โล่งเดินถึงเสมอ (ไม่ไปตกในแปลงดอกไม้/หลังรั้ว) และเก็บเบาะแสได้จากระยะไกลขึ้น',
   ] },
