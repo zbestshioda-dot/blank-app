@@ -2617,7 +2617,7 @@ function act(a, m) {
       if (!cd(a, 'cook', 1500) || !spend(a, 12)) return;
       for (const [k, q] of Object.entries(r.in)) addItem(a, k, -q);
       const comps = Object.keys(r.in).map(ing => ({ ing, ops: r.ops[ing] || [], k: 0, at: 'pantry', t: 0, prog: 0, ready: false, burnt: false }));
-      const sec = 20 + comps.reduce((s0, c) => s0 + 9 + c.ops.reduce((x, o) => x + D.COOK[o] + 7, 0), 0);
+      const sec = 40 + comps.reduce((s0, c) => s0 + 14 + c.ops.reduce((x, o) => x + D.COOK[o] + 10, 0), 0);   // roomy timer
       const limit = Math.round(sec * 1.35 * 1000), t = now();
       a.cook = { rid: r.id, comps, hand: -1, plated: false, t0: t, limit, until: t + limit, ckAt: 0 };
       markMe(a); return toast(a, `🔥 ออเดอร์เข้า! ${D.ITEMS[r.id].icon}${D.ITEMS[r.id].name} ภายใน ${Math.round(limit / 1000)} วินาที — เริ่มที่ 🧺 ตู้วัตถุดิบ`, '🍳');

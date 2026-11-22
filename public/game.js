@@ -5606,6 +5606,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25j', d: '22 พ.ย.', items: [
+    '🍳 Cooking Battle ง่ายขึ้น: สับ/ผัดเร็วขึ้น ต้ม/ย่างไหม้ช้าลงมาก เตาย่างวางได้ 3 ชิ้น และเวลาเสิร์ฟนานขึ้น',
+  ] },
   { v: '2026-11-25i', d: '22 พ.ย.', items: [
     '👨‍🍳 ย้ายเชฟหมีมายืนกลางครัว (มุมซ้ายล่าง) เดินไปคุยสมัครเชฟได้แล้ว ไม่โดนเขียงบัง',
   ] },

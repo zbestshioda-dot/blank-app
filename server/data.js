@@ -1345,7 +1345,7 @@ const RECIPES = [
   { id: 'tomyum',       in: { tilapia: 1, chili: 1, corn: 1 }, ops: { tilapia: ['chop', 'boil'], chili: ['chop'], corn: ['chop', 'boil'] } },
   { id: 'durian_sweet', in: { durian: 1, rice: 1 }, ops: { durian: ['chop'], rice: ['boil'] } },
 ];
-const COOK = { chop: 4, fry: 5, boil: 7, grill: 6, window: { boil: 9, grill: 6 }, grillMax: 2 };
+const COOK = { chop: 2.5, fry: 3, boil: 5, grill: 4, window: { boil: 20, grill: 15 }, grillMax: 3 };   // made easier: quicker chop/fry, much longer before boil/grill burns
 // fishing pools: [id, weight]. null = junk
 // what bites where. The first sheet's fish keep their hand-set weights; the second sheet's join every water of their kind
 // ('f' fresh: river + lake, 's' sea) with a weight by rarity. The nothing-bites weight is then set so a cast is worth about
