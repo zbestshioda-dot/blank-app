@@ -1605,3 +1605,21 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 @keyframes fcPulse{0%,100%{box-shadow:0 3px 10px rgba(0,0,0,.35)}50%{box-shadow:0 3px 16px rgba(255,200,60,.9)}}
 .catchPop .cKg{display:block;font-style:normal;font-weight:700;font-size:13px;margin-top:2px}
 .fbook em.kg{display:block;font-size:9px;font-style:normal;opacity:.85}
+/* 💞 townsfolk list: the painted portrait sits in its own column */
+.folkRow{align-items:flex-start}
+.folkRow .em{width:66px!important;min-width:66px;height:66px;flex:none;position:relative;overflow:hidden;border-radius:12px}
+.folkRow .em .dlgPic{position:static!important;left:auto!important;top:auto!important;bottom:auto!important;transform:none!important;margin:0!important;border-radius:12px}
+.folkRow .nm small{display:block;margin-top:2px}
+.folkReq{background:#fff4d6;border:1px solid #e8c36a;border-radius:8px;padding:3px 6px;color:#6b4a10!important;font-weight:600}
+.folkReq.done{background:#e4ffd6;border-color:#8fd27a;color:#2a6a1c!important}
+/* 📜 journal (favours as little stories, tap to open) */
+.jList{display:flex;flex-direction:column;gap:8px}
+.jEntry{background:#ffe2a8;border:3px solid #7a4a1c;box-shadow:inset 0 0 0 2px #f6c36a;border-radius:6px;padding:10px 12px;cursor:pointer}
+.jEntry.on{background:#f8c97c}
+.jEntry.done{opacity:.6}
+.jHead{display:flex;align-items:center;gap:10px}.jHead i{font-style:normal;font-size:20px;color:#e0a000}.jHead b{flex:1;text-align:center;font-size:16px;color:#4a2a0c}
+.jBody{margin-top:8px;text-align:center}
+.jStory{display:flex;gap:10px;align-items:center;text-align:left}.jStory p{margin:0;color:#4a2a0c;font-size:13px;line-height:1.45}
+.jStory .dlgPic{flex:none;position:static!important;transform:none!important;margin:0!important}
+.jGoal{margin-top:8px;font-weight:700;color:#1d3fa8;font-size:14px}.jGoal span{color:#6b4a10;font-weight:600}
+.jMeta{font-size:12px;color:#6b4a10;margin-top:3px}

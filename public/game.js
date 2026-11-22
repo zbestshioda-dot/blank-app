@@ -732,7 +732,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { mc: p.mc || 0, um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0 });
+        Object.assign(s, { mc: p.mc || 0, um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0, fid: p.fid || '' });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -775,6 +775,8 @@ function handle(m) {
     case 'catch': catchPop(m.item, m.first, m.kg, m.pb); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
     case 'fc': fcMsg(m); break;
+    case 'folks': FOLKS = m.list || []; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
+    case 'folksay': { const o = P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
@@ -4465,6 +4467,10 @@ const FN = {
     if (panel?.soc) { for (const x of Object.keys(panel)) delete panel[x]; Object.assign(panel, next); panelSig = ''; refreshPanel(true); } else openPanel(next);
   },
   fcBait() { send({ t: 'fcbait' }); },
+  openFolks() { send({ t: 'folks' }); openPanel({ kind: 'folks' }); },
+  openJournal() { send({ t: 'folks' }); openPanel({ kind: 'journal' }); },
+  jOpen(m) { if (panel) { panel.open = m.id; refreshPanel(true); } },
+  folkGive(m) { send({ t: 'folkgift', id: m.npc, item: m.item }); closePanel(); },
   fishRecs() { openRecs(); },
   wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
   morder(m, root) { const tip = Math.floor(+root.querySelector('#tipIn')?.value || 0); panel.tip = tip; send({ t: 'morder', item: m.item, qty: m.qty, tip }); },
@@ -4932,6 +4938,18 @@ function talkToTown(o) {
   }
   send({ t: 'npctalk', id: o.id });
   const info = { label: '👤 ดูข้อมูล', fn: () => { dialogClose(); openPanel({ kind: 'player', pid: o.id }); } }, bye = { label: '👋 ลาก่อน', fn: dialogClose };
+  const fd = o.fid && FOLKS?.find(f => f.id === o.fid);
+  if (o.fid) {   // 💞 the townsfolk remember you: the greeting warms up with your friendship, a gift once a day
+    const lv = fd?.lv || 0, nm = me.name;
+    const hi = [`สวัสดีจ้า`, `อ้าว สวัสดี${nm ? 'คุณ' + nm : ''}`, `${nm} มาแล้ว! สบายดีไหม`, `${nm}~ คิดถึงพอดีเลย`, `${nm}! วันนี้เป็นไงบ้าง เล่าให้ฟังหน่อย`][lv];
+    const pool = FOLK_TALK[o.face] || TALK.town, t = pool[Math.floor(Math.random() * pool.length)];
+    const extra = [fd?.today ? '🎂 วันนี้วันเกิดฉันเองนะ!' : null, fd?.doing && lv >= 1 ? `ตอนนี้${fd.doing}` : null].filter(Boolean);
+    const rq = fd?.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
+    if (rq && !rq.done) extra.push(`[n]ขอให้ช่วยหน่อยได้ไหม... อยากได้ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${rq.n} ชิ้น (${whereGet(rq.item)}) เดี๋ยวให้ค่าเหนื่อย ${money(rq.pay)}`);
+    const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id }); dialogClose(); } } }] : [];
+    const gift = { label: fd?.gave ? '🎁 ให้ของแล้ววันนี้' : '🎁 ให้ของขวัญ', cls: fd?.gave ? '' : 'primary', fn: () => { dialogClose(); if (!fd?.gave) openPanel({ kind: 'folkgift', npc: o.id, fid: o.fid }); } };
+    return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [hi, ...extra, ...t], choices: [...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
+  }
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
     const q = me.quests?.list.find(x => x.type === 'trade');
     const lines = q && !q.done ? ['สวัสดีค่ะ! หนูชื่อมะปราง', 'อยากลองแลกของกับคนอื่นจัง... ช่วยหนูหน่อยได้ไหมคะ', 'ถ้าพี่แลกของสำเร็จ หนูจะดีใจมากเลย! ว้าว!', 'ไว้เจอกันใหม่นะคะ บ๊ายบาย!']
@@ -5271,7 +5289,44 @@ async function shareOpen() {
   document.body.appendChild(d);
 }
 // 🏆 fishing contest: a chip at the top while it runs (time left, my rank); tap for the leaderboard
-let FCS = { on: 0 }, FRECS = null;
+let FCS = { on: 0 }, FRECS = null, FOLKS = null;
+const heartBar = (p, lv) => { const a = [0, 3, 10, 25, 50], lo = a[lv], hi = a[lv + 1]; return '💗'.repeat(lv) + '🤍'.repeat(4 - lv) + (hi ? ` <small>${p - lo}/${hi - lo}</small>` : ' <small>สูงสุด</small>'); };
+const whereGet = id => { const k = G.items[id]?.kind; return k === 'crop' ? 'ปลูกที่ไร่หรือซื้อที่ตลาด' : k === 'fish' ? 'ตกปลา' : k === 'meal' ? 'ร้านอาหาร/ทำอาหารเอง' : /^py_|^parkplush|balloon|popcorn|cottoncandy|hotdog/.test(id) ? 'สวนสนุก' : /malai|offering|kanomthai|khaotom|namlamyai/.test(id) ? 'แถววัด' : 'ร้านสะดวกซื้อ/ร้านค้า'; };
+const reqTxt = r => `${G.items[r.item]?.icon || ''}${esc(G.items[r.item]?.name || r.item)} x${r.n}`;
+const FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว'];
+// 📜 the journal: today's favours as a list of little stories; tap one to open it (objective, progress, reward, where to find it)
+function journalPanel(p) {
+  if (!FOLKS) return `<h2>📜 บันทึก</h2><div class="sub">กำลังโหลด...</div>`;
+  const list = FOLKS.filter(f => f.req).sort((a, b) => a.req.done - b.req.done);
+  const open = p.open ?? list.find(f => !f.req.done)?.id;
+  const card = f => {
+    const r = f.req, have = Math.min(me.inv?.[r.item] || 0, r.n), on = open === f.id, nm = f.name.replace(/ \(.*\)$/, '');
+    return `<div class="jEntry${r.done ? ' done' : ''}${on ? ' on' : ''}" data-m='${JSON.stringify({ fn: 'jOpen', id: on ? '' : f.id })}'>
+      <div class="jHead"><i>${r.done ? '✅' : '❗'}</i><b>${esc(r.title)}</b></div>
+      ${on ? `<div class="jBody"><div class="jStory">${dlgFace(f.face) || ''}<p>${esc(r.story)}</p></div>
+        <div class="jGoal">▶ นำ ${reqTxt(r)} ไปให้${esc(nm)} ${r.done ? '' : `<span>(${have}/${r.n})</span>`}</div>
+        <div class="jMeta">${r.done ? '✅ ทำเสร็จแล้ววันนี้' : `📍 ${esc(f.doing || '')} · 🔎 หาได้ที่${whereGet(r.item)}`}</div>
+        <div class="jMeta">🎁 รางวัล ${money(r.pay)} · 💞 ความสนิท +4</div></div>` : ''}
+    </div>`;
+  };
+  const left = list.filter(f => !f.req.done).length;
+  return `<h2>📜 บันทึก</h2><div class="sub">คำขอของชาวเมืองวันนี้ ${left ? `เหลือ ${left} เรื่อง` : 'ครบทุกเรื่องแล้ว 🎉'} · หาของให้ครบ แล้วไปคุยกับเจ้าของคำขอเพื่อส่ง · คำขอใหม่ทุกวัน</div><div class="jList">${list.map(card).join('')}</div>`;
+}
+function folksPanel() {
+  if (!FOLKS) return `<h2>💞 ชาวเมือง</h2><div class="sub">กำลังโหลด...</div>`;
+  const row = f => `<div class="item folkRow"><div class="em">${dlgFace(f.face) || '🙂'}</div><div class="nm"><b>${esc(f.name)}</b> ${f.today ? '🎂' : ''}<small>${FOLK_LVN[f.lv]} · ${heartBar(f.p, f.lv)}</small>
+    <small>${esc(f.doing || '')}${f.bday ? ` · 🎂 ${f.bday[1]} ${G.months?.[f.bday[0] - 1] || ''}` : ''}</small><small>${f.love ? `💖 ชอบที่สุด: ${G.items[f.love]?.icon || ''}${esc(G.items[f.love]?.name || '')} · ` : ''}${f.likes.length ? `❤️ ชอบ: ${f.likes.map(i => G.items[i]?.icon || '').join(' ')}` : '❔ ลองให้ของดูว่าชอบอะไร'}</small>
+    <small>${f.talked ? '✅ คุยแล้ววันนี้' : '💬 ยังไม่ได้คุยวันนี้'} · ${f.gave ? '✅ ให้ของแล้ว' : '🎁 ยังไม่ได้ให้ของ'}</small>
+    ${f.req ? `<small class="folkReq${f.req.done ? ' done' : ''}">📋 ${f.req.done ? 'ช่วยแล้ววันนี้ ✅' : `ขอ ${reqTxt(f.req)} (มี ${Math.min(me.inv?.[f.req.item] || 0, f.req.n)}/${f.req.n}) · ได้ ${money(f.req.pay)} · หาได้ที่${whereGet(f.req.item)}`}</small>` : ''}</div></div>`;
+  const open = FOLKS.filter(f => f.req && !f.req.done).length;
+  return `<h2>💞 ชาวเมือง</h2>${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
+}
+function folkGiftPanel(p) {
+  const f = FOLKS?.find(x => x.id === p.fid), skip = new Set(['petegg', 'fcbait']);
+  const inv = Object.entries(me.inv || {}).filter(([id, n]) => n > 0 && G.items[id] && !skip.has(id)).sort((a, b) => (G.items[b[0]].base || 0) - (G.items[a[0]].base || 0));
+  const rows = inv.map(([id, n]) => { const tag = f?.love === id ? ' 💖' : f?.likes?.includes(id) ? ' ❤️' : ''; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(G.items[id].name)}${tag}<small>มี ${n}</small></div>${B('ให้', { fn: 'folkGive', npc: p.npc, item: id }, 'good')}</div>`; }).join('') || '<div class="sub">กระเป๋าว่าง ลองซื้อขนมหรือของฝากมาให้ดูนะ</div>';
+  return `<h2>🎁 ให้ของขวัญ${f ? ' · ' + esc(f.name) : ''}</h2><div class="sub">ให้ได้วันละ 1 ชิ้น · ❤️ ของที่ชอบ +3 · 💖 ของโปรด +6 · อย่างอื่น +1${f?.today ? ' · 🎂 วันนี้วันเกิด แต้ม x2!' : ''}</div><div class="list">${rows}</div>`;
+}
 const openRecs = () => { send({ t: 'frecs' }); openPanel({ kind: 'fishrecs' }); };
 function fishRecsPanel() {
   if (!FRECS) return `<h2>📜 สถิติปลาของเมือง</h2><div class="sub">กำลังโหลด...</div>`;
@@ -5741,6 +5796,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25z', d: '22 พ.ย.', items: [
+    '💞 <b>ชาวเมืองมีชีวิตแล้ว!</b> แต่ละคนมีตารางของตัวเอง ไปทำงาน พักเที่ยง เดินเล่น และกลับบ้านตอนกลางคืน',
+    '💬 ชาวเมืองจำคุณได้: คุยวันละครั้ง ให้ของขวัญวันละชิ้น (ของที่ชอบ ❤️ ของโปรด 💖) ยิ่งสนิทยิ่งทักทายเป็นกันเอง ขึ้นระดับได้เงินรางวัล',
+    '📋 ชาวเมืองขอให้ช่วยหาของวันละเรื่อง ช่วยแล้วได้เงินและความสนิท +4 · 📜 แอปบันทึกรวมคำขอเป็นเรื่องสั้นๆ แตะเพื่อดูรายละเอียด',
+    '🎂 ชาวเมืองมีวันเกิด ให้ของวันนั้นได้ความสนิท x2 · ดูทุกคนได้ในแอป 💞 ชาวเมือง ในมือถือ',
+  ] },
   { v: '2026-11-25y', d: '22 พ.ย.', items: [
     '🏆🎣 <b>แข่งตกปลาทุกวัน 20:00–20:15</b> ปลาตัวที่หนักที่สุดชนะ 🥇 ฿5,000 + ฉายา 🎣 ราชาตกปลา 1 วัน 🥈 ฿3,000 🥉 ฿1,500 คนอื่นที่ตกได้รับ ฿200 (ส่งทางจดหมาย) · เตือนก่อน 10 นาที',
     '⚖️ ปลาทุกตัวมีน้ำหนักแล้ว ตัวที่หนักที่สุดของแต่ละชนิดบันทึกเป็นสถิติในสมุดภาพปลา',
@@ -7265,6 +7326,9 @@ function renderPanel(p) {
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ptab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
     case 'fishcomp': return fishCompPanel();
+    case 'folks': return folksPanel();
+    case 'journal': return journalPanel(p);
+    case 'folkgift': return folkGiftPanel(p);
     case 'fishrecs': return fishRecsPanel();
     case 'barber':
     case 'fashion': {
@@ -7612,11 +7676,11 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first
-const PH_GROUPS = [['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'แก๊ง']], ['เงินทอง', ['บิล', 'การเงิน', 'หุ้น', 'ลอตเตอรี่']],
+const PH_GROUPS = [['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'ชาวเมือง', 'บันทึก', 'แก๊ง']], ['เงินทอง', ['บิล', 'การเงิน', 'หุ้น', 'ลอตเตอรี่']],
   ['ชีวิตประจำวัน', ['เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา', 'เลือกตั้ง']], ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
   ['อื่นๆ', ['เติมเงิน', 'อัปเดต', 'บทช่วยสอน', 'วอลเปเปอร์', 'ตั้งค่า', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
