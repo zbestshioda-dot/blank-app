@@ -205,9 +205,9 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
-  // 🔨 the crafting workshop: an open-air workbench on the lawn east of the plaza (craft-only furniture, see CRAFTS)
-  prop('x_wbench', 66, 45.6); prop('x_toolbox', 67.7, 45.6, false);
-  STATIONS.push({ id: 'workshop', type: 'craft', label: 'โรงช่างคราฟ', icon: '🔨', x: 66, y: 46.3, r: 1.5, area: 'town' });
+  // 🔨 the crafting workshop: an open-air workbench on the plaza's south-east lawn, in view of the spawn point (craft-only furniture, see CRAFTS)
+  prop('x_wbench', 56.5, 37.6); prop('x_toolbox', 54.2, 37.5, false);
+  STATIONS.push({ id: 'workshop', type: 'craft', label: 'โรงช่างคราฟ', icon: '🔨', x: 55.6, y: 37.9, r: 1.5, area: 'town' });
   STATIONS.push({ id: 'wish', type: 'wish', label: 'โยนเหรียญ ฿10', icon: '⛲', x: 50, y: 34.7, r: 1.4, area: 'town' });
   // five little signs in corners nobody walks to
   [[67, 25.3], [1.6, 38.5], [1.6, 87.6], [92.5, 1.6], [98, 88]].forEach(([x, y], n) => { prop('signpost', x, y - .15, false); STATIONS.push({ id: 'secret' + n, type: 'secret', n, label: 'ป้ายเล็กๆ', icon: '🪧', x, y: y + .1, r: .9, area: 'town' }); });
