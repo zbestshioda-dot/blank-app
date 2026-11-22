@@ -2427,7 +2427,7 @@ function misEnts(ents, vis) {
     if (vis(MISNPC.rx, MISNPC.ry, 3)) ents.push([MISNPC.ry + .31, 7, { k: 'mark', x: MISNPC.rx, y: MISNPC.ry, wait: c.k === 'escort' && misLive?.wait, ph: c.phase }]);
   } else MISNPC = null;
   if (c.k === 'find' && near(c.x, c.y, 9)) ents.push([c.y + .2, 7, { k: 'item', x: c.x, y: c.y, icon: c.icon, glow: 1 }]);
-  if (c.k === 'collect') for (const it of c.items) if (!it[2] && near(it[0], it[1], 11)) ents.push([it[1] + .2, 7, { k: 'item', x: it[0], y: it[1], icon: c.icon }]);
+  if (c.k === 'collect') for (const it of c.items) if (!it[2] && near(it[0], it[1], 14)) ents.push([1e7 + it[1], 7, { k: 'item', x: it[0], y: it[1], icon: c.icon }]);
   if (c.k === 'work') ents.push([-1e8, 7, { k: 'spot', x: c.x, y: c.y, icon: c.icon }]);
   if (c.k === 'go') ents.push([c.y + .2, 7, { k: 'beacon', x: c.x, y: c.y }]);
   if (c.k === 'chase') {
@@ -2445,8 +2445,12 @@ function drawMisThing(e, X, Y, t) {
   if (e.k === 'item') {
     const b = Math.sin(t / 300 + e.x) * 3;
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + TS * .3, TS * .22, TS * .07, 0, 0, 7); ctx.fill();
-    if (e.glow) { ctx.fillStyle = `rgba(255,236,140,${.25 + .15 * Math.sin(t / 200)})`; ctx.beginPath(); ctx.arc(px, py, TS * .45, 0, 7); ctx.fill(); }
-    ctx.font = `${Math.round(TS * .5)}px serif`; ctx.fillText(e.icon, px, py + b);
+    // mission pick-ups must stand out on any ground: a pulsing gold disc, a white ring, a bigger icon and a bouncing arrow above
+    const pl = .5 + .5 * Math.sin(t / 200);
+    ctx.fillStyle = `rgba(255,220,90,${.35 + .25 * pl})`; ctx.beginPath(); ctx.arc(px, py, TS * (.45 + .08 * pl), 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py, TS * (.5 + .08 * pl), 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.font = `${Math.round(TS * .72)}px serif`; ctx.fillText(e.icon, px, py + b);
+    ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('⬇️', px, py - TS * .85 + Math.sin(t / 180) * 5);
   } else if (e.k === 'spot') {
     const p = (misLive?.k === 'work' ? misLive.prog : me.mis?.cur?.prog) || 0, sec = me.mis?.cur?.sec || 1;
     ctx.strokeStyle = 'rgba(255,214,90,.9)'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]); ctx.lineDashOffset = -t / 60;
@@ -4762,6 +4766,12 @@ function dlgRender() {
 }
 function dlgTick() {   // called every frame: types the current line out
   if (!dlgQ) return;
+  $('#dlg')?.querySelectorAll('.dlgCh button[data-k]').forEach(b => {   // live labels (a countdown): tick() gives the text, or null when it is over
+    const c = dlgQ.choices?.[+b.dataset.k]; if (!c?.tick) return;
+    const l = c.tick();
+    if (l == null) { dlgQ.choices[+b.dataset.k] = c.next; const ch = b.parentNode; delete ch.dataset.on; dlgRender(); }
+    else if (b.textContent !== l) b.textContent = l;
+  });
   const line = dlgQ.lines[dlgQ.i] || '';
   if (dlgQ.shown < line.length) { dlgQ.shown = Math.min(line.length, dlgQ.shown + 0.9); dlgRender(); }
 }
@@ -4809,7 +4819,8 @@ function talkTo(n, st) {
   const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
   const base = { name: n.name, face: NPC_FACE[n.id], npc: n.id };
   const misOk = !n.keeper && MIS_CAREERS.includes(n.career) && job(n.career);
-  const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : misWait() > 0 ? { label: `⏳ งานใหม่ในอีก ${misWait()} วินาที`, fn: () => toast(`ยังไม่มีงานใหม่ รออีก ${misWait()} วินาที (จะแจ้งเตือนเมื่อพร้อม)`, '⏳', false) } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' }] : [];
+  const take = { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' };
+  const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : misWait() > 0 ? { label: `⏳ งานใหม่ในอีก ${misWait()} วินาที`, tick: () => misWait() > 0 ? `⏳ งานใหม่ในอีก ${misWait()} วินาที` : null, next: take, fn: () => toast(`ยังไม่มีงานใหม่ รออีก ${misWait()} วินาที (จะแจ้งเตือนเมื่อพร้อม)`, '⏳', false) } : take] : [];
   const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
   dialog({ ...base, lines: [hi], choices });
@@ -5619,6 +5630,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25q', d: '22 พ.ย.', items: [
+    '⏳ ปุ่มรอภารกิจใหม่นับถอยหลังจริงทุกวินาที ครบแล้วเปลี่ยนเป็นปุ่มรับภารกิจเอง',
+    '✨ ของที่ต้องเก็บในภารกิจเห็นชัดขึ้น: ใหญ่ขึ้น มีวงแสงสีทอง ลูกศรชี้ และไม่โดนกำแพง/ต้นไม้บัง',
+  ] },
   { v: '2026-11-25p', d: '22 พ.ย.', items: [
     '📋 ภารกิจอาชีพเพิ่มเป็นอาชีพละ 20 แบบ: เด็กวัด สัปเหร่อ ช่างซ่อมรถ นักเลง ช่างภาพ พนักงานส่งของ (เพิ่มรวม 94 ภารกิจ)',
   ] },
