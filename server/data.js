@@ -116,7 +116,6 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   B('rider', 'b_rider2', 20, 45, { label: 'ศูนย์ไรเดอร์', icon: '🛵', st: 'rider' });
   B('fishhut', 'b_stilthouse', 31, 55, { label: 'สมาคมประมง', icon: '🎣', deco: true });
   B('fishstall', 'b_fishstall', 24, 55, { label: 'ร้านขายปลา', icon: '🐟', deco: true });      // the club's fish counter         // the fishing club's hut by the lake
-  B('fruitstall', 'b_market', 72, 39, { label: '', icon: '🍎', deco: true });                // a fruit stall in the east park
   B('fashion', 'b_boutique', 6, 30, { label: 'ร้านแฟชั่น', icon: '👕', st: 'fashion' });
   // 🎰 the casino: the landmark at the head of the town square (north side, east of the north road); its door opens onto the square
   B('casino', 'b_casino', 52, 24, { label: 'คาสิโนเมืองชีวิต', icon: '🎰', st: 'casino', layout: 'casino', late: 4 });
@@ -801,7 +800,7 @@ const RIDES = {
 {
   const free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !PROPS.some(q => Math.hypot(q.x - x, q.y - y) < 1.3) && !STATIONS.some(q => q.area === 'town' && Math.hypot(q.x - x, q.y - y) < 1.5);
   const put = (s, x, y, solid = true) => { if (free(x, y)) prop(s, x, y, solid); };
-  put('o_shelter2', 76.5, 35.2); put('busstop', 78.7, 35.0, false); put('busstop', 36.4, 35.0, false);
+  put('o_shelter2', 76.5, 35.2);
   for (let x = 57; x <= 92; x += 3.5) put('o_flowerbed', x, 36.0, false);
   for (const [x, y] of [[66.6, 41.9], [70.6, 41.9], [71.4, 45.9], [76.6, 45.9], [83.4, 42.9], [87.4, 38.9], [90.4, 41.9]]) put('o_lampball', x, y, 'grass');
   for (const [x, y] of [[68.6, 41.6], [74.6, 45.6], [86.5, 40.0]]) put('bench', x, y, false);
@@ -924,7 +923,7 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   for (let y = 105; y <= 107; y++) { clearTree(43, y); set(43, y, 'k'); } rect(44, 105, 1, 3, 'k');   // into the park's promenade (east end)
   for (let y = 101; y <= 102; y++) { clearTree(52, y); set(52, y, 'c'); } rect(48, 101, 4, 2, 'c');   // to the football ground's west gate
   for (const x of [6, 14, 22, 30, 38, 56, 64, 72, 80, 90]) { prop('o_lamp', x + .5, 92.95); if (x !== 56) prop('o_lamp', x + 4.5, 89.95); }
-  prop('signpost', 52.6, 89.9, false); prop('busstop', 86, 93.9, false); prop('signpost', 48.6, 94.4, false);
+  prop('signpost', 52.6, 89.9, false); prop('signpost', 48.6, 94.4, false);
   for (const x of [8, 18, 28, 38, 60, 70, 78]) prop('bush', x + .5, 94.4, false);
   for (const [x, y] of [[86, 98], [92, 99], [89, 103], [94, 106], [85, 109], [91, 112], [87, 116], [94, 119], [85, 121], [56, 121], [66, 120], [76, 121], [47, 115], [49, 120], [2, 94]]) tree(x, y);
   for (const [x, y] of [[84.5, 101.4], [84.5, 105.4]]) { prop('o_bench', x, y, false); STATIONS.push({ id: 'seat_sd' + y, type: 'seat', label: 'ม้านั่งริมสนามบอล', icon: '🪑', x, y: y + .2, r: .7, area: 'town' }); }

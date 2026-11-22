@@ -2959,6 +2959,7 @@ function drawPlayer(p, X, Y, t) {
   const view = dir === 'down' ? 'front' : dir === 'up' ? 'back' : 'side';
   const k = TS * 1.55 / CH_ATLAS.h * (p.small || 1), H = CH_ATLAS.h * k;
   let px = px0, py = py0;
+  if (pose === 'seat' && !fo) py -= TS * .28;   // on a bench: sit up on the seat, not on the ground in front of it
   const RV = p.veh && !lying && !sitting && G.shop?.vehicles?.[p.veh] && !roomOf(p.x, p.y) ? G.shop.vehicles[p.veh] : null;
   if (!fo?.high && !fo?.swim) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (lying ? .55 : RV ? (RV.kind !== 'moto' ? (view === 'side' ? 1.2 : .75) : view === 'side' ? .8 : .4) : .32), TS * .11, 0, 0, 7); ctx.fill(); }
   const fk = fo && fo.s.k, fcol = fo && (fo.car || RIDE_COL[(+String(p.fn).split(':')[1] || 0) % RIDE_COL.length]);
@@ -5605,6 +5606,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25h', d: '22 พ.ย.', items: [
+    '🧹 เอาแผงผลไม้ในสวนตะวันออก และป้ายรถเมล์สีฟ้าที่ซ้อนกันออกแล้ว',
+    '🪑 นั่งม้านั่งแล้วตัวละครขึ้นไปนั่งบนที่นั่งจริงๆ ไม่จมลงพื้น',
+  ] },
   { v: '2026-11-25g', d: '22 พ.ย.', items: [
     '🟢 มือถือแนวนอน: จำนวนคนออนไลน์อยู่ใต้แผนที่เล็กเหมือนแนวตั้ง',
   ] },
