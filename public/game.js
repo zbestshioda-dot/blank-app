@@ -2774,28 +2774,31 @@ const wwNow = () => Date.now() + clockOff;
 const wwSniffing = () => wwIsWolf() && (WW.sk?.sniff || 0) > wwNow();
 // while you are a wolf the bag / run / action buttons become 👃 sniff, ⚡ sprint and 📯 summon
 const WW_BTN = { bagBtn: ['sniff', '👃', 'ดมกลิ่น'], runBtn: ['sprint', '⚡', 'วิ่งไว'], actBtn: ['summon', '📯', 'เรียกสมุน'] };
+const wwHuman = () => WW.ph === 'on' && WW.me === 'alive';
+const wwHidden = id => (WW.hid || []).some(([i, u]) => i === id && u > wwNow());
+const wwBtnOf = id => wwIsWolf() ? WW_BTN[id] : wwHuman() && id === 'bagBtn' ? ['hide', '🎭', 'ปลอมตัว'] : null;   // humans: 🎭 pass for a nameless townsperson
 function wwCdLeft(k) { return Math.max(0, Math.ceil(((WW.sk?.[k + 'Cd'] || 0) - wwNow()) / 1000)); }
 function wwBtns() {
-  const on = wwIsWolf();
-  for (const [id, [k, ic, lb]] of Object.entries(WW_BTN)) {
+  for (const id of Object.keys(WW_BTN)) {
     const b = $('#' + id); if (!b) continue;
     if (id === 'actBtn') continue;   // (the action button is relabelled in the frame loop)
+    const sk = wwBtnOf(id), on = !!sk, [k, ic, lb] = sk || [];
     if (on) { const cd = wwCdLeft(k); if (!b.dataset.ww) { b.dataset.ww = b.innerHTML; } b.innerHTML = `<span>${ic}</span><small>${cd ? cd + ' วิ' : lb}</small>`; b.classList.toggle('wwCd', cd > 0); b.classList.add('wwSk'); }
     else if (b.dataset.ww) { b.innerHTML = b.dataset.ww; delete b.dataset.ww; b.classList.remove('wwCd', 'wwSk'); }
   }
 }
 setInterval(wwBtns, 250);
 for (const id of Object.keys(WW_BTN)) {
-  const b = $('#' + id), k = WW_BTN[id][0];
-  const stop = e => { if (!wwIsWolf()) return false; e.stopImmediatePropagation(); e.preventDefault(); return true; };
-  b.addEventListener('pointerdown', e => { if (stop(e)) { FX.play('click'); if (running) setRun(false); send({ t: 'wwskill', k }); } }, true);
+  const b = $('#' + id);
+  const stop = e => { if (!wwBtnOf(id)) return false; e.stopImmediatePropagation(); e.preventDefault(); return true; };
+  b.addEventListener('pointerdown', e => { const sk = wwBtnOf(id); if (stop(e)) { FX.play('click'); if (running && wwIsWolf()) setRun(false); send({ t: 'wwskill', k: sk[0] }); } }, true);
   b.addEventListener('pointerup', stop, true); b.addEventListener('pointercancel', stop, true); b.addEventListener('click', stop, true);
 }
 // 👃 while sniffing: a red arrow from the wolf to the nearest human
 function drawSniff(X, Y, t) {
   if (!wwSniffing()) return;
   const m = P.get(myId); if (!m) return;
-  let best = null, bd = 1e9; for (const id of WW.humans || []) { const o = P.get(id); if (!o) continue; const d = Math.hypot(o.x - m.x, o.y - m.y); if (d < bd) { bd = d; best = o; } }
+  let best = null, bd = 1e9; for (const id of WW.humans || []) { const o = P.get(id); if (!o || wwHidden(id)) continue; const d = Math.hypot(o.x - m.x, o.y - m.y); if (d < bd) { bd = d; best = o; } }
   if (!best) return;
   const a = Math.atan2(best.ry - m.ry, best.rx - m.rx), cx = m.rx * TS + X, cy = m.ry * TS + Y, r = TS * 1.3 + Math.sin(t / 140) * 5;
   ctx.save(); ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.rotate(a);
@@ -2909,7 +2912,14 @@ function drawUmbrella(px, top, H, id, t) {
   ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(cx, rim - ry - TS * .02, TS * .04, 0, 7); ctx.fill();   // tip
   ctx.restore();
 }
+const DISG_HAIR = ['black', 'brown', 'black', 'silver', 'brown'], DISG_SHIRT = ['white', 'blue', 'green', 'red', 'yellow', 'black'];
 function drawPlayer(p, X, Y, t) {
+  if (WW.ph === 'on' && p.id !== myId && wwHidden(p.id) && !p._disg) {   // 🎭 in disguise: drawn as a plain townsperson, no name, no balloon
+    const keep = { lk: p.lk, of: p.of, bl: p.bl, dye: p.dye, adm: p.adm }, id = Math.abs(+p.id || 0);
+    Object.assign(p, { lk: { hair: DISG_HAIR[id % 5], shirt: DISG_SHIRT[id % 6], pants: 'gray' }, of: '', bl: '', dye: 0, adm: false, _disg: 1 });
+    try { drawPlayer(p, X, Y, t); } finally { Object.assign(p, keep); p._disg = 0; }
+    return;
+  }
   if (p.zb) return drawZombie(p, X, Y, t);
   if (p.wwm || WW.ph === 'on' && WW.wolves?.includes(p.id)) return drawWolf(p, X, Y, t, p.id === WW.wolf ? 1.05 : p.wwm ? .78 : .9);
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
@@ -3673,6 +3683,7 @@ $('#keyHint').onclick = () => { FX.play('click'); openPanel({ kind: 'keys' }); }
 let NAME_MODE = 'all'; try { NAME_MODE = localStorage.getItem('lt_names') || 'all'; } catch { }
 const NAME_TXT = { all: '🏷️ ป้ายเหนือหัว: แสดงทั้งหมด', name: '🏷️ ป้ายเหนือหัว: แค่ชื่อ', none: '🏷️ ป้ายเหนือหัว: ซ่อนหมด' };
 function nameAndBubble(p, px, top, mine, t = performance.now()) {
+  if (p._disg) return;   // 🎭 a disguised human shows no name and no chat
   if (p.crowd) return;   // passers-by in the park and the temple: no name tags
   if (!p.npc && !mine) { p.tagX = px; p.tagY = top - TS * ((p.title ? .8 : .46) + (p.gg ? .16 : 0)); p.tagT = t; }
   if (NAME_MODE === 'none' && !p.red) return chatOnly(p, px, top - TS * .22, t);   // player setting: characters only (chat still shows)
@@ -3866,7 +3877,9 @@ function drawMini() {
   // a window that follows you (the town grew too big to show whole): 70 x 52 tiles around you, clamped to the map
   const MW = 140, MH = 104, mini = $('#mini'); if (mini.width !== MW || mini.height !== MH) { mini.width = MW; mini.height = MH; }
   const g = mini.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#1b2a1e'; g.fillRect(0, 0, MW, MH);
-  { const q = outPos(m.rx, m.ry), fit = (c, size, view) => size <= view ? (size - view) / 2 : clamp(c - view / 2, 0, size - view);
+  let mmK = 1;   // 🐺 a sniffing wolf sees the whole town shrunk into the minimap (dots stay big)
+  if (WW.ph === 'on' && wwSniffing() && mapId === 'town') { mmK = Math.min(MW / base.width, MH / base.height); g.setTransform(mmK, 0, 0, mmK, (MW - base.width * mmK) / 2, (MH - base.height * mmK) / 2); }
+  else { const q = outPos(m.rx, m.ry), fit = (c, size, view) => size <= view ? (size - view) / 2 : clamp(c - view / 2, 0, size - view);
     const ox = Math.round(fit((q.x - A.x) * 2, base.width, MW)), oy = Math.round(fit((q.y - A.y) * 2, base.height, MH)); g.setTransform(1, 0, 0, 1, -ox, -oy); }
   g.drawImage(base, 0, 0);
   const tNow = performance.now();
@@ -3874,10 +3887,11 @@ function drawMini() {
   for (const p of P.values()) {
     if (wwOnMap) {   // 🌕 werewolf night: humans see nobody; wolves see their pack (purple), and humans (red) while sniffing
       if (p.id === myId || mapId !== 'town') continue;
-      const isW = p.wwm || WW.wolves?.includes(p.id), isH = WW.humans?.includes(p.id);
+      const isW = p.wwm || WW.wolves?.includes(p.id), isH = WW.humans?.includes(p.id) && !wwHidden(p.id);
       if (!(wolfMe && (isW || sniff && isH))) continue;
-      const mx = (p.rx - A.x) * 2, my = (p.ry - A.y) * 2, s = isH ? 7 : 5;
-      g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1, my - s / 2 - 1, s + 2, s + 2); g.fillStyle = isH ? ((performance.now() / 250 | 0) % 2 ? '#ff1a1a' : '#ff7070') : '#b44dff'; g.fillRect(mx - s / 2, my - s / 2, s, s);
+      const mx = (p.rx - A.x) * 2, my = (p.ry - A.y) * 2, s = (isH ? 12 : 6) / mmK, blink = (tNow / 220 | 0) % 2;
+      if (isH) { const k = (tNow % 700) / 700; g.strokeStyle = `rgba(255,40,40,${1 - k})`; g.lineWidth = 2 / mmK; g.beginPath(); g.arc(mx, my, s * (.6 + k * 1.2), 0, 7); g.stroke(); }   // a red pulse round every human
+      g.fillStyle = '#fff'; g.fillRect(mx - s / 2 - 1 / mmK, my - s / 2 - 1 / mmK, s + 2 / mmK, s + 2 / mmK); g.fillStyle = isH ? (blink ? '#ff1a1a' : '#ff8080') : '#b44dff'; g.fillRect(mx - s / 2, my - s / 2, s, s);
       continue;
     }
     if (p.zb && areaOf(p.rx, p.ry)?.id === A?.id || p.zb && mapId === areaOf(p.rx, p.ry)?.id) { g.fillStyle = '#ff2b2b'; g.fillRect((p.rx - A.x) * 2 - 2, (p.ry - A.y) * 2 - 2, 4, 4); continue; }
@@ -5576,6 +5590,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25c', d: '22 พ.ย.', items: [
+    '🐺 คืนหมาป่า: กดดมกลิ่นแล้วแผนที่เล็กซูมออกเห็นทั้งเมือง มนุษย์เป็นจุดแดงใหญ่กระพริบมีวงสัญญาณ',
+    '🎭 มนุษย์ปลอมตัวได้! กดปุ่ม ปลอมตัว (แทนปุ่มกระเป๋า) กลายเป็นชาวบ้านไม่มีชื่อ 10 วินาที หมาป่าดมกลิ่นไม่เจอ สมุนไม่ไล่ · พัก 40 วินาที',
+  ] },
   { v: '2026-11-25b', d: '22 พ.ย.', items: [
     '🍳 อาชีพเชฟกลับมาแล้ว! สมัครกับเชฟหมีในครัวใหญ่ · อาหารที่เชฟทำขายได้ราคาดีกว่าคนทั่วไป · มีภารกิจเชฟ 20 แบบ และชุดมีดเชฟที่ร้านอุปกรณ์ (โอกาสได้อาหารเพิ่ม)',
   ] },

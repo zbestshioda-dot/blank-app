@@ -960,7 +960,7 @@ setInterval(() => { try { if (online.size || zn) znTick(); } catch (e) { console
 // Humans see nobody on their minimap. The host must keep moving: standing still for 3 s passes the curse to a human.
 // Humans alive at dawn get the full prize; if the wolves bite everyone, the pot is shared (the first host gets most).
 const WW = { hour: 21, warn: 30e3, dur: 4 * 60e3, afk: 3000, grace: 4000, speed: 1.25, bite: .95, prize: { money: 3000, gems: 3 }, perHead: 1500, perKill: 400, min: 2,
-  sk: { sniff: { dur: 8000, cd: 25000 }, sprint: { dur: 5000, cd: 15000, mul: 1.7 }, summon: { dur: 20000, cd: 40000, n: 2, speed: 3.1 } } };
+  sk: { sniff: { dur: 8000, cd: 25000 }, sprint: { dur: 5000, cd: 15000, mul: 1.7 }, summon: { dur: 20000, cd: 40000, n: 2, speed: 3.1 }, hide: { dur: 10000, cd: 40000, human: 1 } } };   // hide: 🎭 a human passes for a nameless townsperson
 let ww = null, wwDone = '', wwAnnounced = '', wwSeq = 0;
 const SYN = 29.530588853, NM0 = Date.UTC(2000, 0, 6, 18, 14);
 const fullMoonAt = t => Math.abs(((t - NM0) / 864e5) % SYN - SYN / 2) <= .5;   // within half a day of the full moon
@@ -972,11 +972,12 @@ const wwSpeed = a => wwWolf(a) ? WW.speed * ((ww.sk.get(a.id)?.sprintUntil || 0)
 const wwMinions = () => npcs.filter(n => n.wwm);
 function wwState(a) {
   if (!ww) return { t: 'ww', ph: 'off' };
-  const h = online.get(ww.wolf), on = ww.ph === 'on', s = on && ww.wolves.has(a.id) ? wwSk(a) : null;
+  const h = online.get(ww.wolf), on = ww.ph === 'on', s = on && (ww.wolves.has(a.id) || ww.alive.has(a.id)) ? wwSk(a) : null, t = now();
   return { t: 'ww', ph: ww.ph, end: ww.ph === 'warn' ? ww.t0 : ww.end, alive: ww.alive?.size || 0, wolf: ww.wolf || 0, wname: h?.name || '', host: ww.host || 0,
     wolves: on ? [...ww.wolves] : [], humans: on && ww.wolves.has(a.id) ? [...ww.alive] : [], ids: on && !ww.wolves.has(a.id) && !ww.alive.has(a.id) ? [...ww.alive] : [],
     me: !on ? '' : ww.wolves.has(a.id) ? 'wolf' : ww.alive.has(a.id) ? 'alive' : 'out', boss: ww.wolf === a.id ? 1 : 0,
-    sk: s ? { sniff: s.sniffUntil || 0, sniffCd: s.sniffCd || 0, sprint: s.sprintUntil || 0, sprintCd: s.sprintCd || 0, summonCd: s.summonCd || 0 } : null };
+    sk: s ? { sniff: s.sniffUntil || 0, sniffCd: s.sniffCd || 0, sprint: s.sprintUntil || 0, sprintCd: s.sprintCd || 0, summonCd: s.summonCd || 0, hide: s.hideUntil || 0, hideCd: s.hideCd || 0 } : null,
+    hid: on ? [...ww.alive].map(id => [id, ww.sk.get(id)?.hideUntil || 0]).filter(([, u]) => u > t) : [] };   // who is in disguise right now (until when)
 }
 function wwSendAll() { for (const o of online.values()) send(o, wwState(o)); }
 function wwStart(t, test) {
@@ -1023,11 +1024,13 @@ function wwEat(byId, o) {
 }
 // 🐺 wolf skills (they replace the bag, run and action buttons while you are a wolf)
 function wwSkill(a, m) {
-  if (!wwWolf(a) || a.down) return;
-  const t = now(), s = wwSk(a), k = String(m.k || ''), S = WW.sk[k]; if (!S) return;
+  const t = now(), k = String(m.k || ''), S = WW.sk[k]; if (!S || a.down) return;
+  if (S.human ? !wwAlive(a) : !wwWolf(a)) return;
+  const s = wwSk(a);
   const cdKey = k + 'Cd'; if ((s[cdKey] || 0) > t) return toast(a, `สกิลยังไม่พร้อม รออีก ${Math.ceil((s[cdKey] - t) / 1000)} วิ`, '⏳', false);
   s[cdKey] = t + S.cd;
-  if (k === 'sniff') { s.sniffUntil = t + S.dur; toast(a, '👃 ดมกลิ่น! มนุษย์ทุกคนขึ้นจุดแดงบนแผนที่', '👃'); }
+  if (k === 'sniff') { s.sniffUntil = t + S.dur; toast(a, '👃 ดมกลิ่น! มนุษย์ทุกคนทั้งเมืองขึ้นจุดแดงบนแผนที่', '👃'); }
+  else if (k === 'hide') { s.hideUntil = t + S.dur; toast(a, '🎭 ปลอมตัวเป็นชาวบ้าน 10 วินาที! หมาป่าจะเห็นคุณเป็นคนเดินถนนไม่มีชื่อ และดมกลิ่นไม่เจอ', '🎭'); setTimeout(() => { if (wwOn()) wwSendAll(); }, S.dur + 50); wwSendAll(); return; }
   else if (k === 'sprint') { s.sprintUntil = t + S.dur; s.sprinting = 1; a.run = false; markMe(a); toast(a, '⚡ วิ่งไว!', '⚡'); }
   else if (k === 'summon') {
     for (let i = 0; i < S.n; i++) {
@@ -1042,7 +1045,7 @@ function wwSkill(a, m) {
 }
 function wwMinionGoal(z) {
   let best = null, bd = 1e9;
-  for (const id of ww?.alive || []) { const o = online.get(id); if (o && areaId(o) === 'town') { const d = Math.hypot(o.x - z.x, o.y - z.y); if (d < bd) { bd = d; best = o; } } }
+  for (const id of ww?.alive || []) { const o = online.get(id); if (o && areaId(o) === 'town' && !((ww.sk.get(id)?.hideUntil || 0) > now())) { const d = Math.hypot(o.x - z.x, o.y - z.y); if (d < bd) { bd = d; best = o; } } }
   z.tgt = best; if (best) return znLead(z, best);
   const [x, y] = pick(walkableIn('town')); return [x + .5, y + .5];
 }
