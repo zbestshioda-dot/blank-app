@@ -744,7 +744,7 @@ function handle(m) {
     case 'ww': case 'wwturn': case 'wwdie': wwMsg(m); break;
     case 'mypic': myPic = m.pic || ''; paintPortrait(); if (panel?.kind === 'profile') refreshPanel(true); break;
     case 'lotto': window.__lotto = m; if (panel?.kind === 'lotto') refreshPanel(true); break;
-    case 'ideas': window.__ideas = m; if (panel?.kind === 'ideas') refreshPanel(true); break;
+    case 'ideas': window.__ideas = m; if (panel?.kind === 'ideas' || panel?.kind === 'gidea') refreshPanel(true); break;
     case 'mayor': window.__mayor = m; if (panel?.kind === 'mayor') refreshPanel(true); break;
     case 'gangs': window.__gangs = m; if (panel?.kind === 'gang') refreshPanel(true); break;
     case 'stockhist': stockHist[m.id] = { i: m.i, c: m.c }; if (panel?.kind === 'bank') document.querySelectorAll('#panelBody canvas[data-chart]').forEach(drawStockChart); break;
@@ -3917,9 +3917,9 @@ function lbNotiHtml() {
 }
 function socHead(k) {
   const t = (l, kk, on) => `<button class="${on ? 'on' : ''}" data-m='{"fn":"social","k":"${kk}"}'>${l}</button>`;
-  const sub = k === 'ideas' || k === 'bug' ? `<div class="socSub">${t('📰 ฟีด', 'ideas', k === 'ideas')}${t('🐞 แจ้งบัค', 'bug', k === 'bug')}</div>` : '';
+  const sub = k === 'ideas' || k === 'bug' || k === 'gidea' ? `<div class="socSub">${t('📰 ฟีด', 'ideas', k === 'ideas')}${t('💡 เสนอไอเดีย', 'gidea', k === 'gidea')}${t('🐞 แจ้งบัค', 'bug', k === 'bug')}</div>` : '';
   const grp = k === 'career' ? `<div class="fbGrp"><b>💼 กลุ่มหางาน เมืองชีวิต</b><small>🌐 กลุ่มสาธารณะ · เลือกอาชีพที่ใช่ แล้วไปสมัครที่สถานที่ทำงานได้เลย</small></div>` : '';
-  return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}${t(`🔔 แจ้งเตือน${lbUnread() ? ` <em class="lbB">${lbUnread()}</em>` : ''}`, 'noti', k === 'noti')}</div>${sub}${grp}`;
+  return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug' || k === 'gidea')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}${t(`🔔 แจ้งเตือน${lbUnread() ? ` <em class="lbB">${lbUnread()}</em>` : ''}`, 'noti', k === 'noti')}</div>${sub}${grp}`;
 }
 function bindPanel(root) {
   bindStocks(root); bindWall(root); bindPay(root);
@@ -4288,8 +4288,9 @@ const FN = {
   social(m) {
     const k = m.k || 'ideas';
     if (k === 'ideas') send({ t: 'idea', op: 'list', sort: panel?.sort || 'new' });
+    if (k === 'gidea') send({ t: 'idea', op: 'list', sort: 'gidea' });
     if (k === 'noti') setTimeout(() => send({ t: 'lbnseen' }), 1500);   // the new ones stay highlighted for a moment
-    const next = { kind: k, soc: 1, ...(k === 'ideas' ? { sort: panel?.soc ? panel.sort || 'new' : 'new' } : {}) };
+    const next = { kind: k, soc: 1, ...(k === 'ideas' ? { sort: panel?.soc && panel.sort !== 'gidea' ? panel.sort || 'new' : 'new' } : k === 'gidea' ? { sort: 'gidea' } : {}) };
     if (panel?.soc) { for (const x of Object.keys(panel)) delete panel[x]; Object.assign(panel, next); panelSig = ''; refreshPanel(true); } else openPanel(next);
   },
   wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
@@ -4310,8 +4311,10 @@ const FN = {
     if (m.op === 'del' && !confirm('ลบโพสต์นี้?')) return;
     if (m.op === 'sort') { panel.sort = m.sort; return send({ t: 'idea', op: 'list', sort: m.sort }); }
     if (m.op === 'open') { panel.open = panel.open === m.id ? 0 : m.id; return refreshPanel(true); }
+    if (m.op === 'cat') { panel.cat = m.cat; return refreshPanel(true); }
+    const gi = panel.kind === 'gidea';
     const text = m.op === 'post' ? root.querySelector('#ideaIn')?.value : m.op === 'cm' ? root.querySelector('#ideaCm' + m.id)?.value : '';
-    send({ t: 'idea', op: m.op, id: m.id, text, sort: panel.sort, ...(m.op === 'post' && fbImg ? { img: fbImg } : {}) });
+    send({ t: 'idea', op: m.op, id: m.id, st: m.st, text, sort: panel.sort, ...(m.op === 'post' && fbImg && !gi ? { img: fbImg } : {}), ...(m.op === 'post' && gi ? { k: 'idea', cat: panel.cat || 'other' } : {}) });
     if (m.op === 'post') { const e = root.querySelector('#ideaIn'); if (e) e.value = ''; fbImg = ''; refreshPanel(true); }
   },
   fbSnap: () => fbSnap(), fbAlbum: () => fbAlbum(), fbClr() { fbImg = ''; refreshPanel(true); },
@@ -5503,6 +5506,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24f', d: '22 พ.ย.', items: [
+    '💡 <b>เสนอไอเดียทำเกม</b> แท็บใหม่ใน 📘 lifebook (ฟีด → 💡 เสนอไอเดีย) เลือกหมวด เขียนไอเดีย ให้เพื่อนโหวต 👍 · ไอเดียโหวตเยอะขึ้นก่อน · ผู้พัฒนาติดป้าย 📋 วางแผนจะทำ / ✅ ใส่ในเกมแล้ว และมีแจ้งเตือนไปหาเจ้าของไอเดีย',
+  ] },
   { v: '2026-11-24e', d: '22 พ.ย.', items: [
     '🏛️ <b>ตึกหน้าใหม่อีก 17 หลัง</b> สไตล์เดียวกันทั้งเมือง: มหาวิทยาลัย ธนาคาร สถานีตำรวจ สถานีดับเพลิง ร้านต้นไม้ ร้านอาหาร ศูนย์ไรเดอร์ ร้านแฟชั่น ร้าน 24 ชม. ร้านสัตว์เลี้ยง 2 คาสิโน ตู้คีบ ตู้ถ่ายรูป และบ้าน 4 แบบ',
     '🎨 สีตึกรอบก่อน (กันสาดม่วง ประตูแดง) ทึบสวยขึ้น ไม่ซีดโปร่งแล้ว',
@@ -6241,6 +6247,25 @@ function ideasPanel(p) {
     <div class="fbAct">${B('📸 ถ่ายรูป', { fn: 'fbSnap' })}${B('🖼️ รูปภาพ', { fn: 'fbAlbum' })}${B('โพสต์', { fn: 'idea', op: 'post' }, 'primary')}</div></div>
     <div class="tabs" style="margin-top:8px">${B('🆕 ล่าสุด', { fn: 'idea', op: 'sort', sort: 'new' }, p.sort !== 'top' ? 'primary' : '')}${B('🔥 ยอดนิยม', { fn: 'idea', op: 'sort', sort: 'top' }, p.sort === 'top' ? 'primary' : '')}</div>${posts}`;
 }
+// 💡 game ideas: players suggest what to add, vote with 👍 / 👎, the developer marks them 📋 planned / ✅ done
+const IDEA_CAT = { job: '💼 อาชีพ', build: '🏠 สถานที่', event: '🎉 อีเวนต์', item: '🎁 ของ/ชุด', game: '🎮 มินิเกม', other: '✨ อื่นๆ' };
+function gideaPanel(p) {
+  const I = window.__ideas?.sort === 'gidea' ? window.__ideas : null, adm = !!I?.admin;
+  const ST = { plan: '<span class="tag" style="background:#ffe9a8">📋 วางแผนจะทำ</span>', done: '<span class="tag" style="background:#c9f2c9">✅ ใส่ในเกมแล้ว</span>' };
+  const cats = Object.entries(IDEA_CAT).map(([c, l]) => B(l, { fn: 'idea', op: 'cat', cat: c }, (p.cat || 'other') === c ? 'primary' : '')).join('');
+  const body = ideasPanel(p).replace(/^[\s\S]*?(?=<div class="fbPost"><div class="fbTop">|<div class="sub">)/, '');
+  const cards = !I ? '<div class="sub">กำลังโหลด…</div>' : body.replace(/<div class="fbPost">\s*<div class="fbTop">/g, '§').split('§').slice(1).map((html, n) => {
+    const i = I.list[n]; if (!i) return '';
+    const head = `<div class="sub" style="margin:0 0 4px">${IDEA_CAT[i.cat] || '✨ อื่นๆ'} ${ST[i.st] || ''} <b style="float:right">⭐ ${i.likes - i.dislikes} โหวต</b></div>`;
+    const ad = adm ? `<div class="fbAct">${B('📋 จะทำ', { fn: 'idea', op: 'st', st: 'plan', id: i.id }, i.st === 'plan' ? 'on' : '')}${B('✅ ทำแล้ว', { fn: 'idea', op: 'st', st: 'done', id: i.id }, i.st === 'done' ? 'on' : '')}${B('↺', { fn: 'idea', op: 'st', st: '', id: i.id })}</div>` : '';
+    return `<div class="fbPost">${head}<div class="fbTop">${html.replace(/<\/div>\s*$/, '')}${ad}</div>`;
+  }).join('') || '<div class="sub">ยังไม่มีไอเดีย มาเป็นคนแรกเลย!</div>';
+  return `<h2>💡 เสนอไอเดียทำเกม</h2><div class="fbPost fbNew"><div class="sub" style="margin:0 0 6px">อยากให้เมืองมีอะไรเพิ่ม? เขียนมาเลย ไอเดียที่คนโหวตเยอะ ผู้พัฒนาจะหยิบไปทำก่อน ✨<br>ได้ใส่ในเกมจริงจะมีแจ้งเตือนไปหาคุณ</div>
+    <div class="tabs" style="flex-wrap:wrap">${cats}</div>
+    <textarea id="ideaIn" maxlength="300" rows="3" placeholder="เช่น อยากให้มีอาชีพช่างภาพ ถ่ายรูปให้คนในเมืองแล้วได้เงิน…" style="width:100%;margin-top:6px"></textarea>
+    <div class="fbAct">${B('💡 ส่งไอเดีย', { fn: 'idea', op: 'post' }, 'primary')}</div></div>
+    <div class="sub" style="margin:8px 0 4px">🔥 เรียงตามคะแนนโหวต · ที่ใส่ในเกมแล้วอยู่ท้ายสุด</div>${cards}`;
+}
 function mayorPanel() {
   const M = window.__mayor; if (!M) return '<h2>🏛️ เลือกตั้งนายกเมือง</h2><div class="sub">กำลังโหลด…</div>';
   const K = M.K, c = M.cur, ok = v => v ? '✅' : '❌';
@@ -6976,6 +7001,7 @@ function renderPanel(p) {
     case 'gang': return gangPanel(p);
     case 'mayor': return mayorPanel();
     case 'ideas': return ideasPanel(p);
+    case 'gidea': return gideaPanel(p);
     case 'lotto': return lottoPanel();
     case 'invite': return invitePanel();
     case 'friends': {

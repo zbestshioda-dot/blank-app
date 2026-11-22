@@ -1136,9 +1136,11 @@ function lbNote(o, icon, text) {
 const friendsOf = a => a.phone ? [...accounts.values()].filter(o => o !== a && (o.contacts || []).some(c => c.p === a.phone)) : [];
 // ------------------------------------------------------------------ idea board (phone app): players post game ideas, like and comment
 let ideas = [], ideaSeq = 1;
+const IDEA_CATS = ['job', 'build', 'event', 'item', 'game', 'other'];
 function ideaView(a, sort) {
-  const me = lk(a), L = [...ideas].sort(sort === 'top' ? (x, y) => Object.keys(y.lk).length - Object.keys(x.lk).length || y.t - x.t : (x, y) => y.t - x.t).slice(0, 60);
-  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, img: i.img ? 1 : 0, av: (accounts.get(i.l)?.pic || '').length, dislikes: Object.keys(i.dl || {}).length, disliked: i.dl?.[me] ? 1 : 0, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, cm: i.cm.slice(-30) })) });
+  const me = lk(a), gi = sort === 'gidea', vote = x => Object.keys(x.lk).length - Object.keys(x.dl || {}).length;
+  const L = ideas.filter(x => !gi || x.k === 'idea').sort(gi ? (x, y) => (x.st === 'done') - (y.st === 'done') || vote(y) - vote(x) || y.t - x.t : sort === 'top' ? (x, y) => Object.keys(y.lk).length - Object.keys(x.lk).length || y.t - x.t : (x, y) => y.t - x.t).slice(0, 60);
+  send(a, { t: 'ideas', sort, list: L.map(i => ({ id: i.id, n: i.n, text: i.text, t: i.t, img: i.img ? 1 : 0, av: (accounts.get(i.l)?.pic || '').length, dislikes: Object.keys(i.dl || {}).length, disliked: i.dl?.[me] ? 1 : 0, likes: Object.keys(i.lk).length, liked: i.lk[me] ? 1 : 0, mine: i.l === me || isAdmin(a) ? 1 : 0, k: i.k || '', st: i.st || '', cat: i.cat || '', cm: i.cm.slice(-30) })), admin: isAdmin(a) ? 1 : 0 });
 }
 function ideaOp(a, m) {
   const me = lk(a), i = ideas.find(x => x.id === +m.id);
@@ -1146,11 +1148,13 @@ function ideaOp(a, m) {
     const img = String(m.img || ''), text = cleanText(m.text, 300);
     if (img && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 70000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '📸', false);
     if (!img && text.length < 5) return toast(a, 'เขียนอย่างน้อย 5 ตัวอักษร หรือแนบรูป', '📘', false);
+    const gi = m.k === 'idea', cat = gi && IDEA_CATS.includes(m.cat) ? m.cat : '';
+    if (gi && text.length < 10) return toast(a, 'เล่าไอเดียอีกนิด (อย่างน้อย 10 ตัวอักษร)', '💡', false);
     const d = dayKey(); if (!a.idd || a.idd.d !== d) a.idd = { d, n: 0 };
     if (a.idd.n >= 5 && !isAdmin(a)) return toast(a, 'วันนี้โพสต์ครบ 5 โพสต์แล้ว พรุ่งนี้มาใหม่นะ', '📘', false);
-    a.idd.n++; a.sd = true; ideas.push({ id: ideaSeq++, l: me, n: a.name, text, t: now(), lk: {}, dl: {}, cm: [], ...(img ? { img } : {}) }); if (ideas.length > 300) ideas.shift();
+    a.idd.n++; a.sd = true; ideas.push({ id: ideaSeq++, l: me, n: a.name, text, t: now(), lk: {}, dl: {}, cm: [], ...(img ? { img } : {}), ...(gi ? { k: 'idea', cat } : {}) }); if (ideas.length > 300) ideas.shift();
     { let k = 0; for (let j = ideas.length - 1; j >= 0; j--) if (ideas[j].img && ++k > 40) delete ideas[j].img; }   // only the newest 40 photos are kept (they live in the saved town data)
-    toast(a, 'โพสต์ลงฟีดแล้ว 📘', '📘');
+    toast(a, gi ? 'ส่งไอเดียแล้ว ขอบคุณมาก! ให้เพื่อนๆ ช่วยโหวตได้เลย 💡' : 'โพสต์ลงฟีดแล้ว 📘', gi ? '💡' : '📘');
     for (const o of friendsOf(a)) lbNote(o, '📝', `${a.name} โพสต์ใหม่: ${text || '📸 รูปภาพ'}`);
     for (const o of online.values()) if (isAdmin(o) && o !== a) toast(o, `💡 ไอเดียใหม่จาก ${a.name}`, '💡');
   } else if (!i) return ideaView(a, m.sort);
@@ -1162,6 +1166,11 @@ function ideaOp(a, m) {
     i.cm.push({ n: a.name, text, t: now(), a: isAdmin(a) ? 1 : 0 }); if (i.cm.length > 60) i.cm.shift();
     const o = accounts.get(i.l); if (o?.ws && o !== a) toast(o, `💬 ${a.name} คอมเมนต์ไอเดียของคุณ`, '💡');
     if (o && o !== a) lbNote(o, '💬', `${a.name} คอมเมนต์โพสต์ของคุณ: ${text}`);
+  } else if (m.op === 'st') {          // 👑 the developer marks a game idea: planned / done / back to new
+    if (!isAdmin(a) || !['', 'plan', 'done'].includes(m.st)) return;
+    i.st = m.st; const o = accounts.get(i.l);
+    if (o && m.st) lbNote(o, m.st === 'done' ? '✅' : '📋', m.st === 'done' ? `ไอเดียของคุณได้ใส่ในเกมแล้ว! "${i.text.slice(0, 40)}"` : `ผู้พัฒนาวางแผนจะทำไอเดียของคุณ: "${i.text.slice(0, 40)}"`);
+    if (m.st === 'done') feed(`💡 ไอเดียของ ${i.n} ได้ใส่ในเกมแล้ว!`);
   } else if (m.op === 'del') { if (i.l !== me && !isAdmin(a)) return; ideas = ideas.filter(x => x !== i); }
   gdirty(); ideaView(a, m.sort);
 }
