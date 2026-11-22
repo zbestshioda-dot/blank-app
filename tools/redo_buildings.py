@@ -32,7 +32,7 @@ def cut(path, names):
     objs = sorted(((sl[0].start + sl[0].stop) / 2, (sl[1].start + sl[1].stop) / 2, i + 1, sl) for i, sl in enumerate(ndimage.find_objects(lab)) if (lab[sl] == i + 1).sum() > 20000)
     assert len(objs) == 4, (path, len(objs))
     objs = sorted(objs[:2], key=lambda o: o[1]) + sorted(objs[2:], key=lambda o: o[1])
-    alpha = np.clip((dist - 70) / 50, 0, 1)
+    alpha = np.clip((dist - 70) / 50, 0, 1); alpha[ndimage.binary_erosion(~bg, iterations=2)] = 1   # soft only along the outline: colours close to the background (red, purple) stay solid
     out = []
     for (cy, cx, lid, sl), name in zip(objs, names):
         keep = (lab[sl] == lid) & ~bg[sl]

@@ -868,6 +868,7 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   // 🏬 redrawn straight-front pictures ('<sprite>_f', tools/redo_buildings.py) for the buildings that were drawn at an angle:
   //    only the picture changes; the footprint, door and room were all laid out from the old one above
   for (const b of BUILDINGS) if (ATLAS.sprites[b.sprite + '_f']) b.sprite += '_f';
+  for (const st of HOME_STYLES) if (ATLAS.sprites[st[0] + '_f']) st[0] += '_f';   // the home looks players pick from match the houses
   // 🥊 the boxing gym that never opened (east park, by the rose arch) is gone, with the flower box beside it: a little rest garden
   //    sits on its lot instead (removed here, last, so every older random layout stays as it was)
   {
