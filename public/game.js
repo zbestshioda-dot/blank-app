@@ -215,7 +215,7 @@ function drawAura(px, py, H, t, front, gold) {
 // ---- vehicles: atlas sprites w_<key>_s (side, faces left) / _f (front) / _b (back)
 const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's' : view === 'front' ? 'f' : 'b'}`];
 const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
-const VEH_FACE_R = new Set(['spider']);   // side sprites drawn facing right (the rest face left)
+const VEH_FACE_R = new Set(['spider', 'mclaren']);   // side sprites drawn facing right (the rest face left)
 // some top views only have one picture for both directions: flip it so the nose points the way you drive
 const VEH_FLIP_B = new Set(['heli2', 'jag', 'lambo', 'mclaren', 'phantom']), VEH_FLIP_F = new Set(['porsche', 'spider', 'heli']);   // _B: the picture has the nose down; _F: nose up
 function drawVeh(key, view, faceLeft, px, py) {
@@ -231,7 +231,8 @@ function drawRide(p, v, px, py, k, view, dir) {
   if (v.kind === 'heli') py -= TS * (1.2 + Math.sin(t / 420) * .12);           // hovering above its shadow
   if (v.aura) {                                                                  // 💎 specials glow around their outline + sparkles
     ctx.save(); ctx.shadowColor = v.aura; ctx.shadowBlur = TS * (.35 + Math.sin(t / 260) * .12);
-    drawVeh(p.veh, view, faceLeft, px, py); drawVeh(p.veh, view, faceLeft, px, py); ctx.restore();
+    if (v.kind !== 'moto' || view !== 'side' && p.veh === 'sleigh') { drawVeh(p.veh, view, faceLeft, px, py); drawVeh(p.veh, view, faceLeft, px, py); }   // a bike glows later, tilted with the wheelie
+    ctx.restore();
     const h = vehH(p.veh, view), w = (vehSpr(p.veh, view)?.[2] || 48) / atlas.tile * TS;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 7; i++) { const ph = (t / 1400 + i / 7) % 1, x = px + Math.sin(i * 2.4 + t / 900) * w * .48, y = py - h * (.1 + ph * .9);
@@ -255,6 +256,7 @@ function drawRide(p, v, px, py, k, view, dir) {
   if (view !== 'back') pilAt();
   drawCharTo(ctx, p, px + (view === 'side' ? (faceLeft ? TS * .12 : -TS * .12) : 0), py - lift, k, view, 0, faceLeft);
   if (view === 'back') pilAt();
+  if (v.aura) { ctx.save(); ctx.shadowColor = v.aura; ctx.shadowBlur = TS * (.35 + Math.sin(t / 260) * .12); drawVeh(p.veh, view, faceLeft, px, py); ctx.restore(); }
   drawVeh(p.veh, view, faceLeft, px, py);                                        // the bike in front hides the legs
   ctx.restore();
 }
@@ -5506,6 +5508,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24g', d: '22 พ.ย.', items: [
+    '🚗 แก้รถแมคลาเรนวิ่งหันท้ายไปข้างหน้า ตอนนี้หันหัวตามทางที่ขับแล้ว',
+    '🔥 แก้สับโดดกับรถ/เลื่อนเรืองแสง 💎 แล้วรูปซ้อนกัน 2 ชั้น',
+  ] },
   { v: '2026-11-24f', d: '22 พ.ย.', items: [
     '💡 <b>เสนอไอเดียทำเกม</b> แท็บใหม่ใน 📘 lifebook (ฟีด → 💡 เสนอไอเดีย) เลือกหมวด เขียนไอเดีย ให้เพื่อนโหวต 👍 · ไอเดียโหวตเยอะขึ้นก่อน · ผู้พัฒนาติดป้าย 📋 วางแผนจะทำ / ✅ ใส่ในเกมแล้ว และมีแจ้งเตือนไปหาเจ้าของไอเดีย',
   ] },
