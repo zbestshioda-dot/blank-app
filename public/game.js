@@ -993,7 +993,7 @@ const quitAsk = (txt, go) => popup(txt, [['ยกเลิกเลย', 'warn',
 $('#dogChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const q = me?.dogq; if (q) quitAsk(q.kind === 'thief' ? `ยกเลิกเคสจับโจร "${esc(q.name)}"?` : `ยกเลิกเคสตามหาน้อง${esc(q.name)}?`, () => send({ t: 'questquit' })); }, true);
 $('#misChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const m = me?.mis; if (m) quitAsk(`ยกเลิกภารกิจ "${esc(m.title)}"?`, () => send({ t: 'mission', op: 'quit' })); }, true);
 $('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
-$('#cbOn').onclick = () => openPanel({ kind: 'friends' });
+$('#miniWrap').appendChild($('#cbOn')); $('#cbOn').onclick = e => { e.stopPropagation(); openPanel({ kind: 'friends' }); };
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -5552,6 +5552,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24z', d: '22 พ.ย.', items: [
+    '⏳ มินิเกมงาน: เล่นจบแล้วปุ่ม เล่นอีกรอบ จะนับถอยหลังเวลาพักให้เห็น กดได้เมื่อครบเวลา',
+    '🟢 จำนวนคนออนไลน์ย้ายไปอยู่มุมแผนที่เล็ก (แตะเพื่อดูรายชื่อเพื่อน)',
+  ] },
   { v: '2026-11-24y', d: '22 พ.ย.', items: [
     '📈 ปรับสมดุลหุ้น: ราคาไม่ขึ้นลงเป็นคลื่นซ้ำๆ ที่เดาได้แล้ว หุ้นมั่นคง (ธนาคาร พลังงาน) แกว่งน้อยลงจริง มูนคอยน์ยังเสี่ยงแต่ไม่เด้งกลับแน่นอน · ถือหุ้นตัวเดียวได้ไม่เกิน ฿300,000',
   ] },
@@ -8768,8 +8772,14 @@ function jgFinish(g) {
   jgStop(true); FX.play(g.score > 0 ? 'levelup' : 'fail');
   const J = G.jobGames[g.k], est = Math.round(Math.min(g.score, J.max) * J.per);
   $('#mgBody').innerHTML = `<h2>${J.icon} ${esc(J.name)}</h2><div class="mgEnd"><div class="sub">${esc(g.endWhy || 'หมดเวลา!')}</div><div class="sub">คะแนน</div><div class="big">${g.score}</div><div class="sub">ค่าแรงประมาณ ${money(est)}+ (โบนัสตามเลเวล) เข้ากระเป๋าแล้ว</div></div>
-    <div class="grid2">${B(`🔁 เล่นอีกรอบ ⚡${Math.ceil(J.energy * (G.energyMul || 1))}`, { fn: 'jgGo', k: g.k }, 'primary')}${B('ปิด', { fn: 'jgClose' })}</div>`;
+    <div class="grid2"><span id="jgAgain" style="display:contents"></span>${B('ปิด', { fn: 'jgClose' })}</div>`;
   bindPanel($('#mgBody'));
+  // the replay button counts down the rest before it can be pressed (it used to look ready, then nothing happened)
+  const until = Date.now() + clockOff + (J.cd || 0) * 1000, cdLeft = () => Math.max(0, Math.ceil((Math.max(me.jgNext?.[g.k] || 0, until) - (Date.now() + clockOff)) / 1000));
+  let last = -1; const paint = () => {
+    const box = $('#jgAgain'); if (!box) return clearInterval(tm); const c = cdLeft(); if (c === last) return; last = c;
+    box.innerHTML = B(c > 0 ? `⏳ พักอีก ${c} วิ` : `🔁 เล่นอีกรอบ ⚡${Math.ceil(J.energy * (G.energyMul || 1))}`, { fn: 'jgGo', k: g.k }, 'primary', c > 0); bindPanel(box);
+  }, tm = setInterval(paint, 250); paint();
 }
 FN.gLink = gLinkOpen;
 FN.adReward = () => adReward();
