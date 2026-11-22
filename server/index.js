@@ -5997,8 +5997,13 @@ function payAdminView() {
 // ------------------------------------------------------------------ http
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json', '.webp': 'image/webp', '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
 const STATIC = new Map();
+// 🔒 copy protection: only our own site may use the game server (the socket) and embed its files (no hotlinking from a copied site).
+// Requests without an Origin/Referer (apps, link previews, health checks) are let through. More hosts: ALLOW_HOSTS=a.com,b.com
+const OK_HOSTS = new Set(['newlifetownth.fly.dev', 'localhost', '127.0.0.1', ...String(process.env.ALLOW_HOSTS || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean)]);
+const okHost = u => { if (!u) return true; try { return OK_HOSTS.has(new URL(u).hostname.toLowerCase()); } catch { return false; } };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (/^\/(assets\/|game\.js|style\.css)/.test(url) && !okHost(req.headers.referer)) { res.writeHead(403); return res.end(); }
   if (url === '/healthz') { res.writeHead(200); return res.end('ok'); }
   if (url === '/ads.txt') { res.writeHead(ADS_CLIENT ? 200 : 404, { 'Content-Type': 'text/plain' }); return res.end(ADS_CLIENT ? `google.com, ${ADS_CLIENT.replace('ca-', '')}, DIRECT, f08c47fec0942fa0\n` : ''); }   // AdSense checks this file
   if (url === '/gauth' && req.method === 'POST') {   // 🔑 Google sign-in (redirect mode) posts the credential here; hand it to the page in the fragment
@@ -6057,7 +6062,7 @@ const server = http.createServer((req, res) => {
     STATIC.set(file, f); send1(f);
   });
 });
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 131072 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 131072, verifyClient: ({ origin }) => okHost(origin) });
 wss.on('connection', (ws, req) => {
   ws.ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   let count = 0, winStart = now();

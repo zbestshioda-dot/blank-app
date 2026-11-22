@@ -1,6 +1,12 @@
+// © เมืองชีวิตนี้เลือกได้ (Life Town) — newlifetownth.fly.dev · สงวนลิขสิทธิ์ ห้ามคัดลอก ดัดแปลง หรือนำไปเผยแพร่ซ้ำโดยไม่ได้รับอนุญาต
 'use strict';
 const TOUCH_UI = matchMedia('(pointer: coarse)').matches;
 (() => {
+// 🔒 runs only on our own site: a copy on another domain shows where the real game is instead
+if (!/^(newlifetownth\.fly\.dev|localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  document.body.innerHTML = '<div style="font:16px sans-serif;text-align:center;padding:40px 16px;color:#333;background:#fff8ec;min-height:100vh">เกมนี้เล่นได้ที่เว็บทางการเท่านั้น<br><br><a href="https://newlifetownth.fly.dev" style="font-size:20px">newlifetownth.fly.dev</a><br><br><small>© เมืองชีวิตนี้เลือกได้ · สงวนลิขสิทธิ์</small></div>';
+  return;
+}
 const $ = s => document.querySelector(s);
 try { const rf = new URLSearchParams(location.search).get('ref'); if (rf) localStorage.setItem('ltRef', rf.toUpperCase()); } catch { }   // invite link: the code is used once this player is in the game
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
