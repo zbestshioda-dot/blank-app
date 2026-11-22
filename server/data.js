@@ -2148,6 +2148,20 @@ const TAROT = {   // key order = card order in assets/tarot.webp (see tools/buil
 for (const it of Object.values(ITEMS)) if (it.eat && it.eat.energy && !it.keepEnergy) { delete it.eat.energy; if (!Object.keys(it.eat).length) it.eat.happy = 2; }
 // what the plant nursery sells: every garden piece, plus the potted plants for indoors
 const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflowers', 'xopalm', 'xotree', 'xotulip', 'xoroses', 'xopot', 'xocactus', 'xobowl', 'xoplanter'];
+// 🧹 taken out everywhere at the players' request: the rock lily ponds, the wooden pavilion, the beach umbrellas with their tables and
+// deckchairs, and the big wooden flower troughs. The ground they stood on goes back to whatever surrounds it (sand on the beach).
+{
+  const GONE = /^(pond|b_pavilion|parasol|parasol2|deckchair|flowerbed2)$/;
+  for (let i = PROPS.length - 1; i >= 0; i--) {
+    const q = PROPS[i]; if (!GONE.test(q.s)) continue; PROPS.splice(i, 1);
+    const x = Math.floor(q.x), y = Math.floor(q.y - .5);
+    if ('og'.includes(get(x, y)) && !PROPS.some(o => Math.floor(o.x) === x && Math.floor(o.y - .5) === y)) {
+      const n = {}; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const c = get(x + dx, y + dy); if (c && '.sckm,'.includes(c)) n[c] = (n[c] || 0) + 1; }
+      set(x, y, Object.keys(n).sort((a, b) => n[b] - n[a])[0] || '.');
+    }
+  }
+}
+TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
 module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,

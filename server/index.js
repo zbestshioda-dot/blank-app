@@ -3673,7 +3673,7 @@ function misNext(a) {
   const m = a.mis; m.i++;
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
-  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((60 + 40 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
+  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((80 + 55 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
   a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); } earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(pay)}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
