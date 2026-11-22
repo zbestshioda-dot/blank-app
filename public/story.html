@@ -71,6 +71,11 @@ p b{color:var(--red);font-weight:800}
 #dots i.on{background:#f6e6c8;width:18px;border-radius:4px}
 #dots i.x{background:rgba(216,70,60,.55)}
 #dots i.x.on{background:#ff8a7a}
+.q{background:#fff;border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:9px 12px;font-size:clamp(13.5px,3.7vw,15px);line-height:1.55;box-shadow:0 2px 0 var(--line);position:relative}
+.q small{display:block;color:var(--soft);font-family:Mitr;font-size:11.5px;margin-top:3px}
+.q.r{border-radius:16px 16px 4px 16px;background:#fff4df;margin-left:22px}
+.qs{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center}
+.likes{text-align:center;font-family:Mitr;font-size:13px;color:var(--soft);margin-top:4px}
 @media (prefers-reduced-motion:reduce){.page{transition:opacity .2s}.page.gone{transform:none}}
 </style>
 </head>
@@ -155,13 +160,26 @@ p b{color:var(--red);font-weight:800}
 <section class="page">
   <div class="ch"><span>บทที่ 9</span><span>ไม่กี่ข้อความ</span></div>
   <h2>“ติดเกมนี้แล้ว”</h2>
+  <div class="qs">
+    <div class="q">สู้ๆ นะคะ เกมส์น่ารักมากๆ ไม่หนักเครื่องด้วย เล่นเพลินสุดๆ ❤️👏<small>— คอมเมนต์ในเฟซบุ๊ก</small></div>
+    <div class="q r">ชอบเกมนี้มากเลยครับ ขอบคุณครับที่ทำเกมดีๆ แบบนี้ออกมา ❤️<small>— คอมเมนต์ในเฟซบุ๊ก</small></div>
+    <div class="q">เกมส์สนุกมากค่าาา<small>— คอมเมนต์ในเฟซบุ๊ก</small></div>
+    <div class="q r">จะเล่นต่อไปเรื่อยๆ เลย ไม่ได้อวยนะ สนุกจริงๆ แต่อยากให้หาเงินได้เยอะๆ เพราะบ้านจัดสรรแพงอะ 😆<small>— จดหมายจากผู้เล่นในเกม</small></div>
+  </div>
+  <div class="likes">❤️ 31 คนกดถูกใจ · แชร์ 12 ครั้ง</div>
+  <p>ในวันที่คนลดลงจนผมอยากทิ้ง ยังมีข้อความ <b style="color:var(--green)">ไม่กี่ข้อความ</b> แบบนี้ส่งมา… แค่นี้ก็พอให้ลุกขึ้นใหม่</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 10</span><span>ตัดสินใจ</span></div>
+  <h2>ทุ่มสุดตัว เพื่อคนกลุ่มเล็กๆ</h2>
   <div class="pic"><img src="assets/story/zombie.webp" alt="ผู้เล่นออนไลน์พร้อมกัน 15 คน ในอีเวนต์ซอมบี้" loading="lazy"><span class="cap">อีเวนต์ซอมบี้ · 15 คนออนไลน์</span></div>
-  <p>แต่มีผู้เล่น <b style="color:var(--green)">ไม่กี่คน</b> ทักมาและเม้นในโพสต์ว่าติดเกมนี้ ผมเลยตัดสินใจครั้งใหญ่ ทุ่มเงินก้อนเปิดเซิร์ฟเวอร์จริงจัง เพื่อคนกลุ่มเล็กๆ นี้</p>
+  <p>ผมตัดสินใจครั้งใหญ่ <b style="color:var(--green)">ทุ่มเงินก้อนเปิดเซิร์ฟเวอร์จริงจัง</b> เพื่อผู้เล่นกลุ่มเล็กๆ กลุ่มนี้ แล้วนั่งกู้ข้อมูลทุกคนกลับมา</p>
   <p>นั่งกู้ข้อมูลจนไม่ได้นอน ตีห้าก็ต้องออกไปทำงานต่อ</p>
 </section>
 
 <section class="page">
-  <div class="ch"><span>บทที่ 10</span><span>ล่าสุด</span></div>
+  <div class="ch"><span>บทที่ 11</span><span>ล่าสุด</span></div>
   <h2>เติมเงินมา<br>แต่ไม่ได้สักบาท</h2>
   <div class="stamp">ล้มครั้งที่ 6</div>
   <div class="pic"><img src="assets/story/stripe.webp" alt="แจ้งเตือนจากผู้ให้บริการรับชำระเงิน ว่าบัญชีถูกระงับ" loading="lazy"><span class="cap">ผู้ให้บริการรับเงินระงับบัญชี</span></div>
@@ -169,7 +187,7 @@ p b{color:var(--red);font-weight:800}
 </section>
 
 <section class="page">
-  <div class="ch"><span>บทที่ 11</span><span>วันนี้</span></div>
+  <div class="ch"><span>บทที่ 12</span><span>วันนี้</span></div>
   <h2>แต่เมืองก็ยังโตทุกวัน</h2>
   <div class="pic two"><img src="assets/story/arcadeout.webp" alt="เกมเซ็นเตอร์ในสวนสนุก" loading="lazy"><img src="assets/story/arcade.webp" alt="ข้างในเกมเซ็นเตอร์" loading="lazy"></div>
   <p>วันนี้เมืองมีอาชีพ บ้าน สัตว์เลี้ยง สวนสนุก เกมเซ็นเตอร์ ตู้คีบตุ๊กตา อีเวนต์ซอมบี้ เทศกาล และยัง <b style="color:var(--green)">อัปเดตแทบทุกวัน</b> จากไอเดียของผู้เล่น</p>
