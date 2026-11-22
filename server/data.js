@@ -2045,6 +2045,10 @@ const ACHIEVEMENTS = [
 // title rarity: common → legendary (colour on the name tag)
 const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: 'ไม่ธรรมดา', col: '#7be07b' }, { name: 'หายาก', col: '#62b8ff' }, { name: 'มหากาพย์', col: '#d08cff' }, { name: 'ตำนาน', col: '#ffb43c' }];
 
+// 🪑 every bench is a seat: benches without a seat of their own get one (id from its spot, so it stays the same across restarts)
+for (const p of PROPS) if (/^(bench|bench2|bench_stone|o_bench|o_stonebench|x_bench|x_bench2)$/.test(p.s) && !STATIONS.some(s => s.type === 'seat' && Math.hypot(s.x - p.x, s.y - p.y) < 1.2)) {
+  const ar = areaAt(p.x, p.y)?.id; if (ar) STATIONS.push({ id: `seat_b${p.x.toFixed(1)}_${p.y.toFixed(1)}`, type: 'seat', label: 'ม้านั่ง', icon: '🪑', x: p.x, y: p.y - .25, r: 1.1, area: ar });
+}
 // trash bins beggars can dig through (one station in front of each bin in town)
 PROPS.filter(p => /bin/.test(p.s) && areaAt(p.x, p.y)?.id === 'town').forEach((p, i) => STATIONS.push({ id: 'trash' + i, type: 'trash', label: 'ถังขยะ', icon: '🗑️', x: p.x, y: p.y + .7, r: 1.1, area: 'town' }));
 // ================================================================= job staff: an NPC at every place that hires (and the rod seller)
