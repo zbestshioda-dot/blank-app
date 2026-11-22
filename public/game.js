@@ -3895,7 +3895,7 @@ function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
 // phones: when the keyboard closes the browser can leave the whole page pushed up; put it back
 addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) { if (scrollY || document.documentElement.scrollTop) scrollTo(0, 0); } }, 80));
 // a finger on the panel (tap or scroll): hold redraws until it lifts, so taps are not lost and lists do not jump back
-let panelTouchT = 0;
+let panelTouchT = 0; let armed = null;   // the pricey button waiting for its confirming second tap
 addEventListener('pointerdown', e => { if (e.target.closest?.('#panel')) panelTouchT = Infinity; }, true);
 let panelLate = false;   // an update arrived while a finger was on the panel: draw it as soon as the finger lifts (it used to be dropped → stale shop cards)
 for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { if (panelTouchT === Infinity) { panelTouchT = performance.now() + 450; setTimeout(() => { if (panelLate && performance.now() >= panelTouchT) { panelLate = false; refreshPanel(); } }, 470); } }, true);
@@ -3955,8 +3955,21 @@ function bindPanel(root) {
     const bs = [...c.querySelectorAll('[data-m]')]; if (bs.length !== 1 || bs[0].disabled) return;
     c.style.cursor = 'pointer'; c.onclick = e => { if (!e.target.closest('[data-m]')) bs[0].click(); };
   });
+  // 💸 pricey buttons (฿10,000+ or 💎50+) need a second tap: a tap at the end of a scroll bought a ฿250,000 outfit by mistake
+  const bigCost = b => { const t = b.textContent; if (/ขาย|ถอน|รับ|ฝาก/.test(t)) return 0; const mm = /฿\s?([\d,]+)/.exec(t), mg = /💎\s?([\d,]+)/.exec(t); return mm && +mm[1].replace(/,/g, '') >= 10000 || mg && +mg[1].replace(/,/g, '') >= 50; };
+  root.querySelectorAll('[data-m]').forEach(b => { if (armed && armed.m === b.dataset.m && Date.now() < armed.until) { b.dataset.lbl = b.innerHTML; b.innerHTML = '✅ แตะอีกครั้งเพื่อซื้อ'; } });
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     if (performance.now() - panelOpenT < 300) return;      // the tap that opened this panel must not also press a button in it
+    if (bigCost(b) || b.dataset.lbl) {
+      if (!(armed && armed.m === b.dataset.m && Date.now() < armed.until)) {
+        armed = { m: b.dataset.m, until: Date.now() + 4000 }; FX.play('click');
+        root.querySelectorAll('[data-lbl]').forEach(o => { o.innerHTML = o.dataset.lbl; delete o.dataset.lbl; });
+        b.dataset.lbl = b.innerHTML; b.innerHTML = '✅ แตะอีกครั้งเพื่อซื้อ';
+        setTimeout(() => { if (b.dataset.lbl && (!armed || armed.m !== b.dataset.m || Date.now() >= armed.until)) { b.innerHTML = b.dataset.lbl; delete b.dataset.lbl; } }, 4100);
+        return;
+      }
+      armed = null;
+    }
     FX.play('click');
     const m = JSON.parse(b.dataset.m);
     if (m.fn) return FN[m.fn](m, root);
@@ -4441,6 +4454,7 @@ const FN = {
   godFind(m, root) { send({ t: 'god', op: 'find', q: root.querySelector('#godFind')?.value || '' }); },
   godGem(m, root) { const n = Math.round(+(root.querySelector('#godGem_' + m.login)?.value || 0)), why = root.querySelector('#godGemW_' + m.login)?.value || '';
     if (!n) return toast('ใส่จำนวนเพชรก่อน', '💎'); if (!confirm(`${n > 0 ? 'ส่ง' : 'หัก'} 💎${Math.abs(n).toLocaleString()} ${n > 0 ? 'ให้' : 'จาก'} ${m.login}?`)) return; send({ t: 'god', op: 'givegems', login: m.login, n, why }); },
+  godRefund(m, root) { const sel = root.querySelector('#godRf_' + m.login), id = sel?.value; if (!id) return; if (!confirm(`คืน "${sel.selectedOptions[0].textContent}" ให้ ${m.login}?\nชุดจะถูกเอาออกจากตู้ และคืนเงิน/เพชร`)) return; send({ t: 'god', op: 'refundoutfit', login: m.login, id }); setTimeout(() => FN.godFind?.(m, root), 600); },
   godPin(m, root) { const pin = root.querySelector('#godPin_' + m.login)?.value || ''; if (!confirm(`ตั้ง PIN ใหม่ให้ ${m.login} เป็น ${pin}?`)) return; send({ t: 'god', op: 'setpin', login: m.login, pin }); },
   godName(m, root) { send({ t: 'god', op: 'rename', name: root.querySelector('#godName')?.value || '' }); },
 };
@@ -5330,7 +5344,7 @@ function godFindHtml() {
   return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
     <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
     <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>
-    <div class="rowf" style="margin-top:4px"><input id="godGem_${esc(x.login)}" type="text" inputmode="numeric" maxlength="7" placeholder="💎 จำนวน (ติดลบ = หัก)"><input id="godGemW_${esc(x.login)}" type="text" maxlength="80" placeholder="เหตุผล (ผู้เล่นเห็น)">${B('💎 ส่งเพชร', { fn: 'godGem', login: x.login }, 'good')}</div>${B('💸 ดูประวัติการเงิน', { fn: 'godLedger', login: x.login })}</div>`).join('')}</div>`;
+    <div class="rowf" style="margin-top:4px"><input id="godGem_${esc(x.login)}" type="text" inputmode="numeric" maxlength="7" placeholder="💎 จำนวน (ติดลบ = หัก)"><input id="godGemW_${esc(x.login)}" type="text" maxlength="80" placeholder="เหตุผล (ผู้เล่นเห็น)">${B('💎 ส่งเพชร', { fn: 'godGem', login: x.login }, 'good')}</div>${B('💸 ดูประวัติการเงิน', { fn: 'godLedger', login: x.login })}${x.buys?.length ? `<div class="rowf" style="margin-top:4px"><select id="godRf_${esc(x.login)}">${x.buys.map(([k, n, p, g]) => `<option value="${esc(k)}">${esc(n)} · ${g ? '💎' + g : money(p)}</option>`).join('')}</select>${B('↩️ คืนชุด+คืนเงิน', { fn: 'godRefund', login: x.login }, 'warn')}</div>` : ''}</div>`).join('')}</div>`;
 }
 function econHtml() {   // today's pump board and the economy mood (stats panel)
   const e = me.econ; if (!e) return '';
@@ -5539,6 +5553,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-24o', d: '22 พ.ย.', items: [
     '🛒 ร้านค้ากดง่ายขึ้น: แตะตรงไหนของการ์ดสินค้าก็ซื้อ/ใช้ได้ ปุ่มยุบให้เห็นทันทีที่แตะ ไม่ต้องรอ',
+    '💸 ของราคา ฿10,000 ขึ้นไป (หรือ 💎50 ขึ้นไป) ต้องแตะยืนยันอีกครั้งก่อนซื้อ กันเลื่อนดูแล้วเผลอซื้อ',
     '🐾 แก้ซื้อของแล้วหน้าร้านไม่อัปเดต (ซื้อแล้วการ์ดยังขึ้นราคาอยู่หลายวินาที) ตอนนี้เปลี่ยนทันที',
   ] },
   { v: '2026-11-24n', d: '22 พ.ย.', items: [

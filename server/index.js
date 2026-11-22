@@ -5087,7 +5087,7 @@ function godAct(a, m) {
     const q = String(m.q || '').trim().toLowerCase(); if (q.length < 2) return toast(a, 'พิมพ์อย่างน้อย 2 ตัวอักษร', '🔎', false);
     const hits = [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
-    return send(a, { t: 'godfind', q, list: hits.map(x => ({ login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
+    return send(a, { t: 'godfind', q, list: hits.map(x => ({ buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
       on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0 })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
@@ -5116,6 +5116,19 @@ function godAct(a, m) {
     if (x.ws) markMe(x);
     console.log('god gems', a.login, x.login, n, why);
     return toast(a, `${x.login}: 💎${had.toLocaleString()} → 💎${x.gems.toLocaleString()}`, '💎');
+  }
+  if (m.op === 'refundoutfit') {            // support: a player bought an outfit by mistake → take it back and return what it cost
+    const x = accounts.get(String(m.login || '').toLowerCase()), id = String(m.id || ''), it = D.OUTFITS[id];
+    if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
+    if (!it || !(x.outfits || []).includes(id)) return toast(a, 'ผู้เล่นไม่มีชุดนี้', '👗', false);
+    if (!it.price && !it.gems) return toast(a, 'ชุดนี้ไม่ได้ซื้อมา (ได้ฟรี/รางวัล) คืนเงินไม่ได้', '👗', false);
+    x.outfits = x.outfits.filter(k => k !== id); if (x.outfit === id) x.outfit = '';
+    if (it.gems) x.gems = (x.gems || 0) + it.gems; else { x.money += it.price; ledAdd(x, it.price, 'คืนเงินชุด (แอดมิน)'); }
+    x.sd = true; dirty = true;
+    sysMail(x, `↩️ แอดมินคืนเงิน${it.name}ให้แล้ว ${it.gems ? `💎${it.gems.toLocaleString()}` : money(it.price)}\n(เอาชุดออกจากตู้แล้ว)`);
+    if (x.ws) { markMe(x); sendRoster(); }
+    console.log('god refund outfit', a.login, x.login, id);
+    return toast(a, `คืน${it.name}ให้ ${x.login} แล้ว ${it.gems ? `💎${it.gems}` : money(it.price)}`, '↩️');
   }
   if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
     const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
