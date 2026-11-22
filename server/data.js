@@ -865,6 +865,9 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
   for (let y = 107; y <= 114; y++) if (get(43, y) === 'T') { clearTree(43, y); set(43, y, '.'); }   // the park's hedge of trees would hide the game centre's sign
   keep(PROPS, q => !(q.x > 40.5 && q.x < 50 && q.y > 114.6 && q.y < 117.2));
+  // 🏬 redrawn straight-front pictures ('<sprite>_f', tools/redo_buildings.py) for the buildings that were drawn at an angle:
+  //    only the picture changes; the footprint, door and room were all laid out from the old one above
+  for (const b of BUILDINGS) if (ATLAS.sprites[b.sprite + '_f']) b.sprite += '_f';
   // 🥊 the boxing gym that never opened (east park, by the rose arch) is gone, with the flower box beside it: a little rest garden
   //    sits on its lot instead (removed here, last, so every older random layout stays as it was)
   {
