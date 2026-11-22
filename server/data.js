@@ -206,7 +206,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
 
   // where the gates and fishing spots are
   // 🔨 the crafting workshop: an open-air workbench on the lawn across the road from the bank (picked by the owner) (craft-only furniture, see CRAFTS)
-  prop('x_wbench', 44.5, 19.6); prop('x_toolbox', 42.4, 19.5, false);
+  prop('x_workbench', 44.5, 19.6); prop('x_toolbox', 42.4, 19.5, false);
   STATIONS.push({ id: 'workshop', type: 'craft', label: 'โรงช่างคราฟ', icon: '🔨', x: 43.6, y: 19.9, r: 1.5, area: 'town' });
   STATIONS.push({ id: 'wish', type: 'wish', label: 'โยนเหรียญ ฿10', icon: '⛲', x: 50, y: 34.7, r: 1.4, area: 'town' });
   // five little signs in corners nobody walks to
@@ -1412,6 +1412,9 @@ const CRAFTS = [
 // chance per stat event (one roll per material)
 const MAT_DROPS = { fish: [['shell', .12], ['crystal', .03]], harvest: [['wood', .25], ['crystal', .03]], shifts: [['wood', .3], ['cloth', .25], ['crystal', .03]] };
 const SHARD_GEMS = 20;
+const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
+// 🎆 fireworks over the fountain square, bought with baht (a money sink everyone in town sees). n bursts over dur seconds
+const FIREWORKS = { s: { name: 'ดอกเล็ก', price: 500, n: 4, dur: 3 }, m: { name: 'ชุดใหญ่', price: 5000, n: 12, dur: 7 }, l: { name: 'มหาพลุ', price: 50000, n: 40, dur: 15 } };
 const COOK = { chop: 2.5, fry: 3, boil: 5, grill: 4, window: { boil: 20, grill: 15 }, grillMax: 3 };   // made easier: quicker chop/fry, much longer before boil/grill burns
 // fishing pools: [id, weight]. null = junk
 // what bites where. The first sheet's fish keep their hand-set weights; the second sheet's join every water of their kind
@@ -1913,6 +1916,13 @@ const FURNITURE = {
   cr_bonsai:  { name: 'บอนไซคริสตัล', icon: '🌳', price: 0, comfort: 4, cat: 'garden', spr: 'xc_bonsai', craft: 1 },
   cr_tank:    { name: 'ตู้ปลามุกคริสตัล', icon: '🐠', price: 0, comfort: 5, cat: 'fun', spr: 'xc_tank', craft: 1 },
   cr_arch:    { name: 'ซุ้มประตูเพชรเรืองแสง', icon: '✨', price: 0, comfort: 6, cat: 'garden', spr: 'xc_arch', craft: 1, glow: '#7ff5ff' },
+  // 👑 one-of-a-kind pieces sold only in the weekly auction (one owner in the whole town); craft: 1 keeps them out of every shop
+  auc_arch:   { name: 'ซุ้มประตูทองคำราชันย์ 👑', icon: '👑', price: 0, comfort: 8, cat: 'garden', spr: 'xa_arch', craft: 1, auc: 1, glow: '#ffd23f' },
+  auc_bonsai: { name: 'บอนไซคริสตัลซากุระ 👑', icon: '👑', price: 0, comfort: 7, cat: 'garden', spr: 'xa_bonsai', craft: 1, auc: 1, glow: '#ff8ad8' },
+  auc_tank:   { name: 'ตู้ปลาทองคำแท้ 👑', icon: '👑', price: 0, comfort: 8, cat: 'fun', spr: 'xa_tank', craft: 1, auc: 1, glow: '#ffd23f' },
+  auc_piano:  { name: 'เปียโนแกรนด์แสงจันทร์ 👑', icon: '👑', price: 0, comfort: 8, cat: 'fun', spr: 'xa_piano', craft: 1, auc: 1, glow: '#cfd8ff' },
+  auc_rocker: { name: 'เก้าอี้โยกบัลลังก์ทอง 👑', icon: '👑', price: 0, comfort: 7, cat: 'fun', spr: 'xa_rocker', craft: 1, auc: 1, glow: '#ffb300' },
+  auc_lamp:   { name: 'เสาไฟดาวตก 👑', icon: '👑', price: 0, comfort: 6, cat: 'garden', spr: 'xa_lamp', craft: 1, auc: 1, glow: '#7ff5ff' },
   xtoolbox: { name: 'ตู้เครื่องมือช่าง', icon: '🧰', price: 6500, comfort: 0, cat: 'fun', spr: 'x_toolbox' },
 };
 // 💎 premium pieces: bought with gems only (one extra comfort each); no money back when the house is sold
@@ -2267,7 +2277,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
