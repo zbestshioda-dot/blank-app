@@ -125,6 +125,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   const HS = ['h_cottage1', 'h_gable_red', 'h_cottage3', 'h_cottage2', 'h_gable_blue', 'h_cottage4'];
   [[54, 76], [61, 75], [68, 76], [76, 75], [83, 76], [3, 13], [8, 12], [12, 85], [20, 85], [30, 85], [70, 85], [80, 85]].forEach(([x, f], i) => {
     if (i === 5 || i === 6) return;                     // the two homes in the north-west corner made way for pet shop branch 2
+    if (i === 2 || i === 3) return;                     // the two homes before the temple made way for its forecourt
     const b = B('vh' + i, HS[i % 6], x, f, { label: '', icon: '🏡', deco: true });
     pathDown(b, f + 1);
     prop(i % 2 ? 'flowerbox' : 'hedge', x + (i % 2 ? 4.5 : -0.8), f + .02, false);
@@ -760,15 +761,19 @@ const RIDES = {
   for (const [x, y] of [[X + 3, Y + 14.9], [X + 11, Y + 14.9], [X + 21, Y + 29.9], [X + 38, Y + 19.9]]) prop('o_flowerbed', x, y, false);
   for (const [x, y] of [[X + 30, Y + 26.9], [X + 34, Y + 26.9]]) prop('x_orchids', x, y);
   STATIONS.push({ id: 'gate_town_t', type: 'gate', to: 'town_from_temple', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 1.6, y: Y + 17, r: 1.6, area: 'temple' });
-  // the way in from town: the temple complex (painted, seen from above) on the open lawn south of the town pond. It stands on a
-  // diamond of ground; tiles inside it are solid, and the client draws it in strips so people in front of an edge stand in front.
-  const F = { cx: 74, bv: 72, hw: 8.92, lv: 5.19, x0: 64.66, by: 72.18, w: 18.39 };   // bottom vertex, half width, side-vertex rise; picture left/bottom/width
-  for (let y = 56; y <= 71; y++) for (let x = 62; x <= 86; x++) { const c = get(x, y); if (c === 'T' || c === 'o') set(x, y, '.'); }
-  for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (q.x >= 62 && q.x < 87 && q.y >= 56.5 && q.y < 72.5 && !(q.s === 'pond')) PROPS.splice(i, 1); }
-  for (let i = TREES.length - 1; i >= 0; i--) { const q = TREES[i]; if (q[0] >= 62 && q[0] <= 86 && q[1] >= 56 && q[1] <= 71) TREES.splice(i, 1); }
-  for (let y = 60; y <= 72; y++) for (let x = 64; x <= 84; x++) { const dx = Math.abs(x + .5 - F.cx) / F.hw, dy = Math.abs(y + .5 - (F.bv - F.lv)) / F.lv; if (dx + dy <= .92) set(x, y, 'o'); }
-  rect(73, 72, 3, 4, 'c'); rect(71, 72, 7, 1, 'c');                            // the stone walk from the road up to the steps
-  prop('o_lantern', 72.4, 74.95); prop('o_lantern', 75.6, 74.95); prop('signpost', 76.6, 75.9, false);
+  // the way in from town: the temple front (painted head-on, like the town's buildings) on the lawn south of the town pond: two
+  // ordination halls either side of a golden chedi. Its front edge is a straight line (lv 0); the tiles behind it are solid.
+  const F = { cx: 74, bv: 72.2, hw: 9.2, lv: 0, x0: 64.22, by: 72.2, w: 18.4 };   // the chedi's steps (53% across the picture) line up with the gate
+  for (let y = 56; y <= 75; y++) for (let x = 62; x <= 86; x++) { const c = get(x, y); if (c === 'T' || c === 'o' || (y >= 72 && c === 'c' && x > 64 && x < 83)) set(x, y, '.'); }
+  for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (q.x >= 62 && q.x < 87 && q.y >= 56.5 && q.y < 76.5 && q.s !== 'pond' && !(q.x < 66 || q.x > 82)) PROPS.splice(i, 1); }
+  for (let i = TREES.length - 1; i >= 0; i--) { const q = TREES[i]; if (q[0] >= 62 && q[0] <= 86 && q[1] >= 56 && q[1] <= 75) TREES.splice(i, 1); }
+  rect(64, 65, 19, 7, 'o'); rect(72, 61, 5, 4, 'o');                              // the halls and the chedi (its spire rises behind)
+  rect(64, 72, 19, 1, 'c'); rect(72, 73, 5, 3, 'c');                              // a stone terrace along the front, a wide walk down to the road
+  for (const [x, y] of [[66, 74], [81, 74]]) { set(x, y, 'T'); TREES.push([x, y, 'tree_white']); }   // frangipani, as at every temple
+  for (const x of [69, 79]) prop('o_flowerbed', x, 74.4, false);
+  for (const x of [71.4, 77.6]) prop('o_lantern', x, 74.95);
+  for (const x of [67.5, 70.2, 77.8, 80.5]) prop('bush2', x, 75.9, false);
+  prop('signpost', 78.9, 75.9, false);
   STATIONS.push({ id: 'gate_temple', type: 'gate', to: 'temple_in', label: 'เข้าวัด', icon: '🛕', x: 74, y: 72.8, r: 1.9, area: 'town', facade: F });
   GATES.temple_in = { x: X + 3.5, y: Y + 17 }; GATES.town_from_temple = { x: 74, y: 73.8 };
 }

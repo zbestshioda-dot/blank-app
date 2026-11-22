@@ -3148,7 +3148,7 @@ function drawRideImg(s, X, Y, t, used) {
 // ------------------------------------------------------------------ 🛕 the temple: painted sprites (assets/temple.webp), shapes as a fallback
 let WJ = null, WIMG = null;
 let watAsked = false;   // loaded the first time the temple (or its front in town) comes into view
-function loadWat() { if (watAsked) return; watAsked = true; fetch('assets/temple.json?v=3').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { WJ = j; WIMG = im; }; im.src = 'assets/temple.webp?v=3'; }).catch(() => { watAsked = false; }); }
+function loadWat() { if (watAsked) return; watAsked = true; fetch('assets/temple.json?v=4').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { WJ = j; WIMG = im; }; im.src = 'assets/temple.webp?v=4'; }).catch(() => { watAsked = false; }); }
 function wdraw(n, cx, by, wT, alpha = 1) { const r = WJ?.s[n]; if (!r) return false; const w = wT * TS, h = w * r[3] / r[2]; ctx.globalAlpha = alpha; ctx.drawImage(WIMG, r[0], r[1], r[2], r[3], cx - w / 2, by - h, w, h); ctx.globalAlpha = 1; return true; }
 const monkFr = {};
 function monkFrame(name) {   // the monk's own walk frames (same cell and feet point as the player sprites)
@@ -5552,6 +5552,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24q', d: '22 พ.ย.', items: [
+    '🛕 ทางเข้าวัดโฉมใหม่! โบสถ์สองหลังขนาบเจดีย์ทององค์ใหญ่ มีลานหินหน้าวัด ต้นลีลาวดี โคมไฟ และแปลงดอกไม้ เดินขึ้นบันไดกลางเพื่อเข้าวัด',
+  ] },
   { v: '2026-11-24p', d: '22 พ.ย.', items: [
     '⚖️ ปรับสมดุล: ค่าจ้างภารกิจอาชีพ (รับจาก NPC) ลดลงราวครึ่งหนึ่ง เพราะเดิมได้มากกว่างานหลักของทุกอาชีพ 2–3 เท่า',
   ] },
