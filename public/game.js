@@ -5606,6 +5606,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25i', d: '22 พ.ย.', items: [
+    '👨‍🍳 ย้ายเชฟหมีมายืนกลางครัว (มุมซ้ายล่าง) เดินไปคุยสมัครเชฟได้แล้ว ไม่โดนเขียงบัง',
+  ] },
   { v: '2026-11-25h', d: '22 พ.ย.', items: [
     '🧹 เอาแผงผลไม้ในสวนตะวันออก และป้ายรถเมล์สีฟ้าที่ซ้อนกันออกแล้ว',
     '🪑 นั่งม้านั่งแล้วตัวละครขึ้นไปนั่งบนที่นั่งจริงๆ ไม่จมลงพื้น',
