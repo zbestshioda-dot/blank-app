@@ -2371,7 +2371,7 @@ function rbResult(m) {
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
 let misLive = null, MISNPC = null;
-const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider', 'templeboy', 'undertaker', 'mechanic', 'thug', 'photographer', 'courier'];
+const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider', 'chef', 'templeboy', 'undertaker', 'mechanic', 'thug', 'photographer', 'courier'];
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
   const m = me.mis, cd = Math.max(0, Math.ceil(((me.misNext || 0) - (Date.now() + clockOff)) / 1000));
@@ -5606,6 +5606,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25l', d: '22 พ.ย.', items: [
+    '📋 เชฟรับภารกิจจากเชฟหมีได้แล้ว (ก่อนหน้านี้ปุ่มรับภารกิจไม่ขึ้น)',
+  ] },
   { v: '2026-11-25k', d: '22 พ.ย.', items: [
     '⚖️ ปรับเงินครัวไม่ให้เฟ้อ: ทิปเสิร์ฟเหลือไม่เกิน ~฿36 ต่อจาน และโอกาสได้จานแถมลดลง (กำไรเชฟใกล้เคียงอาชีพอื่น)',
   ] },
