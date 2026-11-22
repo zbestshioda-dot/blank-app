@@ -1545,3 +1545,5 @@ img.fbAv{object-fit:cover;background:#ddd}
 .czHand{margin:6px 0}.czHand small{display:block;opacity:.8}.czHand>div{display:flex;gap:4px;flex-wrap:wrap}
 .czCard{display:inline-flex;align-items:center;justify-content:center;width:40px;height:56px;background:#fff;border:2px solid #333;border-radius:6px;font:700 15px var(--ui);color:#222}.czCard.r{color:#c0262d}.czCard.back{background:#b33;color:#fff;font-size:30px}
 .cardChip{bottom:calc(env(safe-area-inset-bottom) + 230px);background:linear-gradient(#bfe0ff,#5aa0f0);color:#08284d}
+
+#panelBody [data-m].tap{transform:scale(.95);filter:brightness(.9);transition:transform .05s}

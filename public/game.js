@@ -3948,8 +3948,13 @@ function bindPanel(root) {
   bindStocks(root); bindWall(root); bindPay(root);
   root.querySelectorAll('img.phZoom').forEach(i => { i.style.cursor = 'zoom-in'; i.onclick = () => zoomPic(i.src); });
   { const ti = root.querySelector('#tipIn'); if (ti) ti.oninput = () => { if (panel) panel.tip = Math.max(0, Math.min(500, Math.floor(+ti.value) || 0)); }; }   // keep the tip through panel redraws
+  root.querySelectorAll('[data-m]').forEach(b => { b.onpointerdown = () => { b.classList.add('tap'); setTimeout(() => b.classList.remove('tap'), 260); }; });   // pressed look at once, before the server answers
+  root.querySelectorAll('.look:not(.dcard)').forEach(c => {         // shop cards: a tap anywhere on the card presses its only button (the buttons are small on phones)
+    const bs = [...c.querySelectorAll('[data-m]')]; if (bs.length !== 1 || bs[0].disabled) return;
+    c.style.cursor = 'pointer'; c.onclick = e => { if (!e.target.closest('[data-m]')) bs[0].click(); };
+  });
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
-    if (performance.now() - panelOpenT < 450) return;      // the tap that opened this panel must not also press a button in it
+    if (performance.now() - panelOpenT < 300) return;      // the tap that opened this panel must not also press a button in it
     FX.play('click');
     const m = JSON.parse(b.dataset.m);
     if (m.fn) return FN[m.fn](m, root);
@@ -5530,6 +5535,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24o', d: '22 พ.ย.', items: [
+    '🛒 ร้านค้ากดง่ายขึ้น: แตะตรงไหนของการ์ดสินค้าก็ซื้อ/ใช้ได้ ปุ่มยุบให้เห็นทันทีที่แตะ ไม่ต้องรอ',
+  ] },
   { v: '2026-11-24n', d: '22 พ.ย.', items: [
     '💬 แท็บ "รวม" แสดงข้อความระบบด้วยแล้ว',
     '📶 แก้พับจอ/ล็อกจอแล้วกลับมาเล่น เกมไม่ต่อใหม่ ตอนนี้ต่อใหม่ให้เองทุกครั้ง',
