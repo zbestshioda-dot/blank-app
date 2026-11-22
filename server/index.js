@@ -5087,7 +5087,7 @@ function godAct(a, m) {
     const q = String(m.q || '').trim().toLowerCase(); if (q.length < 2) return toast(a, 'พิมพ์อย่างน้อย 2 ตัวอักษร', '🔎', false);
     const hits = [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
-    return send(a, { t: 'godfind', q, list: hits.map(x => ({ buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
+    return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
       on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0 })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
@@ -5129,6 +5129,16 @@ function godAct(a, m) {
     if (x.ws) { markMe(x); sendRoster(); }
     console.log('god refund outfit', a.login, x.login, id);
     return toast(a, `คืน${it.name}ให้ ${x.login} แล้ว ${it.gems ? `💎${it.gems}` : money(it.price)}`, '↩️');
+  }
+  if (m.op === 'givecard') {                // support: hand a monthly card to a player (paid but no order went through, a gift, a make-good)
+    const x = accounts.get(String(m.login || '').toLowerCase()), pk = PAY.PACKS.find(p => p.kind === 'card');
+    if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false); if (!pk) return toast(a, 'ไม่มีแพ็กบัตรรายเดือน', '💳', false);
+    const gems = m.gems ? pk.gems : 0;
+    x.card = { until: Math.max(now(), x.card?.until || 0) + pk.days * 864e5, last: x.card?.last || '' }; x.gems = (x.gems || 0) + gems; x.sd = true; dirty = true;
+    sysMail(x, `💳 แอดมินส่งบัตรรายเดือน ${pk.days} วันให้คุณ${gems ? ` + 💎${gems} ทันที` : ''}\nกดรับ 💎${pk.daily} ได้ทุกวันถึง ${new Date(x.card.until + 7 * 3600e3).toISOString().slice(0, 10)}`);
+    if (x.ws) markMe(x);
+    console.log('god card', a.login, x.login, gems);
+    return toast(a, `ส่งบัตรรายเดือนให้ ${x.login} แล้ว ถึง ${new Date(x.card.until + 7 * 3600e3).toISOString().slice(0, 10)}`, '💳');
   }
   if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
     const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
