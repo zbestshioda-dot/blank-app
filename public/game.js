@@ -3889,7 +3889,7 @@ function drawFair(e, X, Y, t) {
 let MGJ = null, MGI = null, MGR = null, mgAsked = false;
 function mgLoad() {
   if (mgAsked) return; mgAsked = true;
-  fetch('assets/mg.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { MGJ = j; MGI = im; }; im.src = 'assets/mg.webp?v=1'; }).catch(() => { mgAsked = false; });
+  fetch('assets/mg.json?v=2').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { MGJ = j; MGI = im; }; im.src = 'assets/mg.webp?v=2'; }).catch(() => { mgAsked = false; });
   const r = new Image(); r.onload = () => { MGR = r; }; r.src = 'assets/mg_road.webp?v=2';
 }
 function fairPlay(m) {
@@ -5409,6 +5409,7 @@ const NEWS = [
   { v: '2026-11-24a', d: '22 พ.ย.', items: [
     '🕹️ <b>ตู้เกมในเกมเซ็นเตอร์โฉมใหม่</b> ภาพสวยทุกตู้: แข่งรถ 🏎️ ชู้ตบาส 🏀 ทุบตัวตุ่น 🔨 (มีตัวทองได้ 3 แต้ม) เต้นตามลูกศร 💃 แอร์ฮอกกี้ 🏒 และตู้คีบตุ๊กตา 🧸',
     '🏎️ แก้เกมแข่งรถ: รถจะไม่ขวางเต็มถนนอีกแล้ว มีเลนให้หลบเสมอ',
+    '🏎️ รถของเราในเกมแข่งรถหันถูกทางแล้ว (เห็นท้ายรถ วิ่งไปข้างหน้า)',
   ] },
   { v: '2026-11-23ax', d: '21 พ.ย.', items: [
     '🕹️ <b>เกมเซ็นเตอร์เปิดแล้วในสวนสนุก!</b> ตึกใหม่มุมตะวันออกของสวนสนุก · ตู้ชู้ตบาส 🏀 ทุบตัวตุ่น 🔨 เต้นตามลูกศร 💃 แข่งรถ 🏎️ แอร์ฮอกกี้ 🏒 ครั้งละ ฿20 ได้ตั๋วตามคะแนน',
