@@ -1295,6 +1295,7 @@ const ITEMS = {
   water:  { name: 'น้ำดื่ม', icon: '💧', kind: 'goods', base: 12, eat: { energy: 3, hunger: 2 } },
   bread:  { name: 'ขนมปังไส้หมูหยอง', icon: '🥐', kind: 'goods', base: 30, eat: { hunger: 18 } },
   coffee: { name: 'กาแฟกระป๋อง', icon: '☕', kind: 'goods', base: 35, eat: { energy: 12 } },
+  fcbait:   { name: 'เหยื่อแข่งตกปลา', icon: '🪱', kind: 'goods', base: 50, fcb: 1 },   // sold only during the fishing contest: each catch in the contest uses one, the fish comes out heavier
   umbrella: { name: 'ร่มกันฝน', icon: '☂️', kind: 'goods', base: 180, umb: 1 },   // sold only by the umbrella man who walks into the square when it rains · kept in the bag: opens by itself when it rains outdoors, keeps you dry (no cold from the rain)
   bento:  { name: 'ข้าวกล่องเวฟ', icon: '🍱', kind: 'goods', base: 55, eat: { hunger: 32, energy: 4 } },
   petegg: { name: 'ไข่สัตว์เลี้ยงปริศนา', icon: '🥚', kind: 'goods', base: 0, egg: 1 },   // from inviting friends: open it in the bag to hatch a random pet

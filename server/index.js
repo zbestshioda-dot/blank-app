@@ -134,8 +134,9 @@ function cardClaim(a) {
 }
 const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.find(x => x.id === id) || (id === 'vip' ? D.PAY_TITLE : null);
 const myTitle = a => a.title === 'vip' && !vipOn(a) ? null : titleDef(a.title);   // the supporter title disappears when it runs out
-const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : myTitle(a)?.title || '';
-const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : myTitle(a)?.r || 0;
+const fcKing = a => (a.fcKing || 0) > now();   // 🎣 yesterday's fishing contest winner wears the title for a day
+const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : myTitle(a)?.title || '';
+const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) ? 5 : myTitle(a)?.r || 0;
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -1527,7 +1528,7 @@ const SAVE_KEYS = ['mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -1610,7 +1611,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders, fishRecs }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -3930,6 +3931,76 @@ function dogTick(a, t) {
   if (t > c.until) { a.dogq = null; a.dogNext = t + D.DOGQ.next * 2; markMe(a); toast(a, `⏰ หมดเวลา! ตามหา "น้อง${c.name}" ไม่ทัน ${c.owner}เสียใจมาก เคสล้มเหลว`, '😢', false); joy(a, -4); }
 }
 // a fish (or junk) landed: xp, the bag, the fish book, the news feed
+// ⚖️ fish weights (kg): by rarity, small kinds lighter and big ones heavier; most catches are on the light side, a few are monsters
+const FISH_KG = { 1: [.1, 1.2], 2: [.4, 3.5], 3: [1, 9], 4: [4, 40], 5: [10, 80] };
+const FISH_SMALL = new Set(['shrimp', 'guppy', 'goldfish', 'clownfish', 'seahorse', 'anchovy', 'angelfish', 'goby', 'sfish', 'sardine', 'crab', 'tp_tapian']);
+const FISH_BIG = new Set(['shark', 'hammerhead', 'swordfish', 'tuna', 'stingray', 'pangasius', 'tp_naga', 'mayorkoi']);
+function fishKg(id) {
+  const it = D.ITEMS[id], r = FISH_KG[Math.min(5, it?.rar || 1)] || FISH_KG[1];
+  const mul = FISH_SMALL.has(id) ? .3 : FISH_BIG.has(id) ? 2 : 1, x = Math.random() < .03 ? 1 + Math.random() * .35 : Math.pow(Math.random(), 1.8);
+  return Math.max(.05, Math.round((r[0] + (r[1] - r[0]) * x) * mul * 100) / 100);
+}
+const kgTxt = kg => `${kg.toFixed(2)} กก.`;
+let fishRecs = {};   // 📜 the town's all-time records: { fishId: { n: name, l: login, kg, t } }
+function townRec(a, id, kg) {
+  const r = fishRecs[id]; if (r && r.kg >= kg) return '';
+  fishRecs[id] = { n: a.name, l: lk(a), kg, t: now() }; bugsDirty = true; dirty = true;
+  if (r) feed(`📜 ${a.name} ทำลายสถิติเมือง! ${D.ITEMS[id]?.icon || ''}${D.ITEMS[id]?.name || ''} ${kgTxt(kg)} (เดิม ${r.n} ${kgTxt(r.kg)})`);
+  return r ? ' · 📜 สถิติเมืองใหม่!' : '';
+}
+function recView() { return { t: 'frecs', list: Object.entries(fishRecs).map(([id, r]) => ({ f: id, n: r.n, kg: r.kg, t: r.t })).sort((x, y) => y.kg - x.kg) }; }
+// 🏆 the fishing contest: every day at 20:00 (Thai time) for 15 minutes; the heaviest single fish wins. Prizes come by mail.
+const FC = { hour: 20, min: 15, warn: 10, prizes: [5000, 3000, 1500], join: 200 };
+let fc = null, fcDay = '', fcWarned = '', fcSendAt = 0;
+const thNow = () => { const d = new Date(Date.now() + 7 * 3600e3); return { day: d.toISOString().slice(0, 10), h: d.getUTCHours(), m: d.getUTCMinutes() }; };
+function fcView(a) {
+  if (!fc) return { t: 'fc', on: 0 };
+  const top = fcTop(), me = a && fc.best[lk(a)];
+  return { t: 'fc', on: 1, end: fc.end, top: top.slice(0, 10).map(e => ({ n: e.n, kg: e.kg, f: e.id })), n: top.length,
+    me: me ? { kg: me.kg, f: me.id, rank: top.findIndex(e => e.l === lk(a)) + 1 } : null, prizes: FC.prizes, join: FC.join };
+}
+const fcTop = () => Object.entries(fc.best).map(([l, e]) => ({ l, ...e })).sort((x, y) => y.kg - x.kg || x.t - y.t);
+function fcSendAll() { for (const o of online.values()) send(o, fcView(o)); }
+function fcStart(mins = FC.min) {
+  fc = { start: now(), end: now() + mins * 60e3, best: {} };
+  feed(`🏆🎣 การแข่งตกปลาเริ่มแล้ว! ${mins} นาที ใครตกปลาตัวที่หนักที่สุดชนะ ไปที่ท่าตกปลาได้เลย`);
+  for (const o of online.values()) toast(o, `🏆 แข่งตกปลาเริ่มแล้ว! ${mins} นาที ปลาตัวหนักสุดชนะ ฿${FC.prizes[0].toLocaleString('en-US')}`, '🎣');
+  fcSendAll();
+}
+function fcEnd() {
+  const top = fcTop(); fc = null;
+  if (!top.length) { feed('🎣 การแข่งตกปลาจบแล้ว รอบนี้ไม่มีใครตกได้เลย พรุ่งนี้ 20:00 มาใหม่นะ'); fcSendAll(); return; }
+  top.forEach((e, i) => {
+    const o = accounts.get(e.l); if (!o) return;
+    const prize = FC.prizes[i] || FC.join, it = D.ITEMS[e.id];
+    sysMail(o, i < 3 ? `🏆 ยินดีด้วย! คุณได้อันดับ ${i + 1} การแข่งตกปลา ด้วย ${it?.icon || '🐟'}${it?.name || ''} หนัก ${kgTxt(e.kg)} รับรางวัล ${money(prize)}`
+      : `🎣 ขอบคุณที่ร่วมแข่งตกปลา! ปลาตัวหนักสุดของคุณ ${it?.icon || '🐟'}${it?.name || ''} ${kgTxt(e.kg)} (อันดับ ${i + 1}) รับรางวัลร่วมสนุก ${money(prize)}`, { money: prize });
+    if (i === 0) { stat(o, 'fcwin'); o.fcKing = now() + 24 * 3600e3; o.sd = true; dirty = true; if (o.ws) markMe(o); sendRoster(); }
+  });
+  const w = top[0], it = D.ITEMS[w.id];
+  feed(`🏆 ผู้ชนะแข่งตกปลาวันนี้: ${w.n} กับ ${it?.icon || '🐟'}${it?.name || ''} หนัก ${kgTxt(w.kg)}!${top[1] ? ` · อันดับ 2 ${top[1].n} (${kgTxt(top[1].kg)})` : ''}${top[2] ? ` · อันดับ 3 ${top[2].n} (${kgTxt(top[2].kg)})` : ''}`);
+  for (const o of online.values()) send(o, { ...fcView(o), last: { n: w.n, kg: w.kg, f: w.id } });
+}
+function fcCatch(a, id, kg) {
+  if (!fc || now() > fc.end) return '';
+  const l = lk(a), cur = fc.best[l];
+  if (cur && cur.kg >= kg) return ' · 🏆 แข่งอยู่: ยังไม่หนักกว่าตัวเดิม';
+  fc.best[l] = { n: a.name, kg, id, t: now() };
+  const rank = fcTop().findIndex(e => e.l === l) + 1;
+  if (rank === 1 && fcTop().length > 1) feed(`🎣 ${a.name} ขึ้นนำการแข่งตกปลา! ${D.ITEMS[id]?.icon || ''}${D.ITEMS[id]?.name || ''} ${kgTxt(kg)}`);
+  fcSendAt = 0;
+  return ` · 🏆 แข่งอยู่: อันดับ ${rank}`;
+}
+function fcTick() {
+  const t = now(), th = thNow();
+  if (fc) { if (t > fc.end) fcEnd(); else if (t > fcSendAt) { fcSendAt = t + 3000; fcSendAll(); } return; }
+  if (th.h === FC.hour - 1 && th.m === 60 - FC.warn && fcWarned !== th.day) {
+    fcWarned = th.day; feed(`📣 อีก ${FC.warn} นาที (20:00) แข่งตกปลา! ปลาตัวหนักที่สุดชนะ ${money(FC.prizes[0])} เตรียมเบ็ดไว้ให้พร้อม`);
+    for (const o of online.values()) toast(o, `📣 อีก ${FC.warn} นาทีแข่งตกปลา (20:00) ไปรอที่ท่าตกปลาได้เลย`, '🎣');
+  }
+  if (th.h === FC.hour && th.m < FC.min && fcDay !== th.day) { fcDay = th.day; fcStart(FC.min - th.m); }
+}
+setInterval(() => { try { fcTick(); } catch (e) { console.error('fcTick', e); } }, 1000).unref?.();
 function giveCatch(a, id) {
   const before = fishLv(a);
   a.xp.fisher = (a.xp.fisher || 0) + 1;
@@ -3954,8 +4025,14 @@ function giveCatch(a, id) {
   else if (rar >= 4 || it.base >= 1000) feed(`${it.icon} ${a.name} ตกได้ ${it.name} [${rn}]!!`);
   if (rar >= 4 || it.legend) for (const o of friendsOf(a)) lbNote(o, '🎣', `${a.name} เพื่อนของคุณตกได้ ${it.icon}${it.name} [${rn}]!`);
 
-  send(a, { t: 'catch', item: id, first });
-  return toast(a, `ได้ ${it.icon}${it.name} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : ''}`, it.icon);
+  let kg = fishKg(id); const bait = fc && now() < fc.end && (a.inv.fcbait || 0) > 0;
+  if (bait) { addItem(a, 'fcbait', -1); kg = Math.round(kg * (1.2 + Math.random() * .3) * 100) / 100; }   // 🪱 contest bait: 20–50% heavier
+  const rec = (a.fishRec || {})[id] || 0, pb = kg > rec;   // ⚖️ every fish has a weight; the heaviest of each kind is your record
+  if (pb) { a.fishRec = { ...(a.fishRec || {}), [id]: kg }; a.sd = true; }
+  const fcNote = fcCatch(a, id, kg) + (bait ? ` · 🪱 เหลือเหยื่อ ${a.inv.fcbait || 0}` : '');
+  const tr = townRec(a, id, kg);
+  send(a, { t: 'catch', item: id, first, kg, pb: pb && rec > 0 ? 1 : 0 });
+  return toast(a, `ได้ ${it.icon}${it.name} ${kgTxt(kg)} [${rn}] (~${money(it.base)})${first ? ' · ชนิดใหม่! 📖' : pb && rec ? ' · 🏅 สถิติใหม่!' : ''}${tr}${fcNote}`, it.icon);
 }
 function moodTick(a, t, indoors) {
   // happiness drifts down; good things push it up, hardship pushes it down
@@ -4418,7 +4495,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -4581,7 +4658,7 @@ function login(ws, m, pre) {
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
-  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); send(a, fcView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
@@ -4966,6 +5043,13 @@ function onMessage0(ws, raw) {
       place(a, a.x, a.y); markMe(a); return;
     }
     case 'god': return godAct(a, m);
+    case 'fcbait': {                        // 🪱 contest bait: only while the contest runs, 5 for ฿250
+      if (!fc || now() > fc.end) return toast(a, 'เหยื่อแข่งตกปลาขายเฉพาะช่วงแข่ง (ทุกวัน 20:00)', '🪱', false);
+      if (!cd(a, 'fcbait', 800)) return;
+      if (!pay(a, 250)) return;
+      addItem(a, 'fcbait', 5); markMe(a); return toast(a, 'ได้เหยื่อแข่งตกปลา 🪱 x5 · ใช้เองตอนแข่ง ปลาที่ตกได้หนักขึ้น 20–50%', '🪱');
+    }
+    case 'frecs': return send(a, recView());
     case 'fishcol': return fishCol(a, m);
     case 'cardclaim': if (!cd(a, 'cardclaim', 1500, true)) return; cardClaim(a); return sendRoster();
     case 'aq': return aqAct(a, m);
@@ -5260,6 +5344,10 @@ function godAct(a, m) {
     if (!/^\d{4,8}$/.test(pin)) return toast(a, 'PIN ใหม่ต้องเป็นตัวเลข 4–8 หลัก', '🔒', false);
     x.hash = hashPin(pin, x.salt); x.sd = true; dirty = true;
     return toast(a, `ตั้ง PIN ใหม่ให้ ${x.login} แล้ว แจ้งผู้เล่นให้เปลี่ยนเองอีกครั้งหลังเข้าเกม`, '🔑');
+  }
+  if (m.op === 'fishcomp') {                // 🏆 start a fishing contest now (15 min), or end the running one (prizes go out)
+    if (fc) { fc.end = 0; fcEnd(); return toast(a, 'จบการแข่งตกปลาแล้ว ส่งรางวัลทางจดหมาย', '🏆'); }
+    fcStart(+m.min > 0 ? Math.min(60, +m.min) : FC.min); return toast(a, 'เริ่มแข่งตกปลาแล้ว', '🎣');
   }
   if (m.op === 'rain') {                    // start / stop a rain spell (testing umbrellas and crops)
     if (ev('rain')) { event.until = 0; return toast(a, 'หยุดฝนแล้ว', '🌤️'); }
