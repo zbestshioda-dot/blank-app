@@ -215,9 +215,9 @@ function drawAura(px, py, H, t, front, gold) {
 // ---- vehicles: atlas sprites w_<key>_s (side, faces left) / _f (front) / _b (back)
 const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's' : view === 'front' ? 'f' : 'b'}`];
 const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
-const VEH_FACE_R = new Set(['spider', 'mclaren']);   // side sprites drawn facing right (the rest face left)
+const VEH_FACE_R = new Set([]);   // side sprites drawn facing right (the rest face left)
 // some top views only have one picture for both directions: flip it so the nose points the way you drive
-const VEH_FLIP_B = new Set(['heli2', 'jag', 'lambo', 'mclaren', 'phantom']), VEH_FLIP_F = new Set(['porsche', 'spider', 'heli']);   // _B: the picture has the nose down; _F: nose up
+const VEH_FLIP_B = new Set(['heli2', 'jag']), VEH_FLIP_F = new Set(['heli']);   // _B: the picture has the nose down; _F: nose up
 function drawVeh(key, view, faceLeft, px, py) {
   const flipY = view === 'back' && VEH_FLIP_B.has(key) || view === 'front' && VEH_FLIP_F.has(key);
   const s = flipY || view === 'back' && VEH_FLIP_F.has(key) ? vehSpr(key, 'front') : vehSpr(key, view); if (!s || !atlasImg) return;
@@ -5508,6 +5508,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24h', d: '22 พ.ย.', items: [
+    '🏎️ วาดใหม่ 5 คัน: ซุปเปอร์คาแดงเพลิง · ไฮเปอร์คาส้ม · แฟนทอมดำ · สไปเดอร์ขาว · ปอร์เช่เงิน ภาพคมขึ้น และหันหัวถูกทางทุกทิศ',
+  ] },
   { v: '2026-11-24g', d: '22 พ.ย.', items: [
     '🚗 แก้รถแมคลาเรนวิ่งหันท้ายไปข้างหน้า ตอนนี้หันหัวตามทางที่ขับแล้ว',
     '🔥 แก้สับโดดกับรถ/เลื่อนเรืองแสง 💎 แล้วรูปซ้อนกัน 2 ชั้น',
@@ -7283,7 +7286,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v19').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v19'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v20').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v20'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
