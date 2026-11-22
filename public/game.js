@@ -834,6 +834,7 @@ function handle(m) {
     case 'rbfx': FX.play('notice'); if (navigator.vibrate) navigator.vibrate([40, 40, 40]); break;
     case 'afx': if (m.kind === 'gavel') { FX.play('ding'); } else if (m.kind === 'bid') FX.play('pop'); else if (m.kind === 'win') { FX.play('coin', true); FX.play('levelup'); } else if (m.kind === 'lose') FX.play('fail'); else FX.play('notice'); if (panel?.kind === 'warehouse') refreshPanel(true); break;
     case 'mq': misAsk(m); break;
+    case 'exam': if (EXAM && EXAM.bed === m.bed) { EXAM.ready = m.ready; refreshPanel(); } break;
     case 'detsay': DETP['dets' + m.i] && (MISNPC = DETP['dets' + m.i]); dialog({ name: `${m.name} (ผู้ต้องสงสัย)`, npc: 'misnpc', lines: [m.say], choices: [{ label: '🗂️ เปิดกระดานสืบสวน', fn: () => { dialogClose(); openPanel({ kind: 'detcase' }); } }, { label: '👋 ขอบคุณ', fn: dialogClose }] }); break;
     case 'mfx': if (m.kind === 'pick') { FX.play('pop'); } else if (m.kind === 'catch') { FX.play('pet', ['squeak', 1]); FX.play('chime'); } else FX.play('ding'); if (navigator.vibrate) navigator.vibrate(25); break;
     case 'req': showReq(m); break;
@@ -2417,7 +2418,7 @@ function rbResult(m) {
 }
 // ---- job missions: the current step drawn in the world (people, things to find/pick up, the animal to catch,
 // the spot to work at), a guide arrow toward it, a chip with the time left, and the questions people ask
-let misLive = null, MISNPC = null;
+let misLive = null, MISNPC = null, EXAM = null;   // EXAM: the bed a doctor is examining and when the exam is done (server time)
 const MIS_CAREERS = ['office', 'farmer', 'merchant', 'doctor', 'police', 'beggar', 'rider', 'chef', 'templeboy', 'undertaker', 'mechanic', 'thug', 'photographer', 'detective', 'courier'];
 const MIS_K = { go: '🚶', find: '🔍', collect: '🧺', deliver: '🤝', work: '🛠️', chase: '🏃', escort: '🧑‍🤝‍🧑', talk: '💬' };
 function misBox() {
@@ -5618,7 +5619,7 @@ function godFindHtml() {
   if (!godFindRes.list.length) return `<div class="sub">ไม่พบผู้เล่นที่ตรงกับ "${esc(godFindRes.q)}"</div>`;
   const d = t => t ? new Date(t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
-    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
+    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.doc ? `<br>${x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
     <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>
     <div class="rowf" style="margin-top:4px"><input id="godGem_${esc(x.login)}" type="text" inputmode="numeric" maxlength="7" placeholder="💎 จำนวน (ติดลบ = หัก)"><input id="godGemW_${esc(x.login)}" type="text" maxlength="80" placeholder="เหตุผล (ผู้เล่นเห็น)">${B('💎 ส่งเพชร', { fn: 'godGem', login: x.login }, 'good')}</div>${B('💸 ดูประวัติการเงิน', { fn: 'godLedger', login: x.login })}<div class="grid2" style="margin-top:4px">${B('💳 ให้บัตรรายเดือน + 💎', { fn: 'godCard', login: x.login, gems: 1 }, 'good')}${B('💳 ต่อบัตรอย่างเดียว', { fn: 'godCard', login: x.login })}</div>${x.cardTo ? `<small>💳 บัตรรายเดือนใช้ได้ถึง ${d(x.cardTo)}</small>` : ''}${x.buys?.length ? `<div class="rowf" style="margin-top:4px"><select id="godRf_${esc(x.login)}">${x.buys.map(([k, n, p, g]) => `<option value="${esc(k)}">${esc(n)} · ${g ? '💎' + g : money(p)}</option>`).join('')}</select>${B('↩️ คืนชุด+คืนเงิน', { fn: 'godRefund', login: x.login }, 'warn')}</div>` : ''}</div>`).join('')}</div>`;
 }
@@ -5835,6 +5836,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26e', d: '23 พ.ย.', items: [
+    '🩺 หมอ: ต้องยืนตรวจอาการข้างเตียง 2.5 วินาทีก่อนเลือกการรักษา · อาการสลับลำดับทุกครั้ง และคนไข้อาจบ่นอาการที่ไม่เกี่ยวมา 1 อย่าง ต้องอ่านให้ดี',
+    '🤒 ไอคอนป่วยบนหัวคนอื่นเป็นแบบเดียวกันหมดแล้ว (ไม่บอกชื่อโรค หมอต้องวินิจฉัยเอง)',
+  ] },
   { v: '2026-11-26f', d: '23 พ.ย.', items: [
     '🔨 โรงช่างคราฟหาง่ายขึ้น: มีป้ายลอยเหนือโต๊ะช่าง มีหมุดในแผนที่ และมี <b>ช่างโต</b> ยืนเฝ้า คุยกับช่างโตเพื่อเปิดหน้าคราฟได้เลย',
   ] },
@@ -7056,10 +7061,16 @@ function renderPanel(p) {
       if (job('doctor') && b && b[1] !== myId) {
         const [name, , sym, hp, n, npc, dn] = b;
         if (dn) return `<h2>🚨 ${esc(name)} หมดสติ!</h2><div class="sub">ต้องช่วยให้ฟื้นก่อน แล้วค่อยวินิจฉัยโรค</div>${B('💓 ปั๊มหัวใจ / ช่วยให้ฟื้น (⚡8)', { t: 'act', st, a: 'revive' }, 'primary big pulse')}`;
+        if (n) {   // 🩺 examine first (the server times it): the symptoms and the treatments show when the exam is done
+          if (!EXAM || EXAM.bed !== s.idx || EXAM.pid !== b[1] || EXAM.n !== n) { if (!EXAM || EXAM.sent + 1500 < performance.now() || EXAM.bed !== s.idx || EXAM.pid !== b[1]) { EXAM = { bed: s.idx, pid: b[1], n, sent: performance.now(), ready: 0 }; send({ t: 'act', st, a: 'exam' }); } }
+          const left = EXAM.ready ? Math.ceil((EXAM.ready - Date.now() - clockOff) / 1000) : 3;
+          if (left > 0) { clearTimeout(EXAM.tm); EXAM.tm = setTimeout(() => refreshPanel(), 400);
+            return `<h2>🛏️ ${esc(name)}${npc ? ' <span class="tag">ชาวเมือง</span>' : ''} · ❤️${hp}</h2><div class="jobbox" style="text-align:center">🩺 <b>กำลังตรวจอาการ...</b> ${left} วิ<br><small>ฟังชีพจร วัดไข้ ดูอาการ (ยืนอยู่ข้างเตียงนะ)</small></div>`; }
+        }
         const opts = n ? Object.entries(G.treatments).map(([k, tr]) => B(`${tr.icon} ${tr.name}`, { t: 'act', st, a: 'treat', tx: k }, 'good')).join('') : B('🩺 ตรวจร่างกาย + ให้ยาบำรุง', { t: 'act', st, a: 'treat', tx: 'checkup' }, 'good');
         return `<h2>🛏️ ${esc(name)}${npc ? ' <span class="tag">ชาวเมือง</span>' : ''} · ❤️${hp}</h2>
           <div class="item" style="display:block;font-size:13px"><b>อาการ:</b> ${sym.length ? sym.map(x => esc(x)).join(' · ') : 'ไม่มีอาการป่วย แค่อ่อนแรง'}${n > 1 ? ` <i>(ป่วย ${n} โรค รักษาทีละโรค)</i>` : ''}</div>
-          ${n ? '<div class="sub" style="margin:4px 0 0">เลือกการรักษาที่ตรงกับอาการ (⚡8) ถูก = ได้ค่ารักษา · ผิด = คนไข้สุขภาพลด</div>' : ''}<div class="treat">${opts}</div>`;
+          ${n ? '<div class="sub" style="margin:4px 0 0">เลือกการรักษาที่ตรงกับอาการ (⚡8) ถูก = ได้ค่ารักษา · ผิด = คนไข้สุขภาพลด · ⚠️ คนไข้อาจบ่นอาการที่ไม่เกี่ยวกับโรคมา 1 อย่าง</div>' : ''}<div class="treat">${opts}</div>`;
       }
       if (b && b[1] === myId) return `<h2>🛏️ คุณนอนรอหมออยู่</h2><div class="sub">หมอออนไลน์จะได้รับแจ้งเตือน · เดินออกเพื่อลุกจากเตียง</div>${(me.dz || []).map(d => itemRowRaw(G.diseases[d].icon, G.diseases[d].name, G.diseases[d].sym.join(' · '), '')).join('')}`;
       if (b) return `<h2>🛏️ เตียงนี้มีคนไข้แล้ว</h2><div class="sub">${esc(b[0])} นอนรอหมออยู่</div>`;

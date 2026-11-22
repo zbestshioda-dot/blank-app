@@ -142,6 +142,24 @@ const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) ? 5 : myTit
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
+// 🩺 doctors: an exam (EXAM_MS) before choosing a treatment; symptoms are shown shuffled with one unrelated symptom mixed in,
+// so a diagnosis is read, not recognised; every answer's reaction time is logged for the admins (docFlag)
+const EXAM_MS = 2500;
+const ALL_SYM = [...new Set(Object.values(DZ).flatMap(d => d.sym))];
+function bedSym(p) {
+  const d = p.dz[0]; if (p.symV?.d === d) return p.symV.s;
+  const own = DZ[d].sym, decoy = ALL_SYM.filter(x => !own.includes(x));
+  p.symV = { d, s: [...own, ...(decoy.length ? [decoy[Math.floor(Math.random() * decoy.length)]] : [])].sort(() => Math.random() - .5) };
+  return p.symV.s;
+}
+function docLog(a, ms, ok) {   // keep the last 40 answers: [ms after the exam finished, right?]
+  a.docLog = [...(a.docLog || []), [Math.max(0, Math.round(ms)), ok ? 1 : 0]].slice(-40); a.sd = true;
+}
+function docFlag(a) {          // many answers, nearly all right, nearly all instant: worth an admin's look
+  const L = a.docLog || []; if (L.length < 20) return null;
+  const ms = L.map(x => x[0]).sort((p, q) => p - q), med = ms[Math.floor(ms.length / 2)], acc = L.filter(x => x[1]).length / L.length;
+  return { n: L.length, med, acc: Math.round(acc * 100), sus: acc >= .97 && med < 1200 ? 1 : 0 };
+}
 const dzProd = (a, key) => (a.dz || []).reduce((m, d) => m * (DZ[d]?.[key] || 1), 1);
 const newbie = a => now() - (a.created || now()) < 3 * 3600e3 || (a.earned || 0) < 3000;
 function infect(a, id, chance = 1) {
@@ -1524,7 +1542,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -2817,6 +2835,12 @@ function act(a, m) {
       for (const d of docs) toast(d, `🛏️ ${a.name} นอนรอหมออยู่ที่โรงพยาบาล เตียง ${s.idx + 1}`, '🩺');
       return toast(a, docs.length ? `นอนรอหมอแล้ว (หมอออนไลน์ ${docs.length} คน) ค่ารักษาประมาณ ฿300` : 'นอนรอหมอแล้ว ตอนนี้ไม่มีหมอผู้เล่น หมอเวร NPC จะเดินมารักษาให้ (~฿450)', '🛏️');
     }
+    case 'bed.exam': {                    // 🩺 a doctor starts examining this bed's patient: the treatment can be chosen once the exam is done
+      if (!need(a, 'doctor')) return;
+      const pt = beds[s.idx]; if (!pt || pt === a) return;
+      if (!(a.exam && a.exam.bed === s.idx && a.exam.pid === pt.id && a.exam.dz === (pt.dz || [])[0])) a.exam = { bed: s.idx, pid: pt.id, dz: (pt.dz || [])[0], t: now() };
+      return send(a, { t: 'exam', bed: s.idx, ready: a.exam.t + EXAM_MS });
+    }
     case 'bed.revive': case 'bed.treat': {
       if (!need(a, 'doctor')) return;
       const pt = beds[s.idx];
@@ -2841,6 +2865,8 @@ function act(a, m) {
         wdAt = 0;
         return toast(a, `ตรวจร่างกาย ${pt.name} เรียบร้อย ได้ ${money(got)}`, '🩺');
       }
+      if (!(a.exam && a.exam.bed === s.idx && a.exam.pid === pt.id && a.exam.dz === target && now() - a.exam.t >= EXAM_MS - 300)) return toast(a, '🩺 ตรวจอาการคนไข้ให้เสร็จก่อน แล้วค่อยเลือกการรักษา', '🩺', false);
+      docLog(a, now() - a.exam.t - EXAM_MS, DZ[target].cure === m.tx); a.exam = null;
       if (DZ[target].cure !== m.tx) {
         pt.health = Math.max(1, pt.health - 5); if (!pt.npc) { markMe(pt); toast(pt, `หมอ${a.name}วินิจฉัยผิด! อาการยังไม่ดีขึ้น (สุขภาพ -5)`, '😣', false); }
         wdAt = 0;
@@ -4575,7 +4601,7 @@ function outfitOf(a) {
 }
 function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || []).includes(f.id) || f.locked && isAdmin(a)) ? f.id : -1; }
 function pubInfo(a) {
-  return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(d => DZ[d].icon),
+  return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(() => '🤒'),   // which disease it is: only the patient knows (a doctor reads the symptoms)
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0, ap: isAdmin(a) && a.god?.plain ? 1 : 0,
     of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, mc: cardOn(a) ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
@@ -4657,7 +4683,7 @@ function worldView() {
     t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
-    beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? DZ[p.dz[0]].sym : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
+    beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? bedSym(p) : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
     houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).filter(k => !h.fpos?.[k] || h.fpos[k][0]).slice(0, 600) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}, h ? aqShown(h) : []]),
     chairs: chairs.map(c => c ? c.name : ''),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(), fo: fishOrders,
@@ -5414,7 +5440,7 @@ function godAct(a, m) {
     const hits = [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
     return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
-      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0 })) });
+      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x) })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
