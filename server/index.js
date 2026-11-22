@@ -1517,7 +1517,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -1528,7 +1528,8 @@ async function load() {
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
-  for (const r of rows) if (r && r.name) { const a = hydrate(r); accounts.set(a.login.toLowerCase(), a); }
+  const gap = meta?.savedAt ? Math.max(0, now() - meta.savedAt) : 0;   // how long the server was down (deploy): police cases get that time back
+  for (const r of rows) if (r && r.name) { const a = hydrate(r); if (a.dogq?.until) a.dogq.until += gap; accounts.set(a.login.toLowerCase(), a); }
   for (const a of accounts.values()) {
     for (const L of a.listings || []) nextListing = Math.max(nextListing, L.id + 1);
     if (a.house >= 0 && !a.hown) {                     // the old fixed houses become the owner's own home (it now stands wherever there is room)
@@ -1604,7 +1605,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -5656,6 +5657,7 @@ let closing = false;
 async function shutdown() {
   if (closing) return; closing = true;
   setTimeout(() => process.exit(0), 5000).unref();
+  try { broadcast({ t: 'restart' }); } catch { }   // 🔧 tell players it's an update, not a crash: the game reconnects by itself
   await save(true); await store.close(); process.exit(0);
 }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);

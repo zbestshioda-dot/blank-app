@@ -651,10 +651,18 @@ function connect() {
   ws.onopen = () => { if (wantLogin) sendLogin(); };
   ws.onmessage = e => { lastMsgT = Date.now(); handle(JSON.parse(e.data)); };
   ws.onclose = () => {
-    if (G) toast('การเชื่อมต่อหลุด กำลังเชื่อมต่อใหม่...', '📡', false);
+    if (G && !restartAt) toast('การเชื่อมต่อหลุด กำลังเชื่อมต่อใหม่...', '📡', false);
     setTimeout(() => { if (wantLogin) connect(); }, 2000);
   };
 }
+// 🔧 the server is restarting for an update: a calm banner instead of "connection lost", gone once we are back in
+let restartAt = 0;
+function restartBar(on) {
+  let b = $('#rsBar'); if (!on) { b?.remove(); return; }
+  if (!b) { b = document.createElement('div'); b.id = 'rsBar'; b.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 8px);transform:translateX(-50%);z-index:9999;background:#2b1d14e8;color:#ffe7b0;border:2px solid #f0c25a;border-radius:12px;padding:8px 14px;font-size:14px;text-align:center;max-width:calc(100vw - 32px);pointer-events:none'; document.body.appendChild(b); }
+  b.innerHTML = '🔧 <b>กำลังอัปเดตเกม</b> กลับมาใน ~20 วินาที<br><small>ไม่ต้องทำอะไร ข้อมูลไม่หาย เกมจะต่อใหม่เอง</small>';
+}
+setInterval(() => { if (restartAt && Date.now() - restartAt > 120000) { restartAt = 0; restartBar(false); } }, 5000);   // never stuck on screen
 function sendLogin() { send({ t: 'login', ...creds }); }
 // a socket that stopped talking while the game is on screen (the phone switched networks): the world froze for players. The server
 // sends the world every second, so 8 quiet seconds means the line is dead: drop it and reconnect.
@@ -671,7 +679,8 @@ function handle(m) {
       $('#createName').textContent = 'ยินดีต้อนรับ ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
-      if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');     // a new version was deployed
+      if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');
+      if (restartAt) { restartAt = 0; restartBar(false); toast('อัปเดตเสร็จแล้ว เล่นต่อได้เลย', '✨'); }     // a new version was deployed
       G = m; myId = m.id; setTimeout(pushRefresh, 4000); pushAskAt = Date.now() + 4 * 60e3; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); if (gPendLink) { const gc = gPendLink; gPendLink = null; setTimeout(() => send({ t: 'glink', google: gc }), 500); } promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
@@ -759,6 +768,7 @@ function handle(m) {
     case 'ev7': EV7 = m; ev7Ui(); if (panel?.kind === 'ev7') refreshPanel(true); break;
     case 'mail': mailList = m.list || []; if (panel?.kind === 'mail') refreshPanel(true); break;
     case 'hatch': { const pt = G.pets[m.id], q = P.get(myId); FX.play('pop'); if (q) { FX.burst(q.x, q.y - .6, '#fff3c4', 24); FX.sparkle(q.x, q.y - .8, '#ffe27a', 18); FX.column(q.x, q.y, m.rar >= 4 ? '#ffd34d' : '#bfe8ff'); } flashScreen(m.rar >= 4 ? '255,220,120' : '255,255,255', .3); if (pt) { const d = document.createElement('div'); d.className = 'hatchPop'; d.innerHTML = `<div><small>🐣 ไข่ฟักแล้ว!</small><canvas data-pet="${m.id}" width="120" height="120"></canvas><b>${pt.icon} ${esc(pt.name)}</b><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><small>ตั้งชื่อได้ในแอพ 🐾 สัตว์เลี้ยง · แตะเพื่อปิด</small></div>`; d.onclick = () => d.remove(); document.body.appendChild(d); try { drawPetIcon(d.querySelector('canvas'), m.id); } catch { } setTimeout(() => d.remove(), 7000); } break; }
+    case 'restart': restartAt = Date.now(); restartBar(true); break;
     case 'refcode': window.__ref = m; if (panel?.kind === 'invite') refreshPanel(true); break;
     case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
     case 'tchat': tradeChat.push(m); if (tradeChat.length > 30) tradeChat.shift(); paintTradeChat(); if (!m.mine) FX.play('pop'); break;
@@ -5511,6 +5521,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24m', d: '22 พ.ย.', items: [
+    '🔧 ตอนเกมอัปเดต จะขึ้นแถบ "กำลังอัปเดต" แทนการหลุดเฉยๆ แล้วต่อใหม่ให้เอง',
+    '📄 งานที่ทำค้าง (ส่งเอกสาร · เคสหมาหาย/จับโจร) ไม่หายตอนเกมอัปเดตแล้ว และเวลาเคสไม่ถูกนับช่วงที่เกมปิด',
+  ] },
   { v: '2026-11-24l', d: '22 พ.ย.', items: [
     '🐢 แก้ตัวละครเดิน/ขับรถช้าเป็นสโลว์โมชั่นบนมือถือที่ภาพกระตุก ตอนนี้ความเร็วเท่าเดิมแม้เครื่องช้า',
   ] },
