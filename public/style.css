@@ -1551,3 +1551,6 @@ img.fbAv{object-fit:cover;background:#ddd}
 #miniWrap{position:relative}
 #miniWrap #cbOn{position:absolute;top:4px;left:5px;margin:0;padding:1px 6px 1px 5px;border-radius:9px;background:rgba(20,16,12,.62);font-size:10.5px;line-height:1.5;z-index:2}
 #miniWrap #cbOn i{display:inline}
+/* ✋ decorating: the pick-up hint is small and fades out after a moment so the room stays clear */
+body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forwards}
+@keyframes pbFade{to{opacity:0;visibility:hidden}}

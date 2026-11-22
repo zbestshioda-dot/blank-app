@@ -1308,6 +1308,29 @@ cv.addEventListener('pointerdown', e => {
   if ((e.pointerType === 'touch' || e.pointerType === 'pen') && !joy) joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
   else if (e.button === 0) mouseHold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
 });
+// 🖐️ decorating: press on a piece and drag it where you want; let go and it is put down there (a plain tap still works as before)
+let fDrag = null;
+const decoXY = e => { const c = camera(); return [(e.clientX + c.x) / TS, (e.clientY + c.y) / TS]; };
+cv.addEventListener('pointerdown', e => {
+  if (!G || !me || !(placing || picking) || e.button > 0) return;
+  const [wx, wy] = decoXY(e);
+  if (picking) { const k0 = placing; pickTap(wx, wy); if (!placing || placing === k0) return; fDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, drop: true }; }
+  else if (!placing.brush) { fDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, drop: false }; placeTap(wx, wy); }
+  else return;
+  cv.setPointerCapture(e.pointerId); e.stopImmediatePropagation(); e.preventDefault();
+}, true);
+cv.addEventListener('pointermove', e => {
+  if (!fDrag || fDrag.id !== e.pointerId || !placing) return;
+  if (Math.hypot(e.clientX - fDrag.x, e.clientY - fDrag.y) > 6) fDrag.moved = true;
+  if (fDrag.moved) { const [wx, wy] = decoXY(e); placeTap(wx, wy); }
+  e.stopImmediatePropagation();
+}, true);
+const fDragEnd = e => {
+  if (!fDrag || fDrag.id !== e.pointerId) return;
+  const d = fDrag; fDrag = null; e.stopImmediatePropagation();
+  if (d.drop && d.moved && placing) $('#plOk')?.click();   // dragged out of the room view and let go: put it down there
+};
+cv.addEventListener('pointerup', fDragEnd, true); cv.addEventListener('pointercancel', fDragEnd, true);
 cv.addEventListener('pointermove', e => {
   if (mouseHold && mouseHold.id === e.pointerId) { mouseHold.x = e.clientX; mouseHold.y = e.clientY; }
   if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) down.moved = true;
@@ -5552,6 +5575,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25a', d: '22 พ.ย.', items: [
+    '🖐️ จัดบ้าน: กดค้างที่เฟอร์นิเจอร์แล้วลากไปวางได้เลย ปล่อยนิ้วคือวางลง · ป้ายบอกวิธีเล็กลงและหายไปเองใน 3 วินาที',
+  ] },
   { v: '2026-11-24z', d: '22 พ.ย.', items: [
     '⏳ มินิเกมงาน: เล่นจบแล้วปุ่ม เล่นอีกรอบ จะนับถอยหลังเวลาพักให้เห็น กดได้เมื่อครบเวลา',
     '🟢 จำนวนคนออนไลน์ย้ายไปอยู่มุมแผนที่เล็ก (แตะเพื่อดูรายชื่อเพื่อน)',
@@ -8206,13 +8232,13 @@ function startPick() {
   const m = P.get(myId), r = m && areaOf(m.x, m.y);
   if (!r || !(r.rk === 'house' || r.yard) || r.house !== me.house) return toast('เข้าไปในบ้านหรือสวนของคุณก่อน แล้วค่อยจัดวาง', '🏠', false);
   closePanel(); picking = true; decoBack = true; placeMode(true);
-  $('#placeBar').innerHTML = `<b>✋ แตะของในห้องเพื่อย้าย</b><small>แตะเฟอร์นิเจอร์ที่วางอยู่ · ✓ เสร็จ · 📦 รายการของในคลัง</small><button id="plOk" style="display:none"></button><button id="plX" style="display:none"></button><button id="plStore" style="display:none"></button>`;
-  $('#placeBar').classList.remove('hidden');
+  $('#placeBar').innerHTML = `<b>✋ ลากของเพื่อย้าย</b><small>✓ เสร็จ · 📦 คลัง</small><button id="plOk" style="display:none"></button><button id="plX" style="display:none"></button><button id="plStore" style="display:none"></button>`;
+  $('#placeBar').classList.remove('hidden'); $('#placeBar').classList.add('pick');   // a small hint that fades away
   $('#plOk').onclick = $('#plX').onclick = () => endPick();
   $('#plStore').onclick = () => { endPick(); openPanel({ kind: 'homedeco' }); };
   layoutFurniture();
 }
-function endPick() { picking = false; decoBack = false; $('#placeBar').classList.add('hidden'); placeMode(false); layoutFurniture(); }
+function endPick() { $('#placeBar').classList.remove('pick'); picking = false; decoBack = false; $('#placeBar').classList.add('hidden'); placeMode(false); layoutFurniture(); }
 function pickTap(wx, wy) {
   const m = P.get(myId), r = m && areaOf(m.x, m.y); if (!r) return;
   const fl = r.yard ? 9 : r.floor || 1;
@@ -8242,6 +8268,7 @@ function startPlace(k) {
   placeBar(k);
 }
 function placeBar(k) {
+  $('#placeBar').classList.remove('pick');
   const f = G.shop.furniture[fbase(k)];
   if (placing?.brush) {
     const left = (me.furniture || []).filter(o => G.shop.furniture[fbase(o)]?.tile && !furnPos(wd.houses[me.house], o)).length;
