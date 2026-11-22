@@ -777,6 +777,25 @@ const RIDES = {
   STATIONS.push({ id: 'gate_temple', type: 'gate', to: 'temple_in', label: 'เข้าวัด', icon: '🛕', x: 74, y: 72.8, r: 1.9, area: 'town', facade: F });
   GATES.temple_in = { x: X + 3.5, y: Y + 17 }; GATES.town_from_temple = { x: 74, y: 73.8 };
 }
+// ================================================================= town streets, round 1: pavements along every road that had none
+// (the avenue, the coast road, the west road, the south road), lamps and street trees on the verge behind them, and the odd tree
+// scattered across the south-east lawn moved into neat rows. Only plain grass becomes pavement; nothing standing there moves.
+{
+  const occupied = (x, y) => PROPS.some(q => Math.floor(q.x) === x && Math.floor(q.y - .5) === y) || STATIONS.some(q => q.area === 'town' && Math.floor(q.x) === x && Math.floor(q.y) === y);
+  const paved = new Set(), pave = (x, y) => { if (get(x, y) === '.') { set(x, y, ','); paved.add(y * 1000 + x); } };
+  for (let y = 17; y <= 87; y++) { pave(48, y); pave(51, y); }        // both sides of the central avenue
+  for (let y = 17; y <= 29; y++) { pave(1, y); pave(4, y); }          // the west road up to the farm turn
+  for (let y = 17; y <= 77; y++) { pave(93, y); pave(96, y); }        // the coast road
+  for (let x = 51; x <= 93; x++) { pave(x, 75); pave(x, 78); }        // the south road
+  for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (/bush|hedge|flowerbed|flowerbox|tuft|o_grass/.test(q.s) && paved.has(Math.floor(q.y - .5) * 1000 + Math.floor(q.x))) PROPS.splice(i, 1); }   // no shrubs left growing out of the new paving
+  // the south-east lawn: scattered trees out, rows of shade trees along the new pavements in
+  for (let i = TREES.length - 1; i >= 0; i--) { const [x, y] = TREES[i]; if (((x >= 52 && x <= 62) || (x >= 84 && x <= 92)) && y >= 62 && y <= 74) { set(x, y, '.'); TREES.splice(i, 1); } }
+  const tree = (x, y, k) => { if (get(x, y) === '.' && !occupied(x, y)) { set(x, y, 'T'); TREES.push([x, y, k]); } };
+  for (let y = 52; y <= 72; y += 5) { tree(52, y, 'tree3'); tree(92, y, 'tree2'); }
+  for (let y = 49; y <= 74; y += 5) { prop('o_lampball', 47.5, y + .95, 'grass'); }
+  for (let y = 20; y <= 85; y += 8) if (get(97, y) !== ',') prop('o_lampball', 96.5, y + .95, false);
+  for (let x = 55; x <= 91; x += 6) if (x < 63 || x > 84) { if (get(x, 79) === '.' && !occupied(x, 79)) prop(x % 12 === 7 ? 'o_lampball' : 'tree2', x + .5, 79.95, 'grass'); }
+}
 // ================================================================= the park, dressed up: a food court on the south lawn, café tables,
 // flowerbeds along the main walk and more blossom trees (added after everything else, so nothing older moves)
 {

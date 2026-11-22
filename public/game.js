@@ -5552,6 +5552,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24r', d: '22 พ.ย.', items: [
+    '🚶 ปรับโฉมถนนในเมือง (รอบ 1): ทางเท้าสองข้างถนนใหญ่ ถนนเลียบชายหาด และถนนเส้นใต้ · ทางม้าลายตรงปากแยก · ไฟถนนและต้นไม้ริมทางเรียงเป็นแถว',
+  ] },
   { v: '2026-11-24q', d: '22 พ.ย.', items: [
     '🛕 ทางเข้าวัดโฉมใหม่! โบสถ์สองหลังขนาบเจดีย์ทององค์ใหญ่ มีลานหินหน้าวัด ต้นลีลาวดี โคมไฟ และแปลงดอกไม้ เดินขึ้นบันไดกลางเพื่อเข้าวัด',
   ] },
@@ -7502,6 +7505,8 @@ function drawTile(ch, tx, ty, px, py, tm) {
     case '=': {
       if (!tex('g_asphalt', tx, ty, px, py)) { ctx.fillStyle = '#41464e'; ctx.fillRect(px, py, S, S); }
       const v = hash(tx, ty); ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(px + v * TS * .7, py + (1 - v) * TS * .7, 3, 3);
+      const zc = zebraAt(tx, ty);
+      if (zc) { ctx.fillStyle = 'rgba(240,242,244,.92)'; for (let i = 0; i < 3; i++) zc === 'v' ? ctx.fillRect(px + (i + .2) * TS / 3, py + 1, TS / 6, TS - 2) : ctx.fillRect(px + 1, py + (i + .2) * TS / 3, TS - 2, TS / 6); return; }
       ctx.fillStyle = '#f2d25c';
       const up = tileAt(tx, ty - 1) === '=', dn = tileAt(tx, ty + 1) === '=', left = tileAt(tx - 1, ty) === '=', right = tileAt(tx + 1, ty) === '=';
       if (up && !dn && left && right && tx % 2 === 0 && tileAt(tx, ty - 2) !== '=') ctx.fillRect(px + TS * .15, py - 2, TS * .7, 4);
@@ -7591,6 +7596,19 @@ function drawBuildingSign(b, X, Y) {
 }
 // ------------------------------------------------------------------ depth: soft tile edges, cast shadows, sunlight
 // material of a tile for edge blending (trees and buildings stand on grass)
+// 🦓 zebra crossings: a road tile where a pavement line meets the road on both sides (within a 3-tile-wide road) gets painted stripes.
+// 'v' = a crossing over a north-south road (stripes run along it), 'h' = over an east-west road. Worked out once per tile.
+const ZEBRA = new Map();
+function zebraAt(tx, ty) {
+  const k = ty * 4096 + tx; if (ZEBRA.has(k)) return ZEBRA.get(k);
+  const P = c => c === ',' || c === 'o' || c === 'g';
+  // walk off the road both ways; each side must be pavement that carries on in the same direction (a footpath line, not a kerb)
+  const side = (dx, dy) => { let x = tx, y = ty; for (let i = 0; i < 4; i++) { x += dx; y += dy; const c = tileAt(x, y); if (c !== '=') return P(c) && tileAt(x + dx, y + dy) === ',' ? 2 : c === ',' ? 1 : 0; } return 0; };
+  const ok = (a, b) => a && b && (a === 2 || b === 2);
+  const r = tileAt(tx, ty - 1) === '=' && tileAt(tx, ty + 1) === '=' && ok(side(-1, 0), side(1, 0)) ? 'v'
+    : tileAt(tx - 1, ty) === '=' && tileAt(tx + 1, ty) === '=' && ok(side(0, -1), side(0, 1)) ? 'h' : '';
+  ZEBRA.set(k, r); return r;
+}
 const MAT = c => c === '=' ? 'road' : ',ckp'.includes(c) ? 'pave' : c === 's' ? 'sand' : c === 'w' ? 'water' : c === 'f' ? 'grass' : c === ' ' || c === '#' || c === 'i' || c === 'D' || c === 'o' ? null : 'grass';
 let edgeTS = 0; const EDGE = {};
 // one small canvas per edge kind, drawn for the top side and rotated for the others
