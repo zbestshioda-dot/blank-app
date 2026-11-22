@@ -1662,7 +1662,7 @@ function onAction() {
 let stuckT = 0, unstickAt = 0, downHintAt = 0;
 let last = performance.now(), sendT = 0, lastSent = '', holdAfterTp = false, meMoving = false, fadeT = 0;
 let homeBtnT = 0;
-let frameT = 0, FDT = 1 / 60, liveT = 0;
+let frameT = 0, FDT = 1 / 60, liveT = 0, mdtS = 1 / 60;
 const camS = { x: 0, y: 0, on: false };
 function frame(t) {
   requestAnimationFrame(frame);
@@ -1670,8 +1670,11 @@ function frame(t) {
   const idle = performance.now() - Math.max(lastInput, liveT) > 1500 && !joy;
   if (ECO && (idle ? t - frameT < 30 : t - frameT < 14)) return; frameT = t;   // (and never more than 60 fps on phones: 90/120 Hz screens heat up and slow down)
   dlgTick();
-  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
+  if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.dataset.lbl !== lbl) { rb.dataset.lbl = lbl; rb.innerHTML = lbl; } } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
   const dt = Math.min(0.1, (t - last) / 1000); last = t; FDT = dt;   // up to 1/10 s: a phone at 10–20 fps no longer plays in slow motion
+  // my own movement uses a smoothed frame time: a single slow frame (a hiccup on a phone) is spread out instead of jumping
+  // the player (a fast car most of all) forward in one go; a phone that is slow all the time still moves at full speed
+  mdtS += (dt - mdtS) * .2; const mdt = Math.min(dt, mdtS * 1.35 + .004);
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   if (RUN && !RUN.over && !document.getElementById('runWin')?.classList.contains('hidden')) return;   // the trash run covers the screen: don't draw the town under it (phones lagged)
   const m = P.get(myId);
@@ -1682,7 +1685,7 @@ function frame(t) {
     if (mouseHold && !dx && !dy && performance.now() - mouseHold.t > 260) { const c = camera(), hx = (mouseHold.x + c.x) / TS - m.rx, hy = (mouseHold.y + c.y) / TS - (m.ry - .35), l = Math.hypot(hx, hy); if (l > .3) { dx = hx / l; dy = hy / l; } }
     if (dx || dy) { autoPath = null; autoNav = false; }
     else if (autoNav && guide && !me.down) autoGuide(m);
-    if (!dx && !dy && autoPath && !me.down) { const st = autoStep(m, dt); if (st) [dx, dy] = st; }
+    if (!dx && !dy && autoPath && !me.down) { const st = autoStep(m, mdt); if (st) [dx, dy] = st; }
     const ox0 = m.x, oy0 = m.y;
     if (holdAfterTp) { if (!dx && !dy && !joy) holdAfterTp = false; else { dx = 0; dy = 0; } }
     if (me.down) {
@@ -1708,7 +1711,7 @@ function frame(t) {
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
       if (running && (!canRun() || me.run === false && performance.now() - runSetT > 1500)) setRun(false);
-      const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, sp = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * dt;
+      const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, sp = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * mdt;
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
       const swim = swimming(), inPool0 = nearPoolW(m.x, m.y), ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && !swim && blockedAt(m.x, m.y), free0 = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
@@ -1741,7 +1744,7 @@ function frame(t) {
     m.rx = m.x; m.ry = m.y;
     if (meMoving || autoPath || me.pass || m.pose === 'fun') liveT = performance.now();
     // smooth camera: eases after you instead of being glued to every step; snaps on teleports
-    { const tx = m.rx + m.ox, ty = m.ry + m.oy; if (!camS.on || Math.hypot(tx - camS.x, ty - camS.y) > 3) { camS.x = tx; camS.y = ty; camS.on = true; } else { const e = 1 - Math.exp(-dt * 9); camS.x += (tx - camS.x) * e; camS.y += (ty - camS.y) * e; } }
+    { const tx = m.rx + m.ox, ty = m.ry + m.oy; if (!camS.on || Math.hypot(tx - camS.x, ty - camS.y) > 3) { camS.x = tx; camS.y = ty; camS.on = true; } else { const e = me.ride && !roomOf(m.x, m.y) && !me.pose ? 1 : 1 - Math.exp(-dt * 9); camS.x += (tx - camS.x) * e; camS.y += (ty - camS.y) * e; } }
     m.ox *= 0.8; m.oy *= 0.8; if (Math.abs(m.ox) < .002) m.ox = 0; if (Math.abs(m.oy) < .002) m.oy = 0;
     sendT += dt;
     const sig = m.x.toFixed(2) + ',' + m.y.toFixed(2);
@@ -1751,10 +1754,12 @@ function frame(t) {
   stepPets(dt); stepFight(dt);
 
   near = findNear();
-  const ab = $('#actBtn');
-  if (wwIsWolf()) { const cd = wwCdLeft('summon'); ab.classList.remove('closed'); ab.classList.toggle('idle', cd > 0); actIco('📯'); $('#actLabel').textContent = cd ? `สมุน ${cd} วิ` : 'เรียกสมุน'; }
-  else if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); $('#actLabel').textContent = 'หมุน'; }
-  else if (picking) { ab.classList.add('idle'); actIco('✋'); $('#actLabel').textContent = 'แตะของ'; }
+  // the big button's state is worked out first and written once (its classes used to be rewritten several times a frame)
+  const abEl = $('#actBtn'), abC = { idle: abEl.classList.contains('idle'), closed: abEl.classList.contains('closed') };
+  const ab = { classList: { add: (...c) => c.forEach(k => abC[k] = true), remove: (...c) => c.forEach(k => abC[k] = false), toggle: (k, on) => (abC[k] = on === undefined ? !abC[k] : !!on) } };
+  if (wwIsWolf()) { const cd = wwCdLeft('summon'); ab.classList.remove('closed'); ab.classList.toggle('idle', cd > 0); actIco('📯'); ACT_LBL.v = cd ? `สมุน ${cd} วิ` : 'เรียกสมุน'; }
+  else if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); ACT_LBL.v = 'หมุน'; }
+  else if (picking) { ab.classList.add('idle'); actIco('✋'); ACT_LBL.v = 'แตะของ'; }
   else if (near) {
     ab.classList.remove('idle'); let ico = near.icon;
     const closed = near.type === 'door' && near.house === undefined && (near.renov || !isOpen(near.bld));
@@ -1762,16 +1767,17 @@ function frame(t) {
     if (stf) { ico = '💬'; staffGreet(stf); }
     if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) ico = cookCue(near)[0];
     if (near.type === 'pier') actRod(); else actIco(ico);
-    $('#actLabel').textContent = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
+    ACT_LBL.v = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
       : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
-  } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); $('#actLabel').textContent = 'ใช้งาน'; }
+  } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); ACT_LBL.v = 'ใช้งาน'; }
   if (placing) { }
-  else if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); $('#actLabel').textContent = 'ลงจากรถ'; }
-  else if (swimming()) { ab.classList.remove('idle', 'closed'); actIco('🪜'); $('#actLabel').textContent = 'ขึ้นจากสระ'; }   // in a bumper car the big button gets you out
-  else if (me.pass) { ab.classList.remove('idle', 'closed'); actIco('🚶'); $('#actLabel').textContent = 'ลงรถ'; }       // riding with a friend
-  else if (!near && onBike()) { ab.classList.remove('idle', 'closed'); actIco('🔥'); $('#actLabel').textContent = 'สับโดด'; }   // on a bike with nothing around: pop a wheelie
+  else if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); ACT_LBL.v = 'ลงจากรถ'; }
+  else if (swimming()) { ab.classList.remove('idle', 'closed'); actIco('🪜'); ACT_LBL.v = 'ขึ้นจากสระ'; }   // in a bumper car the big button gets you out
+  else if (me.pass) { ab.classList.remove('idle', 'closed'); actIco('🚶'); ACT_LBL.v = 'ลงรถ'; }       // riding with a friend
+  else if (!near && onBike()) { ab.classList.remove('idle', 'closed'); actIco('🔥'); ACT_LBL.v = 'สับโดด'; }   // on a bike with nothing around: pop a wheelie
+  for (const k of ['idle', 'closed']) if (abEl.classList.contains(k) !== !!abC[k]) abEl.classList.toggle(k, !!abC[k]);
   paintFishCue();
   if (panel?.st && (!near || near.id !== panel.st)) closePanel();
   if (panel?.kind === 'player' && !P.get(panel.pid)) closePanel();
@@ -5677,6 +5683,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25x', d: '22 พ.ย.', items: [
+    '🏎️ ขับรถลื่นขึ้น: กล้องติดรถไม่แกว่ง และมือถือที่กระตุกเป็นพักๆ รถไม่กระโดดไปข้างหน้าแล้ว',
+    '⚡ เกมเบาลงบนมือถือ: ป้ายชื่อร้านและชื่อผู้เล่นวาดครั้งเดียวแล้วใช้ซ้ำ ปุ่มใหญ่ไม่วาดใหม่ทุกเฟรม',
+  ] },
   { v: '2026-11-25w', d: '22 พ.ย.', items: [
     '🚗 แก้ขับรถตามนำทาง (เช่น กลับบ้าน) แล้วรถกระตุกไปมา: ตอนนี้วิ่งลื่น ตัดมุมเป็นเส้นตรง ไม่สั่นแล้ว (มือถือที่เครื่องช้าเป็นหนักสุด)',
   ] },
@@ -7629,14 +7639,25 @@ function shade(hex, f) {
   const t = f < 0 ? 0 : 255, p = Math.abs(f);
   return `rgb(${Math.round((t - r) * p + r)},${Math.round((t - g) * p + g)},${Math.round((t - b) * p + b)})`;
 }
+const signCache = new Map();
 function sign(text, x, y, o = {}) {
-  const fs = Math.max(10, Math.round(o.size || TS * .36));
-  ctx.font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const w = textW(text) + fs * .9, h = o.h || fs * 1.55;
-  ctx.fillStyle = o.bg || 'rgba(58,36,20,.88)';
-  ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
-  if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 2; ctx.stroke(); }
-  ctx.fillStyle = o.color || '#fff'; ctx.fillText(text, x, y + fs * .04);
+  const fs = Math.max(10, Math.round(o.size || TS * .36)), h = o.h || fs * 1.55;
+  const key = `${text}|${fs}|${h}|${o.bg || ''}|${o.border || ''}|${o.color || ''}|${DPR}`;
+  let c = signCache.get(key);
+  if (!c) {
+    ctx.font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`;
+    const w = textW(text) + fs * .9, pad = 2;
+    c = document.createElement('canvas'); c.width = Math.ceil((w + pad * 2) * DPR); c.height = Math.ceil((h + pad * 2) * DPR); c.w = w + pad * 2; c.h = h + pad * 2;
+    const g = c.getContext('2d'); g.scale(DPR, DPR); g.translate(pad + w / 2, pad + h / 2);
+    g.font = ctx.font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = o.bg || 'rgba(58,36,20,.88)'; g.beginPath(); g.roundRect(-w / 2, -h / 2, w, h, h / 2); g.fill();
+    if (o.border) { g.strokeStyle = o.border; g.lineWidth = 2; g.stroke(); }
+    g.fillStyle = o.color || '#fff'; g.fillText(text, 0, fs * .04);
+    if (signCache.size > 400) signCache.delete(signCache.keys().next().value);
+    signCache.set(key, c);
+  }
+  ctx.drawImage(c, Math.round((x - c.w / 2) * DPR) / DPR, Math.round((y - c.h / 2) * DPR) / DPR, c.w, c.h);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // callers draw text after a sign with these (setting the font every time is slow)
 }
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
@@ -8825,6 +8846,8 @@ function fishAt() {
 }
 // the big button's icon: set only when it changes (an emoji, or the drawn fishing rod)
 let actIconKey = '';
+// the big button's label: written only when it changes (rewriting the same text every frame made the phone redo the layout each frame)
+const ACT_LBL = { last: null, set v(x) { if (x === this.last) return; this.last = x; $('#actLabel').textContent = x; } };
 function actIco(txt, html) { const k = html ? txt : 'T' + txt; if (k === actIconKey) return; actIconKey = k; const el = $('#actIcon'); if (html) el.innerHTML = html; else el.textContent = txt; }
 // the fishing rod on the big button: the rod you hold (its colour), bending with the pull, the line to the float / fish
 const ROD_COL = { bamboo: ['#c9a35a', '#8a6a2c'], fiber: ['#3a7bd5', '#1d4e8f'], carbon: ['#3b3b44', '#15151a'], pro: ['#1f8a5b', '#0f5236'], gold: ['#f2c94c', '#a87a12'], dragon: ['#b23ad6', '#5e157a'] };
