@@ -1933,7 +1933,7 @@ function draw(t) {
     if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
-    if (s.type === 'craft') sign('🔨 โรงช่างคราฟ', px, py - TS * 2.6, { size: TS * .3, bg: 'rgba(150,90,30,.92)' });   // floating sign over the workshop
+    if (s.type === 'craft') sign('🔨 โรงช่างคราฟ ✨', px + TS * .5, py - TS * 3 + Math.sin(t / 500) * 3, { size: TS * .5, bg: 'rgba(170,95,25,.95)', border: '#ffd77a' });   // floating sign over the workshop
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
@@ -5839,7 +5839,7 @@ const NEWS = [
     '🔨 โรงช่างคราฟหาง่ายขึ้น: มีป้ายลอยเหนือโต๊ะช่าง มีหมุดในแผนที่ และมี <b>ช่างโต</b> ยืนเฝ้า คุยกับช่างโตเพื่อเปิดหน้าคราฟได้เลย',
   ] },
   { v: '2026-11-26e', d: '22 พ.ย.', items: [
-    '🔨 <b>โรงช่างคราฟเปิดแล้ว!</b> โต๊ะช่างข้างน้ำพุกลางเมือง (ใกล้จุดเกิด) คราฟเฟอร์นิเจอร์ที่ร้านไหนก็ไม่มีขาย 6 แบบ',
+    '🔨 <b>โรงช่างคราฟเปิดแล้ว!</b> โต๊ะช่างบนลานหญ้าตรงข้ามธนาคาร คราฟเฟอร์นิเจอร์ที่ร้านไหนก็ไม่มีขาย 6 แบบ',
     '🧰 วัตถุดิบใหม่ 🪵ไม้ 🧵ผ้า 🐚เปลือกหอยมุก 💠เศษคริสตัล ได้แบบสุ่มระหว่างตกปลา เก็บผัก และทำงาน',
     '✨ ของระดับตำนาน "ซุ้มประตูเพชรเรืองแสง" เรืองแสงในบ้าน ใช้ 💎 ชิ้นส่วนเพชร (ซื้อที่โรงช่าง หรือได้จากอันดับ 1–3 แข่งตกปลา)',
     '🏡 ยังไม่มีบ้านก็คราฟได้ ของจะเก็บไว้ให้ มีบ้านเมื่อไหร่วางได้เลย',
