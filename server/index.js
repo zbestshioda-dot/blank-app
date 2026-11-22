@@ -2299,9 +2299,68 @@ function legendRoll(a, c) {
   if (eggOf(a).ld === dayKey() || Math.random() >= L.odds) return null;
   return 'mayorkoi';
 }
+// 💞 friendship with the townsfolk: talk once a day (+1), a gift once a day (liked +3, loved +6, anything else +1, x2 on
+// their birthday). Each new level pays a reward once; at higher levels they greet you by name and say more.
+const folkOf = (a, id) => (a.folk || (a.folk = {}))[id] || (a.folk[id] = { p: 0, lv: 0 });
+const folkLv = p => { let l = 0; D.FOLK_LV.forEach((v, i) => { if (p >= v) l = i; }); return l; };
+const folkBday = def => { const g = D.dateAt(now()); return def.bday && g.month + 1 === def.bday[0] && g.day === def.bday[1]; };
+function folkAdd(a, def, n, why) {
+  const f = folkOf(a, def.id), before = folkLv(f.p); f.p += n; const lv = folkLv(f.p); a.sd = true; dirty = true;
+  if (lv > (f.lv || 0)) {
+    f.lv = lv; const r = D.FOLK_REWARD[lv] || 0;
+    if (r) credit(a, r);
+    toast(a, `💞 ${def.name} นับคุณเป็น "${D.FOLK_LVN[lv]}" แล้ว!${r ? ` ได้รับ ${money(r)}` : ''}`, '💞'); joy(a, 5);
+    if (lv >= 3) feed(`💞 ${a.name} กลายเป็น${D.FOLK_LVN[lv]}ของ${def.name}`);
+  } else if (why) toast(a, `${why} · 💞 +${n} (${f.p}/${D.FOLK_LV[Math.min(4, lv + 1)]})`, '💞');
+  markMe(a); send(a, folksView(a)); return before !== lv;
+}
+function folkTalk(a, n) {
+  const def = FOLK_DEF[n.fid]; if (!def || areaId(a) !== n.area || dist(a, n) > 3.5) return;
+  const f = folkOf(a, def.id), d = dayKey();
+  if (f.talk === d) return; f.talk = d; folkAdd(a, def, 1, `คุยกับ${def.name}`); quest(a, 'folk');
+}
+function folkGift(a, m) {
+  const n = npcs.find(x => x.id === m.id), def = n && FOLK_DEF[n.fid], id = String(m.item || '');
+  if (!def || areaId(a) !== n.area || dist(a, n) > 3.5) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะให้ของได้', '🎁', false);
+  if (!(a.inv[id] > 0) || !D.ITEMS[id]) return toast(a, 'ไม่มีของชิ้นนี้ในกระเป๋า', '🎁', false);
+  const f = folkOf(a, def.id), d = dayKey(); if (f.gift === d) return toast(a, `วันนี้ให้ของ${def.name}ไปแล้ว พรุ่งนี้ค่อยมาใหม่นะ`, '🎁', false);
+  addItem(a, id, -1); f.gift = d;
+  const love = def.love === id, like = def.likes.includes(id), bd = folkBday(def);
+  if (love || like) f.known = [...new Set([...(f.known || []), id])];
+  const pts = (love ? 6 : like ? 3 : 1) * (bd ? 2 : 1), it = D.ITEMS[id];
+  const say = love ? `ว้าว! ${it.name} ของโปรดเลย ขอบคุณมากๆ` : like ? `${it.name}! ชอบมากเลย ขอบคุณนะ` : `ขอบคุณนะ (${it.name})`;
+  send(a, { t: 'folksay', id: n.id, text: (bd ? '🎂 จำวันเกิดได้ด้วย! ' : '') + say, mood: love ? 'love' : like ? 'like' : 'ok' });
+  folkAdd(a, def, pts, `ให้${it.icon}${it.name}กับ${def.name}${bd ? ' (วันเกิด x2)' : ''}`);
+}
+// 📋 a small favour each townsperson asks of you today (the same all day, different for each player): bring them something
+function folkReq(a, def) {
+  const d = dayKey(); let h = 0; for (const c of d + def.id + lk(a)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const pool = (def.asks || def.likes).filter(id => D.ITEMS[id]), item = pool[h % pool.length], it = D.ITEMS[item];
+  const n = (it.base || 50) >= 200 ? 1 : (it.base || 50) >= 80 ? 2 : 3 - (h >>> 4) % 2;
+  const tale = def.tales?.[(h >>> 7) % def.tales.length] || ['คำขอวันนี้', `${def.name}อยากได้{item}`];   // 📜 a little story for the journal
+  return { item, n, pay: Math.round((it.base || 50) * n * 1.8 + 120), done: (a.folk?.[def.id]?.req === d) ? 1 : 0, title: tale[0], story: tale[1].replace('{item}', it.name) };
+}
+function folkDo(a, m) {
+  const n = npcs.find(x => x.id === m.id), def = n && FOLK_DEF[n.fid];
+  if (!def || areaId(a) !== n.area || dist(a, n) > 3.5) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะส่งของได้', '📋', false);
+  const r = folkReq(a, def), it = D.ITEMS[r.item];
+  if (r.done) return toast(a, `วันนี้ช่วย${def.name}ไปแล้ว พรุ่งนี้มีเรื่องใหม่`, '📋', false);
+  if ((a.inv[r.item] || 0) < r.n) return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[r.item] || 0}/${r.n})`, '📋', false);
+  addItem(a, r.item, -r.n); folkOf(a, def.id).req = dayKey(); credit(a, r.pay); quest(a, 'folk'); joy(a, 4);
+  send(a, { t: 'folksay', id: n.id, text: `ได้ ${it.name} แล้ว! ขอบคุณมากเลยนะ นี่ค่าเหนื่อย ${money(r.pay)}`, mood: 'like' });
+  folkAdd(a, def, 4, `ช่วย${def.name} สำเร็จ · ได้ ${money(r.pay)}`);
+}
+function folksView(a) {
+  return { t: 'folks', list: Object.values(FOLK_DEF).map(def => {
+    const n = npcs.find(x => x.fid === def.id), f = (a.folk || {})[def.id] || { p: 0, lv: 0 }, lv = folkLv(f.p), d = dayKey();
+    return { id: def.id, npc: n?.id, name: def.name, face: def.face, p: f.p, lv, next: D.FOLK_LV[lv + 1] ?? null, about: def.about,
+      bday: def.bday, today: folkBday(def) ? 1 : 0, doing: n ? folkDoing(n) : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0,
+      req: folkReq(a, def), known: f.known || [], love: lv >= 3 ? def.love : (f.known || []).includes(def.love) ? def.love : '', likes: lv >= 2 ? def.likes : (f.known || []).filter(x => def.likes.includes(x)) };
+  }) };
+}
 // the mayor walks around disguised as one of the AI townsfolk; whoever spots them (talks to them up close) wins today's prize
 let mayorBot = null, mayorDayK = '';
-const mayorPool = () => npcs.filter(n => n.area === 'town' && (n.folk || n.bot));   // townsfolk walking around town
+const mayorPool = () => npcs.filter(n => n.area === 'town' && !n.away && (n.folk || n.bot));   // townsfolk walking around town
 function mayorNow() {
   const d = dayKey();
   if (d !== mayorDayK || !mayorPool().some(n => n.id === mayorBot)) { mayorDayK = d; const bs = mayorPool(); mayorBot = bs.length ? pick(bs).id : null; }
@@ -4001,6 +4060,12 @@ function fcTick() {
   if (th.h === FC.hour && th.m < FC.min && fcDay !== th.day) { fcDay = th.day; fcStart(FC.min - th.m); }
 }
 setInterval(() => { try { fcTick(); } catch (e) { console.error('fcTick', e); } }, 1000).unref?.();
+// 🎂 a townsperson's birthday: tell the town once when the (game) day starts
+let bdayKey = '';
+setInterval(() => { try {
+  const g = D.dateAt(now()), k = `${g.year}-${g.month}-${g.day}`; if (k === bdayKey) return; const first = !bdayKey; bdayKey = k; if (first) return;
+  for (const def of Object.values(FOLK_DEF)) if (folkBday(def)) feed(`🎂 วันนี้วันเกิด${def.name}! ให้ของขวัญวันนี้ได้ความสนิท x2`);
+} catch (e) { console.error('bday', e); } }, 5000).unref?.();
 function giveCatch(a, id) {
   const before = fishLv(a);
   a.xp.fisher = (a.xp.fisher || 0) + 1;
@@ -4171,7 +4236,7 @@ let npcRosterDirty = false;
   const spots = D.STATIONS.filter(s => s.area === 'town' && /^(door|seat|pier|square|fishclub)$/.test(s.type)).map(s => [Math.floor(s.x) + .5, Math.floor(s.y + (s.type === 'door' ? .6 : 0)) + .5]).filter(([x, y]) => !D.blocked(x, y));
   D.FOLK.town.forEach((p, i) => {
     const [x, y] = pick(walkableIn('town'));
-    npcs.push({ id: -(i + 1), folk: 1, name: p.name, face: p.face, area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+    npcs.push({ id: -(i + 1), folk: 1, fid: p.id, sched: p.sched, home0: 'town', name: p.name, face: p.face, area: 'town', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
       g: p.g, look: { ...p.look }, speed: p.kid ? rnd(1.4, 1.8) : rnd(1.1, 1.6), pickedAt: 0,
       next: function () { return folkNext(this, spots); }, stay: () => rnd(4, 14) });
   });
@@ -4181,13 +4246,48 @@ let npcRosterDirty = false;
   const hs = walkableIn('housing');
   D.FOLK.housing.forEach((p, i) => {
     const [x, y] = pick(hs);
-    npcs.push({ id: -(40 + i), folk: 1, name: p.name, face: p.face, area: 'housing', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
-      g: p.g, look: { ...p.look }, speed: rnd(1.1, 1.5), pickedAt: 0, next: () => pick(hs).map(v => v + .5), stay: () => rnd(4, 14) });
+    npcs.push({ id: -(40 + i), folk: 1, fid: p.id, sched: p.sched, home0: 'housing', name: p.name, face: p.face, area: 'housing', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 4),
+      g: p.g, look: { ...p.look }, speed: rnd(1.1, 1.5), pickedAt: 0, next: function () { return folkHousingNext(this, hs); }, stay: () => rnd(4, 14) });
   });
 }
 // townsfolk go in and out of open shops through the front door, just like players
 const PUBLIC_DOORS = D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov && ROOM[s.to]);
+// 🕐 the townsfolk's day: which part of their schedule is now (game hours)
+const FOLK_DEF = Object.fromEntries([...D.FOLK.town, ...D.FOLK.housing].map(p => [p.id, p]));
+function folkSlot(n) { if (!n.sched) return null; const h = hourNow(); let cur = n.sched[n.sched.length - 1]; for (const sl of n.sched) if (h >= sl[0]) cur = sl; return cur; }
+function folkDoing(n) {           // what they are up to, for the talk window and the townsfolk app
+  const sl = folkSlot(n); if (!sl) return '';
+  if (sl[1] === 'home' || n.away) return 'กลับบ้านพักผ่อนแล้ว';
+  if (sl[1] === 'work') { const d = D.STATIONS.find(x => x.id === sl[2]); return `อยู่ที่${d?.label?.split(' ·')[0] || 'ในเมือง'}`; }
+  if (sl[1] === 'hang') return sl[2].includes('fishclub') ? 'นั่งเล่นแถวสมาคมประมง' : 'เดินเล่นแถวจัตุรัส';
+  return 'เดินเล่นในเมือง';
+}
+// gone home for the night: off the street until their day starts again
+function folkGoAway(n, on) { if (!!n.away === on) return; n.away = on; n.path = []; n.inside = null; n.goingIn = null; n.leaving = false; npcRosterDirty = true; }
+function folkHousingNext(n, hs) {
+  const sl = folkSlot(n);
+  if (sl?.[1] === 'home') { if (!n.away) folkGoAway(n, true); return null; }
+  if (n.away) { folkGoAway(n, false); const [x, y] = pick(hs); n.x = x + .5; n.y = y + .5; }
+  return pick(hs).map(v => v + .5);
+}
 function folkNext(n, spots) {
+  const sl = folkSlot(n);
+  if (sl?.[1] === 'home') {           // walk off and disappear for the night (no one sees them leave from up close)
+    if (n.away) return null;
+    if (n.inside) { n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y]; }
+    folkGoAway(n, true); return null;
+  }
+  if (n.away) { folkGoAway(n, false); const [x, y] = pick(walkableIn('town')); n.x = x + .5; n.y = y + .5; n.area = 'town'; }
+  if (sl?.[1] === 'work') {
+    const d = D.STATIONS.find(x => x.id === sl[2]), room = d && ROOM[d.to];
+    if (room && n.inside?.room?.id === room.id) { const w = walkableIn(room.id); return w.length ? pick(w).map(v => v + .5) : null; }   // at work: potter about inside
+    if (n.inside) { n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y]; }
+    if (room) { n.goingIn = d; return [d.x, d.y]; }
+  }
+  if (sl?.[1] === 'hang' && !n.inside) {
+    const near = spots.filter(([x, y]) => sl[2].some(id => { const st = D.STATIONS.find(q => q.id === id); return st && Math.hypot(st.x - x, st.y - y) < 9; }));
+    if (near.length && Math.random() < .8) return pick(near);
+  }
   if (n.inside) {
     if (n.inside.left-- > 0) { const w = walkableIn(n.area); return w.length ? pick(w).map(v => v + .5) : [n.inside.room.exit.x, n.inside.room.exit.y]; }
     n.leaving = true; return [n.inside.room.exit.x, n.inside.room.exit.y];
@@ -4203,7 +4303,7 @@ function folkArrive(n) {
   if (n.goingIn) {
     const room = ROOM[n.goingIn.to]; n.goingIn = null;
     if (!room) return false;
-    n.x = room.spawn.x; n.y = room.spawn.y; n.area = room.id; n.inside = { room, left: 1 + Math.floor(Math.random() * 3) }; n.wait = rnd(1, 3);
+    n.x = room.spawn.x; n.y = room.spawn.y; n.area = room.id; n.inside = { room, left: 1 + Math.floor(Math.random() * 3) }; n.wait = rnd(1, 3);   // (at work they stay: see folkNext)
     return true;
   }
   if (n.leaving) {
@@ -4429,13 +4529,13 @@ function npcTick(dt, ps) {
   if (npcRosterDirty) { npcRosterDirty = false; sendRoster(); }
   // now and then a villager near someone says something (bubble over their head)
   if (Math.random() < dt / 40) {
-    const n = pick(npcs.filter(x => x.folk)), near = [...online.values()].filter(o => areaId(o) === n.area && dist(o, n) <= 14);
+    const n = pick(npcs.filter(x => x.folk && !x.away)), near = n ? [...online.values()].filter(o => areaId(o) === n.area && dist(o, n) <= 14) : [];
     if (near.length) { const msg = { t: 'chat', id: n.id, name: n.name, text: pick(D.NPC_LINES), ts: now(), npc: 1 }; near.forEach(o => send(o, msg)); }
   }
 }
-const npcVisible = n => !n.worker || n.on;
+const npcVisible = n => (!n.worker || n.on) && !n.away;
 const npcInfo = n => n.bot ? botPub(n) : n.wwm ? ({ id: n.id, npc: 1, wwm: 1, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : n.zb ? ({ id: n.id, npc: 1, zb: n.zb, name: n.name, c: 'none', lv: 1, dz: [], pose: null, x: n.x, y: n.y, f: n.f, title: '' }) : ({ id: n.id, npc: 1, ...(n.umb ? { um: 1, umb: UMB.price } : {}), name: n.name, c: n.c || 'none', lv: 1, dz: [], pose: n.pose || null, g: n.g, lk: n.look, face: n.face, x: n.x, y: n.y, f: n.f, title: '',
-  of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '' });
+  of: n.c && D.CAREERS[n.c] ? n.c : '', wk: n.worker ? 1 : 0, desc: n.worker?.desc || '', ...(n.fid ? { fid: n.fid } : {}) });
 // what you are wearing: a reward outfit you picked, else your job's clothes (unless hidden)
 function showOf(a) {                       // what the profile shows off (defaults: the outfit, pet and car in use)
   const s = a.show || {}, has = (l, k) => k && (l || []).includes(k);
@@ -4658,7 +4758,7 @@ function login(ws, m, pre) {
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
-  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); send(a, fcView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); send(a, fcView(a)); send(a, folksView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
   if (daily) send(a, { t: 'daily', ...daily });
   if (!a.rod && a.career === 'none') setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
@@ -4953,7 +5053,10 @@ function onMessage0(ws, raw) {
       addItem(a, 'umbrella', 1); markMe(a); sendRoster();
       return toast(a, `ซื้อ ☂️ร่มกันฝน ${money(UMB.price)} · กางให้เองตอนฝนตกข้างนอก ไม่เปียก ไม่เป็นหวัด`, '☂️');
     }
-    case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) eggMayor(a, n); return; }
+    case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) { eggMayor(a, n); if (n.fid) folkTalk(a, n); } return; }
+    case 'folkgift': return folkGift(a, m);
+    case 'folkdo': return folkDo(a, m);
+    case 'folks': return send(a, folksView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
     case 'achsync': return achSweep(a);
@@ -5869,7 +5972,7 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => {});
   // a phone that was swiped away often never closes the socket: no answer to the last ping → drop it (the player leaves the map)
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
-  const ka = setInterval(() => { if (ws.readyState !== 1) return; if (!ws.alive) return ws.terminate(); ws.alive = false; ws.ping(); }, 20000);
+  const ka = setInterval(() => { if (ws.readyState !== 1) return; if (!ws.alive) return (ws.terminate || ws.close).call(ws); ws.alive = false; ws.ping(); }, 20000);
   ws.on('close', () => clearInterval(ka));
 });
 

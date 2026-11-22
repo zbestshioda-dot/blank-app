@@ -1877,20 +1877,43 @@ const TREATMENTS = {
 };
 // the townsfolk who stroll around: fixed people, each matching a painted portrait (public/assets/portraits, folk_*)
 const FOLK = {
+  // each one now lives a day: sched = [game hour, what, where] (work = inside that building, hang = near those spots,
+  // stroll = around town, home = gone home for the night). likes / love = gifts they enjoy; bday = their birthday (month, day)
   town: [
-    { name: 'พี่โจ้ (พนักงานออฟฟิศ)', g: 'm', face: 'folk_m1', look: { hair: 'black', shirt: 'black', pants: 'gray' } },
-    { name: 'คุณเมย์', g: 'f', face: 'folk_f1', look: { hair: 'brown', shirt: 'black', pants: 'black' } },
-    { name: 'ป้าสมใจ', g: 'f', face: 'folk_f2', look: { hair: 'black', shirt: 'white', pants: 'gray' } },
-    { name: 'พี่ดำ', g: 'm', face: 'folk_m2', look: { hair: 'black', shirt: 'red', pants: 'gray' } },
-    { name: 'ต้นกล้า', g: 'm', face: 'folk_m3', look: { hair: 'brown', shirt: 'black', pants: 'gray' } },
-    { name: 'น้องมะปราง', g: 'f', face: 'mprang_happy', look: { hair: 'brown', shirt: 'pink', pants: 'gray' }, kid: 1 },
+    { id: 'joe', tales: [['งานด่วนของพี่โจ้', 'พี่โจ้ต้องปั่นงานส่งหัวหน้าทั้งวัน ตาจะปิดแล้ว ขอ{item}มาช่วยหน่อย'], ['เสบียงห้องประชุม', 'ประชุมยาวจนลืมกินข้าว พี่โจ้อยากได้{item}ไปแบ่งเพื่อนในทีม']],  asks: ['coffee', 'bento', 'kaprao', 'fried_rice'],  name: 'พี่โจ้ (พนักงานออฟฟิศ)', g: 'm', face: 'folk_m1', look: { hair: 'black', shirt: 'black', pants: 'gray' },
+      likes: ['coffee', 'bento', 'bread', 'hotdog'], love: 'kaprao', bday: [2, 3], about: 'ทำงานบริษัทไทยเทค ชอบกาแฟ เลิกงานชอบไปกินข้าวที่ร้านอาหาร',
+      sched: [[0, 'home'], [7, 'hang', ['square']], [8, 'work', 'door_office'], [17, 'work', 'door_restaurant'], [19, 'stroll'], [22, 'home']] },
+    { id: 'may', tales: [['รางวัลให้ตัวเอง', 'คุณเมย์ยืนขายของทั้งวันจนเหนื่อย อยากได้{item}เป็นรางวัลให้ตัวเอง'], ['ของขวัญให้เพื่อน', 'เพื่อนสนิทของคุณเมย์จะย้ายบ้าน เธออยากได้{item}ไปเป็นของขวัญ']],  asks: ['thaitea', 'cottoncandy', 'sunflower', 'py_bunny'],  name: 'คุณเมย์', g: 'f', face: 'folk_f1', look: { hair: 'brown', shirt: 'black', pants: 'black' },
+      likes: ['thaitea', 'coconutice', 'cottoncandy', 'malai'], love: 'py_bunny', bday: [4, 2], about: 'ทำงานร้านแฟชั่น ชอบของหวานกับตุ๊กตา',
+      sched: [[0, 'home'], [8, 'hang', ['square']], [10, 'work', 'door_fashion'], [18, 'work', 'door_cstore'], [19, 'hang', ['square', 'fishclub']], [23, 'home']] },
+    { id: 'somjai', tales: [['ของไหว้ยามเช้า', 'พรุ่งนี้ป้าสมใจจะไปทำบุญ ขอ{item}ไปเตรียมของ'], ['ร้านต้นไม้ของป้า', 'ลูกค้าประจำสั่งของไว้ แต่ป้าสมใจหาไม่ทัน ขอ{item}หน่อยนะ']],  asks: ['tomato', 'malai', 'kanomthai', 'sunflower'],  name: 'ป้าสมใจ', g: 'f', face: 'folk_f2', look: { hair: 'black', shirt: 'white', pants: 'gray' },
+      likes: ['khaotom', 'kanomthai', 'offering', 'namlamyai'], love: 'malai', bday: [7, 1], about: 'แม่ค้าใจดี ตื่นเช้าทุกวัน ชอบขนมไทยกับทำบุญ',
+      sched: [[0, 'home'], [5, 'hang', ['square']], [7, 'work', 'door_flower'], [12, 'work', 'door_restaurant'], [13, 'work', 'door_flower'], [17, 'stroll'], [20, 'home']] },
+    { id: 'dam', tales: [['ช่างดำทำงานดึก', 'พี่ดำซ่อมรถจนดึก ยังไม่ได้กินอะไรเลย อยากได้{item}'], ['เหยื่อล่อปลาใหญ่', 'พี่ดำได้ยินว่ามีปลายักษ์ในทะเลสาบ ขอ{item}ไปเป็นเสบียงตอนนั่งรอ']],  asks: ['tilapia', 'carp', 'grilled_fish', 'soda'],  name: 'พี่ดำ', g: 'm', face: 'folk_m2', look: { hair: 'black', shirt: 'red', pants: 'gray' },
+      likes: ['sausage', 'meatball', 'soda', 'grilled_fish'], love: 'tomyum', bday: [9, 4], about: 'ช่างซ่อมรถ ชอบตกปลาตอนเย็น ชอบของปิ้งย่าง',
+      sched: [[0, 'home'], [8, 'work', 'door_toolshop'], [12, 'work', 'door_dealer'], [16, 'hang', ['fishclub']], [20, 'stroll'], [23, 'home']] },
+    { id: 'tonkla', tales: [['ปาร์ตี้เกมคืนนี้', 'ต้นกล้านัดเพื่อนเล่นเกมทั้งคืน ขอ{item}ไว้กินระหว่างเล่น'], ['อ่านหนังสือสอบ', 'พรุ่งนี้ต้นกล้ามีสอบ ต้องอ่านโต้รุ่ง ขอ{item}มาเติมพลังหน่อย']],  asks: ['soda', 'popcorn', 'hotdog', 'snack'],  name: 'ต้นกล้า', g: 'm', face: 'folk_m3', look: { hair: 'brown', shirt: 'black', pants: 'gray' },
+      likes: ['soda', 'popcorn', 'hotdog', 'snack'], love: 'py_dino', bday: [11, 5], about: 'นักศึกษามหาวิทยาลัย ติดเกม ชอบไปเกมเซ็นเตอร์',
+      sched: [[0, 'home'], [9, 'work', 'door_school'], [15, 'work', 'door_inn'], [17, 'work', 'door_arcade'], [21, 'stroll'], [23, 'home']] },
+    { id: 'mprang', tales: [['ของขวัญให้คุณยาย', 'น้องมะปรางอยากให้ของขวัญคุณยายที่บ้าน แต่เงินในกระปุกไม่พอ ช่วยหา{item}ให้หน่อย'], ['ปาร์ตี้ตุ๊กตา', 'น้องมะปรางจะจัดปาร์ตี้ให้ตุ๊กตา ขาด{item}อีกนิดเดียว']],  asks: ['icecream', 'balloon', 'py_duck', 'cottoncandy'],  name: 'น้องมะปราง', g: 'f', face: 'mprang_happy', look: { hair: 'brown', shirt: 'pink', pants: 'gray' }, kid: 1,
+      likes: ['icecream', 'cottoncandy', 'balloon', 'py_duck'], love: 'py_star', bday: [1, 2], about: 'เด็กข้างบ้าน ชอบแลกสติกเกอร์ ชอบลูกโป่งกับตุ๊กตา',
+      sched: [[0, 'home'], [8, 'work', 'door_school'], [13, 'hang', ['square']], [16, 'work', 'door_pet1'], [18, 'hang', ['square']], [20, 'home']] },
   ],
   housing: [
-    { name: 'ป้านวล', g: 'f', face: 'folk_f3', look: { hair: 'brown', shirt: 'yellow', pants: 'gray' } },
-    { name: 'ตาเฉย', g: 'm', face: 'folk_m4', look: { hair: 'silver', shirt: 'white', pants: 'gray' } },
-    { name: 'น้องเจมส์ (นักเรียน)', g: 'm', face: 'folk_m5', look: { hair: 'black', shirt: 'white', pants: 'black' } },
+    { id: 'nuan', tales: [['แกงหม้อใหญ่', 'ลูกหลานป้านวลจะมาเยี่ยม ป้าจะทำกับข้าวหม้อใหญ่ แต่ผักในสวนไม่พอ ขอ{item}หน่อย'], ['ตลาดนัดชุมชน', 'ป้านวลจะไปขายของที่ตลาดนัด ขอ{item}ไปวางขายเพิ่ม']],  asks: ['tomato', 'corn', 'chili', 'pumpkin'],  name: 'ป้านวล', g: 'f', face: 'folk_f3', look: { hair: 'brown', shirt: 'yellow', pants: 'gray' },
+      likes: ['rice', 'tomato', 'chili', 'somtam'], love: 'durian', bday: [5, 3], about: 'ปลูกผักหน้าบ้าน ชอบของสดจากไร่',
+      sched: [[0, 'home'], [6, 'stroll'], [21, 'home']] },
+    { id: 'choei', tales: [['คิดถึงวันวาน', 'ตาเฉยคิดถึงขนมที่ยายเคยทำให้กินตอนหนุ่มๆ อยากได้{item}'], ['น้ำชายามบ่าย', 'เพื่อนเก่าของตาเฉยจะมาเยี่ยม ขอ{item}ไว้รับแขก']],  asks: ['namlamyai', 'kanomkrok', 'durian', 'luukchup'],  name: 'ตาเฉย', g: 'm', face: 'folk_m4', look: { hair: 'silver', shirt: 'white', pants: 'gray' },
+      likes: ['namlamyai', 'kanomkrok', 'luukchup', 'amulet'], love: 'durian_sweet', bday: [8, 1], about: 'คุณตาเกษียณแล้ว นั่งเล่นหน้าบ้านทั้งวัน ชอบขนมหวาน',
+      sched: [[0, 'home'], [7, 'stroll'], [19, 'home']] },
+    { id: 'james', tales: [['ทำการบ้านกลุ่ม', 'เพื่อนๆ จะมาทำรายงานที่บ้านน้องเจมส์ ขอ{item}ไว้เลี้ยงเพื่อน'], ['ขนมหลังเลิกเรียน', 'แม่น้องเจมส์ลืมให้ค่าขนม ขอ{item}หน่อยนะ หิวมาก']],  asks: ['bread', 'snack', 'soda', 'icecream'],  name: 'น้องเจมส์ (นักเรียน)', g: 'm', face: 'folk_m5', look: { hair: 'black', shirt: 'white', pants: 'black' },
+      likes: ['bread', 'snack', 'soda', 'icecream'], love: 'py_panda', bday: [10, 2], about: 'นักเรียน ชอบขนมกับน้ำอัดลม',
+      sched: [[0, 'home'], [7, 'stroll'], [22, 'home']] },
   ],
 };
+// friendship with the townsfolk: points -> level (0 stranger … 4 like family); rewards the first time each level is reached
+const FOLK_LV = [0, 3, 10, 25, 50], FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว'];
+const FOLK_REWARD = [0, 300, 1000, 3000, 8000];
 const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้องเมย์', 'พี่ต้น', 'ยายจันทร์', 'ตาเหลือง', 'น้าแดง', 'พี่ฝน', 'น้องบอส', 'ป้าแจ๋ว', 'ลุงชัย', 'พี่นก'];
 
 // ================================================================= achievements -> titles shown over your head
@@ -2184,6 +2207,6 @@ module.exports = { FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAR
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, FISH_COL, CASINO, ARCADE, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, FOLK_LV, FOLK_LVN, FOLK_REWARD, FISH_COL, CASINO, ARCADE, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };
