@@ -1435,7 +1435,13 @@ function walkTo(wx, wy) {
 // returns the direction to walk this frame (or null), and steers around anything that blocks the way
 function autoStep(m, dt) {
   const ap = autoPath; if (!ap) return null;
-  while (ap.pts.length && Math.hypot(ap.pts[0][0] - m.x, ap.pts[0][1] - m.y) < .12) ap.pts.shift();
+  // how far we move this frame: a fast car passes a waypoint in one frame, so "reached" must be at least one step
+  // (it used to be .12 tiles: the car overshot, turned back, overshot again — the shaking while driving home)
+  const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, step = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * dt;
+  while (ap.pts.length && Math.hypot(ap.pts[0][0] - m.x, ap.pts[0][1] - m.y) < Math.max(.12, step * 1.1)) ap.pts.shift();
+  // cut corners: head straight for a later waypoint when the way there is clear (smooth lines instead of tile zig-zags)
+  const clear = (x1, y1) => { const L = Math.hypot(x1 - m.x, y1 - m.y), n = Math.ceil(L / .2); for (let i = 1; i <= n; i++) { const x = m.x + (x1 - m.x) * i / n, y = m.y + (y1 - m.y) * i / n; if (blockedAt(x, y) || blockedAt(x + .3, y) || blockedAt(x - .3, y) || blockedAt(x, y + .3) || blockedAt(x, y - .3)) return false; } return true; };
+  for (let k = 0; k < 3 && ap.pts.length > 1 && clear(ap.pts[1][0], ap.pts[1][1]); k++) ap.pts.shift();
   if (!ap.pts.length) { autoPath = null; return null; }
   const [tx, ty] = ap.pts[0]; let dx = tx - m.x, dy = ty - m.y; const l = Math.hypot(dx, dy);
   dx /= l; dy /= l;
@@ -5671,6 +5677,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25w', d: '22 พ.ย.', items: [
+    '🚗 แก้ขับรถตามนำทาง (เช่น กลับบ้าน) แล้วรถกระตุกไปมา: ตอนนี้วิ่งลื่น ตัดมุมเป็นเส้นตรง ไม่สั่นแล้ว (มือถือที่เครื่องช้าเป็นหนักสุด)',
+  ] },
   { v: '2026-11-25v', d: '22 พ.ย.', items: [
     '💾 ภารกิจอาชีพและคดีนักสืบที่ทำค้างอยู่ไม่หายแล้วตอนเกมอัปเดต (เวลาหยุดนับระหว่างเซิร์ฟเวอร์ปิด)',
   ] },
