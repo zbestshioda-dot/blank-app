@@ -1599,3 +1599,9 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 /* phones: the online count sits just under the minimap */
 #topRight>#cbOn{display:block;align-self:center;margin:3px auto 0;padding:1px 8px 1px 6px;border-radius:9px;background:rgba(20,16,12,.7);font-size:10.5px;line-height:1.6;text-align:center;width:max-content}
 #topRight>#cbOn i{display:inline}
+/* 🏆 fishing contest chip (tap for the leaderboard) and fish weights */
+#fcChip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 300px);z-index:40;background:linear-gradient(#ffd45e,#e8a10c);color:#3a2400;border:2px solid #8a5a00;border-radius:20px;padding:6px 14px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.35);animation:fcPulse 2s ease-in-out infinite}
+#fcChip.hidden{display:none}
+@keyframes fcPulse{0%,100%{box-shadow:0 3px 10px rgba(0,0,0,.35)}50%{box-shadow:0 3px 16px rgba(255,200,60,.9)}}
+.catchPop .cKg{display:block;font-style:normal;font-weight:700;font-size:13px;margin-top:2px}
+.fbook em.kg{display:block;font-size:9px;font-style:normal;opacity:.85}

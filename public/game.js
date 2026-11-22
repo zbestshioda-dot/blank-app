@@ -772,8 +772,10 @@ function handle(m) {
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
     case 'nbstep': FX.play('levelup'); if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && S[i].go) setGuide(S[i].go, true); }, 900); break;
     case 'cz': czMsg(m); break;
-    case 'catch': catchPop(m.item, m.first); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
+    case 'catch': catchPop(m.item, m.first, m.kg, m.pb); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
+    case 'fc': fcMsg(m); break;
+    case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
     case 'zn': case 'zspawn': case 'zdie': znMsg(m); break;
@@ -4462,6 +4464,8 @@ const FN = {
     const next = { kind: k, soc: 1, ...(k === 'ideas' ? { sort: panel?.soc && panel.sort !== 'gidea' ? panel.sort || 'new' : 'new' } : k === 'gidea' ? { sort: 'gidea' } : {}) };
     if (panel?.soc) { for (const x of Object.keys(panel)) delete panel[x]; Object.assign(panel, next); panelSig = ''; refreshPanel(true); } else openPanel(next);
   },
+  fcBait() { send({ t: 'fcbait' }); },
+  fishRecs() { openRecs(); },
   wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
   morder(m, root) { const tip = Math.floor(+root.querySelector('#tipIn')?.value || 0); panel.tip = tip; send({ t: 'morder', item: m.item, qty: m.qty, tip }); },
   openInvite() { send({ t: 'refcode' }); openPanel({ kind: 'invite' }); },
@@ -4947,11 +4951,11 @@ function talkQuest(type) {
 function fishBook() {
   const all = Object.entries(G.items).filter(([, it]) => it.kind === 'fish' && it.rar && it.spr).sort((a, b) => a[1].rar - b[1].rar || a[1].base - b[1].base);
   const dex = me.fishdex || {}, got = all.filter(([id]) => dex[id]).length;
-  const cell = ([id, it]) => `<div class="fbook ${dex[id] ? 'got' : ''} r${it.rar}" title="${esc(it.name)}"><canvas class="fspr" data-spr="${it.spr}" width="56" height="40"></canvas><small>${dex[id] ? esc(it.name) : '???'}</small>${dex[id] ? `<em>x${dex[id]}</em>` : ''}</div>`;
+  const cell = ([id, it]) => `<div class="fbook ${dex[id] ? 'got' : ''} r${it.rar}" title="${esc(it.name)}"><canvas class="fspr" data-spr="${it.spr}" width="56" height="40"></canvas><small>${dex[id] ? esc(it.name) : '???'}</small>${dex[id] ? `<em>x${dex[id]}</em>` : ''}${me.frec?.[id] ? `<em class="kg">⚖️${me.frec[id].toFixed(2)}</em>` : ''}</div>`;
   const cells = [...new Set(all.map(([, it]) => it.rar))].map(r => { const g = all.filter(([, it]) => it.rar === r); return `<div class="fbookH"><span class="rtag r${r}">${G.fishRarity[r] || RAR[r]}</span> <small>${g.filter(([id]) => dex[id]).length}/${g.length}</small></div><div class="fbookGrid">${g.map(cell).join('')}</div>`; }).join('');
   return `<div class="secT" style="margin-top:14px">📖 สมุดภาพปลา ${got}/${all.length}</div>
     <div class="sub">${[1, 2, 3, 4, 5].map(r => `<span class="rtag r${r}">${G.fishRarity[r]}</span>`).join('')} · ยิ่งหายากยิ่งราคาดี · เบ็ดที่ดีขึ้นทำให้ปลาหายากกินเบ็ดบ่อยขึ้น</div>
-    ${aqBox()}<div class="secT" style="margin-top:10px">🏆 เป้าสะสมปลา (ได้เพชร)</div><div class="list">${fishGoals(all, dex)}</div>${cells}`;
+    ${aqBox()}<div class="grid2" style="margin-top:8px">${B('📜 สถิติปลาของเมือง', { fn: 'fishRecs' })}${B('🏆 แข่งตกปลา', { fn: 'open', kind: 'fishcomp' })}</div><div class="secT" style="margin-top:10px">🏆 เป้าสะสมปลา (ได้เพชร)</div><div class="list">${fishGoals(all, dex)}</div>${cells}`;
 }
 // 📊 admin stats: the last 30 days of new players, players in town, who came back (D1 / D7) and top-up income
 let aStats = null;
@@ -5266,11 +5270,46 @@ async function shareOpen() {
   };
   document.body.appendChild(d);
 }
-function catchPop(id, first) {
+// 🏆 fishing contest: a chip at the top while it runs (time left, my rank); tap for the leaderboard
+let FCS = { on: 0 }, FRECS = null;
+const openRecs = () => { send({ t: 'frecs' }); openPanel({ kind: 'fishrecs' }); };
+function fishRecsPanel() {
+  if (!FRECS) return `<h2>📜 สถิติปลาของเมือง</h2><div class="sub">กำลังโหลด...</div>`;
+  const rows = FRECS.map((r, i) => `<div class="item"><div class="em">${itemIco(r.f)}</div><div class="nm">${esc(G.items[r.f]?.name || r.f)}${rarTag(r.f)}<small>${i < 3 ? ['🥇', '🥈', '🥉'][i] + ' ' : ''}${esc(r.n)}</small></div><b>${r.kg.toFixed(2)} กก.</b></div>`).join('') || '<div class="sub">ยังไม่มีใครทำสถิติ ตกตัวแรกเลย!</div>';
+  return `<h2>📜 สถิติปลาของเมือง</h2><div class="sub">ปลาตัวที่หนักที่สุดของแต่ละชนิดตลอดกาล ใครตกได้หนักกว่าจะขึ้นชื่อแทนและประกาศทั้งเมือง</div><div class="list">${rows}</div>`;
+}
+function fcMsg(m) {
+  const was = FCS.on; FCS = m;
+  if (m.last && !m.on) toast(`🏆 แข่งตกปลาจบแล้ว ผู้ชนะ ${m.last.n} ${G.items[m.last.f]?.icon || '🐟'} ${m.last.kg.toFixed(2)} กก.`, '🏆');
+  if (!was && m.on) FX.play('notice');
+  fcChip(); if (panel?.kind === 'fishcomp') refreshPanel(true);
+}
+function fcChip() {
+  let c = $('#fcChip');
+  if (!c) { c = document.createElement('button'); c.id = 'fcChip'; c.onclick = () => openPanel({ kind: 'fishcomp' }); document.body.appendChild(c); }
+  if (!FCS.on) { c.classList.add('hidden'); return; }
+  const left = Math.max(0, FCS.end - Date.now() - (G?.toff || 0)), mm = Math.floor(left / 60000), ss = Math.floor(left / 1000) % 60;
+  const t = `🏆🎣 แข่งตกปลา ${mm}:${String(ss).padStart(2, '0')}${FCS.me ? ` · อันดับ ${FCS.me.rank} (${FCS.me.kg.toFixed(2)} กก.)` : ' · ไปตกปลาเลย!'}`;
+  if (c.textContent !== t) c.textContent = t; c.classList.remove('hidden');
+}
+setInterval(() => { if (FCS.on) fcChip(); }, 1000);
+function fishCompPanel() {
+  if (!FCS.on) return `<h2>🏆 แข่งตกปลา</h2><div class="sub">จัดทุกวัน 20:00–20:15 · ปลาตัวที่หนักที่สุดตัวเดียวของคุณคือคะแนน · รางวัล 🥇 ${money(5000)} + ฉายา 🎣 ราชาตกปลา 1 วัน 🥈 ${money(3000)} 🥉 ${money(1500)} · ร่วมสนุก ${money(200)} (ส่งทางจดหมาย) · เหยื่อแข่ง 🪱 ขายเฉพาะช่วงแข่ง</div>${B('📜 สถิติปลาของเมือง', { fn: 'fishRecs' })}`;
+  const left = Math.max(0, FCS.end - Date.now() - (G?.toff || 0)), medal = ['🥇', '🥈', '🥉'];
+  const rows = (FCS.top || []).map((e, i) => `<div class="item"><div class="em">${medal[i] || `<b>${i + 1}</b>`}</div><div class="nm">${esc(e.n)}<small>${G.items[e.f]?.icon || '🐟'} ${esc(G.items[e.f]?.name || '')}</small></div><b>${e.kg.toFixed(2)} กก.</b></div>`).join('') || '<div class="sub">ยังไม่มีใครตกได้ ตัวแรกของคุณขึ้นอันดับ 1 ทันที!</div>';
+  return `<h2>🏆 แข่งตกปลา</h2><div class="sub">เหลือ ${Math.ceil(left / 60000)} นาที · ผู้ร่วมแข่ง ${FCS.n || 0} คน · ปลาตัวที่หนักที่สุดตัวเดียวของคุณคือคะแนน</div>
+    ${FCS.me ? `<div class="sub" style="font-weight:700">ของคุณ: อันดับ ${FCS.me.rank} · ${G.items[FCS.me.f]?.icon || '🐟'} ${FCS.me.kg.toFixed(2)} กก.</div>` : ''}
+    <div class="list">${rows}</div>
+    <div class="sub">รางวัล 🥇 ${money(FCS.prizes?.[0] || 5000)} 🥈 ${money(FCS.prizes?.[1] || 3000)} 🥉 ${money(FCS.prizes?.[2] || 1500)} · คนอื่นที่ตกได้ ${money(FCS.join || 200)} · ส่งทางจดหมาย ✉️ หลังจบ</div>
+    <div class="grid2">${B(`🪱 เหยื่อแข่ง x5 ${money(250)}`, { fn: 'fcBait' }, 'good', (me.money || 0) < 250)}${B('📍 ไปท่าตกปลา', { fn: 'guidePt', x: 21, y: 63, area: 'town', label: 'ท่าตกปลา' }, 'primary')}</div>
+    <div class="sub">🪱 มีเหยื่อแข่ง ${me.inv?.fcbait || 0} ชิ้น · ใช้อัตโนมัติตอนแข่ง ปลาที่ตกได้หนักขึ้น 20–50%</div>
+    ${B('📜 สถิติปลาของเมือง', { fn: 'fishRecs' })}`;
+}
+function catchPop(id, first, kg, pb) {
   const it = G.items[id]; if (!it?.spr) return;
   document.querySelector('.catchPop')?.remove();
   const d = document.createElement('div'); d.className = `catchPop r${it.rar}`;
-  d.innerHTML = `<canvas class="fspr" data-spr="${it.spr}" width="150" height="100"></canvas><b>${esc(it.name)}</b>${rarTag(id)}${first ? '<small>📖 ชนิดใหม่! บันทึกลงสมุดภาพปลาแล้ว</small>' : `<small>~${money(it.base)}</small>`}`;
+  d.innerHTML = `<canvas class="fspr" data-spr="${it.spr}" width="150" height="100"></canvas><b>${esc(it.name)}</b>${kg ? `<i class="cKg">⚖️ ${kg.toFixed(2)} กก.${pb ? ' · 🏅 สถิติใหม่!' : ''}</i>` : ''}${rarTag(id)}${first ? '<small>📖 ชนิดใหม่! บันทึกลงสมุดภาพปลาแล้ว</small>' : `<small>~${money(it.base)}</small>`}`;
   document.body.appendChild(d); bindSpr(d); setTimeout(() => d.classList.add('out'), 2600); setTimeout(() => d.remove(), 3200);
 }
 // item icon: fish have their own pixel sprite; everything else is an emoji. Fish also carry a rarity tag.
@@ -5702,6 +5741,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25y', d: '22 พ.ย.', items: [
+    '🏆🎣 <b>แข่งตกปลาทุกวัน 20:00–20:15</b> ปลาตัวที่หนักที่สุดชนะ 🥇 ฿5,000 + ฉายา 🎣 ราชาตกปลา 1 วัน 🥈 ฿3,000 🥉 ฿1,500 คนอื่นที่ตกได้รับ ฿200 (ส่งทางจดหมาย) · เตือนก่อน 10 นาที',
+    '⚖️ ปลาทุกตัวมีน้ำหนักแล้ว ตัวที่หนักที่สุดของแต่ละชนิดบันทึกเป็นสถิติในสมุดภาพปลา',
+    '🪱 เหยื่อแข่งตกปลา ขายเฉพาะช่วงแข่ง ปลาหนักขึ้น 20–50% · 📜 สถิติปลาของเมือง ใครตกตัวหนักที่สุดของแต่ละชนิดได้ขึ้นชื่อ',
+  ] },
   { v: '2026-11-25x', d: '22 พ.ย.', items: [
     '🏎️ ขับรถลื่นขึ้น: กล้องติดรถไม่แกว่ง และมือถือที่กระตุกเป็นพักๆ รถไม่กระโดดไปข้างหน้าแล้ว',
     '⚡ เกมเบาลงบนมือถือ: ป้ายชื่อร้าน ชื่อผู้เล่น ชื่อแอดมินสีรุ้ง แสงรอบรถพิเศษ และวงแหวนนางฟ้า วาดครั้งเดียวแล้วใช้ซ้ำ ปุ่มใหญ่ไม่วาดใหม่ทุกเฟรม',
@@ -7220,6 +7264,8 @@ function renderPanel(p) {
       return `<h2>🌳 ร้านต้นไม้</h2><div class="sub">${hoursTxt('flower')} · ต้นไม้ใหญ่ พุ่มไม้ ดอกไม้ และไม้ประดับ ซื้อแล้วส่งเข้าคลังที่บ้าน วางเองด้วยปุ่ม 🛋️ จัดบ้าน · 🌱 อยากปลูกผัก? ซื้อ 🟫 แปลงดิน ที่ร้านเฟอร์นิเจอร์ (แท็บสวน)</div>${own ? '' : '<div class="jobbox">🏡 ต้องมีบ้านของตัวเองก่อนถึงจะซื้อต้นไม้ได้</div>'}
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ptab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
+    case 'fishcomp': return fishCompPanel();
+    case 'fishrecs': return fishRecsPanel();
     case 'barber':
     case 'fashion': {
       const W = { hair: [], shirt: [], pants: [], ...(me.wardrobe || {}), skin: Object.keys(G.looks.skin || {}) }, lk = { skin: 'warm', ...(me.look || {}) };
@@ -7429,7 +7475,8 @@ function renderPanel(p) {
           <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
           <div class="setRow"><span><b>🏷️ ซ่อนสีชื่อแอดมินบนหัว</b><small>ป้ายชื่อบนหัวเป็นแบบธรรมดา ไม่มีสีรุ้ง/มงกุฎ (คนอื่นก็เห็นแบบนี้) · ชื่อในแชทยังเป็นสีพิเศษ</small></span>${B(g.plain ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'plain' }, g.plain ? 'primary' : '')}</div>
           <div class="setRow"><span><b>👻 ล่องหน</b><small>คนอื่นมองไม่เห็นตัว ไม่ขึ้นในแผนที่/รายชื่อออนไลน์ (แชทใกล้ๆ ยังเห็นข้อความ)</small></span>${B(g.invis ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'invis' }, g.invis ? 'good' : '')}</div>`,
-        event: `<div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
+        event: `<div class="setRow"><span><b>🏆 แข่งตกปลา</b><small>ปกติเริ่มเองทุกวัน 20:00 (15 นาที) · กดเพื่อเริ่มตอนนี้ หรือกดอีกครั้งเพื่อจบและส่งรางวัล</small></span>${B(FCS.on ? 'จบ' : 'เริ่ม', { fn: 'god', op: 'fishcomp' }, FCS.on ? 'bad' : 'primary')}</div>
+          <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>📣 โพสต์ข่าวลงเฟส</b><small>ได้ข้อความอัปเดตพร้อมลิงก์เกม ไปวางในกลุ่มเฟสได้เลย</small></span>${B('📋 เปิด', { fn: 'open', kind: 'fbpost' }, 'primary')}</div>`,
