@@ -201,8 +201,9 @@ function drawAura(px, py, H, t, front, gold) {
   }
   if (front && angel) {                                                          // a glowing halo over the head and a few feathers drifting down
     const hy = py - H * 1.02 + Math.sin(t / 700) * H * .02;
-    ctx.strokeStyle = `rgba(255,240,170,${.8 + Math.sin(t / 250) * .15})`; ctx.lineWidth = Math.max(2, H * .05); ctx.shadowColor = '#ffe9a0'; ctx.shadowBlur = H * .25;
-    ctx.beginPath(); ctx.ellipse(px, hy, H * .2, H * .06, 0, 0, 7); ctx.stroke(); ctx.shadowBlur = 0;
+    const hw = Math.round(H * .4), hh = Math.round(H * .12), pad = Math.ceil(H * .3);
+    const hc = glowGet('halo', hw, hh, pad, g => { g.strokeStyle = 'rgb(255,240,170)'; g.lineWidth = Math.max(2, H * .05); g.shadowColor = '#ffe9a0'; g.shadowBlur = H * .25; g.beginPath(); g.ellipse(hw / 2, hh / 2, hw / 2, hh / 2, 0, 0, 7); g.stroke(); });
+    ctx.globalAlpha = .8 + Math.sin(t / 250) * .15; ctx.drawImage(hc, px - hw / 2 - pad, hy - hh / 2 - pad, hw + pad * 2, hh + pad * 2); ctx.globalAlpha = 1;
     ctx.fillStyle = 'rgba(255,255,255,.9)';
     for (let i = 0; i < 5; i++) { const f = (t / 3200 + i * .21) % 1, fx = px + Math.sin(t / 900 + i * 2) * H * .4 + (i - 2) * H * .1, fy = py - H * (.95 - f * .9);
       ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.sin(t / 500 + i) * .8); ctx.globalAlpha = .85 * (1 - f); ctx.beginPath(); ctx.ellipse(0, 0, Math.max(1, H * .025), Math.max(2, H * .06), 0, 0, 7); ctx.fill(); ctx.restore(); }
@@ -213,27 +214,43 @@ function drawAura(px, py, H, t, front, gold) {
   }
   ctx.restore();
 }
+// ---- glows drawn once into a bitmap and reused: a canvas blur (shadowBlur) every frame is one of the slowest things a phone can do
+const glowCache = new Map();
+function glowGet(key, w, h, pad, paint) {
+  const k = `${key}|${Math.round(w)}|${Math.round(h)}|${DPR}`; let c = glowCache.get(k);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = Math.ceil((w + pad * 2) * DPR); c.height = Math.ceil((h + pad * 2) * DPR); c.pad = pad;
+    const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0); g.imageSmoothingEnabled = false; g.translate(pad, pad); paint(g);
+    if (glowCache.size > 120) glowCache.delete(glowCache.keys().next().value);
+    glowCache.set(k, c);
+  }
+  return c;
+}
 // ---- vehicles: atlas sprites w_<key>_s (side, faces left) / _f (front) / _b (back)
 const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's' : view === 'front' ? 'f' : 'b'}`];
 const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
 const VEH_FACE_R = new Set([]);   // side sprites drawn facing right (the rest face left)
 // some top views only have one picture for both directions: flip it so the nose points the way you drive
 const VEH_FLIP_B = new Set(['heli2', 'jag']), VEH_FLIP_F = new Set(['heli']);   // _B: the picture has the nose down; _F: nose up
-function drawVeh(key, view, faceLeft, px, py) {
+function drawVeh(key, view, faceLeft, px, py, glow) {
   const flipY = view === 'back' && VEH_FLIP_B.has(key) || view === 'front' && VEH_FLIP_F.has(key);
   const s = flipY || view === 'back' && VEH_FLIP_F.has(key) ? vehSpr(key, 'front') : vehSpr(key, view); if (!s || !atlasImg) return;
-  const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS;
+  const w = Math.round(s[2] / atlas.tile * TS), h = Math.round(s[3] / atlas.tile * TS);
   ctx.save(); ctx.translate(px, py + TS * .06); if (view === 'side' && !faceLeft !== VEH_FACE_R.has(key)) ctx.scale(-1, 1);
   if (flipY) { ctx.translate(0, -h); ctx.scale(1, -1); }
-  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
+  if (glow) {   // the sprite with its coloured glow, painted once (two blurred passes, like before) and reused
+    const pad = Math.ceil(TS * .6), c = glowGet(`veh|${key}|${s[0]},${s[1]}|${glow}`, w, h, pad, g => {
+      g.shadowColor = glow; g.shadowBlur = TS * .4; g.drawImage(atlasImg, s[0], s[1], s[2], s[3], 0, 0, w, h); g.drawImage(atlasImg, s[0], s[1], s[2], s[3], 0, 0, w, h);
+    });
+    ctx.drawImage(c, -w / 2 - pad, -h - pad, w + pad * 2, h + pad * 2);
+  } else ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), w, h);
+  ctx.restore();
 }
 function drawRide(p, v, px, py, k, view, dir) {
   const faceLeft = dir === 'left', t = performance.now();
   if (v.kind === 'heli') py -= TS * (1.2 + Math.sin(t / 420) * .12);           // hovering above its shadow
   if (v.aura) {                                                                  // 💎 specials glow around their outline + sparkles
-    ctx.save(); ctx.shadowColor = v.aura; ctx.shadowBlur = TS * (.35 + Math.sin(t / 260) * .12);
-    if (v.kind !== 'moto' || view !== 'side' && p.veh === 'sleigh') { drawVeh(p.veh, view, faceLeft, px, py); drawVeh(p.veh, view, faceLeft, px, py); }   // a bike glows later, tilted with the wheelie
-    ctx.restore();
+    if (v.kind !== 'moto' || view !== 'side' && p.veh === 'sleigh') drawVeh(p.veh, view, faceLeft, px, py, v.aura);   // a bike glows later, tilted with the wheelie
     const h = vehH(p.veh, view), w = (vehSpr(p.veh, view)?.[2] || 48) / atlas.tile * TS;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 7; i++) { const ph = (t / 1400 + i / 7) % 1, x = px + Math.sin(i * 2.4 + t / 900) * w * .48, y = py - h * (.1 + ph * .9);
@@ -257,8 +274,7 @@ function drawRide(p, v, px, py, k, view, dir) {
   if (view !== 'back') pilAt();
   drawCharTo(ctx, p, px + (view === 'side' ? (faceLeft ? TS * .12 : -TS * .12) : 0), py - lift, k, view, 0, faceLeft);
   if (view === 'back') pilAt();
-  if (v.aura) { ctx.save(); ctx.shadowColor = v.aura; ctx.shadowBlur = TS * (.35 + Math.sin(t / 260) * .12); drawVeh(p.veh, view, faceLeft, px, py); ctx.restore(); }
-  drawVeh(p.veh, view, faceLeft, px, py);                                        // the bike in front hides the legs
+  drawVeh(p.veh, view, faceLeft, px, py, v.aura);                                 // the bike in front hides the legs (💎 specials with their glow)
   ctx.restore();
 }
 const SEAT_LEGS = .45;
@@ -3819,17 +3835,20 @@ function chatOnly(p, px, yTop, t) {
 }
 // the admin's name tag: a rainbow that keeps flowing, with a soft glow
 function premiumName(text, x, y, t) {
-  const fs = Math.max(10, Math.round(TS * .29));
-  ctx.font = `800 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const w = textW(text) + fs * 1.1, h = fs * 1.6;
-  ctx.save();
-  ctx.shadowColor = `hsla(${(t / 8) % 360},100%,60%,.9)`; ctx.shadowBlur = 10;
-  ctx.fillStyle = 'rgba(20,14,30,.92)'; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
-  ctx.restore();
-  const g = ctx.createLinearGradient(x - w / 2, 0, x + w / 2, 0);
-  for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${(t / 6 + i * 60) % 360},95%,65%)`);
-  ctx.lineWidth = 2; ctx.strokeStyle = g; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.stroke();
-  ctx.fillStyle = g; ctx.fillText(text, x, y + fs * .04);
+  const fs = Math.max(10, Math.round(TS * .29)), st = Math.floor(t / 60) % 36, T = st * 60;   // 36 colour steps, drawn once each and reused
+  ctx.font = `800 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`;
+  const w = textW(text) + fs * 1.1, h = fs * 1.6, pad = 8;
+  const c = glowGet(`pn|${text}|${fs}|${st}`, w, h, pad, g => {
+    g.font = ctx.font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.save(); g.shadowColor = `hsla(${(T / 8) % 360},100%,60%,.9)`; g.shadowBlur = 10;
+    g.fillStyle = 'rgba(20,14,30,.92)'; g.beginPath(); g.roundRect(0, 0, w, h, h / 2); g.fill(); g.restore();
+    const gr = g.createLinearGradient(0, 0, w, 0);
+    for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, `hsl(${(T / 6 + i * 60) % 360},95%,65%)`);
+    g.lineWidth = 2; g.strokeStyle = gr; g.beginPath(); g.roundRect(0, 0, w, h, h / 2); g.stroke();
+    g.fillStyle = gr; g.fillText(text, w / 2, h / 2 + fs * .04);
+  });
+  ctx.drawImage(c, Math.round((x - w / 2 - pad) * DPR) / DPR, Math.round((y - h / 2 - pad) * DPR) / DPR, w + pad * 2, h + pad * 2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 }
 function drawPlayerPixel(p, X, Y, t) {
   const px0 = (p.rx + (p.ox || 0)) * TS + X; let py0 = (p.ry + (p.oy || 0)) * TS + Y + TS * .32;
@@ -5685,7 +5704,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-25x', d: '22 พ.ย.', items: [
     '🏎️ ขับรถลื่นขึ้น: กล้องติดรถไม่แกว่ง และมือถือที่กระตุกเป็นพักๆ รถไม่กระโดดไปข้างหน้าแล้ว',
-    '⚡ เกมเบาลงบนมือถือ: ป้ายชื่อร้านและชื่อผู้เล่นวาดครั้งเดียวแล้วใช้ซ้ำ ปุ่มใหญ่ไม่วาดใหม่ทุกเฟรม',
+    '⚡ เกมเบาลงบนมือถือ: ป้ายชื่อร้าน ชื่อผู้เล่น ชื่อแอดมินสีรุ้ง แสงรอบรถพิเศษ และวงแหวนนางฟ้า วาดครั้งเดียวแล้วใช้ซ้ำ ปุ่มใหญ่ไม่วาดใหม่ทุกเฟรม',
   ] },
   { v: '2026-11-25w', d: '22 พ.ย.', items: [
     '🚗 แก้ขับรถตามนำทาง (เช่น กลับบ้าน) แล้วรถกระตุกไปมา: ตอนนี้วิ่งลื่น ตัดมุมเป็นเส้นตรง ไม่สั่นแล้ว (มือถือที่เครื่องช้าเป็นหนักสุด)',
