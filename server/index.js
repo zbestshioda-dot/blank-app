@@ -1618,16 +1618,25 @@ const sHash = (i, k) => { let h = Math.imul(i, 374761393) ^ Math.imul(k + 1, 668
 const sGauss = (i, k) => Math.sqrt(-2 * Math.log(Math.max(1e-9, sHash(i, k)))) * Math.cos(2 * Math.PI * sHash(i, k + 7919));
 const mkt = D.STOCKS.map(s => ({ ...s, lp: Math.log(s.base), hist: [] }));
 let stockI = 0;                                         // index of the last finished candle
+const STOCK_V2 = Math.floor((Date.parse('2026-11-23T00:00:00+07:00') - D.STOCK.epoch) / D.STOCK.candleMs);   // candles from here on use the calmer model
+// a slow wandering level under the fair value: a new random target every 12 hours, eased into
+const stockLevel = (i, si, vol) => { const K = 1440, k = Math.floor(i / K), f = (1 - Math.cos(Math.PI * (i / K - k))) / 2, r = j => (sHash(j, si * 17 + 9) - 0.5) * 2 * vol * 25; return r(k) * (1 - f) + r(k + 1) * f; };
+const STOCK_CAP = 300000;   // most a player may have in one stock (at today's price): the market is a side bet, not a money press
 function stockCandle(i, bias) {
   for (let si = 0; si < mkt.length; si++) {
-    const s = mkt[si], fair = Math.log(s.base) + 0.3 * Math.sin(i / 1700 + si * 2.1) + 0.12 * Math.sin(i / 370 + si);
-    const trend = (sHash(Math.floor(i / 160), si * 13 + 3) - 0.5) * s.vol * 0.35;
+    // v2 (from STOCK_V2): the fair value used to be the same big, regular wave for every stock (even the 'stable' bank swung ±35%
+    // every ~4 days, so buying the trough was free money) and prices snapped back to it hard (MOON dips were a sure bounce).
+    // Now the wave scales with each stock's volatility, wanders on a slow random level, and the pull back is gentle.
+    const s = mkt[si], v2 = i >= STOCK_V2, vol = v2 ? s.vol2 || s.vol : s.vol;
+    const fair = Math.log(s.base) + (v2 ? vol * 12 * (0.6 * Math.sin(i / 2300 + si * 2.1 + 0.8 * Math.sin(i / 5300 + si)) + 0.4 * Math.sin(i / 880 + si * 1.3)) + stockLevel(i, si, vol)
+      : 0.3 * Math.sin(i / 1700 + si * 2.1) + 0.12 * Math.sin(i / 370 + si));
+    const trend = (sHash(Math.floor(i / 160), si * 13 + 3) - 0.5) * vol * 0.35, pull = v2 ? 0.0006 : 0.004;
     const o = Math.exp(s.lp); let hi = o, lo = o;
     for (let k = 0; k < 5; k++) {
-      s.lp += 0.004 * (fair - s.lp) + (trend + (bias?.[si] || 0)) / 5 + s.vol / 2.236 * sGauss(i * 5 + k, si * 101);
+      s.lp += pull * (fair - s.lp) + (trend + (bias?.[si] || 0)) / 5 + vol / 2.236 * sGauss(i * 5 + k, si * 101);
       const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p);
     }
-    if (sHash(i, si * 31 + 5) < 0.003) { s.lp += (sHash(i, si * 31 + 6) < 0.5 ? -1 : 1) * s.vol * (4 + 4 * sHash(i, si * 31 + 7)); const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p); }   // news
+    if (sHash(i, si * 31 + 5) < 0.003) { s.lp += (sHash(i, si * 31 + 6) < 0.5 ? -1 : 1) * vol * (4 + 4 * sHash(i, si * 31 + 7)); const p = Math.exp(s.lp); hi = Math.max(hi, p); lo = Math.min(lo, p); }   // news
     s.lp = Math.max(Math.log(s.base * 0.12), Math.min(Math.log(s.base * 8), s.lp));
     const c = Math.exp(s.lp), v = Math.round(1000 * (0.5 + sHash(i, si * 57)) * (1 + Math.abs(Math.log(c / o)) * 60));
     s.hist.push([+o.toFixed(2), +hi.toFixed(2), +lo.toFixed(2), +c.toFixed(2), v]); if (s.hist.length > D.STOCK.keep) s.hist.shift();
@@ -1662,6 +1671,7 @@ function stockTrade(a, m) {
   const gross = p * q, fee = Math.max(D.STOCK.feeMin, Math.round(gross * D.STOCK.fee));
   a.stocks = { ...(a.stocks || {}) }; const cur = a.stocks[s.id] || [0, 0];
   if (m.op === 'buy') {
+    if ((cur[0] + q) * p > STOCK_CAP) return toast(a, `ถือหุ้นตัวเดียวได้ไม่เกิน ${money(STOCK_CAP)} (ซื้อ ${s.id} เพิ่มได้อีก ${Math.max(0, Math.floor(STOCK_CAP / p) - cur[0]).toLocaleString()} หุ้น)`, '📈', false);
     if (!pay(a, Math.ceil(gross) + fee)) return;
     a.stocks[s.id] = [cur[0] + q, +((cur[0] * cur[1] + gross) / (cur[0] + q)).toFixed(4)]; stat(a, 'trades');
     toast(a, `ซื้อ ${s.icon}${s.id} ${q.toLocaleString()} หุ้น @${p.toFixed(2)} รวม ${money(Math.ceil(gross) + fee)} (ค่าธรรมเนียม ${money(fee)})`, '📈');

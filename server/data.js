@@ -1077,7 +1077,7 @@ const STOCKS = [
   { id: 'SEAFD', name: 'ประมงทองคำ', icon: '🐟', base: 28, vol: 0.006, desc: 'ธุรกิจปลาและอาหารทะเล' },
   { id: 'RIDE', name: 'ส่งไวเดลิเวอรี่', icon: '🛵', base: 65, vol: 0.008, desc: 'ขึ้นแรงช่วงเทศกาลและคนหิว', ev: { festival: 0.004, hungry: 0.004 } },
   { id: 'FUEL', name: 'พลังงานไทย', icon: '⛽', base: 150, vol: 0.004, desc: 'ปั๊มน้ำมันและพลังงาน' },
-  { id: 'MOON', name: 'มูนคอยน์', icon: '🚀', base: 12, vol: 0.025, desc: 'เสี่ยงสูงมาก ขึ้นลงทีละหลายสิบ%' },
+  { id: 'MOON', name: 'มูนคอยน์', icon: '🚀', base: 12, vol: 0.025, vol2: 0.015, desc: 'เสี่ยงสูงมาก ขึ้นลงทีละหลายสิบ%' },
 ];
 const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeMin: 5, keep: 240 };
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
