@@ -1461,6 +1461,28 @@ function tradePrices(a) {
   return out;
 }
 // ⚡ energy history for the admins (last hour, in memory): what used it and where it came back from
+// 🛡️ silent cheat watch: suspicious events are only counted (nobody is told, nothing is announced); admins review them in God
+// mode (player card + "ผู้เล่นน่าสงสัย" list). Speed / wall / distance cheats are already refused by the server; this keeps the evidence.
+const SUS_W = { speed: 1, wall: 2, far: 1, flood: 3, bot: 6, doc: 10 };
+const SUS_NM = { speed: 'เดินเร็วเกิน', wall: 'ทะลุกำแพง', far: 'กดจากระยะไกล', flood: 'ส่งคำสั่งรัว', bot: 'จังหวะกดเหมือนบอท', doc: 'หมอตอบเร็ว/ถูกผิดปกติ' };
+function sus(a, kind) {
+  const t = now(), L = a.susL || (a.susL = []), last = L[L.length - 1];
+  if (last && last[1] === kind && t - last[0] < 60000) last[2]++; else L.push([t, kind, 1]);   // one row a minute per kind
+  while (L.length && t - L[0][0] > 7 * 86400e3) L.shift(); if (L.length > 400) L.shift(); a.sd = true;
+}
+function susSum(a) {   // the last 24 h: counts per kind and a weighted score (a few speed/far hits are normal lag)
+  const by = {}; for (const [t, k, n] of a.susL || []) if (now() - t < 86400e3) by[k] = (by[k] || 0) + n;
+  if (docFlag(a)?.sus) by.doc = 1;
+  const score = Object.entries(by).reduce((s0, [k, n]) => s0 + (SUS_W[k] || 1) * (k === 'speed' || k === 'far' ? Math.max(0, n - 20) : n), 0);
+  return { score, rows: Object.entries(by).map(([k, n]) => [SUS_NM[k] || k, n]) };
+}
+// robot timing: a person never taps at exactly the same rhythm; 15 actions in a row with almost no jitter is a script
+function botBeat(a) {
+  const t = now(), T = a.beat || (a.beat = []); T.push(t); if (T.length > 16) T.shift();
+  if (T.length < 16 || t - T[0] > 120000) return;
+  const g = T.slice(1).map((x, i) => x - T[i]), mean = g.reduce((p, q) => p + q, 0) / g.length, sd = Math.sqrt(g.reduce((p, q) => p + (q - mean) ** 2, 0) / g.length);
+  if (mean > 300 && sd < 25) { sus(a, 'bot'); a.beat = []; }
+}
 function enLog(a, d, why) {
   if (!d) return; const t = now(), L = a.enLog || (a.enLog = []);
   const last = L[L.length - 1]; if (last && last[2] === why && t - last[0] < 60000) { last[1] += d; last[3]++; return; }   // one row a minute per reason
@@ -1553,7 +1575,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -2459,7 +2481,7 @@ function act(a, m) {
   if (!s && m.st === 'water') { if (a.cast) { a.cast = null; markMe(a); } return toast(a, 'ต้องยืนติดริมน้ำก่อนถึงจะตกปลาได้', '🎣', false); }
   if (!s) return;
   if (a.down) return toast(a, 'คุณหมดสติอยู่ ทำอะไรไม่ได้', '💤', false);
-  if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
+  if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) { sus(a, 'far'); return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false); }
   const h = hourNow();
   if (!D.isOpen(s.type, h) && !(s.type === 'restaurant' && m.a === 'pickup')) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
   const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
@@ -4994,7 +5016,8 @@ function move(a, m) {
   const d = Math.hypot(x - a.x, y - a.y);
   const swim = a.pose === 'fun' && a.fun?.k === 'pool';
   const trapped = d > 0.01 && D.blocked(a.x, a.y, D.RADIUS - 0.04) && !D.blocked(x, y, D.RADIUS - 0.04) && D.areaAt(x, y)?.id === D.areaAt(a.x, a.y)?.id && !swim;   // standing inside a wall margin (a bad seat spot): any step out to open ground is allowed
-  if (d > a.mvb + 0.05 || (swim ? !inPoolWater(x, y) : !trapped && !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && !nearPool(a.x, a.y))) return place(a, a.x, a.y);
+  if (d > a.mvb + 0.05) { if (d > a.mvb + 1.5) sus(a, 'speed'); return place(a, a.x, a.y); }   // (small overshoots are phone lag: only clear jumps are counted)
+  if ((swim ? !inPoolWater(x, y) : !trapped && !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && !nearPool(a.x, a.y))) { if (!swim && d > 1.2) sus(a, 'wall'); return place(a, a.x, a.y); }
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper' && !swim) standUp(a);   // (bumper cars are driven, swimmers swim: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
@@ -5031,6 +5054,7 @@ function onMessage0(ws, raw) {
   if (m.t === 'login') { if (!a) login(ws, m); return; }
   if (!a || a.ws !== ws) return;
   godTop(a);
+  if (m.t === 'act' && !isAdmin(a)) botBeat(a);
   a.ledCtx = ledLabel(a, m);
   switch (m.t) {
     case 'p': return move(a, m);
@@ -5446,12 +5470,16 @@ function bugReport(a, m) {
 function godAct(a, m) {
   if (!isAdmin(a)) return;
   a.god = a.god || {};
+  if (m.op === 'suslist') {                 // 🛡️ the players the cheat watch counted the most against in the last day
+    const hits = [...accounts.values()].filter(x => x.login && (x.susL?.length || docFlag(x)?.sus)).map(x => [x, susSum(x).score]).filter(([, sc]) => sc >= 5).sort((p, q) => q[1] - p[1]).slice(0, 15).map(([x]) => x.login.toLowerCase());
+    return godAct(a, { op: 'find', q: '', list: hits });
+  }
   if (m.op === 'find') {                    // look a player up by login ID, display name or phone number
-    const q = String(m.q || '').trim().toLowerCase(); if (q.length < 2) return toast(a, 'พิมพ์อย่างน้อย 2 ตัวอักษร', '🔎', false);
-    const hits = [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
+    const q = m.list ? '🚩 ผู้เล่นน่าสงสัย' : String(m.q || '').trim().toLowerCase(); if (!m.list && q.length < 2) return toast(a, 'พิมพ์อย่างน้อย 2 ตัวอักษร', '🔎', false);
+    const hits = m.list ? m.list.map(l => accounts.get(l)).filter(Boolean) : [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
     return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
-      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x) })) });
+      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x) })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
@@ -6025,7 +6053,7 @@ wss.on('connection', (ws, req) => {
   ws.on('message', raw => {
     const t = now();
     if (t - winStart > 1000) { winStart = t; count = 0; }
-    if (++count > 60) return;
+    if (++count > 60) { if (count === 61 && ws.acct) sus(ws.acct, 'flood'); return; }
     const str = raw.toString();
     if (str.length > 4096 && !str.startsWith('{"t":"pic"') && !str.startsWith('{"t":"idea","op":"post"')) return;   // only a profile photo may be large
     onMessage(ws, str);
