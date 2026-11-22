@@ -993,7 +993,7 @@ const quitAsk = (txt, go) => popup(txt, [['ยกเลิกเลย', 'warn',
 $('#dogChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const q = me?.dogq; if (q) quitAsk(q.kind === 'thief' ? `ยกเลิกเคสจับโจร "${esc(q.name)}"?` : `ยกเลิกเคสตามหาน้อง${esc(q.name)}?`, () => send({ t: 'questquit' })); }, true);
 $('#misChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const m = me?.mis; if (m) quitAsk(`ยกเลิกภารกิจ "${esc(m.title)}"?`, () => send({ t: 'mission', op: 'quit' })); }, true);
 $('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
-$('#miniWrap').appendChild($('#cbOn')); $('#cbOn').onclick = e => { e.stopPropagation(); openPanel({ kind: 'friends' }); };
+{ const mq = matchMedia('(max-width:600px)'), put = () => mq.matches ? $('#miniWrap').after($('#cbOn')) : $('#miniWrap').appendChild($('#cbOn')); put(); mq.addEventListener?.('change', put); }   // on the minimap; under it on phones $('#cbOn').onclick = e => { e.stopPropagation(); openPanel({ kind: 'friends' }); };
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -5605,6 +5605,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25f', d: '22 พ.ย.', items: [
+    '🪑 ม้านั่งในจัตุรัสกลางเมืองเป็นม้านั่งไม้ทั้งหมด',
+    '🟢 บนมือถือ จำนวนคนออนไลน์อยู่ใต้แผนที่เล็ก',
+  ] },
   { v: '2026-11-25e', d: '22 พ.ย.', items: [
     '🌱 ปลูกผักแบบใหม่! ยืนข้างแปลงดินในสวนบ้าน จะมีปุ่มหกเหลี่ยมรอบตัว: เก็บ · รดน้ำ · ปลูก (พืชที่ปลูกล่าสุด) · เลือกพืช พร้อมการ์ดข้อมูลแปลง (สถานะ เวลาที่เหลือ น้ำ อากาศ ผลผลิต)',
     '🏷️ ป้ายลอยบนแปลง บอกชื่อพืชและสถานะ (✅ เก็บได้ · 💧 ต้องรดน้ำ · ⏳ เวลาที่เหลือ) ซ่อนได้ด้วยปุ่ม ซ่อนป้าย',

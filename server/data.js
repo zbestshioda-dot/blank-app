@@ -2083,7 +2083,7 @@ const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: '�
   const at = (x, y) => gone.find(g => Math.abs(g.x - x) < .4 && Math.abs(g.y - y) < .4);
   const used = new Set(), take = (x, y) => { const g = at(x, y); if (g) used.add(g); return g?.ids || []; };
   bench('wood', 'f', 44.6, 30.1, take(44.6, 29.95)); bench('wood', 'f', 55.4, 30.1, take(55.4, 29.95));     // the square: north side looks down at the fountain
-  bench('stone', 'b', 44.6, 36.3, take(44.6, 35.95)); bench('stone', 'b', 55.4, 36.3, take(55.4, 35.95));   // south side: their backs to us, facing it
+  bench('wood', 'b', 44.6, 36.3, take(44.6, 35.95)); bench('wood', 'b', 55.4, 36.3, take(55.4, 35.95));   // south side: their backs to us, facing it
   bench('wood', 'r', 52.4, 61.9, [...take(52.6, 58.2), ...take(52.6, 61.2)]); bench('wood', 'l', 60.8, 61.9);   // fountain square: both sides face the fountain
   take(59, 56.9);                                                                                              // (taken out)
   bench('wood', 'f', 62.6, 44.4, take(62.6, 44.2)); bench('wood', 'f', 74.6, 45.8, take(74.6, 45.6)); take(72, 47); bench('stone', 'f', 80.5, 41.4, take(80.5, 41.2)); take(86.5, 40);   // east park
