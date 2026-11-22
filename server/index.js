@@ -3755,6 +3755,97 @@ function misTick(a, t, dt) {
   }
   if (live && t > m.mtAt) { m.mtAt = t + 200; send(a, { t: 'mt', k: c.k, prog: c.prog, cx: c.cx, cy: c.cy, fx: c.fx, fy: c.fy, wait: c.wait ? 1 : 0, phase: c.phase }); }
 }
+// ---- 🕵️ detective: "who did it?" — a generated case in town. Suspects (townsfolk standing around town) differ in gender,
+// shirt, hair and trouser colours you can see on them; clue spots each reveal one trait of the culprit; the culprit lies
+// about where they were, and the CCTV clue shows that place was empty. Name the culprit on the case board.
+const DET = {
+  shirt: [['แดง', '#e0645a'], ['น้ำเงิน', '#3f6fd0'], ['เขียว', '#6cbf5a'], ['เหลือง', '#f0cf4a'], ['ม่วง', '#9a6ad0'], ['ขาว', '#f2f2f2']],
+  hair: [['ดำ', '#2a2420'], ['น้ำตาล', '#6e4528'], ['ทอง', '#e3c06a'], ['แดง', '#b2452c']],
+  pants: [['เทา', '#9a9a9a'], ['ดำ', '#2e2e33'], ['น้ำเงิน', '#3a4f8a'], ['น้ำตาล', '#7a5534']],
+  names: { m: ['นายเก่ง', 'นายต้น', 'ลุงชาญ', 'นายบอย', 'นายโอ๊ต', 'พี่หนุ่ม', 'นายเบียร์', 'นายเอก', 'พี่ปอนด์', 'นายภูมิ'], f: ['นางสาวเมย์', 'ป้าแดง', 'คุณจิ๋ว', 'นางสาวฝน', 'คุณแพรว', 'ป้าศรี', 'นางสาวมิ้นท์', 'คุณนก', 'พี่แอน', 'นางสาวปลา'] },
+  places: ['ร้านอาหาร', 'ธนาคาร', 'ตลาดกลาง', 'โรงเรียน', 'ร้านสะดวกซื้อ', 'สมาคมประมง', 'วัด', 'สวนสนุก', 'ร้านตัดผม', 'โรงพยาบาล'],
+  crimes: [['สร้อยเพชรหายจากธนาคาร', '💎', 'door_bank'], ['กระเป๋าเงินแม่ค้าถูกขโมยที่ตลาด', '👛', 'market'], ['ขโมยเค้กวันเกิดจากร้านอาหาร', '🎂', 'door_restaurant'],
+    ['รถจักรยานหายหน้าโรงเรียน', '🚲', 'door_school'], ['ตู้ปลาร้านสัตว์เลี้ยงถูกงัด', '🐠', 'door_pet1'], ['ขโมยดอกไม้ประกวดจากร้านต้นไม้', '🌷', 'door_flower'],
+    ['เงินบริจาคหายจากจัตุรัส', '🪙', 'square'], ['ใครแอบกินไอติมทั้งตู้ที่ร้านสะดวกซื้อ', '🍦', 'door_cstore']],
+  limit: 7 * 60e3, cd: 20e3,
+};
+const detTrait = (k, v, g) => k === 'g' ? (v === 'f' ? '👣 รอยรองเท้าส้นสูงขนาดเล็ก (คนร้ายเป็นผู้หญิง)' : '👣 รอยรองเท้าผ้าใบขนาดใหญ่ (คนร้ายเป็นผู้ชาย)')
+  : k === 'shirt' ? `🧵 เศษผ้าเสื้อสี${DET.shirt[v][0]}เกี่ยวติดรั้ว` : k === 'hair' ? `💇 เส้นผมสี${DET.hair[v][0]}ตกอยู่ที่พื้น` : `👖 ขุยผ้ากางเกงสี${DET.pants[v][0]}ติดอยู่ที่ม้านั่ง`;
+function detView(a) {
+  const c = a.case; if (!c) return null;
+  return { title: c.title, icon: c.icon, t0: c.t0, until: c.until, scene: c.scene,
+    sus: c.sus.map(q => ({ name: q.name, g: q.g, lk: q.lk, x: q.x, y: q.y, desc: q.desc, said: q.said || '' })),
+    clues: c.clues.map(q => ({ x: q.x, y: q.y, icon: q.icon, found: !!q.found, text: q.found ? q.text : '' })) };
+}
+function detBuild(a) {
+  const L = lvl(a), N = L >= 5 ? 6 : L >= 3 ? 5 : 4, r = n => Math.floor(Math.random() * n);
+  const [title, icon, at] = pick(DET.crimes), st = ST[at] || ST.square, A = D.AREAS.find(q => q.id === 'town');
+  const culprit = { g: pick(['m', 'f']), shirt: r(DET.shirt.length), hair: r(DET.hair.length), pants: r(DET.pants.length) }, sus = [culprit];
+  const same = (p, q) => p.g === q.g && p.shirt === q.shirt && p.hair === q.hair && p.pants === q.pants;
+  while (sus.length < N) {   // look-alikes: each trait copies the culprit's half the time, but nobody matches them on everything
+    const q = { g: Math.random() < .5 ? culprit.g : pick(['m', 'f']), shirt: Math.random() < .5 ? culprit.shirt : r(DET.shirt.length), hair: Math.random() < .5 ? culprit.hair : r(DET.hair.length), pants: Math.random() < .5 ? culprit.pants : r(DET.pants.length) };
+    if (!sus.some(p => same(p, q))) sus.push(q);
+  }
+  sus.sort(() => Math.random() - .5);
+  const ci = sus.indexOf(culprit), places = [...DET.places].sort(() => Math.random() - .5), used = new Set();
+  // clues: traits of the culprit that rule others out, until two or fewer remain (the alibi settles it)
+  let left = sus.map((_, i) => i); const traits = [];
+  for (const k of ['g', 'shirt', 'hair', 'pants'].sort(() => Math.random() - .5)) {
+    if (left.length <= (Math.random() < .5 ? 1 : 2)) break;
+    const keep = left.filter(i => sus[i][k] === culprit[k]); if (keep.length < left.length) { traits.push(k); left = keep; }
+  }
+  // where the suspects stand: spread over town, away from each other
+  const pool = reachFrom(st.x, st.y, 8, 70, 6).filter(([x, y]) => !D.blocked(x + .5, y + .5, .4)).sort(() => Math.random() - .5), spots = [];
+  for (const p of pool) { if (spots.length >= N + traits.length + 1) break; if (spots.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) > 7)) spots.push(p); }
+  while (spots.length < N + traits.length + 1) spots.push(pool[spots.length] || [Math.floor(st.x), Math.floor(st.y) + 2]);
+  const names = { m: [...DET.names.m].sort(() => Math.random() - .5), f: [...DET.names.f].sort(() => Math.random() - .5) };
+  const S = sus.map((q, i) => {
+    const name = names[q.g].pop(), place = places[i];
+    return { ...q, name, place, liar: i === ci, x: spots[i][0] + .5, y: spots[i][1] + .5,
+      lk: { shirt: DET.shirt[q.shirt][1], hair: DET.hair[q.hair][1], pants: DET.pants[q.pants][1] },
+      desc: `${q.g === 'f' ? 'ผู้หญิง' : 'ผู้ชาย'} · เสื้อ${DET.shirt[q.shirt][0]} · ผม${DET.hair[q.hair][0]} · กางเกง${DET.pants[q.pants][0]}` };
+  });
+  const clues = traits.map((k, j) => ({ k, icon: { g: '👣', shirt: '🧵', hair: '💇', pants: '👖' }[k], text: detTrait(k, culprit[k]), x: spots[N + j][0] + .5, y: spots[N + j][1] + .5 }));
+  const cam = spots[N + traits.length];
+  clues.push({ k: 'cctv', icon: '📹', text: `📹 กล้องวงจรปิดแถว${S[ci].place}: ช่วงเกิดเหตุไม่มีใครอยู่ที่นั่นเลย`, x: cam[0] + .5, y: cam[1] + .5 });
+  return { title, icon, scene: st.label, t0: now(), until: now() + DET.limit, ci, sus: S, clues };
+}
+function detAct(a, m) {
+  const t = now();
+  if (m.op === 'start') {
+    if (a.career !== 'detective') return toast(a, 'ต้องเป็นนักสืบเอกชนก่อน ถึงจะรับคดีได้', '🕵️', false);
+    if (a.case) return toast(a, 'คุณมีคดีที่ยังไม่ปิดอยู่ ดูได้ที่กระดานสืบสวน', '🗂️', false);
+    if (a.mis) return toast(a, 'ทำภารกิจที่ค้างอยู่ให้เสร็จก่อน', '📋', false);
+    const st = ST.staff_detective; if (!st || areaId(a) !== st.area || Math.hypot(a.x - st.x, a.y - st.y) > 4) return toast(a, 'รับคดีได้ที่ผู้กองเดชในหอสมุดเมือง', '🕵️', false);
+    if ((a.detNext || 0) > t && !(isAdmin(a) && a.god?.nocd)) return toast(a, `ผู้กองยังไม่มีคดีใหม่ รออีก ${Math.ceil((a.detNext - t) / 1000)} วินาที`, '⏳', false);
+    if (a.down || !spend(a, 8)) return;
+    a.case = detBuild(a); markMe(a);
+    return toast(a, `${a.case.icon} คดีใหม่: ${a.case.title}! ผู้ต้องสงสัย ${a.case.sus.length} คนอยู่ในเมือง · เก็บเบาะแส ${a.case.clues.length} จุด สอบปากคำ แล้วชี้ตัวคนร้ายที่กระดานสืบสวน (7 นาที)`, '🕵️');
+  }
+  const c = a.case; if (!c) return;
+  if (t > c.until) { a.case = null; a.detNext = t + DET.cd; markMe(a); return toast(a, '⏰ หมดเวลา! คนร้ายหนีไปได้ คดีนี้ปิดไม่สำเร็จ', '🕵️', false); }
+  if (m.op === 'quit') { a.case = null; a.detNext = t + DET.cd; markMe(a); return toast(a, 'ส่งคดีคืนผู้กองแล้ว', 'ℹ️', false); }
+  if (m.op === 'ask') {
+    const q = c.sus[+m.i]; if (!q || areaId(a) !== 'town' || Math.hypot(a.x - q.x, a.y - q.y) > 2.4) return;
+    q.said = q.said || `ตอนเกิดเหตุ${q.g === 'f' ? 'ฉัน' : 'ผม'}อยู่ที่${q.place}${pick([' มีคนเห็นด้วยนะ', ' ไปทำธุระอยู่', ' ถามคนที่นั่นได้เลย', ' ทั้งช่วงเลย', ' ไม่ได้ไปไหนเลย'])}`;   // the culprit lies in the same tone
+    markMe(a); return send(a, { t: 'detsay', i: +m.i, name: q.name, g: q.g, lk: q.lk, say: q.said });
+  }
+  if (m.op === 'clue') {
+    const q = c.clues[+m.i]; if (!q || q.found || areaId(a) !== 'town' || Math.hypot(a.x - q.x, a.y - q.y) > 2) return;
+    q.found = true; FX0(a, 'pick'); markMe(a); return toast(a, `🔎 เจอเบาะแส! ${q.text}`, '🔎');
+  }
+  if (m.op === 'accuse') {
+    const i = +m.i; if (!c.sus[i]) return;
+    a.case = null; a.detNext = t + DET.cd;
+    if (i !== c.ci) { joy(a, -3); markMe(a); return toast(a, `❌ จับผิดตัว! ${c.sus[i].name} มีพยานยืนยัน ส่วนคนร้ายตัวจริงคือ ${c.sus[c.ci].name} (${c.sus[c.ci].desc}) หนีไปแล้ว`, '🕵️', false); }
+    const left = Math.max(0, (c.until - t) / DET.limit), N = c.sus.length;
+    const pay = Math.round((120 + 30 * N) * (1 + .4 * left) * jobPay(a) * (1 + (BOOST[tier(a, 'detective')] || 0)));
+    a.cases = [...(a.cases || []), { t: c.title, i: c.icon, d: t, c: [...c.clues.filter(q => q.found).map(q => q.text.replace(/\s*\(.*\)$/, '')), `คนร้าย: ${c.sus[c.ci].name}`].slice(0, 5) }].slice(-40);
+    quest(a, 'job_detective'); stat(a, 'missions'); earn(a, pay); addXp(a, 2); joy(a, 8); markMe(a);
+    feed(`🕵️ นักสืบ${a.name} ปิดคดี "${c.title}" จับ${c.sus[c.ci].name}ได้สำเร็จ`);
+    return toast(a, `✅ ปิดคดีสำเร็จ! คนร้ายคือ ${c.sus[c.ci].name} จริงๆ · ใช้เวลา ${Math.round((t - c.t0) / 1000)} วิ · ค่าจ้าง ${money(pay)}`, '🏅');
+  }
+}
 function misAct(a, m) {
   if (m.op === 'start') {
     const car = allJobs(a) && MIS.M[m.car] ? m.car : a.career;
@@ -4334,7 +4425,7 @@ function meView(a) {
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
-    jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
+    jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], case: detView(a), detAt: a.detNext || 0, stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
   };
 }
@@ -4919,6 +5010,7 @@ function onMessage0(ws, raw) {
     }
     case 'decor': { a.decor = m.on && inOwnHome(a) ? 1 : 0; return; }
     case 'mission': return misAct(a, m);
+    case 'det': return detAct(a, m);
     case 'wwskill': return wwSkill(a, m);
     case 'rb': return rbAct(a, m);
     case 'rbseek': { if (a.career !== 'rider' && !allJobs(a)) return; if (a.rival || a.rb) return toast(a, 'มีไรเดอร์ส้มอยู่แล้ว ตามจุดสีส้มบนมินิแมพ', '🧡', false); if (now() < (a.rbSeekAt || 0)) return toast(a, `ยังไม่มีข่าว รออีก ${Math.ceil((a.rbSeekAt - now()) / 1000)} วินาที`, '⏳', false); a.rbSeekAt = now() + 60000; if (!rivalSpawn(a, 1)) toast(a, 'ออกไปข้างนอกในตัวเมืองก่อนนะ', '🏙️', false); return; }
@@ -5361,6 +5453,7 @@ function tick() {
   for (const a of online.values()) {
     const indoors = !!D.roomAt(a.x, a.y);
     if (a.mis) misTick(a, t, dt);
+    if (a.case && t > a.case.until) { a.case = null; a.detNext = t + DET.cd; markMe(a); toast(a, '⏰ หมดเวลา! คนร้ายหนีไปได้ คดีนี้ปิดไม่สำเร็จ', '🕵️', false); }
     if (a.cook) cookTick(a, t, dt);
     if (a.auc) aucTick(a, t);
     if (a.career === 'rider' || a.rival) rivalTick(a, t);

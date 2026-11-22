@@ -814,6 +814,7 @@ function handle(m) {
     case 'rbfx': FX.play('notice'); if (navigator.vibrate) navigator.vibrate([40, 40, 40]); break;
     case 'afx': if (m.kind === 'gavel') { FX.play('ding'); } else if (m.kind === 'bid') FX.play('pop'); else if (m.kind === 'win') { FX.play('coin', true); FX.play('levelup'); } else if (m.kind === 'lose') FX.play('fail'); else FX.play('notice'); if (panel?.kind === 'warehouse') refreshPanel(true); break;
     case 'mq': misAsk(m); break;
+    case 'detsay': DETP['dets' + m.i] && (MISNPC = DETP['dets' + m.i]); dialog({ name: `${m.name} (ผู้ต้องสงสัย)`, npc: 'misnpc', lines: [m.say], choices: [{ label: '🗂️ เปิดกระดานสืบสวน', fn: () => { dialogClose(); openPanel({ kind: 'detcase' }); } }, { label: '👋 ขอบคุณ', fn: dialogClose }] }); break;
     case 'mfx': if (m.kind === 'pick') { FX.play('pop'); } else if (m.kind === 'catch') { FX.play('pet', ['squeak', 1]); FX.play('chime'); } else FX.play('ding'); if (navigator.vibrate) navigator.vibrate(25); break;
     case 'req': showReq(m); break;
     case 'ring': showRing(m); break;
@@ -991,7 +992,7 @@ function paintDogChip() {
 setInterval(paintDogChip, 500);
 const quitAsk = (txt, go) => popup(txt, [['ยกเลิกเลย', 'warn', go], ['ทำต่อ', 'good', () => { }]], 10000);
 $('#dogChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const q = me?.dogq; if (q) quitAsk(q.kind === 'thief' ? `ยกเลิกเคสจับโจร "${esc(q.name)}"?` : `ยกเลิกเคสตามหาน้อง${esc(q.name)}?`, () => send({ t: 'questquit' })); }, true);
-$('#misChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const m = me?.mis; if (m) quitAsk(`ยกเลิกภารกิจ "${esc(m.title)}"?`, () => send({ t: 'mission', op: 'quit' })); }, true);
+$('#misChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); if (me?.case && !me.mis) return quitAsk('ส่งคดีนี้คืนผู้กอง? (คดีจะปิดไม่สำเร็จ)', () => send({ t: 'det', op: 'quit' })); const m = me?.mis; if (m) quitAsk(`ยกเลิกภารกิจ "${esc(m.title)}"?`, () => send({ t: 'mission', op: 'quit' })); }, true);
 $('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
 { const mq = matchMedia('(max-width:600px), (max-height:520px) and (orientation:landscape)'), put = () => mq.matches ? $('#miniWrap').after($('#cbOn')) : $('#miniWrap').appendChild($('#cbOn')); put(); mq.addEventListener?.('change', put); }   // on the minimap; under it on phones $('#cbOn').onclick = e => { e.stopPropagation(); openPanel({ kind: 'friends' }); };
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
@@ -1569,6 +1570,10 @@ function findNear() {
     const d = Math.hypot(s.x - m.x, s.y - m.y);
     if (d <= s.r && d < bd) { bd = d; best = s; }
   }
+  if (me?.case && here === 'town') {   // 🕵️ question a suspect / pick up a clue
+    me.case.sus.forEach((q, i) => { const d = Math.hypot(q.x - m.x, q.y - m.y); if (d <= 2 && d < bd) { bd = d; best = { id: 'dets' + i, type: 'dets', i, icon: '🗣️', label: `สอบปากคำ ${q.name}`, x: q.x, y: q.y, r: 2, area: here }; } });
+    me.case.clues.forEach((q, i) => { const d = Math.hypot(q.x - m.x, q.y - m.y); if (!q.found && d <= 1.6 && d < bd + .5) { bd = d; best = { id: 'detc' + i, type: 'detc', i, icon: '🔎', label: 'ตรวจเบาะแส', x: q.x, y: q.y, r: 1.6, area: here }; } });
+  }
   // ☂️ the umbrella man (only around while it rains): a yellow ring and the action button talk to him
   for (const p of P.values()) if (p.umb && p.npc) { const d = Math.hypot(p.x - m.x, p.y - m.y); if (d <= 1.8 && d < bd) { bd = d; best = { id: 'umbman', type: 'umb', npc: p, label: 'คุยกับลุงชัย (ซื้อร่ม)', icon: '☂️', x: p.x, y: p.y, r: 1.8, area: here }; } }
   if (here === 'town' && FBALL && zoneOf(m.x, m.y) === 'field') { const d = Math.hypot(FBALL.rx - m.x, FBALL.ry - (m.y - .1)); if (d <= 1.25 && d < bd + .6) { bd = d; best = { id: 'fbball', type: 'ball', icon: '⚽', label: '⚽ เตะ!' }; } }   // ⚽ near the ball: the action button kicks it
@@ -1628,6 +1633,8 @@ function onAction() {
     return strike();
   }
   if (near.type === 'umb') return talkToTown(near.npc);
+  if (near.type === 'dets') { if (t < actCd) return; actCd = t + 800; return send({ t: 'det', op: 'ask', i: near.i }); }
+  if (near.type === 'detc') { if (t < actCd) return; actCd = t + 800; return send({ t: 'det', op: 'clue', i: near.i }); }
   if (near.type === 'note') return dialog({ name: near.label, face: null, lines: [near.text], choices: [{ label: '👌 โอเค', fn: dialogClose }] });   // a plain readable sign
   if (near.type === 'wish' || near.type === 'secret') { if (t < actCd) return; actCd = t + 900; return doAct(near.id, near.type === 'wish' ? 'toss' : 'read'); }
   if (panel?.st === near.id) { closePanel(); return; }
@@ -1843,7 +1850,7 @@ function draw(t) {
   for (const p of P.values()) { const q = p.pt && PETST.get(p.id); if (q && vis(q.x, q.y, 3) && !roomOf(p.x, p.y)) ents.push([q.y + .3, 6, q]); }   // pets wait outside: none indoors
   { const q = lostDog(); if (q && vis(q.x, q.y, 3)) ents.push([q.y + .3, 6, q]); }
   { const q = thiefNpc(); if (q && vis(q.rx, q.ry, 3)) ents.push([q.ry + .3, 4, q]); }
-  misEnts(ents, vis);
+  misEnts(ents, vis); detEnts(ents, vis);
   if (me?.alms) me.alms.pts.forEach((q, i) => { if (!me.alms.got[i] && vis(q[0], q[1], 4)) ents.push([q[1] + .2, 7, { k: 'beacon', x: q[0], y: q[1] }]); });   // 🙏 alms stops
   rivalEnts(ents, vis);
   if (me?.cook && myRoom?.rk === 'kitchen') ents.push([1e8, 7, { k: 'cook' }]);
@@ -2394,6 +2401,13 @@ function misBox() {
 function paintMisChip() {
   document.querySelectorAll('.auccd').forEach(el => { const l = Math.max(0, Math.ceil((+el.dataset.t - Date.now() - clockOff) / 1000)); el.textContent = l ? `${l} วินาที` : 'ปิดรับซอง!'; });
   const c = $('#misChip'), m = me?.mis;
+  if (!m && me?.case) {   // 🕵️ a detective case: title, clues found and the clock; tapping opens the case board
+    const k = me.case, l = Math.max(0, Math.ceil((k.until - Date.now() - clockOff) / 1000)), tm = `${Math.floor(l / 60)}:${String(l % 60).padStart(2, '0')}`;
+    c.classList.remove('hidden'); c.classList.toggle('late', l < 45);
+    const html = `${esc(`🗂️ ${k.title} · เบาะแส ${k.clues.filter(q => q.found).length}/${k.clues.length} · ${tm}`)}<span class="chipX">✕</span>`; if (c.innerHTML !== html) c.innerHTML = html;
+    document.querySelectorAll('.miscd').forEach(el => { el.textContent = tm; });
+    return;
+  }
   if (!m) { if (!cookChip()) c.classList.add('hidden'); return; }
   const left = Math.max(0, Math.ceil((m.until - Date.now() - clockOff) / 1000)), tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   const cur = m.cur; let extra = '';
@@ -2405,13 +2419,25 @@ function paintMisChip() {
   document.querySelectorAll('.miscd').forEach(el => { el.textContent = tm; });
 }
 setInterval(paintMisChip, 250);
-$('#misChip').onclick = () => { if (me?.cook && !me.mis) return toast('ทำทีละขั้น: 🧺 หยิบวัตถุดิบ → 🔪 สับ / 🍳 ผัด (ยืนทำ) → 🍲 ต้ม / 🔥 ย่าง (สุกเองแต่อย่าปล่อยนาน!) → 🍽️ วางจัดจาน → 🛎️ ยกไปเสิร์ฟที่เคาน์เตอร์ด้านบน', '🍳'); openPanel({ kind: me?.mis?.kind === 'icu' ? 'icu' : 'career', st: me?.mis?.kind === 'icu' ? 'icu' : undefined }); };
+$('#misChip').onclick = () => { if (me?.case && !me.mis) return openPanel({ kind: 'detcase' }); if (me?.cook && !me.mis) return toast('ทำทีละขั้น: 🧺 หยิบวัตถุดิบ → 🔪 สับ / 🍳 ผัด (ยืนทำ) → 🍲 ต้ม / 🔥 ย่าง (สุกเองแต่อย่าปล่อยนาน!) → 🍽️ วางจัดจาน → 🛎️ ยกไปเสิร์ฟที่เคาน์เตอร์ด้านบน', '🍳'); openPanel({ kind: me?.mis?.kind === 'icu' ? 'icu' : 'career', st: me?.mis?.kind === 'icu' ? 'icu' : undefined }); };
 function misAsk(m) {
   MISNPC = misPerson(m.who, 0, 0);
   dialog({ name: m.who.name, npc: 'misnpc', lines: [m.q], choices: m.ans.map((a, i) => ({ label: a, fn: () => { dialogClose(); send({ t: 'mission', op: 'answer', i }); } })) });
 }
 function misPerson(w, x, y) { return { id: 'misnpc', staff: 1, career: '', c: '', of: '', g: w.g, lk: w.lk, name: w.name, short: w.name, x, y, rx: x, ry: y, f: 6, dz: [], kid: w.kid }; }
 const misAnim = {};
+// 🕵️ the detective case in town: suspects stand at their spots, unfound clues glow (seen from up close)
+const DETP = {};
+function detEnts(ents, vis) {
+  const k = me?.case, P0 = P.get(myId); if (!k || !P0 || areaOf(P0.x, P0.y)?.id !== 'town') return;
+  k.sus.forEach((q, i) => {
+    const id = 'dets' + i; let n = DETP[id];
+    if (!n || n.name !== q.name) n = DETP[id] = { ...misPerson({ g: q.g, lk: q.lk, name: q.name }, q.x, q.y), id: 'misnpc' };
+    n.x = n.rx = q.x; n.y = n.ry = q.y; n.f = (Math.floor(performance.now() / 4000) + i) % 2 ? 6 : 2;
+    if (vis(q.x, q.y, 3)) { ents.push([q.y + .3, 4, n]); ents.push([q.y + .31, 7, { k: 'mark', x: q.x, y: q.y, ph: q.said ? 1 : 0 }]); }
+  });
+  k.clues.forEach(q => { if (!q.found && Math.hypot(P0.rx - q.x, P0.ry - q.y) < 9) ents.push([1e7 + q.y, 7, { k: 'item', x: q.x, y: q.y, icon: q.icon, glow: 1 }]); });
+}
 function misEnts(ents, vis) {
   const m = me?.mis, c = m?.cur, P0 = P.get(myId);
   if (!c || !P0 || areaOf(P0.x, P0.y)?.id !== (c.area || 'town')) { MISNPC = null; return; }
@@ -4011,8 +4037,12 @@ function socHead(k) {
   const grp = k === 'career' ? `<div class="fbGrp"><b>💼 กลุ่มหางาน เมืองชีวิต</b><small>🌐 กลุ่มสาธารณะ · เลือกอาชีพที่ใช่ แล้วไปสมัครที่สถานที่ทำงานได้เลย</small></div>` : '';
   return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug' || k === 'gidea')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}${t(`🔔 แจ้งเตือน${lbUnread() ? ` <em class="lbB">${lbUnread()}</em>` : ''}`, 'noti', k === 'noti')}</div>${sub}${grp}`;
 }
+const DETX = new Set();   // 🕵️ suspects crossed out on the case board (this device only)
 function bindPanel(root) {
   bindStocks(root); bindWall(root); bindPay(root);
+  root.querySelectorAll('[data-detx]').forEach(b => b.onclick = () => { const i = +b.dataset.detx; DETX.has(i) ? DETX.delete(i) : DETX.add(i); FX.play('click'); refreshPanel(); });
+  root.querySelectorAll('[data-detnav]').forEach(b => b.onclick = () => { const [x, y] = b.dataset.detnav.split(',').map(Number); closePanel(); guide = { x, y, area: 'town', label: b.dataset.label, mis: 1 }; autoNav = false; paintNav(); toast(`นำทางไป ${b.dataset.label} — เดินตามลูกศร`, '📍', false); });
+  root.querySelectorAll('[data-detacc]').forEach(b => b.onclick = () => { const q = me.case?.sus[+b.dataset.detacc]; if (q) popup(`👉 ชี้ตัว <b>${esc(q.name)}</b> เป็นคนร้าย?<br><small>ถ้าผิด คนร้ายตัวจริงจะหนีไป</small>`, [['👉 ชี้ตัวเลย', 'warn', () => { DETX.clear(); closePanel(); send({ t: 'det', op: 'accuse', i: +b.dataset.detacc }); }], ['ยังก่อน', 'good', () => { }]], 15000); });
   root.querySelectorAll('img.phZoom').forEach(i => { i.style.cursor = 'zoom-in'; i.onclick = () => zoomPic(i.src); });
   { const ti = root.querySelector('#tipIn'); if (ti) ti.oninput = () => { if (panel) panel.tip = Math.max(0, Math.min(500, Math.floor(+ti.value) || 0)); }; }   // keep the tip through panel redraws
   root.querySelectorAll('[data-m]').forEach(b => { b.onpointerdown = () => { b.classList.add('tap'); setTimeout(() => b.classList.remove('tap'), 260); }; });   // pressed look at once, before the server answers
@@ -4821,9 +4851,10 @@ function talkTo(n, st) {
   const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
   const base = { name: n.name, face: NPC_FACE[n.id], npc: n.id };
   const misOk = !n.keeper && MIS_CAREERS.includes(n.career) && job(n.career);
+  const det = n.career === 'detective' && job('detective') ? [me.case ? { label: '🗂️ กระดานสืบสวน', fn: () => { dialogClose(); openPanel({ kind: 'detcase' }); }, cls: 'good' } : { label: '🕵️ รับคดี "ใครคือคนร้าย?" (⚡8)', fn: () => { dialogClose(); send({ t: 'det', op: 'start' }); }, cls: 'good' }] : [];
   const take = { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' };
   const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : misWait() > 0 ? { label: `⏳ งานใหม่ในอีก ${misWait()} วินาที`, tick: () => misWait() > 0 ? `⏳ งานใหม่ในอีก ${misWait()} วินาที` : null, next: take, fn: () => toast(`ยังไม่มีงานใหม่ รออีก ${misWait()} วินาที (จะแจ้งเตือนเมื่อพร้อม)`, '⏳', false) } : take] : [];
-  const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
+  const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
   dialog({ ...base, lines: [hi], choices });
 }
@@ -5640,6 +5671,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25t', d: '22 พ.ย.', items: [
+    '🕵️ <b>เกมนักสืบ "ใครคือคนร้าย?"</b> รับคดีกับผู้กองเดช (⚡8) · ผู้ต้องสงสัย 4–6 คนยืนอยู่ในเมือง ดูสีเสื้อ ผม กางเกงได้จริง · เก็บเบาะแสที่จุดเรืองแสง สอบปากคำ (คนร้ายโกหกว่าอยู่ที่ไหน กล้องวงจรปิดจะจับได้) แล้วชี้ตัวที่ 🗂️ กระดานสืบสวน · ชี้ผิดคนร้ายหนี · ยิ่งเร็วยิ่งได้มาก · คดีสุ่มใหม่ทุกครั้ง',
+    '📚 หอสมุดแต่งใหม่: กระดานสืบสวนด้ายแดง โต๊ะพิมพ์ดีด ตู้บัตรรายการ ชั้นหนังสือมีบันได ตู้โชว์ ตู้เซฟ เครื่องเล่นแผ่นเสียง พรมเขียว และป้ายสำนักงานนักสืบหน้าประตู',
+  ] },
   { v: '2026-11-25s', d: '22 พ.ย.', items: [
     '📚 <b>หอสมุดเมืองเปิดแล้ว!</b> (06:00–22:00) ชั้นหนังสือ โต๊ะอ่านหนังสือ มุมนั่งเล่นโซฟา · ยืมหนังสืออ่านที่เคาน์เตอร์ได้สุข +6 ทุก 10 นาที',
     '🕵️ สำนักงานนักสืบย้ายเข้าไปอยู่มุมขวาในหอสมุด ผู้กองเดชรอรับสมัครและแจกคดีอยู่ที่โต๊ะทำงาน',
@@ -6875,6 +6910,18 @@ function renderPanel(p) {
     case 'hbed': {
       const s = STN(st), h = wd?.houses?.[s.idx], own = me.house === s.idx && !(h && h[5]), rent = me.rent && me.rent.idx === s.idx;
       return own || rent ? `<h2>🛏️ เตียงนอน</h2><div class="sub">นอนแล้วได้พลังงาน หายง่วง หายอ่อนเพลีย (ทุก 2 นาที)</div>${B(`😴 นอนพัก (+${50 + (own ? me.comfort * 2 : 0)}⚡)`, { t: 'act', st, a: 'sleep' }, 'primary big')}` : '<h2>🛏️ เตียงนอน</h2><div class="sub">นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า</div>';
+    }
+    case 'detcase': {   // 🗂️ the case board: suspects (what they said), clues found, cross people out, name the culprit
+      const k = me.case; if (!k) return `<h2>🗂️ กระดานสืบสวน</h2><div class="sub">ยังไม่มีคดี · รับคดีได้ที่ผู้กองเดชในหอสมุดเมือง</div>`;
+      const nav = (x, y, label) => `<button class="mini" data-detnav="${x},${y}" data-label="${esc(label)}">📍 นำทาง</button>`;
+      const cl = k.clues.map((q, i) => itemRowRaw(q.found ? q.icon : '❓', q.found ? esc(q.text) : `เบาะแสจุดที่ ${i + 1} (ยังไม่เจอ)`, q.found ? 'เก็บแล้ว' : 'ไปตรวจที่จุดเรืองแสง', q.found ? '' : nav(q.x, q.y, 'เบาะแส'))).join('');
+      const su = k.sus.map((q, i) => { const x = DETX.has(i);
+        return itemRowRaw(x ? '❌' : '🧑', `<span style="${x ? 'text-decoration:line-through;opacity:.55' : ''}">${esc(q.name)}</span>`, `${esc(q.desc)}<br>${q.said ? `💬 "${esc(q.said)}"` : '<i>ยังไม่ได้สอบปากคำ</i>'}`,
+          `<div class="col2">${q.said ? '' : nav(q.x, q.y, q.name)}<button class="mini" data-detx="${i}">${x ? '↩️ คืน' : '✖️ ตัดออก'}</button><button class="mini bad" data-detacc="${i}">👉 ชี้ตัว</button></div>`); }).join('');
+      return `<h2>🗂️ ${k.icon} ${esc(k.title)}</h2><div class="sub">ที่เกิดเหตุ: ${esc(k.scene)} · เหลือเวลา <b class="miscd"></b> · ชี้ตัวผิด = คนร้ายหนี</div>
+        <div class="jobbox">💡 วิธีสืบ: เก็บเบาะแสทุกจุด → สอบปากคำทุกคน (คนร้ายจะโกหกว่าอยู่ที่ไหน) → ตัดคนที่ไม่ตรงกับเบาะแสออก → ชี้ตัวคนร้าย</div>
+        <h3>🔎 เบาะแส</h3><div class="list">${cl}</div><h3>🧑‍🤝‍🧑 ผู้ต้องสงสัย</h3><div class="list">${su}</div>
+        ${B('🏳️ ส่งคดีคืน', { t: 'det', op: 'quit' }, 'warn')}`;
     }
     case 'library': {
       return `<h2>📚 หอสมุดเมือง</h2><div class="sub">${hoursTxt('library')} · เงียบๆ หน่อยนะ มีคนอ่านหนังสืออยู่</div>
