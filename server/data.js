@@ -838,6 +838,23 @@ const RIDES = {
   if (free(5, 68)) prop('b_pavilion', 5, 68);
   for (const [s1, x, y, sol] of [['o_woodtable', 5, 73.9, true], ['o_woodtable', 42.5, 76.9, true]]) if (free(x, y)) { prop(s1, x, y, sol); prop(x > 20 ? 'o_parasol2' : 'o_parasol', x, y + .4, false); }
 }
+// ================================================================= the homes, round 4: three more cottages along the south-east lane so it
+// reads as a street of homes, a mailbox and a shade tree by every front door, trees in the back gardens
+{
+  const HS2 = ['h_cottage4', 'h_gable_blue', 'h_cottage1'];
+  [[54, 85], [62, 85], [88, 85]].forEach(([x, f], i) => {
+    const b = B('vh' + (12 + i), HS2[i], x, f, { label: '', icon: '🏡', deco: true });
+    for (let y = b.y; y < b.y + b.h; y++) for (let xx = b.x; xx < b.x + b.w; xx++) { const t = TREES.findIndex(q => q[0] === xx && q[1] === y); if (t >= 0) TREES.splice(t, 1); set(xx, y, 'B'); }
+  });
+  const free = (x, y) => get(Math.floor(x), Math.floor(y - .5)) === '.' && !PROPS.some(q => Math.hypot(q.x - x, q.y - y) < 1.2) && !TREES.some(t => Math.hypot(t[0] + .5 - x, t[1] + .5 - y) < 1.5);
+  const homes = BUILDINGS.filter(b => /^vh\d+$/.test(b.id) && b.y + b.h === 85);
+  for (const b of homes) {
+    if (free(b.x + b.w + .4, 84.95)) prop('o_mailbox', b.x + b.w + .4, 84.95, false);
+    const tx = b.x - 2; if (get(tx, 83) === '.' && free(tx + .5, 83.5)) { set(tx, 83, 'T'); TREES.push([tx, 83, ['tree_pink', 'tree_oak', 'tree_white', 'tree3'][b.x % 4]]); }
+    for (const dx of [.6, b.w - .6]) if (free(b.x + dx, 81.4)) prop('fence_white', b.x + dx, 81.4, false);   // a low picket fence round each back garden
+  }
+  for (let x = 9; x <= 91; x += 7) if ((x < 38 || x > 52) && get(x, 80) === '.' && free(x + .5, 80.5)) { set(x, 80, 'T'); TREES.push([x, 80, ['tree2', 'tree_pink2', 'tree4'][x % 3]]); }
+}
 // ================================================================= the park, dressed up: a food court on the south lawn, café tables,
 // flowerbeds along the main walk and more blossom trees (added after everything else, so nothing older moves)
 {
