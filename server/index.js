@@ -52,7 +52,7 @@ for (const [k, it] of Object.entries(D.ITEMS)) {
 let event = null;                           // { id, text, until }
 let nextEventAt = Date.now() + (process.env.EVENT_NOW ? 2000 : 120_000);   // EVENT_NOW=1 starts an event right away (testing)
 const chatLog = [], sysLog = [];             // world chat / town announcements, kept apart so a burst of announcements never pushes the chat out
-let announceText = '📢 จะอัปเดตอีกครั้งในวันศุกร์ · แมพใหม่ สวนสนุกที่จะเพิ่มพลังใจ ยะฮู้! ❤️';                      // the admin's notice in the red ticker at the top ('' = the default CBT notice); chat "all <text>"
+let announceText = '🔨 ใหม่! โรงช่างคราฟ ลานหญ้าตรงข้ามธนาคาร · คราฟเฟอร์นิเจอร์ที่ร้านไม่มีขาย · ซุ้มเพชรเรืองแสง ✨ คุยกับช่างโตได้เลย';                      // the admin's notice in the red ticker at the top ('' = the default CBT notice); chat "all <text>"
 const reqs = new Map();                     // pending requests (trade / heal / call)
 let nextId = 1, dirty = false;
 
