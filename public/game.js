@@ -3926,7 +3926,7 @@ function openPanel(p) {
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
   if (p.kind === 'achv' || p.kind === 'profile') send({ t: 'achsync' });   // unlock goals already reached (the server only checks when a number goes up)
-  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); $('#panel').classList.toggle('soc', !!p.soc); refreshPanel(true);
+  panel = p; panelSig = ''; panelOpenT = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').classList.toggle('phMode', p.kind === 'phone'); $('#panel').classList.toggle('bagMode', p.kind === 'bag' && (p.gtab || 'items') === 'items'); $('#panel').classList.toggle('soc', !!p.soc); refreshPanel(true);
   if (p.kind === 'chat' && !TOUCH_UI) setTimeout(() => $('#chatIn')?.focus(), 50);   // phones: no keyboard until they tap the box (it would push the sheet up)
 }
 function closePanel() { panel = null; $('#panel').classList.add('hidden'); }
@@ -4365,7 +4365,7 @@ const FN = {
   mailSend: () => { const to = $('#mailTo').value.trim(), text = $('#mailText').value.trim(); if (!to || !text) return toast('ใส่ชื่อผู้รับและข้อความ', '✉️', false); send({ t: 'mail', to, text }); },   // the text stays until the server confirms (mailsent)
   mailReply: m => { panel.to = m.to; refreshPanel(true); $('#mailText')?.focus(); },
   mtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
-  qtab(m) { Object.assign(panel, m.set); refreshPanel(true); },
+  qtab(m) { Object.assign(panel, m.set); $('#panel').classList.toggle('bagMode', panel.kind === 'bag' && (panel.gtab || 'items') === 'items'); refreshPanel(true); },
   social(m) {
     const k = m.k || 'ideas';
     if (k === 'ideas') send({ t: 'idea', op: 'list', sort: panel?.sort || 'new' });
@@ -5590,6 +5590,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25d', d: '22 พ.ย.', items: [
+    '🎒 กระเป๋าโฉมใหม่! เปิดเต็มจอ ของเรียงเป็นช่องตาราง แท็บหมวดด้านซ้าย แตะช่องเพื่อดูรายละเอียดด้านขวา (ราคา มูลค่ารวม กินแล้วได้อะไร) พร้อมปุ่มกิน/ใช้ · เรียงตามหมวด มูลค่า จำนวน หรือชื่อได้',
+  ] },
   { v: '2026-11-25c', d: '22 พ.ย.', items: [
     '🐺 คืนหมาป่า: กดดมกลิ่นแล้วแผนที่เล็กซูมออกเห็นทั้งเมือง มนุษย์เป็นจุดแดงใหญ่กระพริบมีวงสัญญาณ',
     '🎭 มนุษย์ปลอมตัวได้! กดปุ่ม ปลอมตัว (แทนปุ่มกระเป๋า) กลายเป็นชาวบ้านไม่มีชื่อ 10 วินาที หมาป่าดมกลิ่นไม่เจอ สมุนไม่ไล่ · พัก 40 วินาที',
@@ -6819,7 +6822,27 @@ function renderPanel(p) {
       const own = `<div class="grid2" style="margin:6px 0"><div class="item"><div class="nm">🛠️ อุปกรณ์<small>${tools}</small></div></div><div class="item"><div class="nm">🏠 บ้าน<small>${home}</small></div>${me.house >= 0 || me.rent ? B('📍', { fn: 'guide', key: 'door_house' + (me.house >= 0 ? me.house : me.rent.idx) }) : ''}</div><div class="item"><div class="nm">🌾 สวน<small>${me.garden ? `แปลงที่ ${me.garden.lot + 1} · ${me.garden.n} แปลงปลูก` : 'ยังไม่มี'}</small></div>${me.garden ? B('📍', { fn: 'guide', key: 'lot' + me.garden.lot }) : ''}</div><div class="item"><div class="nm">🏦 ธนาคาร<small>${money(me.bank)}${me.loan ? ` · หนี้ ${money(me.loan)}` : ''}</small></div></div><div class="item"><div class="nm">📱 เบอร์ของฉัน<small>${me.phone}</small></div></div></div>`;
       const job = me.career !== 'none' && G.careers[me.career]?.where;
       const outfits = (me.outfits || []).length ? `<div class="looks">${me.outfits.map(id => { const on = me.outfit === id; return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(G.outfitDefs[id]) || id)}</small>${B(on ? 'ถอด' : 'ใส่', { fn: 'look', set: { outfit: on ? '' : id } }, on ? '' : 'good')}</div>`; }).join('')}</div>` : '';
-      if (gtab === 'items') return `<h2>🎒 กระเป๋า</h2>${gtabs}${ctabs}<div class="sub">${shown.length} อย่าง · มูลค่าประมาณ ${money(totalV)}</div><div class="list">${rows || '<div class="sub">ไม่มีของในหมวดนี้</div>'}</div>${gcat === 'all' && (me.rods || []).length ? `<div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>` : ''}`;
+      if (gtab === 'items') {   // 🎒 a grid of slots (like a proper RPG bag): categories down the left, the picked item's card on the right
+        const sort = ['cat', 'value', 'qty', 'name'].includes(p.gsort) ? p.gsort : 'cat';
+        const list = [...shown].sort(sort === 'value' ? (a, b) => G.items[b[0]].base * b[1] - G.items[a[0]].base * a[1] : sort === 'qty' ? (a, b) => b[1] - a[1] : sort === 'name' ? (a, b) => G.items[a[0]].name.localeCompare(G.items[b[0]].name, 'th') : () => 0);
+        const sel = list.some(([id]) => id === p.gsel) ? p.gsel : list[0]?.[0];
+        const cats = `<div class="bagCats">${CATS.map(([k, l]) => { const n = k === 'all' ? ents.length : ents.filter(([id]) => catOf(id) === k).length, [ic, ...nm] = l.split(' ');
+          return B(`<span>${ic}</span><small>${nm.join(' ')}</small>${n ? `<i>${n}</i>` : ''}`, { fn: 'qtab', set: { gcat: k, gsel: '' } }, 'bcat' + (gcat === k ? ' on' : '')); }).join('')}</div>`;
+        const slots = list.map(([id, q]) => { const it = G.items[id]; return B(`${itemIco(id, 44, 34)}<i>${q > 999 ? '999+' : q}</i>`, { fn: 'qtab', set: { gsel: id } }, `bslot${it.rar ? ' r' + it.rar : ''}${id === sel ? ' on' : ''}`); }).join('')
+          + '<span class="bslot empty"></span>'.repeat(Math.max(0, 20 - list.length) || (5 - list.length % 5) % 5);
+        const CATNM = { use: 'กิน/ใช้ได้', fish: 'ปลา', crop: 'ผลผลิต', goods: 'ของทั่วไป' };
+        let det = '<div class="sub">เลือกของในช่องเพื่อดูรายละเอียด</div>';
+        if (sel) { const it = G.items[sel], q = me.inv[sel];
+          const act = it.egg ? B('🐣 เปิดไข่', { t: 'use', item: sel }, 'primary big') : it.eat ? B(`${it.kind === 'meal' || it.kind === 'crop' || it.kind === 'fish' ? 'กิน' : 'ใช้'}`, { t: 'use', item: sel }, 'primary big') : '';
+          det = `<div class="bdHead">${itemIco(sel, 84, 64)}<div><b>${esc(it.name)}</b>${rarTag(sel)}<small>${CATNM[catOf(sel)]} · มี ${q.toLocaleString()} ชิ้น</small></div></div>
+            <div class="bdRows"><span>ราคากลาง</span><b>${money(it.base)} / ชิ้น</b><span>มูลค่ารวม</span><b>${money(it.base * q)}</b>${it.eat ? `<span>เมื่อกิน</span><b>${eatText(it.eat)}</b>` : ''}</div>
+            ${it.desc ? `<div class="sub">${esc(it.desc)}</div>` : ''}${it.egg ? '<div class="sub">ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)</div>' : ''}
+            <div class="bdAct">${act}${B('📍 ไปขายที่ตลาด', { fn: 'guide', key: 'market' })}</div>`; }
+        const sorts = [['cat', 'หมวด'], ['value', 'มูลค่า'], ['qty', 'จำนวน'], ['name', 'ชื่อ']].map(([k, l]) => B(l, { fn: 'qtab', set: { gsort: k } }, sort === k ? 'primary' : '')).join('');
+        return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}
+          <div class="bagG">${cats}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
+          ${gcat === 'all' && (me.rods || []).length ? `<div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>` : ''}`;
+      }
       if (gtab === 'info') return `<h2>🎒 กระเป๋า</h2>${gtabs}<div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}`;
       return `<h2>🎒 กระเป๋า</h2>${gtabs}
         <div class="secT">👕 ชุด</div>

@@ -1554,3 +1554,31 @@ img.fbAv{object-fit:cover;background:#ddd}
 /* ✋ decorating: the pick-up hint is small and fades out after a moment so the room stays clear */
 body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forwards}
 @keyframes pbFade{to{opacity:0;visibility:hidden}}
+/* 🎒 the bag as a grid of slots: categories on the left, the picked item's card on the right (stacks below on phones) */
+.bagCnt{font-size:12px;font-weight:400;opacity:.75;margin-left:6px}
+.bagG{display:grid;grid-template-columns:58px minmax(0,1fr) 220px;gap:8px;align-items:start;margin-top:6px}
+.bagCats{display:flex;flex-direction:column;gap:5px}
+.bagCats .bcat{position:relative;display:flex;flex-direction:column;align-items:center;gap:0;padding:6px 2px;min-height:0;background:rgba(58,36,20,.88);color:#f3e2c4;border:1px solid #6a4426;border-radius:9px;font-size:18px;line-height:1.1}
+.bagCats .bcat small{font-size:9.5px;opacity:.85;white-space:nowrap}
+.bagCats .bcat i{position:absolute;top:-4px;right:-4px;font-style:normal;font-size:9px;background:var(--acc);color:#fff;border-radius:8px;padding:0 4px;line-height:14px}
+.bagCats .bcat.on{background:linear-gradient(#f2c14e,#c8902a);color:#3a240f;border-color:#fff3c4}
+.bagMain{min-width:0;display:flex;flex-direction:column;gap:6px}
+.bagSlots{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:4px;padding:6px;background:rgba(30,20,12,.82);border:1px solid #5a3620;border-radius:10px;max-height:min(52vh,420px);overflow-y:auto}
+.bagSlots .bslot{position:relative;aspect-ratio:1;min-height:0;padding:2px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,235,200,.16);border-radius:6px;font-size:26px;color:#fff;box-shadow:none}
+.bagSlots .bslot canvas{max-width:88%;height:auto}
+.bagSlots .bslot i{position:absolute;right:3px;bottom:1px;font-style:normal;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000,0 0 2px #000}
+.bagSlots .bslot.empty{background:rgba(255,255,255,.025);border-style:dashed}
+.bagSlots .bslot.on{border:2px solid #f2c14e;box-shadow:0 0 0 2px rgba(242,193,78,.35) inset}
+.bagSlots .bslot.r2{border-color:#2e9e3a}.bagSlots .bslot.r3{border-color:#1d7fd6}.bagSlots .bslot.r4{border-color:#9a45d6}.bagSlots .bslot.r5{border-color:#e07b00}
+.bagBar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px}
+.bagBar button{padding:3px 9px;font-size:12px;min-height:0}
+.bagDet{background:rgba(255,248,232,.9);border:1px solid #c9a45a;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.bagDet .bdHead{display:flex;gap:8px;align-items:center}
+.bagDet .bdHead>canvas,.bagDet .bdHead>:first-child{flex:none;font-size:44px;line-height:1}
+.bagDet .bdHead b{display:block;font-size:16px}.bagDet .bdHead small{display:block;font-size:12px;opacity:.8}
+.bagDet .bdRows{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12.5px}.bagDet .bdRows b{text-align:right}
+.bagDet .bdAct{display:flex;flex-direction:column;gap:6px}
+@media (max-width:620px){.bagG{grid-template-columns:52px minmax(0,1fr)}.bagDet{grid-column:1/-1}.bagSlots{grid-template-columns:repeat(auto-fill,minmax(50px,1fr));max-height:40vh}}
+/* the bag opens big, nearly full screen, like an RPG inventory */
+#panel.bagMode .sheet{width:min(1000px,96vw);max-height:88vh;max-height:88dvh;zoom:1}
+#panel.bagMode .bagSlots{max-height:min(60vh,520px)}
