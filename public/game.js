@@ -400,31 +400,47 @@ function faceFind(fr) {   // where the eyes are on this frame (null: none found,
   }
   const mid = w / 2 - .5, L = blobs.filter(b => b.cx < mid && b.cx > mid - 16).sort((a, b) => b.n - a.n)[0], R = blobs.filter(b => b.cx > mid && b.cx < mid + 16).sort((a, b) => b.n - a.n)[0];
   if (!L || !R || Math.abs(L.cy - R.cy) > 2.5 || R.cx - L.cx < 14 || R.cx - L.cx > 26) return null;
-  return { X0, Y0, w, h, skin, lx: L.cx, rx: R.cx, ey: (L.cy + R.cy) / 2, top: Math.min(L.y0, R.y0), bot: Math.max(L.y1, R.y1), ex0: L.x0, ex1: R.x1 };
+  return { X0, Y0, w, h, skin, eyes: [[L.x0, L.x1], [R.x0, R.x1]], lx: L.cx, rx: R.cx, ey: (L.cy + R.cy) / 2, top: Math.min(L.y0, R.y0), bot: Math.max(L.y1, R.y1), ex0: L.x0, ex1: R.x1 };
 }
 function faceFrame(fr, ex) {
   if (!ex || ex === 'neutral') return fr;
   let m = faceMemo.get(fr); if (!m) { m = { info: faceFind(fr) }; faceMemo.set(fr, m); }
   if (!m.info) return fr;
   if (m[ex]) return m[ex];
-  const F = EXPR, k = F.names.indexOf(ex); if (k < 0) return fr;
+  const k = EXPR.names.indexOf(ex); if (k < 0) return fr;
   const I = m.info, c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(fr, 0, 0);
-  const W = c.width, im = g.getImageData(0, 0, W, c.height), d = im.data, o = new Uint8ClampedArray(d), [sr, sg, sb] = I.skin;
-  const near = i => Math.abs(o[i] - sr) + Math.abs(o[i + 1] - sg) + Math.abs(o[i + 2] - sb);
-  // paint the face's skin over the old eyes, brows and mouth (anything not skin-coloured in that box)
-  const bx0 = I.X0 + Math.max(2, I.ex0 - 3), bx1 = I.X0 + Math.min(I.w - 3, I.ex1 + 3), by0 = I.Y0 + Math.max(0, I.top - 6), by1 = I.Y0 + Math.min(I.h - 1, I.bot + 7);
-  const inBox = (x, y) => x >= bx0 && x <= bx1 && y >= by0 && y <= by1;
-  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) { const i = (y * W + x) * 4; if (o[i + 3] >= 200 && near(i) > 40) { d[i] = sr; d[i + 1] = sg; d[i + 2] = sb; } }
-  // the new features, only where the face is (skin, or the old features' box): never on the hair, the outline or the collar
+  const W = c.width, H = c.height, im = g.getImageData(0, 0, W, H), d = im.data, o = new Uint8ClampedArray(d), [sr, sg, sb] = I.skin;
+  const at = (x, y) => (y * W + x) * 4, gr0 = sg / sr, br0 = sb / sr;
+  // skin and its shading (same hue, a little darker or lighter); not the outline, the eyes, the mouth or a blond fringe
+  const skinish = i => o[i + 3] >= 200 && o[i] > 60 && Math.abs(o[i] - sr) + Math.abs(o[i + 1] - sg) + Math.abs(o[i + 2] - sb) <= 90 && Math.abs(o[i + 1] / o[i] - gr0) < .12 && Math.abs(o[i + 2] / o[i] - br0) < .12;
+  // the area we work in: around the eyes, down to the mouth
+  const rx0 = I.X0 + I.ex0 - 5, rx1 = I.X0 + I.ex1 + 5, ry0 = I.Y0 + I.top - 7, ry1 = Math.min(H - 1, I.Y0 + I.bot + 10);
+  const inR = (x, y) => x >= rx0 && x <= rx1 && y >= ry0 && y <= ry1;
+  // 1) erase the old features: both eye blobs (their boxes, 1px wider), the brows just above each eye (dark pixels only, so a
+  //    fringe of hair is left alone) and the mouth under the middle of the face (anything not skin)
+  const E = new Uint8Array(W * H), paint = (x, y) => { const i = at(x, y); if (o[i + 3] < 200) return; d[i] = sr; d[i + 1] = sg; d[i + 2] = sb; E[y * W + x] = 1; };
+  const luma = i => o[i] * .3 + o[i + 1] * .59 + o[i + 2] * .11;
+  for (const [a0, a1] of I.eyes) {
+    for (let y = I.Y0 + I.top - 1; y <= I.Y0 + I.bot + 1; y++) for (let x = I.X0 + a0 - 1; x <= I.X0 + a1 + 1; x++) if (!skinish(at(x, y))) paint(x, y);
+    for (let y = I.Y0 + I.top - 5; y < I.Y0 + I.top - 1; y++) for (let x = I.X0 + a0 - 1; x <= I.X0 + a1 + 2; x++) { const i = at(x, y); if (o[i + 3] >= 200 && luma(i) < 120) paint(x, y); }
+  }
+  const mxc = Math.round(I.X0 + (I.lx + I.rx) / 2);
+  for (let y = I.Y0 + I.bot + 2; y <= I.Y0 + I.bot + 4; y++) for (let x = mxc - 3; x <= mxc + 3; x++) { const i = at(x, y); if (o[i + 3] >= 200 && !skinish(i) && luma(i) > 70) paint(x, y); }
+  // 2) where the new face may be drawn: the face's skin (and what was just erased), flooded from between the eyes
+  const F = new Uint8Array(W * H), st = [[mxc, Math.round(I.Y0 + I.ey)]];
+  while (st.length) { const [x, y] = st.pop(); if (!inR(x, y)) continue; const kk = y * W + x; if (F[kk] || !(E[kk] || skinish(at(x, y)))) continue; F[kk] = 1; st.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+  // 3) the new features, only on the face: if the mouth would reach the chin, lift it (up to 3 rows)
   const t = document.createElement('canvas'); t.width = EXPR.w; t.height = EXPR.h; const tg = t.getContext('2d', { willReadFrequently: true });
   tg.drawImage(EXPR.im, k * EXPR.w, 0, EXPR.w, EXPR.h, 0, 0, EXPR.w, EXPR.h); const td = tg.getImageData(0, 0, EXPR.w, EXPR.h).data;
-  const ox = Math.round(I.X0 + (I.lx + I.rx) / 2 + .5 - EXPR.ax), oy = Math.round(I.Y0 + I.ey + .5 - EXPR.ay);
+  const ox = Math.round(I.X0 + (I.lx + I.rx) / 2 + .5 - EXPR.ax), oy = Math.round(I.Y0 + I.ey + .5 - EXPR.ay), cut = Math.round(EXPR.ay) + 4;
+  const mx = Math.round(I.X0 + (I.lx + I.rx) / 2); let chin = Math.round(I.Y0 + I.ey); while (chin + 1 < H && F[(chin + 1) * W + mx]) chin++;
+  let low = -1; for (let y = EXPR.h - 1; y >= cut && low < 0; y--) for (let x = 0; x < EXPR.w; x++) if (td[(y * EXPR.w + x) * 4 + 3] >= 128) { low = y; break; }
+  const lift = low < 0 ? 0 : Math.max(0, Math.min(3, oy + low - (chin - 1)));
   for (let y = 0; y < EXPR.h; y++) for (let x = 0; x < EXPR.w; x++) {
-    const s = (y * EXPR.w + x) * 4; if (td[s + 3] < 128) continue;
-    const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= W || Y >= c.height) continue;
-    const i = (Y * W + X) * 4; if (o[i + 3] < 200 || !(inBox(X, Y) || near(i) <= 60)) continue;
-    d[i] = td[s]; d[i + 1] = td[s + 1]; d[i + 2] = td[s + 2];
+    const s0 = (y * EXPR.w + x) * 4; if (td[s0 + 3] < 128) continue;
+    const X = ox + x, Y = oy + y - (y >= cut ? lift : 0); if (X < 0 || Y < 0 || X >= W || Y >= H || !F[Y * W + X]) continue;
+    const i = at(X, Y); d[i] = td[s0]; d[i + 1] = td[s0 + 1]; d[i + 2] = td[s0 + 2];
   }
   g.putImageData(im, 0, 0);
   return (m[ex] = c);
@@ -4357,6 +4373,7 @@ const FN = {
   },
   god(m) { send({ t: 'god', op: m.op }); },
   xmasGo(m) { closePanel(); setGuide(m.key, false, true); },
+  story() { storyOpen(); },
   czBet(m) { czBetV = m.v; FX.play('click'); refreshPanel(true); },
   czGo(m) { const s = STN(m.st); if (s) { panel = null; openPanel({ kind: s.type, st: s.id }); } },
   pushOn() { pushOn(true); },
@@ -4883,6 +4900,16 @@ function arcHtml(k, st) {
     hockey: 'ลากไม้ตีรับลูกพัคไม่ให้ผ่านไปได้ · พลาด 3 ครั้งจบเกม' }[STN(st).k];
   return `<h2>${g.icon} ${esc(g.name)}</h2><div class="sub">🕹️ เกมเซ็นเตอร์ · เล่นครั้งละ ${money(g.price)}<br>${how}<br>🎟️ ได้ตั๋วตามคะแนน เอาไปแลกตุ๊กตาที่เคาน์เตอร์ · ตอนนี้มี 🎟️ ${me.tix || 0}</div>
     ${B(`🎮 เล่นเลย (${money(g.price)})`, { t: 'act', st, a: 'start' }, 'primary big', me.money < g.price)}`;
+}
+// 📕 the developer's story (public/story.html), a flip book shown over the game; it posts {story:'close'} to close
+function storyOpen() {
+  if ($('#storyBox')) return; closePanel(); FX.play('click');
+  const el = document.createElement('div'); el.id = 'storyBox';
+  el.style.cssText = 'position:fixed;inset:0;z-index:9000;background:#2a1d16';
+  el.innerHTML = '<iframe src="story.html?game=1" title="เรื่องเล่าคนทำเกม" style="border:0;width:100%;height:100%;display:block"></iframe>';
+  document.body.appendChild(el);
+  const close = e => { if (e.data?.story === 'close') { el.remove(); removeEventListener('message', close); } };
+  addEventListener('message', close);
 }
 // 🐠 the home tank: put fish from the bag in (they swim there for visitors and add comfort), take them back out
 function aqBox() {
@@ -5473,6 +5500,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24c', d: '22 พ.ย.', items: [
+    '📕 <b>เรื่องเล่าคนทำเกม</b> หนังสือเปิดอ่านทีละหน้า จากเกมซอมบี้เกมแรก สู่เมืองวันนี้ (ล้มมาแล้ว 6 ครั้ง ❤️) · เปิดได้ที่ 📱 โทรศัพท์ → เรื่องเล่า หรือแชร์ลิงก์ให้เพื่อน',
+    '😊 สีหน้าตัวละครเนียนขึ้น: วาดอยู่ในกรอบหน้าพอดี ไม่ล้นออกนอกหน้าแล้ว',
+  ] },
   { v: '2026-11-24b', d: '22 พ.ย.', items: [
     '😊 <b>ตัวละครมีสีหน้าแล้ว!</b> กดอิโมจิ 😀 😂 😍 😭 😡 😱 💤 😎 หน้าตัวละครเปลี่ยนตาม (คนอื่นเห็นด้วย) · ป่วยหน้าซีด ง่วงตาปรือ เล่นเครื่องเล่นหัวเราะ เศร้าหรือหิวหน้าเศร้า',
   ] },
@@ -7100,7 +7131,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first

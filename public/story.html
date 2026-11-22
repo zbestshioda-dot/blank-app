@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>เรื่องเล่าคนทำเกม · เมืองชีวิตนี้เลือกได้</title>
+<meta name="description" content="จากคนที่แค่อยากเล่นเกม สู่เมืองออนไลน์ที่ล้มมาแล้ว 6 ครั้ง — เรื่องเล่าจากผู้พัฒนา Life Town เมืองชีวิตนี้เลือกได้">
+<meta property="og:title" content="เรื่องเล่าคนทำเกม · เมืองชีวิตนี้เลือกได้">
+<meta property="og:description" content="ล้มมาแล้ว 6 ครั้ง แต่ยังไม่เลิก ❤️ เปิดอ่านทีละหน้า">
+<meta property="og:image" content="assets/story/arcadeout.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#3b2a20; --desk2:#2a1d16; --paper:#fff8ea; --paper2:#f3e6c9; --ink:#3a2a1e; --soft:#7a6250;
+  --red:#d8463c; --gold:#e8a93a; --green:#3fa45a; --line:#e2cfa8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(ellipse at 50% 30%,#4a3528,var(--desk2) 75%);color:var(--ink);font-family:'Noto Sans Thai','Mitr',sans-serif;
+  overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#top{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;padding:10px 16px;color:#f6e6c8;font-family:Mitr;z-index:5}
+#top b{font-weight:500;font-size:15px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#top a,#top button{color:#f6e6c8;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;text-decoration:none;cursor:pointer}
+#stage{position:fixed;inset:52px 0 64px;display:flex;align-items:center;justify-content:center;perspective:1600px;padding:0 16px}
+.book{position:relative;width:min(440px,100%);height:100%;max-height:820px}
+.page{position:absolute;inset:0;background:linear-gradient(90deg,#e9d9b6 0,var(--paper) 18px,var(--paper) calc(100% - 6px),#efe0c0);
+  border-radius:6px 14px 14px 6px;box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 0 0 1px rgba(120,90,50,.15);
+  transform-origin:left center;transition:transform .7s cubic-bezier(.3,.7,.3,1),opacity .7s;backface-visibility:hidden;
+  overflow:hidden;display:flex;flex-direction:column;padding:22px 22px 18px 30px}
+.page::before{content:'';position:absolute;left:0;top:0;bottom:0;width:14px;background:linear-gradient(90deg,rgba(80,50,20,.25),transparent)}
+.page.gone{transform:rotateY(-105deg);opacity:0;pointer-events:none}
+.page.wait{transform:rotateY(0);opacity:0;pointer-events:none}
+.page.cur{transform:rotateY(0);opacity:1;z-index:2}
+.ch{font-family:Mitr;font-size:12px;letter-spacing:.06em;color:var(--soft);display:flex;justify-content:space-between}
+h2{overflow-wrap:anywhere;font-family:Mitr;font-weight:600;font-size:clamp(20px,5.6vw,25px);line-height:1.3;margin:6px 0 10px;text-wrap:balance}
+.pic{position:relative;flex:1;min-height:120px;border-radius:12px;overflow:hidden;background:#2b2130;border:3px solid #fff;box-shadow:0 4px 0 var(--line),0 6px 14px rgba(0,0,0,.18);transform:rotate(-.6deg)}
+.pic img{width:100%;height:100%;object-fit:cover;object-position:top;display:block;image-rendering:auto}
+.pic.two{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:#fff}
+.pic.scene{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:clamp(44px,13vw,64px);text-align:center;line-height:1.15}
+.pic.scene small{font-size:13px;font-family:Mitr;color:#fff;opacity:.85}
+.pic .cap{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:999px;font-family:Mitr}
+p{font-size:clamp(14px,3.9vw,16px);line-height:1.7;margin:12px 0 0;text-wrap:pretty}
+p b{color:var(--red);font-weight:800}
+.stamp{position:absolute;right:14px;top:auto;bottom:calc(50% - 10px);transform:rotate(12deg);border:3px solid var(--red);color:var(--red);font-family:Mitr;font-weight:600;
+  font-size:15px;padding:4px 10px;border-radius:8px;background:rgba(255,248,234,.9);box-shadow:0 0 0 2px rgba(255,248,234,.9);z-index:3;opacity:0;transition:opacity .3s .5s,transform .35s .5s}
+.cur .stamp{opacity:1;transform:rotate(-8deg) scale(1)}
+.chain{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;justify-content:center;font-size:13px;font-family:Mitr;color:#fff;padding:10px}
+.chain span{background:rgba(255,255,255,.14);border-radius:999px;padding:4px 9px;white-space:nowrap}
+.chain i{font-style:normal;opacity:.7}
+.cover{background:linear-gradient(160deg,#ffcf6a,#f08a4b 55%,#d8463c);color:#fff;align-items:center;justify-content:center;text-align:center;padding:30px}
+.cover::before{background:linear-gradient(90deg,rgba(0,0,0,.25),transparent)}
+.cover h1{font-family:Mitr;font-weight:600;font-size:clamp(28px,8vw,38px);line-height:1.25;margin:10px 0 6px;text-shadow:0 3px 0 rgba(0,0,0,.18)}
+.cover .sub{font-family:Mitr;font-size:16px;opacity:.95}
+.cover .art{font-size:64px;line-height:1;margin-bottom:4px}
+.cover .hint{position:absolute;bottom:22px;left:0;right:0;font-size:13px;opacity:.9;animation:bob 1.6s ease-in-out infinite}
+.tally{display:flex;gap:4px;justify-content:center;margin-top:14px}
+.tally span{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:13px}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.end{background:linear-gradient(180deg,var(--paper),#ffe9ef)}
+.end .heart{font-size:54px;text-align:center;animation:beat 1.2s ease-in-out infinite}
+@keyframes beat{15%{transform:scale(1.15)}30%{transform:scale(1)}}
+.btn{display:block;text-align:center;background:var(--green);color:#fff;text-decoration:none;font-family:Mitr;font-size:17px;padding:13px;border-radius:14px;box-shadow:0 4px 0 #2b7a41;margin-top:14px}
+.btn.alt{background:#fff;color:var(--ink);box-shadow:0 4px 0 var(--line);border:1px solid var(--line);font-size:15px;padding:10px}
+.link{text-align:center;font-family:Mitr;color:var(--soft);font-size:14px;margin-top:10px}
+#nav{position:fixed;left:0;right:0;bottom:0;height:64px;display:flex;align-items:center;justify-content:center;gap:14px;padding-bottom:env(safe-area-inset-bottom)}
+#nav button{width:46px;height:46px;border-radius:50%;border:0;background:#f6e6c8;color:var(--ink);font-size:20px;cursor:pointer;box-shadow:0 3px 0 #b89a6a}
+#nav button:disabled{opacity:.35}
+#dots{display:flex;gap:5px;max-width:220px;flex-wrap:wrap;justify-content:center}
+#dots i{width:8px;height:8px;border-radius:50%;background:rgba(246,230,200,.3)}
+#dots i.on{background:#f6e6c8;width:18px;border-radius:4px}
+#dots i.x{background:rgba(216,70,60,.55)}
+#dots i.x.on{background:#ff8a7a}
+@media (prefers-reduced-motion:reduce){.page{transition:opacity .2s}.page.gone{transform:none}}
+</style>
+</head>
+<body>
+<div id="top"><b>📖 เรื่องเล่าคนทำเกม</b><a id="play" href="/">🎮 เข้าเกม</a><button id="share">🔗 แชร์</button></div>
+<div id="stage"><div class="book" id="book">
+
+<section class="page cover">
+  <div class="art">🏘️</div>
+  <h1>จากวันนั้น<br>สู่วันนี้</h1>
+  <div class="sub">เรื่องเล่าจากคนทำเกม<br>“เมืองชีวิตนี้เลือกได้”</div>
+  <div class="tally" aria-label="ล้มมาแล้ว 6 ครั้ง"><span>💔</span><span>💔</span><span>💔</span><span>💔</span><span>💔</span><span>💔</span></div>
+  <div class="hint">แตะขวาเพื่อเปิดหน้าถัดไป 👉</div>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 1</span><span>จุดเริ่มต้น</span></div>
+  <h2>ผมแค่อยากเล่นเกม…</h2>
+  <div class="pic scene" style="background:linear-gradient(#2c3a2e,#1b231c)">🧟‍♂️ 🎮<br>💼 ⏰<small>อยากเล่น · แต่ไม่มีเวลา</small></div>
+  <p>ผมชอบเกมเอาชีวิตรอดจากซอมบี้อย่าง <b style="color:var(--ink)">Project Zomboid</b> มาก แต่ชีวิตจริงงานเยอะ แทบไม่มีเวลาได้นั่งหน้าคอมเลย</p>
+  <p>เลยคิดว่า… งั้นทำเกมเล่นเองบนมือถือดีไหม?</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 2</span><span>Dead Street</span></div>
+  <h2>เขียนเกมซอมบี้เล่นเอง</h2>
+  <div class="stamp">ล้มครั้งที่ 1</div>
+  <div class="pic"><img src="assets/story/dead.webp" alt="เกม Dead Street เกมซอมบี้เกมแรก" loading="lazy"><span class="cap">Dead Street · เกมแรก</span></div>
+  <p>เริ่มลงมือทำเกมซอมบี้ชื่อ Dead Street แต่ <b>ยิ่งทำยิ่งเละ</b> เพราะผมไม่มีความรู้เรื่องโค้ดเลยสักนิด</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 3</span><span>เรียนรู้</span></div>
+  <h2>ไอเดียใหม่: หมู่บ้านที่มีชีวิต</h2>
+  <div class="pic scene" style="background:linear-gradient(#2a4a6a,#1d2f45);font-size:40px">📱 🎓
+    <div class="chain"><span>👮 ตำรวจ</span><i>จับ</i><span>🦹 โจร</span><i>ไถ</i><span>🧑 ชาวบ้าน</span>
+      <span>🧑‍🌾 เกษตร</span><span>🎣 ตกปลา</span><i>→</i><span>👨‍🍳 พ่อครัว</span><i>→</i><span>🛵 ไรเดอร์</span>
+      <span>🌧️ อากาศ + 🦠 โรค</span><i>→</i><span>🩺 หมอ</span></div></div>
+  <p>นั่งเรียนจากยูทูปกับติ๊กต็อกทีละนิด แล้วไอเดียก็เปลี่ยนเป็น <b style="color:var(--green)">หมู่บ้านที่มีเศรษฐกิจของตัวเอง</b> ทุกอาชีพพึ่งพากันเป็นวงกลม</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 4</span><span>เปิดเมือง</span></div>
+  <h2>เปิดแล้ว… แต่ไม่มีใครมา</h2>
+  <div class="stamp">ล้มครั้งที่ 2</div>
+  <div class="pic"><img src="assets/story/first.webp" alt="เมืองเวอร์ชันแรก เป็นกล่องสี่เหลี่ยม มีผู้เล่น 1 คน" loading="lazy"><span class="cap">เวอร์ชันแรกสุด · 👥 1 คน</span></div>
+  <p>เมืองแรกเป็นแค่กล่องสี่เหลี่ยม ดูมุมขวาบนสิครับ <b>👥 1</b> คนที่ออนไลน์อยู่… คือผมเอง</p>
+  <p>ใจคิดจะยกเลิก แล้วกลับไปทำแบบออฟไลน์เล่นคนเดียว</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 5</span><span>มีคนมาแล้ว!</span></div>
+  <h2>มีคนเข้ามา… แต่ระบบพัง</h2>
+  <div class="stamp">ล้มครั้งที่ 3</div>
+  <div class="pic"><img src="assets/story/pixel.webp" alt="เมืองเวอร์ชันพิกเซลยุคแรก" loading="lazy"><span class="cap">ยุคพิกเซลแรก</span></div>
+  <p>อยู่ๆ ก็มีคนเข้ามาเล่น! แต่เกมถูกออกแบบให้ <b>หมุนเงินกันเองในหมู่บ้าน</b> พอคนจริงเข้ามา เศรษฐกิจรับไม่ไหว ต้องยุบทิ้ง แล้วเปลี่ยนเป็นทำเควสหาเงินแทน</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 6</span><span>ไฟลุก</span></div>
+  <h2>600 กว่าบัญชี!</h2>
+  <div class="pic"><img src="assets/story/square.webp" alt="ลานจัตุรัสกลางเมืองในวันนี้" loading="lazy"><span class="cap">ลานจัตุรัสกลางเมือง</span></div>
+  <p>คนสมัครเข้ามา <b style="color:var(--green)">600 กว่าบัญชี</b> เพื่อดูว่าเรากำลังทำอะไรอยู่ มันกลายเป็นไฟ อยากสร้างคอมมูนิตี้ใหญ่ ที่ผู้คนมารวมกันที่นี่ ไอเดียกองเป็นภูเขารออัปเดต</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 7</span><span>หมดแรง</span></div>
+  <h2>Token ที่เตรียมไว้… หมด</h2>
+  <div class="stamp">ล้มครั้งที่ 4</div>
+  <div class="pic scene" style="background:linear-gradient(#3a2d45,#1f1828)">🪫 🐛🐛<br>👋 👋 👋<small>แก้บั๊กไม่ได้ · คนค่อยๆ ออก</small></div>
+  <p>ตัวช่วยเขียนโค้ดที่ใช้อยู่ใช้ได้ตามโควต้า (Token) พอหมด ก็ <b>แก้บั๊กให้ผู้เล่นไม่ได้เลย</b> ได้แต่นั่งมองผู้คนค่อยๆ จากไป</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 8</span><span>เซิร์ฟล่ม</span></div>
+  <h2>แล้วเซิร์ฟเวอร์ก็ดับ</h2>
+  <div class="stamp">ล้มครั้งที่ 5</div>
+  <div class="pic scene" style="background:linear-gradient(#452626,#1f1414)">🖥️💥<br>⛔<small>เซิร์ฟเวอร์ฟรีเต็มโควต้า</small></div>
+  <p>ปัญหาที่ไม่คิดว่าจะเกิด: เซิร์ฟเวอร์ฟรีที่ใช้อยู่ <b>เต็มโควต้า</b> เกมรันต่อไม่ได้ คนลดลงจนผมอยากจะทิ้งมันไปจริงๆ</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 9</span><span>ไม่กี่ข้อความ</span></div>
+  <h2>“ติดเกมนี้แล้ว”</h2>
+  <div class="pic"><img src="assets/story/zombie.webp" alt="ผู้เล่นออนไลน์พร้อมกัน 15 คน ในอีเวนต์ซอมบี้" loading="lazy"><span class="cap">อีเวนต์ซอมบี้ · 15 คนออนไลน์</span></div>
+  <p>แต่มีผู้เล่น <b style="color:var(--green)">ไม่กี่คน</b> ทักมาและเม้นในโพสต์ว่าติดเกมนี้ ผมเลยตัดสินใจครั้งใหญ่ ทุ่มเงินก้อนเปิดเซิร์ฟเวอร์จริงจัง เพื่อคนกลุ่มเล็กๆ นี้</p>
+  <p>นั่งกู้ข้อมูลจนไม่ได้นอน ตีห้าก็ต้องออกไปทำงานต่อ</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 10</span><span>ล่าสุด</span></div>
+  <h2>เติมเงินมา<br>แต่ไม่ได้สักบาท</h2>
+  <div class="stamp">ล้มครั้งที่ 6</div>
+  <div class="pic"><img src="assets/story/stripe.webp" alt="แจ้งเตือนจากผู้ให้บริการรับชำระเงิน ว่าบัญชีถูกระงับ" loading="lazy"><span class="cap">ผู้ให้บริการรับเงินระงับบัญชี</span></div>
+  <p>มีผู้เล่นเติมเงินเข้ามาช่วย แต่ตัวกลางรับชำระเงินระงับบัญชี ผลคือ <b>ผมไม่ได้เงินสักบาท</b> ตอนนี้ก็ยังทำฟรีอยู่</p>
+</section>
+
+<section class="page">
+  <div class="ch"><span>บทที่ 11</span><span>วันนี้</span></div>
+  <h2>แต่เมืองก็ยังโตทุกวัน</h2>
+  <div class="pic two"><img src="assets/story/arcadeout.webp" alt="เกมเซ็นเตอร์ในสวนสนุก" loading="lazy"><img src="assets/story/arcade.webp" alt="ข้างในเกมเซ็นเตอร์" loading="lazy"></div>
+  <p>วันนี้เมืองมีอาชีพ บ้าน สัตว์เลี้ยง สวนสนุก เกมเซ็นเตอร์ ตู้คีบตุ๊กตา อีเวนต์ซอมบี้ เทศกาล และยัง <b style="color:var(--green)">อัปเดตแทบทุกวัน</b> จากไอเดียของผู้เล่น</p>
+</section>
+
+<section class="page end">
+  <div class="ch"><span>ส่งท้าย</span><span>❤️</span></div>
+  <div class="heart">❤️</div>
+  <h2 style="text-align:center">ถึงคนที่ผ่านมา</h2>
+  <p style="text-align:center">ไม่ว่าอะไรจะเกิดขึ้น ผมแค่อยากให้คนที่ผ่านมา ได้สัมผัสเกมนี้สักครั้ง<br>เพราะผมตั้งใจกับมันมากจริงๆ</p>
+  <p style="text-align:center;color:var(--soft)">มาเติบโตไปพร้อมกับอัปเดตของเรา<br>เห็นการพัฒนาไปด้วยกัน ✅</p>
+  <div style="flex:1"></div>
+  <a class="btn" id="playEnd" href="/">🎮 เข้าเมืองชีวิตนี้เลือกได้</a>
+  <div class="link">is.gd/newlifetown</div>
+  <button class="btn alt" id="again" type="button">↺ อ่านอีกรอบ</button>
+</section>
+
+</div></div>
+<div id="nav"><button id="prev" aria-label="หน้าก่อน">◀</button><div id="dots"></div><button id="next" aria-label="หน้าถัดไป">▶</button></div>
+<script>
+(() => {
+  const pages = [...document.querySelectorAll('.page')], dots = document.getElementById('dots');
+  const inGame = new URLSearchParams(location.search).has('game');
+  if (inGame) { for (const id of ['play', 'playEnd']) { const a = document.getElementById(id); a.href = '#'; a.onclick = e => { e.preventDefault(); parent.postMessage({ story: 'close' }, '*'); }; } document.getElementById('play').textContent = '✕ ปิด'; }
+  pages.forEach(p => { const i = document.createElement('i'); if (p.querySelector('.stamp')) i.className = 'x'; dots.appendChild(i); });
+  let at = 0; try { at = Math.min(pages.length - 1, +(localStorage.getItem('lt_story') || 0)); } catch { }
+  function go(n) {
+    at = Math.max(0, Math.min(pages.length - 1, n));
+    pages.forEach((p, i) => p.className = p.className.replace(/\s*\b(cur|gone|wait)\b/g, '') + (i < at ? ' gone' : i === at ? ' cur' : ' wait'));
+    [...dots.children].forEach((d, i) => d.classList.toggle('on', i === at));
+    document.getElementById('prev').disabled = at === 0; document.getElementById('next').disabled = at === pages.length - 1;
+    try { localStorage.setItem('lt_story', at); } catch { }
+  }
+  document.getElementById('prev').onclick = () => go(at - 1);
+  document.getElementById('next').onclick = () => go(at + 1);
+  document.getElementById('again').onclick = () => go(0);
+  const book = document.getElementById('book');
+  book.addEventListener('click', e => { if (e.target.closest('a,button')) return; const r = book.getBoundingClientRect(); go(at + (e.clientX - r.left < r.width * .33 ? -1 : 1)); });
+  let sx = null; book.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+  book.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 40) { go(at + (dx < 0 ? 1 : -1)); e.preventDefault(); } });
+  addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === ' ') go(at + 1); if (e.key === 'ArrowLeft') go(at - 1); });
+  document.getElementById('share').onclick = async () => {
+    const url = location.origin + location.pathname, text = 'เรื่องเล่าคนทำเกม "เมืองชีวิตนี้เลือกได้" ล้มมาแล้ว 6 ครั้ง แต่ยังไม่เลิก ❤️';
+    try { if (navigator.share) return await navigator.share({ title: document.title, text, url }); } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(text + '\n' + url); document.getElementById('share').textContent = '✔ คัดลอกแล้ว'; } catch { prompt('คัดลอกลิงก์นี้:', url); }
+  };
+  go(at);
+})();
+</script>
+</body>
+</html>
