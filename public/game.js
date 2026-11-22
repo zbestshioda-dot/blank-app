@@ -5508,6 +5508,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24i', d: '22 พ.ย.', items: [
+    '👋 แก้ปัดปิดแอปแล้วตัวละครยังค้างอยู่ในเมือง ตอนนี้ออกจากแผนที่ภายในไม่ถึงนาที',
+  ] },
   { v: '2026-11-24h', d: '22 พ.ย.', items: [
     '🏎️ วาดใหม่ 5 คัน: ซุปเปอร์คาแดงเพลิง · ไฮเปอร์คาส้ม · แฟนทอมดำ · สไปเดอร์ขาว · ปอร์เช่เงิน ภาพคมขึ้น หันหัวถูกทางทุกทิศ และคันแดงเพลิงแดงสดขึ้น',
   ] },
@@ -7580,6 +7583,7 @@ document.addEventListener('visibilitychange', () => {
   if (ws && ws.readyState === 1 && Date.now() - lastMsgT > 6000) { try { ws.close(); } catch { } }   // a socket that went quiet in the background: reconnect
   else if (wantLogin && (!ws || ws.readyState > 1)) connect();
 });
+addEventListener('pagehide', () => { try { ws?.close(); } catch { } });   // tab / app closed: leave the map right away
 addEventListener('pageshow', e => { if (e.persisted) { gfxRecover(); if (wantLogin && (!ws || ws.readyState > 1)) connect(); } });
 cv.addEventListener('contextrestored', gfxRecover);
 const FLAT = /^(f_rug|flowerbed|fl_|g_|pond|grass_tuft|manhole|puddle|tuft)/;

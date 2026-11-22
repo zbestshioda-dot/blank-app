@@ -5639,7 +5639,9 @@ wss.on('connection', (ws, req) => {
   });
   ws.on('close', () => { if (ws.acct && ws.acct.ws === ws) detach(ws.acct); });
   ws.on('error', () => {});
-  const ka = setInterval(() => { if (ws.readyState === 1) ws.ping(); }, 25000);
+  // a phone that was swiped away often never closes the socket: no answer to the last ping → drop it (the player leaves the map)
+  ws.alive = true; ws.on('pong', () => { ws.alive = true; });
+  const ka = setInterval(() => { if (ws.readyState !== 1) return; if (!ws.alive) return ws.terminate(); ws.alive = false; ws.ping(); }, 20000);
   ws.on('close', () => clearInterval(ka));
 });
 
