@@ -21,6 +21,8 @@ PICK = {
   'b_casino': (5, 1), 'b_flower2': (6, 1), 'b_cafe2': (6, 4),
 }
 
+PICK3 = {'b_market2': 0, 'b_library': 1, 'h_cottage3': 2, 'h_cottage2': 3}
+
 def cut(path, dil):
     a = np.asarray(Image.open(path).convert('RGB')).astype(int)
     bgc = np.median(np.concatenate([a[:20, :20].reshape(-1, 3), a[-20:, -20:].reshape(-1, 3), a[:20, -20:].reshape(-1, 3)]), axis=0)
@@ -42,6 +44,11 @@ def main():
     pieces = []
     for name, (n, i) in PICK.items():
         im = sheets[n][i]; w = S[name][2]; pieces.append((name, im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)))
+    # third sheet (bld3.jpg): drawn long and flat, so a few middle strips are cut out first (tools/narrow_bld3.py)
+    from narrow_bld3 import narrow
+    b3 = cut(SH('bld3.jpg'), 12)
+    for name, i in PICK3.items():
+        im = narrow(b3[i], i); w = S[name][2]; pieces.append((name, im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)))
     x, y, rowh, placed = 0, data['size'][1] + 2, 0, []
     for name, im in pieces:
         if x + im.width > atlas.width: x, y, rowh = 0, y + rowh + 2, 0

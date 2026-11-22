@@ -5506,6 +5506,7 @@ const NEWS = [
   { v: '2026-11-24e', d: '22 พ.ย.', items: [
     '🏛️ <b>ตึกหน้าใหม่อีก 17 หลัง</b> สไตล์เดียวกันทั้งเมือง: มหาวิทยาลัย ธนาคาร สถานีตำรวจ สถานีดับเพลิง ร้านต้นไม้ ร้านอาหาร ศูนย์ไรเดอร์ ร้านแฟชั่น ร้าน 24 ชม. ร้านสัตว์เลี้ยง 2 คาสิโน ตู้คีบ ตู้ถ่ายรูป และบ้าน 4 แบบ',
     '🎨 สีตึกรอบก่อน (กันสาดม่วง ประตูแดง) ทึบสวยขึ้น ไม่ซีดโปร่งแล้ว',
+    '🏪 ตลาดกลาง ห้องสมุด และบ้านอิฐ/บ้านหลังคาเขียว หน้าใหม่แล้ว (ครบทั้งเมือง)',
   ] },
   { v: '2026-11-24d', d: '22 พ.ย.', items: [
     '🚗 แก้รถวิ่งถอยหลัง: สไปเดอร์ขาว ฮอสีเงิน และรถตำรวจบนถนน หันหัวถูกทางแล้วตอนวิ่งขึ้น/ลง',
@@ -7250,7 +7251,7 @@ const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id)
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
 fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v18').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v18'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/atlas.json?v=v19').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v19'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
