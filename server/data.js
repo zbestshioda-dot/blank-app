@@ -17,7 +17,7 @@ const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองช�
 const XMAS_END = Date.parse('2027-01-01T00:00:00+07:00');
 const RX0 = 256;                                         // interiors start here
 const YX0 = RX0 + 10 * 18 + 4;                           // home yards (one per house) start here: 4 per row
-const W = YX0 + 4 * 34, H = 125;   // rows 90+ : the town's south district (amusement park + football ground)                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
+const W = YX0 + 4 * 34, H = 172;   // (125 -> 172: room for the floors and yards of houses 13-24)   // rows 90+ : the town's south district (amusement park + football ground)                          // 6 columns of interiors + 4 columns of upstairs floors (house expansions) + the yards
 
 // ---------------------------------------------------------------- grid helpers
 // tile codes: . grass  = road  , sidewalk  c cobble path  k plaza bricks  w water  p pier/bridge
@@ -62,7 +62,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
 // ================================================================= TOWN
 {
   const T = TOWN;
-  rect(102, 0, 8, H, 'w'); rect(97, 0, 5, H, 's');               // sea + beach along the east
+  rect(102, 0, 8, 125, 'w'); rect(97, 0, 5, 125, 's');               // sea + beach along the east
   ellipse(26, 68, 15, 9, 'w');                                     // the lake
   ellipse(80, 54, 7, 4.5, 'w');                                    // pond in the east park
   // roads (2 lanes) with sidewalks where buildings face them
@@ -513,12 +513,21 @@ for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.off
 // university classroom: 4 desks, two students each
 const SCHOOL_DESKS = [[3.6, 4.6], [10.4, 4.6], [3.6, 7.0], [10.4, 7.0]];
 for (const [cx, by] of SCHOOL_DESKS) LAYOUT.school.push(['f_desk', cx, by], ['f_chair', cx - .45, by + 1.25], ['f_chair', cx + .45, by + 1.25]);
+// 🏘️ the village west wing (where the old farm was): 12 more home plots, houses 12-23, same layout as the first wing.
+// Created here so they get room slots after every existing room (late: 7); their tiles and decor are laid out after the farm wipe.
+const VX = 114;   // the wing's left edge (the first wing starts at HOUSING.x = 184)
+for (let i = 12; i < 24; i++) {
+  const j = i - 12, row = j < 6 ? 0 : 1, col = j % 6, front = row ? 37 : 20, x = VX + 10 + col * 9 + (row ? 1 : 0);
+  const price = Math.round((28000 + col * 7000 + row * 10000) / 1000) * 1000;
+  HOUSE_PRICES.push(price); HOUSE_RENT.push(Math.round(price / 160 / 10) * 10);
+  B('house' + i, HOUSE_SPRITES[(j + row + 3) % 6], x, front, { label: 'บ้าน', icon: '🏠', st: 'house' + i, house: i, area: 'housing', late: 7, vx: 1 });
+}
 const ROOMS = [];
 let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4, 5, 6].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4, 5, 6, 7].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -879,9 +888,37 @@ const RIDES = {
   const inF = (x, y) => x >= FARM.x && x < FARM.x + FARM.w && y >= FARM.y && y < FARM.y + FARM.h;
   rect(FARM.x, FARM.y, FARM.w, FARM.h, ' ');
   const keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
-  keep(BUILDINGS, b => !inF(b.x, b.y)); keep(PROPS, p => !inF(p.x, p.y) && !(p.s === 'sign_walk' && Math.hypot(p.x - 4.6, p.y - 30.3) < .5));
+  keep(BUILDINGS, b => b.vx || !inF(b.x, b.y)); keep(PROPS, p => !inF(p.x, p.y) && !(p.s === 'sign_walk' && Math.hypot(p.x - 4.6, p.y - 30.3) < .5));
   keep(TREES, t => !inF(t[0], t[1])); keep(STATIONS, st => st.area !== 'farm' && st.id !== 'gate_farm');
   LOTS.length = 0; delete GATES.farm_in; delete GATES.town_from_farm;
+}
+// 🏘️ the village west wing: ground, roads joining the first wing, the 12 houses, hedges, fences, lamps and a small square
+{
+  const X = HOUSING.x, X0 = VX, Hh = HOUSING.h;
+  rect(X0, 0, X - X0, Hh, '.');
+  for (let y = 1; y < Hh - 1; y++) for (const x of [X, X + 1]) if (get(x, y) === 'T') set(x, y, '.');   // open the old west edge
+  for (let k = TREES.length - 1; k >= 0; k--) { const t = TREES[k]; if ((t[0] === X || t[0] === X + 1) && t[1] > 0 && t[1] < Hh - 1) TREES.splice(k, 1); }
+  for (let x = X0; x < X; x++) { set(x, 0, 'T'); set(x, Hh - 1, 'T'); TREES.push([x, 0, TREE_KINDS[(x * 7) % TREE_KINDS.length]], [x, Hh - 1, TREE_KINDS[(x * 7 + 3) % TREE_KINDS.length]]); }
+  for (let y = 1; y < Hh - 1; y++) { set(X0, y, 'T'); TREES.push([X0, y, TREE_KINDS[(y * 13) % TREE_KINDS.length]]); }
+  rect(X0 + 2, 21, X - X0, 2, '='); rect(X0 + 2, 20, X - X0, 1, ',');                 // the north street, joined to the first wing's
+  rect(X0 + 6, 38, X - X0, 2, '='); rect(X0 + 6, 37, X - X0, 1, ',');                 // the south street
+  rect(X0 + 6, 23, 2, 15, '=');                                                     // the west cross street
+  for (const b of BUILDINGS.filter(q => q.vx)) {
+    for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) if (get(i, j) === '.') set(i, j, 'B');
+    const k = b.house - 12; prop(k % 2 ? 'hedge_flower' : 'hedge', b.x - 1, b.y + b.h - .1, false);
+    if (k % 3 === 0) prop('postbox', b.x + 5.3, b.y + b.h + .05);
+  }
+  fenceRow('fence_white', X0 + 8, X0 + 62, 16.95); fenceRow('fence_white', X0 + 9, X0 + 62, 33.95);   // back gardens
+  // the wing's square: a fountain lawn with benches, flowers and lamps between the streets
+  const cx = X0 + 35;
+  rect(cx - 2, 29, 4, 2, 'o'); prop('o_fountain2', cx, 30.6);
+  for (const [sp, dx, y, so] of [['o_bench', -6, 27, false], ['o_bench', 6, 27, false], ['o_tulips', -3.4, 26.9, true], ['o_tulips', 3.4, 26.9, true], ['o_lampball', -8, 26.9, true], ['o_lampball', 8, 26.9, true],
+    ['o_flowerbed', -12, 30.5, false], ['o_flowerbed', 12, 30.5, false], ['tree_pink', -16, 29.5, true], ['tree_pink2', 16, 29.5, true], ['o_roses', -4, 32.6, true], ['o_roses', 4, 32.6, true]]) prop(sp, cx + dx, y, so);
+  for (let x = X0 + 12; x < X - 2; x += 9) { prop('o_lampball', x + 4.5, 23.9, true); prop('o_lampball', x + 4.5, 40.9, true); }
+  for (const [x, y] of [[cx - 6, 27], [cx + 6, 27]]) STATIONS.push({ id: 'seat_hw' + x, type: 'seat', label: 'ม้านั่งในสวน', icon: '🪑', x, y: y - .25, r: 1.1, area: 'housing' });
+  for (const [x, y] of [[X0 + 20, 44], [X0 + 50, 44], [X0 + 30, 46], [X0 + 40, 46]]) TREES.push([x, y, TREE_KINDS[(x * 3 + y) % TREE_KINDS.length]]), set(x, y, 'T');
+  for (let k = 0; k < 9; k++) for (const [dx, y] of [[4, 5], [7.5, 10]]) { const x = Math.floor(X0 + dx + k * 7.3), y0 = y + (k % 2); if (x < X - 2 && get(x, y0) === '.') { set(x, y0, 'T'); TREES.push([x, y0, TREE_KINDS[(x * 5 + y0 * 3) % TREE_KINDS.length]]); } }   // a grove behind the back gardens
+  HOUSING.x = X0; HOUSING.w = X + 70 - X0;   // the area now spans both wings
 }
 // ================================================================= ⚽ THE FOOTBALL GROUND (in the farm's empty space): an 18 x 10 pitch with a goal at each
 // end, stands (you can sit on them) and a scoreboard along the north, dugouts and a snack kiosk along the south. The ball is simulated by the server.
@@ -917,14 +954,14 @@ const FOOTBALL = { pitch: { x: FIELD.x + 6, y: FIELD.y + 8, w: 18, h: 10 }, goal
 // east side, along its promenade) and on to the football ground's west gate. No more teleport gates: you just walk in.
 const PARK_ARCH = { x: 46, y: 94.6 };
 {
-  const T = TOWN, y0 = 89, xe = 96; T.h = H;
+  const T = TOWN, y0 = 89, xe = 96; const TH = 125; T.h = TH;   // the town's south edge (the map itself is taller now)
   const keep = (arr, f) => { const k = arr.filter(f); arr.length = 0; arr.push(...k); };
   const clearTree = (x, y) => { keep(TREES, t => !(t[0] === x && t[1] === y)); };
   for (let x = 1; x <= xe; x++) if (get(x, y0) === 'T') { clearTree(x, y0); set(x, y0, '.'); }
-  for (let y = y0; y < H; y++) for (let x = 0; x <= xe; x++) if (get(x, y) === ' ') set(x, y, '.');
+  for (let y = y0; y < TH; y++) for (let x = 0; x <= xe; x++) if (get(x, y) === ' ') set(x, y, '.');
   const tree = (x, y) => { if (get(x, y) !== '.') return; set(x, y, 'T'); TREES.push([x, y, TREE_KINDS[(x * 7 + y * 13) % TREE_KINDS.length]]); };
-  for (let y = y0; y < H; y++) tree(0, y);
-  for (let x = 0; x <= xe; x++) tree(x, H - 1);
+  for (let y = y0; y < TH; y++) tree(0, y);
+  for (let x = 0; x <= xe; x++) tree(x, TH - 1);
   rect(1, y0, xe, 1, ','); rect(1, 90, xe, 2, '='); rect(1, 92, xe, 1, ',');   // pavement, avenue, pavement
   rect(49, 76, 2, 14, '=');                                                      // the road down from the old town meets it
   rect(45, 93, 3, 15, 'c');                                                      // the cobbled walk south
