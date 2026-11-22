@@ -701,7 +701,7 @@ function handle(m) {
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
-      const prev = me; me = m.d && prev ? { ...prev, ...m } : m; if (!prev || prev.frame !== me.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = me.name; paintHud(); refreshPanel(); if (prev && prev.id === me.id) onMeDiff(prev, me); break; }   // d: only the fields that changed
+      const prev = me; me = m.d && prev ? { ...prev, ...m } : m; if (!prev || prev.frame !== me.frame) setTimeout(paintPortrait, 0); $('#meName').textContent = me.name; paintHud(); refreshPanel(); if (prev && prev.id === me.id) onMeDiff(prev, me); if (!prev || prev.misAt !== me.misAt) misReadyWatch(); break; }   // d: only the fields that changed
     case 'announce': setTicker(m.text); showTicker(); break;
     case 'wd': {   // the full snapshot on login, then only the parts that changed (d: 1)
       if ('ann' in m && (m.ann || '') !== tickerAnn) setTicker(m.ann);
@@ -4793,6 +4793,13 @@ function guideTalk(n) {
   const tip = !me.vehicles?.length && (me.money || 0) < 2000 ? 'ยังไม่มีเงินใช่ไหม ลองไปตกปลาก่อนเลย พี่พาไปหาน้าเล็กได้นะ' : me.career === 'none' ? 'ยังไม่มีงานทำเหรอ ลองดูว่ามีอาชีพอะไรบ้างสิ' : 'วันนี้อยากรู้อะไรจ๊ะ';
   menu([`สวัสดีจ้า ${me.name || ''}! พี่ฟ้าประจำจุดแนะนำเมืองจ้า`, tip]);
 }
+// job missions: seconds until the next one can be taken, and a heads-up when it is ready
+const misWait = () => Math.max(0, Math.ceil(((me?.misAt || 0) - (Date.now() + clockOff)) / 1000));
+let misReadyT = 0;
+function misReadyWatch() {
+  clearTimeout(misReadyT); const w = misWait(); if (!w || me.mis) return;
+  misReadyT = setTimeout(() => { if (me && !me.mis && !misWait()) { FX.play('chime'); toast('มีภารกิจใหม่แล้ว! ไปรับได้ที่ NPC อาชีพของคุณ', '📋'); } }, w * 1000 + 300);
+}
 function talkTo(n, st) {
   const now = performance.now(), quick = now - (talkedAt[n.id] || -1e9) < 90000; talkedAt[n.id] = now;
   const openIt = () => { dialogClose(); openPanel({ kind: STN(st)?.type || 'staff', st }); };
@@ -4802,7 +4809,7 @@ function talkTo(n, st) {
   const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
   const base = { name: n.name, face: NPC_FACE[n.id], npc: n.id };
   const misOk = !n.keeper && MIS_CAREERS.includes(n.career) && job(n.career);
-  const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' }] : [];
+  const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : misWait() > 0 ? { label: `⏳ งานใหม่ในอีก ${misWait()} วินาที`, fn: () => toast(`ยังไม่มีงานใหม่ รออีก ${misWait()} วินาที (จะแจ้งเตือนเมื่อพร้อม)`, '⏳', false) } : { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' }] : [];
   const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
   dialog({ ...base, lines: [hi], choices });
@@ -5618,6 +5625,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25o', d: '22 พ.ย.', items: [
+    '⏳ ภารกิจอาชีพ: ปุ่มบอกเวลานับถอยหลังก่อนรับงานใหม่ได้ และมีแจ้งเตือนเด้งขึ้นเมื่อมีภารกิจใหม่',
+    '👨‍🍳 เชฟหมีกลับมายืนกลางครัวใหญ่ (ไม่หลบมุม ไม่โดนเขียงบัง)',
+  ] },
   { v: '2026-11-25l', d: '22 พ.ย.', items: [
     '📋 เชฟรับภารกิจจากเชฟหมีได้แล้ว (ก่อนหน้านี้ปุ่มรับภารกิจไม่ขึ้น)',
   ] },
