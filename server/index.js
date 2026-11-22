@@ -3795,7 +3795,8 @@ function detBuild(a) {
     const keep = left.filter(i => sus[i][k] === culprit[k]); if (keep.length < left.length) { traits.push(k); left = keep; }
   }
   // where the suspects stand: spread over town, away from each other
-  const pool = reachFrom(st.x, st.y, 8, 70, 6).filter(([x, y]) => !D.blocked(x + .5, y + .5, .4)).sort(() => Math.random() - .5), spots = [];
+  const open = (x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => !D.blocked(x + dx + .5, y + dy + .5, .45));   // open ground only (not inside a fenced bed or a hedge gap)
+  const pool = reachFrom(st.x, st.y, 8, 70, 6).filter(([x, y]) => open(x, y)).sort(() => Math.random() - .5), spots = [];
   for (const p of pool) { if (spots.length >= N + traits.length + 1) break; if (spots.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) > 7)) spots.push(p); }
   while (spots.length < N + traits.length + 1) spots.push(pool[spots.length] || [Math.floor(st.x), Math.floor(st.y) + 2]);
   const names = { m: [...DET.names.m].sort(() => Math.random() - .5), f: [...DET.names.f].sort(() => Math.random() - .5) };
@@ -3831,7 +3832,7 @@ function detAct(a, m) {
     markMe(a); return send(a, { t: 'detsay', i: +m.i, name: q.name, g: q.g, lk: q.lk, say: q.said });
   }
   if (m.op === 'clue') {
-    const q = c.clues[+m.i]; if (!q || q.found || areaId(a) !== 'town' || Math.hypot(a.x - q.x, a.y - q.y) > 2) return;
+    const q = c.clues[+m.i]; if (!q || q.found || areaId(a) !== 'town' || Math.hypot(a.x - q.x, a.y - q.y) > 2.8) return;
     q.found = true; FX0(a, 'pick'); markMe(a); return toast(a, `🔎 เจอเบาะแส! ${q.text}`, '🔎');
   }
   if (m.op === 'accuse') {

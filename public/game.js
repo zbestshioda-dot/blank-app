@@ -1572,7 +1572,7 @@ function findNear() {
   }
   if (me?.case && here === 'town') {   // 🕵️ question a suspect / pick up a clue
     me.case.sus.forEach((q, i) => { const d = Math.hypot(q.x - m.x, q.y - m.y); if (d <= 2 && d < bd) { bd = d; best = { id: 'dets' + i, type: 'dets', i, icon: '🗣️', label: `สอบปากคำ ${q.name}`, x: q.x, y: q.y, r: 2, area: here }; } });
-    me.case.clues.forEach((q, i) => { const d = Math.hypot(q.x - m.x, q.y - m.y); if (!q.found && d <= 1.6 && d < bd + .5) { bd = d; best = { id: 'detc' + i, type: 'detc', i, icon: '🔎', label: 'ตรวจเบาะแส', x: q.x, y: q.y, r: 1.6, area: here }; } });
+    me.case.clues.forEach((q, i) => { const d = Math.hypot(q.x - m.x, q.y - m.y); if (!q.found && d <= 2.4 && d < bd + .5) { bd = d; best = { id: 'detc' + i, type: 'detc', i, icon: '🔎', label: 'ตรวจเบาะแส', x: q.x, y: q.y, r: 2.4, area: here }; } });
   }
   // ☂️ the umbrella man (only around while it rains): a yellow ring and the action button talk to him
   for (const p of P.values()) if (p.umb && p.npc) { const d = Math.hypot(p.x - m.x, p.y - m.y); if (d <= 1.8 && d < bd) { bd = d; best = { id: 'umbman', type: 'umb', npc: p, label: 'คุยกับลุงชัย (ซื้อร่ม)', icon: '☂️', x: p.x, y: p.y, r: 1.8, area: here }; } }
@@ -5671,6 +5671,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25u', d: '22 พ.ย.', items: [
+    '🔎 เกมนักสืบ: จุดเบาะแสและผู้ต้องสงสัยอยู่ในที่โล่งเดินถึงเสมอ (ไม่ไปตกในแปลงดอกไม้/หลังรั้ว) และเก็บเบาะแสได้จากระยะไกลขึ้น',
+  ] },
   { v: '2026-11-25t', d: '22 พ.ย.', items: [
     '🕵️ <b>เกมนักสืบ "ใครคือคนร้าย?"</b> รับคดีกับผู้กองเดช (⚡8) · ผู้ต้องสงสัย 4–6 คนยืนอยู่ในเมือง ดูสีเสื้อ ผม กางเกงได้จริง · เก็บเบาะแสที่จุดเรืองแสง สอบปากคำ (คนร้ายโกหกว่าอยู่ที่ไหน กล้องวงจรปิดจะจับได้) แล้วชี้ตัวที่ 🗂️ กระดานสืบสวน · ชี้ผิดคนร้ายหนี · ยิ่งเร็วยิ่งได้มาก · คดีสุ่มใหม่ทุกครั้ง',
     '📚 หอสมุดแต่งใหม่: กระดานสืบสวนด้ายแดง โต๊ะพิมพ์ดีด ตู้บัตรรายการ ชั้นหนังสือมีบันได ตู้โชว์ ตู้เซฟ เครื่องเล่นแผ่นเสียง พรมเขียว และป้ายสำนักงานนักสืบหน้าประตู',
