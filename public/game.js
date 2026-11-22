@@ -252,29 +252,15 @@ function drawRide(p, v, px, py, k, view, dir) {
   const wl = p.whlT && t < p.whlT ? Math.sin((1 - (p.whlT - t) / 1400) * Math.PI) : 0;   // a wheelie: the front wheel up for a moment
   ctx.save();
   if (wl) { if (view === 'side') { const rx = px + back * TS * .55; ctx.translate(rx, py); ctx.rotate(back * wl * .5); ctx.translate(-rx, -py); } else ctx.translate(0, -wl * TS * .25); }
-  // 🏍️ sit astride (legs folded), lean into the bars on the side view, hands on the grips (the scooter and the sleigh keep their pose)
-  const sit = p.veh !== 'escoot' && p.veh !== 'sleigh', fw = faceLeft ? -1 : 1, lean = view === 'side' && sit ? fw * .16 : 0;
-  const rx = px + (view === 'side' ? -fw * TS * .12 : 0), ry = py - lift - (sit && CH_ATLAS ? (CH_ATLAS.feet[1] * .34 + 1.4) * k * (1 - SEAT_LEGS) : 0);   // folded legs: lift the body so the hips stay on the seat
-  const rider = (q, x, y) => { ctx.save(); ctx.translate(x, y); if (lean) ctx.rotate(lean); drawCharTo(ctx, q, 0, 0, k, view, 0, faceLeft, sit); ctx.restore(); };
-  const pilAt = () => pil && rider(pil, px + (view === 'side' ? back * TS * .44 : 0), py - lift - TS * (view === 'side' ? .04 : .12));
+  const pilAt = () => pil && drawCharTo(ctx, pil, px + (view === 'side' ? back * TS * .44 : 0), py - lift - TS * (view === 'side' ? .04 : .12), k, view, 0, faceLeft);
   if (view !== 'back') pilAt();
-  rider(p, rx, ry);
+  drawCharTo(ctx, p, px + (view === 'side' ? (faceLeft ? TS * .12 : -TS * .12) : 0), py - lift, k, view, 0, faceLeft);
   if (view === 'back') pilAt();
   if (v.aura) { ctx.save(); ctx.shadowColor = v.aura; ctx.shadowBlur = TS * (.35 + Math.sin(t / 260) * .12); drawVeh(p.veh, view, faceLeft, px, py); ctx.restore(); }
   drawVeh(p.veh, view, faceLeft, px, py);                                        // the bike in front hides the legs
-  if (sit && CH_ATLAS) {                                                         // forearms from the elbows to the handlebar grips
-    const [, ay] = CH_ATLAS.feet, hip = Math.round(ay - (ay - 4) * .34), ey = -(ay - hip) * k * SEAT_LEGS - (hip - 62) * k;   // elbow height on the folded body
-    const bw = (vehSpr(p.veh, view)?.[2] || 48) / atlas.tile * TS, bh = vehH(p.veh, view), gr = GRIP[p.veh] || GRIP._;
-    const sk = SKIN_COL[p.lk?.skin] || SKIN_REF, col = `rgb(${sk})`;
-    const arm = (x0, y0, x1, y1) => { ctx.lineCap = 'round'; for (const [c, w] of [['#3b2418', 6], [col, 4]]) { ctx.strokeStyle = c; ctx.lineWidth = w * k; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); } };
-    if (view === 'side') { const ex = fw * 11 * k, c = Math.cos(lean), s = Math.sin(lean); arm(rx + ex * c - ey * s, ry + ex * s + ey * c, px + fw * bw * gr[0], py - bh * gr[1]); }
-    else for (const d of [-1, 1]) arm(rx + d * 18 * k, ry + ey, px + d * bw * gr[2], py - bh * gr[3]);
-  }
   ctx.restore();
 }
 const SEAT_LEGS = .45;
-// where the handlebar grips are on each bike picture: [side: ahead of centre × width, up × height, front/back: out × width, up × height]
-const GRIP = { _: [.27, .8, .4, .85], sport: [.22, .74, .4, .8], cruiser: [.3, .84, .42, .85] };
 // re-dye a sprite frame: the rider's green turned orange (the rival riders); cached per frame
 const DYE = new Map();
 function dyeFrame(fr, dye) {
