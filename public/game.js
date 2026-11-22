@@ -103,7 +103,8 @@ function paintSw() {
 // every frame has 4 layers: base (outline, skin, shoes) + shirt / pants / hair stored as grey shading and tinted per player
 let CH_ATLAS = null, chImg = null; const chWait = [], chCache = new Map();
 // recoloured character frames: an LRU cache (a hit moves the frame to the back) big enough for a busy square, so frames are not rebuilt every frame
-const CH_MAX = 600;   // (~30 MB of small canvases; 1400 was too much for iPhones)
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+const CH_MAX = IOS ? 350 : 600;   // (~30 MB of small canvases; 1400 was too much for iPhones, which also cap all canvases together)
 const chGet = k => { const c = chCache.get(k); if (c) { chCache.delete(k); chCache.set(k, c); } return c; };
 const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCache.delete(chCache.keys().next().value); return c; };
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
@@ -262,7 +263,7 @@ function drawRide(p, v, px, py, k, view, dir) {
 }
 const SEAT_LEGS = .45;
 // re-dye a sprite frame: the rider's green turned orange (the rival riders); cached per frame
-const DYE = new Map();
+let DYE = new WeakMap();   // per frame canvas: a frame dropped from the cache takes its dyed copy with it (a Map kept both forever → iPhones ran out of canvas memory: black screen)
 function dyeFrame(fr, dye) {
   let m = DYE.get(fr); if (m) return m;
   const c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height; const g = c.getContext('2d'); g.drawImage(fr, 0, 0);
@@ -645,12 +646,16 @@ let gPendLink = null;
 }
 // ------------------------------------------------------------------ network
 let lastMsgT = 0;
+let connT = 0;
 function connect() {
-  if (ws && ws.readyState <= 1) { if (ws.readyState === 1) sendLogin(); return; }
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
-  ws.onopen = () => { if (wantLogin) sendLogin(); };
-  ws.onmessage = e => { lastMsgT = Date.now(); handle(JSON.parse(e.data)); };
+  if (ws && ws.readyState === 1) { sendLogin(); return; }
+  if (ws && ws.readyState === 0) { if (Date.now() - connT < 6000) return; try { ws.onclose = null; ws.close(); } catch { } }   // a socket stuck "connecting" (phone woke from sleep): drop it and dial again
+  connT = Date.now();
+  const s = ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => { if (s === ws && wantLogin) sendLogin(); };
+  ws.onmessage = e => { if (s !== ws) return; lastMsgT = Date.now(); handle(JSON.parse(e.data)); };   // an old socket's last words never count
   ws.onclose = () => {
+    if (s !== ws) return;
     if (G && !restartAt) toast('การเชื่อมต่อหลุด กำลังเชื่อมต่อใหม่...', '📡', false);
     setTimeout(() => { if (wantLogin) connect(); }, 2000);
   };
@@ -666,7 +671,11 @@ setInterval(() => { if (restartAt && Date.now() - restartAt > 120000) { restartA
 function sendLogin() { send({ t: 'login', ...creds }); }
 // a socket that stopped talking while the game is on screen (the phone switched networks): the world froze for players. The server
 // sends the world every second, so 8 quiet seconds means the line is dead: drop it and reconnect.
-setInterval(() => { if (G && wantLogin && !document.hidden && ws && ws.readyState === 1 && lastMsgT && Date.now() - lastMsgT > 8000) { lastMsgT = Date.now(); try { ws.close(); } catch { } } }, 2000);
+setInterval(() => {
+  if (!wantLogin || document.hidden || !ws) return;
+  if (G && ws.readyState === 1 && lastMsgT && Date.now() - lastMsgT > 8000) { lastMsgT = Date.now(); try { ws.close(); } catch { } }
+  else if (ws.readyState === 0 && Date.now() - connT > 8000 || ws.readyState === 3 && Date.now() - connT > 5000) connect();   // stuck dialling, or closed and the retry timer was lost while asleep
+}, 2000);
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 let fixId = 0;                          // the server's last position correction we have applied
 const doAct = (st, a, extra = {}) => send({ t: 'act', st, a, ...extra });
@@ -852,7 +861,7 @@ function handle(m) {
 // ---- the chat box under the status card: tabs, foldable, type straight into it
 let cbTab = 'all', cbFolded = false, cbUnread = 0;
 try { cbFolded = localStorage.getItem('lt_cb') === '1'; } catch { }
-const cbShow = m => cbTab === 'all' ? !m.sys : (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : cbTab === 'gang' ? m.g : !m.sys && !m.w && !m.g);
+const cbShow = m => cbTab === 'all' ? true : (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : cbTab === 'gang' ? m.g : !m.sys && !m.w && !m.g);
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
   box.innerHTML = chatLog.filter(cbShow).slice(-40).map(m => m.sys ? `<div class="sys">• ${esc(m.text)}</div>`
@@ -5114,7 +5123,7 @@ function worldOk(ch) {
   if (left > 0) { toast(`แชทโลกส่งได้ทุก 3 วินาที · รออีก ${left} วินาที แล้วกดส่งใหม่ได้เลย (ข้อความยังอยู่ในช่องพิมพ์)`, '💬', false); return false; }
   worldAt = Date.now(); return true;
 }
-const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? !m.sys : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b${m.adm ? ' class="admN"' : ''}>${m.adm ? '👑 ' : ''}${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
+const chatHtml = () => chatLog.filter(m => chatTab === 'all' ? true : m.sys || (chatTab === 'world' ? m.w : !m.w)).map(m => m.sys ? `<div class="sys">${esc(m.text)}</div>` : `<div class="${m.w ? 'w' : ''}"><b${m.adm ? ' class="admN"' : ''}>${m.adm ? '👑 ' : ''}${esc(m.name)}</b>: ${esc(m.text)}</div>`).join('');
 // ---- profile photo, titles by rarity, mail
 let myPic = '', mailList = [], tradeChat = [];
 const infoCache = new Map();
@@ -5521,6 +5530,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24n', d: '22 พ.ย.', items: [
+    '💬 แท็บ "รวม" แสดงข้อความระบบด้วยแล้ว',
+    '📶 แก้พับจอ/ล็อกจอแล้วกลับมาเล่น เกมไม่ต่อใหม่ ตอนนี้ต่อใหม่ให้เองทุกครั้ง',
+    '📱 แก้ iPhone/iPad เล่นไปนานๆ แล้วจอดำ (เกมกินหน่วยความจำภาพสะสมเรื่อยๆ) ตอนนี้ใช้น้อยลงและคืนหน่วยความจำได้',
+  ] },
   { v: '2026-11-24m', d: '22 พ.ย.', items: [
     '🔧 ตอนเกมอัปเดต จะขึ้นแถบ "กำลังอัปเดต" แทนการหลุดเฉยๆ แล้วต่อใหม่ให้เอง',
     '📄 งานที่ทำค้าง (ส่งเอกสาร · เคสหมาหาย/จับโจร) ไม่หายตอนเกมอัปเดตแล้ว และเวลาเคสไม่ถูกนับช่วงที่เกมปิด',
@@ -6984,7 +6998,7 @@ function renderPanel(p) {
     }
     case 'chat':
       return `<h2>💬 แชท</h2><div class="tabs">${B('💬 รวม', { fn: 'chatTab', tab: 'all' }, chatTab === 'all' ? 'primary' : '')}${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}</div>
-        <div class="sub">${chatTab === 'all' ? 'แชทโลก + คนใกล้ๆ รวมกัน (ไม่มีข้อความระบบ) · พิมพ์ที่นี่ = ส่งเข้าแชทโลก' : chatTab === 'world' ? 'ทุกคนในเมืองอ่านได้ ไม่ขึ้นบนหัว (ส่งได้ทุก 3 วินาที)' : 'ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น'}</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="${chatTab === 'world' || chatTab === 'all' ? 'พิมพ์ถึงทุกคน...' : 'พิมพ์ข้อความ...'}" autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
+        <div class="sub">${chatTab === 'all' ? 'แชทโลก + คนใกล้ๆ + ข้อความระบบ รวมกัน · พิมพ์ที่นี่ = ส่งเข้าแชทโลก' : chatTab === 'world' ? 'ทุกคนในเมืองอ่านได้ ไม่ขึ้นบนหัว (ส่งได้ทุก 3 วินาที)' : 'ข้อความจะลอยเป็นบับเบิ้ลบนหัว เฉพาะคนที่อยู่ใกล้คุณ (~14 ช่อง) เท่านั้นที่เห็น'}</div><div id="chatMsgs">${chatHtml()}</div><form id="chatForm" class="rowf"><input id="chatIn" maxlength="120" placeholder="${chatTab === 'world' || chatTab === 'all' ? 'พิมพ์ถึงทุกคน...' : 'พิมพ์ข้อความ...'}" autocomplete="off"><button class="primary" type="submit">ส่ง</button></form>`;
     case 'screen': {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⛶ หน้าจอ</h2><div class="sub">${canFs ? 'เต็มจอซ่อนแถบเบราว์เซอร์ · แนวนอนจะล็อกจอให้เป็นแนวนอน (มือถือ Android)' : 'iPhone/iPad ใช้เต็มจอจากเบราว์เซอร์ไม่ได้: กดปุ่มแชร์ ⬆️ → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดเกมจากไอคอนจะเต็มจอ · หมุนเครื่องเป็นแนวนอนได้เลย'}</div>
@@ -7430,7 +7444,7 @@ function groundChunk(A, cx, cy) {
     for (let ty = Math.max(ty0, A.y); ty < ty1; ty++) for (let tx = Math.max(tx0, A.x); tx < tx1; tx++) { const ch = G.map.tiles[ty][tx]; if (ch !== 'w') drawTile(ch, tx, ty, (tx - tx0) * TS, (ty - ty0) * TS, 0); }
     for (let ty = Math.max(ty0, A.y); ty < ty1; ty++) for (let tx = Math.max(tx0, A.x); tx < tx1; tx++) drawEdges(tx, ty, (tx - tx0) * TS, (ty - ty0) * TS);
   } finally { ctx = mainCtx; }
-  gCache.set(key, c); if (gCache.size > 36) gCache.delete(gCache.keys().next().value);
+  gCache.set(key, c); if (gCache.size > (IOS ? 24 : 36)) { const k0 = gCache.keys().next().value, o = gCache.get(k0); gCache.delete(k0); o.width = o.height = 0; }   // (shrinking frees the pixels right away on iOS)
   return c;
 }
 function drawTile(ch, tx, ty, px, py, tm) {
@@ -7606,7 +7620,7 @@ function silhouettes() {
 }
 // back from another app: phones may have thrown away the canvases (black screen) or left a dead connection; rebuild both
 function gfxRecover() {
-  chCache.clear(); DYE.clear(); gCache.clear(); shadowAtlas = null; shadowBuf = null;
+  chCache.clear(); DYE = new WeakMap(); gCache.clear(); shadowAtlas = null; shadowBuf = null;
   cv.width = 0; resize();
 }
 let hiddenAt = 0;
@@ -7614,7 +7628,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
   if (Date.now() - hiddenAt > 1500) gfxRecover();
   if (ws && ws.readyState === 1 && Date.now() - lastMsgT > 6000) { try { ws.close(); } catch { } }   // a socket that went quiet in the background: reconnect
-  else if (wantLogin && (!ws || ws.readyState > 1)) connect();
+  else if (wantLogin && (!ws || ws.readyState !== 1)) connect();   // closed, or stuck dialling while the phone slept
 });
 addEventListener('pagehide', () => { try { ws?.close(); } catch { } });   // tab / app closed: leave the map right away
 addEventListener('pageshow', e => { if (e.persisted) { gfxRecover(); if (wantLogin && (!ws || ws.readyState > 1)) connect(); } });
