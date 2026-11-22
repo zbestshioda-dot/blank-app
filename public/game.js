@@ -217,7 +217,7 @@ const vehSpr = (key, view) => atlas?.sprites?.[`w_${key}_${view === 'side' ? 's'
 const vehH = (key, view) => { const s = vehSpr(key, view); return s ? s[3] / atlas.tile * TS : TS; };
 const VEH_FACE_R = new Set(['spider']);   // side sprites drawn facing right (the rest face left)
 // some top views only have one picture for both directions: flip it so the nose points the way you drive
-const VEH_FLIP_B = new Set(['heli', 'heli2', 'jag', 'lambo', 'mclaren', 'phantom', 'spider']), VEH_FLIP_F = new Set(['porsche']);
+const VEH_FLIP_B = new Set(['heli2', 'jag', 'lambo', 'mclaren', 'phantom']), VEH_FLIP_F = new Set(['porsche', 'spider', 'heli']);   // _B: the picture has the nose down; _F: nose up
 function drawVeh(key, view, faceLeft, px, py) {
   const flipY = view === 'back' && VEH_FLIP_B.has(key) || view === 'front' && VEH_FLIP_F.has(key);
   const s = flipY || view === 'back' && VEH_FLIP_F.has(key) ? vehSpr(key, 'front') : vehSpr(key, view); if (!s || !atlasImg) return;
@@ -5504,6 +5504,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-24d', d: '22 พ.ย.', items: [
+    '🚗 แก้รถวิ่งถอยหลัง: สไปเดอร์ขาว ฮอสีเงิน และรถตำรวจบนถนน หันหัวถูกทางแล้วตอนวิ่งขึ้น/ลง',
     '🏬 <b>ตึกในเมืองหน้าใหม่ 16 หลัง</b> วาดใหม่ให้หันหน้าตรงเข้ากับเมือง: ร้านอุปกรณ์ โชว์รูมรถ โรงพยาบาล ตึกบริษัท โรงประมูล ครัวใหญ่ สมาคมประมง ร้านขายปลา ร้าน 24 ชม. 3 สาขา ปั๊มน้ำมัน ร้านสัตว์เลี้ยง ฟิตเนส แผงผลไม้ ร้านทำผม',
   ] },
   { v: '2026-11-24c', d: '22 พ.ย.', items: [
@@ -7607,7 +7608,7 @@ const VEH = {
   blue:   { faceR: 1, side: 'v_blue_side', front: ['car_blue', .45], back: 'v_blue_back', len: 1.9, v: 3.0 },
   taxi:   { faceR: 1, side: 'v_taxi_side', front: ['taxi', .41], back: 'v_taxi_back', len: 1.9, v: 3.4 },
   yellow: { faceR: 1, side: 'v_yellow_side', front: 'v_yellow_front', back: 'v_yellow_back', len: 1.9, v: 3.1 },
-  police: { faceR: 1, side: 'v_police_side', front: 'v_police_front', back: 'v_police_front', len: 1.9, v: 3.3 },
+  police: { faceR: 1, side: 'v_police_side', front: 'v_police_front', back: ['w_police_b', .69], len: 1.9, v: 3.3 },
   amb:    { side: 'v_amb_side', front: 'v_amb_back', back: 'v_amb_back', len: 2.3, v: 6, deep: 1.2 },
   bus:    { side: 'v_bus_side', front: 'v_bus_front', back: 'v_bus_back', len: 3.8, v: 2.4, deep: 1.7 },
 };
