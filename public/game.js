@@ -5836,7 +5836,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
-  { v: '2026-11-26e', d: '23 พ.ย.', items: [
+  { v: '2026-11-26g', d: '23 พ.ย.', items: [
     '🩺 หมอ: ต้องยืนตรวจอาการข้างเตียง 2.5 วินาทีก่อนเลือกการรักษา · อาการสลับลำดับทุกครั้ง และคนไข้อาจบ่นอาการที่ไม่เกี่ยวมา 1 อย่าง ต้องอ่านให้ดี',
     '🤒 ไอคอนป่วยบนหัวคนอื่นเป็นแบบเดียวกันหมดแล้ว (ไม่บอกชื่อโรค หมอต้องวินิจฉัยเอง)',
   ] },
