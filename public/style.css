@@ -1582,3 +1582,17 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 /* the bag opens big, nearly full screen, like an RPG inventory */
 #panel.bagMode .sheet{width:min(1000px,96vw);max-height:88vh;max-height:88dvh;zoom:1}
 #panel.bagMode .bagSlots{max-height:min(60vh,520px)}
+/* 🌱 by your vegetable bed: a crop card on the left, hexagon buttons round your character */
+#farmHud{position:fixed;inset:0;pointer-events:none;z-index:4}
+#farmHud .fCard{position:absolute;left:clamp(8px,calc(var(--px) + 122px),calc(100vw - 242px));top:clamp(60px,calc(var(--py) - 110px),calc(100vh - 330px));width:230px;background:rgba(22,16,10,.86);color:#f4e6cc;border:1px solid #6a4a26;border-radius:10px;padding:9px 11px;font-size:12.5px;pointer-events:auto}
+#farmHud .fcHead{display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(255,230,180,.25);padding-bottom:5px;margin-bottom:5px}
+#farmHud .fcHead span{font-size:20px}#farmHud .fcHead b{font-size:15px;color:#ffd770}
+#farmHud .fcRows{display:grid;grid-template-columns:auto 1fr;gap:3px 10px}#farmHud .fcRows span{opacity:.75}#farmHud .fcRows b{text-align:right;font-weight:600}
+#farmHud .fcRows b.ok{color:#8be36b}#farmHud .fcRows b.bad{color:#7cc4ff}
+#farmHud .fHex{position:absolute;left:var(--px);top:var(--py);width:0;height:0}
+#farmHud .hx{position:absolute;width:64px;height:58px;margin:-29px 0 0 -32px;padding:0;pointer-events:auto;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);background:linear-gradient(#3a2c1c,#1d150d);border:none;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;box-shadow:none}
+#farmHud .hx span{font-size:20px}#farmHud .hx small{font-size:9px;max-width:56px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#farmHud .hx:active{filter:brightness(1.4)}
+#farmHud .h0{transform:translate(-78px,-40px)}#farmHud .h1{transform:translate(78px,-40px)}#farmHud .h2{transform:translate(-78px,40px)}#farmHud .h3{transform:translate(78px,40px)}#farmHud .h4{transform:translate(0,-92px) scale(.8)}
+#farmHud .hx[data-f=harvest]{background:linear-gradient(#5d8a2a,#2f5212)}#farmHud .hx[data-f=water]{background:linear-gradient(#2d72b8,#133d6c)}
+@media (max-width:620px){#farmHud .fCard{left:auto;right:8px;top:auto;bottom:calc(230px + env(safe-area-inset-bottom));width:190px;font-size:11px}}

@@ -676,7 +676,7 @@ setInterval(() => {
   if (G && ws.readyState === 1 && lastMsgT && Date.now() - lastMsgT > 8000) { lastMsgT = Date.now(); try { ws.close(); } catch { } }
   else if (ws.readyState === 0 && Date.now() - connT > 8000 || ws.readyState === 3 && Date.now() - connT > 5000) connect();   // stuck dialling, or closed and the retry timer was lost while asleep
 }, 2000);
-function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+function send(o) { if (o.t === 'yfarm' && o.op === 'plant' && o.crop) { farmLast = o.crop; try { localStorage.setItem('lt_fcrop', o.crop); } catch { } } if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 let fixId = 0;                          // the server's last position correction we have applied
 const doAct = (st, a, extra = {}) => send({ t: 'act', st, a, ...extra });
 
@@ -1895,7 +1895,7 @@ function draw(t) {
   drawOtherCasts(X, Y, t); drawBobber(X, Y, t); drawMisGuide(X, Y, t);
   drawSirens(X, Y);
   FX.draw(ctx, X, Y, TS);
-  drawGuide(X, Y, t); drawSniff(X, Y, t);
+  drawGuide(X, Y, t); drawSniff(X, Y, t); cropTags();
   if (autoPath) {                          // tap-to-walk route: dotted line and a marker where you tapped
     const m = P.get(myId), pts = [[m.rx, m.ry], ...autoPath.pts];
     ctx.save(); ctx.setLineDash([TS * .14, TS * .14]); ctx.lineDashOffset = -t / 40; ctx.lineWidth = Math.max(3, TS * .08); ctx.lineCap = 'round';
@@ -1988,8 +1988,23 @@ function cropTint(id) {                         // the ripe crop's colour, for t
     for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && !(d[i + 1] > d[i] + 20 && d[i + 1] > d[i + 2] + 20)) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; }
     return (CROP_TINT[id] = n ? `rgb(${r / n | 0},${gg / n | 0},${b / n | 0})` : '#ffcf4a'); } catch { return (CROP_TINT[id] = '#ffcf4a'); }
 }
+// 🏷️ floating tags over the beds (like an MMO field): neighbouring cells of the same crop share one tag
+// ✅ ripe (how many) · 💧 needs water · ⏳ growing (time left on the soonest)
+function cropTags() {
+  const q = TAGQ.splice(0), now = Date.now() + clockOff, seen = new Array(q.length).fill(false);
+  for (let i = 0; i < q.length; i++) {
+    if (seen[i]) continue; const grp = [i]; seen[i] = true;
+    for (let g = 0; g < grp.length; g++) for (let j = 0; j < q.length; j++) if (!seen[j] && q[j][0][0] === q[grp[g]][0][0] && Math.abs(q[j][1] - q[grp[g]][1]) < TS * 1.2 && Math.abs(q[j][2] - q[grp[g]][2]) < TS * 1.2) { seen[j] = true; grp.push(j); }
+    const cells = grp.map(k => q[k]), ripe = cells.filter(c => c[0][1] <= now).length, dry = cells.filter(c => c[0][1] > now && c[0][2] === 0).length;
+    const soon = Math.min(...cells.map(c => c[0][1] - now)), mm = soon > 0 ? `${Math.floor(soon / 60e3)}:${String(Math.ceil(soon % 60e3 / 1000) % 60).padStart(2, '0')}` : '';
+    const x = cells.reduce((s, c) => s + c[1], 0) / cells.length, y = Math.min(...cells.map(c => c[2])), nm = G.items[cells[0][0][0]]?.name || '';
+    const txt = ripe ? `✅ ${nm} เก็บได้ ${ripe}` : dry ? `💧 ${nm} รดน้ำ ${dry}` : `⏳ ${nm} ${mm}`;
+    sign(txt, x, y - TS * .95, { size: TS * .24, bg: ripe ? 'rgba(40,120,40,.92)' : dry ? 'rgba(30,90,170,.92)' : 'rgba(30,24,18,.8)' });
+  }
+}
 function drawSoilCrop(e, X, Y, t) {
   const pl = wd?.houses?.[e[4].house]?.[10]?.[e[4].k], px = e[1] * TS + X, py = (e[2] - .5) * TS + Y;
+  if (pl && FARM_TAGS) TAGQ.push([pl, px, py]);
   if (near?.id === 'yf:' + e[4].k) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 2; ctx.strokeRect(px - TS / 2 + 1, py - TS / 2 + 1, TS - 2, TS - 2); }
   if (!pl) return;
   const [crop, readyAt, w] = pl, it = G.items[crop], left = readyAt - (Date.now() + clockOff), total = G.crops[crop].grow * 1000 * (w === 0 ? 2 : 1), prog = clamp(1 - left / total, 0, 1);
@@ -5590,6 +5605,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-25e', d: '22 พ.ย.', items: [
+    '🌱 ปลูกผักแบบใหม่! ยืนข้างแปลงดินในสวนบ้าน จะมีปุ่มหกเหลี่ยมรอบตัว: เก็บ · รดน้ำ · ปลูก (พืชที่ปลูกล่าสุด) · เลือกพืช พร้อมการ์ดข้อมูลแปลง (สถานะ เวลาที่เหลือ น้ำ อากาศ ผลผลิต)',
+    '🏷️ ป้ายลอยบนแปลง บอกชื่อพืชและสถานะ (✅ เก็บได้ · 💧 ต้องรดน้ำ · ⏳ เวลาที่เหลือ) ซ่อนได้ด้วยปุ่ม ซ่อนป้าย',
+  ] },
   { v: '2026-11-25d', d: '22 พ.ย.', items: [
     '🎒 กระเป๋าโฉมใหม่! เปิดเต็มจอ ของเรียงเป็นช่องตาราง แท็บหมวดด้านซ้าย แตะช่องเพื่อดูรายละเอียดด้านขวา (ราคา มูลค่ารวม กินแล้วได้อะไร) พร้อมปุ่มกิน/ใช้ · เรียงตามหมวด มูลค่า จำนวน หรือชื่อได้',
   ] },
@@ -8392,6 +8411,38 @@ function drawStairs(x, y, down, X, Y) {   // a little staircase drawn on the flo
 }
 // soil autotile: grass shows on each side that has no soil next to it (see tools/add_soil.py for the piece order)
 // the connected bed of soil tiles a tile belongs to (same rule as the server)
+// 🌱 standing by your vegetable bed: a card with the crop's details on the left and hexagon buttons round your character
+// (harvest / water / plant the whole bed / choose a crop), like the field menus in big farming games
+const TAGQ = []; let FARM_TAGS = true; try { FARM_TAGS = localStorage.getItem('lt_ftags') !== '0'; } catch { }
+let farmLast = ''; try { farmLast = localStorage.getItem('lt_fcrop') || ''; } catch { }
+function farmHud() {
+  let el = $('#farmHud'); const n = near, h = n?.type === 'yfield' && n.tile && n.house === me?.house ? wd?.houses?.[me.house] : null;
+  if (!h || panel || placing || picking) { if (el) el.classList.add('hidden'); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'farmHud'; el.className = 'hidden'; document.body.appendChild(el);
+    el.addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; FX.play('click'); const k = el.dataset.k, op = b.dataset.f;
+      if (op === 'pick') return openPanel({ kind: 'yfield', st: near.id });
+      if (op === 'plant') { if (!farmLast || !G.crops[farmLast]) return openPanel({ kind: 'yfield', st: near.id }); return send({ t: 'yfarm', k, op: 'plant', crop: farmLast, all: 1 }); }
+      if (op === 'tags') { FARM_TAGS = !FARM_TAGS; try { localStorage.setItem('lt_ftags', FARM_TAGS ? '1' : '0'); } catch { } return farmHud(); }
+      send({ t: 'yfarm', k, op, all: 1 }); }); }
+  const k = n.k, cr = h[10] || {}, bed = soilBedOf(h, k), now = Date.now() + clockOff, pl = cr[k];
+  const empty = bed.filter(o => !cr[o]).length, ripe = bed.filter(o => cr[o] && cr[o][1] <= now).length, dry = bed.filter(o => cr[o] && cr[o][2] === 0 && cr[o][1] > now).length;
+  const it = pl && G.items[pl[0]], left = pl ? pl[1] - now : 0, c = pl && G.crops[pl[0]];
+  const mm = ms => ms <= 0 ? 'พร้อมเก็บเกี่ยว' : ms < 60e3 ? `${Math.ceil(ms / 1000)} วินาที` : `${Math.floor(ms / 60e3)} นาที ${Math.round(ms % 60e3 / 1000)} วิ`;
+  const card = pl ? `<div class="fcHead"><span>${it.icon}</span><b>${esc(it.name)}</b></div><div class="fcRows">
+      <span>สถานะ</span><b class="${left <= 0 ? 'ok' : ''}">${left <= 0 ? '✅ สุกแล้ว' : '🌱 กำลังโต'}</b>
+      <span>เก็บเกี่ยวได้ใน</span><b>${mm(left)}</b>
+      <span>น้ำ</span><b class="${pl[2] === 0 && left > 0 ? 'bad' : ''}">${left <= 0 ? '—' : pl[2] === 0 ? '💧 ต้องรดน้ำ (โตช้าลงครึ่งหนึ่ง)' : 'เพียงพอ'}</b>
+      <span>สภาพอากาศ</span><b>${wd?.ev?.id === 'rain' ? '🌧️ ฝนตก (รดน้ำให้เอง)' : wd?.ev?.id === 'drought' ? '☀️ แล้ง (โตช้า)' : '⛅ ปกติ'}</b>
+      <span>ผลผลิต</span><b>${c ? `${c.min}–${c.max} ต่อช่อง` : '1–2 ต่อช่อง'}</b></div>`
+    : `<div class="fcHead"><span>🟫</span><b>แปลงดินว่าง</b></div><div class="fcRows"><span>แปลงนี้</span><b>${bed.length} ช่อง</b><span>ว่าง</span><b>${empty} ช่อง</b></div>`;
+  const hx = [ripe && ['harvest', '🧺', `เก็บ ${ripe}`], dry && ['water', '💧', `รดน้ำ ${dry}`], empty && ['plant', '🌱', farmLast && G.crops[farmLast] ? `ปลูก${G.items[farmLast].name} ${empty}` : `ปลูก ${empty}`], ['pick', '📋', 'เลือกพืช'], ['tags', '🏷️', FARM_TAGS ? 'ซ่อนป้าย' : 'แสดงป้าย']].filter(Boolean);
+  const sig = card + hx.map(x => x.join()).join('|');
+  if (el.dataset.sig !== sig) { el.dataset.sig = sig; el.dataset.k = k;
+    el.innerHTML = `<div class="fCard">${card}</div><div class="fHex">${hx.map(([op, ic, lb], i) => `<button data-f="${op}" class="hx h${i}"><span>${ic}</span><small>${esc(lb)}</small></button>`).join('')}</div>`; }
+  const m = P.get(myId); if (m) { const cm = camera(); el.style.setProperty('--px', Math.round(m.rx * TS - cm.x) + 'px'); el.style.setProperty('--py', Math.round(m.ry * TS - cm.y - TS * .7) + 'px'); }
+  el.classList.remove('hidden');
+}
+setInterval(() => { try { if (G && me) farmHud(); } catch (e) { } }, 120);
 function soilBedOf(h, k) {
   const cell = o => { const p = furnPos(h, o); return p && p[0] === 9 && G.shop.furniture[fbase(o)]?.tile ? `${Math.floor(p[1])},${Math.round(p[2]) - 1}` : null; };
   const at = new Map(); for (const o of h[2]) { const c = cell(o); if (c) at.set(c, o); }
