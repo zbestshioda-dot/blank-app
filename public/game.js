@@ -3885,13 +3885,23 @@ function drawFair(e, X, Y, t) {
   const night = nightLevel();
   if (night > .15 && (e.s === 'f_lights' || e.s === 'f_pole' || e.s.startsWith('s_'))) { const g = ctx.createRadialGradient(px + w / 2, py + h * .4, 0, px + w / 2, py + h * .4, w * .7); g.addColorStop(0, `rgba(255,210,130,${night * .55})`); g.addColorStop(1, 'rgba(255,180,80,0)'); ctx.fillStyle = g; ctx.fillRect(px - w * .2, py - h * .3, w * 1.4, h * 1.4); }
 }
+// 🕹️ game-centre mini-game art (assets/mg.webp + the scrolling road), loaded the first time an arcade panel or game opens
+let MGJ = null, MGI = null, MGR = null, mgAsked = false;
+function mgLoad() {
+  if (mgAsked) return; mgAsked = true;
+  fetch('assets/mg.json?v=1').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { MGJ = j; MGI = im; }; im.src = 'assets/mg.webp?v=1'; }).catch(() => { mgAsked = false; });
+  const r = new Image(); r.onload = () => { MGR = r; }; r.src = 'assets/mg_road.webp?v=2';
+}
 function fairPlay(m) {
+  mgLoad();
   const W = 340, H = 400, el = document.createElement('div'); el.id = 'fairG';
   el.innerHTML = `<div class="fgBox"><div class="fgH">${m.icon || '🎪'} ${esc(m.name)} <span id="fgInfo"></span></div><canvas width="${W}" height="${H}"></canvas><div class="fgTip"></div></div>`;
   document.body.appendChild(el);
   const c = el.querySelector('canvas'), g = c.getContext('2d'), info = el.querySelector('#fgInfo'), tip = el.querySelector('.fgTip');
   const t0 = performance.now(); let score = 0, done = false, raf = 0, ptr = { x: W / 2, y: H / 2 }, dropX = 0;
   const finish = () => { if (done) return; done = true; cancelAnimationFrame(raf); setTimeout(() => { send({ t: 'fair', op: 'end', id: m.id, score, x: dropX }); el.remove(); }, 1100); };
+  // a mini-game sprite: w = width in canvas px (h keeps the ratio unless given); anchor c = centre, b = bottom, t = top. false until the art has loaded
+  const mg = (name, x, y, w, an = 'c', h0) => { const s = MGJ?.sprites?.[name]; if (!s || !MGI) return false; const h = h0 || w * s[3] / s[2]; g.drawImage(MGI, s[0], s[1], s[2], s[3], x - w / 2, an === 'b' ? y - h : an === 't' ? y : y - h / 2, w, h); return true; };
   const spr = (name, cx, by, w, a = 1) => { const s = atlas?.sprites?.[name]; if (!s || !atlasImg) return; const h = w * s[3] / s[2]; g.globalAlpha = a; g.drawImage(atlasImg, s[0], s[1], s[2], s[3], cx - w / 2, by - h, w, h); g.globalAlpha = 1; };
   const txt = (t, x, y, sz = 20, c = '#fff', al = 'left') => { g.fillStyle = c; g.font = `bold ${sz}px sans-serif`; g.textAlign = al; g.fillText(t, x, y); };
   const pos = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
@@ -3935,14 +3945,16 @@ function fairPlay(m) {
         g.fillStyle = '#fff'; g.font = 'bold 22px sans-serif'; g.textAlign = 'left'; g.fillText(`⏱ ${left.toFixed(1)}`, 14, 380);
         info.textContent = `ได้ ${score} ตัว`; if (!left) finish();
       }; },
-    // ---- 🕹️ game centre
+    // ---- 🕹️ game centre (art: assets/mg.webp; plain shapes until it has loaded)
     claw: () => { const toys = m.toys || [], L = 40, R = W - 40, FL = 330; let st = 0, t1 = 0, cx = W / 2, cy = 56, pick = -1, toyY = 0, drop = 0;
       tip.textContent = 'ก้ามคีบเลื่อนไปมา — กดปล่อยตอนอยู่เหนือตุ๊กตา';
       score = -1;
       return tt => {
-        g.fillStyle = '#2b2140'; g.fillRect(0, 0, W, H); g.fillStyle = '#cfe9ff'; g.fillRect(16, 30, W - 32, FL - 10); g.fillStyle = '#f3b6d0'; g.fillRect(16, FL + 10, W - 32, 50);
-        g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(26, 40, 14, FL - 40);
-        g.fillStyle = '#888'; g.fillRect(16, 26, W - 32, 8);
+        g.fillStyle = '#2b2140'; g.fillRect(0, 0, W, H);
+        if (!mg('claw_wall', W / 2, FL + 12, W - 20, 'b')) { g.fillStyle = '#cfe9ff'; g.fillRect(16, 30, W - 32, FL - 10); }
+        if (!mg('claw_floor', W / 2, FL + 52, W - 20, 'b')) { g.fillStyle = '#f3b6d0'; g.fillRect(16, FL + 10, W - 32, 50); }
+        mg('chute', W - 36, FL + 6, 54, 'b');
+        g.fillStyle = '#888'; g.fillRect(16, 22, W - 32, 8);
         if (st === 0) { cx = L + (R - L) * (.5 + .5 * Math.sin(tt * 1.7)); info.textContent = `⏱ ${Math.max(0, 15 - tt).toFixed(0)}`; if (tap || tt > 15) { st = 1; t1 = tt; dropX = +((cx - L) / (R - L)).toFixed(3); let best = 1; toys.forEach((q, i) => { const d = Math.abs(q.x - dropX); if (d < best) { best = d; pick = i; } }); if (best > .085) pick = -1; FX.play('click'); } }
         else if (st === 1) { cy = 56 + Math.min(1, (tt - t1) / 1.1) * (FL - 120); if (tt - t1 > 1.3) { st = 2; t1 = tt; } }
         else if (st === 2) { const k = Math.min(1, (tt - t1) / 1.2); cy = FL - 64 - k * (FL - 120); const hold = pick >= 0 && m.hold[pick];
@@ -3950,74 +3962,96 @@ function fairPlay(m) {
           if (k >= 1) { st = 3; t1 = tt; if (pick >= 0 && !hold) FX.play('fail'); } }
         else if (st === 3) { const hold = pick >= 0 && m.hold[pick]; if (hold) { cx += (R + 10 - cx) * .08; if (tt - t1 > 1) { score = pick; FX.play('levelup'); info.textContent = '🎉 ได้แล้ว!'; finish(); } } else { if (!done) info.textContent = pick >= 0 ? 'หลุดซะได้!' : 'พลาด!'; finish(); } }
         toys.forEach((q, i) => { const x = L + q.x * (R - L); if (i === pick && st >= 2) spr(q.id, st === 3 && m.hold[pick] ? cx : x, FL - toyY, q.id === 'py_gold' ? 62 : 50); else spr(q.id, x, FL, q.id === 'py_gold' ? 62 : 50); });
-        g.strokeStyle = '#666'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, 30); g.lineTo(cx, cy); g.stroke();
-        const open = st === 1 || st === 0 ? 1 : 0; g.fillStyle = '#c9c9c9'; g.fillRect(cx - 14, cy, 28, 10); g.strokeStyle = '#aaa'; g.lineWidth = 5;
-        g.beginPath(); g.moveTo(cx - 12, cy + 10); g.lineTo(cx - 14 - open * 10, cy + 34); g.lineTo(cx - 4, cy + 44); g.moveTo(cx + 12, cy + 10); g.lineTo(cx + 14 + open * 10, cy + 34); g.lineTo(cx + 4, cy + 44); g.stroke();
-        txt('🧸 คีบได้ไปเลย!', W / 2, 385, 18, '#5a2340', 'center');
+        g.strokeStyle = '#9aa'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, 26); g.lineTo(cx, cy); g.stroke();
+        const open = st <= 1;
+        if (!mg(open ? 'claw_open' : 'claw_shut', cx, cy - 6, open ? 64 : 44, 't')) { g.strokeStyle = '#aaa'; g.lineWidth = 5; g.beginPath(); g.moveTo(cx - 12, cy + 10); g.lineTo(cx - 14 - (open ? 10 : 0), cy + 34); g.moveTo(cx + 12, cy + 10); g.lineTo(cx + 14 + (open ? 10 : 0), cy + 34); g.stroke(); }
+        txt('🧸 คีบได้ไปเลย!', W / 2, 392, 16, '#ffd6ea', 'center');
       }; },
-    hoop: () => { let balls = 6, res = [], fly = null; tip.textContent = 'กดตอนเข็มอยู่ในช่องสีเขียว เพื่อชู้ตลงห่วง';
+    hoop: () => { let balls = 6, fly = null, swish = 0; tip.textContent = 'กดตอนเข็มอยู่ในช่องสีเขียว เพื่อชู้ตลงห่วง';
+      const HX = W / 2, HY = 128;
       return tt => {
-        g.fillStyle = '#1d2a55'; g.fillRect(0, 0, W, H); g.fillStyle = '#c98a4b'; g.fillRect(40, 250, W - 80, 60);
-        g.fillStyle = '#fff'; g.fillRect(W / 2 - 50, 40, 100, 70); g.strokeStyle = '#e0473a'; g.lineWidth = 3; g.strokeRect(W / 2 - 22, 70, 44, 30);
-        g.strokeStyle = '#ff7a2e'; g.lineWidth = 4; g.beginPath(); g.ellipse(W / 2, 112, 26, 6, 0, 0, 7); g.stroke();
+        g.fillStyle = '#1d2a55'; g.fillRect(0, 0, W, H);
+        mg('hoop_wall', W / 2, 0, W, 't'); mg('court', W / 2, H, W + 40, 'b') || (g.fillStyle = '#c98a4b', g.fillRect(0, 300, W, 100));
+        if (!mg('board', HX, 26, 150, 't')) { g.fillStyle = '#fff'; g.fillRect(HX - 50, 40, 100, 70); g.strokeStyle = '#ff7a2e'; g.lineWidth = 4; g.beginPath(); g.ellipse(HX, 112, 26, 6, 0, 0, 7); g.stroke(); }
+        if (tt < swish) mg('net_swish', HX, 96, 64, 't');
         const lvl = 6 - balls, sp = 2.4 + lvl * .5, zw = .24 - lvl * .025, k = (Math.sin(tt * sp) + 1) / 2;
-        g.fillStyle = '#222'; g.fillRect(30, 330, W - 60, 24); g.fillStyle = '#5ed17a'; g.fillRect(30 + (W - 60) * (.5 - zw / 2), 330, (W - 60) * zw, 24); g.fillStyle = '#fff'; g.fillRect(30 + (W - 60) * k - 3, 322, 6, 40);
-        if (fly) { const q = Math.min(1, (tt - fly.t) / .7), x = W / 2 + fly.off * q, y = 290 - Math.sin(q * Math.PI) * 220 - q * 160; g.fillStyle = '#f08a24'; g.beginPath(); g.arc(x, Math.max(y, 100), 14, 0, 7); g.fill(); if (q >= 1) fly = null; }
-        txt('🏀'.repeat(balls), 16, 385, 18);
-        if (tap && balls > 0 && !fly) { const ok = Math.abs(k - .5) < zw / 2; fly = { t: tt, off: ok ? 0 : (k - .5) * 160 }; res.push(ok); if (ok) { score++; FX.play('coin'); } else FX.play('fail'); balls--; if (!balls) setTimeout(finish, 700); }
+        g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(26, 318, W - 52, 30); g.fillStyle = '#222'; g.fillRect(30, 322, W - 60, 22); g.fillStyle = '#5ed17a'; g.fillRect(30 + (W - 60) * (.5 - zw / 2), 322, (W - 60) * zw, 22); g.fillStyle = '#fff'; g.fillRect(30 + (W - 60) * k - 3, 314, 6, 38);
+        if (fly) { const q = Math.min(1, (tt - fly.t) / .75), x = HX + fly.off * q, y = 300 - Math.sin(q * Math.PI * .9) * 230 - q * 70, s = 34 - q * 10;
+          if (!mg(q < .3 ? 'ball_blur' : 'ball', x, y, q < .3 ? 52 : s, 'c')) { g.fillStyle = '#f08a24'; g.beginPath(); g.arc(x, y, s / 2, 0, 7); g.fill(); }
+          if (q >= 1) { if (fly.ok) swish = tt + .5; fly = null; } }
+        else if (balls > 0) mg('ball', HX, 290, 34, 'c');
+        g.font = '18px sans-serif'; g.textAlign = 'left'; g.fillText('🏀'.repeat(balls), 14, 388);
+        if (tap && balls > 0 && !fly) { const ok = Math.abs(k - .5) < zw / 2; fly = { t: tt, ok, off: ok ? 0 : (k - .5) * 170 }; if (ok) { score++; FX.play('coin'); } else FX.play('fail'); balls--; if (!balls) setTimeout(finish, 900); }
         info.textContent = `ลง ${score} ลูก`;
       }; },
-    mole: () => { const holes = Array.from({ length: 9 }, (_, i) => ({ x: 70 + (i % 3) * 100, y: 110 + Math.floor(i / 3) * 95, up: 0, until: 0 })); let next = 0;
-      tip.textContent = 'แตะตัวตุ่นที่โผล่ขึ้นมา · 15 วินาที';
+    mole: () => { const holes = Array.from({ length: 9 }, (_, i) => ({ x: 70 + (i % 3) * 100, y: 120 + Math.floor(i / 3) * 95, up: 0, until: 0, t0: 0, gold: 0 })); let next = 0, bonk = null;
+      tip.textContent = 'แตะตัวตุ่นที่โผล่ขึ้นมา (ตัวทองได้ 3 แต้ม) · 15 วินาที';
       return tt => {
         const left = Math.max(0, 15 - tt); g.fillStyle = '#4c8a3a'; g.fillRect(0, 0, W, H);
-        if (tt > next) { const h = holes[Math.floor(Math.random() * 9)]; if (!h.up) { h.up = 1; h.until = tt + .7 + Math.random() * .5; } next = tt + .35 + Math.random() * .35; }
+        mg('grass', W / 2, 0, W + 10, 't', H);
+        if (tt > next && left > .6) { const h = holes[Math.floor(Math.random() * 9)]; if (!h.up) { h.up = 1; h.t0 = tt; h.gold = Math.random() < .08; h.until = tt + (h.gold ? .55 : .75 + Math.random() * .5); } next = tt + .32 + Math.random() * .33; }
         for (const h of holes) { if (h.up && tt > h.until) h.up = 0;
-          g.fillStyle = '#2b1d12'; g.beginPath(); g.ellipse(h.x, h.y + 22, 36, 12, 0, 0, 7); g.fill();
-          if (h.up) { g.fillStyle = h.up === 2 ? '#a36' : '#8a5a3a'; g.beginPath(); g.ellipse(h.x, h.y, 24, 28, 0, Math.PI, 0); g.fill(); g.fillRect(h.x - 24, h.y, 48, 20); g.fillStyle = '#000'; g.fillRect(h.x - 10, h.y - 8, 5, 5); g.fillRect(h.x + 5, h.y - 8, 5, 5); g.fillStyle = '#f9a'; g.fillRect(h.x - 4, h.y, 8, 5); } }
-        if (tap) { const h = holes.find(q => q.up === 1 && Math.hypot(q.x - tap.x, q.y - tap.y) < 38); if (h) { h.up = 2; h.until = tt + .15; score++; FX.play('pop'); } else FX.play('click'); }
-        txt(`⏱ ${left.toFixed(1)}`, 14, 385, 22); info.textContent = `ทุบได้ ${score} ตัว`; if (!left) finish();
+          const name = !h.up ? 'hole' : h.up === 2 ? 'mole_hit' : h.gold ? 'mole_gold' : tt - h.t0 < .12 ? 'mole_peek' : 'mole_up';
+          if (h.up && h.gold && h.up === 1) { mg('hole', h.x, h.y + 26, 80, 'b'); mg('mole_gold', h.x, h.y + 22, 56, 'b'); }
+          else if (!mg(name, h.x, h.y + 26, 80, 'b')) { g.fillStyle = '#2b1d12'; g.beginPath(); g.ellipse(h.x, h.y + 18, 34, 11, 0, 0, 7); g.fill(); if (h.up) { g.fillStyle = '#8a5a3a'; g.beginPath(); g.ellipse(h.x, h.y, 24, 28, 0, Math.PI, 0); g.fill(); g.fillRect(h.x - 24, h.y, 48, 18); } } }
+        if (tap) { const h = holes.find(q => q.up === 1 && Math.hypot(q.x - tap.x, q.y - tap.y) < 42); bonk = { x: tap.x, y: tap.y, t: tt }; if (h) { h.up = 2; h.until = tt + .3; score += h.gold ? 3 : 1; FX.play(h.gold ? 'coin' : 'pop'); } else FX.play('click'); }
+        if (bonk && tt - bonk.t < .18) { g.save(); g.translate(bonk.x + 20, bonk.y - 10); g.rotate(-.5 + (tt - bonk.t) * 4); mg('mallet', 0, 0, 56, 'c'); g.restore(); }
+        txt(`⏱ ${left.toFixed(1)}`, 14, 30, 20); info.textContent = `ทุบได้ ${score} แต้ม`; if (!left) finish();
       }; },
-    dance: () => { const lanes = ['⬅️', '⬇️', '⬆️', '➡️'], arrows = []; let next = .5; const HY = 320, lw = (W - 40) / 4;
-      tip.textContent = 'แตะช่องของลูกศรตอนมันถึงเส้นเรืองแสง · 20 วินาที';
+    dance: () => { const AR = ['ar_l', 'ar_d', 'ar_u', 'ar_r'], SL = ['sl_l', 'sl_d', 'sl_u', 'sl_r'], lanes = ['⬅️', '⬇️', '⬆️', '➡️'], arrows = [], fx = []; let next = .5; const HY = 320, lw = (W - 40) / 4;
+      tip.textContent = 'แตะช่องของลูกศรตอนมันซ้อนกับลูกศรเทา · 20 วินาที';
       return tt => {
         const left = Math.max(0, 20 - tt); g.fillStyle = '#1a1030'; g.fillRect(0, 0, W, H);
-        for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#24183f' : '#2c1d4d'; g.fillRect(20 + i * lw, 0, lw, H); }
-        g.fillStyle = `rgba(120,220,255,${.5 + .3 * Math.sin(tt * 8)})`; g.fillRect(20, HY - 4, W - 40, 8);
+        if (!mg('stage', W / 2, 0, W * 1.6, 't')) for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#24183f' : '#2c1d4d'; g.fillRect(20 + i * lw, 0, lw, H); }
+        g.fillStyle = 'rgba(10,0,30,.35)'; g.fillRect(0, 0, W, H);
         if (tt > next && left > 1) { arrows.push({ l: Math.floor(Math.random() * 4), t: tt }); next = tt + Math.max(.38, .8 - tt * .02); }
         const sp = 170 + tt * 4;
-        for (let i = arrows.length - 1; i >= 0; i--) { const a = arrows[i]; a.y = (tt - a.t) * sp; if (a.y > HY + 40) { arrows.splice(i, 1); continue; } g.font = '30px sans-serif'; g.textAlign = 'center'; g.fillText(lanes[a.l], 20 + a.l * lw + lw / 2, a.y + 10); }
-        for (let i = 0; i < 4; i++) { g.font = '26px sans-serif'; g.textAlign = 'center'; g.globalAlpha = .45; g.fillText(lanes[i], 20 + i * lw + lw / 2, HY + 52); g.globalAlpha = 1; }
-        if (tap) { const l = Math.floor((tap.x - 20) / lw), i = arrows.findIndex(a => a.l === l && Math.abs(a.y - HY) < 34); if (i >= 0) { arrows.splice(i, 1); score++; FX.play('coin'); } else FX.play('click'); }
+        for (let i = 0; i < 4; i++) { const x = 20 + i * lw + lw / 2; if (!mg(SL[i], x, HY, 52, 'c')) { g.font = '26px sans-serif'; g.textAlign = 'center'; g.globalAlpha = .45; g.fillText(lanes[i], x, HY + 10); g.globalAlpha = 1; } }
+        for (let i = arrows.length - 1; i >= 0; i--) { const a = arrows[i]; a.y = (tt - a.t) * sp; if (a.y > HY + 40) { arrows.splice(i, 1); continue; } const x = 20 + a.l * lw + lw / 2; if (!mg(AR[a.l], x, a.y, 52, 'c')) { g.font = '30px sans-serif'; g.textAlign = 'center'; g.fillText(lanes[a.l], x, a.y + 10); } }
+        for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i], k = (tt - f.t) * 3; if (k > 1) { fx.splice(i, 1); continue; } g.globalAlpha = 1 - k; mg('burst', f.x, HY, 70 + k * 40, 'c'); g.globalAlpha = 1; }
+        if (tap) { const l = Math.floor((tap.x - 20) / lw), i = arrows.findIndex(a => a.l === l && Math.abs(a.y - HY) < 34); if (i >= 0) { arrows.splice(i, 1); score++; fx.push({ x: 20 + l * lw + lw / 2, t: tt }); FX.play('coin'); } else FX.play('click'); }
         txt(`⏱ ${left.toFixed(1)}`, 14, 30, 18); info.textContent = `${score} ครั้ง`; if (!left) finish();
       }; },
-    race: () => { let lane = 1, cars = [], next = .8, crash = 0; const lx = l => 80 + l * 90, CY = 330;
-      tip.textContent = 'แตะซ้าย/ขวาของจอเพื่อเปลี่ยนเลน หลบรถ';
+    race: () => { let lane = 1, cars = [], next = .8, crash = 0, road = 0, cx = 0; const lx = l => W / 2 + (l - 1) * 82, CY = 330, CAR = ['car_blue', 'car_yellow', 'car_green', 'car_purple', 'car_taxi'], OB = ['cone', 'oil', 'barrier_s'];
+      tip.textContent = 'แตะซ้าย/ขวาของจอเพื่อเปลี่ยนเลน หลบรถ — จะมีช่องว่างให้หลบเสมอ';
+      cx = lx(lane);
+      // a new car never closes the last open lane: within one car-and-a-half of the top, at least one lane stays free
+      const canSpawn = l => { const near = new Set(cars.filter(c => c.y < 130).map(c => c.l)); near.add(l); return near.size < 3; };
       return tt => {
-        g.fillStyle = '#3a3a3a'; g.fillRect(0, 0, W, H); g.fillStyle = '#5a9a3a'; g.fillRect(0, 0, 30, H); g.fillRect(W - 30, 0, 30, H);
-        g.fillStyle = '#fff'; for (let i = 0; i < 2; i++) for (let y = ((tt * 300) % 60) - 60; y < H; y += 60) g.fillRect(122 + i * 90, y, 6, 30);
-        if (!crash) { if (tap) { lane = Math.max(0, Math.min(2, lane + (tap.x < W / 2 ? -1 : 1))); FX.play('click'); }
-          if (tt > next) { cars.push({ l: Math.floor(Math.random() * 3), y: -60, c: ['#4fb3ff', '#ffd23a', '#7ee07a', '#c88cff'][Math.floor(Math.random() * 4)] }); next = tt + Math.max(.45, 1.1 - tt * .03); }
-          const sp = 4 + tt * .12;
-          for (let i = cars.length - 1; i >= 0; i--) { const c = cars[i]; c.y += sp; if (c.y > H + 40) { cars.splice(i, 1); score++; continue; } if (c.l === lane && Math.abs(c.y - CY) < 56) { crash = tt; FX.play('fail'); } }
-          if (tt > 40) crash = tt; }
-        for (const c of cars) { g.fillStyle = c.c; g.fillRect(lx(c.l) - 22, c.y - 34, 44, 68); g.fillStyle = '#223'; g.fillRect(lx(c.l) - 16, c.y - 20, 32, 14); }
-        g.fillStyle = '#e0473a'; g.fillRect(lx(lane) - 22, CY - 34, 44, 68); g.fillStyle = '#223'; g.fillRect(lx(lane) - 16, CY - 24, 32, 14);
-        if (crash) { txt('💥 ชน!', W / 2, 200, 40, '#fff', 'center'); finish(); }
+        const sp = crash ? 0 : 4 + Math.min(tt, 40) * .12;
+        road = (road + sp) % H;
+        if (MGR) { const rh = MGR.height * W / MGR.width; for (let y = road - rh; y < H; y += rh) g.drawImage(MGR, 0, y, W, rh); }
+        else { g.fillStyle = '#3a3a3a'; g.fillRect(0, 0, W, H); g.fillStyle = '#5a9a3a'; g.fillRect(0, 0, 40, H); g.fillRect(W - 40, 0, 40, H); g.fillStyle = '#fff'; for (const x of [W / 2 - 41, W / 2 + 41]) for (let y = road % 60 - 60; y < H; y += 60) g.fillRect(x - 3, y, 6, 30); }
+        if (!crash) {
+          if (tap) { lane = Math.max(0, Math.min(2, lane + (tap.x < W / 2 ? -1 : 1))); FX.play('click'); }
+          if (tt > next) {
+            const l = Math.floor(Math.random() * 3), ob = Math.random() < .25;
+            if (canSpawn(l)) { cars.push({ l, y: -50, s: ob ? OB[Math.floor(Math.random() * 3)] : CAR[Math.floor(Math.random() * 5)], ob }); next = tt + Math.max(.42, 1.05 - tt * .03); }
+            else next = tt + .12;
+          }
+          for (let i = cars.length - 1; i >= 0; i--) { const c = cars[i]; c.y += sp; /* everything moves together, so a gap that opened at the top stays open all the way down */ if (c.y > H + 60) { cars.splice(i, 1); score++; continue; } if (c.l === lane && Math.abs(c.y - CY) < (c.ob ? 40 : 56)) { crash = tt; FX.play('fail'); } }
+          if (tt > 40) crash = tt;
+        }
+        cx += (lx(lane) - cx) * .35;
+        for (const c of cars) if (!mg(c.s, lx(c.l), c.y, c.ob ? (c.s === 'oil' ? 56 : 36) : 50, 'c')) { g.fillStyle = '#4fb3ff'; g.fillRect(lx(c.l) - 22, c.y - 34, 44, 68); }
+        if (!mg('car_me', cx, CY, 50, 'c')) { g.fillStyle = '#e0473a'; g.fillRect(cx - 22, CY - 34, 44, 68); }
+        if (crash) { mg('crash', cx, CY - 20, 90, 'c'); txt('💥 ชน!', W / 2, 200, 40, '#fff', 'center'); finish(); }
         info.textContent = `หลบได้ ${score} คัน`;
       }; },
-    hockey: () => { let px = W / 2, py = 120, vx = 2.4, vy = 3.2, lives = 3; const PY = 350;
-      tip.textContent = 'ลากนิ้วซ้าย-ขวา ใช้ไม้ตีรับลูกพัค';
+    hockey: () => { let px = W / 2, py = 120, vx = 2.4, vy = 3.2, lives = 3, ex = W / 2; const PY = 350;
+      tip.textContent = 'ลากนิ้วซ้าย-ขวา ใช้ไม้ตีรับลูกพัค · พลาด 3 ครั้งจบ';
       return tt => {
-        g.fillStyle = '#e8f4ff'; g.fillRect(0, 0, W, H); g.strokeStyle = '#e0473a'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke(); g.beginPath(); g.arc(W / 2, H / 2, 40, 0, 7); g.stroke();
-        g.fillStyle = '#333'; g.fillRect(W / 2 - 50, 0, 100, 8);
-        px += vx; py += vy; if (px < 14 || px > W - 14) { vx = -vx; px = Math.max(14, Math.min(W - 14, px)); } if (py < 14) { vy = Math.abs(vy); FX.play('click'); }
-        const mx = Math.max(30, Math.min(W - 30, ptr.x));
-        if (vy > 0 && py > PY - 26 && py < PY + 6 && Math.abs(px - mx) < 42) { vy = -Math.abs(vy) * 1.05; vx += (px - mx) / 12; score++; FX.play('coin'); }
+        g.fillStyle = '#1b1b24'; g.fillRect(0, 0, W, H);
+        if (!mg('table', W / 2, H / 2, W - 10, 'c', H - 4)) { g.fillStyle = '#e8f4ff'; g.fillRect(0, 0, W, H); g.strokeStyle = '#e0473a'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke(); }
+        px += vx; py += vy; if (px < 28 || px > W - 28) { vx = -vx; px = Math.max(28, Math.min(W - 28, px)); } if (py < 40) { vy = Math.abs(vy); FX.play('click'); }
+        ex += (Math.max(40, Math.min(W - 40, px)) - ex) * .08;
+        const mx = Math.max(40, Math.min(W - 40, ptr.x));
+        if (vy > 0 && py > PY - 30 && py < PY + 6 && Math.abs(px - mx) < 42) { vy = -Math.abs(vy) * 1.05; vx += (px - mx) / 12; score++; FX.play('coin'); }
         if (py > H + 20) { lives--; FX.play('fail'); px = W / 2; py = 120; vy = 3.2 + score * .1; vx = (Math.random() - .5) * 5; if (!lives) finish(); }
-        g.fillStyle = '#222'; g.beginPath(); g.arc(px, py, 13, 0, 7); g.fill();
-        g.fillStyle = '#e0473a'; g.beginPath(); g.arc(mx, PY, 26, 0, 7); g.fill(); g.fillStyle = '#b02a20'; g.beginPath(); g.arc(mx, PY, 12, 0, 7); g.fill();
-        txt('❤️'.repeat(lives), 14, 30, 18); info.textContent = `ตีรับได้ ${score} ครั้ง`;
+        if (!mg('mallet_b', ex, 40, 48, 'c')) { g.fillStyle = '#3a6fe0'; g.beginPath(); g.arc(ex, 40, 22, 0, 7); g.fill(); }
+        if (!mg('puck', px, py, 28, 'c')) { g.fillStyle = '#222'; g.beginPath(); g.arc(px, py, 13, 0, 7); g.fill(); }
+        if (!mg('mallet_r', mx, PY, 52, 'c')) { g.fillStyle = '#e0473a'; g.beginPath(); g.arc(mx, PY, 26, 0, 7); g.fill(); }
+        txt('❤️'.repeat(lives), 14, 390, 18); info.textContent = `ตีรับได้ ${score} ครั้ง`;
       }; },
   }[m.k]();
   const loop = () => { if (done) return; G1((performance.now() - t0) / 1000); tap = null; raf = requestAnimationFrame(loop); };
@@ -4765,6 +4799,7 @@ setTimeout(function xmasDaily() {
 }, 12000);
 // 🕹️ game centre panels: the prize counter (tickets -> plush toys, the toy collection), the arcade machines and the claw machine
 function arcHtml(k, st) {
+  mgLoad();
   const A = G.arcade, tix = me.tix || 0, got = me.pyd || [];
   if (k === 'arcade') {
     const rows = Object.entries(A.prizes).map(([id, c]) => `<div class="row"><div class="ic">${itemIco(id, 44, 38)}</div><div class="grow"><b>${esc(G.items[id].name)}</b>${got.includes(id) ? ' <small>✔ เคยได้</small>' : ''}<br><small>🎟️ ${c} ตั๋ว</small></div>${B('แลก', { t: 'act', st, a: 'buy', id }, 'good', tix < c)}</div>`).join('');
@@ -5371,6 +5406,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24a', d: '22 พ.ย.', items: [
+    '🕹️ <b>ตู้เกมในเกมเซ็นเตอร์โฉมใหม่</b> ภาพสวยทุกตู้: แข่งรถ 🏎️ ชู้ตบาส 🏀 ทุบตัวตุ่น 🔨 (มีตัวทองได้ 3 แต้ม) เต้นตามลูกศร 💃 แอร์ฮอกกี้ 🏒 และตู้คีบตุ๊กตา 🧸',
+    '🏎️ แก้เกมแข่งรถ: รถจะไม่ขวางเต็มถนนอีกแล้ว มีเลนให้หลบเสมอ',
+  ] },
   { v: '2026-11-23ax', d: '21 พ.ย.', items: [
     '🕹️ <b>เกมเซ็นเตอร์เปิดแล้วในสวนสนุก!</b> ตึกใหม่มุมตะวันออกของสวนสนุก · ตู้ชู้ตบาส 🏀 ทุบตัวตุ่น 🔨 เต้นตามลูกศร 💃 แข่งรถ 🏎️ แอร์ฮอกกี้ 🏒 ครั้งละ ฿20 ได้ตั๋วตามคะแนน',
     '🎟️ เอาตั๋วไปแลก <b>ตุ๊กตา 9 แบบ</b> ที่เคาน์เตอร์ · 🧸 <b>ตู้คีบตุ๊กตา</b> ครั้งละ ฿30 คีบติดได้เลย (มีลุ้นหมีทองคำ 🏅) · สะสมครบ 9 ตัวรับ 💎20',
