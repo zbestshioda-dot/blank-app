@@ -644,10 +644,10 @@ const promo = (() => {
   // phone: the form is a bottom dock, closed to a single big button until tapped (a saved account just plays on)
   const saved = !!(creds && creds.name && (creds.pin || creds.tok)), start = $('#startBtn');
   const open = () => { form.classList.add('open'); setTimeout(() => $(saved && $('#inName').value ? '#inPin' : '#inName').focus(), 120); };
-  if (saved) { start.textContent = `▶ เล่นต่อ · ${creds.name}`; }
+  if (saved) { start.innerHTML = `<b>แตะเพื่อเล่น</b><small>${esc(creds.name)}</small>`; login.classList.add('saved'); }   // phone: a returning player just taps the poster
   start.onclick = () => { if (saved && !form.classList.contains('open')) { loginBusy(true); creds = { name: creds.name, pin: creds.pin, tok: creds.tok }; wantLogin = true; connect(); } else open(); };
   $('#otherAcct').onclick = () => { $('#inName').value = ''; $('#inPin').value = ''; open(); };
-  $('#promoPhone').onclick = () => { if (matchMedia('(max-width:860px)').matches) return; $('#inName').focus(); };   // desktop: the "enter the city" button in the video focuses the form
+  $('#promoPhone').onclick = () => { if (matchMedia('(max-width:860px)').matches) { if (saved && !form.classList.contains('open')) start.onclick(); return; } $('#inName').focus(); };   // desktop: the "enter the city" button in the video focuses the form
   return { open, stop() { v.pause(); v.removeAttribute('src'); v.load(); } };
 })();
 // back from Google's sign-in page (redirect mode): the server put the credential in the address fragment

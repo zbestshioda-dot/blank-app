@@ -1625,3 +1625,32 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 .jMeta{font-size:12px;color:#6b4a10;margin-top:3px}
 /* 🎨 painted manhwa portraits in the talk window */
 .dlgImg{background-size:cover;background-position:center top;background-repeat:no-repeat;background-color:#e9e9ee;display:block}
+/* 📱 compact login bar on phones: smaller play button, one slim row of app buttons */
+@media(max-width:860px){
+  #startBtn{font-size:18px!important;padding:10px!important;border-radius:14px}
+  .linkBtn{font-size:12px;padding:3px}
+  .lfApps{display:flex;gap:6px;margin-top:4px}
+  .lfApps button{flex:1;flex-direction:row;justify-content:center;gap:4px;padding:5px 4px;font-size:13px;border-radius:10px}
+  .lfApps button span{font-size:11px}
+}
+@media(max-height:520px) and (orientation:landscape){
+  #login.hasVid #loginForm{left:0!important;right:0!important;margin:0 auto;width:min(440px,70vw)!important}
+  #login.hasVid #loginForm:not(.open){padding:6px 12px calc(6px + env(safe-area-inset-bottom))!important}
+  #startBtn{font-size:16px!important;padding:8px!important}
+  .lfApps{margin-top:2px}.lfApps button{padding:4px}
+}
+/* 👆 returning player on a phone: no panel, just "tap to play" over the poster + tiny icon buttons */
+@media(max-width:860px){
+  #login.hasVid.saved #loginForm:not(.open){background:none!important;border:0!important;box-shadow:none!important;animation:none;padding:0 12px calc(10px + env(safe-area-inset-bottom))!important;align-items:center;pointer-events:none}
+  #login.hasVid.saved #loginForm:not(.open)>*{pointer-events:auto}
+  #login.saved #loginForm:not(.open) #startBtn{background:none!important;border:0!important;box-shadow:none!important;color:#fff;padding:6px 18px!important;display:flex;flex-direction:column;align-items:center;gap:0;margin:0 auto;text-shadow:0 2px 6px #000,0 0 14px rgba(255,190,80,.7)}
+  #login.saved #loginForm:not(.open) #startBtn::after{display:none}
+  #login.saved #startBtn b{font-size:22px;letter-spacing:1px;animation:tapBlink 1.4s ease-in-out infinite}
+  #login.saved #startBtn small{font-size:12px;font-weight:600;opacity:.85}
+  #login.saved #loginForm:not(.open) .linkBtn{color:#fff;opacity:.75;font-size:11px;padding:2px;text-shadow:0 1px 4px #000}
+  #login.saved #loginForm:not(.open) .lfApps{justify-content:center;gap:10px;margin-top:2px}
+  #login.saved #loginForm:not(.open) .lfApps button{flex:none;width:40px;height:40px;padding:0;border-radius:50%;font-size:18px;background:rgba(255,243,220,.88)!important;border:1px solid #d9a94f!important;box-shadow:none!important}
+  #login.saved #loginForm:not(.open) .lfApps button span{display:none}
+  #login.saved #loginForm:not(.open) .lfApps button.hidden{display:none}
+}
+@keyframes tapBlink{0%,100%{opacity:1}50%{opacity:.35}}
