@@ -1385,6 +1385,12 @@ function onTap(sx, sy) {
     const d = Math.hypot(p.rx - wx, (p.ry - .35) - wy); if (d < hd) { hd = d; hit = p; }
   }
   if (hit) { FX.play('click'); if (hit.npc && !hit.bot) return talkToTown(hit); return openPanel({ kind: 'player', pid: hit.id }); }
+  for (const n of STAFF) {   // tapping a staff NPC (Chef Mee, shopkeepers...) talks to them when you are close enough
+    if (areaOf(n.rx, n.ry)?.id !== here || Math.hypot(n.rx - wx, (n.ry - .35) - wy) > .8) continue;
+    const s = STN(n.st); FX.play('click');
+    if (s && Math.hypot(m.x - s.x, m.y - s.y) > (s.r || 1.3) + .8) { autoNav = false; walkTo(s.x, s.y); return toast(`เดินเข้าไปใกล้ ${n.short || n.name} ก่อน`, '💬', false); }
+    return n.guide ? guideTalk(n) : talkTo(n, n.st);
+  }
   if (lastPtrMouse && !me.down) { autoNav = false; walkTo(wx, wy); }   // computers: click the ground to walk there
 }
 // ---- tap-to-walk: breadth-first path over free tiles of the current area, followed by the movement loop
@@ -5600,6 +5606,9 @@ function applyBox(career, st) {
   return `<div class="jobbox"><b>📝 รับสมัคร ${c.icon} ${c.name}</b><div class="sub">${c.desc}</div>
     ${miss.length ? `<div class="sub" style="color:var(--bad)">ต้องมี: ${miss.join(', ')}</div>` : ''}${wait}
     ${me.career !== 'none' ? `<div class="sub">ตอนนี้คุณเป็น${G.careers[me.career].name} สมัครงานนี้ = ลาออกจากงานเดิม</div>` : ''}
+  { v: '2026-11-25m', d: '22 พ.ย.', items: [
+    '👆 แตะที่ตัวเจ้าหน้าที่ (เชฟหมี คนขายของ ฯลฯ) บนจอเพื่อคุยได้เลย ถ้าอยู่ไกลจะเดินเข้าไปหาให้',
+  ] },
     ${B(`✍️ สมัครงาน${c.name}`, { t: 'act', st, a: 'apply', career }, 'primary big', miss.length > 0 || me.jobWait > 0)}</div>`;
 }
 const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
