@@ -1610,7 +1610,7 @@ function frame(t) {
   if (ECO && (idle ? t - frameT < 30 : t - frameT < 14)) return; frameT = t;   // (and never more than 60 fps on phones: 90/120 Hz screens heat up and slow down)
   dlgTick();
   if (G && me && t - homeBtnT > 400) { homeBtnT = t; const m0 = P.get(myId), r0 = m0 && areaOf(m0.x, m0.y); { const vs = (me.vehicles || []).filter(k => G.shop.vehicles[k]), rb = $('#rideBtn'), v = G.shop.vehicles[me.ride]; rb.classList.toggle('hidden', !vs.length || !!(r0 && r0.kind === 'room')); rb.classList.toggle('on', !!v); const lbl = v ? `<span>🚶</span><small>ลงรถ</small>` : `<span>${G.shop.vehicles[vs[0]]?.icon || '🛵'}</span><small>ขี่รถ</small>`; if (rb.innerHTML !== lbl) rb.innerHTML = lbl; } paintDocBack(); const atHome = r0 && (r0.rk === 'house' || r0.yard) && r0.house === me.house; $('#homeBtn').classList.toggle('hidden', !atHome || !!placing); if (placing && !atHome) endPlace(); }
-  const dt = Math.min(0.05, (t - last) / 1000); last = t; FDT = dt;
+  const dt = Math.min(0.1, (t - last) / 1000); last = t; FDT = dt;   // up to 1/10 s: a phone at 10–20 fps no longer plays in slow motion
   if (!G || !me) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#14181d'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
   if (RUN && !RUN.over && !document.getElementById('runWin')?.classList.contains('hidden')) return;   // the trash run covers the screen: don't draw the town under it (phones lagged)
   const m = P.get(myId);
@@ -1653,8 +1653,10 @@ function frame(t) {
       const swim = swimming(), inPool0 = nearPoolW(m.x, m.y), ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && !swim && blockedAt(m.x, m.y), free0 = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
       const free = (x, y) => swim ? inPoolW(x, y) : !inPool0 && nearPoolW(x, y) ? false : free0(x, y);   // swimmers stay in the water; nobody walks or drives into it
       const bx = m.x, by = m.y;
-      const nx = r2(m.x + dx * sp); if (free(nx, m.y)) m.x = nx;
-      const ny = r2(m.y + dy * sp); if (free(m.x, ny)) m.y = ny;
+      for (let i = 0, n = Math.max(1, Math.ceil(sp / .3)), ss = sp / n; i < n; i++) {   // long steps (fast car, slow phone) in small pieces: never jump through a wall
+        const nx = r2(m.x + dx * ss); if (free(nx, m.y)) m.x = nx;
+        const ny = r2(m.y + dy * ss); if (free(m.x, ny)) m.y = ny;
+      }
       // corner assist: brushing the edge of a tree, pole or pot slides you around it instead of stopping dead
       if (m.x === bx && m.y === by && !ar0) {
         const slide = (ax, ay, px, py) => { if (!ax && !ay) return false; for (let o = .06; o <= .52; o += .04) for (const sg of [1, -1]) { const qx = bx + px * o * sg, qy = by + py * o * sg; if (free(qx, qy) && free(r2(qx + ax * sp), r2(qy + ay * sp))) { const k = Math.min(sp, o); m.x = r2(bx + px * k * sg); m.y = r2(by + py * k * sg); if (!free(m.x, m.y)) { m.x = bx; m.y = by; continue; } return true; } } return false; };
@@ -4380,6 +4382,7 @@ const FN = {
     send({ t: 'reset', pin }); closePanel();
   },
   god(m) { send({ t: 'god', op: m.op }); },
+  godTab: m => { godTab = m.tab; if (m.tab === 'bug' && !bugList) send({ t: 'god', op: 'bugs' }); panel.sig = 'g' + m.tab; refreshPanel(true); },
   xmasGo(m) { closePanel(); setGuide(m.key, false, true); },
   story() { storyOpen(); },
   czBet(m) { czBetV = m.v; FX.play('click'); refreshPanel(true); },
@@ -5093,7 +5096,7 @@ const rarTag = id => { const r = G.items[id]?.rar; return r ? `<span class="rtag
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(it.name)}${rarTag(id)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
 const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
-let chatTab = 'all', worldAt = 0;
+let chatTab = 'all', worldAt = 0, godTab = 'quick';
 // world chat: one line every 3 seconds. Too soon -> say so and keep what was typed, so nothing is lost
 function worldOk(ch) {
   if (ch !== 'world') return true;
@@ -5508,6 +5511,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-24l', d: '22 พ.ย.', items: [
+    '🐢 แก้ตัวละครเดิน/ขับรถช้าเป็นสโลว์โมชั่นบนมือถือที่ภาพกระตุก ตอนนี้ความเร็วเท่าเดิมแม้เครื่องช้า',
+  ] },
   { v: '2026-11-24k', d: '22 พ.ย.', items: [
     '🩺 แก้หมอกดตรวจร่างกายคนไข้คนเดิมรัวๆ ได้เงินซ้ำ ตอนนี้ตรวจเสร็จคนไข้ลุกจากเตียงทันที',
     '💬 แก้เข้าเกมแล้วเห็นแต่ข้อความระบบ ไม่เห็นแชทโลก ตอนนี้แชทโลกล่าสุดขึ้นครบ',
@@ -7040,30 +7046,36 @@ function renderPanel(p) {
       if (!me.admin) return '';
       const g = me.god || {};
       const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small>${b.done ? '<small style="color:var(--ok)">✅ แจ้งผู้เล่นแล้ว</small>' : B('✅ ตอบกลับว่าแก้แล้ว', { fn: 'bugReply', bt: b.t, login: b.login || '' }, 'good')}</div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
-      return `<h2>👑 God mode</h2><div class="sub">เฉพาะแอดมิน · ปกติเล่นด้วยค่าสเตตัสธรรมดา</div>
-        <div class="setRow"><span><b>♾️ เงิน/เพชรไม่จำกัด</b><small>เปิดอยู่ = ซื้อได้ทุกอย่าง ปิด = กลับไปใช้เงินจริงของคุณ</small></span>${B(me.monInf ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'inf' }, me.monInf ? 'good' : '')}</div>
-        <div class="secT">💰 ปรับเงินตัวเอง${me.monInf ? ' <small>(ปิดเงินไม่จำกัดก่อนจึงลด/ตั้งได้)</small>' : ''}</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="0" placeholder="จำนวนเงิน เช่น 1000000"></div><div class="grid2">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}${B('➖ ลด', { fn: 'godMoney', op: 'submoney' }, '', !!me.monInf)}${B('🎯 ตั้งเป็นจำนวนนี้', { fn: 'godMoney', op: 'setmoney' }, '', !!me.monInf)}</div>
-        <div class="secT">📊 วัดผล</div>${B('📊 กราฟผู้เล่น / การกลับมาเล่น / รายได้', { fn: 'god', op: 'stats' }, 'primary')}
-        <div class="secT">💎 เติมเงินจริง</div>${B('💎 ดูรายการเติมเงิน / ยอดขาย', { fn: 'openPayAdmin' }, 'primary')}
-        <div class="secT">🔎 ค้นหาผู้เล่น</div><div class="rowf"><input id="godFind" maxlength="20" placeholder="ไอดี / ชื่อในเกม / เบอร์">${B('ค้นหา', { fn: 'godFind' }, 'primary')}</div>${godFindHtml()}
-        <div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
-        <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>
-        <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
-        <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
-        <div class="setRow"><span><b>📣 โพสต์ข่าวลงเฟส</b><small>ได้ข้อความอัปเดตพร้อมลิงก์เกม ไปวางในกลุ่มเฟสได้เลย</small></span>${B('📋 เปิด', { fn: 'open', kind: 'fbpost' }, 'primary')}</div>
-        <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
-        <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
-        <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
-        <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>
-        <div class="setRow"><span><b>🏃 ความเร็ว x<span id="godSpdV">${(g.speed || 1).toFixed(1)}</span></b><small>เลื่อนปรับได้ 1–5 เท่า (กดค้างปุ่มวิ่งได้อีก)</small></span><input id="godSpd" type="range" min="1" max="5" step="0.5" value="${g.speed || 1}" style="width:130px"></div>
-        <div class="setRow"><span><b>✨ วาร์ป</b><small>เปิดแล้วกด 🗺️ แผนที่ แตะตรงไหนก็วาร์ปไปที่นั่น</small></span>${B(g.warp ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'warp' }, g.warp ? 'good' : '')}</div>
-        ${g.warp ? B('🗺️ เปิดแผนที่เพื่อวาร์ป', { fn: 'map' }, 'primary big') : ''}
-        <div class="setRow"><span><b>🌑 ชุดคลุมแอดมิน + ออร่า</b><small>ชุดเฉพาะแอดมิน ไม่มีขาย · ทุกคนเห็นออร่ารอบตัว</small></span>${B(g.cloak ? 'ใส่อยู่' : 'ซ่อนอยู่', { fn: 'god', op: 'cloak' }, g.cloak ? 'good' : '')}</div>
-        <div class="setRow"><span><b>🚪 เข้าได้ทุกอาคาร</b><small>แม้ร้านปิด ปิดปรับปรุง หรือบ้านของคนอื่น · ไม่โดนไล่ออกตอนร้านปิด</small></span>${B(g.doors ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'doors' }, g.doors ? 'good' : '')}</div>
-        <div class="setRow"><span><b>🏷️ ซ่อนสีชื่อแอดมินบนหัว</b><small>ป้ายชื่อบนหัวเป็นแบบธรรมดา ไม่มีสีรุ้ง/มงกุฎ (คนอื่นก็เห็นแบบนี้) · ชื่อในแชทยังเป็นสีพิเศษ</small></span>${B(g.plain ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'plain' }, g.plain ? 'primary' : '')}</div>
-        <div class="setRow"><span><b>👻 ล่องหน</b><small>คนอื่นมองไม่เห็นตัว ไม่ขึ้นในแผนที่/รายชื่อออนไลน์ (แชทใกล้ๆ ยังเห็นข้อความ)</small></span>${B(g.invis ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'invis' }, g.invis ? 'good' : '')}</div>
-        <div class="grid2">${B('💯 สเตตัสเต็ม', { fn: 'god', op: 'fill' }, 'primary')}${B('💰 เงิน 999,999', { fn: 'god', op: 'money' }, 'primary')}</div><div class="grid2" style="margin-top:6px">${B('💎 เพชร +1,000', { fn: 'god', op: 'gems' }, 'primary')}</div>
-        <div class="secT">🐞 รายงานบัคจากผู้เล่น</div><div class="grid2">${B('📥 โหลดรายงาน', { fn: 'god', op: 'bugs' })}${B('🗑️ ล้างทั้งหมด', { fn: 'god', op: 'bugclear' }, 'warn', !bugList?.length)}</div>${bl}`;
+      const GT = [['quick', '⚡ ด่วน'], ['bug', `🐞 บัค${bugList?.length ? ` (${bugList.length})` : ''}`], ['me', '🧍 ตัวฉัน'], ['look', '👀 หน้าตา'], ['event', '🎉 อีเวนต์'], ['admin', '📊 จัดการ']];
+      const tab = {
+        quick: `<div class="grid2">${B('💯 สเตตัสเต็ม', { fn: 'god', op: 'fill' }, 'primary')}${B('💰 เงิน 999,999', { fn: 'god', op: 'money' }, 'primary')}</div><div class="grid2" style="margin-top:6px">${B('💎 เพชร +1,000', { fn: 'god', op: 'gems' }, 'primary')}</div>
+          <div class="secT">🧍 ใช้บ่อย</div>
+          <div class="setRow"><span><b>✨ วาร์ป</b><small>เปิดแล้วกด 🗺️ แผนที่ แตะตรงไหนก็วาร์ปไปที่นั่น</small></span>${B(g.warp ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'warp' }, g.warp ? 'good' : '')}</div>
+          ${g.warp ? B('🗺️ เปิดแผนที่เพื่อวาร์ป', { fn: 'map' }, 'primary big') : ''}
+          <div class="setRow"><span><b>👻 ล่องหน</b><small>คนอื่นมองไม่เห็นตัว ไม่ขึ้นในแผนที่/รายชื่อออนไลน์ (แชทใกล้ๆ ยังเห็นข้อความ)</small></span>${B(g.invis ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'invis' }, g.invis ? 'good' : '')}</div>
+          <div class="setRow"><span><b>🛡️ ล็อกสเตตัสเต็ม</b><small>ไม่หิว ไม่ป่วย ไม่หมดสติ</small></span>${B(g.lock ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'lock' }, g.lock ? 'good' : '')}</div>`,
+        bug: `<div class="grid2">${B('📥 โหลดรายงาน', { fn: 'god', op: 'bugs' })}${B('🗑️ ล้างทั้งหมด', { fn: 'god', op: 'bugclear' }, 'warn', !bugList?.length)}</div>${bl || '<div class="sub">กด 📥 โหลดรายงาน เพื่อดูรายการ</div>'}`,
+        me: `<div class="setRow"><span><b>♾️ เงิน/เพชรไม่จำกัด</b><small>เปิดอยู่ = ซื้อได้ทุกอย่าง ปิด = กลับไปใช้เงินจริงของคุณ</small></span>${B(me.monInf ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'inf' }, me.monInf ? 'good' : '')}</div>
+          <div class="secT">💰 ปรับเงินตัวเอง${me.monInf ? ' <small>(ปิดเงินไม่จำกัดก่อนจึงลด/ตั้งได้)</small>' : ''}</div><div class="rowf"><input id="godMoney" type="number" inputmode="numeric" min="0" placeholder="จำนวนเงิน เช่น 1000000"></div><div class="grid2">${B('➕ เพิ่ม', { fn: 'godMoney' }, 'primary')}${B('➖ ลด', { fn: 'godMoney', op: 'submoney' }, '', !!me.monInf)}${B('🎯 ตั้งเป็นจำนวนนี้', { fn: 'godMoney', op: 'setmoney' }, '', !!me.monInf)}</div>
+          <div class="setRow"><span><b>⚡ ไม่มีคูลดาวน์</b><small>ทุกอย่างไม่ต้องรอ (เปลี่ยนงาน ตกปลา ฯลฯ)</small></span>${B(g.nocd ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'nocd' }, g.nocd ? 'good' : '')}</div>
+          <div class="setRow"><span><b>🏃 ความเร็ว x<span id="godSpdV">${(g.speed || 1).toFixed(1)}</span></b><small>เลื่อนปรับได้ 1–5 เท่า (กดค้างปุ่มวิ่งได้อีก)</small></span><input id="godSpd" type="range" min="1" max="5" step="0.5" value="${g.speed || 1}" style="width:130px"></div>
+          <div class="setRow"><span><b>🚪 เข้าได้ทุกอาคาร</b><small>แม้ร้านปิด ปิดปรับปรุง หรือบ้านของคนอื่น · ไม่โดนไล่ออกตอนร้านปิด</small></span>${B(g.doors ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'doors' }, g.doors ? 'good' : '')}</div>
+          <div class="setRow"><span><b>💼 ทำงานได้ทุกอาชีพ</b><small>ปิดแล้วจะทำได้เฉพาะงานของอาชีพตัวเองเหมือนผู้เล่นทั่วไป</small></span>${B(g.alljobs !== false ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'alljobs' }, g.alljobs !== false ? 'good' : '')}</div>`,
+        look: `<div class="secT">✏️ เปลี่ยนชื่อตัวเอง</div><div class="rowf"><input id="godName" maxlength="16" placeholder="ชื่อใหม่ 2–16 ตัว" value="${esc(me.name || '')}">${B('บันทึก', { fn: 'godName' }, 'good')}</div>
+          <div class="setRow"><span><b>🌑 ชุดคลุมแอดมิน + ออร่า</b><small>ชุดเฉพาะแอดมิน ไม่มีขาย · ทุกคนเห็นออร่ารอบตัว</small></span>${B(g.cloak ? 'ใส่อยู่' : 'ซ่อนอยู่', { fn: 'god', op: 'cloak' }, g.cloak ? 'good' : '')}</div>
+          <div class="setRow"><span><b>🏅 ฉายา «${esc(G.adminTitle || 'นายกเทศมนตรี')}»</b><small>ปิดแล้วบนหัวจะขึ้นฉายาจากความสำเร็จที่เลือกไว้แทน</small></span>${B(!g.notitle ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'notitle' }, !g.notitle ? 'good' : '')}</div>
+          <div class="setRow"><span><b>🏷️ ซ่อนสีชื่อแอดมินบนหัว</b><small>ป้ายชื่อบนหัวเป็นแบบธรรมดา ไม่มีสีรุ้ง/มงกุฎ (คนอื่นก็เห็นแบบนี้) · ชื่อในแชทยังเป็นสีพิเศษ</small></span>${B(g.plain ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'plain' }, g.plain ? 'primary' : '')}</div>
+          <div class="setRow"><span><b>👻 ล่องหน</b><small>คนอื่นมองไม่เห็นตัว ไม่ขึ้นในแผนที่/รายชื่อออนไลน์ (แชทใกล้ๆ ยังเห็นข้อความ)</small></span>${B(g.invis ? 'เปิดอยู่' : 'ปิดอยู่', { fn: 'god', op: 'invis' }, g.invis ? 'good' : '')}</div>`,
+        event: `<div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
+          <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
+          <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
+          <div class="setRow"><span><b>📣 โพสต์ข่าวลงเฟส</b><small>ได้ข้อความอัปเดตพร้อมลิงก์เกม ไปวางในกลุ่มเฟสได้เลย</small></span>${B('📋 เปิด', { fn: 'open', kind: 'fbpost' }, 'primary')}</div>`,
+        admin: `<div class="secT">📊 วัดผล</div>${B('📊 กราฟผู้เล่น / การกลับมาเล่น / รายได้', { fn: 'god', op: 'stats' }, 'primary')}
+          <div class="secT">💎 เติมเงินจริง</div>${B('💎 ดูรายการเติมเงิน / ยอดขาย', { fn: 'openPayAdmin' }, 'primary')}
+          <div class="secT">🔎 ค้นหาผู้เล่น</div><div class="rowf"><input id="godFind" maxlength="20" placeholder="ไอดี / ชื่อในเกม / เบอร์">${B('ค้นหา', { fn: 'godFind' }, 'primary')}</div>${godFindHtml()}`,
+      }[godTab] || '';
+      return `<h2>👑 God mode</h2><div class="tabs" style="flex-wrap:wrap">${GT.map(([k, l]) => B(l, { fn: 'godTab', tab: k }, godTab === k ? 'primary' : '')).join('')}</div>
+        ${tab}`;
     }
     case 'more': {                                   // everything that is not an everyday button
       const tile = (kind, icon, label, sub, badge) => `<button class="moreTile" data-m='${JSON.stringify({ fn: 'open', kind })}'><b>${icon}</b><span>${label}${badge ? ' <i class="dot"></i>' : ''}</span><small>${sub}</small></button>`;
