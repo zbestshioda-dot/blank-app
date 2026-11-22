@@ -1575,7 +1575,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
@@ -4795,6 +4795,7 @@ function login(ws, m, pre) {
       loginFail('n:' + lname, 5, 5 * 60000); loginFail('i:' + ws.ip, 15, 10 * 60000);
       return fail(ws, 'ID นี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
     }
+    if (a.ban && (!a.ban.until || a.ban.until > now())) return fail(ws, `บัญชีนี้ถูกระงับ${a.ban.until ? ' ถึง ' + new Date(a.ban.until).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }) : 'ถาวร'}${a.ban.why ? ' · เหตุผล: ' + a.ban.why : ''} · ติดต่อแอดมินหากคิดว่าผิดพลาด`);
     loginFails.delete('n:' + lname);
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
@@ -5479,7 +5480,7 @@ function godAct(a, m) {
     const hits = m.list ? m.list.map(l => accounts.get(l)).filter(Boolean) : [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
     return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
-      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x) })) });
+      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x), ban: x.ban && (!x.ban.until || x.ban.until > now()) ? x.ban : null })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
@@ -5530,6 +5531,16 @@ function godAct(a, m) {
     if (x.ws) markMe(x);
     console.log('god card', a.login, x.login, gems);
     return toast(a, `ส่งบัตรรายเดือนให้ ${x.login} แล้ว ถึง ${new Date(x.card.until + 7 * 3600e3).toISOString().slice(0, 10)}`, '💳');
+  }
+  if (m.op === 'ban' || m.op === 'unban') {   // 🚫 suspend an account (days 0 = for good): they are kicked now and cannot log in until it ends
+    const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
+    if (m.op === 'unban') { x.ban = null; x.sd = true; dirty = true; toast(a, `ปลดแบน ${x.login} แล้ว`, '✅'); return godAct(a, { op: 'find', q: x.login }); }
+    if (isAdmin(x)) return toast(a, 'แบนแอดมินไม่ได้', '🛡️', false);
+    const days = Math.max(0, Math.min(3650, +m.days || 0)), why = cleanText(String(m.why || ''), 80);
+    x.ban = { until: days ? now() + days * 86400e3 : 0, why, by: a.login, at: now() }; x.sd = true; dirty = true;
+    if (x.ws) { send(x, { t: 'kicked', msg: `บัญชีนี้ถูกระงับ${days ? ` ${days} วัน` : 'ถาวร'}${why ? ' · เหตุผล: ' + why : ''}` }); try { x.ws.close(); } catch { } detach(x); }
+    console.log(`[ban] ${a.login} banned ${x.login} for ${days || 'ever'} days: ${why}`);
+    toast(a, `แบน ${x.login} ${days ? days + ' วัน' : 'ถาวร'} แล้ว`, '🚫'); return godAct(a, { op: 'find', q: x.login });
   }
   if (m.op === 'setpin') {                  // give a player a new PIN (they asked support for help logging in)
     const x = accounts.get(String(m.login || '').toLowerCase()), pin = String(m.pin || '');
