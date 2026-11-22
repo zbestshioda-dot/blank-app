@@ -2625,8 +2625,8 @@ function act(a, m) {
     case 'kitchen.serve': {
       const c = a.cook; if (!c || c.hand !== 'plate') return toast(a, 'ยังไม่มีจานพร้อมเสิร์ฟ', 'ℹ️', false);
       a.cook = null;
-      const it = D.ITEMS[c.rid], left = Math.max(0, (c.until - now()) / c.limit), extra = Math.random() < 0.2 * tier(a, 'chef') + (left > .4 ? .25 : 0) ? 1 : 0;
-      const tip = Math.round(it.base * .35 * left * jobPay(a));
+      const it = D.ITEMS[c.rid], left = Math.max(0, (c.until - now()) / c.limit), extra = Math.random() < 0.2 * tier(a, 'chef') + (left > .5 ? .1 : 0) ? 1 : 0;
+      const tip = Math.round(CHEF_MARGIN * .5 * left * jobPay(a));   // a small tip (was 35% of the dish's price: cooking paid far more than other jobs)
       addItem(a, c.rid, 1 + extra); quest(a, 'cook'); stat(a, 'cooked', 1 + extra); if (tip > 0) earn(a, tip); markMe(a);
       if (Math.random() < 0.02) infect(a, 'injury');
       send(a, { t: 'kfx', kind: 'serve' });
