@@ -6118,6 +6118,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27k', d: '23 พ.ย.', items: [
+    '💞 แก้บั๊ก: ความสนิทกับชาวเมืองหายทุกครั้งที่เซิร์ฟเวอร์รีสตาร์ท ตอนนี้บันทึกถาวรแล้ว',
+  ] },
   { v: '2026-11-27j', d: '23 พ.ย.', items: [
     '🕹️ จอยสติ๊กอยู่กับที่มุมซ้ายล่าง: แตะที่จอยแล้วลากเพื่อเดิน (เปลี่ยนกลับเป็นแบบลอยตามนิ้วได้ที่ ⚙️ ตั้งค่า)',
   ] },
