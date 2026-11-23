@@ -18,6 +18,20 @@ function mark(a, key, t) {
 
 const realMove = (a, t) => t - (a.loginAt || 0) >= 3000;   // the first moves after login are the spawn being placed, not the player
 
+// 🥚 the egg that hatches tomorrow: earned with the first three steps (rod, 3 fish, sell), in any order
+const eggDue = a => isV2(a) && !a.nb.egg && (a.nb.p?.[0] || 0) >= 1 && (a.nb.p?.[1] || 0) >= 3 && (a.nb.p?.[2] || 0) >= 1;
+const eggReady = (a, day) => isV2(a) && !!a.nb.egg && !a.nb.egg.h && day > a.nb.egg.d;
+// 🎁 the day-2 gift: the first login on any Thai day after signing up (no gems: not worth farming accounts)
+const GIFT2 = { money: 500, items: { bento: 2 } };
+const giftDue = (a, day, signupDay) => isV2(a) && !a.nb.g2 && day > signupDay;
+// what the phone gets: v2 all through the signup day and until the egg hatches; older newcomers keep the old { p } while unfinished
+function view(a, day, signupDay) {
+  const S = a?.nb; if (!S) return null;
+  if (!isV2(a)) return S.done ? null : { p: S.p };
+  if (S.done && day !== signupDay && !(S.egg && !S.egg.h)) return null;
+  return { p: S.p, t0: S.t0, v: S.v, done: S.done || 0, egg: S.egg || null, g2: S.g2 || null };
+}
+
 // the admin funnel: of the v2 newcomers, how many reached each moment; back = came again on a later day
 function funnel(list, dayNumOf) {
   const L = list.filter(isV2), has = k => L.filter(a => a.nb.ev?.[k]).length;
@@ -27,4 +41,4 @@ function funnel(list, dayNumOf) {
   return { n: L.length, rows, back };
 }
 
-module.exports = { NBV, CLIENT_EV, SERVER_EV, start, isV2, mark, funnel, realMove };
+module.exports = { NBV, CLIENT_EV, SERVER_EV, start, isV2, mark, funnel, realMove, eggDue, eggReady, GIFT2, giftDue, view };

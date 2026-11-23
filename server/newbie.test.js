@@ -43,3 +43,46 @@ T('realMove: ignores the spawn nudge right after login', () => {
   assert.equal(N.realMove({ loginAt: 1000 }, 1800), false);
   assert.equal(N.realMove({ loginAt: 1000 }, 4500), true);
 });
+
+// ---- Task 2: egg tomorrow, day-2 gift, what the phone is sent
+T('egg: needs steps 0-2', () => {
+  assert.equal(N.eggDue(v2({ p: [1, 3, 0] })), false);
+  assert.equal(N.eggDue(v2({ p: [1, 3, 1] })), true);
+});
+T('egg out of order: chat undone still gets it, never twice', () => {
+  const a = v2({ p: [1, 3, 1, 0, 0, 0] });
+  assert.equal(N.eggDue(a), true);
+  a.nb.egg = { d: '2026-11-23' };
+  assert.equal(N.eggDue(a), false);
+});
+T('eggReady: next Thai day only, once', () => {
+  const a = v2({ egg: { d: '2026-11-23' } });
+  assert.equal(N.eggReady(a, '2026-11-23'), false);
+  assert.equal(N.eggReady(a, '2026-11-24'), true);
+  a.nb.egg.h = '2026-11-24';
+  assert.equal(N.eggReady(a, '2026-11-25'), false);
+});
+T('gift2: once, on any later day', () => {
+  const a = v2();
+  assert.equal(N.giftDue(a, '2026-11-23', '2026-11-23'), false);
+  assert.equal(N.giftDue(a, '2026-11-27', '2026-11-23'), true);
+  a.nb.g2 = '2026-11-27';
+  assert.equal(N.giftDue(a, '2026-11-28', '2026-11-23'), false);
+  assert.deepEqual(N.GIFT2, { money: 500, items: { bento: 2 } });
+});
+T('v1 untouched', () => {
+  const a = { nb: { p: [1, 3, 1] } };
+  assert.equal(N.eggDue(a), false);
+  assert.equal(N.giftDue(a, '2026-11-30', '2026-11-23'), false);
+  assert.deepEqual(N.view(a, '2026-11-23', '2026-11-23'), { p: [1, 3, 1] });
+  assert.equal(N.view({ nb: { p: [1], done: 5 } }, '2026-11-23', '2026-11-23'), null);
+});
+T('nbView keeps day 1', () => {
+  const a = v2({ p: [1, 3, 1, 1, 1, 1], done: 2000, egg: { d: '2026-11-23' } });
+  const v = N.view(a, '2026-11-23', '2026-11-23');
+  assert.equal(v.v, 2); assert.equal(v.done, 2000); assert.deepEqual(v.egg, { d: '2026-11-23' });
+  assert.notEqual(N.view(a, '2026-11-24', '2026-11-23'), null);           // the egg has not hatched yet
+  a.nb.egg.h = '2026-11-24';
+  assert.equal(N.view(a, '2026-11-24', '2026-11-23'), null);
+  assert.equal(N.view({}, '2026-11-24', '2026-11-23'), null);
+});

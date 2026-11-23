@@ -672,16 +672,28 @@ function santaGift(a) {
 // a mystery egg: hatches into a pet you do not have yet (rarer ones less often)
 function hatchEgg(a) {
   if (!(a.inv.petegg > 0)) return;
-  const pool = Object.entries(D.PETS).filter(([k, p]) => !p.gem && !(a.pets || []).includes(k));   // 💎 aura pets are never in eggs
   addItem(a, 'petegg', -1);
-  if (!pool.length) { a.gems = (a.gems || 0) + 30; markMe(a); return toast(a, 'คุณมีสัตว์เลี้ยงครบทุกตัวแล้ว! ไข่กลายเป็น 💎30', '💎'); }
+  return givePet(a);
+}
+// a random pet the player does not have yet (rarer ones less often): added, called out and celebrated; all owned = 💎30
+function givePet(a) {
+  const pool = Object.entries(D.PETS).filter(([k, p]) => !p.gem && !(a.pets || []).includes(k));   // 💎 aura pets are never in eggs
+  if (!pool.length) { a.gems = (a.gems || 0) + 30; markMe(a); toast(a, 'คุณมีสัตว์เลี้ยงครบทุกตัวแล้ว! ไข่กลายเป็น 💎30', '💎'); return null; }
   const W = { 1: 50, 2: 25, 3: 12, 4: 5, 5: 1.5 }, tot = pool.reduce((t, [, p]) => t + (W[p.rar] || 1), 0);
   let r = Math.random() * tot, id = pool[0][0];
   for (const [k, p] of pool) { r -= W[p.rar] || 1; if (r <= 0) { id = k; break; } }
   const P = D.PETS[id]; a.pets = [...(a.pets || []), id]; a.pet = id; markMe(a); sendRoster(); joy(a, 8 + P.rar * 3);
   send(a, { t: 'hatch', id, rar: P.rar });
   if (P.rar >= 4) feed(`🥚 ${a.name} ฟักไข่ได้ ${P.icon}${P.name} สุดหายาก!`);
-  return toast(a, `🐣 ไข่ฟักแล้ว! ได้ ${P.icon}${P.name} มาเลี้ยง เดินตามคุณอยู่`, '🐣');
+  toast(a, `🐣 ไข่ฟักแล้ว! ได้ ${P.icon}${P.name} มาเลี้ยง เดินตามคุณอยู่`, '🐣');
+  return id;
+}
+// 🌱 v2 newcomers, once a day (login, and every minute while online so midnight counts): the egg hatches, the day-2 gift arrives
+function nbDaily(a) {
+  if (!NBM.isV2(a)) return;
+  const day = dayKey();
+  if (NBM.eggReady(a, day)) { a.nb.egg.h = day; a.sd = true; givePet(a); }
+  if (NBM.giftDue(a, day, dayKeyAt(a.nb.t0))) { a.nb.g2 = day; NBM.mark(a, 'day2', now()); sysMail(a, '🎁 ยินดีต้อนรับกลับมาวันที่ 2!\n\nดีใจที่กลับมาเล่นนะ นี่ของขวัญเล็กๆ จากเมือง เปิดรับได้เลย', NBM.GIFT2); }
 }
 // ------------------------------------------------------------------ invite friends: a code to share; the new player gets an egg, the inviter an egg + 10 gems (in the mailbox)
 const REF = { gems: 10, max: 20, newHours: 72, needMin: 30 };   // the inviter is paid once the friend has really played 30 minutes
@@ -794,7 +806,7 @@ function adminStats() {
 function refTick() {
   const t = now();
   for (const a of online.values()) {
-    markSeen(a);
+    markSeen(a); nbDaily(a);
     if (t - (a.lastMoveT || 0) < 120e3) { a.playMin = (a.playMin || 0) + 1; a.sd = true; }   // 📊 minutes of real play (for the admin stats)
     if (!a.refPend || t - (a.lastMoveT || 0) > 120e3) continue;
     a.actMin = (a.actMin || 0) + 1; a.sd = true;
@@ -1618,7 +1630,12 @@ function nbEv(a, ev, n = 1) {
     send(a, { t: 'nbstep', i });
   });
   if (!changed) return;
-  if (NB.every((st, i) => (S.p[i] || 0) >= st.n)) {
+  if (NBM.eggDue(a)) { S.egg = { d: dayKey() }; NBM.mark(a, 'egg', now()); send(a, { t: 'nbegg', tmr: loginView(a).tomorrow }); }   // 🥚 hatches tomorrow
+  if (NB.every((st, i) => (S.p[i] || 0) >= st.n) && NBM.isV2(a)) {
+    S.done = now(); a.gems = (a.gems || 0) + NB_END.gems;
+    toast(a, `🎉 ผ่านภารกิจมือใหม่ครบแล้ว! ได้ 💎${NB_END.gems} · 🥚 ไข่ของคุณฟักพรุ่งนี้นะ`, '🎉');
+    feed(`🌱 ${a.name} ผ่านภารกิจมือใหม่ครบแล้ว ยินดีต้อนรับสู่เมือง!`);
+  } else if (NB.every((st, i) => (S.p[i] || 0) >= st.n)) {
     S.done = now(); a.gems = (a.gems || 0) + NB_END.gems; addItem(a, NB_END.item, 1);
     toast(a, `🎉 ผ่านภารกิจมือใหม่ครบแล้ว! ได้ 💎${NB_END.gems} + 🥚 ไข่สัตว์เลี้ยงปริศนา (เปิดในกระเป๋า)`, '🎉');
     feed(`🌱 ${a.name} ผ่านภารกิจมือใหม่ครบแล้ว ยินดีต้อนรับสู่เมือง!`);
@@ -2564,6 +2581,7 @@ function monkTick() {
 setInterval(() => { try { monkTick(); } catch (e) { console.error('monkTick', e); } }, 5e3).unref?.();
 // ------------------------------------------------------------------ easter eggs
 const dayKey = () => new Date(now() + 7 * 3600e3).toISOString().slice(0, 10);   // Thai calendar day
+const dayKeyAt = t => new Date(t + 7 * 3600e3).toISOString().slice(0, 10);
 const eggOf = a => { a.egg = a.egg || {}; a.egg.s = a.egg.s || []; return a.egg; };
 // the legendary fish: the east corner of the lake, around midnight in game, once a day per player
 function legendRoll(a, c) {
@@ -5052,7 +5070,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb ? NBM.view(a, dayKey(), dayKeyAt(a.nb.t0)) : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -5197,7 +5215,7 @@ function login(ws, m, pre) {
     a.garden = null; a.money += back; a.sd = true;
     setTimeout(() => a.ws === ws && toast(a, `ไร่ชานเมืองปิดแล้ว คืนค่าสวนของคุณเต็มจำนวน ${money(back)} 💰`, '🌾'), 6000);
   }
-  const daily = dailyLogin(a); ev7Mark(a);
+  const daily = dailyLogin(a); ev7Mark(a); nbDaily(a);
   ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
