@@ -167,3 +167,4 @@ data/
 
 # player-save backup used once to fill a fresh volume (holds PINs, never commit)
 seed/
+.superpowers/

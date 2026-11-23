@@ -5182,6 +5182,7 @@ function misReadyWatch() {
   misReadyT = setTimeout(() => { if (me && !me.mis && !misWait()) { FX.play('chime'); toast('มีภารกิจใหม่แล้ว! ไปรับได้ที่ NPC อาชีพของคุณ', '📋'); } }, w * 1000 + 300);
 }
 function talkTo(n, st) {
+  if (me?.nb?.v === 2) send({ t: 'nbev', k: 'talk' });
   const now = performance.now(), quick = now - (talkedAt[n.id] || -1e9) < 90000; talkedAt[n.id] = now;
   const openIt = () => { dialogClose(); openPanel({ kind: STN(st)?.type || 'staff', st }); };
   if (quick && !(!n.keeper && MIS_CAREERS.includes(n.career) && job(n.career))) return openIt();   // mission givers always ask, so 📋 รับภารกิจ shows again right after a mission
@@ -5341,6 +5342,7 @@ function asExtra(S) {
   const nb = S.nbN ? [bar('สมัครแล้ว', S.nbN, S.nbN, '#8fb3ff'), ...S.nbName.map((t, i) => bar(`${i + 1}. ${t.split(' (')[0]}`, S.nbStep[i], S.nbN, '#7fd38a')), bar('🎉 ครบทุกข้อ', S.nbDone, S.nbN, '#ffd34d')].join('') : '<div class="sub">ยังไม่มีผู้เล่นใหม่ใน 30 วัน</div>';
   const ft = S.wN ? S.feat.map(([n, v]) => bar(n, v, S.wN, '#f2a35c')).join('') : '<div class="sub">ยังไม่มีข้อมูล</div>';
   return `<div class="secT">🌱 ผู้เล่นใหม่ติดอยู่ตรงไหน (คนที่ได้ภารกิจมือใหม่: ${S.nbN} คน)</div><div class="sub">แถบที่ลดฮวบ = ขั้นที่คนเลิกเล่น · สมัครใน 30 วันทั้งหมด ${S.allN ?? S.nbN} คน มาแค่วันเดียวแล้วหาย <b>${S.once}</b> คน (${(S.allN ?? S.nbN) ? Math.round(S.once / (S.allN ?? S.nbN) * 100) : 0}%)</div>${nb}
+    ${S.ftue?.n ? `<div class="secT">🧭 มือใหม่รุ่นใหม่ (v2) ทีละขั้น: ${S.ftue.n} คน</div><div class="sub">กลับมาวันที่ 2 ขึ้นไป <b>${S.ftue.back}</b> คน (${Math.round(S.ftue.back / S.ftue.n * 100)}%)</div>${S.ftue.rows.map(([l, n]) => bar(l, n, S.ftue.n, '#9b86e0')).join('')}` : ''}
     <div class="secT">🧭 ระบบไหนมีคนใช้ (คนที่เล่นใน 7 วัน: ${S.wN} คน)</div>${ft}
     <div class="secT">⏱️ เวลาเล่น</div><div class="sub">เข้าเล่นเฉลี่ย (ค่ากลาง) <b>${S.daysMed}</b> วันต่อคน · เวลาเล่นสะสม (ค่ากลาง) <b>${S.playMed}</b> นาที${S.playN ? ` จาก ${S.playN} คน` : ''} (เริ่มนับตั้งแต่อัปเดตนี้)</div>`;
 }
@@ -9054,6 +9056,7 @@ function showTut(i = 0) {
 $('#tutNext').onclick = () => { FX.play('click'); if (tutStep < TUT().length - 1) return showTut(tutStep + 1); endTut(); };
 $('#tutSkip').onclick = endTut;
 function endTut() {
+  if (me?.nb?.v === 2) send({ t: 'nbev', k: 'tut' });
   tutPending = false; if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
   $('#tut').classList.add('hidden'); try { localStorage.setItem('lt_tut2', '1'); } catch { }
   if (me?.nb && G.nbSteps) { const p = me.nb.p || [], i = G.nbSteps.findIndex((st, j) => (p[j] || 0) < st.n); if (i >= 0 && G.nbSteps[i].go) setGuide(G.nbSteps[i].go, false, true); }

@@ -11,6 +11,7 @@ const store = require('./store');
 const Q = require('./quests');
 const CR = require('./craft');
 const HM = require('./homes');
+const NBM = require('./newbie');   // 🌱 newcomer (v2) rules: event log, egg, day-2 gift, first fish
 const AU = require('./auction');
 const { docFlag } = require('./doc');
 const MR = require('./marry');
@@ -785,6 +786,7 @@ function adminStats() {
       ['ไปทำบุญวัด', x => x.prayDays], ['มีเพื่อนในโทรศัพท์', x => (x.contacts || []).length], ['เคยเติมเงิน', x => x.paidN]].map(([n, f]) => [n, has(f)]);
     const pm = W.map(x => x.playMin || 0).filter(Boolean).sort((p, q) => p - q); S.playMed = pm.length ? pm[pm.length >> 1] : 0; S.playN = pm.length;
     const dd = W.map(x => (x.seen || []).length).sort((p, q) => p - q); S.daysMed = dd.length ? dd[dd.length >> 1] : 0; }
+  S.ftue = NBM.funnel([...accounts.values()].filter(x => x.login && x.login !== '__meta' && !isAdmin(x)), dayNum);   // 🧭 v2 newcomers step by step
   S.on = onlineStats(); S.total = total; S.online = [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length;
   return S;
 }
@@ -1610,6 +1612,7 @@ function nbEv(a, ev, n = 1) {
     if (st.ev !== ev || (S.p[i] || 0) >= st.n) return;
     S.p[i] = Math.min(st.n, (S.p[i] || 0) + n); changed = true;
     if (S.p[i] < st.n) return;
+    NBM.mark(a, 's' + i, now());
     if (st.money) earn(a, st.money, true); if (st.gems) a.gems = (a.gems || 0) + st.gems;
     toast(a, `🌱 ภารกิจมือใหม่สำเร็จ: ${st.text} · ได้ ${st.money ? money(st.money) : `💎${st.gems}`}`, '🌱');
     send(a, { t: 'nbstep', i });
@@ -4494,6 +4497,7 @@ setInterval(() => { try {
   for (const def of Object.values(FOLK_DEF)) if (folkBday(def)) feed(`🎂 วันนี้วันเกิด${def.name}! ให้ของขวัญวันนี้ได้ความสนิท x2`);
 } catch (e) { console.error('bday', e); } }, 5000).unref?.();
 function giveCatch(a, id) {
+  if (a.nb && !a.nb.ev?.fish1) NBM.mark(a, 'fish1', now());
   const before = fishLv(a);
   a.xp.fisher = (a.xp.fisher || 0) + 1;
   if (fishLv(a) > before) {
@@ -5178,7 +5182,7 @@ function login(ws, m, pre) {
     const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
     a = hydrate({ v: VERSION, login: name, name: cname, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
-    accounts.set(lname, a); isNew = true; a.nb = { p: [], t0: now() };
+    accounts.set(lname, a); isNew = true; a.nb = NBM.start(now());
   }
   Q.ensure(a); santaGift(a); achSweep(a);
   if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) {   // a career that has been closed
@@ -5395,7 +5399,7 @@ function move(a, m) {
     const e0 = a.energy; a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); enLog(a, a.energy - e0, 'วิ่ง'); a.runT = t;
     if (a.energy <= D.RUN.minEnergy) { a.run = false; markMe(a); toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหวแล้ว พักหรือกินอะไรก่อน', '🥵', false); }
   }
-  if (x !== a.x || y !== a.y) { fuel(a, Math.hypot(x - a.x, y - a.y)); a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; }
+  if (x !== a.x || y !== a.y) { fuel(a, Math.hypot(x - a.x, y - a.y)); a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; if (a.nb && !a.nb.ev?.move && NBM.realMove(a, t)) NBM.mark(a, 'move', t); }
   a.f = clamp(Math.floor(+m.f) || 0, 0, 7);
   if (a.cast && Math.hypot(a.x - a.cast.x, a.y - a.cast.y) > 1.2) { a.cast = null; markMe(a); toast(a, 'เดินออกมา เก็บเบ็ดแล้ว', '🎣', false); }
 }
@@ -5538,6 +5542,7 @@ function onMessage0(ws, raw) {
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
     case 'use': return m.item === 'petegg' ? (cd(a, 'use', 600) && hatchEgg(a)) : useItem(a, m.item);
+    case 'nbev': { if (NBM.CLIENT_EV.includes(m.k)) NBM.mark(a, m.k, now()); return; }
     case 'spec': { const id = Math.trunc(+m.id) || 0; if (a.specOn !== id) { a.specOn = id; specChanged(); } return; }
     case 'pet.leash': { if (!a.leash) return toast(a, 'ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง', '🦮', false); a.leashOn = a.leashOn ? 0 : 1; markMe(a); sendRoster(); return toast(a, a.leashOn ? 'ใส่สายจูงแล้ว' : 'ถอดสายจูงแล้ว', '🦮'); }
     case 'pet.name': {
