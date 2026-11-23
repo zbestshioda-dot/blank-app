@@ -116,7 +116,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b9', chSheets = {};
+const CH_V = 'b10', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
