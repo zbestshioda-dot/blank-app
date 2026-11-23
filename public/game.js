@@ -316,7 +316,7 @@ function sheetHasHair(sheet) {
   let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
   return HAIR_MASKED[sheet] = n > 50;
 }
-const HAIR_HAT = { detective: 1, farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
+const HAIR_HAT = { detective: 1, farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1, panda: 1, bear: 1, catsuit: 1, cathood: 1, chicken: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
 function hairFix(fr, outfit, step, gender, lk) {
   const sh = outfit.slice(0, -1).replace(/^f(?=[a-z]{3})/, m => CH_ATLAS.rows[outfit.slice(1) + 'down0'] !== undefined ? '' : m);
   if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh]) return fr;
@@ -6088,6 +6088,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27d', d: '23 พ.ย.', items: [
+    '🐼 แก้ชุดแพนด้า (และชุดหมี ชุดแมว ชุดไก่): หูและลายบนฮู้ดไม่ติดสีผมแล้ว']},
   { v: '2026-11-27c', d: '23 พ.ย.', items: [
     '🍸 บาร์ชิลล์ราตรีโฉมใหม่! ตึกและของตกแต่งวาดใหม่ทั้งร้าน · 🪩 ไฟแสงสี สปอตไลต์ ลูกบอลดิสโก้ และ <b>เลเซอร์ยิงจากเวที</b> ตอนบาร์เปิด · มีคนร้องเพลงไฟจะเต้นเร็วขึ้น 🎤']},
   { v: '2026-11-27b', d: '23 พ.ย.', items: [
