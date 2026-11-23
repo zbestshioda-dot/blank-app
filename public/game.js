@@ -5320,7 +5320,18 @@ function aStatsHtml() {
     ${asChart(S, [{ name: 'เข้าเล่น', v: S.active }], { title: '👥 คนเข้าเล่นต่อวัน', sub: 'คนที่ออนไลน์อย่างน้อย 1 ครั้งในวันนั้น' })}
     ${asChart(S, [{ name: 'D1 กลับมาวันถัดไป', v: S.d1 }, { name: 'D7 ยังเล่นหลัง 7 วัน', v: S.d7 }], { type: 'line', max: 100, pct: 1, fmt: v => v + '%', title: '🔁 การกลับมาเล่น', sub: 'แยกตามวันที่สมัคร: กี่ % ของคนใหม่วันนั้นกลับมาเล่นอีก' })}
     ${asChart(S, [{ name: 'รายได้', v: S.thb }], { title: '💎 รายได้จากการเติมเงินต่อวัน', sub: `จ่ายเงินแล้ว 30 วัน ${sum(S.payers)} ครั้ง-คน`, fmt: v => money(v) })}
+    ${asExtra(S)}
     ${tbl}`;
+}
+// 📊 newcomer drop-off, which systems get used, play time (bars: plain HTML, no chart library)
+function asExtra(S) {
+  if (S.nbStep == null) return '';
+  const bar = (label, n, of, col) => { const p = of ? Math.round(n / of * 100) : 0; return `<div class="asBar"><span>${esc(label)}</span><i><u style="width:${p}%;background:${col}"></u></i><b>${n} · ${p}%</b></div>`; };
+  const nb = S.nbN ? [bar('สมัครแล้ว', S.nbN, S.nbN, '#8fb3ff'), ...S.nbName.map((t, i) => bar(`${i + 1}. ${t.split(' (')[0]}`, S.nbStep[i], S.nbN, '#7fd38a')), bar('🎉 ครบทุกข้อ', S.nbDone, S.nbN, '#ffd34d')].join('') : '<div class="sub">ยังไม่มีผู้เล่นใหม่ใน 30 วัน</div>';
+  const ft = S.wN ? S.feat.map(([n, v]) => bar(n, v, S.wN, '#f2a35c')).join('') : '<div class="sub">ยังไม่มีข้อมูล</div>';
+  return `<div class="secT">🌱 ผู้เล่นใหม่ติดอยู่ตรงไหน (สมัครใน 30 วัน: ${S.nbN} คน)</div><div class="sub">แถบที่ลดฮวบ = ขั้นที่คนเลิกเล่น · มาแค่วันเดียวแล้วหาย <b>${S.once}</b> คน (${S.nbN ? Math.round(S.once / S.nbN * 100) : 0}%)</div>${nb}
+    <div class="secT">🧭 ระบบไหนมีคนใช้ (คนที่เล่นใน 7 วัน: ${S.wN} คน)</div>${ft}
+    <div class="secT">⏱️ เวลาเล่น</div><div class="sub">เข้าเล่นเฉลี่ย (ค่ากลาง) <b>${S.daysMed}</b> วันต่อคน · เวลาเล่นสะสม (ค่ากลาง) <b>${S.playMed}</b> นาที${S.playN ? ` จาก ${S.playN} คน` : ''} (เริ่มนับตั้งแต่อัปเดตนี้)</div>`;
 }
 // 🎰 casino panels: the cashier (rules + today's tally) and four games. Results come from the server; the client only animates.
 let czBetV = 100, czLast = {}, czAnim = 0;

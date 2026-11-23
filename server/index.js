@@ -730,6 +730,19 @@ function adminStats() {
   const payDays = Array.from({ length: N }, () => new Set());
   for (const o of Object.values(payOrders)) if (o.st === 'paid' && o.paidT) { const d = dayNum(o.paidT); if (d >= d0 && d <= today) { S.thb[idx(d)] += o.thb || 0; payDays[idx(d)].add(o.l); } }
   S.payers = payDays.map(x => x.size);
+  // 🌱 where newcomers stop: players who joined in the last 30 days, how many finished each starter step; and who never came back
+  { const C = [...accounts.values()].filter(x => x.login && x.login !== '__meta' && !isAdmin(x) && dayNum(x.created || 0) >= d0 && dayNum(x.created || 0) <= today - 1);
+    S.nbN = C.length; S.nbStep = NB.map((st, i) => C.filter(x => x.nb && (x.nb.p?.[i] || 0) >= st.n).length); S.nbDone = C.filter(x => x.nb?.done).length; S.nbName = NB.map(st => st.text);
+    S.once = C.filter(x => (x.seen?.length || 1) <= 1).length; }
+  // 🧭 which systems players actually use: everyone who played in the last 7 days
+  { const W = [...accounts.values()].filter(x => x.login && x.login !== '__meta' && !isAdmin(x) && (x.seen || []).some(d => d >= today - 6));
+    const has = f => W.filter(x => { try { return !!f(x); } catch { return false; } }).length;
+    S.wN = W.length;
+    S.feat = [['มีงานทำ', x => x.career && x.career !== 'none'], ['มีบ้าน', x => x.hown], ['ตกปลาได้', x => Object.keys(x.fishdex || {}).length], ['ปลูกผักในสวน', x => Object.keys(x.ycrops || {}).length],
+      ['มีสัตว์เลี้ยง', x => (x.pets || []).length], ['อยู่แก๊ง', x => x.gang], ['แต่งงาน', x => x.spouse], ['สนิทชาวเมือง', x => Object.values(x.folk || {}).some(f => f.p > 0)],
+      ['ไปทำบุญวัด', x => x.prayDays], ['มีเพื่อนในโทรศัพท์', x => (x.contacts || []).length], ['เคยเติมเงิน', x => x.paidN]].map(([n, f]) => [n, has(f)]);
+    const pm = W.map(x => x.playMin || 0).filter(Boolean).sort((p, q) => p - q); S.playMed = pm.length ? pm[pm.length >> 1] : 0; S.playN = pm.length;
+    const dd = W.map(x => (x.seen || []).length).sort((p, q) => p - q); S.daysMed = dd.length ? dd[dd.length >> 1] : 0; }
   S.on = onlineStats(); S.total = total; S.online = [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length;
   return S;
 }
@@ -738,6 +751,7 @@ function refTick() {
   const t = now();
   for (const a of online.values()) {
     markSeen(a);
+    if (t - (a.lastMoveT || 0) < 120e3) { a.playMin = (a.playMin || 0) + 1; a.sd = true; }   // 📊 minutes of real play (for the admin stats)
     if (!a.refPend || t - (a.lastMoveT || 0) > 120e3) continue;
     a.actMin = (a.actMin || 0) + 1; a.sd = true;
     if (a.actMin < REF.needMin) continue;
@@ -1723,7 +1737,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'prayDay', 'prayDays', 'folk', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)

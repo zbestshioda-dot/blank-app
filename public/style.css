@@ -1685,3 +1685,6 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 body.drunk1 #cv { animation: drunkSway 6s ease-in-out infinite }
 body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 @media (prefers-reduced-motion: reduce) { body.drunk1 #cv, body.drunk2 #cv { animation: none } }
+
+/* 📊 admin stats: simple bars */
+.asBar{display:grid;grid-template-columns:minmax(0,1fr) 38% auto;gap:6px;align-items:center;font-size:12.5px;margin:3px 0}.asBar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.asBar i{height:10px;border-radius:5px;background:rgba(0,0,0,.12);overflow:hidden;display:block}.asBar u{display:block;height:100%;border-radius:5px}.asBar b{font-size:11.5px;white-space:nowrap}
