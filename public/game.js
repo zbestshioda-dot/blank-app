@@ -732,7 +732,7 @@ function handle(m) {
     case 'announce': setTicker(m.text); showTicker(); break;
     case 'wd': {   // the full snapshot on login, then only the parts that changed (d: 1)
       if ('ann' in m && (m.ann || '') !== tickerAnn) setTicker(m.ann);
-      wd = m.d && wd ? { ...wd, ...m } : m; clockOff = m.now - Date.now(); paintEvent();
+      wd = m.d && wd ? { ...wd, ...m } : m; clockOff = m.now - Date.now(); paintEvent(); if (wd.fest) festCardSoon();
       if (!m.d || Object.keys(m).some(k => k !== 't' && k !== 'd' && k !== 'now' && k !== 'on')) refreshPanel();
       if (m.houses) { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9], h[15]])); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } }
       break; }
@@ -1104,7 +1104,7 @@ function nbStepCard(i) {
   d.innerHTML = `<b>✅ ${esc(st.text.split(' (')[0])}</b><small>${st.money ? '+' + money(st.money) : st.gems ? '+💎' + st.gems : ''}</small><i><u style="width:${Math.round(done / S.length * 100)}%"></u></i><em>${done}/${S.length}</em>`;
   document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 1300); setTimeout(() => d.remove(), 1700);
   const r = $('#meMoney').getBoundingClientRect();
-  for (let k = 0; k < 6; k++) { const c = document.createElement('span'); c.className = 'nbCoin'; c.textContent = '🪙'; c.style.left = (innerWidth / 2 - 10 + (k - 3) * 14) + 'px'; c.style.top = (innerHeight * .42) + 'px'; document.body.appendChild(c);
+  for (let k = 0; k < 6; k++) { const c = document.createElement('span'); c.className = 'nbCoin'; c.innerHTML = nbImg('coin', 22); c.style.left = (innerWidth / 2 - 10 + (k - 3) * 14) + 'px'; c.style.top = (innerHeight * .42) + 'px'; document.body.appendChild(c);
     setTimeout(() => { c.style.left = r.left + 'px'; c.style.top = r.top + 'px'; c.style.opacity = '.2'; }, 60 + k * 70); setTimeout(() => c.remove(), 1000 + k * 70); }
 }
 function nbFirstFish(id) {
@@ -1115,9 +1115,12 @@ function nbFirstFish(id) {
 }
 const nbFishHelp = () => nbDay1() && !me.nb.f1;   // talk a newcomer through their very first fish
 const nbEggWaiting = () => nbDay1() && !!me.nb.egg && !me.nb.egg.h;
+// 🖼️ newcomer + festival art (tools/add_nb_icons.py → assets/nb)
+const NB_ART_V = 1;
+const nbImg = (n, px, cls = '') => `<img class="nbI ${cls}" src="assets/nb/${n}.webp?v=${NB_ART_V}" alt="" style="width:${px}px;height:${px}px">`;
 function nbTomorrowCard(tmr) {
   const d = document.createElement('div'); d.className = 'hatchPop nbCard';
-  d.innerHTML = `<div><div style="font-size:54px">🌙</div><b>พรุ่งนี้รอคุณอยู่!</b><span>🥚 ไข่สัตว์เลี้ยงของคุณจะฟักพรุ่งนี้</span><span>🎁 ของขวัญวันที่ 2 ในจดหมาย</span>${tmr ? `<span>💰 โบนัสเข้าเกม ${money(tmr)}</span>` : ''}<button class="primary">โอเค! พรุ่งนี้เจอกัน</button></div>`;
+  d.innerHTML = `<div>${nbImg('moon', 72)}<b>พรุ่งนี้รอคุณอยู่!</b><span>${nbImg('egg', 30)} ไข่สัตว์เลี้ยงของคุณจะฟักพรุ่งนี้</span><span>${nbImg('gift', 30)} ของขวัญวันที่ 2 ในจดหมาย</span>${tmr ? `<span>${nbImg('coin', 30)} โบนัสเข้าเกม ${money(tmr)}</span>` : ''}<button class="primary">โอเค! พรุ่งนี้เจอกัน</button></div>`;
   d.onclick = () => { d.remove(); };
   document.body.appendChild(d); FX.play('chime');
   if (nbTomorrowCard.sent !== 1) { nbTomorrowCard.sent = 1; send({ t: 'nbev', k: 'card' }); }
@@ -1187,7 +1190,7 @@ function paintHud() {
   if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">${ic('i_bulb')} อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
   if (me.desk >= 0 && me.enrolled) chips.push(`<span class="chip study" data-dz="_study">📖 เรียนอยู่ ${Math.round((me.study || 0) * 100)}%</span>`);
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
-  if (nbEggWaiting()) chips.push('<span class="chip study" data-dz="_nbegg">🌙 พรุ่งนี้: 🥚 ไข่ฟัก + 🎁</span>');
+  if (nbEggWaiting()) chips.push(`<span class="chip study" data-dz="_nbegg">${nbImg('moon', 18)} พรุ่งนี้: ${nbImg('egg', 18)} ไข่ฟัก + ${nbImg('gift', 18)}</span>`);
   if (me.prayed === 0 && (me.lv || 0) >= 2) chips.push('<span class="chip study" data-dz="_pray">🪷 ยังไม่ได้ทำบุญวันนี้</span>');
   $('#statusBox').classList.toggle('hidden', !chips.length);
   { const n = me.mailN || 0, f = $('#mailFab'); if (f) { f.classList.toggle('hidden', !n); $('#mailFabN').textContent = n > 9 ? '9+' : n; if (!f.onclick) f.onclick = () => openPanel({ kind: 'mail' }); } }
@@ -1236,6 +1239,16 @@ function festText() {
   return `${F.icon} ${F.text}`;
 }
 setInterval(() => { if (wd?.fest?.ny && !wd.ev) paintEvent(); }, 1000);
+const FEST_ART = { newyear: ['ev_newyear', 'firework'], cny: ['ev_cny', 'angpao'] };
+function festCardSoon(ms = 2500) { if (!festCardSoon.t) festCardSoon.t = setTimeout(() => { festCardSoon.t = 0; festCard(); }, ms); }   // one pending check at a time (wd arrives every second)
+function festCard() {   // 🎉 a festival's card with its banner, once a day (never over a newcomer's first steps or an open panel)
+  const F = wd?.fest, art = F && FEST_ART[F.id]; if (!art || !me || nbQuiet() || $('.festCard')) return;
+  if (panel || $('#daily')?.offsetParent || $('.hatchPop') || !$('#tut').classList.contains('hidden')) return void festCardSoon(3000);   // wait for the daily bonus, tutorial or another card
+  const k = 'lt_fest_' + F.id + '_' + thaiDay(Date.now() + clockOff); try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch { }
+  const d = document.createElement('div'); d.className = 'hatchPop festCard';
+  d.innerHTML = `<div><img class="festBan" src="assets/nb/${art[0]}.webp?v=${NB_ART_V}" alt=""><b>${nbImg(art[1], 34)} ${esc(F.name)}</b><span>${esc(F.text)}</span><button class="primary">${nbImg(art[1], 24)} เย้!</button></div>`;
+  d.onclick = () => d.remove(); document.body.appendChild(d); FX.play('chime');
+}
 function paintEvent() {
   const e = $('#eventBar'), ev = wd?.ev || (wd?.fest ? { text: festText() } : null);
   if (ev) { if (e.dataset.t !== ev.text) { e.dataset.t = ev.text; e.innerHTML = `<span>${esc(ev.text)}</span>`; }
@@ -6229,6 +6242,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27q', d: '23 พ.ย.', items: [
+    '🖼️ รูปใหม่: ไข่ ของขวัญ เหรียญ พระจันทร์ในการ์ดมือใหม่ และการ์ดเทศกาลปีใหม่/ตรุษจีนพร้อมภาพแบนเนอร์',
+  ] },
   { v: '2026-11-27p', d: '23 พ.ย.', items: [
     '🎉 มือใหม่: ฉลองทุกครั้งที่ทำภารกิจสำเร็จ · ปลาตัวแรกโชว์ตัวใหญ่ · เงินก้อนแรกนับขึ้นให้เห็น',
   ] },
@@ -7732,7 +7748,7 @@ function renderPanel(p) {
         const sorts = [['cat', 'หมวด'], ['value', 'มูลค่า'], ['qty', 'จำนวน'], ['name', 'ชื่อ']].map(([k, l]) => B(l, { fn: 'qtab', set: { gsort: k } }, sort === k ? 'primary' : '')).join('');
         const fu = (me.furniture || []).filter(k => k !== 'sbed' && G.shop.furniture[fbase(k)] && !G.shop.furniture[fbase(k)].field), fg = fu.filter(k => G.shop.furniture[fbase(k)].cat === 'garden').length;
         const homeNote = me.hown && fu.length ? `<div class="setRow"><span><b>🛋️ เฟอร์นิเจอร์และของแต่งสวน ${fu.length} ชิ้น${fg ? ` (ของสวน ${fg})` : ''}</b><small>ของที่ซื้อจากร้านเฟอร์นิเจอร์/ร้านต้นไม้ไม่อยู่ในกระเป๋า แต่ส่งไปเก็บที่คลังบ้าน เข้าบ้านแล้วกดจัดบ้านเพื่อวาง</small></span>${B('เปิดคลังบ้าน', { fn: 'open', kind: 'homedeco', set: { dtab: fg ? 'garden' : 'basic' } }, 'good')}</div>` : '';
-        const eggNote = nbEggWaiting() ? (() => { const left = Math.max(0, nextThaiMidnight() - Date.now() - clockOff), h = Math.floor(left / 36e5), mm = Math.floor(left / 6e4) % 60; return `<div class="setRow nbEggRow"><span><b>🥚 ไข่รอฟัก</b><small>ฟักพรุ่งนี้ (อีก ${h}:${String(mm).padStart(2, '0')} ชม.) เข้าเกมพรุ่งนี้แล้วได้สัตว์เลี้ยงเลย</small></span><b style="font-size:30px">🥚</b></div>`; })() : '';
+        const eggNote = nbEggWaiting() ? (() => { const left = Math.max(0, nextThaiMidnight() - Date.now() - clockOff), h = Math.floor(left / 36e5), mm = Math.floor(left / 6e4) % 60; return `<div class="setRow nbEggRow"><span><b>ไข่รอฟัก</b><small>ฟักพรุ่งนี้ (อีก ${h}:${String(mm).padStart(2, '0')} ชม.) เข้าเกมพรุ่งนี้แล้วได้สัตว์เลี้ยงเลย</small></span>${nbImg(left < 3 * 36e5 ? 'egg_crack' : 'egg', 52)}</div>`; })() : '';
         return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}${eggNote}${homeNote}
           <div class="bagG">${cats}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
           ${gcat === 'all' && (me.rods || []).length ? `<div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>` : ''}`;

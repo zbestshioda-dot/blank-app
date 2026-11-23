@@ -1707,3 +1707,9 @@ body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 @keyframes nbPop{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
 .nbCoin{position:fixed;z-index:61;font-size:22px;pointer-events:none;transition:left .7s ease-in,top .7s ease-in,opacity .7s}
 #meMoney.nbUp{color:#ffe27a;text-shadow:0 0 8px #ffd34d}
+
+/* 🖼️ newcomer / festival art */
+.nbI{display:inline-block;vertical-align:middle;object-fit:contain;image-rendering:pixelated}
+.nbCard>div>.nbI:first-child{display:block;margin:0 auto 4px}
+.festCard>div{max-width:min(92vw,520px);padding-top:10px}.festBan{display:block;width:100%;border-radius:12px;margin-bottom:8px;border:2px solid #b97a2a}
+.festCard b{display:flex;align-items:center;justify-content:center;gap:8px;font-size:20px}.festCard span{display:block;margin:6px 0 10px}.festCard button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
