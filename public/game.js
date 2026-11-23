@@ -1099,7 +1099,8 @@ function nbMoneyUp(from) {
   tick();
 }
 function nbStepCard(i) {
-  const S = G.nbSteps || [], p = me?.nb?.p || [], done = S.filter((st, j) => j === i || (p[j] || 0) >= st.n).length, st = S[i];   // the step just finished counts even before its update arrives if (!st) return;
+  const S = G.nbSteps || [], p = me?.nb?.p || [], done = S.filter((st, j) => j === i || (p[j] || 0) >= st.n).length, st = S[i];   // the step just finished counts even before its update arrives
+  if (!st) return;
   const d = document.createElement('div'); d.className = 'nbStepCard';
   d.innerHTML = `<b>✅ ${esc(st.text.split(' (')[0])}</b><small>${st.money ? '+' + money(st.money) : st.gems ? '+💎' + st.gems : ''}</small><i><u style="width:${Math.round(done / S.length * 100)}%"></u></i><em>${done}/${S.length}</em>`;
   document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 1300); setTimeout(() => d.remove(), 1700);
@@ -1165,6 +1166,7 @@ function paintQuestBox() {
 }
 function paintHud() {
   try { nbHudApply(); } catch { }
+  if (pendingDaily && !dailyWait() && !panel && !$('.hatchPop')) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 1500); }
   if (!me) return;
   const c = G.careers[me.career];
   if ((me.docjob?.dest || '') !== (window.__docDest || '')) { window.__docDest = me.docjob?.dest || ''; if (me.docjob) setGuide(me.docjob.dest, true); }   // a new envelope: point the way
@@ -1239,6 +1241,7 @@ function festText() {
   return `${F.icon} ${F.text}`;
 }
 setInterval(() => { if (wd?.fest?.ny && !wd.ev) paintEvent(); }, 1000);
+setInterval(() => { if (panel?.kind === 'bag' && typeof nbEggWaiting === 'function' && nbEggWaiting()) refreshPanel(true); }, 30000);   // the egg countdown in the bag
 const FEST_ART = { newyear: ['ev_newyear', 'firework'], cny: ['ev_cny', 'angpao'] };
 function festCardSoon(ms = 2500) { if (!festCardSoon.t) festCardSoon.t = setTimeout(() => { festCardSoon.t = 0; festCard(); }, ms); }   // one pending check at a time (wd arrives every second)
 function festCard() {   // 🎉 a festival's card with its banner, once a day (never over a newcomer's first steps or an open panel)
@@ -6242,6 +6245,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27r', d: '23 พ.ย.', items: [
+    '🛠️ มือใหม่: โบนัสเข้าเกมขึ้นให้รับทันทีที่ทำภารกิจครบ · นับถอยหลังไข่ในกระเป๋าเดินเอง · ไม่ขึ้น "กำลังเดินไป" ตอนยืนอยู่ที่นั่นแล้ว',
+  ] },
   { v: '2026-11-27q', d: '23 พ.ย.', items: [
     '🖼️ รูปใหม่: ไข่ ของขวัญ เหรียญ พระจันทร์ในการ์ดมือใหม่ และการ์ดเทศกาลปีใหม่/ตรุษจีนพร้อมภาพแบนเนอร์',
   ] },
@@ -8991,6 +8997,7 @@ function setGuide(key, quiet, auto) {
   const g = targetOf(key); if (!g) return;
   guide = g; autoNav = !!auto; autoPath = null;
   if (g.label === 'เจ้าหน้าที่' && STAFF_AT[key]) g.label = STAFF_AT[key].short;
+  { const m0 = P.get(myId); if (m0 && !g.player && g.x != null && Math.hypot(m0.x - g.x, m0.y - g.y) < 1.6) { quiet = true; autoNav = false; } }   // already there: no walking notice
   if (!quiet) { toast(auto ? `กำลังเดินไป ${g.label} (ขยับจอยเพื่อหยุดเดินเอง)` : `นำทางไป ${g.label} — เดินตามลูกศรสีเหลือง (ยกเลิกได้ที่ปุ่มใต้สถานะ)`, '📍'); FX.play('notice'); }
   paintNav(); placeLog();
 }
