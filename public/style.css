@@ -1694,3 +1694,8 @@ body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 
 /* 🌱 newcomer HUD: buttons wait for their step; a new one glows once */
 #runBtn.nbHide,#restBtn.nbHide,#cbOpen.nbHide,#emoBtn.nbHide,#ev7Btn.nbHide,#lkBtn.nbHide,#topupBtn.nbHide,#eventBar.nbHide,.nbHide{display:none!important}.nbNew{animation:nbNewGlow .6s ease-in-out 4;z-index:20}@keyframes nbNewGlow{50%{transform:scale(1.18);filter:drop-shadow(0 0 12px #ffe27a) brightness(1.25)}}
+
+/* 🌱 newcomer hints: where to drag, and the big button glowing when something is in reach */
+#stick.nbHint{animation:nbStick 1.2s ease-in-out infinite}#stick.nbHint::after{content:'ลากตรงนี้เพื่อเดิน';position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;background:#fff3c9;color:#5a3620;font:700 13px 'Mitr',sans-serif;padding:4px 10px;border-radius:10px;border:2px solid #b97a2a}
+@keyframes nbStick{50%{box-shadow:0 0 0 10px rgba(255,226,122,.45)}}
+#actBtn.nbGlow{animation:nbAct 1s ease-in-out infinite}@keyframes nbAct{50%{filter:drop-shadow(0 0 14px #ffe27a) brightness(1.2);transform:scale(1.06)}}

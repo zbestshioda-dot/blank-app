@@ -29,7 +29,14 @@ function view(a, day, signupDay) {
   const S = a?.nb; if (!S) return null;
   if (!isV2(a)) return S.done ? null : { p: S.p };
   if (S.done && day !== signupDay && !(S.egg && !S.egg.h)) return null;
-  return { p: S.p, t0: S.t0, v: S.v, done: S.done || 0, egg: S.egg || null, g2: S.g2 || null };
+  return { p: S.p, t0: S.t0, v: S.v, done: S.done || 0, egg: S.egg || null, g2: S.g2 || null, f1: S.f1 ? 1 : 0 };
+}
+
+// 🎣 a v2 newcomer's very first fish is sure to come home: a common fish (not junk), never lost to timing
+const firstFish = a => isV2(a) && !a.nb.f1;
+function pickFirst(table, items) {
+  const fish = table.filter(([id]) => id), common = fish.filter(([id]) => (items[id]?.rar || 1) === 1);
+  return (common.length ? common : fish).sort((x, y) => y[1] - x[1])[0]?.[0] || null;
 }
 
 // the admin funnel: of the v2 newcomers, how many reached each moment; back = came again on a later day
@@ -41,4 +48,4 @@ function funnel(list, dayNumOf) {
   return { n: L.length, rows, back };
 }
 
-module.exports = { NBV, CLIENT_EV, SERVER_EV, start, isV2, mark, funnel, realMove, eggDue, eggReady, GIFT2, giftDue, view };
+module.exports = { NBV, CLIENT_EV, SERVER_EV, start, isV2, mark, funnel, realMove, eggDue, eggReady, GIFT2, giftDue, view, firstFish, pickFirst };

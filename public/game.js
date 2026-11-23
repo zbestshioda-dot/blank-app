@@ -782,7 +782,7 @@ function handle(m) {
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
     case 'nbegg': nbTomorrowCard(m.tmr); break;
-    case 'nbstep': FX.play('levelup'); if (pendingDaily) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && S[i].go) setGuide(S[i].go, true); }, 900); break;
+    case 'nbstep': FX.play('levelup'); if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && nbGo(i)) setGuide(nbGo(i), true); }, 900); break;
     case 'cz': czMsg(m); break;
     case 'catch': catchPop(m.item, m.first, m.kg, m.pb); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
@@ -849,8 +849,8 @@ function handle(m) {
       document.querySelectorAll('.req.quiz').forEach(e => e.remove()); if (m.end) break;
       const d = popup(`${m.teacher ? '👩‍🏫 <b>อาจารย์เรียกตอบ!</b>' : '📝 <b>ควิซประจำคาบ</b>'} <small>(${m.sec} วินาที)</small><br>${esc(m.q)}`, m.o.map((txt, i) => [txt, 'good', () => send({ t: 'quizans', i })]), m.sec * 1000);
       d.classList.add('quiz'); FX.play('ding'); break; }
-    case 'bite': fishBiteT = performance.now(); FX.play('bite'); if (navigator.vibrate) navigator.vibrate([60, 40, 90]); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 1.1); FX.burst(bobber.x, bobber.y, '#dff4ff', 10); } break;
-    case 'hooked': fightStart(m.fight); break;
+    case 'bite': if (nbFishHelp()) toastNow('ทุ่นจม! กดปุ่มใหญ่เลย', '🎣'); fishBiteT = performance.now(); FX.play('bite'); if (navigator.vibrate) navigator.vibrate([60, 40, 90]); if (bobber) { FX.ring(bobber.x, bobber.y, '#fff', 600, 1.1); FX.burst(bobber.x, bobber.y, '#dff4ff', 10); } break;
+    case 'hooked': if (nbFishHelp()) toastNow('ติดเบ็ดแล้ว! กดค้างปุ่มใหญ่ ให้อยู่ในแถบเขียว', '🐟'); fightStart(m.fight); break;
     case 'mt': misLive = m; break;
     case 'ck': ckLive = { prog: m.prog, t: performance.now() }; break;
     case 'kfx': cookFx(m.kind); break;
@@ -962,6 +962,7 @@ function logLine(html, cls, bubbleOnly) {
 
 // ------------------------------------------------------------------ toasts and popups
 const recentToasts = new Map();
+function toastNow(msg, icon) { toast.q = []; toast.busyUntil = 0; recentToasts.delete(icon + msg); toast(msg, icon); }   // time-critical (fishing cues): skip the newcomer queue
 function toastDrain() { toast.drainT = 0; const n = toast.q.shift(); if (n) toast(...n); if (toast.q.length && !toast.drainT) toast.drainT = setTimeout(toastDrain, Math.max(50, toast.busyUntil - performance.now() + 50)); }
 function toast(msg, icon = '✅', ok = true) {
   toast.q = toast.q || []; toast.busyUntil = toast.busyUntil || 0;
@@ -1063,7 +1064,7 @@ function paintCardClock(h) {
 // 🌱 starter path in the quest card (new players until it is done): tap a step to be walked there
 function nbTap(i) {
   const st = G.nbSteps[i]; FX.play('click');
-  if (st.go) return setGuide(st.go, false, true);
+  if (st.go) return setGuide(nbGo(i), false, true);
   if (i === 3) { foldChat(false); const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
   toast('เดินไปใกล้ผู้เล่นคนอื่น แล้วกดปุ่มอีโมจิ 😄 (มุมขวาล่าง) · หรือขอแลกเบอร์จากโปรไฟล์ของเขา', '👋');
 }
@@ -1086,6 +1087,8 @@ function nbHudApply() {
     if (on && was && vis && was[id] === false) { el.classList.add('nbNew'); setTimeout(() => el.classList.remove('nbNew'), 2600); if (NB_HUD_NAME[id]) toast(`ปุ่มใหม่: ${NB_HUD_NAME[id]}`, '✨'); }
   }
 }
+const nbGo = i => i === 1 && nbDay1() ? 'nbwater' : G.nbSteps?.[i]?.go;   // the starter step's guide target (v2: the fishing step points at the water itself)
+const nbFishHelp = () => nbDay1() && !me.nb.f1;   // talk a newcomer through their very first fish
 const nbEggWaiting = () => nbDay1() && !!me.nb.egg && !me.nb.egg.h;
 function nbTomorrowCard(tmr) {
   const d = document.createElement('div'); d.className = 'hatchPop nbCard';
@@ -1602,7 +1605,9 @@ cv.addEventListener('pointermove', e => {
   if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) down.moved = true;
   if (joy && joy.id === e.pointerId) joyMove(e);
 });
+let nbMoved = false;
 function joyMove(e) {
+  if (!nbMoved) { nbMoved = true; $('#stick')?.classList.remove('nbHint'); }
   let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), max = JOY_R;
   if (d > max) { if (!joy.fix) { joy.ox += dx - dx / d * max; joy.oy += dy - dy / d * max; } dx = dx / d * max; dy = dy / d * max; }   // a fixed stick never drifts after your finger
   joy.dx = dx / max; joy.dy = dy / max;
@@ -1875,7 +1880,9 @@ function findNear() {
   return best;
 }
 const onBike = () => { const m = P.get(myId), v = me?.ride && G.shop?.vehicles?.[me.ride]; return !!(v && v.kind === 'moto' && me.ride !== 'escoot' && m && !roomOf(m.x, m.y) && !me.pose); };
+let nbGlowDone = false;
 function onAction() {
+  if (!nbGlowDone && near && (near.id === 'water' || STAFF_AT[near.id])) { nbGlowDone = true; $('#actBtn').classList.remove('nbGlow'); }
   if (driving() || swimming()) return send({ t: 'rideoff' });
   if (me.pass) return send({ t: 'hopoff' });
   if (!near && onBike()) { const t0 = performance.now(); if (t0 < actCd) return; actCd = t0 + 1800; return send({ t: 'wheelie' }); }
@@ -1904,7 +1911,7 @@ function onAction() {
   if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type)) { if (t < actCd) return; actCd = t + 250; return doAct(near.id, 'use'); }   // cooking battle stations
   if (near.type === 'kitchen' && me.cook?.hand === 'plate') return doAct(near.id, 'serve');
   if (near.type === 'pier') {                                         // fishing is all on the big button: cast, strike, (hold to reel), lift
-    if (!me.cast) { if (t < actCd) return; actCd = t + 900; return doAct(near.id, 'cast'); }
+    if (!me.cast) { if (t < actCd) return; actCd = t + 900; if (nbFishHelp()) setTimeout(() => toastNow('เหวี่ยงแล้ว! รอทุ่นจม… แล้วกดปุ่มใหญ่', '🎣'), 400); return doAct(near.id, 'cast'); }
     if (me.cast.state === 'fight') return fightPress();
     return strike();
   }
@@ -2028,6 +2035,7 @@ function frame(t) {
   // the big button's state is worked out first and written once (its classes used to be rewritten several times a frame)
   const abEl = $('#actBtn'), abC = { idle: abEl.classList.contains('idle'), closed: abEl.classList.contains('closed') };
   const ab = { classList: { add: (...c) => c.forEach(k => abC[k] = true), remove: (...c) => c.forEach(k => abC[k] = false), toggle: (k, on) => (abC[k] = on === undefined ? !abC[k] : !!on) } };
+  { const g = !!near && (near.id === 'water' || !!STAFF_AT[near.id]) && nbQuiet() && !nbGlowDone; if (g !== abEl.classList.contains('nbGlow')) abEl.classList.toggle('nbGlow', g); }   // 🌱 the big button glows when something is in reach, until the first press
   if (wwIsWolf()) { const cd = wwCdLeft('summon'); ab.classList.remove('closed'); ab.classList.toggle('idle', cd > 0); actIco('📯'); ACT_LBL.v = cd ? `สมุน ${cd} วิ` : 'เรียกสมุน'; }
   else if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); ACT_LBL.v = 'หมุน'; }
   else if (picking) { ab.classList.add('idle'); actIco('✋'); ACT_LBL.v = 'แตะของ'; }
@@ -4855,7 +4863,7 @@ const FN = {
   price(m, root) { send({ t: 'act', st: m.st, a: m.op, price: m.zero ? 0 : +root.querySelector('#' + m.inp).value || 0 }); },
   guide(m) { closePanel(); setGuide(m.key, false, true); },
   guidePt(m) { closePanel(); guide = { x: m.x, y: m.y, area: m.area, label: m.label }; toast(`นำทางไป ${m.label}`, '📍'); paintNav(); placeLog(); },
-  tut() { closePanel(); showTut(0); },
+  tut() { closePanel(); showTut(0, true); },
   map() { closePanel(); openMap(); },
   logout() { localStorage.removeItem('lt_creds'); wantLogin = false; location.reload(); },
   fs(m) { closePanel(); screenMode(m.mode); },
@@ -5244,7 +5252,8 @@ function talkTo(n, st) {
   const det = n.career === 'detective' && job('detective') ? [me.case ? { label: '🗂️ กระดานสืบสวน', fn: () => { dialogClose(); openPanel({ kind: 'detcase' }); }, cls: 'good' } : { label: '🕵️ รับคดี "ใครคือคนร้าย?" (⚡8)', fn: () => { dialogClose(); send({ t: 'det', op: 'start' }); }, cls: 'good' }] : [];
   const take = { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' };
   const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : misWait() > 0 ? { label: `⏳ งานใหม่ในอีก ${misWait()} วินาที`, tick: () => misWait() > 0 ? `⏳ งานใหม่ในอีก ${misWait()} วินาที` : null, next: take, fn: () => toast(`ยังไม่มีงานใหม่ รออีก ${misWait()} วินาที (จะแจ้งเตือนเมื่อพร้อม)`, '⏳', false) } : take] : [];
-  const choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
+  let choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
+  if (n.career === 'fishing' && nbDay1() && !me.rod && !(me.rods || []).length) choices = [{ label: `🎣 ซื้อเบ็ดแรก ${money(G.rods?.bamboo?.price || 150)}`, fn: () => { dialogClose(); send({ t: 'act', st, a: 'rod', rod: 'bamboo' }); }, cls: 'primary' }, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];   // 🌱 a newcomer's first rod: one tap
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
   dialog({ ...base, lines: [hi], choices });
 }
@@ -6194,6 +6203,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27o', d: '23 พ.ย.', items: [
+    '🎣 มือใหม่: บทสอนเหลือการ์ดเดียว สอนตอนเล่นจริง ซื้อเบ็ดแรกแตะเดียว ลูกศรพาไปปลายท่าตกปลา และปลาตัวแรกได้แน่นอน',
+  ] },
   { v: '2026-11-27n', d: '23 พ.ย.', items: [
     '🧘 มือใหม่: จอเริ่มต้นสะอาดขึ้น ข้อความขึ้นทีละอัน ปุ่มค่อยๆ โผล่ตามภารกิจที่ทำ',
   ] },
@@ -8923,6 +8935,7 @@ function drawLights(X, Y, dark) {
 // ------------------------------------------------------------------ navigation across maps
 const GATE_TO = { field_in: 'field', town_from_field: 'town', temple_in: 'temple', town_from_temple: 'town', farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
 function targetOf(key) {
+  if (key === 'nbwater') return { x: 21, y: 61.6, label: 'ท่าตกปลา (ยืนปลายท่าแล้วกดปุ่มใหญ่)', area: 'town' };   // 🌱 where a newcomer fishes: the end of the pier by the fishing club (the lake's own fishing spot)
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
@@ -9104,22 +9117,26 @@ const TUT = () => [
   ['🌱', 'ภารกิจมือใหม่ 10 นาที', 'ทำตามรายการ<b>ภารกิจมือใหม่</b>มุมซ้ายบน: ซื้อเบ็ด → ตกปลา → ขาย = <b>เงินก้อนแรก</b> → ซื้อของ → ทักทายเพื่อน<br>ทุกข้อได้รางวัลทันที ครบได้ 🥚 <b>ไข่สัตว์เลี้ยง</b> · แตะแต่ละข้อ ตัวละครจะเดินไปเอง'],
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป · หางานทำได้กับ NPC เจ้าหน้าที่ 💬 ตามร้านต่างๆ'],
 ];
-let tutStep = 0, tutPending = false, pendingDaily = null;
+let tutStep = 0, tutPending = false, pendingDaily = null, tutFull = false;
+const TUT_NB = () => [['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือคนที่มีป้ายชื่อ<b>สีเหลือง</b><br>เริ่มจาก<b>ซื้อเบ็ดกับน้าเล็ก</b> แล้วตกปลาหาเงินก้อนแรก · ลูกศรสีเหลืองจะพาไป']];
+const tutSteps = () => tutFull || !nbDay1() ? TUT() : TUT_NB();
 // the login bonus waits through the tutorial, and for newcomers until their first starter step is done (one thing at a time)
-const dailyWait = () => tutPending || !!(nbActive() && !(me.nb.p || []).some(Boolean));
-function showTut(i = 0) {
-  tutStep = i; const steps = TUT(), [icon, title, body] = steps[i];
+const dailyWait = () => tutPending || nbQuiet() || !!(nbActive() && !(me.nb.p || []).some(Boolean));   // v2 newcomers: after the starter path (or tomorrow)
+function showTut(i = 0, full) {
+  if (i === 0) tutFull = !!full;
+  tutStep = i; const steps = tutSteps(), [icon, title, body] = steps[i];
   $('#tut').classList.remove('hidden');
   $('#tutBody').innerHTML = `<div class="tutIcon">${icon}</div><h2>${esc(title)}</h2><p>${body}</p><div class="dots">${steps.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
   $('#tutNext').textContent = i === steps.length - 1 ? '🚀 เริ่มเลย! (พาไปซื้อเบ็ด)' : 'ถัดไป →';
 }
-$('#tutNext').onclick = () => { FX.play('click'); if (tutStep < TUT().length - 1) return showTut(tutStep + 1); endTut(); };
+$('#tutNext').onclick = () => { FX.play('click'); if (tutStep < tutSteps().length - 1) return showTut(tutStep + 1); endTut(); };
 $('#tutSkip').onclick = endTut;
 function endTut() {
   if (me?.nb?.v === 2) send({ t: 'nbev', k: 'tut' });
+  if (nbQuiet() && JOYFIX && TOUCH_UI && !nbMoved) $('#stick')?.classList.add('nbHint');   // 🕹️ show where to drag, until the first drag
   tutPending = false; if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
   $('#tut').classList.add('hidden'); try { localStorage.setItem('lt_tut2', '1'); } catch { }
-  if (nbActive() && G.nbSteps) { const p = me.nb.p || [], i = G.nbSteps.findIndex((st, j) => (p[j] || 0) < st.n); if (i >= 0 && G.nbSteps[i].go) setGuide(G.nbSteps[i].go, false, true); }
+  if (nbActive() && G.nbSteps) { const p = me.nb.p || [], i = G.nbSteps.findIndex((st, j) => (p[j] || 0) < st.n); if (i >= 0 && nbGo(i)) setGuide(nbGo(i), false, true); }
   else if (me && me.career === 'none' && !me.rod) { setGuide('staff_fishing', true); toast('ลูกศรสีเหลืองจะพาไปหาน้าเล็ก ซื้อเบ็ดแล้วตกปลาหาเงินก้อนแรก!', '🎣'); }
   else if (me && me.career === 'none') openPanel({ kind: 'career' });
 }

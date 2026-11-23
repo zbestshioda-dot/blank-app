@@ -86,3 +86,23 @@ T('nbView keeps day 1', () => {
   assert.equal(N.view(a, '2026-11-24', '2026-11-23'), null);
   assert.equal(N.view({}, '2026-11-24', '2026-11-23'), null);
 });
+
+// ---- Task 5: the first fish always comes home
+T('firstFish: fresh v2 only, once', () => {
+  const a = v2();
+  assert.equal(N.firstFish(a), true);
+  a.nb.f1 = 1;
+  assert.equal(N.firstFish(a), false);
+  assert.equal(N.firstFish({ nb: { p: [] } }), false);
+  assert.equal(N.firstFish({}), false);
+});
+T('pickFirst: most common non-junk fish of rarity 1', () => {
+  assert.equal(N.pickFirst([[null, 50], ['a', 30], ['b', 40], ['c', 35]], { a: { rar: 1 }, b: { rar: 2 }, c: { rar: 1 } }), 'c');
+  assert.equal(N.pickFirst([[null, 50], ['b', 40]], { b: { rar: 2 } }), 'b');   // no common fish here: the most common one
+});
+T('view tells the phone whether the first fish is in', () => {
+  const a = v2({ p: [1] });
+  assert.equal(N.view(a, '2026-11-23', '2026-11-23').f1, 0);
+  a.nb.f1 = 1;
+  assert.equal(N.view(a, '2026-11-23', '2026-11-23').f1, 1);
+});

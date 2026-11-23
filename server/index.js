@@ -3384,15 +3384,15 @@ function act(a, m) {
       if (a.cast) return;
       if (riding(a)) return toast(a, 'ลงจากรถก่อนถึงจะตกปลาได้', '🎣', false);
       if (!spend(a, 8)) return;
-      const bite = now() + rnd(2500, 7000) / Math.sqrt(rodOf(a).luck), r = rodOf(a);
-      a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round(2200 + r.zone * 3000 + 30 * fishLv(a)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
+      const f1 = NBM.firstFish(a), bite = now() + (f1 ? rnd(2000, 3000) : rnd(2500, 7000) / Math.sqrt(rodOf(a).luck)), r = rodOf(a);   // 🌱 a newcomer's first fish bites fast and waits long
+      a.cast = { state: 'wait', ch: hourNow(), bite, win: Math.round((2200 + r.zone * 3000 + 30 * fishLv(a)) * (f1 ? 3 : 1)), st: s.id, pool: s.pool, x: a.x, y: a.y }; markMe(a);
       return;
     }
     case 'pier.reel': case 'pier.hook': {   // strike: too early (only a nibble) scares the fish, inside the bite window hooks it and the fight starts
       const c = a.cast; if (!c) return;
       if (c.state === 'wait') { c.bite = Math.max(c.bite, now() + 1500); markMe(a); return toast(a, 'ยังไม่ใช่! ทุ่นแค่ไหว รอให้ทุ่นจมก่อนค่อยตวัด', '⏳', false); }
       if (c.state !== 'bite') return;
-      const id = legendRoll(a, c) || rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
+      const id = NBM.firstFish(a) ? NBM.pickFirst(D.FISH[c.pool] || D.FISH.lake, D.ITEMS) : legendRoll(a, c) || rollFish(a, c.pool), it = id ? D.ITEMS[id] : null, rar = it ? it.rar || 1 : 0, r = rodOf(a) || D.RODS.bamboo;
       const pow = id ? clamp(.14 + .085 * rar + (it.base >= 1500 ? .04 : 0), .12, .62) : .1;
       c.state = 'fight'; c.fish = id; c.t0 = now(); c.min = Math.round((0.6 + rar * 0.6) * 1000);
       c.fight = { pow: +pow.toFixed(2), str: +(1 + (r.zone - .2) * 2.6 + .02 * fishLv(a)).toFixed(2), land: Math.round(1100 + r.zone * 1300), seed: rint(1, 1e9), min: c.min };
@@ -3400,11 +3400,12 @@ function act(a, m) {
     }
     case 'pier.land': {                     // the fish was played out and lifted at the right moment
       const c = a.cast; if (!c || c.state !== 'fight') return;
-      if (now() - c.t0 < c.min) { a.cast = null; markMe(a); return toast(a, 'ดึงแรงเกินไป ปลาหลุด!', '💨', false); }
+      if (now() - c.t0 < c.min && !NBM.firstFish(a)) { a.cast = null; markMe(a); return toast(a, 'ดึงแรงเกินไป ปลาหลุด!', '💨', false); }
       a.cast = null; return giveCatch(a, c.fish);
     }
     case 'pier.lose': {                     // the line snapped, the fish ran off with it or the hook slipped
       if (!a.cast) return;
+      if (a.cast.state === 'fight' && NBM.firstFish(a)) { const f = a.cast.fish; a.cast = null; return giveCatch(a, f); }   // 🌱 the first fish never gets away
       const why = { snap: '💥 สายขาด! ดึงตอนปลากำลังสู้แรงเกินไป', run: '🐟 ปลาลากสายออกไปไกลจนหลุด', slack: '〰️ สายหย่อนนานไป เบ็ดหลุดจากปากปลา', miss: '💦 ยกไม่ทันจังหวะ ปลาดิ้นหลุดไปแล้ว' }[m.why] || 'ปลาหลุดไปแล้ว';
       a.cast = null; markMe(a); return toast(a, why, '🎣', false);
     }
@@ -4516,6 +4517,7 @@ setInterval(() => { try {
 } catch (e) { console.error('bday', e); } }, 5000).unref?.();
 function giveCatch(a, id) {
   if (a.nb && !a.nb.ev?.fish1) NBM.mark(a, 'fish1', now());
+  if (NBM.firstFish(a) && id) a.nb.f1 = 1;
   const before = fishLv(a);
   a.xp.fisher = (a.xp.fisher || 0) + 1;
   if (fishLv(a) > before) {
@@ -6309,6 +6311,7 @@ function tick() {
     }
     if (a.cast) {
       if (a.cast.state === 'wait' && t >= a.cast.bite) { a.cast.state = 'bite'; a.cast.expire = t + a.cast.win + 300; send(a, { t: 'bite', win: a.cast.win }); markMe(a); }
+      else if (a.cast.state === 'bite' && t > a.cast.expire && NBM.firstFish(a)) { a.cast.expire = t + a.cast.win; toast(a, 'ทุ่นจมอยู่! กดปุ่มใหญ่เลย', '🎣'); }   // 🌱 the first fish waits
       else if (a.cast.state === 'bite' && t > a.cast.expire) { a.cast = null; markMe(a); toast(a, 'ตวัดไม่ทัน ปลาฉกเหยื่อแล้วหนีไป', '💨', false); }
       else if (a.cast.state === 'fight' && t > a.cast.t0 + 150000) { a.cast = null; markMe(a); }
     }
