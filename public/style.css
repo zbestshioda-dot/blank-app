@@ -1721,7 +1721,7 @@ body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 :root{--k-ink:#22284a;--k-cream:#fff7e8;--k-cream2:#f6ead2;--k-sun:#ffc93c;--k-sunDk:#e08a00;--k-berry:#ff5d73;--k-berryDk:#c02a4a;
   --k-sky:#4cc3ff;--k-skyDk:#1a7fc4;--k-mint:#38d39f;--k-mintDk:#169069;--k-grape:#9b6bff;--k-grapeDk:#6236c9;--k-orange:#ff8a3d;--k-orangeDk:#d4581a;
   --k-lip:0 3px 0 var(--k-ink);--k-drop:0 6px 14px rgba(20,20,50,.3);
-  --k-head:'Chonburi','Mitr',serif}   /* the body font stays Mitr: a wider font would change sizes */
+  --k-head:'Chonburi','Mitr',serif}   /* body font: ItimUI (see the end of this file) */
 /* panels: same 16px transparent border as before, the colour now fills it and an ink outline sits on the edge */
 .paper,#card:not(.v2),.sheet,.box,.tutCard,.mapBox,.req,#downView{border-image:none!important;background:linear-gradient(#fffdf8,var(--k-cream) 70px) border-box!important;
   outline:3px solid var(--k-ink);outline-offset:-3px;border-radius:22px!important;box-shadow:0 5px 0 var(--k-ink),var(--k-drop);color:var(--k-ink)}
@@ -1841,3 +1841,7 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 .sheet .look.on{background:linear-gradient(#fff,#fff3c4)!important;outline:3px solid var(--k-sun);outline-offset:1px}
 .sheet .list.shop .item .em{--pxs:40px}.sheet .list.shop .item .em .pxi{vertical-align:middle}
 .sheet .list.shop .item .em,.sheet .list.shop .item .em>span{font-size:36px!important;line-height:1.1}
+/* ✍️ body font: Itim (SIL Open Font License, hosted in assets/fonts), 8% larger so it reads as tall as the old Mitr without overflowing */
+@font-face{font-family:'ItimUI';src:url(assets/fonts/itim-thai.woff2) format('woff2');font-display:swap;size-adjust:108%;unicode-range:U+02D7,U+0303,U+0331,U+0E01-0E5B,U+200C-200D,U+25CC}
+@font-face{font-family:'ItimUI';src:url(assets/fonts/itim-latin.woff2) format('woff2');font-display:swap;size-adjust:108%;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{--ui:'ItimUI','Mitr','Noto Sans Thai',system-ui,sans-serif}

@@ -6249,6 +6249,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27x', d: '23 พ.ย.', items: [
+    '✍️ เปลี่ยนฟอนต์ทั้งเกมเป็น Itim ลายมือน่ารัก อ่านง่าย ขนาดเท่าเดิม',
+  ] },
   { v: '2026-11-27w', d: '23 พ.ย.', items: [
     '🛍️ ร้านค้าใหม่: ของเป็นการ์ดใหญ่ 3 ช่อง ไอคอนชัด ป้าย "แนะนำ" ของที่เงินยังไม่พอเป็นสีเทาพร้อม 🔒 · หัวข้อหน้าต่างเป็นป้ายสีฟ้า',
   ] },
