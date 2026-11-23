@@ -1242,7 +1242,7 @@ function festText() {
 }
 setInterval(() => { if (wd?.fest?.ny && !wd.ev) paintEvent(); }, 1000);
 setInterval(() => { if (panel?.kind === 'bag' && typeof nbEggWaiting === 'function' && nbEggWaiting()) refreshPanel(true); }, 30000);   // the egg countdown in the bag
-const FEST_ART = { newyear: ['ev_newyear', 'firework'], cny: ['ev_cny', 'angpao'], valentine: [null, null] };   // [banner, icon] (null = emoji only until the art arrives)
+const FEST_ART = { newyear: ['ev_newyear', 'firework'], cny: ['ev_cny', 'angpao'], valentine: ['ev_valentine', 'heart'] };   // [banner, icon] (null = emoji only)
 function festCardSoon(ms = 2500) { if (!festCardSoon.t) festCardSoon.t = setTimeout(() => { festCardSoon.t = 0; festCard(); }, ms); }   // one pending check at a time (wd arrives every second)
 function festCard() {   // 🎉 a festival's card with its banner, once a day (never over a newcomer's first steps or an open panel)
   const F = wd?.fest, art = F && FEST_ART[F.id]; if (!art || !me || nbQuiet() || $('.festCard')) return;
@@ -6246,6 +6246,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27t', d: '23 พ.ย.', items: [
+    '🖼️ การ์ดวาเลนไทน์มีภาพแบนเนอร์และไอคอนหัวใจแล้ว',
+  ] },
   { v: '2026-11-27s', d: '23 พ.ย.', items: [
     '💘 เพิ่มเทศกาลวาเลนไทน์ (13–15 ก.พ. ทุกปี): อยู่ใกล้เพื่อนสนิทหรือคู่รัก ความสนิท/ความรักขึ้นเร็ว 2 เท่า และรับช็อกโกแลตในจดหมาย',
   ] },
