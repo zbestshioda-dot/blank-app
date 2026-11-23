@@ -13,6 +13,8 @@ const CR = require('./craft');
 const HM = require('./homes');
 const AU = require('./auction');
 const { docFlag } = require('./doc');
+const MR = require('./marry');
+const DG = require('./dungeon');   // 🗝️ the treasure cave   // 💞 closeness, proposals, marriage, divorce
 const GD = require('./guard');   // 🤖 "are you a person?" checks against auto-play tools
 const hcSend = (a, why) => { const q = GD.ask(a, why, now()); if (q) { send(a, { t: 'hc', ...q, sec: 90 }); toast(a, '🙋 ช่วยแตะปุ่มยืนยันว่าเป็นคนจริงก่อนนะ (ป้องกันโปรแกรมช่วยเล่น)', '🤖'); } };   // 🩺 doctor answer-timing flags (sus / bot)   // 🏆 weekly one-of-a-kind auction   // 🏡 house contest (hearts, weekly prizes)   // 🔨 crafting rules (drops, recipes, gem shards)
 const PUSH = require('./push');
@@ -142,9 +144,12 @@ function cardClaim(a) {
 const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.find(x => x.id === id) || (id === 'vip' ? D.PAY_TITLE : null);
 const myTitle = a => a.title === 'vip' && !vipOn(a) ? null : titleDef(a.title);   // the supporter title disappears when it runs out
 const fcKing = a => (a.fcKing || 0) > now();
+const cpKing = a => (a.cpKing || 0) > now();
+const dgKing = a => (a.dgKing || 0) > now();   // 🗝️ last week's deepest cave diver   // 👑 last week's top couple
 const homeKing = a => (a.homeKing || 0) > now();   // 🏡 last week's most-liked home wears the title for 7 days   // 🎣 yesterday's fishing contest winner wears the title for a day
-const titleOf = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : homeKing(a) ? '🏡 บ้านสวยที่สุดในเมือง' : myTitle(a)?.title || '';
-const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) || homeKing(a) ? 5 : myTitle(a)?.r || 0;
+const titleBase = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : homeKing(a) ? '🏡 บ้านสวยที่สุดในเมือง' : cpKing(a) ? '👑 คู่รักแห่งเมือง' : dgKing(a) ? '🗝️ นักล่าสมบัติ' : myTitle(a)?.title || '';
+const titleOf = a => { const t = titleBase(a), s = a.spouse; return s ? `${t ? t + ' · ' : ''}${D.RINGS[s.ring]?.icon || '💞'} ${MR.tier(s.lp || 0).name}ของ ${s.name}` : t; }   // 💞 married: the ring and the partner's name join the title;
+const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) || homeKing(a) || cpKing(a) || dgKing(a) ? 5 : Math.max(myTitle(a)?.r || 0, a.spouse ? Math.max(a.spouse.ring === 'diamond' ? 5 : a.spouse.ring === 'gold' ? 4 : 3, [0, 4, 5][MR.tier(a.spouse.lp || 0).i]) : 0);
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -367,6 +372,7 @@ function earn(a, amount, nocap) {
   if (amount > 0 && !nocap) amount *= GD.payMul(a, dayKey());   // 💤 daily soft cap: less pay after 3 / 5 hours of work today
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
   if (amount > 0 && mayor?.pol === 'tax') amount *= 1 + MAYOR.tax;   // the mayor's low-tax policy
+  if (amount > 0 && !nocap && spouseNear(a)) amount *= 1.1;   // 💞 working near your spouse pays 10% more
   if (amount > 0 && a.gang) { const g0 = gangOf(a); if (g0) amount *= 1 + GANG.lv[g0.lvl - 1].inc; }   // a bigger gang house pays its members a little extra
   ledSweep(a);
   amount = Math.round(amount); const tx = amount > 0 ? taxOf(a, amount) : 0; amount -= tx; a.money += amount; a.earned += amount; markMe(a);
@@ -759,6 +765,99 @@ function aucTick() {
   feed(`🏆 ${e.name} ชนะการประมูล ${f.name} ด้วยราคา ${money(e.bid)}!`);
 }
 setInterval(() => { try { aucTick(); } catch (e) { console.error('aucTick', e); } }, 60e3).unref?.();
+// 💞 closeness and weddings. Closeness grows for two friends (each has the other's number) who are near each other online.
+// One wedding at a time: the proposer's ring is used when the other says yes; both must reach the arch in the temple in 15 min.
+let wed = null;
+const WED = { come: 15 * 60e3, rite: 60e3, ask: 120e3 };
+const wedView = a => ({ t: 'wedinfo', rings: D.RINGS, ring: a.ring || null, need: MR.BOND_NEED, day: MR.BOND_DAY,
+  spouse: a.spouse ? { ...a.spouse, on: !!accounts.get(a.spouse.login)?.ws, tier: MR.tier(a.spouse.lp || 0), wn: a.spouse.wl?.w === weekKey() ? a.spouse.wl.n : 0, today: a.spouse.ld === dayKey() ? a.spouse.ln : 0, near: spouseNear(a) } : null,
+  top: coupleTop(), loveDay: MR.LOVE_DAY,
+  list: (a.contacts || []).map(c => byPhone.get(c.p)).filter(b => b && b !== a).map(b => ({ id: b.ws ? b.id : 0, n: b.name, v: MR.bond(a, b), mut: friendOf(b, a) ? 1 : 0, sp: b.spouse ? 1 : 0 })).sort((x, y) => y.v - x.v),
+  wed: wed ? { an: wed.an, bn: wed.bn, began: wed.began, until: wed.until, me: wed.a === lk(a) || wed.b === lk(a) ? 1 : 0 } : null });
+// 🗝️ treasure cave: the run lives on the account (a.dg) so a reconnect picks it up again
+const DGC = D.DUNGEON;
+const dgLeft = a => DGC.perDay - (a.dgd?.d === dayKey() ? a.dgd.n : 0);
+let dgTopC = { t: 0, v: [] };   // the rankings scan every account: recount at most every 30 s
+function dgTop(wk = weekKey()) { if (now() - dgTopC.t < 30e3) return dgTopC.v; dgTopC = { t: now(), v: dgTopRaw(wk) }; return dgTopC.v; }
+function dgTopRaw(wk) { return [...accounts.values()].filter(a => a.dgw?.w === wk && a.dgw.f > 0).sort((x, y) => y.dgw.f - x.dgw.f).slice(0, 5).map(a => ({ n: a.name, f: a.dgw.f })); }
+const dgView = a => ({ t: 'dg', g: a.dg ? DG.view(a.dg) : null, res: a.dgRes || null, left: dgLeft(a), torch: a.dgTorch || 0, coin: a.dgc || 0, pot: a.dgPot || 0, charm: a.dgCharm || 0,
+  best: a.dgBest || 0, top: dgTop(), furn: Object.entries(D.FURNITURE).filter(([, f]) => f.dgc).map(([k, f]) => ({ k, n: f.name, spr: f.spr, c: f.dgc, has: furnOf(a).includes(k) })), ticket: DGC.ticket, perDay: DGC.perDay, shop: DGC.shop, relics: DG.RELICS, hint: DG.HINT, prize: DGC.prize });
+function dgFinish(a) {
+  const g = a.dg, p = DG.payout(g), fl = g.f - (g.over === 'dead' ? 0 : 1);
+  if (p.money) { a.ledCtx = '🗝️ ถ้ำสมบัติ'; earn(a, p.money, true); a.ledCtx = null; }
+  if (p.shard) addItem(a, 'gshard', p.shard); if (p.crystal) addItem(a, 'crystal', p.crystal); if (p.coin) a.dgc = (a.dgc || 0) + p.coin;
+  a.dgBest = Math.max(a.dgBest || 0, fl); const wk = weekKey();
+  if (a.dgw?.w !== wk) a.dgw = { w: wk, f: 0 }; a.dgw.f = Math.max(a.dgw.f, fl);
+  a.dgRes = { over: g.over, f: fl, ...p }; a.dg = null; a.sd = true; dirty = true; joy(a, 6); stat(a, 'dungeon'); markMe(a);
+  if (fl >= 10) feed(`🗝️ ${a.name} ลงถ้ำสมบัติลึกถึงชั้น ${fl}!${g.over === 'out' ? ` ขนสมบัติออกมาได้ ${money(p.money)}` : ''}`);
+}
+function dgTick() {                            // 🗝️ a finished week: the 3 deepest divers get gems, #1 the title for 7 days
+  const wins = DG.weekly([...accounts.values()].filter(a => a.dgw), weekKey()); if (!wins.length) return; dirty = true;
+  for (const x of wins) {
+    x.a.sd = true; sysMail(x.a, `🗝️ ยินดีด้วย! คุณลงถ้ำสมบัติลึกเป็นอันดับ ${x.rank} ของสัปดาห์ (ชั้น ${x.f})${x.rank === 1 ? '\nได้ฉายา 🗝️ นักล่าสมบัติ 7 วัน' : ''}`, { gems: DGC.prize[x.rank - 1] });
+    if (x.rank === 1) { x.a.dgKing = now() + 7 * 864e5; if (x.a.ws) markMe(x.a); feed(`🗝️ นักล่าสมบัติประจำสัปดาห์: ${x.a.name} (ชั้น ${x.f})!`); sendRoster(); }
+  }
+}
+setInterval(() => { try { dgTick(); } catch (e) { console.error('dgTick', e); } }, 60e3).unref?.();
+function spouseNear(a) { const o = a.spouse && accounts.get(a.spouse.login); return !!(o?.ws && a.ws && o.spouse?.login === lk(a) && areaId(o) === areaId(a) && Math.hypot(o.x - a.x, o.y - a.y) <= 6); }
+let cpTopC = { t: 0, v: [] };
+function coupleTop(wk = weekKey()) { if (now() - cpTopC.t < 30e3) return cpTopC.v; cpTopC = { t: now(), v: coupleTopRaw(wk) }; return cpTopC.v; }
+function coupleTopRaw(wk) {          // this week's couples by love gained, each pair once
+  const seen = new Set(), out = [];
+  for (const a of accounts.values()) { const s = a.spouse; if (!s || s.wl?.w !== wk || !s.wl.n) continue; const k = [lk(a), s.login].sort().join('|'); if (seen.has(k)) continue; seen.add(k); out.push({ an: a.name, bn: s.name, n: s.wl.n, ring: s.ring }); }
+  return out.sort((x, y) => y.n - x.n).slice(0, 5);
+}
+function coupleTick() {                       // 👑 a finished week: the top 3 couples get gems, #1 the title for 7 days
+  const wins = MR.coupleAwards([...accounts.values()].filter(a => a.spouse), weekKey(), l => accounts.get(l)); if (!wins.length) { return; }
+  const G = [30, 20, 10]; dirty = true;
+  for (const x of wins) for (const o of [x.a, x.b]) {
+    o.sd = true; sysMail(o, `💞 ยินดีด้วย! คุณกับ${o === x.a ? x.b.name : x.a.name}ได้อันดับ ${x.rank} คู่รักประจำสัปดาห์ (${x.n} 💗)${x.rank === 1 ? '\nได้ฉายา 👑 คู่รักแห่งเมือง 7 วัน' : ''}`, { gems: G[x.rank - 1] });
+    if (x.rank === 1) { o.cpKing = now() + 7 * 864e5; if (o.ws) markMe(o); }
+  }
+  const w1 = wins.find(x => x.rank === 1); if (w1) { feed(`👑 คู่รักแห่งเมืองสัปดาห์นี้: ${w1.a.name} 💞 ${w1.b.name} (${w1.n} 💗)!`); sendRoster(); }
+}
+setInterval(() => { try { coupleTick(); } catch (e) { console.error('coupleTick', e); } }, 60e3).unref?.();
+function loveTick() {                         // 💗 married and near each other: +1 love every 2 minutes, 30 a day
+  const day = dayKey(), wk = weekKey(), seen = new Set();
+  for (const a of online.values()) {
+    if (!a.spouse || !spouseNear(a)) continue; const b = accounts.get(a.spouse.login), k = [lk(a), lk(b)].sort().join('|');
+    if (seen.has(k)) continue; seen.add(k);
+    const t0 = MR.tier(a.spouse.lp || 0).i; MR.loveAdd(a, b, day, wk); a.sd = b.sd = true; dirty = true;
+    const t1 = MR.tier(a.spouse.lp).i;
+    if (t1 > t0) { for (const o of [a, b]) { markMe(o); toast(o, `💗 ความรักขึ้นขั้น! ตอนนี้เป็น ${MR.tier(o.spouse.lp).name}แล้ว`, '💗'); } feed(`💗 ${a.name} กับ ${b.name} เป็น${MR.tier(a.spouse.lp).name}แล้ว!`); sendRoster(); }
+  }
+}
+function bondTick() {
+  try { loveTick(); } catch (e) { console.error('loveTick', e); }
+  const day = dayKey(), seen = new Set();
+  for (const a of online.values()) {
+    if (!a.ws || !a.phone || !a.contacts?.length) continue;
+    for (const c of a.contacts) {
+      const b = byPhone.get(c.p); if (!b || b === a || !b.ws || !friendOf(b, a)) continue;
+      const k = [lk(a), lk(b)].sort().join('|'); if (seen.has(k)) continue; seen.add(k);
+      if (areaId(a) !== areaId(b) || Math.hypot(a.x - b.x, a.y - b.y) > 5) continue;
+      const before = MR.bond(a, b), v = MR.bondAdd(a, b, day); a.sd = b.sd = true; dirty = true;
+      if (before < MR.BOND_NEED && v >= MR.BOND_NEED) for (const [x, y] of [[a, b], [b, a]]) toast(x, `💞 คุณกับ${y.name}เป็นเพื่อนสนิทกันแล้ว! ขอแต่งงานได้ที่ซุ้มแต่งงานในวัด`, '💞');
+    }
+  }
+}
+setInterval(() => { try { bondTick(); } catch (e) { console.error('bondTick', e); } }, 120e3).unref?.();
+function wedTick() {
+  if (!wed) return; const t = now(), A = accounts.get(wed.a), B = accounts.get(wed.b);
+  if (!A || !B) { wed = null; return; }
+  if (!wed.began) {
+    if (t > wed.until) { if (!A.ring) A.ring = wed.ring; A.sd = true; dirty = true; if (A.ws) markMe(A); feed(`💒 งานแต่งของ ${wed.an} กับ ${wed.bn} ยกเลิก (มาไม่ทันเวลา) แหวนคืนเจ้าของแล้ว`); wed = null; return; }
+    const S = ST.wedding, at = o => o.ws && areaId(o) === 'temple' && Math.hypot(o.x - S.x, o.y - S.y) <= 3.2;
+    if (at(A) && at(B)) { wed.began = t; feed(`💒 พิธีแต่งงานของ ${wed.an} กับ ${wed.bn} เริ่มแล้วที่วัด! ไปกด 🎉 อวยพรที่ซุ้มแต่งงาน รับขนมแต่งงาน`); }
+    return;
+  }
+  if (t - wed.began < WED.rite) return;
+  MR.marry(A, B, wed.ring, t); A.sd = B.sd = true; dirty = true;
+  for (const o of [A, B]) if (o.ws) { markMe(o); toast(o, `💞 ยินดีด้วย! คุณกับ${o === A ? wed.bn : wed.an}แต่งงานกันแล้ว`, '💒'); }
+  for (const o of online.values()) send(o, { t: 'fw', k: wed.ring === 'diamond' ? 'l' : 'm', n: `${wed.an} 💞 ${wed.bn}` });
+  feed(`💞 ${wed.an} กับ ${wed.bn} แต่งงานกันแล้ว! ${D.RINGS[wed.ring]?.icon || '💍'}`); sendRoster(); wed = null;
+}
+setInterval(() => { try { wedTick(); } catch (e) { console.error('wedTick', e); } }, 2000).unref?.();
 function lottoNext(t = now()) {   // the next draw: [key 'Y-MM-DD' (game date, Buddhist year), real time]
   const C = D.CLOCK, hMs = (LOTTO.hour - C.dawn) * C.dayMin / (C.dusk - C.dawn) * 60000;   // 16:00 sits in the daytime part of a cycle
   for (let n = D.dayAt(t); ; n++) {
@@ -2542,6 +2641,59 @@ function act(a, m) {
       a.fairG = { k: s.k, t: now(), id: crypto.randomBytes(6).toString('hex'), arc: 1 };
       return send(a, { t: 'fairgo', k: s.k, id: a.fairG.id, name: G0.name, icon: G0.icon });
     }
+    case 'dg.view': return send(a, dgView(a));
+    case 'dg.enter': {
+      if (a.dg) return send(a, dgView(a));
+      if (!cd(a, 'dg', 800)) return;
+      const extra = dgLeft(a) <= 0; if (extra && !(a.dgTorch > 0)) return toast(a, `วันนี้ลงถ้ำครบ ${DGC.perDay} รอบแล้ว (ใช้ 🔥 คบเพลิงสำรองได้)`, '🗝️', false);
+      if (!pay(a, DGC.ticket)) return;
+      if (extra) a.dgTorch--; else a.dgd = { d: dayKey(), n: (a.dgd?.d === dayKey() ? a.dgd.n : 0) + 1 };
+      const g = DG.start(Math.random); g.pot += a.dgPot || 0; a.dgPot = 0;
+      if (a.dgCharm > 0) { a.dgCharm--; DG.relic(g, Math.random); }   // 🧿 the charm: start with one relic
+      a.dg = g; a.dgRes = null; a.sd = true; markMe(a); return send(a, dgView(a));
+    }
+    case 'dg.door': case 'dg.act': case 'dg.leave': {
+      const g = a.dg; if (!g || !cd(a, 'dgact', 250, true)) return;
+      if (m.a === 'door') DG.pick(g, +m.i, Math.random);
+      else if (m.a === 'act') DG.act(g, String(m.x), Math.random);
+      else DG.leave(g);
+      if (g.over) dgFinish(a); a.sd = true; return send(a, dgView(a));
+    }
+    case 'dg.furn': {                        // 🗝️ coin-shop furniture: one of each, to the house (or kept until they have one)
+      const f = D.FURNITURE[m.k]; if (!f?.dgc) return; if (furnOf(a).includes(m.k)) return toast(a, `มี${f.name}แล้ว`, '🪙', false);
+      if ((a.dgc || 0) < f.dgc) return toast(a, `เหรียญโบราณไม่พอ (ต้องใช้ 🪙${f.dgc})`, '🪙', false);
+      a.dgc -= f.dgc; if (a.hown) a.furniture = [...(a.furniture || []), m.k]; else a.keep = [...(a.keep || []), m.k];
+      a.sd = true; markMe(a); wdAt = 0; toast(a, `ได้ ${f.icon} ${f.name}!${a.hown ? ' ส่งไปที่บ้านแล้ว' : ' เก็บไว้ให้จนกว่าจะมีบ้าน'}`, '🪙'); return send(a, dgView(a));
+    }
+    case 'dg.buy': {
+      const it = DGC.shop[m.k]; if (!it) return; if ((a.dgc || 0) < it.coin) return toast(a, `เหรียญโบราณไม่พอ (ต้องใช้ 🪙${it.coin})`, '🪙', false);
+      if (m.k === 'potion' && (a.dgPot || 0) >= 3) return toast(a, 'มียาติดตัวครบ 3 ขวดแล้ว', '🧪', false);
+      a.dgc -= it.coin; if (m.k === 'torch') a.dgTorch = (a.dgTorch || 0) + 1; else if (m.k === 'potion') a.dgPot = (a.dgPot || 0) + 1; else a.dgCharm = (a.dgCharm || 0) + 1;
+      a.sd = true; markMe(a); toast(a, `ได้ ${it.icon} ${it.name}`, it.icon); return send(a, dgView(a));
+    }
+    case 'wed.buy': {                        // 💍 a ring: one at a time, used up when a proposal is accepted
+      const R = D.RINGS[m.tier]; if (!R) return;
+      if (a.ring) return toast(a, 'คุณมีแหวนอยู่แล้ว', '💍', false); if (a.spouse) return toast(a, 'คุณแต่งงานแล้ว', '💞', false);
+      if (R.gems) { if ((a.gems || 0) < R.gems) return toast(a, `เพชรไม่พอ (ต้องใช้ 💎${R.gems})`, '💎', false); a.gems -= R.gems; } else if (!pay(a, R.price)) return;
+      a.ring = m.tier; a.sd = true; markMe(a); send(a, wedView(a));
+      return toast(a, `ได้${R.icon}${R.name}แล้ว! เลือกเพื่อนสนิทแล้วกดขอแต่งงานได้เลย`, R.icon);
+    }
+    case 'wed.propose': {
+      if (!cd(a, 'wedask', 5000)) return;
+      const b = online.get(+m.id), err = MR.canPropose(a, b, now()); if (err) return toast(a, err, '💍', false);
+      if (!b.ws) return toast(a, `${b.name}ไม่ได้ออนไลน์`, '💍', false);
+      if (wed) return toast(a, 'ตอนนี้มีงานแต่งอีกคู่อยู่ รอให้จบก่อนนะ', '💒', false);
+      b.wedAsk = { from: lk(a), at: now() }; send(b, { t: 'wedask', id: a.id, name: a.name, ring: a.ring });
+      return toast(a, `💍 ขอ${b.name}แต่งงานแล้ว รอคำตอบนะ...`, '💍');
+    }
+    case 'wed.bless': {
+      if (!wed?.began) return toast(a, 'ตอนนี้ไม่มีพิธีแต่งงาน', '💒', false);
+      if (lk(a) === wed.a || lk(a) === wed.b) return toast(a, 'เจ้าบ่าวเจ้าสาวรอรับคำอวยพรอยู่นะ 😊', '💒', false);
+      wed.bless = wed.bless || []; if (wed.bless.includes(lk(a))) return toast(a, 'อวยพรไปแล้ว ขอบคุณนะ', '🎉', false);
+      wed.bless.push(lk(a)); addItem(a, 'wedcake', 1); joy(a, 8); markMe(a);
+      for (const x of [wed.a, wed.b]) { const o = accounts.get(x); if (o?.ws) toast(o, `🎉 ${a.name} อวยพรให้คุณทั้งคู่`, '🎉'); }
+      return toast(a, '🎉 อวยพรแล้ว ได้ 🎂 ขนมแต่งงาน', '🎂');
+    }
     case 'craft.make': {                  // 🔨 workshop: make a craft-only piece from materials
       if (!cd(a, 'craft', 800)) return;
       const r = CR.craft(a, String(m.rid || ''), D); if (!r.ok) return toast(a, r.msg, '🔨', false);
@@ -3311,13 +3463,13 @@ function act(a, m) {
       return st ? teleport(a, st.x + (s.down ? (st.x < r.x + 7 ? 1.3 : -1.3) : -1.4), st.y - .1) : teleport(a, r.spawn.x, r.spawn.y);
     }
     case 'hbed.sleep': {
-      const i = s.idx, own = houses[i] === a && !tenants[i], rent = tenants[i] === a;
+      const i = s.idx, sp = !!houses[i] && !tenants[i] && a.spouse?.login === lk(houses[i]), own = (houses[i] === a || sp) && !tenants[i], rent = tenants[i] === a;   // 💞 a spouse sleeps there like the owner
       if (!own && !rent) return toast(a, houses[i] === a ? 'บ้านนี้ปล่อยเช่าอยู่ คุณนอนไม่ได้' : 'นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า', '🔒', false);
       if (a.utilOff) return toast(a, 'ถูกตัดน้ำตัดไฟเพราะค้างค่าน้ำค่าไฟ! จ่ายบิลที่ธนาคารหรือในแอพมือถือก่อน', '🔌', false);
       if (!cd(a, 'homesleep', 120000)) return;
-      const e = 50 + (own ? comfort(a) * 2 : 0);
+      const e = 50 + (own ? comfort(houses[i]) * 2 : 0);
       enLog(a, Math.min(100, a.energy + e) - a.energy, 'นอนที่บ้าน'); a.energy = Math.min(100, a.energy + e); a.health = Math.min(100, a.health + 5); sleepWell(a);
-      a.usage = { sleep: (a.usage?.sleep || 0) + 1 }; joy(a, 6 + (own ? comfort(a) : 0));
+      a.usage = { sleep: (a.usage?.sleep || 0) + 1 }; joy(a, 6 + (own ? comfort(houses[i]) : 0));
       markMe(a);
       return toast(a, `นอนหลับสบาย พลังงาน +${e} หายง่วงแล้ว 😊`, '😴');
     }
@@ -4075,8 +4227,8 @@ function dogSpot(a) {
 function almsTick(a, t) {
   const A = a.alms; if (a.career !== 'monk') { a.alms = null; markMe(a); return; }
   if (hourNow() >= D.TEMPLEQ.almsTo + 2) { a.alms = null; markMe(a); return toast(a, 'สายแล้ว จบการบิณฑบาตวันนี้ (ยังไม่ครบทุกจุด)', '🙏', false); }
-  if (areaId(a) === 'town') A.pts.forEach((p, i) => {
-    if (A.got[i] || Math.hypot(a.x - p[0], a.y - p[1]) > 2.4) return;
+  A.pts.forEach((p, i) => {   // distance only: on a laggy phone the server's position trails a little, so the reach is generous
+    if (A.got[i] || Math.hypot(a.x - p[0], a.y - p[1]) > 3.2) return;
     A.got[i] = 1; const f = pick(D.TEMPLEQ.almsFood), tip = rint(...D.TEMPLEQ.almsTip);
     addItem(a, f, 1); earn(a, tip); quest(a, 'job_monk'); markMe(a); send(a, { t: 'tfx', kind: 'alms', x: p[0], y: p[1] });
     toast(a, `🙏 ญาติโยมหน้า${p[2]}ใส่บาตร ${D.ITEMS[f].icon}${D.ITEMS[f].name} + ปัจจัย ${money(tip)} (${A.got.filter(Boolean).length}/${A.pts.length})`, '🙏');
@@ -4677,9 +4829,10 @@ function pubInfo(a) {
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
-// many things change the roster in one moment (a whole tick can call this dozens of times): send it at most once per ~60 ms
+// many things change the roster in one moment (a whole tick can call this dozens of times): send it at most ~4 times a second.
+// (every fishing bite and title change resends the whole town to every phone: at 60 ms a busy evening was megabytes a second)
 let rosterQ = null;
-function sendRoster() { if (!rosterQ) rosterQ = setTimeout(sendRosterNow, 60); }
+function sendRoster() { if (!rosterQ) rosterQ = setTimeout(sendRosterNow, 250); }
 function sendRosterNow() {
   rosterQ = null;
   const all = [...online.values()].map(a => ({ ...pubInfo(a), x: a.x, y: a.y, f: a.f, _h: hidden(a) })), npc = npcs.filter(npcVisible).map(npcInfo);
@@ -5060,7 +5213,7 @@ function move(a, m) {
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper' && !swim) standUp(a);   // (bumper cars are driven, swimmers swim: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
   if (a.run && !godLock(a) && !riding(a)) {               // running burns energy; too tired = back to walking
-    a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); a.runT = t;
+    const e0 = a.energy; a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); enLog(a, a.energy - e0, 'วิ่ง'); a.runT = t;
     if (a.energy <= D.RUN.minEnergy) { a.run = false; markMe(a); toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหวแล้ว พักหรือกินอะไรก่อน', '🥵', false); }
   }
   if (x !== a.x || y !== a.y) { fuel(a, Math.hypot(x - a.x, y - a.y)); a.x = x; a.y = y; a.moved = true; dirty = true; a.lastMoveT = t; }
@@ -5278,6 +5431,33 @@ function onMessage0(ws, raw) {
     }
     case 'frecs': return send(a, recView());
     case 'auc': aucTick(); return send(a, aucView(a));
+    case 'wedinfo': return send(a, wedView(a));
+    case 'wedans': {                         // 💍 the answer to a proposal
+      const q = a.wedAsk; a.wedAsk = null; if (!q || now() - q.at > WED.ask) return toast(a, 'คำขอนี้หมดเวลาแล้ว', '💍', false);
+      const A = accounts.get(q.from); if (!A) return;
+      if (!m.yes) { if (A.ws) toast(A, `💔 ${a.name} ยังไม่ตอบตกลง แหวนยังอยู่กับคุณนะ`, '💔'); return toast(a, 'ตอบปฏิเสธแล้ว', '💍'); }
+      const err = MR.canPropose(A, a, now()); if (err) return toast(a, err, '💍', false);
+      if (wed) return toast(a, 'ตอนนี้มีงานแต่งอีกคู่อยู่ ลองใหม่หลังจบนะ', '💒', false);
+      wed = { a: lk(A), b: lk(a), an: A.name, bn: a.name, ring: A.ring, until: now() + WED.come, began: 0 }; A.ring = null; A.sd = true; dirty = true; if (A.ws) markMe(A);
+      feed(`💒 ${A.name} กับ ${a.name} จะแต่งงานกัน! พิธีที่ซุ้มแต่งงานในวัด ภายใน 15 นาที`);
+      for (const o of [A, a]) { if (!(o.outfits || []).includes('wedding')) o.outfits = [...(o.outfits || []), 'wedding']; o.outfit = 'wedding'; o.sd = true; if (o.ws) markMe(o); }   // 👰 both get the wedding outfit, worn now
+      sendRoster();
+      for (const o of [A, a]) if (o.ws) toast(o, '💒 ตกลงแล้ว! ไปที่ซุ้มแต่งงานในวัดทั้งคู่ภายใน 15 นาที พิธีเริ่มเองเมื่อมาครบ', '💒');
+      return;
+    }
+    case 'spgo': {                           // 💞 go to your spouse
+      const o = a.spouse && accounts.get(a.spouse.login); if (!o?.ws) return toast(a, 'คู่ของคุณไม่ได้ออนไลน์', '💞', false);
+      if (o.fun || o.down || a.fun || a.down) return toast(a, 'ตอนนี้ไปหาไม่ได้ ลองใหม่อีกทีนะ', '💞', false);
+      if (!cd(a, 'spgo', 300000)) return;
+      teleport(a, o.x, o.y); return toast(o, `💞 ${a.name} มาหาคุณแล้ว`, '💞');
+    }
+    case 'sphome': { const o = a.spouse && accounts.get(a.spouse.login); if (!o?.ws) return toast(a, 'ไปบ้านคู่ได้ตอนที่คู่ออนไลน์อยู่', '🏡', false); return goHome(a, o); }
+    case 'spdiv': {                          // 💔 one side is enough
+      const s = a.spouse; if (!s) return; const o = accounts.get(s.login);
+      MR.divorce(a, o, now()); a.sd = true; dirty = true; markMe(a);
+      if (o) { o.sd = true; sysMail(o, `💔 ${a.name} ขอหย่ากับคุณแล้ว ทั้งคู่แต่งงานใหม่ได้หลังครบ 7 วัน`); if (o.ws) markMe(o); }
+      sendRoster(); send(a, wedView(a)); return toast(a, '💔 หย่าแล้ว แต่งงานใหม่ได้หลังครบ 7 วัน', '💔');
+    }
     case 'cal': {                            // 📅 phone app: every timed event in one place
       aucTick(); const th = thNow(), wk = weekKey(), today20 = Date.parse(th.day + 'T20:00:00+07:00');
       const top = HM.board([...accounts.values()], wk, 1)[0];
@@ -5923,7 +6103,7 @@ function tick() {
     }
     if (a.trade && (dist(a.trade.a, a.trade.b) > 8 || areaId(a.trade.a) !== areaId(a.trade.b))) tradeClose(a.trade, 'อยู่ไกลกันเกินไป ยกเลิกการแลกเปลี่ยน');
     if (godLock(a)) a.energy = a.hunger = a.health = a.happy = 100;
-    if (a.meDirty || t % 2000 < TICK) { a.meDirty = false; meSend(a); }
+    if (a.meDirty || (t + a.id * 137) % 2000 < TICK) { a.meDirty = false; meSend(a); }   // the 2 s refresh is spread over the 2 s instead of everyone at once
   }
   if (slow) {
     // garden: tell owners their crops are ready
@@ -6185,7 +6365,10 @@ async function main() {
   await store.init();
   await load();
   for (let i = Math.min(botCap, rint(3, 6)); i > 0; i--) botJoin(true);   // only as many as are still left
-  setInterval(tick, TICK);
+  try { const h = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 }); h.enable();
+    setInterval(() => { const p = h.percentile(99) / 1e6, mx = h.max / 1e6; if (mx > 250) console.warn(`event loop stall: p99 ${p.toFixed(0)}ms max ${mx.toFixed(0)}ms · online ${online.size}`); h.reset(); }, 60e3).unref?.(); } catch { }
+  let slowLog = 0;   // ⏱️ lag hunting: say in the Fly logs when one tick takes too long (at most once a minute)
+  setInterval(() => { const t0 = Date.now(); tick(); const ms = Date.now() - t0; if (ms > 60 && t0 > slowLog) { slowLog = t0 + 60e3; console.warn(`slow tick ${ms}ms · online ${online.size}`); } }, TICK);
   server.listen(PORT, () => console.log(`Life Town running on http://localhost:${PORT}`));
 }
 if (require.main === module) main().catch(e => { console.error('fatal:', e); process.exit(1); });

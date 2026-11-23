@@ -205,6 +205,12 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   prop('cartstall', 41, 55);
 
   // where the gates and fishing spots are
+  // 🗝️ the treasure cave on the lawn by the workshop (placeholder rocks + chest until the cave art comes)
+  prop('o_cave', 39.5, 19.5, false); for (const x of [38, 39, 40]) for (const y of [17, 18]) set(x, y, 'o');   // the rocky hill is solid, the doorway's step is not
+  STATIONS.push({ id: 'cave', type: 'dg', label: 'ถ้ำสมบัติ', icon: '🗝️', x: 39.5, y: 20.1, r: 1.8, area: 'town' });
+  // 💒 the wedding arch on the temple's east lawn (rings, proposals, the ceremony)
+  prop('o_wedarch', 222.5, 75.2, false);
+  STATIONS.push({ id: 'wedding', type: 'wed', label: 'ซุ้มแต่งงาน', icon: '💒', x: 222.5, y: 76.1, r: 2.6, area: 'temple' });
   // 🔨 the crafting workshop: an open-air workbench on the lawn across the road from the bank (picked by the owner) (craft-only furniture, see CRAFTS)
   prop('x_workbench', 44.5, 19.6); prop('x_toolbox', 42.4, 19.5, false);
   STATIONS.push({ id: 'workshop', type: 'craft', label: 'โรงช่างคราฟ', icon: '🔨', x: 43.6, y: 19.9, r: 1.5, area: 'town' });
@@ -1341,6 +1347,7 @@ const ITEMS = {
   shell:    { name: 'เปลือกหอยมุก', icon: '🐚', kind: 'mat', base: 25 },
   crystal:  { name: 'เศษคริสตัล', icon: '💠', kind: 'mat', base: 120 },
   snow:     { name: 'เกล็ดหิมะ', icon: '❄️', kind: 'mat', base: 30 },   // December only
+  wedcake:  { name: 'ขนมแต่งงาน', icon: '🎂', kind: 'goods', base: 40 },   // 💒 a guest's keepsake from a wedding
   gshard:   { name: 'ชิ้นส่วนเพชร', icon: '💎', kind: 'mat', base: 0, nosell: 1 },
   fcbait:   { name: 'เหยื่อแข่งตกปลา', icon: '🪱', kind: 'goods', base: 50, fcb: 1 },   // sold only during the fishing contest: each catch in the contest uses one, the fish comes out heavier
   umbrella: { name: 'ร่มกันฝน', icon: '☂️', kind: 'goods', base: 180, umb: 1 },   // sold only by the umbrella man who walks into the square when it rains · kept in the bag: opens by itself when it rains outdoors, keeps you dry (no cold from the rain)
@@ -1420,6 +1427,13 @@ const CRAFTS = [
 // chance per stat event (one roll per material)
 const MAT_DROPS = { fish: [['shell', .12], ['crystal', .03], ['snow', .15, 12]], harvest: [['wood', .25], ['crystal', .03], ['snow', .15, 12]], shifts: [['wood', .3], ['cloth', .25], ['crystal', .03], ['snow', .2, 12]] };   // [id, chance, only in this month]
 const SHARD_GEMS = 20;
+// 🗝️ treasure cave: a ticket per run, a few runs a day; ancient coins 🪙 buy help for the next run
+const DUNGEON = { ticket: 300, perDay: 4, prize: [30, 20, 10],
+  shop: { torch: { name: 'คบเพลิงสำรอง', icon: '🔥', coin: 3, desc: 'ลงถ้ำเพิ่มได้อีก 1 รอบ (เกินโควตาวันนี้)' },
+          potion: { name: 'ยาติดตัว', icon: '🧪', coin: 2, desc: 'รอบหน้าเริ่มด้วยยาเพิ่ม 1 ขวด (สะสมได้ 3)' },
+          charm: { name: 'เครื่องรางนักสำรวจ', icon: '🧿', coin: 5, desc: 'รอบหน้าเริ่มพร้อมของวิเศษ 1 ชิ้น' } } };
+// 💍 wedding rings, bought at the wedding arch in the temple; the tier shows next to the couple's names
+const RINGS = { silver: { name: 'แหวนเงิน', icon: '💍', price: 19999 }, gold: { name: 'แหวนทอง', icon: '💛', price: 49999 }, diamond: { name: 'แหวนเพชร', icon: '💎', gems: 199 } };
 const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
 // 🎆 fireworks over the fountain square, bought with baht (a money sink everyone in town sees). n bursts over dur seconds
 const FIREWORKS = { s: { name: 'ดอกเล็ก', price: 500, n: 4, dur: 3 }, m: { name: 'ชุดใหญ่', price: 5000, n: 12, dur: 7 }, l: { name: 'มหาพลุ', price: 50000, n: 40, dur: 15 } };
@@ -1655,7 +1669,7 @@ const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนัก�
 const OFFICE_WAGE = [80, 92, 106, 122, 140, 160, 185];          // per game hour seated
 const RIDER = { baseFee: 18, perTile: 0.45, npcEvery: 55, tipMax: 30 };
 // running: faster, costs energy per tile; you stop running when energy gets low
-const RUN = { mul: 1.2, energyPerTile: 0.3, minEnergy: 5 };
+const RUN = { mul: 1.2, energyPerTile: 0.15, minEnergy: 5 };
 const POLICE = { patrolWage: 48, bounty: 300, jailSec: 75, fineBase: 300, wantedMin: 6, outfitMin: 3, npcSpeed: 4.3, begMax: 5000 };   // outfitMin: thief outfit stays on after a pickpocket; npcSpeed: the NPC patrol (players walk at 3)
 const HAPPY = { decay: 0.012, low: 20, crave: 22, donateMax: 25 };
 
@@ -1925,6 +1939,13 @@ const FURNITURE = {
   cr_tank:    { name: 'ตู้ปลามุกคริสตัล', icon: '🐠', price: 0, comfort: 5, cat: 'fun', spr: 'xc_tank', craft: 1 },
   cr_arch:    { name: 'ซุ้มประตูเพชรเรืองแสง', icon: '✨', price: 0, comfort: 6, cat: 'garden', spr: 'xc_arch', craft: 1, glow: '#7ff5ff' },
   // 👑 one-of-a-kind pieces sold only in the weekly auction (one owner in the whole town); craft: 1 keeps them out of every shop
+  // 🗝️ treasure-cave coin shop (🪙 ancient coins, not baht): one of each
+  dg_trophy:  { name: 'รูปปั้นมังกรทองคำ', icon: '🐉', price: 0, comfort: 7, cat: 'basic', spr: 'xd_trophy', craft: 1, dgc: 12, glow: '#ffd23f' },
+  dg_chest:   { name: 'หีบสมบัติโบราณ', icon: '💰', price: 0, comfort: 5, cat: 'basic', spr: 'xd_chest', craft: 1, dgc: 8 },
+  dg_crystal: { name: 'กระจุกคริสตัลเรืองแสง', icon: '💠', price: 0, comfort: 6, cat: 'basic', spr: 'xd_crystal', craft: 1, dgc: 10, glow: '#7fd8ff' },
+  dg_sword:   { name: 'ดาบในศิลา', icon: '🗡️', price: 0, comfort: 6, cat: 'garden', spr: 'xd_sword', craft: 1, dgc: 10 },
+  dg_map:     { name: 'แผนที่สมบัติใส่กรอบ', icon: '🗺️', price: 0, comfort: 4, cat: 'basic', spr: 'xd_map', craft: 1, dgc: 5 },
+  dg_lantern: { name: 'ตะเกียงเหล็กในถ้ำ', icon: '🏮', price: 0, comfort: 4, cat: 'basic', spr: 'xd_lantern', craft: 1, dgc: 5, glow: '#ffb347' },
   auc_arch:   { name: 'ซุ้มประตูทองคำราชันย์ 👑', icon: '👑', price: 0, comfort: 8, cat: 'garden', spr: 'xa_arch', craft: 1, auc: 1, glow: '#ffd23f' },
   auc_bonsai: { name: 'บอนไซคริสตัลซากุระ 👑', icon: '👑', price: 0, comfort: 7, cat: 'garden', spr: 'xa_bonsai', craft: 1, auc: 1, glow: '#ff8ad8' },
   auc_tank:   { name: 'ตู้ปลาทองคำแท้ 👑', icon: '👑', price: 0, comfort: 8, cat: 'fun', spr: 'xa_tank', craft: 1, auc: 1, glow: '#ffd23f' },
@@ -2121,6 +2142,7 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   bear:      { name: 'ชุดหมีน้ำตาลขนนุ่ม', how: 'ซื้อที่ร้านแฟชั่น', price: 89999 },
   panda:     { name: 'ชุดแพนด้าตัวกลม', how: 'ซื้อที่ร้านแฟชั่น', gems: 120 },
   cathood:   { name: 'ชุดฮู้ดแมวพาสเทล', how: 'ซื้อที่ร้านแฟชั่น', gems: 150 },
+  wedding:   { name: 'ชุดเจ้าบ่าว', nf: 'ชุดเจ้าสาว', how: 'ได้ฟรีตอนแต่งงาน หรือซื้อที่ร้านแฟชั่น', gems: 150 },
   kitsune:   { name: 'ชุดจิ้งจอกเก้าหาง', nf: 'ชุดจิ้งจอกเก้าหางสาว', how: 'เร็วๆ นี้ (ยังไม่เปิดขาย)' },   // locked for now: not in OUTFIT_CAT, so no shop slot
   winter:    { name: 'ชุดไหมพรมกันหนาว', nf: 'ชุดไหมพรมกันหนาวสาว', how: 'กิจกรรมล็อกอิน 7 วัน (แจกฟรี ไม่มีขาย)' } };
 // 🎁 a login event: log in on 7 different days between start and end; each day unlocks the next reward, day 7 is the outfit
@@ -2135,7 +2157,7 @@ const DYE_WHITE = ['catsuit', 'chicken', 'knight'];   // white / silver cloth al
 // shop tabs
 const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop', 'swim', 'coat', 'racer', 'tanktop'],
   thai: ['songkran', 'lanna', 'phasin', 'muaythai', 'lukthung', 'chinese', 'chakri', 'thai', 'thairoyal'],
-  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune', 'maid', 'dino', 'bear', 'panda', 'cathood'] };
+  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune', 'maid', 'dino', 'bear', 'panda', 'cathood', 'wedding'] };
 for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
   OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', nosale: 1, ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }
@@ -2342,7 +2364,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
