@@ -41,7 +41,7 @@ PETS = [
  ('turtle','d',4,[0,1,2],[3,4,5],[6,7],L,.8),
  ('capybara','d',5,[0,1,2],[3,4,5],[6,7,8],L,1.05),
  ('dragon','d',6,[0,1,2],[3,4,5],[6,7],[L,R],1.0),
- ('unicorn','d',7,[0,1],[3,4,5],[6,7],R,1.1),
+ ('unicorn','d',7,[0,1],[3,4,5],[6,7],L,1.1),   # its side frames are drawn facing left (was R: the unicorns walked backwards)
 ]
 # 💎 aura pets: tools/sheets/pets_e.jpg / pets_f.jpg have the same layout as pets_d.jpg
 for k, ids in (('e', ['starpanda', 'moonpanda', 'crystalfox', 'holopeng', 'runeturtle', 'goldcapy', 'skydragon', 'starunicorn']),
