@@ -781,8 +781,9 @@ function handle(m) {
       if (panel?.kind === 'wpray') refreshPanel(true);
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
-    case 'nbegg': nbTomorrowCard(m.tmr); break;
-    case 'nbstep': FX.play('levelup'); if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && nbGo(i)) setGuide(nbGo(i), true); }, 900); break;
+    case 'nbegg': setTimeout(() => nbTomorrowCard(m.tmr), $('.nbStepCard') ? 1800 : 0); break;   // after the step card, not on top of it
+    case 'nbfish': nbFirstFish(m.id); break;
+    case 'nbstep': $('#stick')?.classList.remove('nbHint'); if (nbDay1()) { nbStepCard(m.i); if (m.i === 2) { const shown = +($('#meMoney').textContent || '0').replace(/[^\d]/g, '') || 0; nbMoneyUp(shown < me.money ? shown : nbMoneyPrev ?? shown); } } FX.play('levelup'); if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && nbGo(i)) setGuide(nbGo(i), true); }, 900); break;
     case 'cz': czMsg(m); break;
     case 'catch': catchPop(m.item, m.first, m.kg, m.pb); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
@@ -1088,6 +1089,28 @@ function nbHudApply() {
   }
 }
 const nbGo = i => i === 1 && nbDay1() ? 'nbwater' : G.nbSteps?.[i]?.go;   // the starter step's guide target (v2: the fishing step points at the water itself)
+// 🎉 newcomer moments: a small card per starter step, the first fish held up, the first money counting up
+let nbCount = null, nbMoneyLast = null, nbMoneyPrev = null;
+function nbMoneyUp(from) {
+  const el = $('#meMoney'), t0 = performance.now(); nbCount = 1;
+  const tick = () => { const k = Math.min(1, (performance.now() - t0) / 1000), to = Math.round(me.money); el.textContent = Math.round(from + (to - from) * k).toLocaleString('en-US'); el.classList.toggle('nbUp', k < 1); if (k < 1) requestAnimationFrame(tick); else nbCount = null; };
+  tick();
+}
+function nbStepCard(i) {
+  const S = G.nbSteps || [], p = me?.nb?.p || [], done = S.filter((st, j) => j === i || (p[j] || 0) >= st.n).length, st = S[i];   // the step just finished counts even before its update arrives if (!st) return;
+  const d = document.createElement('div'); d.className = 'nbStepCard';
+  d.innerHTML = `<b>✅ ${esc(st.text.split(' (')[0])}</b><small>${st.money ? '+' + money(st.money) : st.gems ? '+💎' + st.gems : ''}</small><i><u style="width:${Math.round(done / S.length * 100)}%"></u></i><em>${done}/${S.length}</em>`;
+  document.body.appendChild(d); setTimeout(() => d.classList.add('out'), 1300); setTimeout(() => d.remove(), 1700);
+  const r = $('#meMoney').getBoundingClientRect();
+  for (let k = 0; k < 6; k++) { const c = document.createElement('span'); c.className = 'nbCoin'; c.textContent = '🪙'; c.style.left = (innerWidth / 2 - 10 + (k - 3) * 14) + 'px'; c.style.top = (innerHeight * .42) + 'px'; document.body.appendChild(c);
+    setTimeout(() => { c.style.left = r.left + 'px'; c.style.top = r.top + 'px'; c.style.opacity = '.2'; }, 60 + k * 70); setTimeout(() => c.remove(), 1000 + k * 70); }
+}
+function nbFirstFish(id) {
+  const it = G.items[id]; if (!it) return;
+  const d = document.createElement('div'); d.className = 'hatchPop nbFishPop';
+  d.innerHTML = `<div><small>🎉 ตัวแรกในชีวิต!</small><b style="font-size:84px;line-height:1.1">${it.icon}</b><b>${esc(it.name)}</b><small>ตกได้อีก 2 ตัว แล้วไปขายที่สมาคมประมง · แตะเพื่อปิด</small></div>`;
+  d.onclick = () => d.remove(); document.body.appendChild(d); FX.play('levelup'); setTimeout(() => d.remove(), 3500);
+}
 const nbFishHelp = () => nbDay1() && !me.nb.f1;   // talk a newcomer through their very first fish
 const nbEggWaiting = () => nbDay1() && !!me.nb.egg && !me.nb.egg.h;
 function nbTomorrowCard(tmr) {
@@ -1169,7 +1192,8 @@ function paintHud() {
   paintPortrait(); $('#phoneBtn').classList.toggle('has', (me.mailN || 0) > 0 || (me.bills || []).length > 0 || achTodo().length > 0);
   const dzBox = $('#dzChips'); const html = chips.join('');
   if (dzBox.dataset.h !== html) { dzBox.dataset.h = html; dzBox.innerHTML = html; dzBox.querySelectorAll('[data-dz]').forEach(c => c.onclick = () => dzInfo(c.dataset.dz)); }
-  $('#meMoney').textContent = me.monInf ? '∞' : Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
+  if (me.money !== nbMoneyLast) { nbMoneyPrev = nbMoneyLast ?? me.money; nbMoneyLast = me.money; }
+  if (!nbCount) $('#meMoney').textContent = me.monInf ? '∞' : Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
@@ -6203,6 +6227,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27p', d: '23 พ.ย.', items: [
+    '🎉 มือใหม่: ฉลองทุกครั้งที่ทำภารกิจสำเร็จ · ปลาตัวแรกโชว์ตัวใหญ่ · เงินก้อนแรกนับขึ้นให้เห็น',
+  ] },
   { v: '2026-11-27o', d: '23 พ.ย.', items: [
     '🎣 มือใหม่: บทสอนเหลือการ์ดเดียว สอนตอนเล่นจริง ซื้อเบ็ดแรกแตะเดียว ลูกศรพาไปปลายท่าตกปลา และปลาตัวแรกได้แน่นอน',
   ] },
@@ -9133,7 +9160,7 @@ $('#tutNext').onclick = () => { FX.play('click'); if (tutStep < tutSteps().lengt
 $('#tutSkip').onclick = endTut;
 function endTut() {
   if (me?.nb?.v === 2) send({ t: 'nbev', k: 'tut' });
-  if (nbQuiet() && JOYFIX && TOUCH_UI && !nbMoved) $('#stick')?.classList.add('nbHint');   // 🕹️ show where to drag, until the first drag
+  if (nbQuiet() && JOYFIX && TOUCH_UI && !nbMoved) { $('#stick')?.classList.add('nbHint'); setTimeout(() => $('#stick')?.classList.remove('nbHint'), 25000); }   // 🕹️ show where to drag, until the first drag
   tutPending = false; if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 600); }
   $('#tut').classList.add('hidden'); try { localStorage.setItem('lt_tut2', '1'); } catch { }
   if (nbActive() && G.nbSteps) { const p = me.nb.p || [], i = G.nbSteps.findIndex((st, j) => (p[j] || 0) < st.n); if (i >= 0 && nbGo(i)) setGuide(nbGo(i), false, true); }

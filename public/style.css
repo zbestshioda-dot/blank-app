@@ -1699,3 +1699,11 @@ body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 #stick.nbHint{animation:nbStick 1.2s ease-in-out infinite}#stick.nbHint::after{content:'ลากตรงนี้เพื่อเดิน';position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;background:#fff3c9;color:#5a3620;font:700 13px 'Mitr',sans-serif;padding:4px 10px;border-radius:10px;border:2px solid #b97a2a}
 @keyframes nbStick{50%{box-shadow:0 0 0 10px rgba(255,226,122,.45)}}
 #actBtn.nbGlow{animation:nbAct 1s ease-in-out infinite}@keyframes nbAct{50%{filter:drop-shadow(0 0 14px #ffe27a) brightness(1.2);transform:scale(1.06)}}
+
+/* 🎉 newcomer moments */
+.nbStepCard{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:60;background:#fffaf0;border:3px solid #b97a2a;border-radius:16px;padding:10px 18px;min-width:220px;text-align:center;box-shadow:0 6px 0 #7a4a14;animation:nbPop .25s ease-out;pointer-events:none;transition:opacity .4s,transform .4s}
+.nbStepCard b{display:block;color:#5a3620;font-size:16px}.nbStepCard small{display:block;color:#2f8a3c;font-weight:700;font-size:15px}.nbStepCard i{display:block;height:10px;border-radius:5px;background:#eadbb8;margin:6px 0 2px;overflow:hidden}.nbStepCard u{display:block;height:100%;background:linear-gradient(90deg,#7fd38a,#ffd34d)}.nbStepCard em{font-style:normal;font-size:12px;color:#7a5a3a}
+.nbStepCard.out{opacity:0;transform:translate(-50%,-70%)}
+@keyframes nbPop{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
+.nbCoin{position:fixed;z-index:61;font-size:22px;pointer-events:none;transition:left .7s ease-in,top .7s ease-in,opacity .7s}
+#meMoney.nbUp{color:#ffe27a;text-shadow:0 0 8px #ffd34d}

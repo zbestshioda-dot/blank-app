@@ -4517,7 +4517,7 @@ setInterval(() => { try {
 } catch (e) { console.error('bday', e); } }, 5000).unref?.();
 function giveCatch(a, id) {
   if (a.nb && !a.nb.ev?.fish1) NBM.mark(a, 'fish1', now());
-  if (NBM.firstFish(a) && id) a.nb.f1 = 1;
+  if (NBM.firstFish(a) && id) { a.nb.f1 = 1; send(a, { t: 'nbfish', id }); }   // 🎉 the phone celebrates the first fish
   const before = fishLv(a);
   a.xp.fisher = (a.xp.fisher || 0) + 1;
   if (fishLv(a) > before) {
