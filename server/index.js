@@ -953,10 +953,14 @@ let zn = null, znDone = '', znSeq = 0, znAnnounced = '';
 const znAlive = a => zn?.ph === 'on' && zn.alive.has(a.id);
 const zombies = () => npcs.filter(n => n.zb);
 function znId() { let id; do id = -(9000 + (znSeq++ % 900)); while (npcs.some(n => n.id === id)); return id; }   // ids recycle (cap < 900), never two at once
+// 👁 spectators: who (bitten / sitting out) is watching which survivor right now; survivors see how many are watching
+function specCount(set, a) { let all = 0, me = 0; for (const o of online.values()) if (o.specOn && !set.has(o.id) && set.has(o.specOn)) { all++; if (o.specOn === a.id) me++; } return [all, me]; }
+let specQ = null;
+function specChanged() { if (specQ) return; specQ = setTimeout(() => { specQ = null; if (zn?.ph === 'on') znSendAll(); if (ww?.ph === 'on') wwSendAll(); }, 400); }
 function znState(a) {
   if (!zn) return { t: 'zn', ph: 'off' };
   const names = zn.ph === 'on' ? [...zn.alive].map(id => online.get(id)?.name).filter(Boolean).slice(0, 30) : [];
-  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, names, ids: zn.ph === 'on' && !zn.alive.has(a.id) ? [...zn.alive].slice(0, 60) : [], me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '' };
+  return { t: 'zn', ph: zn.ph, end: zn.ph === 'warn' ? zn.t0 : zn.end, wave: zn.wave || 0, alive: zn.alive?.size || 0, names, ids: zn.ph === 'on' && !zn.alive.has(a.id) ? [...zn.alive].slice(0, 60) : [], me: zn.ph === 'on' ? (zn.alive.has(a.id) ? 'alive' : zn.dead.has(a.id) ? 'dead' : 'out') : '', ...(zn.ph === 'on' ? (([w, wm]) => ({ watch: w, watchMe: wm }))(specCount(zn.alive, a)) : {}) };
 }
 function znSendAll() { for (const o of online.values()) send(o, znState(o)); }
 function znStart(t, test) {
@@ -1026,7 +1030,7 @@ function znSpawn(t) {
       for (let k = 0; k < 30 && !p; k++) { const [x, y] = pick(tiles), d = Math.min(...ps.map(o => Math.hypot(o.x - x - .5, o.y - y - .5))); if (d > 9 && d < 26) p = [x + .5, y + .5]; }
       if (!p) { const [x, y] = pick(tiles); if (Math.min(...ps.map(o => Math.hypot(o.x - x - .5, o.y - y - .5))) > 6) p = [x + .5, y + .5]; }
       if (!p) continue;
-      const r = Math.random(), kind = last && i < 2 ? 'brute' : zn.wave >= 2 && r < .25 ? 'run' : r < .6 ? 'walk' : 'girl', K = ZN.kinds[kind];
+      const r = Math.random(), kind = last && i < 2 ? 'brute' : r < (zn.wave >= 2 ? .45 : .3) ? 'run' : r < .7 ? 'walk' : 'girl', K = ZN.kinds[kind];
       const z = { id: znId(), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1.2, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {}, lead: i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : .6,   // some chase, some cut you off
         next: () => znGoal(z), stay: () => .15 };
       npcs.push(z); pts.push([area, +p[0].toFixed(1), +p[1].toFixed(1)]);
@@ -1053,7 +1057,7 @@ function znTrickle(t) {
         if (!D.blocked(x, y) && D.TILES[Math.floor(y)]?.[Math.floor(x)] !== 'D' && D.areaAt(x, y)?.id === area && live.every(q => Math.hypot(q.x - x, q.y - y) > 7)) p = [x, y];
       }
       if (!p) break;
-      const rr = Math.random(), kind = zn.wave >= 2 && rr < .2 ? 'run' : rr < .6 ? 'walk' : 'girl', K = ZN.kinds[kind];
+      const rr = Math.random(), kind = rr < (zn.wave >= 2 ? .4 : .25) ? 'run' : rr < .7 ? 'walk' : 'girl', K = ZN.kinds[kind];
       const z = { id: znId(), zb: kind, name: K.name, area, x: p[0], y: p[1], f: 2, path: [], wait: 1, speed: K.speed * rnd(.92, 1.08), zt: 0, g: 'm', look: {}, lead: Math.random() < .4 ? 0 : 1,
         next: () => znGoal(z), stay: () => .15 };
       npcs.push(z); pts.push([area, +p[0].toFixed(1), +p[1].toFixed(1)]); n++;
@@ -1142,7 +1146,7 @@ function wwState(a) {
     wolves: on ? [...ww.wolves] : [], humans: on && ww.wolves.has(a.id) ? [...ww.alive] : [], ids: on && !ww.wolves.has(a.id) && !ww.alive.has(a.id) ? [...ww.alive] : [],
     me: !on ? '' : ww.wolves.has(a.id) ? 'wolf' : ww.alive.has(a.id) ? 'alive' : 'out', boss: ww.wolf === a.id ? 1 : 0,
     sk: s ? { sniff: s.sniffUntil || 0, sniffCd: s.sniffCd || 0, sprint: s.sprintUntil || 0, sprintCd: s.sprintCd || 0, summonCd: s.summonCd || 0, hide: s.hideUntil || 0, hideCd: s.hideCd || 0 } : null,
-    hid: on ? [...ww.alive].map(id => [id, ww.sk.get(id)?.hideUntil || 0]).filter(([, u]) => u > t) : [] };   // who is in disguise right now (until when)
+    hid: on ? [...ww.alive].map(id => [id, ww.sk.get(id)?.hideUntil || 0]).filter(([, u]) => u > t) : [], ...(on ? (([w, wm]) => ({ watch: w, watchMe: wm }))(specCount(new Set([...ww.alive, ...ww.wolves]), a)) : {}) };   // who is in disguise right now (until when)
 }
 function wwSendAll() { for (const o of online.values()) send(o, wwState(o)); }
 function wwStart(t, test) {
@@ -1719,7 +1723,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
@@ -3388,6 +3392,12 @@ function act(a, m) {
       const amu = (a.inv.amulet || 0) > 0, mins = D.TEMPLEQ.blessMin * (amu ? 2 : 1);
       a.bless = now() + mins * 60000; joy(a, has ? 12 : 8); stat(a, 'pray'); markMe(a);
       send(a, { t: 'tfx', kind: 'pray' });
+      if (a.prayDay !== dayKey()) {         // 🙏 merit of the day: the first prayer each (real) day gives energy + money, every 5th day also gems
+        a.prayDay = dayKey(); a.prayDays = (a.prayDays || 0) + 1;
+        const cash = Math.min(600, 150 + lvl(a) * 20), en = 25, gem = a.prayDays % 5 === 0 ? 3 : 0;
+        enLog(a, Math.min(100, a.energy + en) - a.energy, 'ทำบุญประจำวัน'); a.energy = Math.min(100, a.energy + en); credit(a, cash); if (gem) a.gems = (a.gems || 0) + gem; markMe(a);
+        toast(a, `🪷 บุญประจำวัน! +⚡${en} +${money(cash)}${gem ? ` +💎${gem}` : ''} · ทำบุญมาแล้ว ${a.prayDays} วัน (ครบทุก 5 วันรับ 💎3)`, '🪷');
+      }
       return toast(a, `🙏 ไหว้พระขอพร${has ? 'ด้วยชุดธูปเทียนดอกไม้' : ` (ค่าธูปเทียน ${money(D.TEMPLEQ.pray)})`} · ได้รับพร ${mins} นาที${amu ? ' (ผ้ายันต์นำโชค 🧧 x2)' : ''}: รายได้ทุกอย่าง +5% ✨ ความสุขเพิ่ม`, '🙏');
     }
     case 'wpray.alms': {                    // monks: the morning alms round through town
@@ -4898,6 +4908,11 @@ function npcTick(dt, ps) {
       if (!n.path.length && (n.folk || n.bot)) { n.goingIn = null; if (n.leaving) folkArrive(n); else if (n.bot && goal) n.bot.plan.shift(); }   // could not reach the door: give up (or just step outside)
       n.wait = n.path.length ? 0 : 2; if (!n.path.length) continue;
     }
+    if (n.zb && n.path.length > 1 && n.smooth !== n.path.length) {   // 🧟 cut the tile-by-tile zigzag into straight runs: a fast runner kept flipping left/right (looked like spinning)
+      n.smooth = n.path.length; let k = 0;
+      for (let j = Math.min(n.path.length - 1, 6); j > 0; j--) if (pathClear(n.x, n.y, n.path[j][0], n.path[j][1])) { k = j; break; }
+      if (k) { n.path.splice(0, k); n.smooth = n.path.length; }
+    }
     const [tx, ty] = n.path[0], dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy), st = n.speed * dt;
     if (d <= st) {
       n.x = tx; n.y = ty; n.path.shift();
@@ -4985,7 +5000,7 @@ function meView(a) {
     dogq: a.dogq ? { kind: a.dogq.kind || 'dog', stole: a.dogq.stole, dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0, thiefNext: a.thiefNext || 0, jgNext: a.jgNext || {},
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
-    happy: a.happy, craving: a.craving, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
+    happy: a.happy, craving: a.craving, prayed: a.prayDay === dayKey() ? 1 : 0, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
     jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], case: detView(a), detAt: a.detNext || 0, stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
@@ -5294,7 +5309,7 @@ function detach(a) {
   for (const o of [...orders.values()]) { if (o.cust === a && o.state === 'open') cancelOrder(o, 'ลูกค้าออฟไลน์'); else if (o.rider === a) { o.state = 'open'; o.rider = null; o.riderName = ''; } }
   standUp(a);
   if (zn?.alive?.delete(a.id)) zn.dead.add(a.id);   // logging off mid-wave does not count as surviving
-  online.delete(a.id); a.lastOff = now();
+  online.delete(a.id); a.lastOff = now(); if (a.specOn) { a.specOn = 0; specChanged(); }
   a.ws = null; a.cast = null; a.sd = true; a.afk = false; dirty = true;
   sendRoster();
 }
@@ -5467,6 +5482,7 @@ function onMessage0(ws, raw) {
     case 'enter': return enterRoom(a, m);
     case 'exit': return exitRoom(a);
     case 'use': return m.item === 'petegg' ? (cd(a, 'use', 600) && hatchEgg(a)) : useItem(a, m.item);
+    case 'spec': { const id = Math.trunc(+m.id) || 0; if (a.specOn !== id) { a.specOn = id; specChanged(); } return; }
     case 'pet.leash': { if (!a.leash) return toast(a, 'ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง', '🦮', false); a.leashOn = a.leashOn ? 0 : 1; markMe(a); sendRoster(); return toast(a, a.leashOn ? 'ใส่สายจูงแล้ว' : 'ถอดสายจูงแล้ว', '🦮'); }
     case 'pet.name': {
       if (!(a.pets || []).includes(m.id)) return;

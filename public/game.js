@@ -1109,7 +1109,7 @@ function paintHud() {
   if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">${ic('i_bulb')} อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
   if (me.desk >= 0 && me.enrolled) chips.push(`<span class="chip study" data-dz="_study">📖 เรียนอยู่ ${Math.round((me.study || 0) * 100)}%</span>`);
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
-  if (0) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
+  if (me.prayed === 0 && (me.lv || 0) >= 2) chips.push('<span class="chip study" data-dz="_pray">🪷 ยังไม่ได้ทำบุญวันนี้</span>');
   $('#statusBox').classList.toggle('hidden', !chips.length);
   { const n = me.mailN || 0, f = $('#mailFab'); if (f) { f.classList.toggle('hidden', !n); $('#mailFabN').textContent = n > 9 ? '9+' : n; if (!f.onclick) f.onclick = () => openPanel({ kind: 'mail' }); } }
   paintPortrait(); $('#phoneBtn').classList.toggle('has', (me.mailN || 0) > 0 || (me.bills || []).length > 0 || achTodo().length > 0);
@@ -2953,7 +2953,10 @@ function zSil(row, col) {   // a solid red copy of one zombie frame (cached) for
 function drawZombie(p, X, Y, t) {
   const px = Math.round(p.rx * TS + X), py = Math.round(p.ry * TS + Y + TS * .32);
   if (px < -120 || py < -160 || px > VW + 120 || py > VH + 160) return;
-  const f8 = ((p.f | 0) % 8 + 8) % 8, dir = { 0: 'left', 1: 'left', 2: 'up', 3: 'right', 4: 'right', 5: 'right', 6: 'down', 7: 'left' }[f8];
+  const f0 = ((p.f | 0) % 8 + 8) % 8;
+  if (p.zfS == null) p.zfS = f0;
+  if (f0 !== p.zfS) { p.zfT = p.zfT || t; if (t - p.zfT > 140) { p.zfS = f0; p.zfT = 0; } } else p.zfT = 0;   // a facing must hold a moment before the sprite turns (no flicker-spin)
+  const f8 = p.zfS, dir = { 0: 'left', 1: 'left', 2: 'up', 3: 'right', 4: 'right', 5: 'right', 6: 'down', 7: 'left' }[f8];
   const moving = Math.hypot(p.x - p.rx, p.y - p.ry) > .02;
   p.walk = (p.walk || 0) + (moving ? (p.zb === 'run' ? .3 : .16) * FDT * 60 : 0);
   const fi = moving ? [1, 0, 2, 0][Math.floor(p.walk / 1.4) % 4] : 0, col = (dir === 'down' ? 0 : dir === 'up' ? 3 : 6) + fi;
@@ -2987,12 +2990,14 @@ function drawZDecals(X, Y, t, A) {
 }
 function drawZTint(t) {
   if (ZN.ph !== 'on' && ZN.ph !== 'warn') return;
-  const a = ZN.ph === 'on' ? .16 : .1 + Math.sin(t / 250) * .04;   // light, so you can still see where you run
-  ctx.fillStyle = `rgba(14,48,26,${a})`; ctx.fillRect(0, 0, VW, VH);
-  const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .45, VW / 2, VH / 2, Math.max(VW, VH) * .75);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, ZN.ph === 'warn' ? `rgba(120,0,0,${.28 + Math.sin(t / 250) * .1})` : 'rgba(0,10,4,.38)');
+  const a = ZN.ph === 'on' ? .2 + Math.sin(t / 900) * .03 : .1 + Math.sin(t / 250) * .04;   // a sickly green air, still light enough to see where you run
+  ctx.fillStyle = ZN.ph === 'on' ? `rgba(40,110,30,${a})` : `rgba(14,48,26,${a})`; ctx.fillRect(0, 0, VW, VH);
+  const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .32, VW / 2, VH / 2, Math.max(VW, VH) * .72);
+  if (ZN.ph === 'warn') { g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(120,0,0,${.28 + Math.sin(t / 250) * .1})`); }
+  else { g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.55, 'rgba(6,30,8,.35)'); g.addColorStop(1, 'rgba(0,6,0,.86)'); }   // dark edges: you only see what is close
   ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
 }
+const watchTxt = S => S.watch ? ` · 👁 มีคนดูอยู่ ${S.watch} คน${S.watchMe ? ` (ดูคุณ ${S.watchMe})` : ''}` : '';   // spectators of zombie / werewolf night
 const zIcon = (i, sz) => `<i class="zic" style="width:${sz}px;height:${sz}px;background-size:${sz * 9}px ${sz}px;background-position:-${i * sz}px 0"></i>`;
 let ZWIN = { ids: new Set(), until: 0 }, znListOpen = true;
 function znList() {   // a small, tap-to-fold survivor list on the left edge: never in the way of running
@@ -3072,7 +3077,7 @@ function wwHud(el) {
   const title = WW.ph === 'warn' ? `🌕 หมาป่าออกล่าใน ${mm}` : WW.me === 'wolf' ? `🐺 ${WW.boss ? 'คุณคือโฮสหมาป่า' : 'คุณคือหมาป่าลูกน้อง'} · ${mm}` : `🌕 รอดอีก ${mm}`;
   const sub = WW.ph === 'warn' ? 'ออกจากอาคาร เตรียมวิ่ง!' : WW.me === 'wolf' ? `กัดมนุษย์ให้หมด · เหลือ ${WW.alive} คน${WW.boss ? ' · ห้ามยืนนิ่ง!' : ''}` : WW.me === 'alive' ? `หมาป่า ${nw} ตัว · มนุษย์ ${WW.alive} คน · แผนที่ไม่เห็นใคร ระวัง!` : `ดูอยู่ข้างสนาม · มนุษย์ ${WW.alive} คน`;
   el.classList.remove('hidden'); el.classList.toggle('warn', WW.ph === 'warn' || WW.me === 'wolf'); el.classList.toggle('dead', false);
-  el.innerHTML = `<span style="font-size:24px">🐺</span><div><b>${title}</b><small>${esc(sub)}</small></div>`;
+  el.innerHTML = `<span style="font-size:24px">🐺</span><div><b>${title}</b><small>${esc(sub + (WW.ph === 'on' ? watchTxt(WW) : ''))}</small></div>`;
 }
 const wwIsWolf = () => WW.ph === 'on' && WW.me === 'wolf';
 const wwNow = () => Date.now() + clockOff;
@@ -3121,6 +3126,7 @@ function znHud() {
   if (ZN.ph === 'warn') { title = `ซอมบี้บุกใน ${mm}`; sub = me && roomOf(me.x, me.y) ? '⚠️ ออกจากอาคารด่วน! อยู่ข้างในจะโดนรุม' : 'อยู่นอกอาคาร เตรียมวิ่งหนี!'; }
   else { title = `เอาตัวรอดอีก ${mm}`; sub = ZN.me === 'alive' ? `ระลอก ${ZN.wave || 1} · ผู้รอด ${ZN.alive} คน · ห้ามให้ซอมบี้ถึงตัว!` : ZN.me === 'dead' ? `คุณสลบแล้ว · ผู้รอด ${ZN.alive} คน` : `ดูอยู่ข้างสนาม · ผู้รอด ${ZN.alive} คน`; }
   el.classList.remove('hidden'); el.classList.toggle('warn', ZN.ph === 'warn'); el.classList.toggle('dead', ZN.me === 'dead');
+  if (ZN.ph === 'on') sub += watchTxt(ZN);
   el.innerHTML = `${zIcon(ZN.ph === 'warn' ? 0 : ZN.me === 'dead' ? 6 : 1, 24)}<div><b>${title}</b><small>${sub}</small></div>`;
 }
 setInterval(znHud, 250);
@@ -3160,8 +3166,10 @@ function specGo(d) {
   const L = specList() || []; if (!L.length) return;
   const i = L.indexOf(specId); specId = L[i < 0 ? (d > 0 ? 0 : L.length - 1) : (i + d + L.length) % L.length]; FX.play('click'); specTick();
 }
+let specSent = 0;
 function specTick() {
   const L = specList();
+  { const want = specId && L?.includes(specId) ? specId : 0; if (want !== specSent && ws?.readyState === 1) { specSent = want; send({ t: 'spec', id: want }); } }   // tell the server who we watch (survivors see 👁 counts)
   if (!L?.length) { specId = 0; specEl?.remove(); specEl = null; return; }
   if (specId && !L.includes(specId)) specId = L[0];   // the one you watched got caught: on to the next
   if (!specEl) {
@@ -4217,6 +4225,10 @@ function drawMini() {
     g.fillStyle = p.adm ? `hsl(${(performance.now() / 8) % 360},90%,55%)` : COLORS[Math.abs(p.id * 7 + (p.av || 0)) % COLORS.length]; g.fillRect(mx - s / 2, my - s / 2, s, s);
   }
   misMini(g, A, mapId);
+  if (ZN.ph === 'on' && ZN.me === 'alive' && mapId === 'town') {   // 🧟 zombie night: the minimap goes dark, only a small circle around you is lit
+    const q = outPos(m.rx, m.ry), mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2, d = g.createRadialGradient(mx, my, 10, mx, my, 34);
+    d.addColorStop(0, 'rgba(0,8,2,0)'); d.addColorStop(1, 'rgba(0,8,2,.93)'); g.fillStyle = d; g.fillRect(-2000, -2000, 6000, 6000);
+  }
   if (me?.alms && mapId === 'town') { const b = (performance.now() / 350 | 0) % 2; me.alms.pts.forEach((q, i) => { if (me.alms.got[i]) return; const x = (q[0] - A.x) * 2, y = (q[1] - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); g.fillStyle = b ? '#ffb300' : '#ffd84d'; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); });
   }
   if (mapId === 'town') { const x = (74 - A.x) * 2, y = (67 - A.y) * 2, big = me?.alms?.got.every(Boolean); g.font = `${big ? 20 : 14}px serif`; g.textAlign = 'center'; g.fillText('🛕', x, y + 5); }
@@ -6090,6 +6102,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27g', d: '23 พ.ย.', items: [
+    '🪷 ทำบุญประจำวัน: ไหว้พระที่วัดครั้งแรกของวันได้ ⚡25 + เงิน และทำบุญครบทุก 5 วันได้ 💎3',
+    '🛠️ แก้บั๊กผู้เล่น',
+  ] },
   { v: '2026-11-27f', d: '23 พ.ย.', items: [
     '🛕 วัดคึกคักขึ้น: มีชาวบ้านมาทำบุญ ไหว้พระ เสี่ยงเซียมซี ตีระฆัง และนั่งพักที่ศาลาทั้งวัน (กลางคืนเหลือไม่กี่คน)',
   ] },
@@ -9333,6 +9349,7 @@ function dzInfo(id) {
   if (id === '_sad') return toast('ความสุขต่ำมาก ทำงานไม่ได้ · กินของที่อยากกิน นั่งเล่นที่จัตุรัส โทรหาเพื่อน บริจาคให้ขอทาน นอนในบ้านตัวเอง', '😞', false);
   if (id === '_crave') return toast(`อยากกิน${G.items[me.craving.item].name} หาซื้อที่ตลาด/ร้านอาหาร แล้วกินภายในเวลาจะมีความสุขเพิ่มมาก`, '🤤');
   if (id === '_bills') return openPanel({ kind: 'phone', tab: 'bills' });
+  if (id === '_pray') return toast('ไปวัด 🛕 (ทางใต้ของเมือง ใต้บ่อน้ำ) แล้วไหว้พระขอพร: ครั้งแรกของวันได้ ⚡25 + เงิน · ทำบุญครบทุก 5 วันได้ 💎3', '🪷');
   if (id === '_study') return toast('กำลังนั่งเรียน นั่งครบ 1 ชั่วโมงในเกมได้ 1 คาบ (เดินเพื่อลุก)', '📖');
   if (id === '_duty') return toast(`เข้าเวรอยู่ในโรงพยาบาล ได้เงินเดือนทุกชั่วโมงจนถึง ${hhmm(G.doctor.end)} (ออกจากโรงพยาบาล = หยุดนับ)`, '🩺');
   if (id === '_lic') return toast('ใบขับขี่หมดอายุ ต่ออายุได้ที่โชว์รูมรถ', '🪪', false);
