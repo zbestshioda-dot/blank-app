@@ -5340,7 +5340,7 @@ function asExtra(S) {
   const bar = (label, n, of, col) => { const p = of ? Math.round(n / of * 100) : 0; return `<div class="asBar"><span>${esc(label)}</span><i><u style="width:${p}%;background:${col}"></u></i><b>${n} · ${p}%</b></div>`; };
   const nb = S.nbN ? [bar('สมัครแล้ว', S.nbN, S.nbN, '#8fb3ff'), ...S.nbName.map((t, i) => bar(`${i + 1}. ${t.split(' (')[0]}`, S.nbStep[i], S.nbN, '#7fd38a')), bar('🎉 ครบทุกข้อ', S.nbDone, S.nbN, '#ffd34d')].join('') : '<div class="sub">ยังไม่มีผู้เล่นใหม่ใน 30 วัน</div>';
   const ft = S.wN ? S.feat.map(([n, v]) => bar(n, v, S.wN, '#f2a35c')).join('') : '<div class="sub">ยังไม่มีข้อมูล</div>';
-  return `<div class="secT">🌱 ผู้เล่นใหม่ติดอยู่ตรงไหน (สมัครใน 30 วัน: ${S.nbN} คน)</div><div class="sub">แถบที่ลดฮวบ = ขั้นที่คนเลิกเล่น · มาแค่วันเดียวแล้วหาย <b>${S.once}</b> คน (${S.nbN ? Math.round(S.once / S.nbN * 100) : 0}%)</div>${nb}
+  return `<div class="secT">🌱 ผู้เล่นใหม่ติดอยู่ตรงไหน (คนที่ได้ภารกิจมือใหม่: ${S.nbN} คน)</div><div class="sub">แถบที่ลดฮวบ = ขั้นที่คนเลิกเล่น · สมัครใน 30 วันทั้งหมด ${S.allN ?? S.nbN} คน มาแค่วันเดียวแล้วหาย <b>${S.once}</b> คน (${(S.allN ?? S.nbN) ? Math.round(S.once / (S.allN ?? S.nbN) * 100) : 0}%)</div>${nb}
     <div class="secT">🧭 ระบบไหนมีคนใช้ (คนที่เล่นใน 7 วัน: ${S.wN} คน)</div>${ft}
     <div class="secT">⏱️ เวลาเล่น</div><div class="sub">เข้าเล่นเฉลี่ย (ค่ากลาง) <b>${S.daysMed}</b> วันต่อคน · เวลาเล่นสะสม (ค่ากลาง) <b>${S.playMed}</b> นาที${S.playN ? ` จาก ${S.playN} คน` : ''} (เริ่มนับตั้งแต่อัปเดตนี้)</div>`;
 }

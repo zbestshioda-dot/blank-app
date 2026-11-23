@@ -775,8 +775,7 @@ function adminStats() {
   S.payers = payDays.map(x => x.size);
   // 🌱 where newcomers stop: players who joined in the last 30 days, how many finished each starter step; and who never came back
   { const C = [...accounts.values()].filter(x => x.login && x.login !== '__meta' && !isAdmin(x) && dayNum(x.created || 0) >= d0 && dayNum(x.created || 0) <= today - 1);
-    S.nbN = C.length; S.nbStep = NB.map((st, i) => C.filter(x => x.nb && (x.nb.p?.[i] || 0) >= st.n).length); S.nbDone = C.filter(x => x.nb?.done).length; S.nbName = NB.map(st => st.text);
-    S.once = C.filter(x => (x.seen?.length || 1) <= 1).length; }
+    S.once = C.filter(x => (x.seen?.length || 1) <= 1).length; S.allN = C.length; const Cn = C.filter(x => x.nb); S.nbN = Cn.length; S.nbStep = NB.map((st, i) => Cn.filter(x => (x.nb.p?.[i] || 0) >= st.n).length); S.nbDone = Cn.filter(x => x.nb.done).length; S.nbName = NB.map(st => st.text); }   // only players who got the starter path (added 22/11)
   // 🧭 which systems players actually use: everyone who played in the last 7 days
   { const W = [...accounts.values()].filter(x => x.login && x.login !== '__meta' && !isAdmin(x) && (x.seen || []).some(d => d >= today - 6));
     const has = f => W.filter(x => { try { return !!f(x); } catch { return false; } }).length;
