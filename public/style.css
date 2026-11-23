@@ -1801,3 +1801,12 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 /* the NPC talk box */
 #dlg{border-color:var(--k-ink)!important}
 #dlg .dlgName{font-family:var(--k-head);font-weight:400}
+/* 📊 status card: dark glass + round stat icons (chosen from 3 options) — same size and place */
+#card.v2 .sInfo,#card.v2 .bars{background:rgba(34,40,74,.86)!important;color:#fff!important;border-color:rgba(255,255,255,.25)!important;box-shadow:0 3px 10px rgba(0,0,0,.35)!important}
+#card.v2 .money{color:#ffd45c!important}#card.v2 #meGems{color:#c9b5ff!important}#card.v2 #meCareer{color:#c9d0ea!important}
+#card.v2 .bar label{font-size:0!important;width:auto!important;gap:4px;align-items:center;color:#fff!important}
+#card.v2 .bar label::before{font-size:8.5px;width:14px;height:14px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #fff;line-height:1;flex:none}
+#card.v2 .bar[data-bar=energy] label::before{content:'⚡';background:var(--k-sun)}#card.v2 .bar[data-bar=hunger] label::before{content:'🍚';background:var(--k-mint)}
+#card.v2 .bar[data-bar=health] label::before{content:'❤';color:#fff;background:var(--k-berry)}#card.v2 .bar[data-bar=happy] label::before{content:'😊';background:var(--k-sky)}
+#card.v2 .bar em{font-size:11px!important;font-weight:700;color:#fff!important}
+#card.v2 .bar s{height:10px!important;background:rgba(255,255,255,.15)!important;border-color:rgba(255,255,255,.4)!important;border-radius:7px!important}
