@@ -1810,3 +1810,34 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 #card.v2 .bar[data-bar=health] label::before{content:'❤';color:#fff;background:var(--k-berry)}#card.v2 .bar[data-bar=happy] label::before{content:'😊';background:var(--k-sky)}
 #card.v2 .bar em{font-size:11px!important;font-weight:700;color:#fff!important}
 #card.v2 .bar s{height:10px!important;background:rgba(255,255,255,.15)!important;border-color:rgba(255,255,255,.4)!important;border-radius:7px!important}
+/* 🛍️ shop lists as card grids (bindPanel marks them .shop): big icon, name, short note, price button; can't afford = grey + 🔒 */
+.sheet .list.shop{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.sheet .list.shop .item{position:relative;flex-direction:column;align-items:stretch;text-align:center;gap:4px;padding:10px 6px 8px!important;border-width:3px!important;border-image:none!important;
+  background:#fff border-box!important;outline:0;border:3px solid var(--k-ink)!important;border-radius:16px!important;box-shadow:0 4px 0 var(--k-ink)!important}
+.sheet .list.shop .item .em{width:auto;font-size:34px;line-height:1.15;height:44px;display:grid;place-items:center}
+.sheet .list.shop .item .em img,.sheet .list.shop .item .em canvas{max-height:44px}
+.sheet .list.shop .item .nm{font-size:12.5px;font-weight:700;line-height:1.25;color:var(--k-ink)}
+.sheet .list.shop .item .nm small{font-size:10px;font-weight:400;color:#5b6285;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+.sheet .list.shop .item>button,.sheet .list.shop .item>div:last-child button{width:100%;margin-top:auto;padding:6px 2px;font-weight:700}
+.sheet .list.shop .item>button:not(:disabled){background:linear-gradient(#ffe37a 0 46%,var(--k-sun) 47%)}
+.sheet .list.shop .item:has(>button:disabled){background:#f1ede4 border-box!important}
+.sheet .list.shop .item:has(>button:disabled) .em{filter:grayscale(.75);opacity:.6}
+.sheet .list.shop .item>button:disabled::before{content:'🔒';margin-right:2px}
+.sheet .list.shop .rib,.rib{position:absolute;top:-10px;left:-6px;font-style:normal;font-size:11px;font-weight:700;color:#fff;background:var(--k-berry);border:2px solid var(--k-ink);border-radius:8px;padding:0 6px;transform:rotate(-8deg);z-index:1}
+@media (min-width:700px){.sheet .list.shop{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* panel titles: a blue sign; the shopkeeper talks in a speech bubble */
+.sheet h2{color:var(--k-ink)!important}
+.npcSay{background:#fff!important;border:3px solid var(--k-ink)!important;border-radius:16px!important;box-shadow:0 3px 0 var(--k-ink)}
+.npcSay b{color:var(--k-skyDk)!important}
+.sheet .list.shop .item .em{justify-items:center;justify-content:center;width:100%!important}
+.sheet .list.shop .item .em img{width:42px!important;height:42px!important;object-fit:contain;image-rendering:pixelated;margin:0 auto}
+.sheet .list.shop .item .em .fspr{width:58px!important;height:44px!important;margin:0 auto}
+/* panel titles as a blue sign (as in the mockup) */
+.sheet h2{background:linear-gradient(#7fe0ff 0 48%,var(--k-sky) 49%)!important;color:#fff!important;-webkit-text-stroke:4px var(--k-ink);paint-order:stroke fill;
+  border:3px solid var(--k-ink)!important;border-radius:16px;box-shadow:0 4px 0 var(--k-ink);padding:6px 12px!important;margin-right:46px!important;line-height:1.35}
+.sheet h2 small,.sheet h2 .bagCnt{-webkit-text-stroke:0;color:#eaf7ff!important;text-shadow:0 1px 0 var(--k-skyDk)}
+/* picture cards (outfits, pets, cars, limited items) match the shop cards */
+.sheet .look{background:#fff!important;border:3px solid var(--k-ink)!important;border-radius:16px!important;box-shadow:0 4px 0 var(--k-ink)!important;color:var(--k-ink)}
+.sheet .look.on{background:linear-gradient(#fff,#fff3c4)!important;outline:3px solid var(--k-sun);outline-offset:1px}
+.sheet .list.shop .item .em{--pxs:40px}.sheet .list.shop .item .em .pxi{vertical-align:middle}
+.sheet .list.shop .item .em,.sheet .list.shop .item .em>span{font-size:36px!important;line-height:1.1}

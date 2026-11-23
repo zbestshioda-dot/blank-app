@@ -4438,6 +4438,9 @@ function socHead(k) {
 }
 const DETX = new Set();   // 🕵️ suspects crossed out on the case board (this device only)
 function bindPanel(root) {
+  // 🛍️ a list of things to buy shows as a grid of cards (mail, contacts and other lists stay as rows)
+  root.querySelectorAll('.list').forEach(l => { const its = [...l.children].filter(c => c.classList.contains('item'));
+    if (its.length >= 2 && its.every(it => [...it.querySelectorAll('button')].some(b => /"a":"(buy|rod)"/.test(b.dataset.m || '')))) l.classList.add('shop'); });
   bindStocks(root); bindWall(root); bindPay(root);
   root.querySelectorAll('[data-detx]').forEach(b => b.onclick = () => { const i = +b.dataset.detx; DETX.has(i) ? DETX.delete(i) : DETX.add(i); FX.play('click'); refreshPanel(); });
   root.querySelectorAll('[data-detnav]').forEach(b => b.onclick = () => { const [x, y] = b.dataset.detnav.split(',').map(Number); closePanel(); guide = { x, y, area: 'town', label: b.dataset.label, mis: 1 }; autoNav = false; paintNav(); toast(`นำทางไป ${b.dataset.label} — เดินตามลูกศร`, '📍', false); });
@@ -5604,7 +5607,7 @@ function rodRows(st) {
     const r = G.rods[k], own = have.includes(k), on = me.rodEq === k;
     const stats = `ตวัดง่าย/สายเหนียว ${Math.round(r.zone * 100)}% · โชคปลาหายาก x${r.luck} · ขยะ ${Math.round(r.junk * 100)}%`;
     const btn = own ? B(on ? 'ถืออยู่ ✓' : 'ถือเบ็ดนี้', { t: 'rod', id: k }, on ? 'primary' : 'good', on) : B(money(r.price), { t: 'act', st, a: 'rod', rod: k }, 'good', me.money < r.price);
-    return itemRowRaw(r.icon, `${esc(r.name)}${on ? ' <span class="tag">ในมือ</span>' : ''}`, `${esc(r.desc)} · ${stats}`, btn);
+    return itemRowRaw(r.icon, `${!own && !have.length && k === G.rodOrder[0] ? '<i class="rib">แนะนำ</i>' : ''}${esc(r.name)}${on ? ' <span class="tag">ในมือ</span>' : ''}`, `${esc(r.desc)} · ${stats}`, btn);
   }).join('') || '<div class="sub">ยังไม่มีเบ็ด · ซื้อได้กับน้าเล็กที่สมาคมประมง</div>';
 }
 // fishing anywhere: standing at the water's edge with a rod makes a fishing spot right where you are
@@ -6246,6 +6249,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27w', d: '23 พ.ย.', items: [
+    '🛍️ ร้านค้าใหม่: ของเป็นการ์ดใหญ่ 3 ช่อง ไอคอนชัด ป้าย "แนะนำ" ของที่เงินยังไม่พอเป็นสีเทาพร้อม 🔒 · หัวข้อหน้าต่างเป็นป้ายสีฟ้า',
+  ] },
   { v: '2026-11-27v', d: '23 พ.ย.', items: [
     '📊 กล่องสถานะใหม่: พื้นมืดอ่านง่ายทุกฉาก ไอคอน ⚡🍚❤️😊 แทนคำ หลอดสีสดขึ้น',
   ] },
