@@ -2190,6 +2190,15 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   kitsune:   { name: 'ชุดจิ้งจอกเก้าหาง', nf: 'ชุดจิ้งจอกเก้าหางสาว', how: 'เร็วๆ นี้ (ยังไม่เปิดขาย)' },   // locked for now: not in OUTFIT_CAT, so no shop slot
   winter:    { name: 'ชุดไหมพรมกันหนาว', nf: 'ชุดไหมพรมกันหนาวสาว', how: 'กิจกรรมล็อกอิน 7 วัน (แจกฟรี ไม่มีขาย)' } };
 // 🎁 a login event: log in on 7 different days between start and end; each day unlocks the next reward, day 7 is the outfit
+// 🎉 the festival calendar: every entry repeats each year by itself (Bangkok dates). from = fixed 'MM-DD'; lunar = the start date
+// for each year (the eve of Chinese New Year). days = how long it runs. Gifts: once per festival (gift) or once per day (daily).
+const FESTS = [
+  { id: 'newyear', name: 'ปีใหม่', icon: '🎆', from: '12-31', days: 3, text: 'สวัสดีปีใหม่! เที่ยงคืนมีพลุทั้งเมืองที่ลานน้ำพุ · รับของขวัญปีใหม่ในจดหมาย',
+    gift: { money: 2027, gems: 10 }, mail: '🎆 สวัสดีปีใหม่จากเมือง Life Town!\n\nขอให้ปีนี้รวย สุขภาพดี และสนุกกับการใช้ชีวิตในเมืองนะ ของขวัญปีใหม่อยู่ในจดหมายนี้แล้ว' },
+  { id: 'cny', name: 'ตรุษจีน', icon: '🧧', lunar: { 2027: '02-05', 2028: '01-25', 2029: '02-12', 2030: '02-02', 2031: '01-22', 2032: '02-10', 2033: '01-30' }, days: 4,
+    text: 'ซินเจียยู่อี่ ซินนี้ฮวดไช้! รับอั่งเปาทุกวันช่วงตรุษจีน (ดูในจดหมาย)', daily: 'angpao' },
+];
+const ANGPAO = [[88, 40], [168, 30], [288, 18], [888, 9], [8888, 1]];   // [baht, weight]; plus a small chance of 💎8
 const EV7 = { id: 'winter26', title: 'ล็อกอิน 7 วัน รับชุดกันหนาวฟรี', start: Date.parse('2026-11-21T00:00:00+07:00'), end: Date.parse('2026-12-14T23:59:59+07:00'),
   days: [{ money: 1000 }, { gems: 10 }, { money: 2000 }, { gems: 15 }, { egg: 1 }, { gems: 25 }, { outfit: 'winter' }] };
 // 🎨 dyed versions of the shop outfits: same sheet (base), clothes recoloured to one hue on the client; sold like the original
@@ -2408,7 +2417,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

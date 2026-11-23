@@ -602,6 +602,49 @@ function gangOp(a, m) {
 
 
 // ------------------------------------------------------------------ system letters (with gifts you claim in the mailbox)
+// ------------------------------------------------------------------ 🎉 festivals (server/data.js FESTS): which one is on now, its gifts, the New Year fireworks
+const BKK = 7 * 3600e3;
+let festForce = null;   // admin preview: { id, until }
+function festRange(f, year) {
+  const md = f.lunar ? f.lunar[year] : f.from; if (!md) return null;
+  const start = Date.parse(`${year}-${md}T00:00:00+07:00`); return [start, start + f.days * 86400e3];
+}
+function festNow(t = now()) {
+  if (festForce && t < festForce.until) { const f = D.FESTS.find(x => x.id === festForce.id); if (f) return { f, start: t - 1, end: festForce.until, test: 1 }; }
+  const y = new Date(t + BKK).getUTCFullYear();
+  for (const f of D.FESTS) for (const yy of [y, y - 1]) { const r = festRange(f, yy); if (r && t >= r[0] && t < r[1]) return { f, start: r[0], end: r[1] }; }
+  return null;
+}
+function festView() {
+  const F = festNow(); if (!F) return null;
+  const v = { id: F.f.id, icon: F.f.icon, name: F.f.name, text: F.f.text, end: F.end };
+  if (F.f.id === 'newyear') { const y = new Date(now() + BKK).getUTCFullYear(), mid = Date.parse(`${y + 1}-01-01T00:00:00+07:00`); if (now() < mid && mid - now() < 86400e3 * 1.05) v.ny = mid; }
+  return v;
+}
+function festGive(a) {
+  const F = festNow(); if (!F || !a.login || F.test && !isAdmin(a)) return;   // a test preview only gives the admin the gifts
+  const got = a.festGot || (a.festGot = {}), key = F.f.id + ':' + new Date(F.start + BKK).getUTCFullYear() + (F.test ? 't' : '');
+  if (F.f.gift && !got[key]) { got[key] = 1; const g = F.f.id === 'newyear' ? { ...F.f.gift, money: new Date(F.start + BKK).getUTCFullYear() + 1 } : F.f.gift; sysMail(a, F.f.mail || `${F.f.icon} สุขสันต์เทศกาล${F.f.name}!`, g); }   // New Year: ฿ = the new year (2027, 2028 …)
+  if (F.f.daily === 'angpao') {
+    const dk = key + ':' + dayKey(); if (got[dk]) return; got[dk] = 1;
+    const tot = D.ANGPAO.reduce((n, x) => n + x[1], 0); let r = Math.random() * tot, amt = D.ANGPAO[0][0]; for (const [v, w] of D.ANGPAO) { if ((r -= w) < 0) { amt = v; break; } }
+    const gem = Math.random() < .08 ? 8 : 0;
+    sysMail(a, `🧧 อั่งเปาวันนี้มาแล้ว! ซินเจียยู่อี่ ซินนี้ฮวดไช้\n\nเปิดซองดูสิว่าได้เท่าไหร่ (พรุ่งนี้มารับซองใหม่ได้อีกจนจบเทศกาล)`, gem ? { money: amt, gems: gem } : { money: amt });
+  }
+  for (const k of Object.keys(got)) if (!k.startsWith(F.f.id + ':') && Object.keys(got).length > 40) delete got[k];   // keep the record small
+  a.sd = true;
+}
+let nyShown = 0;
+function festTick() {
+  const v = festView(), t = now();
+  if (v?.id === 'newyear') { const y = new Date(t + BKK).getUTCFullYear(), mid = Date.parse(`${y}-01-01T00:00:00+07:00`);
+    if (t >= mid && t - mid < 10 * 60e3 && nyShown !== mid) {   // midnight: the whole town's fireworks, three waves
+      nyShown = mid; feed(`🎆 สวัสดีปีใหม่ ${y + 543}! พลุทั้งเมืองที่ลานน้ำพุ`);
+      [0, 6000, 13000].forEach((d, i) => setTimeout(() => { for (const o of online.values()) send(o, { t: 'fw', k: i === 2 ? 'l' : 'm', n: 'เมือง Life Town' }); }, d));
+    } }
+  for (const o of online.values()) festGive(o);
+}
+setInterval(() => { try { festTick(); } catch (e) { console.error('festTick', e); } }, 15e3).unref?.();
 function sysMail(o, text, gift) {
   o.mail = [{ id: now() + '' + Math.floor(Math.random() * 1000), from: '🏙️ เมือง Life Town', text, t: now(), read: 0, ...(gift ? { gift, got: 0 } : {}) }, ...(o.mail || [])].slice(0, 50);
   o.sd = true; dirty = true;
@@ -1737,7 +1780,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
@@ -5040,7 +5083,7 @@ function worldView() {
     .concat((ghostLook(), ghosts).map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: ghostTi(g) })))
     .sort((x, y) => y.w - x.w).slice(0, 10));
   return {
-    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
+    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, fest: festView(), on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? bedSym(p) : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
@@ -5964,6 +6007,11 @@ function godAct(a, m) {
     event = { ...e, until: now() + 240e3 }; nextEventAt = event.until + 150e3; feed(e.text); wdAt = 0; return toast(a, 'ฝนตก 4 นาที', '🌧️');
   }
   if (m.op === 'werewolf') { if (ww) { ww.n = 0; wwEnd(); return toast(a, 'หยุดคืนหมาป่าแล้ว', '🐺'); } wwDone = ''; return wwStart(now(), true); }
+  if (m.op === 'fest') {                    // 🎉 preview a festival for 10 minutes (everyone sees it; gifts are marked as test gifts)
+    const id = String(m.id || ''); if (!id || festForce?.id === id) { festForce = null; toast(a, 'ปิดเทศกาลทดสอบแล้ว', '🎉'); }
+    else if (D.FESTS.some(f => f.id === id)) { festForce = { id, until: now() + 10 * 60e3 }; toast(a, `เปิดเทศกาลทดสอบ 10 นาที`, '🎉'); if (id === 'newyear') { nyShown = 0; for (const o of online.values()) send(o, { t: 'fw', k: 'l', n: 'ทดสอบปีใหม่' }); } }
+    return send(a, worldView());
+  }
   if (m.op === 'zombie') { if (zn) { for (const z of zombies()) npcs.splice(npcs.indexOf(z), 1); zn = null; npcRosterDirty = true; znSendAll(); return toast(a, 'หยุดคืนปล่อยผีแล้ว', '🧟'); } znDone = ''; return znStart(now(), true); }
   if (m.op === 'nocd') { a.god.nocd = !a.god.nocd; if (a.god.nocd) a.cd = {}; toast(a, a.god.nocd ? 'God mode: ไม่มีคูลดาวน์' : 'ปิด: ไม่มีคูลดาวน์', '⚡'); }
   else if (m.op === 'lock') { a.god.lock = !a.god.lock; toast(a, a.god.lock ? 'God mode: ล็อกสเตตัสเต็ม (ไม่ป่วย/ไม่หมดสติ)' : 'ปิด: ล็อกสเตตัส', '🛡️'); }

@@ -1150,11 +1150,19 @@ function paintDown() {
     : `<b>🚑 หมดสติอยู่บนเตียงโรงพยาบาล</b><span>พักฟื้นสักครู่ เจ้าหน้าที่กำลังรักษาให้</span><span>ฟื้นในอีก <b class="big-cd">${mm}</b> · รักษาโรคให้หายด้วย${me.down.free ? ' · <b>ฟรี 💚</b>' : ''}</span>`;
 }
 setInterval(() => { if (me?.down) paintDown(); }, 500);
+// 🎉 a festival on now (server/data.js FESTS): its line in the event bar; on New Year's Eve a live countdown to midnight
+function festText() {
+  const F = wd?.fest; if (!F) return '';
+  if (F.ny) { const left = Math.max(0, Math.floor((F.ny - (Date.now() + clockOff)) / 1000)); if (left > 0) { const h = Math.floor(left / 3600), mm = Math.floor(left / 60) % 60, ss = left % 60; return `🎆 นับถอยหลังปีใหม่ ${h}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')} · เที่ยงคืนมีพลุทั้งเมืองที่ลานน้ำพุ`; } }
+  return `${F.icon} ${F.text}`;
+}
+setInterval(() => { if (wd?.fest?.ny && !wd.ev) paintEvent(); }, 1000);
 function paintEvent() {
-  const e = $('#eventBar');
-  if (wd?.ev) { if (e.dataset.t !== wd.ev.text) { e.dataset.t = wd.ev.text; e.innerHTML = `<span>${esc(wd.ev.text)}</span>`; }
+  const e = $('#eventBar'), ev = wd?.ev || (wd?.fest ? { text: festText() } : null);
+  if (ev) { if (e.dataset.t !== ev.text) { e.dataset.t = ev.text; e.innerHTML = `<span>${esc(ev.text)}</span>`; }
     requestAnimationFrame(() => { const sp = e.firstElementChild; if (sp) e.classList.toggle('still', sp.offsetWidth <= e.clientWidth - 16); }); e.classList.remove('hidden'); } else { e.classList.add('hidden'); e.dataset.t = ''; }
-  document.body.classList.toggle('hasEvent', !!wd?.ev);
+  document.body.classList.toggle('hasEvent', !!ev);
+  try { placeLog(); } catch { }   // (placeLog is defined further down)
 }
 // same clock as the server: days are slow, nights run twice as fast (server/data.js CLOCK)
 const hourOfPhase = m => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 }, dayH = c.dusk - c.dawn; return m < c.dayMin ? c.dawn + m * dayH / c.dayMin : (c.dusk + (m - c.dayMin) * (24 - dayH) / (24 - c.dayMin)) % 24; };
@@ -1213,7 +1221,10 @@ function openChatBox() { foldChat(false); setTimeout(() => $('#cbIn').focus(), 3
 $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // the status card folds down to a small strip (face, money, slim bars); folded by default on phones
-const placeLog = () => { const cd = $('#card'), db = $('#docBack'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); const tr = $('#topRight'); if (tr) document.body.style.setProperty('--miniW', tr.offsetWidth + 'px'); };
+const PORTRAIT_MQ = matchMedia('(max-width:600px) and (orientation:portrait)');
+const placeLog = () => { const cd = $('#card'), db = $('#docBack'), ev = $('#eventBar'); let top = cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0);
+  if (ev) { if (PORTRAIT_MQ.matches && !ev.classList.contains('hidden')) { ev.style.setProperty('top', top + 'px', 'important'); top += ev.offsetHeight + 6; } else ev.style.removeProperty('top'); }   // phones: the event line sits under the card and pushes the rest down (it used to cover the buttons there)
+  $('#feed').style.top = top + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); const tr = $('#topRight'); if (tr) document.body.style.setProperty('--miniW', tr.offsetWidth + 'px'); };
 addEventListener('resize', () => placeLog());
 const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
 $('#qBox .qHead').addEventListener('click', e => { if (e.target.closest('#cardToggle') || !$('#qBox').classList.contains('nb')) return; FX.play('click'); $('#qBox').classList.toggle('all'); });   // phones: the starter list shows only the current step; tap the title for all
@@ -4821,7 +4832,7 @@ const FN = {
     if (!confirm('ยืนยันรีเซ็ตตัวละคร? เงิน ของ บ้าน สวน งาน และความสำเร็จทั้งหมดจะหายไป (ID/PIN/ชื่อ/เบอร์โทรยังอยู่)')) return;
     send({ t: 'reset', pin }); closePanel();
   },
-  god(m) { send({ t: 'god', op: m.op }); },
+  god(m) { send({ t: 'god', op: m.op, ...(m.id ? { id: m.id } : {}) }); },
   godTab: m => { godTab = m.tab; if (m.tab === 'bug' && !bugList) send({ t: 'god', op: 'bugs' }); panel.sig = 'g' + m.tab; refreshPanel(true); },
   xmasGo(m) { closePanel(); setGuide(m.key, false, true); },
   story() { storyOpen(); },
@@ -6129,6 +6140,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27l', d: '23 พ.ย.', items: [
+    '🎆 ปีใหม่ (31 ธ.ค.–2 ม.ค.): นับถอยหลังบนจอ เที่ยงคืนมีพลุทั้งเมืองที่ลานน้ำพุ และรับของขวัญปีใหม่ในจดหมาย',
+    '🧧 ตรุษจีน: ช่วงเทศกาลรับอั่งเปาในจดหมายทุกวัน ลุ้นได้สูงสุด ฿8,888',
+    '📱 แถบอีเวนต์บนมือถือไม่บังปุ่มนำทางแล้ว',
+  ] },
   { v: '2026-11-27k', d: '23 พ.ย.', items: [
     '💞 แก้บั๊ก: ความสนิทกับชาวเมืองหายทุกครั้งที่เซิร์ฟเวอร์รีสตาร์ท ตอนนี้บันทึกถาวรแล้ว',
   ] },
@@ -8022,6 +8038,7 @@ function renderPanel(p) {
         event: `<div class="setRow"><span><b>🏆 แข่งตกปลา</b><small>ปกติเริ่มเองทุกวัน 20:00 (15 นาที) · กดเพื่อเริ่มตอนนี้ หรือกดอีกครั้งเพื่อจบและส่งรางวัล</small></span>${B(FCS.on ? 'จบ' : 'เริ่ม', { fn: 'god', op: 'fishcomp' }, FCS.on ? 'bad' : 'primary')}</div>
           <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
+          <div class="setRow"><span><b>🎉 ทดสอบเทศกาล</b><small>เปิดให้ทุกคนเห็น 10 นาที (ของขวัญได้เฉพาะแอดมิน) กดอีกครั้งเพื่อปิด</small></span>${B('🎆 ปีใหม่', { fn: 'god', op: 'fest', id: 'newyear' }, wd?.fest?.id === 'newyear' ? 'good' : '')}${B('🧧 ตรุษจีน', { fn: 'god', op: 'fest', id: 'cny' }, wd?.fest?.id === 'cny' ? 'good' : '')}</div>
           <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>📣 โพสต์ข่าวลงเฟส</b><small>ได้ข้อความอัปเดตพร้อมลิงก์เกม ไปวางในกลุ่มเฟสได้เลย</small></span>${B('📋 เปิด', { fn: 'open', kind: 'fbpost' }, 'primary')}</div>`,
         admin: `<div class="secT">📊 วัดผล</div>${B('📊 กราฟผู้เล่น / การกลับมาเล่น / รายได้', { fn: 'god', op: 'stats' }, 'primary')}
