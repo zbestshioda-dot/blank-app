@@ -145,11 +145,12 @@ const titleDef = id => D.ACHIEVEMENTS.find(x => x.id === id) || D.LUX_TITLES.fin
 const myTitle = a => a.title === 'vip' && !vipOn(a) ? null : titleDef(a.title);   // the supporter title disappears when it runs out
 const fcKing = a => (a.fcKing || 0) > now();
 const cpKing = a => (a.cpKing || 0) > now();
-const dgKing = a => (a.dgKing || 0) > now();   // 🗝️ last week's deepest cave diver   // 👑 last week's top couple
+const dgKing = a => (a.dgKing || 0) > now();
+const richKing = a => (a.richKing || 0) > now();   // 💰 last week's #1 on the rich list   // 🗝️ last week's deepest cave diver   // 👑 last week's top couple
 const homeKing = a => (a.homeKing || 0) > now();   // 🏡 last week's most-liked home wears the title for 7 days   // 🎣 yesterday's fishing contest winner wears the title for a day
-const titleBase = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : homeKing(a) ? '🏡 บ้านสวยที่สุดในเมือง' : cpKing(a) ? '👑 คู่รักแห่งเมือง' : dgKing(a) ? '🗝️ นักล่าสมบัติ' : myTitle(a)?.title || '';
+const titleBase = a => adminTitle(a) ? ADMIN_TITLE : isMayor(a) ? '🏛️ นายกเมือง' : fcKing(a) ? '🎣 ราชาตกปลา' : homeKing(a) ? '🏡 บ้านสวยที่สุดในเมือง' : cpKing(a) ? '👑 คู่รักแห่งเมือง' : dgKing(a) ? '🗝️ นักล่าสมบัติ' : richKing(a) ? '💰 เศรษฐีอันดับ 1 ของเมือง' : myTitle(a)?.title || '';
 const titleOf = a => { const t = titleBase(a), s = a.spouse; return s ? `${t ? t + ' · ' : ''}${D.RINGS[s.ring]?.icon || '💞'} ${MR.tier(s.lp || 0).name}ของ ${s.name}` : t; }   // 💞 married: the ring and the partner's name join the title;
-const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) || homeKing(a) || cpKing(a) || dgKing(a) ? 5 : Math.max(myTitle(a)?.r || 0, a.spouse ? Math.max(a.spouse.ring === 'diamond' ? 5 : a.spouse.ring === 'gold' ? 4 : 3, [0, 4, 5][MR.tier(a.spouse.lp || 0).i]) : 0);
+const titleRar = a => adminTitle(a) ? 6 : isMayor(a) ? 5 : fcKing(a) || homeKing(a) || cpKing(a) || dgKing(a) || richKing(a) ? 5 : Math.max(myTitle(a)?.r || 0, a.spouse ? Math.max(a.spouse.ring === 'diamond' ? 5 : a.spouse.ring === 'gold' ? 4 : 3, [0, 4, 5][MR.tier(a.spouse.lp || 0).i]) : 0);
 
 // ------------------------------------------------------------------ diseases
 const DZ = D.DISEASES;
@@ -799,6 +800,21 @@ function dgTick() {                            // 🗝️ a finished week: the 3
   }
 }
 setInterval(() => { try { dgTick(); } catch (e) { console.error('dgTick', e); } }, 60e3).unref?.();
+// 💰 the rich list pays out every week (Monday 00:00): the top 10 on the board get gems by mail, #1 also the title for 7 days.
+// The board is the one players see (AI rivals keep their places but get nothing). richWk = the week already paid (saved in __meta).
+const RICH = { gems: [100, 60, 40, 15, 15, 15, 15, 15, 15, 15] };
+let richWk = '';
+const richBoard = () => [...accounts.values()].filter(a => !isAdmin(a)).map(a => ({ a, w: worth(a) })).concat((ghostLook(), ghosts).map(g => ({ a: null, w: g.w }))).sort((x, y) => y.w - x.w).slice(0, RICH.gems.length);
+function richTick() {
+  const wk = weekKey(); if (!richWk) { richWk = wk; gdirty(); return; } if (richWk === wk) return;
+  richWk = wk; gdirty(); dirty = true;
+  richBoard().forEach(({ a, w }, i) => {
+    if (!a) return;
+    a.sd = true; sysMail(a, `💰 ยินดีด้วย! สัปดาห์ที่แล้วคุณติดอันดับเศรษฐีที่ ${i + 1} ของเมือง (ทรัพย์สิน ${money(Math.round(w))})${i === 0 ? '\nได้ฉายา 💰 เศรษฐีอันดับ 1 ของเมือง 7 วัน' : ''}\nขอบคุณที่ปั้นเมืองไปด้วยกันนะ 🙏`, { gems: RICH.gems[i] });
+    if (i === 0) { a.richKing = now() + 7 * 864e5; if (a.ws) markMe(a); feed(`💰 เศรษฐีอันดับ 1 ประจำสัปดาห์: ${a.name}!`); sendRoster(); }
+  });
+}
+setInterval(() => { try { richTick(); } catch (e) { console.error('richTick', e); } }, 60e3).unref?.();
 function spouseNear(a) { const o = a.spouse && accounts.get(a.spouse.login); return !!(o?.ws && a.ws && o.spouse?.login === lk(a) && areaId(o) === areaId(a) && Math.hypot(o.x - a.x, o.y - a.y) <= 6); }
 let cpTopC = { t: 0, v: [] };
 function coupleTop(wk = weekKey()) { if (now() - cpTopC.t < 30e3) return cpTopC.v; cpTopC = { t: now(), v: coupleTopRaw(wk) }; return cpTopC.v; }
@@ -1704,11 +1720,13 @@ const PET_LEASH = 800;
 const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
-  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN'];
+  'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
+  // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
+  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -1791,7 +1809,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders, fishRecs, auc }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -5098,7 +5116,7 @@ function login(ws, m, pre) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, bar: D.BAR, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, bar: D.BAR, rich: RICH.gems, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());

@@ -6045,6 +6045,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27b', d: '23 พ.ย.', items: [
+    '🏆 <b>อันดับเศรษฐีมีรางวัลแล้ว!</b> แจกทุกวันจันทร์ 00:00 ทางจดหมาย: 🥇 💎100 + ฉายา 💰 เศรษฐีอันดับ 1 ของเมือง 7 วัน · 🥈 💎60 · 🥉 💎40 · อันดับ 4–10 💎15']},
   { v: '2026-11-27a', d: '23 พ.ย.', items: [
     '🍸 <b>บาร์ชิลล์ราตรี เปิดแล้ว!</b> อยู่ข้างตึกบริษัทไทยเทค ริมถนนใหญ่ฝั่งตะวันออก เปิด 18:00–03:00',
     '🍺 สั่งเบียร์ ค็อกเทล วิสกี้ ไวน์ ความสุขเพิ่ม · ดื่มเยอะจะเมา เดินเซ จอโยก 🥴 · น้ำเปล่า/กาแฟดำช่วยสร่างเมา',
@@ -7798,7 +7800,10 @@ function renderPanel(p) {
     case 'phone': return phonePanel(p);
     case 'rank': {
       const rows = (wd?.lb || []).map((r, i) => itemRowRaw(['🥇', '🥈', '🥉'][i] || `${i + 1}.`, `${esc(r.name)} <span class="tag">${CAREER_ICON(r.c)}</span>${r.on ? ' 🟢' : ''}${r.ti ? ` <small style="display:inline;color:var(--acc)">«${esc(r.ti)}»</small>` : ''}`, '', `<b>${money(r.w)}</b>`)).join('');
-      return `<h2>🏆 อันดับเศรษฐี</h2><div class="sub">นับเงินสด + เงินฝาก + ทรัพย์สิน</div><div class="list">${rows}</div>`;
+      const R = G.rich || [], n0 = Date.now() + clockOff, d0 = new Date(n0 + 7 * 3600e3), end = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), d0.getUTCDate()) - 7 * 3600e3 + (7 - (d0.getUTCDay() + 6) % 7) * 864e5;   // next Monday 00:00 (Thai time)
+      const left = Math.max(0, end - n0), dd = Math.floor(left / 864e5), hh = Math.floor(left % 864e5 / 3600e3);
+      const prize = R.length ? `<div class="jobbox">🎁 <b>รางวัลประจำสัปดาห์</b> (แจกทุกวันจันทร์ 00:00 ทางจดหมาย ✉️ · อีก ${dd ? dd + ' วัน ' : ''}${hh} ชม.)<br>🥇 💎${R[0]} + ฉายา 💰 เศรษฐีอันดับ 1 ของเมือง 7 วัน · 🥈 💎${R[1]} · 🥉 💎${R[2]} · อันดับ 4–${R.length} 💎${R[3]}</div>` : '';
+      return `<h2>🏆 อันดับเศรษฐี</h2>${prize}<div class="sub">นับเงินสด + เงินฝาก + ทรัพย์สิน · วัดอันดับตอนแจกรางวัล</div><div class="list">${rows}</div>`;
     }
     case 'chat':
       return `<h2>💬 แชท</h2><div class="tabs">${B('💬 รวม', { fn: 'chatTab', tab: 'all' }, chatTab === 'all' ? 'primary' : '')}${B('🌐 แชทโลก', { fn: 'chatTab', tab: 'world' }, chatTab === 'world' ? 'primary' : '')}${B('👥 คนใกล้ๆ', { fn: 'chatTab', tab: 'near' }, chatTab === 'near' ? 'primary' : '')}</div>
