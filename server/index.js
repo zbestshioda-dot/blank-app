@@ -3500,7 +3500,7 @@ function act(a, m) {
         if (!pay(a, f.price * q)) return;
         const add = []; for (let n = 1, made = 0; made < q; n++) { const k = n === 1 ? m.item : `${m.item}#${n}`; if (!a.furniture.includes(k)) { add.push(k); made++; } }
         a.furniture = [...a.furniture, ...add]; joy(a, 1); markMe(a); wdAt = 0;
-        return toast(a, `ซื้อ ${f.icon}${f.name} x${q} แล้ว (มี ${have + q} ชิ้น) · วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
+        return toast(a, `ซื้อ ${f.icon}${f.name} x${q} แล้ว (มี ${have + q} ชิ้น) · ส่งไปคลังบ้าน (ไม่อยู่ในกระเป๋า) วางได้ด้วยปุ่ม 🛋️ จัดบ้าน`, f.icon);
       } else if (a.furniture.includes(m.item)) return toast(a, `มี${f.name}แล้ว`, 'ℹ️', false);
       if (f.gem) { if (!godInf(a) && (a.gems || 0) < f.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${f.gem} (มี 💎${a.gems || 0})`, '💎', false); if (!godInf(a)) a.gems -= f.gem; }
       else if (!pay(a, f.price)) return;

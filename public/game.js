@@ -6102,6 +6102,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27h', d: '23 พ.ย.', items: [
+    '🌳 ของแต่งสวน/เฟอร์นิเจอร์ที่ซื้อไม่ได้หายนะ: ส่งไปเก็บที่คลังบ้าน (🛋️ จัดบ้าน › 🌳 สวน) · ตอนนี้มีปุ่ม "เปิดคลังบ้าน" ในกระเป๋าให้กดไปหาได้เลย',
+  ] },
   { v: '2026-11-27g', d: '23 พ.ย.', items: [
     '🪷 ทำบุญประจำวัน: ไหว้พระที่วัดครั้งแรกของวันได้ ⚡25 + เงิน และทำบุญครบทุก 5 วันได้ 💎3',
     '🛠️ แก้บั๊กผู้เล่น',
@@ -7572,7 +7575,9 @@ function renderPanel(p) {
             ${it.desc ? `<div class="sub">${esc(it.desc)}</div>` : ''}${it.egg ? '<div class="sub">ฟักออกมาเป็นสัตว์เลี้ยงสุ่ม (ตัวที่ยังไม่มี)</div>' : ''}
             <div class="bdAct">${act}${B(STARS.has(sel) ? '⭐ เลิกติดดาว' : '☆ ติดดาว (ขึ้นก่อนเสมอ)', { fn: 'star', item: sel })}${B('📍 ไปขายที่ตลาด', { fn: 'guide', key: 'market' })}</div>`; }
         const sorts = [['cat', 'หมวด'], ['value', 'มูลค่า'], ['qty', 'จำนวน'], ['name', 'ชื่อ']].map(([k, l]) => B(l, { fn: 'qtab', set: { gsort: k } }, sort === k ? 'primary' : '')).join('');
-        return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}
+        const fu = (me.furniture || []).filter(k => k !== 'sbed' && G.shop.furniture[fbase(k)] && !G.shop.furniture[fbase(k)].field), fg = fu.filter(k => G.shop.furniture[fbase(k)].cat === 'garden').length;
+        const homeNote = me.hown && fu.length ? `<div class="setRow"><span><b>🛋️ เฟอร์นิเจอร์และของแต่งสวน ${fu.length} ชิ้น${fg ? ` (ของสวน ${fg})` : ''}</b><small>ของที่ซื้อจากร้านเฟอร์นิเจอร์/ร้านต้นไม้ไม่อยู่ในกระเป๋า แต่ส่งไปเก็บที่คลังบ้าน เข้าบ้านแล้วกดจัดบ้านเพื่อวาง</small></span>${B('เปิดคลังบ้าน', { fn: 'open', kind: 'homedeco', set: { dtab: fg ? 'garden' : 'basic' } }, 'good')}</div>` : '';
+        return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}${homeNote}
           <div class="bagG">${cats}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
           ${gcat === 'all' && (me.rods || []).length ? `<div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>` : ''}`;
       }
