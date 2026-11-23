@@ -3087,11 +3087,12 @@ function act(a, m) {
         return toast(a, `ตรวจร่างกาย ${pt.name} เรียบร้อย ได้ ${money(got)}`, '🩺');
       }
       if (!(a.exam && a.exam.bed === s.idx && a.exam.pid === pt.id && a.exam.dz === target && now() - a.exam.t >= EXAM_MS - 300)) return toast(a, '🩺 ตรวจอาการคนไข้ให้เสร็จก่อน แล้วค่อยเลือกการรักษา', '🩺', false);
-      docLog(a, now() - a.exam.t - EXAM_MS, DZ[target].cure === m.tx); a.exam = null;
+      docLog(a, now() - a.exam.t - EXAM_MS, DZ[target].cure === m.tx);
+      if (DZ[target].cure === m.tx) a.exam = null;   // a wrong cure keeps the exam: the doctor can try another treatment right away (the patient already lost 5 health)
       if (DZ[target].cure !== m.tx) {
         pt.health = Math.max(1, pt.health - 5); if (!pt.npc) { markMe(pt); toast(pt, `หมอ${a.name}วินิจฉัยผิด! อาการยังไม่ดีขึ้น (สุขภาพ -5)`, '😣', false); }
         wdAt = 0;
-        return toast(a, 'วินิจฉัยผิด! คนไข้ไม่ได้เป็นโรคที่รักษานี้ ลองดูอาการอีกครั้ง', '❌', false);
+        return toast(a, 'วินิจฉัยผิด! คนไข้ไม่ได้เป็นโรคที่รักษานี้ ลองเลือกวิธีรักษาอื่นได้เลย', '❌', false);
       }
       let fee = 55;
       if (pt.npc) pt.dz = pt.dz.filter(x => x !== target);
