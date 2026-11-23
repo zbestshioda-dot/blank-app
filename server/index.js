@@ -4613,6 +4613,24 @@ let npcRosterDirty = false;
       g: p.g, look: { ...p.look }, speed: rnd(1.1, 1.5), pickedAt: 0, next: function () { return folkHousingNext(this, hs); }, stay: () => rnd(4, 14) });
   });
 }
+// 🛕 temple visitors: people come in to pray, draw siamsi, ring the bell, sit at the sala or by the lotus pond (daytime; few at night)
+{
+  const ids = ['wat_pray', 'wat_siamsi', 'wat_ring', 'tshop', 'merit_t'], tw = walkableIn('temple');
+  const spots = [...D.STATIONS.filter(s => s.area === 'temple' && (ids.includes(s.id) || /^seat_t/.test(s.id))).map(s => standNear('temple', s.x, s.y + .4) || [s.x, s.y])];
+  const NAMES = ['ยายบุญมี', 'ตาสมหวัง', 'ป้าศรี', 'ลุงประเสริฐ', 'พี่แก้ว', 'น้าสมใจ', 'ป้าจันทร์', 'ลุงทองดี'];
+  NAMES.forEach((name, i) => {
+    const [x, y] = pick(tw), n = { id: -(300 + i), visitor: 1, name: `${name} (มาทำบุญ)`, area: 'temple', x: x + .5, y: y + .5, f: 6, path: [], wait: rnd(0, 6),
+      g: /ยาย|ป้า|พี่แก้ว|น้า/.test(name) ? 'f' : 'm', look: { hair: /ยาย|ตา|ลุง/.test(name) ? 'silver' : pick(['black', 'brown']), shirt: pick(SH), pants: pick(PA) }, speed: rnd(.9, 1.3), pickedAt: 0 };
+    n.next = () => {
+      const h = hourNow(), night = h >= 20 || h < 6;
+      if (night && i >= 2) { if (!n.away) { n.away = true; npcRosterDirty = true; } return null; }   // most go home at night
+      if (n.away) { n.away = false; npcRosterDirty = true; const [gx, gy] = [D.GATES.temple_in.x, D.GATES.temple_in.y]; n.x = gx; n.y = gy; }
+      return Math.random() < .75 && spots.length ? pick(spots) : pick(tw).map(v => v + .5);
+    };
+    n.stay = () => rnd(6, 18);
+    npcs.push(n);
+  });
+}
 // townsfolk go in and out of open shops through the front door, just like players
 const PUBLIC_DOORS = D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov && ROOM[s.to]);
 // 🕐 the townsfolk's day: which part of their schedule is now (game hours)

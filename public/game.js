@@ -6090,6 +6090,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27f', d: '23 พ.ย.', items: [
+    '🛕 วัดคึกคักขึ้น: มีชาวบ้านมาทำบุญ ไหว้พระ เสี่ยงเซียมซี ตีระฆัง และนั่งพักที่ศาลาทั้งวัน (กลางคืนเหลือไม่กี่คน)',
+  ] },
   { v: '2026-11-27e', d: '23 พ.ย.', items: [
     '🐱 แก้บั๊ก: สัตว์เลี้ยงไม่กระโดดลงสระว่ายน้ำสวนสนุกแล้ว (รอเจ้าของอยู่ริมสระ)',
     '🚗 แก้บั๊ก: ขับ/ขี่รถลงน้ำในสระไม่ได้แล้ว',
