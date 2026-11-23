@@ -91,6 +91,7 @@ body.hasEvent #callChip{top:88px}
 .req .btns{display:flex;gap:8px;margin-top:8px}.req .btns button{flex:1}
 
 #stick{position:fixed;width:120px;height:120px;border-radius:50%;background:rgba(246,230,194,.18);border:3px solid rgba(246,230,194,.45);display:none;pointer-events:none;z-index:3}
+body.joyfix #stick{left:calc(22px + env(safe-area-inset-left))!important;top:auto!important;bottom:calc(34px + env(safe-area-inset-bottom));opacity:.85;width:120px;height:120px}
 #stick i{position:absolute;left:33px;top:33px;width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f3dcab,#b67c46);border:2px solid #5a3620}
 
 #callChip{position:absolute;left:50%;transform:translateX(-50%);top:46px;background:linear-gradient(#8aa54a,#5f7a2c);color:#fff;border-color:#3d4e1a;font-weight:600;border-radius:20px;padding:6px 14px}

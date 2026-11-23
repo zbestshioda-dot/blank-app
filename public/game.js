@@ -717,7 +717,7 @@ function handle(m) {
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');
       if (restartAt) { restartAt = 0; restartBar(false); toast('อัปเดตเสร็จแล้ว เล่นต่อได้เลย', '✨'); }     // a new version was deployed
-      G = m; myId = m.id; setTimeout(pushRefresh, 4000); pushAskAt = Date.now() + 4 * 60e3; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
+      G = m; myId = m.id; setTimeout(joyFixShow, 0); setTimeout(pushRefresh, 4000); pushAskAt = Date.now() + 4 * 60e3; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); if (gPendLink) { const gc = gPendLink; gPendLink = null; setTimeout(() => send({ t: 'glink', google: gc }), 500); } promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
@@ -1453,6 +1453,11 @@ const blockedAt = (x, y) => { const r = G.radius; return yardLocked(x, y) || sol
 // ------------------------------------------------------------------ input
 const keys = {};
 let joy = null;
+// 🕹️ fixed joystick (setting, on by default): the stick stays at the bottom-left; only a touch on it moves you
+let JOYFIX = true; try { const v = localStorage.getItem('lt_joyfix'); if (v !== null) JOYFIX = v === '1'; } catch { }
+const JOY_R = 50;
+function joyHome() { const st = $('#stick'); if (!st) return null; const r = st.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+function joyFixShow() { const st = $('#stick'); if (!st) return; const on = JOYFIX && TOUCH_UI && !!G; document.body.classList.toggle('joyfix', on); st.style.left = st.style.top = ''; st.style.display = on ? 'block' : 'none'; st.firstElementChild.style.transform = ''; }
 // letter keys by their position, so WASD / E / space work with a Thai keyboard layout too
 // some keyboards/IMEs send no e.code, only the Thai character: map the Thai Kedmanee keys back to their letters
 const TH_KEY = { 'ไ': 'w', 'ฟ': 'a', 'ห': 's', 'ก': 'd', 'ำ': 'e', 'ิ': 'b', 'ร': 'i', 'ท': 'm', 'ๆ': 'q', '้': 'h', 'ย': 'p', 'พ': 'r', 'ด': 'f', 'แ': 'c', 'ะ': 't', '"': 'w', 'ฤ': 'a', 'ฆ': 's', 'ฏ': 'd', 'ฎ': 'e' };
@@ -1502,7 +1507,10 @@ cv.addEventListener('pointerdown', e => {
   lastPtrMouse = e.pointerType === 'mouse';
   cv.setPointerCapture(e.pointerId);
   down = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
-  if ((e.pointerType === 'touch' || e.pointerType === 'pen') && !joy) joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
+  if ((e.pointerType === 'touch' || e.pointerType === 'pen') && !joy) {
+    if (JOYFIX) { const h = joyHome(); if (h && Math.hypot(e.clientX - h[0], e.clientY - h[1]) < JOY_R * 1.8) { joy = { id: e.pointerId, ox: h[0], oy: h[1], dx: 0, dy: 0, fix: 1 }; down.moved = true; joyMove(e); } }
+    else joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
+  }
   else if (e.button === 0) mouseHold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
 });
 // 🖐️ decorating: press on a piece and drag it where you want; let go and it is put down there (a plain tap still works as before)
@@ -1531,21 +1539,26 @@ cv.addEventListener('pointerup', fDragEnd, true); cv.addEventListener('pointerca
 cv.addEventListener('pointermove', e => {
   if (mouseHold && mouseHold.id === e.pointerId) { mouseHold.x = e.clientX; mouseHold.y = e.clientY; }
   if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) down.moved = true;
-  if (joy && joy.id === e.pointerId) {
-    let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), max = 50;
-    if (d > max) { joy.ox += dx - dx / d * max; joy.oy += dy - dy / d * max; dx = dx / d * max; dy = dy / d * max; }
-    joy.dx = dx / max; joy.dy = dy / max;
-    if (down?.moved) { const st = $('#stick'); st.style.display = 'block'; st.style.left = (joy.ox - 60) + 'px'; st.style.top = (joy.oy - 60) + 'px'; st.firstElementChild.style.transform = `translate(${dx}px,${dy}px)`; }
-  }
+  if (joy && joy.id === e.pointerId) joyMove(e);
 });
+function joyMove(e) {
+  let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), max = JOY_R;
+  if (d > max) { if (!joy.fix) { joy.ox += dx - dx / d * max; joy.oy += dy - dy / d * max; } dx = dx / d * max; dy = dy / d * max; }   // a fixed stick never drifts after your finger
+  joy.dx = dx / max; joy.dy = dy / max;
+  const st = $('#stick');
+  if (joy.fix) st.firstElementChild.style.transform = `translate(${dx}px,${dy}px)`;
+  else if (down?.moved) { st.style.display = 'block'; st.style.left = (joy.ox - 60) + 'px'; st.style.top = (joy.oy - 60) + 'px'; st.firstElementChild.style.transform = `translate(${dx}px,${dy}px)`; }
+}
+const joyEnd = () => { joy = null; if (JOYFIX && TOUCH_UI) joyFixShow(); else $('#stick').style.display = 'none'; };
 const endPtr = e => {
   if (mouseHold && mouseHold.id === e.pointerId) { const held = performance.now() - mouseHold.t > 260; mouseHold = null; if (held && down) down.moved = true; }
   if (down && down.id === e.pointerId) { if (!down.moved && performance.now() - down.t < 350) onTap(e.clientX, e.clientY); down = null; }
-  if (joy && joy.id === e.pointerId) { joy = null; $('#stick').style.display = 'none'; }
+  if (joy && joy.id === e.pointerId) joyEnd();
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 // a popup appearing under your finger used to swallow the touch: always release the stick
-addEventListener('pointerup', e => { if (joy && joy.id === e.pointerId) { joy = null; $('#stick').style.display = 'none'; } });
+addEventListener('pointerup', e => { if (joy && joy.id === e.pointerId) joyEnd(); });
+joyFixShow();
 
 let camLift = 0;
 const camRide = { x: 0, y: 0 };
@@ -4787,6 +4800,7 @@ const FN = {
   fs(m) { closePanel(); screenMode(m.mode); },
   toggle(m) { FX.setOpt(m.k, !FX.opts[m.k]); paintMute(); refreshPanel(true); },
   names() { const L = ['all', 'name', 'none']; NAME_MODE = L[(L.indexOf(NAME_MODE) + 1) % 3]; try { localStorage.setItem('lt_names', NAME_MODE); } catch { } refreshPanel(true); toast(NAME_TXT[NAME_MODE], '🏷️'); },
+  joyfix() { JOYFIX = !JOYFIX; try { localStorage.setItem('lt_joyfix', JOYFIX ? '1' : '0'); } catch { } joy = null; joyFixShow(); refreshPanel(true); toast(JOYFIX ? 'จอยสติ๊กอยู่กับที่มุมซ้ายล่าง: แตะที่จอยแล้วลากเพื่อเดิน' : 'จอยสติ๊กแบบลอย: แตะค้างตรงไหนก็ได้แล้วลากนิ้ว', '🕹️'); },
   eco() { ECO = !ECO; try { localStorage.setItem('lt_eco', ECO ? '1' : '0'); } catch { } resize(); refreshPanel(true); toast(ECO ? 'เปิดโหมดประหยัดแบต: เล่นยังลื่น ยืนเฉยๆ จะพักเครื่องให้เย็น' : 'ปิดโหมดประหยัดแบต: ภาพเต็ม 60 เฟรม', '🔋'); },
   tradeReq(m) { send({ t: 'req', kind: 'trade', to: m.to }); closePanel(); },
   heal(m, root) { send({ t: 'req', kind: 'heal', to: m.to, fee: +root.querySelector('#feeIn').value || 0 }); closePanel(); },
@@ -6104,6 +6118,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27j', d: '23 พ.ย.', items: [
+    '🕹️ จอยสติ๊กอยู่กับที่มุมซ้ายล่าง: แตะที่จอยแล้วลากเพื่อเดิน (เปลี่ยนกลับเป็นแบบลอยตามนิ้วได้ที่ ⚙️ ตั้งค่า)',
+  ] },
   { v: '2026-11-27i', d: '23 พ.ย.', items: [
     '📱 จอมือถือโล่งขึ้น: แชทเริ่มแบบหุบไว้ (กด 💬 แชท เพื่อเปิด) · ภารกิจมือใหม่โชว์แค่ข้อที่ต้องทำ (แตะหัวข้อเพื่อดูทั้งหมด)',
     '📢 แถบประกาศสีแดงย้ายไปด้านล่างจอ ไม่บังเงินแล้ว',
@@ -8017,7 +8034,7 @@ function renderPanel(p) {
       const fsOn = !!document.fullscreenElement, canFs = !!document.documentElement.requestFullscreen;
       return `<h2>⚙️ ตั้งค่า</h2>
         <div class="secT">🏷️ ป้ายเหนือหัว</div><div class="grid2">${B(NAME_TXT[NAME_MODE], { fn: 'names' }, NAME_MODE === 'all' ? '' : 'good')}</div><div class="sub">แตะเพื่อสลับ: แสดงทั้งหมด → แค่ชื่อ → ซ่อนหมด (เหลือแต่ตัวละครกับข้อความแชท) · ตั้งแค่ในเครื่องนี้</div>
-        <div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = เดินลื่น 60 เฟรม แต่ตอนยืนเฉยๆ ลดเหลือ 30 ให้เครื่องเย็น (เปิดอยู่แล้วบนมือถือ)</div>
+        <div class="secT">🕹️ ปุ่มเดิน (จอยสติ๊ก)</div><div class="grid2">${B(JOYFIX ? '🕹️ จอยอยู่กับที่: เปิด' : '🕹️ จอยอยู่กับที่: ปิด (ลอยตามนิ้ว)', { fn: 'joyfix' }, JOYFIX ? 'good' : '')}</div><div class="secT">🔋 เครื่องร้อน / แบตหมดไว</div><div class="grid2">${B(ECO ? '🔋 โหมดประหยัดแบต: เปิด' : '🔋 โหมดประหยัดแบต: ปิด', { fn: 'eco' }, ECO ? 'good' : '')}</div><div class="sub">เปิดไว้ = เดินลื่น 60 เฟรม แต่ตอนยืนเฉยๆ ลดเหลือ 30 ให้เครื่องเย็น (เปิดอยู่แล้วบนมือถือ)</div>
         <div class="secT">🔔 แจ้งเตือนบนมือถือ/คอม</div><div class="grid2">${B(pushState() === 'on' ? '🔔 แจ้งเตือน: เปิดอยู่' : '🔕 เปิดแจ้งเตือน', { fn: 'pushOn' }, pushState() === 'on' ? 'good' : 'primary')}</div><div class="sub">เตือนตอนซอมบี้/หมาป่าบุก มีคนคอมเมนต์ใน lifebook หรือสตรีคใกล้หาย (ไม่เกินวันละ 4 ครั้ง)${/iP(hone|ad|od)/.test(navigator.userAgent) ? ' · iPhone: ต้องเพิ่มเกมไปที่หน้าจอโฮมก่อน (ปุ่มแชร์ ⬆️ → เพิ่มไปยังหน้าจอโฮม)' : ''}</div>
         <div class="secT">🔊 เสียง</div><div class="grid2">${B(FX.opts.sfx ? '🔊 เสียงเอฟเฟกต์: เปิด' : '🔇 เสียงเอฟเฟกต์: ปิด', { fn: 'toggle', k: 'sfx' }, FX.opts.sfx ? 'good' : '')}${B(FX.opts.music ? '🎵 เพลง: เปิด' : '🎵 เพลง: ปิด', { fn: 'toggle', k: 'music' }, FX.opts.music ? 'good' : '')}</div>
         <div class="secT">⛶ หน้าจอ</div><div class="grid2">${B(fsOn ? '↙️ ออกจากเต็มจอ' : '⛶ เต็มจอ', { fn: 'fs', mode: fsOn ? 'exit' : 'full' }, fsOn ? '' : 'primary', !canFs)}${B('🔄 เต็มจอ + แนวนอน', { fn: 'fs', mode: 'landscape' }, 'good', !canFs)}</div>
@@ -8990,7 +9007,7 @@ function closeMap() { $('#mapView').classList.add('hidden'); }
 // first-time tutorial
 const TUT = () => [
   ['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือตัวละครที่มีป้ายชื่อ<b>สีเหลือง</b> คนอื่นในเมืองเป็นผู้เล่นจริงทั้งนั้น ทักทายกันได้เลย!'],
-  ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะค้างตรงไหนก็ได้แล้วลากนิ้ว</b><br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร · ใช้งาน/เข้าประตู: <b>ปุ่มกลมสีเหลือง</b> (คอม: E)'],
+  ['👣', 'วิธีเดิน', 'มือถือ: <b>แตะจอยสติ๊กมุมซ้ายล่างแล้วลากนิ้ว</b> (หรือแตะพื้นที่อยากไป)<br>คอม: ปุ่ม <b>W A S D</b> หรือลูกศร · ใช้งาน/เข้าประตู: <b>ปุ่มกลมสีเหลือง</b> (คอม: E)'],
   ['🌱', 'ภารกิจมือใหม่ 10 นาที', 'ทำตามรายการ<b>ภารกิจมือใหม่</b>มุมซ้ายบน: ซื้อเบ็ด → ตกปลา → ขาย = <b>เงินก้อนแรก</b> → ซื้อของ → ทักทายเพื่อน<br>ทุกข้อได้รางวัลทันที ครบได้ 🥚 <b>ไข่สัตว์เลี้ยง</b> · แตะแต่ละข้อ ตัวละครจะเดินไปเอง'],
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป · หางานทำได้กับ NPC เจ้าหน้าที่ 💬 ตามร้านต่างๆ'],
 ];
