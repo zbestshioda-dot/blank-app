@@ -904,12 +904,13 @@ function coupleTick() {                       // 👑 a finished week: the top 3
   const w1 = wins.find(x => x.rank === 1); if (w1) { feed(`👑 คู่รักแห่งเมืองสัปดาห์นี้: ${w1.a.name} 💞 ${w1.b.name} (${w1.n} 💗)!`); sendRoster(); }
 }
 setInterval(() => { try { coupleTick(); } catch (e) { console.error('coupleTick', e); } }, 60e3).unref?.();
+const festLove = () => festNow()?.f.love || 1;   // 💘 Valentine's: friendship and love grow twice as fast (daily caps stay)
 function loveTick() {                         // 💗 married and near each other: +1 love every 2 minutes, 30 a day
   const day = dayKey(), wk = weekKey(), seen = new Set();
   for (const a of online.values()) {
     if (!a.spouse || !spouseNear(a)) continue; const b = accounts.get(a.spouse.login), k = [lk(a), lk(b)].sort().join('|');
     if (seen.has(k)) continue; seen.add(k);
-    const t0 = MR.tier(a.spouse.lp || 0).i; MR.loveAdd(a, b, day, wk); a.sd = b.sd = true; dirty = true;
+    const t0 = MR.tier(a.spouse.lp || 0).i; for (let i = festLove(); i > 0; i--) MR.loveAdd(a, b, day, wk); a.sd = b.sd = true; dirty = true;
     const t1 = MR.tier(a.spouse.lp).i;
     if (t1 > t0) { for (const o of [a, b]) { markMe(o); toast(o, `💗 ความรักขึ้นขั้น! ตอนนี้เป็น ${MR.tier(o.spouse.lp).name}แล้ว`, '💗'); } feed(`💗 ${a.name} กับ ${b.name} เป็น${MR.tier(a.spouse.lp).name}แล้ว!`); sendRoster(); }
   }
@@ -923,7 +924,7 @@ function bondTick() {
       const b = byPhone.get(c.p); if (!b || b === a || !b.ws || !friendOf(b, a)) continue;
       const k = [lk(a), lk(b)].sort().join('|'); if (seen.has(k)) continue; seen.add(k);
       if (areaId(a) !== areaId(b) || Math.hypot(a.x - b.x, a.y - b.y) > 5) continue;
-      const before = MR.bond(a, b), v = MR.bondAdd(a, b, day); a.sd = b.sd = true; dirty = true;
+      const before = MR.bond(a, b); let v = 0; for (let i = festLove(); i > 0; i--) v = MR.bondAdd(a, b, day); a.sd = b.sd = true; dirty = true;
       if (before < MR.BOND_NEED && v >= MR.BOND_NEED) for (const [x, y] of [[a, b], [b, a]]) toast(x, `💞 คุณกับ${y.name}เป็นเพื่อนสนิทกันแล้ว! ขอแต่งงานได้ที่ซุ้มแต่งงานในวัด`, '💞');
     }
   }

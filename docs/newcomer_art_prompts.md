@@ -60,3 +60,18 @@ envelopes (ang pao) floating, plum blossom branches at the edges. Warm red and g
 Leave the centre-left area a little calmer (space for a title added later in the game).
 No text, no Chinese characters, no letters, no watermark.
 ```
+
+---
+
+## 4) แบนเนอร์วาเลนไทน์ → `tools/sheets/ev_valentine.jpg` (เพิ่มทีหลัง)
+
+ตอนนี้การ์ดวาเลนไทน์ใช้อีโมจิ 💘 แทนไปก่อน อัปโหลดรูปนี้แล้วบอก Claude ว่า "ใส่รูปวาเลนไทน์"
+
+```
+Cozy pixel art banner, very wide landscape (about 3 : 1), bright clean pixel style matching a cute Thai
+life-sim town game. A small Thai town square at golden sunset decorated for Valentine's Day: pink and red
+heart garlands, a flower stall full of red roses, heart-shaped balloons, a cute chibi couple sitting on a
+bench by the fountain sharing a box of chocolates (small, simple faces), petals floating in the air.
+Soft pink, red and warm gold colours, sweet happy mood. Leave the centre-left area a little calmer
+(space for a title added later in the game). No text, no letters, no watermark.
+```

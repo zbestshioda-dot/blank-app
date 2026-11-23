@@ -1371,6 +1371,7 @@ const ITEMS = {
   gshard:   { name: 'ชิ้นส่วนเพชร', icon: '💎', kind: 'mat', base: 0, nosell: 1 },
   fcbait:   { name: 'เหยื่อแข่งตกปลา', icon: '🪱', kind: 'goods', base: 50, fcb: 1 },   // sold only during the fishing contest: each catch in the contest uses one, the fish comes out heavier
   umbrella: { name: 'ร่มกันฝน', icon: '☂️', kind: 'goods', base: 180, umb: 1 },   // sold only by the umbrella man who walks into the square when it rains · kept in the bag: opens by itself when it rains outdoors, keeps you dry (no cold from the rain)
+  choco:  { name: 'กล่องช็อกโกแลตวาเลนไทน์', icon: '🍫', kind: 'goods', base: 80, eat: { hunger: 10, happy: 12 } },   // 💘 from the Valentine's mail
   bento:  { name: 'ข้าวกล่องเวฟ', icon: '🍱', kind: 'goods', base: 55, eat: { hunger: 32, energy: 4 } },
   petegg: { name: 'ไข่สัตว์เลี้ยงปริศนา', icon: '🥚', kind: 'goods', base: 0, egg: 1 },   // from inviting friends: open it in the bag to hatch a random pet
   popcorn: { name: 'ป๊อปคอร์นคาราเมล', icon: '🍿', kind: 'goods', base: 45, eat: { hunger: 8, happy: 5 } },
@@ -2197,6 +2198,8 @@ const FESTS = [
     gift: { money: 2027, gems: 10 }, mail: '🎆 สวัสดีปีใหม่จากเมือง Life Town!\n\nขอให้ปีนี้รวย สุขภาพดี และสนุกกับการใช้ชีวิตในเมืองนะ ของขวัญปีใหม่อยู่ในจดหมายนี้แล้ว' },
   { id: 'cny', name: 'ตรุษจีน', icon: '🧧', lunar: { 2027: '02-05', 2028: '01-25', 2029: '02-12', 2030: '02-02', 2031: '01-22', 2032: '02-10', 2033: '01-30' }, days: 4,
     text: 'ซินเจียยู่อี่ ซินนี้ฮวดไช้! รับอั่งเปาทุกวันช่วงตรุษจีน (ดูในจดหมาย)', daily: 'angpao' },
+  { id: 'valentine', name: 'วาเลนไทน์', icon: '💘', from: '02-13', days: 3, text: 'อยู่ใกล้เพื่อนสนิทหรือคู่รัก ความสนิทและความรักขึ้นเร็ว 2 เท่า · รับช็อกโกแลตในจดหมาย',
+    gift: { items: { choco: 2 } }, mail: '💘 สุขสันต์วันวาเลนไทน์จากเมือง Life Town!\n\nช่วง 13–15 ก.พ. อยู่ใกล้เพื่อนสนิทหรือคู่รัก ความสนิทและความรักขึ้นเร็วเป็น 2 เท่า\nช็อกโกแลต 2 กล่องในจดหมายนี้ กินเองหรือแลกให้คนพิเศษก็ได้นะ', love: 2 },
 ];
 const ANGPAO = [[88, 40], [168, 30], [288, 18], [888, 9], [8888, 1]];   // [baht, weight]; plus a small chance of 💎8
 const EV7 = { id: 'winter26', title: 'ล็อกอิน 7 วัน รับชุดกันหนาวฟรี', start: Date.parse('2026-11-21T00:00:00+07:00'), end: Date.parse('2026-12-14T23:59:59+07:00'),

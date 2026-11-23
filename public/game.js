@@ -1242,14 +1242,15 @@ function festText() {
 }
 setInterval(() => { if (wd?.fest?.ny && !wd.ev) paintEvent(); }, 1000);
 setInterval(() => { if (panel?.kind === 'bag' && typeof nbEggWaiting === 'function' && nbEggWaiting()) refreshPanel(true); }, 30000);   // the egg countdown in the bag
-const FEST_ART = { newyear: ['ev_newyear', 'firework'], cny: ['ev_cny', 'angpao'] };
+const FEST_ART = { newyear: ['ev_newyear', 'firework'], cny: ['ev_cny', 'angpao'], valentine: [null, null] };   // [banner, icon] (null = emoji only until the art arrives)
 function festCardSoon(ms = 2500) { if (!festCardSoon.t) festCardSoon.t = setTimeout(() => { festCardSoon.t = 0; festCard(); }, ms); }   // one pending check at a time (wd arrives every second)
 function festCard() {   // 🎉 a festival's card with its banner, once a day (never over a newcomer's first steps or an open panel)
   const F = wd?.fest, art = F && FEST_ART[F.id]; if (!art || !me || nbQuiet() || $('.festCard')) return;
   if (panel || $('#daily')?.offsetParent || $('.hatchPop') || !$('#tut').classList.contains('hidden')) return void festCardSoon(3000);   // wait for the daily bonus, tutorial or another card
   const k = 'lt_fest_' + F.id + '_' + thaiDay(Date.now() + clockOff); try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch { }
   const d = document.createElement('div'); d.className = 'hatchPop festCard';
-  d.innerHTML = `<div><img class="festBan" src="assets/nb/${art[0]}.webp?v=${NB_ART_V}" alt=""><b>${nbImg(art[1], 34)} ${esc(F.name)}</b><span>${esc(F.text)}</span><button class="primary">${nbImg(art[1], 24)} เย้!</button></div>`;
+  const ico = px => art[1] ? nbImg(art[1], px) : `<i style="font-style:normal;font-size:${px}px">${F.icon}</i>`;
+  d.innerHTML = `<div>${art[0] ? `<img class="festBan" src="assets/nb/${art[0]}.webp?v=${NB_ART_V}" alt="">` : `<div style="font-size:64px">${F.icon}</div>`}<b>${ico(34)} ${esc(F.name)}</b><span>${esc(F.text)}</span><button class="primary">${ico(24)} เย้!</button></div>`;
   d.onclick = () => d.remove(); document.body.appendChild(d); FX.play('chime');
 }
 function paintEvent() {
@@ -6245,6 +6246,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27s', d: '23 พ.ย.', items: [
+    '💘 เพิ่มเทศกาลวาเลนไทน์ (13–15 ก.พ. ทุกปี): อยู่ใกล้เพื่อนสนิทหรือคู่รัก ความสนิท/ความรักขึ้นเร็ว 2 เท่า และรับช็อกโกแลตในจดหมาย',
+  ] },
   { v: '2026-11-27r', d: '23 พ.ย.', items: [
     '🛠️ มือใหม่: โบนัสเข้าเกมขึ้นให้รับทันทีที่ทำภารกิจครบ · นับถอยหลังไข่ในกระเป๋าเดินเอง · ไม่ขึ้น "กำลังเดินไป" ตอนยืนอยู่ที่นั่นแล้ว',
   ] },
@@ -8163,7 +8167,7 @@ function renderPanel(p) {
         event: `<div class="setRow"><span><b>🏆 แข่งตกปลา</b><small>ปกติเริ่มเองทุกวัน 20:00 (15 นาที) · กดเพื่อเริ่มตอนนี้ หรือกดอีกครั้งเพื่อจบและส่งรางวัล</small></span>${B(FCS.on ? 'จบ' : 'เริ่ม', { fn: 'god', op: 'fishcomp' }, FCS.on ? 'bad' : 'primary')}</div>
           <div class="setRow"><span><b>🌧️ ให้ฝนตก</b><small>ฝนตก 4 นาที (ทดสอบร่ม/พืช) กดอีกครั้งเพื่อหยุด</small></span>${B(wd?.ev?.id === 'rain' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'rain' }, wd?.ev?.id === 'rain' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>🐺 ทดสอบคืนหมาป่า</b><small>เริ่มเลยตอนนี้ (เตือน 10 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(WW.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'werewolf' }, WW.ph !== 'off' ? 'bad' : '')}</div>
-          <div class="setRow"><span><b>🎉 ทดสอบเทศกาล</b><small>เปิดให้ทุกคนเห็น 10 นาที (ของขวัญได้เฉพาะแอดมิน) กดอีกครั้งเพื่อปิด</small></span>${B('🎆 ปีใหม่', { fn: 'god', op: 'fest', id: 'newyear' }, wd?.fest?.id === 'newyear' ? 'good' : '')}${B('🧧 ตรุษจีน', { fn: 'god', op: 'fest', id: 'cny' }, wd?.fest?.id === 'cny' ? 'good' : '')}</div>
+          <div class="setRow"><span><b>🎉 ทดสอบเทศกาล</b><small>เปิดให้ทุกคนเห็น 10 นาที (ของขวัญได้เฉพาะแอดมิน) กดอีกครั้งเพื่อปิด</small></span>${B('🎆 ปีใหม่', { fn: 'god', op: 'fest', id: 'newyear' }, wd?.fest?.id === 'newyear' ? 'good' : '')}${B('🧧 ตรุษจีน', { fn: 'god', op: 'fest', id: 'cny' }, wd?.fest?.id === 'cny' ? 'good' : '')}${B('💘 วาเลนไทน์', { fn: 'god', op: 'fest', id: 'valentine' }, wd?.fest?.id === 'valentine' ? 'good' : '')}</div>
           <div class="setRow"><span><b>🧟 ทดสอบคืนปล่อยผี</b><small>เริ่มเลยตอนนี้ (เตือน 15 วิ · ยาว 2.5 นาที) กดอีกครั้งเพื่อหยุด</small></span>${B(ZN.ph !== 'off' ? 'หยุด' : 'เริ่ม', { fn: 'god', op: 'zombie' }, ZN.ph !== 'off' ? 'bad' : '')}</div>
           <div class="setRow"><span><b>📣 โพสต์ข่าวลงเฟส</b><small>ได้ข้อความอัปเดตพร้อมลิงก์เกม ไปวางในกลุ่มเฟสได้เลย</small></span>${B('📋 เปิด', { fn: 'open', kind: 'fbpost' }, 'primary')}</div>`,
         admin: `<div class="secT">📊 วัดผล</div>${B('📊 กราฟผู้เล่น / การกลับมาเล่น / รายได้', { fn: 'god', op: 'stats' }, 'primary')}
