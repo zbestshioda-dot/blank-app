@@ -116,7 +116,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b7', chSheets = {};
+const CH_V = 'b9', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -180,11 +180,12 @@ function femOutfitFrame(sheet, step, lk) {
 const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
-  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong' };   // women's versions are the 'f' + name sheets
+  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', tanktop: 'tanktop', bear: 'bear', panda: 'panda', cathood: 'cathood', kitsune: 'kitsune', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
 function drawAura(px, py, H, t, front, gold) {
+  const fox = gold === 'fox'; if (fox) gold = false;   // 🦊 nine-tail fox: the violet aura with pink-magenta sparks
   const cy = py - H * .45, angel = gold === 'angel', fairy = gold === 'fairy', soft = angel || fairy;   // 😇 angel: white-gold light, halo and falling feathers · 🧚 fairy: pink-lilac glitter
   ctx.save();
   if (!front) {
@@ -192,6 +193,7 @@ function drawAura(px, py, H, t, front, gold) {
     if (angel) { g.addColorStop(0, 'rgba(255,252,230,.7)'); g.addColorStop(.55, 'rgba(255,236,170,.34)'); g.addColorStop(1, 'rgba(255,220,120,0)'); }
     else if (fairy) { g.addColorStop(0, 'rgba(255,214,242,.7)'); g.addColorStop(.55, 'rgba(238,160,255,.34)'); g.addColorStop(1, 'rgba(200,100,255,0)'); }
     else if (gold) { g.addColorStop(0, 'rgba(255,236,150,.7)'); g.addColorStop(.55, 'rgba(255,190,50,.38)'); g.addColorStop(1, 'rgba(200,120,0,0)'); }
+    else if (fox) { g.addColorStop(0, 'rgba(225,150,255,.75)'); g.addColorStop(.55, 'rgba(160,60,235,.45)'); g.addColorStop(1, 'rgba(90,0,140,0)'); }
     else { g.addColorStop(0, 'rgba(200,130,255,.75)'); g.addColorStop(.55, 'rgba(130,50,235,.42)'); g.addColorStop(1, 'rgba(60,0,120,0)'); }
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(px, cy, r * .78, r, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = angel ? `rgba(255,248,200,${.45 + Math.sin(t / 300) * .2})` : fairy ? `rgba(255,190,240,${.45 + Math.sin(t / 300) * .2})` : gold ? `rgba(255,220,120,${.4 + Math.sin(t / 300) * .2})` : `rgba(214,170,255,${.35 + Math.sin(t / 300) * .2})`; ctx.lineWidth = 2;
@@ -202,7 +204,7 @@ function drawAura(px, py, H, t, front, gold) {
     const a = t / 900 + i * Math.PI * 2 / 9, z = Math.sin(a);
     if ((z > 0) !== front) continue;
     const rise = ((t / 1600 + i * .37) % 1), x = px + Math.cos(a) * H * .38, y = py - H * (.08 + rise * .85), s = (1.6 + z * .8) * (1 - rise * .5) * H / 60;
-    ctx.fillStyle = `hsla(${angel ? 46 + i * 3 : fairy ? 300 + i * 8 : gold ? 42 + i * 2 : 270 + i * 9},100%,${(soft ? 82 : 70) + z * 8}%,${.85 * (1 - rise)})`;
+    ctx.fillStyle = `hsla(${angel ? 46 + i * 3 : fairy ? 300 + i * 8 : gold ? 42 + i * 2 : fox ? 285 + i * 6 : 270 + i * 9},100%,${(soft ? 82 : 70) + z * 8}%,${.85 * (1 - rise)})`;
     ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, s * 2.2), 0, 7); ctx.fill();
   }
   if (front && angel) {                                                          // a glowing halo over the head and a few feathers drifting down
@@ -781,7 +783,17 @@ function handle(m) {
     case 'catch': catchPop(m.item, m.first, m.kg, m.pb); if ((G.items[m.item]?.rar || 0) >= 4 || G.items[m.item]?.temple) shareOffer({ k: 'fish', item: m.item }); break;
     case 'share': shareOffer(m); break;
     case 'fc': fcMsg(m); break;
+    case 'hc': hcShow(m); break;
+    case 'dg': {                                  // 🗝️ treasure cave: sounds from what changed, then redraw
+      const o = DGV?.g, n = m.g;
+      if (o && n) { if (n.hp < o.hp) { FX.play('chop'); DGHIT = Date.now(); } else if (n.bag.money > o.bag.money) FX.play('coin'); else if (n.f > o.f) FX.play('pop'); if (n.relics.length > o.relics.length) FX.play('levelup'); }
+      if (o && !n && m.res) FX.play(m.res.over === 'dead' ? 'fail' : 'chime');
+      DGV = m; if (panel?.kind === 'dg') refreshPanel(true); break;
+    }
+    case 'wedinfo': WEDI = m; m._t = Date.now(); if (['wed', 'couple'].includes(panel?.kind)) refreshPanel(true); break;
+    case 'wedask': openPanel({ kind: 'wedask', ...m }); FX.play('coin'); break;
     case 'fw': fwShow(m); break;
+    case 'cal': CAL = m; if (panel?.kind === 'cal') refreshPanel(true); break;
     case 'auc': AUC = m; if (panel?.kind === 'auc') refreshPanel(true); break;
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
@@ -1242,6 +1254,92 @@ document.addEventListener('fullscreenchange', () => { if (panel?.kind === 'setti
 $('#mapX').onclick = closeMap;
 $('#mapView').addEventListener('pointerdown', e => { if (e.target.id === 'mapView') closeMap(); });
 $('#panel').addEventListener('pointerdown', e => { if (e.target === $('#panel')) closePanel(); });
+// 📣 event banners: a swipeable strip on the phone home screen and the events app; tap opens the event
+function evBanners() {
+  const mo = new Date(Date.now() + 7 * 3600e3).getUTCMonth() + 1;
+  const list = [...(mo === 11 || mo === 12 ? [['xmas', 'openCal']] : []), ['auc', 'openAuc'], ['home', 'openHomes'], ['fish', 'openCal']];
+  return `<div class="evBan">${list.map(([k, fn]) => `<img src="assets/ev_${k}.webp?v=1" alt="" data-m='{"fn":"${fn}"}'>`).join('')}</div>`;
+}
+setInterval(() => { const b = document.querySelector('.evBan'); if (!b || b.matches(':hover') || b._touch > Date.now()) return; const n = Math.round(b.scrollLeft / b.clientWidth) + 1; b.scrollTo({ left: n * b.clientWidth >= b.scrollWidth - 2 ? 0 : n * b.clientWidth, behavior: 'smooth' }); }, 4500);
+document.addEventListener('touchstart', e => { const b = e.target.closest?.('.evBan'); if (b) b._touch = Date.now() + 8000; }, { passive: true });
+// 🗝️ treasure cave: everything is decided on the server; this only draws the run and sends the choices
+let DGV = null, DGHIT = 0;
+function dgHtml(st) {
+  const V = DGV; if (!V) { send({ t: 'act', st, a: 'view' }); return '<h2>🗝️ ถ้ำสมบัติ</h2><div class="sub">กำลังโหลด...</div>'; }
+  const g = V.g, bar = (v, mx, c) => `<span class="dgbar"><span style="width:${Math.max(0, Math.min(100, v / mx * 100))}%;background:${c}"></span></span>`;
+  const bag = b => `💰${money(b.money)}${b.coin ? ` · 🪙${b.coin}` : ''}${b.crystal ? ` · 💠${b.crystal}` : ''}${b.shard ? ` · 💎${b.shard}` : ''}`;
+  let h = `<h2>🗝️ ถ้ำสมบัติ${g ? ` · ชั้น ${g.f}` : ''}</h2>`;
+  if (!g) {
+    const r = V.res;
+    if (r) h += `<div class="jobbox dgres ${r.over}">${r.over === 'dead' ? `💫 คุณล้มลงที่ชั้น ${r.f} · หน่วยกู้ภัยเก็บเงินกลับมาได้ 30%` : `🏃 ออกจากถ้ำได้ปลอดภัย (ผ่าน ${r.f} ชั้น)`}<br><b>ได้รับ ${bag(r)}</b></div>`;
+    h += `<div class="sub">เลือกประตูทีละชั้น · ทุก 5 ชั้นมีบอส · ออกจากถ้ำเมื่อไหร่ก็ได้พร้อมของทั้งหมด แต่ถ้าล้มจะเหลือเงินแค่ 30%</div>
+      <div class="dgstat">🎟️ ค่าเข้า ${money(V.ticket)} · วันนี้เหลือ <b>${Math.max(0, V.left)}/${V.perDay}</b> รอบ${V.torch ? ` · 🔥${V.torch}` : ''} · 🪙 ${V.coin} · ลึกสุด ชั้น ${V.best}</div>
+      ${V.pot || V.charm ? `<div class="sub">รอบหน้าพกไปด้วย: ${V.pot ? `🧪x${V.pot} ` : ''}${V.charm ? `🧿x${V.charm}` : ''}</div>` : ''}
+      ${B(`🕯️ ลงถ้ำ ${money(V.ticket)}`, { t: 'act', st, a: 'enter' }, 'primary', V.left <= 0 && !V.torch)}
+      <div class="secT" style="margin-top:8px">🪙 ร้านพ่อค้าเร่ในถ้ำ (ใช้เหรียญโบราณ)</div>
+      <div class="list">${Object.entries(V.shop).map(([k, it]) => `<div class="item"><div class="em">${it.icon}</div><div class="nm"><b>${it.name}</b><small>${it.desc}</small></div>${B(`🪙${it.coin}`, { t: 'act', st, a: 'buy', k }, '', V.coin < it.coin)}</div>`).join('')}</div>
+      <div class="secT" style="margin-top:8px">🏠 ของแต่งบ้านจากถ้ำ (🪙 เหรียญโบราณ)</div>
+      <div class="list">${V.furn.map(f => `<div class="item"><div class="em"><canvas data-spr="${f.spr}" width="40" height="40"></canvas></div><div class="nm"><b>${esc(f.n)}</b><small>${f.has ? 'มีแล้ว' : 'มีได้ชิ้นเดียว'}</small></div>${B(f.has ? '✓' : `🪙${f.c}`, { t: 'act', st, a: 'furn', k: f.k }, 'primary', f.has || V.coin < f.c)}</div>`).join('')}</div>
+      <div class="secT" style="margin-top:8px">🏆 ลงลึกสุดสัปดาห์นี้</div><div class="sub">สิ้นสัปดาห์ ที่ 1 ได้ฉายา 🗝️ นักล่าสมบัติ 7 วัน + 💎${V.prize[0]} · ที่ 2 💎${V.prize[1]} · ที่ 3 💎${V.prize[2]}</div>
+      <div class="list">${V.top.length ? V.top.map((x, i) => `<div class="item"><div class="em">${['🥇', '🥈', '🥉'][i] || '🗝️'}</div><div class="nm"><b>${esc(x.n)}</b><small>ชั้น ${x.f}</small></div></div>`).join('') : '<div class="sub">ยังไม่มีใครลงถ้ำสัปดาห์นี้ เป็นคนแรกเลย!</div>'}</div>`;
+    return h;
+  }
+  const hit = Date.now() - DGHIT < 600 ? ' dghit' : '';
+  h += `<div class="dgme${hit}">❤️ ${bar(g.hp, g.mhp, g.hp < g.mhp * .3 ? '#e04848' : '#3bb36b')} ${g.hp}/${g.mhp} · ⚔️${g.atk} · 🛡️${g.def} · 🧪${g.pot}</div>
+    <div class="dgstat">🎒 ${bag(g.bag)}${g.relics.length ? ` · ${g.relics.map(k => `<span title="${esc(V.relics[k][0])}">${V.relics[k][1]}</span>`).join('')}` : ''}</div>`;
+  if (g.mon) {
+    const M = g.mon;
+    h += `<div class="dgmon${M.boss ? ' boss' : ''}"><div class="dgface"><canvas data-spr="mon_${M.id}" width="96" height="96"></canvas></div><b>${esc(M.name)}${M.boss ? ' 🔥บอส' : ''}</b><div>${bar(M.hp, M.mhp, '#c0392b')} ${Math.max(0, M.hp)}/${M.mhp} · โจมตี ${M.atk}</div></div>
+      <div class="grid2">${B('⚔️ โจมตี', { t: 'act', st, a: 'act', x: 'atk' }, 'primary')}${B('🛡️ ป้องกัน', { t: 'act', st, a: 'act', x: 'def' })}${B(`🧪 ดื่มยา (${g.pot})`, { t: 'act', st, a: 'act', x: 'pot' }, '', !g.pot || g.hp >= g.mhp)}${B('🏃 หนี', { t: 'act', st, a: 'act', x: 'run' }, '', M.boss)}</div>`;
+  } else {
+    h += `<div class="sub">${g.f % 5 === 0 ? '🔥 ห้องบอส! เตรียมตัวให้พร้อม' : 'เลือกประตู (คำใบ้ถูก 70%)'}</div>
+      <div class="dgdoors">${g.doors.map((d, i) => `<button class="dgdoor" data-m="${esc(JSON.stringify({ t: 'act', st, a: 'door', i }))}"><span>🚪</span><small>${V.hint?.[d] || d}</small></button>`).join('')}</div>
+      <div class="grid2">${B(`🧪 ดื่มยา (${g.pot})`, { t: 'act', st, a: 'act', x: 'pot' }, '', !g.pot || g.hp >= g.mhp)}${B('🏃 ออกจากถ้ำพร้อมของ', { t: 'act', st, a: 'leave' }, 'warn')}</div>`;
+  }
+  h += `<div class="dglog">${g.log.map((s, i) => `<div style="opacity:${1 - i * .14}">${esc(s)}</div>`).join('')}</div>`;
+  return h;
+}
+// 💞 closeness, rings, proposals and the wedding (the arch in the temple) · the same data drives the phone's couple app
+let WEDI = null, WEDDIV = false;
+function wedHtml(st, phone) {
+  const W = WEDI; if (!W || Date.now() - W._t > 3000) send({ t: 'wedinfo' }); if (!W) return '<h2>💒 ซุ้มแต่งงาน</h2><div class="sub">กำลังโหลด...</div>';
+  G.rings = W.rings;
+  const bar = v => `<span style="display:inline-block;width:70px;height:7px;border-radius:4px;background:#f3d0dc;vertical-align:middle;overflow:hidden"><span style="display:block;height:100%;width:${Math.min(100, v / W.need * 100)}%;background:#e0508a"></span></span> ${Math.min(v, W.need)}/${W.need}`;
+  let h = `<h2>${phone ? '💞 คู่รัก' : '💒 ซุ้มแต่งงาน'}</h2>`;
+  if (W.wed) h += `<div class="jobbox">💒 ${esc(W.wed.an)} กับ ${esc(W.wed.bn)} ${W.wed.began ? 'กำลังทำพิธีอยู่!' : 'กำลังจะแต่งงาน (รอทั้งคู่มาที่ซุ้ม)'}${!phone && W.wed.began && !W.wed.me ? '<br>' + B('🎉 อวยพร รับขนมแต่งงาน', { t: 'act', st, a: 'bless' }, 'primary') : ''}</div>`;
+  if (W.spouse) {
+    const S = W.spouse, R = W.rings[S.ring];
+    h += `<div class="item"><div class="em">${R ? `<canvas data-spr="ring_${S.ring}" width="40" height="40"></canvas>` : '💞'}</div><div class="nm"><b>คู่ของ ${esc(S.name)}</b><small>${R?.name || ''} · แต่งเมื่อ ${new Date(S.since).toLocaleDateString('th-TH')} · ${S.on ? '🟢 ออนไลน์' : 'ออฟไลน์'}</small></div></div>
+      <div class="jobbox">💗 ความรัก <b>${S.lp || 0}</b> · ขั้น <b>${S.tier.name}</b>${S.tier.next ? ` (อีก ${S.tier.next - (S.lp || 0)} ถึงขั้นถัดไป)` : ' (ขั้นสูงสุด)'}<br>
+        วันนี้ ${S.today}/${W.loveDay} · สัปดาห์นี้ ${S.wn} 💗<br>${S.near ? '✅ อยู่ใกล้คู่ตอนนี้: ความรักเพิ่ม และรายได้ +10%' : 'อยู่ใกล้คู่ (ไม่เกิน 6 ช่อง) ความรักจะเพิ่มทุก 2 นาที และทำงานได้เงิน +10%'}</div>
+      <div class="grid2">${B('💞 ไปหาคู่', { fn: 'spGo' }, 'primary', !S.on)}${B('🏡 ไปบ้านคู่', { fn: 'spHome' }, '', !S.on)}</div>
+      ${WEDDIV ? `<div class="jobbox">หย่าแล้วต้องรอ 7 วันถึงแต่งใหม่ได้ และแหวนไม่คืน ${B('💔 ยืนยันหย่า', { fn: 'spDiv' }, 'warn')}</div>` : B('💔 หย่า', { fn: 'spDivAsk' })}`;
+  } else if (!phone) {
+    h += W.ring ? `<div class="sub">มี ${W.rings[W.ring].icon} ${W.rings[W.ring].name} แล้ว · เลือกเพื่อนสนิทที่ออนไลน์อยู่แล้วกดขอแต่งงาน</div>`
+      : `<div class="sub">ซื้อแหวนก่อน แล้วขอเพื่อนสนิทแต่งงาน (ความสนิทครบ ${W.need} ❤️)</div><div class="list">${Object.entries(W.rings).map(([k, R]) => `<div class="item"><div class="em"><canvas data-spr="ring_${k}" width="40" height="40"></canvas></div><div class="nm"><b>${R.name}</b><small>${k === 'diamond' ? 'ชื่อคู่เรืองแสงระดับตำนาน · พลุมหาพลุตอนแต่ง' : k === 'gold' ? 'ชื่อคู่สีทอง' : 'แหวนคู่เรียบหรู'}</small></div>${B(R.gems ? `💎${R.gems}` : money(R.price), { t: 'act', st, a: 'buy', tier: k }, 'primary')}</div>`).join('')}</div>`;
+  }
+  if (phone) h += `<div class="secT" style="margin-top:8px">👑 คู่รักประจำสัปดาห์</div><div class="sub">สิ้นสัปดาห์: ที่ 1 ได้ฉายา 👑 คู่รักแห่งเมือง 7 วัน + 💎30 คนละ · ที่ 2 💎20 · ที่ 3 💎10</div>
+    <div class="list">${W.top.length ? W.top.map((x, i) => `<div class="item"><div class="em">${['🥇', '🥈', '🥉'][i] || '💞'}</div><div class="nm"><b>${esc(x.an)} 💞 ${esc(x.bn)}</b><small>${x.n} 💗 สัปดาห์นี้</small></div></div>`).join('') : '<div class="sub">ยังไม่มีคู่ไหนสะสมความรักสัปดาห์นี้</div>'}</div>`;
+  const list = W.list.filter(x => x.mut);
+  h += `<div class="secT" style="margin-top:8px">❤️ ความสนิทกับเพื่อน</div><div class="sub">ได้ +1 ทุก 2 นาทีที่อยู่ใกล้กัน (ทั้งคู่ต้องบันทึกเบอร์กันและกัน) · วันละไม่เกิน ${W.day}</div>
+    <div class="list">${list.length ? list.map(x => `<div class="item"><div class="em">${x.v >= W.need ? '💞' : '🤝'}</div><div class="nm"><b>${esc(x.n)}</b><small>${bar(x.v)}${x.sp ? ' · แต่งงานแล้ว' : ''}${x.id ? '' : ' · ออฟไลน์'}</small></div>${!phone && W.ring && !W.spouse && x.v >= W.need && x.id && !x.sp ? B('💍 ขอแต่งงาน', { t: 'act', st, a: 'propose', id: x.id }, 'primary') : ''}</div>`).join('') : '<div class="sub">ยังไม่มีเพื่อนที่บันทึกเบอร์กันทั้งสองฝ่าย</div>'}</div>`;
+  return h;
+}
+// 📅 events calendar: every timed event in one place, each row opens the event
+let CAL = null;
+function calHtml() {
+  const C = CAL; if (!C) return '<h2>📅 กิจกรรม</h2><div class="sub">กำลังโหลด...</div>';
+  const left = t => { const m = Math.max(0, Math.round((t - Date.now()) / 60000)); return m < 60 ? `อีก ${m} นาที` : m < 1440 ? `อีก ${Math.floor(m / 60)} ชม. ${m % 60} นาที` : `อีก ${Math.floor(m / 1440)} วัน ${Math.floor(m % 1440 / 60)} ชม.`; };
+  const row = (ic, title, sub, btn) => `<div class="item"><div class="em">${ic}</div><div class="nm"><b>${title}</b><small>${sub}</small></div>${btn || ''}</div>`;
+  return `<h2>📅 กิจกรรม</h2>${evBanners()}<div class="sub">ทุกกิจกรรมที่มีเวลาในเมือง</div><div class="list">
+    ${row('🎣', C.fc.end ? '<span style="color:#e05555">กำลังแข่งตกปลา!</span>' : 'แข่งตกปลา ทุกวัน 20:00', C.fc.end ? `จบ${left(C.fc.end)} · ไปที่ท่าตกปลาเลย` : `เริ่ม${left(C.fc.at)} · ปลาตัวหนักสุดชนะ ${money(C.prize)}`)}
+    ${row('🏆', 'ประมูลประจำสัปดาห์', C.auc ? `${esc(C.auc.name)} · ${C.auc.bid ? `${money(C.auc.bid)} โดย ${esc(C.auc.by)}` : 'ยังไม่มีคนเสนอ'} · ปิด${left(C.weekEnd)}` : 'ของชุดนี้ขายหมดแล้ว', B('ดู', { fn: 'openAuc' }))}
+    ${row('🏡', 'ประกวดบ้านสวย', `${C.home ? `นำอยู่: ${esc(C.home.n)} ❤️ ${C.home.hearts}` : 'ยังไม่มีใครได้หัวใจ'} · ตัดสิน${left(C.weekEnd)}`, B('ดู', { fn: 'openHomes' }))}
+    ${row('🎟️', 'หวยเมือง', `ออก${left(C.lotto)}`)}
+    ${row('🎆', 'จุดพลุที่ลานน้ำพุ', 'จุดได้ตลอด ทุกคนในเมืองเห็น', B('จุด', { fn: 'openFw' }))}
+    ${row('🔨', 'โรงช่างคราฟ', C.xmas ? '🎄 เดือนนี้มีเกล็ดหิมะ ❄️ + สูตรคริสต์มาส!' : 'ลานหญ้าตรงข้ามธนาคาร · 🎄 สูตรคริสต์มาสเปิด 1 ธ.ค.')}
+  </div>`;
+}
 // 🏆 weekly auction: one-of-a-kind furniture, bid in baht (money is held while you lead, handed back if outbid)
 let AUC = null;
 function aucWHtml() {
@@ -1253,6 +1351,24 @@ function aucWHtml() {
     <div class="sub">ราคาตอนนี้ <b>${A.bid ? money(A.bid) : 'ยังไม่มีคนเสนอ'}</b>${A.by ? ` โดย <b>${esc(A.by)}</b>${A.mine ? ' (คุณ)' : ''}` : ''}</div>
     ${A.mine ? '<div class="jobbox">👑 คุณนำการประมูลอยู่</div>' : `<div class="grid2"><input id="aucWAmt" type="number" inputmode="numeric" min="${A.min}" step="100" value="${A.min}">${B('🏆 เสนอราคา', { fn: 'aucWBid' }, 'primary', me.money < A.min)}</div><div class="sub">ขั้นต่ำ ${money(A.min)} · มีเงิน ${money(me.money)}</div>`}`;
 }
+// 🤖 person-check: a button at a random spot; tapping it with a real finger lets work go on
+function hcShow(m) {
+  document.getElementById('hcBox')?.remove();
+  const d = document.createElement('div'); d.id = 'hcBox';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,10,30,.55);touch-action:none';
+  d.innerHTML = `<div style="position:absolute;left:50%;top:10%;transform:translateX(-50%);color:#fff;font-weight:bold;text-align:center;font-size:15px;text-shadow:0 2px 3px #000">🤖 ป้องกันโปรแกรมช่วยเล่น<br>แตะปุ่มด้านล่างเพื่อยืนยันว่าเป็นคนจริง${m.sec ? ` (${m.sec} วิ)` : ''}</div>
+    <button style="position:absolute;left:${(m.x * 100).toFixed(1)}%;top:${(m.y * 100).toFixed(1)}%;transform:translate(-50%,-50%);padding:14px 22px;border-radius:18px;border:3px solid #fff;background:#3ecf6a;color:#fff;font-size:18px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,.4)">🙋 ฉันเป็นคนจริง</button>`;
+  d.querySelector('button').onclick = e => { if (!e.isTrusted) return; send({ t: 'hc', tok: m.tok }); d.remove(); };
+  document.body.appendChild(d);
+}
+// clicks and taps made by a script (not a finger) are dropped; the code's own .click() calls happen inside a real tap, so they pass
+let lastReal = 0, untrSent = 0;
+for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend', 'mousedown', 'mouseup', 'keydown', 'keyup']) addEventListener(ev, e => { if (e.isTrusted) lastReal = Date.now(); }, { capture: true, passive: true });
+for (const ev of ['click', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'keydown']) addEventListener(ev, e => {
+  if (e.isTrusted || Date.now() - lastReal < 800) return;
+  e.stopImmediatePropagation(); e.preventDefault?.();
+  if (Date.now() - untrSent > 60000) { untrSent = Date.now(); send({ t: 'untr' }); }
+}, { capture: true });
 // 🎆 fireworks over the fountain square (bursts scheduled when the message arrives; drawn only while you are in town)
 const FW_AT = { x: 50, y: 33.6 }; let FWB = [];
 function fwShow(m) {
@@ -1302,11 +1418,11 @@ const EMOJIS = ['😀', '😂', '😍', '😎', '😭', '😡', '👍', '👋', 
 $('#emoPick').innerHTML = EMOJIS.map(e => `<button data-e="${e}">${e}</button>`).join('');
 $('#emoPick').querySelectorAll('[data-e]').forEach(b => b.onclick = () => { send({ t: 'emo', e: b.dataset.e }); $('#emoPick').classList.add('hidden'); });
 $('#emoBtn').onclick = () => { FX.play('click'); $('#emoPick').classList.toggle('hidden'); };
-// the CBT notice scrolls across the top now and then
-const TICKER_DEFAULT = '📢 เซิฟนี้เป็น CBT เมื่อเกมสมบูรณ์ข้อมูลจะถูกรีเซ็ต';
+// the admin's announcement scrolls across the top now and then (nothing to show = no ticker)
+const TICKER_DEFAULT = '';
 let tickerAnn = '';
 function setTicker(text) { tickerAnn = text || ''; $('#ticker').firstElementChild.textContent = tickerAnn ? '📢 ' + tickerAnn : TICKER_DEFAULT; }
-function showTicker() { const t = $('#ticker'); if (!G) return; t.classList.remove('hidden'); const sp = t.firstElementChild; sp.style.animation = 'none'; void sp.offsetWidth; sp.style.animation = ''; setTimeout(() => t.classList.add('hidden'), 16500); }
+function showTicker() { const t = $('#ticker'); if (!G || !tickerAnn) return; t.classList.remove('hidden'); const sp = t.firstElementChild; sp.style.animation = 'none'; void sp.offsetWidth; sp.style.animation = ''; setTimeout(() => t.classList.add('hidden'), 16500); }
 setTimeout(showTicker, 8000); setInterval(showTicker, 180000);
 // away from the keyboard: no touch / key for 2 minutes = "ไม่อยู่"
 let lastInput = performance.now(), afkSent = false;
@@ -3095,7 +3211,7 @@ function drawPlayer(p, X, Y, t) {
     [...P.values()].filter(o => o.ps === p.id).forEach((o, i) => nameAndBubble(o, px + (i - .5) * TS * .2, top0 - TS * (.62 + i * .5), o.id === myId, t));   // the passengers' names (and chat) over the driver's
     return;
   }
-  const aura = (p.of === 'admin' || p.of === 'thai' || p.of === 'angel') && !lying, gold = p.of === 'angel' ? (p.g === 'f' ? 'fairy' : 'angel') : p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold · angel / fairy outfit: white-gold / pink
+  const aura = (p.of === 'admin' || p.of === 'thai' || p.of === 'angel' || p.of === 'kitsune') && !lying, gold = p.of === 'angel' ? (p.g === 'f' ? 'fairy' : 'angel') : p.of === 'kitsune' ? 'fox' : p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold · angel / fairy outfit: white-gold / pink
   if (aura) drawAura(px, py, H, now0, false, gold);
   ctx.save();
   if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
@@ -4527,6 +4643,11 @@ const FN = {
   },
   fcBait() { send({ t: 'fcbait' }); },
   openFolks() { send({ t: 'folks' }); openPanel({ kind: 'folks' }); },
+  openCouple() { send({ t: 'wedinfo' }); openPanel({ kind: 'couple' }); },
+  wedAns: m => { send({ t: 'wedans', yes: m.yes }); closePanel(); },
+  spGo: () => { send({ t: 'spgo' }); closePanel(); }, spHome: () => { send({ t: 'sphome' }); closePanel(); },
+  spDivAsk: () => { WEDDIV = true; refreshPanel(true); }, spDiv: () => { WEDDIV = false; send({ t: 'spdiv' }); },
+  openCal() { send({ t: 'cal' }); openPanel({ kind: 'cal' }); },
   openAuc() { send({ t: 'auc' }); openPanel({ kind: 'auc' }); },
   aucWBid(m, root) { send({ t: 'aucbid', amt: +(root.querySelector('#aucWAmt')?.value || 0) }); },
   openFw() { openPanel({ kind: 'fw' }); },
@@ -5682,7 +5803,7 @@ function godFindHtml() {
   if (!godFindRes.list.length) return `<div class="sub">ไม่พบผู้เล่นที่ตรงกับ "${esc(godFindRes.q)}"</div>`;
   const d = t => t ? new Date(t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
-    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.sus?.rows?.length ? `<br>🛡️ <b style="color:${x.sus.score >= 20 ? 'var(--bad)' : 'inherit'}">จับตา 24 ชม. (คะแนน ${x.sus.score})</b>: ${x.sus.rows.map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}` : ''}${x.en ? `<br>⚡ พลังงานตอนนี้ ${x.en.now} · 1 ชม.ล่าสุด: ${x.en.rows.length ? x.en.rows.map(([k, d, n]) => `${esc(k.replace(/^-/, ''))} ${d > 0 ? '+' : ''}${d} (${n})`).join(' · ') : 'ยังไม่มีข้อมูล'}` : ''}${x.doc ? `<br>${x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
+    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.sus?.rows?.length ? `<br>🛡️ <b style="color:${x.sus.score >= 20 ? 'var(--bad)' : 'inherit'}">จับตา 24 ชม. (คะแนน ${x.sus.score})</b>: ${x.sus.rows.map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}` : ''}${x.en ? `<br>⚡ พลังงานตอนนี้ ${x.en.now} · 1 ชม.ล่าสุด: ${x.en.rows.length ? x.en.rows.map(([k, d, n]) => `${esc(k.replace(/^-/, ''))} ${d > 0 ? '+' : ''}${d} (${n})`).join(' · ') : 'ยังไม่มีข้อมูล'}` : ''}${x.doc ? `<br>${x.doc.bot ? '🤖 <b style="color:var(--bad)">หมอ: เหมือนบอท</b>' : x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ · จังหวะคลาด ±${((x.doc.sd ?? 0) / 1000).toFixed(2)} วิ ${x.doc.sd == null ? '' : x.doc.sd < 150 ? '(เท่ากันผิดปกติ)' : '(ไม่เท่ากัน แบบคน)'}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
     ${x.ban ? `<div class="jobbox" style="margin-top:4px">🚫 <b style="color:var(--bad)">ถูกแบน${x.ban.until ? ' ถึง ' + new Date(x.ban.until).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ถาวร'}</b>${x.ban.why ? ' · ' + esc(x.ban.why) : ''} <small>(โดย ${esc(x.ban.by || '')})</small> ${B('✅ ปลดแบน', { fn: 'godUnban', login: x.login }, 'good')}</div>`
       : `<div class="rowf" style="margin-top:4px"><select id="godBanD_${esc(x.login)}"><option value="1">1 วัน</option><option value="3">3 วัน</option><option value="7">7 วัน</option><option value="30">30 วัน</option><option value="0">ถาวร</option></select><input id="godBanW_${esc(x.login)}" maxlength="80" placeholder="เหตุผลการแบน">${B('🚫 แบน', { fn: 'godBan', login: x.login }, 'warn')}</div>`}
     <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>
@@ -5901,6 +6022,40 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-26d', d: '23 พ.ย.', items: [
+    '🗝️ <b>ถ้ำสมบัติ เปิดแล้ว!</b> อยู่ข้างโรงช่างคราฟ เลือกประตูทีละชั้น เจอสมบัติ มอนสเตอร์ กับดัก น้ำพุ ห้องลึกลับ · ทุก 5 ชั้นมีบอส',
+    '🎒 ออกจากถ้ำเมื่อไหร่ก็ได้พร้อมของทั้งหมด แต่ถ้าล้มจะเหลือเงินแค่ 30% จะเสี่ยงลงต่อหรือพอแค่นี้ก็เลือกเอง · ได้ของวิเศษติดตัวระหว่างรอบ',
+    '🪙 เก็บเหรียญโบราณไปแลกคบเพลิงสำรอง ยาติดตัว เครื่องราง · 🏆 ลงลึกสุดประจำสัปดาห์ ที่ 1 ได้ฉายา <b>นักล่าสมบัติ</b> + เพชร',
+  ] },
+  { v: '2026-11-26s', d: '23 พ.ย.', items: [
+    '💒 <b>ระบบแต่งงาน!</b> อยู่กับเพื่อน (ที่บันทึกเบอร์กันทั้งคู่) บ่อยๆ จนความสนิทครบ 100 ❤️ แล้วซื้อแหวนที่ <b>ซุ้มแต่งงานในวัด</b> ขอแต่งงานได้เลย',
+    '💍 แหวน 3 แบบ: แหวนเงิน ฿19,999 · แหวนทอง ฿49,999 · แหวนเพชร 💎199 · แต่งแล้วมีชื่อคู่บนหัว ไปหาคู่ได้ทันที นอนบ้านคู่ได้พลังงานเต็ม',
+    '🎉 มีพิธีที่วัด ทั้งเมืองเห็นประกาศ แขกไปกดอวยพรรับขนมแต่งงาน จบพิธีมีพลุ · แอปใหม่ 💞 คู่รัก ในมือถือ',
+    '💗 แต่งแล้วอยู่ใกล้คู่ = ความรักเพิ่ม + ทำงานได้เงิน +10% · ความรักครบ 100 เป็น <b>คู่ทอง</b> ครบ 500 เป็น <b>คู่ตำนาน</b> (ชื่อเรืองแสง)',
+    '👑 อันดับ <b>คู่รักประจำสัปดาห์</b> ดูในแอป 💞 คู่รัก · ที่ 1 ได้ฉายา คู่รักแห่งเมือง + เพชร · ได้ชุดเจ้าบ่าว/เจ้าสาวฟรีตอนแต่ง (หรือซื้อ 💎150)',
+  ] },
+  { v: '2026-11-26q', d: '23 พ.ย.', items: [
+    '🤖 ระบบกันโปรแกรมช่วยเล่น: ถ้าเล่นต่อเนื่องนานมากหรือกดเป็นจังหวะเหมือนโปรแกรม จะมีปุ่ม "🙋 ฉันเป็นคนจริง" เด้งขึ้นมา แตะครั้งเดียวก็เล่นต่อได้ (ไม่หักของ ไม่หักเงิน)',
+  ] },
+  { v: '2026-11-26p', d: '23 พ.ย.', items: [
+    '🛋️ <b>เฟอร์นิเจอร์ใหม่อีก 18 ชิ้น</b>: ชุดเรือนไทย 🛕 (ตั่ง ตู้ลายรดน้ำ ศาลพระภูมิ) · ห้องนอนเจ้าหญิง 👑 · ห้องเกมเมอร์ 🎮 (โต๊ะจอคู่ ชุดสตรีม ตู้เกม)',
+  ] },
+  { v: '2026-11-26o', d: '23 พ.ย.', items: [
+    '👗 <b>ชุดใหม่ 4 แบบ</b> ที่ร้านแฟชั่น: ชุดฮู้ดแมวพาสเทล 🐱 (💎150) · ชุดแพนด้าตัวกลม 🐼 (💎120) · ชุดหมีน้ำตาลขนนุ่ม 🐻 (฿89,999) · ชุดเสื้อกล้ามยีนส์ (฿14,999 ผู้หญิง)',
+    '🦊 ชุดจิ้งจอกเก้าหาง เรืองแสงออร่าสีม่วง... เร็วๆ นี้',
+  ] },
+  { v: '2026-11-26n', d: '23 พ.ย.', items: [
+    '🛋️ <b>เฟอร์นิเจอร์ใหม่ 24 ชิ้น</b> ที่ร้านเฟอร์นิเจอร์: ชุดบ้านริมทะเล 🐚 · ชุดเรือนญี่ปุ่น ⛩️ · ห้องน้ำ 🛁 (หมวดใหม่) · ครัวครบชุด 🍳',
+    '🧜 ของเด่น: น้ำพุนางเงือก · ประตูโทริอิ · บ่อปลาคาร์ป · เปลญวน (วางในสวน)',
+  ] },
+  { v: '2026-11-26m', d: '23 พ.ย.', items: [
+    '📣 แบนเนอร์กิจกรรมบนหน้าจอมือถือ: ปัดดูได้ กดแล้วไปที่กิจกรรมนั้นเลย (ประมูล · บ้านสวย · แข่งตกปลา · คราฟคริสต์มาส)',
+  ] },
+  { v: '2026-11-26l', d: '23 พ.ย.', items: [
+    '📅 แอปใหม่ <b>กิจกรรม</b> ในมือถือ: แข่งตกปลา ประมูล บ้านสวย หวย พลุ ดูเวลาที่เหลือได้ในหน้าเดียว',
+    '🔔 เปิดแจ้งเตือนไว้ จะได้รับแจ้งเตือน 10 นาทีก่อนแข่งตกปลา 20:00 ทุกวัน',
+    '🎄 1 ธ.ค. นี้ ทำงาน ตกปลา เก็บผัก มีโอกาสได้ ❄️ เกล็ดหิมะ ไปคราฟของคริสต์มาส 6 แบบที่โรงช่าง (เฉพาะเดือนธันวาคม หมดแล้วหมดเลย)',
+  ] },
   { v: '2026-11-26k', d: '23 พ.ย.', items: [
     '🏆 <b>ประมูลประจำสัปดาห์!</b> แอป 🏆 ประมูล ในมือถือ ทุกสัปดาห์มีเฟอร์นิเจอร์เรืองแสง 👑 ที่มีชิ้นเดียวในเมือง เสนอราคาด้วยเงินบาท เริ่ม ฿10,000 ปิดทุกวันจันทร์ 00:00 คนให้ราคาสูงสุดได้ไป',
     '💸 เงินถูกหักตอนเสนอราคา ถ้ามีคนแซงจะได้เงินคืนทันที',
@@ -6938,9 +7093,10 @@ function craftHtml(st) {
   const inv = me.inv || {}, own = [...(me.furniture || []), ...(me.keep || [])];
   const rows = (G.crafts || []).map(r => {
     const f = G.shop.furniture[r.id]; if (!f) return '';
-    const ok = Object.entries(r.in).every(([k, q]) => (inv[k] || 0) >= q);
+    const off = r.season && r.season !== new Date(Date.now() + 7 * 3600e3).getUTCMonth() + 1;   // 🎄 December-only recipes show as a teaser
+    const ok = !off && Object.entries(r.in).every(([k, q]) => (inv[k] || 0) >= q);
     const need = Object.entries(r.in).map(([k, q]) => `<span style="${(inv[k] || 0) >= q ? '' : 'color:#e05555'}">${G.items[k]?.icon || ''}${esc(G.items[k]?.name || k)} ${inv[k] || 0}/${q}</span>`).join(' · ');
-    return `<div class="item"><div class="em">${f.icon}</div><div class="nm"><b>${esc(f.name)}</b>${f.glow ? ' ✨ <small>ตำนาน เรืองแสง</small>' : ''}<small>ความสบาย +${f.comfort} · ${need}</small></div>${own.includes(r.id) ? '<small>✅ มีแล้ว</small>' : B('🔨 คราฟ', { t: 'act', st, a: 'make', rid: r.id }, 'primary', !ok)}</div>`;
+    return `<div class="item"><div class="em">${f.icon}</div><div class="nm"><b>${esc(f.name)}</b>${f.glow ? ' ✨ <small>ตำนาน เรืองแสง</small>' : ''}${r.season ? ' <small>🎄 เฉพาะธันวาคม</small>' : ''}<small>ความสบาย +${f.comfort} · ${need}</small></div>${own.includes(r.id) ? '<small>✅ มีแล้ว</small>' : B('🔨 คราฟ', { t: 'act', st, a: 'make', rid: r.id }, 'primary', !ok)}</div>`;
   }).join('');
   return `<h2>🔨 โรงช่างคราฟ</h2><div class="sub">ของที่นี่ร้านไหนก็ไม่มีขาย · วัตถุดิบ 🪵🧵🐚💠 ได้ระหว่างตกปลา เก็บผัก และทำงาน · 💎 ชิ้นส่วนเพชรซื้อที่นี่หรือได้จากอันดับ 1–3 แข่งตกปลา · ของที่คราฟส่งไปบ้าน (ยังไม่มีบ้านก็เก็บไว้ให้)</div><div class="list">${rows}</div>
     <div class="grid2" style="margin-top:8px">${B(`💎 ชิ้นส่วนเพชร x1 (💎${G.shardGems})`, { t: 'act', st, a: 'shard', n: 1 }, '', (me.gems || 0) < G.shardGems)}${B(`💎 x5 (💎${G.shardGems * 5})`, { t: 'act', st, a: 'shard', n: 5 }, '', (me.gems || 0) < G.shardGems * 5)}</div>`;
@@ -7192,7 +7348,7 @@ function renderPanel(p) {
       if (me.house < 0) return '<h2>🛋️ จัดบ้าน</h2><div class="sub">ต้องมีบ้านของตัวเองก่อน</div>';
       const h = wd?.houses?.[me.house]; if (!h) return '';
       const m0 = P.get(myId), rr = m0 && areaOf(m0.x, m0.y), inHome = rr && (rr.rk === 'house' || rr.yard) && rr.house === me.house;
-      const cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ นอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน'], ['style', '🟫 พื้น/ผนัง']];
+      const cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ นอน'], ['kitchen', '🍳 ครัว'], ['bath', '🛁 ห้องน้ำ'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน'], ['style', '🟫 พื้น/ผนัง']];
       const own = [...new Set(['sbed', ...(me.furniture || []), ...(me.keep || [])])].filter(k => G.shop.furniture[fbase(k)]);
       const catOf = k => G.shop.furniture[fbase(k)].cat || 'basic';
       const tab = cats.some(c => c[0] === p.dtab) ? p.dtab : (cats.find(c => own.some(k => catOf(k) === c[0]))?.[0] || 'basic');
@@ -7466,7 +7622,7 @@ function renderPanel(p) {
     }
     case 'door': return houseDoor(STN(st), st);
     case 'furnshop': {
-      const own = !!me.hown, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน'], ['hfloor', '🟫 พื้น'], ['hwall', '🎨 ผนัง']];
+      const own = !!me.hown, cats = [['basic', '⭐ พื้นฐาน'], ['live', '🛋️ นั่งเล่น'], ['bed', '🛏️ ห้องนอน'], ['kitchen', '🍳 ครัว'], ['bath', '🛁 ห้องน้ำ'], ['deco', '🌿 ของแต่ง'], ['fun', '🎮 บันเทิง'], ['wall', '🧱 กั้นห้อง'], ['garden', '🌳 สวน'], ['hfloor', '🟫 พื้น'], ['hwall', '🎨 ผนัง']];
       const tab = cats.some(c => c[0] === p.ftab) ? p.ftab : 'basic';
       if (tab === 'hfloor' || tab === 'hwall') {
         const fl = tab === 'hfloor', defs = fl ? G.shop.hfloors : G.shop.hwalls, mine = fl ? me.hfl || [] : me.hwl || [];
@@ -7491,6 +7647,11 @@ function renderPanel(p) {
         <div class="tabs ftabs">${cats.map(([k, l]) => B(l, { fn: 'qtab', set: { ptab: k } }, tab === k ? 'primary' : '')).join('')}</div><div class="looks">${cards}</div>`;
     }
     case 'fishcomp': return fishCompPanel();
+    case 'cal': return calHtml();
+    case 'dg': return dgHtml(st);
+    case 'wed': return wedHtml(st, false);
+    case 'couple': return wedHtml(null, true);
+    case 'wedask': return `<h2>💍 ขอแต่งงาน</h2><div class="sub" style="font-size:16px"><b>${esc(p.name)}</b> ขอคุณแต่งงานด้วย${G.rings?.[p.ring] ? ' ' + G.rings[p.ring].icon : ''} 💞<br>ถ้าตกลง ทั้งคู่ต้องไปที่ซุ้มแต่งงานในวัดภายใน 15 นาที</div><div class="grid2">${B('💞 ตกลง', { fn: 'wedAns', yes: 1 }, 'primary')}${B('ยังก่อน', { fn: 'wedAns', yes: 0 })}</div>`;
     case 'auc': return aucWHtml();
     case 'fw': return `<h2>🎆 จุดพลุ</h2><div class="sub">พลุขึ้นที่ลานน้ำพุ ทุกคนในเมืองเห็นพร้อมชื่อคุณ · ต้องอยู่ในตัวเมือง</div><div class="list">${Object.entries(G.fireworks || {}).map(([k, f]) => `<div class="item"><div class="em">🎆</div><div class="nm"><b>พลุ${f.name}</b><small>${f.n} ลูก · ${f.dur} วินาที</small></div>${B(money(f.price), { fn: 'fw', k }, 'primary', me.money < f.price)}</div>`).join('')}</div>`;
     case 'homes': return homesPanel();
@@ -7844,13 +8005,16 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first
-const PH_GROUPS = [['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'ชาวเมือง', 'บันทึก', 'แก๊ง']], ['เงินทอง', ['บิล', 'การเงิน', 'หุ้น', 'ลอตเตอรี่']],
-  ['ชีวิตประจำวัน', ['เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา', 'เลือกตั้ง']], ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
-  ['อื่นๆ', ['เติมเงิน', 'อัปเดต', 'บทช่วยสอน', 'วอลเปเปอร์', 'ตั้งค่า', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
+const PH_GROUPS = [   // 4 apps a row: every app has a group, most-used first (the 'rest' row only catches future apps)
+  ['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'ชาวเมือง', 'คู่รัก', 'บันทึก', 'แก๊ง', 'เลือกตั้ง']],
+  ['เงินทอง', ['การเงิน', 'บิล', 'หุ้น', 'ลอตเตอรี่', 'ประมูล', 'เติมเงิน']],
+  ['ไลฟ์สไตล์', ['กิจกรรม', 'บ้านสวย', 'จุดพลุ', 'เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา']],
+  ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
+  ['ช่วยเหลือ & ตั้งค่า', ['อัปเดต', 'เรื่องเล่า', 'บทช่วยสอน', 'ตั้งค่า', 'วอลเปเปอร์', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
 const PH_TITLE = { wall: 'วอลเปเปอร์', mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 function phonePanel(p) {
@@ -7865,7 +8029,7 @@ function phonePanel(p) {
     for (const a of PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay))) all[a[0]] = emApp(a);
     const used = new Set(), sec = PH_GROUPS.map(([t, names]) => { const h = names.filter(n => all[n]).map(n => (used.add(n), all[n])).join(''); return h ? `<div class="phSec">${t}</div><div class="phApps">${h}</div>` : ''; }).join('');
     const rest = Object.keys(all).filter(n => !used.has(n)).map(n => all[n]).join('');   // anything not listed in a group still shows, at the end
-    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div><div class="phList">${sec}${rest ? `<div class="phApps">${rest}</div>` : ''}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
+    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div>${evBanners()}<div class="phList">${sec}${rest ? `<div class="phApps">${rest}</div>` : ''}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
   if (tab === 'contacts') {
@@ -7960,8 +8124,17 @@ function sign(text, x, y, o = {}) {
 const STN = id => id === 'water' ? waterNear : G.stations.find(s => s.id === id);
 let atlas = null, atlasImg = null;
 let PET_AT = null, petImg = null;
-fetch('assets/pets.json?v=3').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=4'; }, 3500); }).catch(() => { });
-fetch('assets/atlas.json?v=v25').then(r => r.json()).then(j => { atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; }; im.src = (SNOW ? 'assets/atlas_snow.webp' : 'assets/atlas.webp') + '?v=v25'; });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+fetch('assets/pets.json?v=4').then(r => r.json()).then(j => { PET_AT = j; setTimeout(() => { const im = new Image(); im.onload = () => { petImg = im; }; im.src = 'assets/pets.webp?v=5'; }, 3500); }).catch(() => { });
+// 📱 phones get the half-size atlas (~25 MB decoded instead of ~100 MB: iPhones were reloading to a white screen, and it draws faster);
+// halving every sprite rectangle and the tile size keeps every draw call the same
+const HALF_ATLAS = TOUCH_UI || IOS;
+fetch('assets/atlas.json?v=v30').then(r => r.json()).then(j => {
+  if (HALF_ATLAS) { j.tile /= 2; for (const k in j.sprites) j.sprites[k] = j.sprites[k].map(v => v / 2); }
+  atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
+  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v30';
+});
+let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
+if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v30').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v30'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
@@ -8027,10 +8200,10 @@ function sprF(name, cx, by, X, Y, flip) {   // a sprite, mirrored left-right whe
   const px = Math.round(cx * TS + X); ctx.save(); ctx.translate(px, 0); ctx.scale(-1, 1); const r = spr(name, 0, by, 0, Y); ctx.restore(); return r;
 }
 function tex(name, tx, ty, px, py) {
-  const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
-  const q = atlas.tile;
+  const T = TEXA?.sprites[name], s = T || atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
+  const q = T ? TEXA.tile : atlas.tile, img = T ? TEXA.img : atlasImg;
   // sample 1px inside each quarter: the lossy atlas bleeds a little at sprite edges, which showed as lines between tiles
-  ctx.drawImage(atlasImg, s[0] + (tx & 1) * q + 1, s[1] + (ty & 1) * q + 1, q - 2, q - 2, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
+  ctx.drawImage(img, s[0] + (tx & 1) * q + 1, s[1] + (ty & 1) * q + 1, q - 2, q - 2, Math.floor(px), Math.floor(py), Math.ceil(TS) + 1, Math.ceil(TS) + 1);
   return true;
 }
 // your own house: the floor / wallpaper picked for this storey (wd.houses[i][14] = { storey: [floor, wall] })

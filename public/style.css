@@ -1657,3 +1657,20 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 @keyframes tapBlink{0%,100%{opacity:1}50%{opacity:.35}}
 /* login screen: no "players online" badge */
 #promoOnline,.promoOnline,#heroOnline{display:none!important}
+
+/* 📣 event banners (phone home + events app): swipe sideways, one at a time */
+.evBan{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;margin:6px 10px 10px;border-radius:12px;scrollbar-width:none;position:relative;z-index:1}
+.evBan::-webkit-scrollbar{display:none}
+.evBan img{flex:0 0 100%;width:100%;aspect-ratio:640/220;border-radius:12px;scroll-snap-align:center;cursor:pointer;display:block;box-shadow:0 3px 10px rgba(0,0,0,.25)}
+
+/* 🗝️ treasure cave */
+.dgbar{display:inline-block;width:90px;height:8px;border-radius:4px;background:#3a3340;vertical-align:middle;overflow:hidden}.dgbar span{display:block;height:100%;transition:width .3s}
+.dgstat{font-size:13px;margin:4px 0}.dgme{font-size:14px;margin:4px 0;padding:6px;border-radius:10px;background:rgba(0,0,0,.05)}
+.dghit{animation:dgshake .35s;background:rgba(224,72,72,.18)}@keyframes dgshake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+.dgmon{text-align:center;padding:10px;margin:6px 0;border-radius:14px;background:linear-gradient(#3b3346,#1f1a26);color:#fff}.dgmon.boss{background:linear-gradient(#5a1e1e,#220c0c);box-shadow:0 0 14px #ff6a3a}
+.dgface{font-size:56px;line-height:1.1;animation:pulse 1s infinite alternate}
+.dgdoors{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin:8px 0}
+.dgdoor{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 4px;border-radius:14px;background:linear-gradient(#6b4a2e,#3e2a18);color:#ffe9c4;border:2px solid #c9a36b}
+.dgdoor span{font-size:38px}.dgdoor small{font-size:12px}
+.dglog{font-size:12.5px;margin-top:8px;padding:6px 8px;border-radius:10px;background:rgba(0,0,0,.06);min-height:60px}
+.dgres.dead{background:#fde3e3}.dgres.out{background:#e2f6e7}
