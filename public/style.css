@@ -594,7 +594,12 @@ body.hasEvent #topBar{top:146px!important}
   #card.v2 .qRow{padding:2px 4px;font-size:10.5px}
 }
 #card.v2 .bar em{display:inline!important}
-@media (max-width:600px) and (orientation:portrait){#ticker{left:8px!important;right:8px!important;top:calc(2px + env(safe-area-inset-top))!important;z-index:9}}
+@media (max-width:600px) and (orientation:portrait){#ticker{left:8px!important;right:8px!important;top:auto!important;bottom:calc(4px + env(safe-area-inset-bottom))!important;height:20px!important;font-size:11.5px!important;z-index:9;opacity:.92}
+  /* the starter quest list: only the step you are on (tap the title to see all) */
+  #qBox.nb:not(.all) #qList .qRow:not(.cur){display:none}
+  #qBox.nb .qHead{cursor:pointer}
+  #qBox.nb:not(.all) #qCount::after{content:' ▾ ดูทั้งหมด';font-size:11px;opacity:.8}
+  #qBox.nb.all #qCount::after{content:' ▴ ย่อ';font-size:11px;opacity:.8}}
 
 .prof .phCol{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none}
 .prof .phCol button{padding:4px 8px;font-size:12px;white-space:nowrap}

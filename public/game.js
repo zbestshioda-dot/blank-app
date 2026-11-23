@@ -906,7 +906,7 @@ function handle(m) {
 }
 // ---- the chat box under the status card: tabs, foldable, type straight into it
 let cbTab = 'all', cbFolded = false, cbUnread = 0;
-try { cbFolded = localStorage.getItem('lt_cb') === '1'; } catch { }
+try { const v = localStorage.getItem('lt_cb'); cbFolded = v === '1' || v === null && matchMedia('(max-width:600px) and (orientation:portrait)').matches; } catch { }   // phones start with the chat folded: the town stays visible
 const cbShow = m => cbTab === 'all' ? true : (cbTab === 'sys' ? m.sys : cbTab === 'world' ? m.w : cbTab === 'gang' ? m.g : !m.sys && !m.w && !m.g);
 function paintChatBox(added) {
   const box = $('#cbMsgs'); if (!box) return;
@@ -1055,13 +1055,13 @@ function paintCardClock(h) {
 function nbTap(i) {
   const st = G.nbSteps[i]; FX.play('click');
   if (st.go) return setGuide(st.go, false, true);
-  if (i === 3) { const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
+  if (i === 3) { foldChat(false); const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
   toast('เดินไปใกล้ผู้เล่นคนอื่น แล้วกดปุ่มอีโมจิ 😄 (มุมขวาล่าง) · หรือขอแลกเบอร์จากโปรไฟล์ของเขา', '👋');
 }
 function paintNb(box) {
   if (!paintNb.opened) { paintNb.opened = 1; if ($('#card')?.classList.contains('mini')) setCard(false); }   // newcomers see the list open (once; they can fold it)
   const S = G.nbSteps, p = me.nb.p || [], done = S.filter((st, i) => (p[i] || 0) >= st.n).length, first = S.findIndex((st, i) => (p[i] || 0) < st.n);
-  $('#qCount').textContent = `${done}/${S.length}`; const hd = $('#qBox .qHead span'); if (hd) hd.textContent = '🌱 ภารกิจมือใหม่';
+  $('#qBox').classList.add('nb'); $('#qCount').textContent = `${done}/${S.length}`; const hd = $('#qBox .qHead span'); if (hd) hd.textContent = '🌱 ภารกิจมือใหม่';
   const html = S.map((st, i) => { const ok = (p[i] || 0) >= st.n; return `<button class="qRow ${ok ? 'done' : ''} ${i === first ? 'cur' : ''}" data-nb="${ok ? '' : i}"><i>${ok ? '☑' : i === first ? '◆' : '☐'}</i><span>${esc(st.text)} <small>${st.n > 1 ? `(${Math.min(p[i] || 0, st.n)}/${st.n}) ` : ''}${st.money ? '+' + money(st.money) : '+💎' + st.gems}</small></span></button>`; }).join('')
     + `<div class="qRow rew"><i>🎁</i><span>ครบ ${S.length} ข้อ: 💎${G.nbEnd.gems} + 🥚 ไข่สัตว์เลี้ยง</span></div>`;
   if (box.dataset.h === html) return; box.dataset.h = html; box.innerHTML = html;
@@ -1070,6 +1070,7 @@ function paintNb(box) {
 function paintQuestBox() {
   const q = me.quests, box = $('#qList'); if (!box) return;
   if (me.nb && G.nbSteps) return paintNb(box);
+  $('#qBox').classList.remove('nb');
   { const hd = $('#qBox .qHead span'); if (hd && hd.textContent !== '📜 เควสต์วันนี้') { hd.textContent = '📜 เควสต์วันนี้'; box.dataset.h = ''; } }
   if (!q) return;
   const done = q.list.filter(x => x.done).length; $('#qCount').textContent = `${done}/3`;
@@ -1215,6 +1216,7 @@ $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 const placeLog = () => { const cd = $('#card'), db = $('#docBack'); $('#feed').style.top = (cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0)) + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); const tr = $('#topRight'); if (tr) document.body.style.setProperty('--miniW', tr.offsetWidth + 'px'); };
 addEventListener('resize', () => placeLog());
 const setCard = mini => { $('#card').classList.toggle('mini', mini); placeLog(); try { localStorage.setItem('lt_card', mini ? '1' : '0'); } catch { } };
+$('#qBox .qHead').addEventListener('click', e => { if (e.target.closest('#cardToggle') || !$('#qBox').classList.contains('nb')) return; FX.play('click'); $('#qBox').classList.toggle('all'); });   // phones: the starter list shows only the current step; tap the title for all
 $('#cardToggle').onclick = e => { e.stopPropagation(); FX.play('click'); setCard(!$('#card').classList.contains('mini')); };
 { let c = null; try { c = localStorage.getItem('lt_card'); } catch { } setCard(c === null ? innerWidth < 700 && innerHeight > innerWidth : c === '1'); }
 // what each bar means and how to fill it
@@ -6102,6 +6104,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27i', d: '23 พ.ย.', items: [
+    '📱 จอมือถือโล่งขึ้น: แชทเริ่มแบบหุบไว้ (กด 💬 แชท เพื่อเปิด) · ภารกิจมือใหม่โชว์แค่ข้อที่ต้องทำ (แตะหัวข้อเพื่อดูทั้งหมด)',
+    '📢 แถบประกาศสีแดงย้ายไปด้านล่างจอ ไม่บังเงินแล้ว',
+  ] },
   { v: '2026-11-27h', d: '23 พ.ย.', items: [
     '🌳 ของแต่งสวน/เฟอร์นิเจอร์ที่ซื้อไม่ได้หายนะ: ส่งไปเก็บที่คลังบ้าน (🛋️ จัดบ้าน › 🌳 สวน) · ตอนนี้มีปุ่ม "เปิดคลังบ้าน" ในกระเป๋าให้กดไปหาได้เลย',
   ] },
