@@ -444,12 +444,15 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   B('playland', 'b_playland', 44, 122, { label: 'บ้านบอลเด็กเล่น', icon: '🧒', deco: true, clr: 1 });
   B('clawbooth', 'b_clawbooth', 39, 111, { label: 'ตู้คีบตุ๊กตา', icon: '🧸', st: 'clawst', stype: 'claw', noSlot: true, clr: 1 });
   B('photobooth', 'b_photobooth', 26, 103, { label: 'ตู้ถ่ายรูป', icon: '📸', deco: true, clr: 1 });
+  // 🍸 the night bar: east of the office tower on the east main road (door onto the sidewalk). Its footprint is fixed (the old cinema
+  //    picture's size) so the lot never moves when its own painted picture (b_bar, tools/add_bar.py) arrives.
+  { const b = B('bar', 'b_cinema', 87, 30, { label: 'บาร์ชิลล์ราตรี', icon: '🍸', st: 'bar', layout: 'bar', late: 8, clr: 1 }); if (ATLAS.sprites.b_bar) b.sprite = 'b_bar'; }
 }
 
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12] };
+const ROOM_SIZE = { inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['x_vending', 14.2, 2.7], ['x_drinkfridge', 12.6, 2.6], ['x_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['x_wclock', 10.2, 1.0, false], ['f_corkboard', 5.5, 1.15, false], ['x_aircon', 8, 1.0, false], ['f_extinguisher', 3.2, 2.4], ['x_coatrack', 12.6, 10.8], ['x_magrack', 3.6, 10.8], ['x_fern', 9.6, 10.8]],
@@ -513,10 +516,20 @@ const LAYOUT = {
     ['l_typedesk', 13.0, 5.0], ['x_coatrack', 14.7, 5.1], ['f_rug_blue', 13.0, 7.2, false], ['l_case', 13.2, 9.0], ['l_news', 9.9, 8.6],
     ['x_alamp', 1.4, 11.2], ['f_armchair', 2.6, 11.2, false], ['l_books', 4.3, 11.25, false], ['f_plant', 6.0, 11.2], ['l_gramo', 10.2, 11.1],
     ['x_lsofa', 12.8, 11.2, false], ['x_plant', 14.9, 11.2], ['f_welcome', 8, 11.55, false]],
+  // 🍸 night bar: the counter top left with stools in front (bottles and a drinks fridge behind), the karaoke stage top right,
+  // round tables and a pool table at the bottom, a sofa corner; the aisle from the door is kept clear.
+  // br_* pictures come from tools/add_bar.py; until then older furniture stands in (BRS below)
+  bar: [['br_neon', 8, 1.25, false], ['br_shelf', 4.6, 1.9, false], ['br_counter', 4.6, 3.3], ['br_fridge', 1.6, 2.8], ['br_tap', 7.2, 2.5, false],
+    ['br_stool', 3.0, 4.7, false], ['br_stool', 4.6, 4.7, false], ['br_stool', 6.2, 4.7, false],
+    ['br_stage', 12.7, 4.6, false], ['br_speaker', 10.9, 3.0], ['br_speaker', 14.5, 3.0], ['br_mic', 12.7, 3.9, false],
+    ['br_table', 3.2, 8.0], ['br_table', 12.8, 8.0], ['br_pool', 3.6, 11.0], ['br_dart', 14.6, 11.0], ['br_sofa', 12.4, 11.0, false], ['br_lamp', 1.3, 6.4], ['br_lamp', 14.8, 6.4], ['br_barrel', 6.0, 11.0]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
 };
+const BRS = { br_neon: 'ad_neon', br_shelf: 'f_wine_rack', br_counter: 'cz_bar', br_fridge: 'x_drinkfridge', br_tap: 'i_bottles', br_stool: 'x_barstool', br_stage: 'cz_carpet', br_speaker: 'x_flamp',
+  br_mic: 'f_guitar', br_table: 'f_round_table', br_pool: 'x_pool', br_dart: 'x_dart', br_sofa: 'f_sofa_red', br_lamp: 'f_floorlamp', br_barrel: 'barrel' };
+for (const e of LAYOUT.bar) if (!ATLAS.sprites[e[0]]) e[0] = BRS[e[0]];
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
 // university classroom: 4 desks, two students each
@@ -536,7 +549,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4, 5, 6, 7].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -603,6 +616,12 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7].flatMap(L => BUILDINGS.filter(b => +(b.
     for (const [id, type, k, label, icon, dx, dy, r] of [['ad_clawm', 'claw', '', 'ตู้คีบตุ๊กตา', '🧸', 3.0, 4.1, 1.9], ['ad_racem', 'arcm', 'race', 'เกมแข่งรถซิ่ง', '🏎️', 13.3, 4.4, 1.7], ['ad_hoopm', 'arcm', 'hoop', 'ชู้ตบาสเกตบอล', '🏀', 2.0, 7.9, 1.3], ['ad_dancem', 'arcm', 'dance', 'เต้นตามลูกศร', '💃', 4.9, 7.9, 1.1],
       ['ad_molem', 'arcm', 'mole', 'ทุบตัวตุ่น', '🔨', 11.0, 7.8, 1.0], ['ad_hockeym', 'arcm', 'hockey', 'แอร์ฮอกกี้', '🏒', 13.6, 7.9, 1.3]])
       STATIONS.push({ id, type, k, label, icon, room: room.id, x: rx + dx, y: ry + dy, r });
+  }
+  if (kind === 'bar') {                // the counter (drinks, the bartender's shift), the karaoke stage, seats at the tables and on the sofa
+    s.x = rx + 4.6; s.y = ry + 5.2; s.r = 1.9; s.label = 'เคาน์เตอร์บาร์';
+    STATIONS.push({ id: 'bstage', type: 'bstage', label: 'เวทีคาราโอเกะ', icon: '🎤', room: room.id, x: rx + 12.7, y: ry + 5.0, r: 1.6 });
+    for (const [i, dx, dy] of [[1, 2.0, 8.6], [2, 4.4, 8.6], [3, 11.6, 8.6], [4, 14.0, 8.6], [5, 11.8, 10.9], [6, 13.0, 10.9]])
+      STATIONS.push({ id: 'seat_bar' + i, type: 'seat', label: 'ที่นั่งในบาร์', icon: '🪑', room: room.id, x: rx + dx, y: ry + dy, r: .7 });
   }
   if (kind === 'casino') {             // the games: each table / the slot row is its own station
     for (const [id, type, label, icon, dx, dy] of [['cz_slots', 'slot', 'สล็อตแมชชีน', '🎰', 3.2, 4.3], ['cz_roul', 'roul', 'รูเล็ต', '🎡', 4.0, 7.7],
@@ -1139,8 +1158,8 @@ const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', '
 const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'painkiller', 'medkit', 'umbrella'], markup: 1.35 };
 const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
-  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21], inn: [6, 22], library: [6, 22] };
-const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]); };
+  bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21], inn: [6, 22], library: [6, 22], bar: [18, 27], bstage: [18, 27] };
+const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]) || (o[1] > 24 && h < o[1] - 24); };   // past 24 = after midnight (the bar: 18-27 = 18:00-03:00)
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
 // doctors are paid for every game hour they spend inside the hospital during their shift
 const DOCTOR = { start: 8, end: 20, wage: [88, 98, 110, 125, 140, 158, 178] };   // (old shift pay, kept for reference)
@@ -1165,6 +1184,7 @@ const JOBGAMES = {
   type:  { career: 'office', name: 'พิมพ์เอกสารตามแบบ', icon: '⌨️', energy: 4, cd: 20, min: 10, max: 12, per: 6, rate: .5 },
   stock: { career: 'cashier', name: 'เติมของและจัดเรียงชั้น', icon: '📦', energy: 4, cd: 15, min: 20, max: 24, per: 2.6, rate: 1.2 },
   vend:  { career: 'merchant', name: 'ส่งของเติมตู้กดน้ำ', icon: '🥤', energy: 4, cd: 20, min: 20, max: 30, per: 2.2, rate: 1.3 },
+  mix:   { career: 'bartender', name: 'ผสมเครื่องดื่มตามออเดอร์', icon: '🍸', energy: 4, cd: 15, min: 15, max: 12, per: 5.5, rate: .5 },
   slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 18, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
@@ -1565,6 +1585,29 @@ const CASINO = {
   // roulette (0-36, one zero): red/black/odd/even/1-18/19-36 pay 2x, a single number 36x
   red: [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36],
 };
+// 🍸 the night bar (18:00-03:00). Every drink lifts happiness; alcohol also costs a little health and adds to how drunk you are
+// (drunk: 0-100, wears off by `sober` points a real minute). Water and coffee sober you up. Very drunk (>= brawl) may start
+// a fight: the police get called (any officer in the bar can calm it down for a reward); if nobody comes it ends by itself.
+// Karaoke: one singer at a time holds the stage for `sing` seconds; people in the bar can tip the singer.
+const BAR = {
+  drinks: {   // price, happy, health, drunk
+    beer:     { name: 'เบียร์สด', icon: '🍺', price: 60, happy: 6, health: -1, drunk: 14 },
+    cocktail: { name: 'ค็อกเทลผลไม้', icon: '🍹', price: 120, happy: 10, health: -1, drunk: 18 },
+    whisky:   { name: 'วิสกี้โซดา', icon: '🥃', price: 150, happy: 12, health: -2, drunk: 26 },
+    wine:     { name: 'ไวน์แดง', icon: '🍷', price: 180, happy: 12, health: 0, drunk: 16 },
+    shot:     { name: 'ช็อตเตกีลา', icon: '🥂', price: 90, happy: 8, health: -2, drunk: 30 },
+    soda:     { name: 'โซดามะนาว (ไม่มีแอลกอฮอล์)', icon: '🥤', price: 40, happy: 4, health: 0, drunk: -15 },
+    water:    { name: 'น้ำเปล่าเย็นๆ', icon: '💧', price: 15, happy: 1, health: 1, drunk: -25 },
+    coffee:   { name: 'กาแฟดำแก้เมา', icon: '☕', price: 50, happy: 2, health: 0, drunk: -40 },
+  },
+  max: 100, sober: 4, tipsy: 30, drunk: 60, brawl: 85, brawlChance: .35, brawlFor: 180, brawlPay: 450, brawlFine: 200,
+  sing: 60, singCd: 120, singJoy: 10, tips: [20, 50, 100],
+  songs: ['ลมหนาวในบาร์', 'คืนนี้ขอเมา', 'รักเธอเท่าฟ้า', 'เพลงรักริมทะเล', 'ไม่ลืมเธอ', 'แด่เพื่อนผู้ร่วมทาง', 'สายฝนที่หัวใจ', 'บาร์เล็กๆ ในเมืองใหญ่'],
+  // bartender orders (the mini-game): a recipe = the ingredients in order
+  recipes: [['ม็อกเทลมะนาว', '🍹', ['🧊', '🍋', '🥤']], ['วิสกี้โซดา', '🥃', ['🧊', '🥃', '🥤']], ['มาร์การิต้า', '🍸', ['🧂', '🍋', '🥃', '🧊']], ['เบียร์สด', '🍺', ['🍺']],
+    ['ไวน์แดง', '🍷', ['🍷']], ['โมฮิโต้', '🍹', ['🌿', '🍋', '🧊', '🥤']], ['ช็อกโกแลตปั่น', '🥛', ['🍫', '🥛', '🧊']], ['พันช์ผลไม้', '🍹', ['🍓', '🍊', '🧊', '🥤']]],
+  shelf: ['🧊', '🍋', '🥤', '🥃', '🍺', '🍷', '🌿', '🧂', '🍫', '🥛', '🍓', '🍊'],
+};
 // 🕹️ game centre: arcade machines cost a coin and pay tickets by score; tickets buy plush toys at the counter. The claw machine
 // sells a straight try at a toy: aim the claw over one, then it holds on (or slips) with the toy's grip chance.
 const ARCADE = {
@@ -1605,6 +1648,7 @@ const CAREERS = {
   detective: { name: 'นักสืบเอกชน', icon: '🕵️', where: 'staff_detective', need: [], desc: 'รับคดีค้นหาของหาย ตามหาคนและสัตว์เลี้ยง และไขปริศนา: เก็บเบาะแส สอบปากคำพยาน แล้วชี้ตัวคนร้าย (ตอบผิดเสียเวลา) · คดีที่ปิดได้จะถูกบันทึกในสมุดคดี · รับคดีที่ผู้กองเดชในหอสมุดเมือง (มุมขวา)' },
   courier: { name: 'พนักงานส่งของ', icon: '📦', where: 'door_warehouse', need: [], desc: 'เดินส่งพัสดุตามบ้าน (ไม่ต้องมีใบขับขี่) ส่งครบเร็วได้โบนัส · รับภารกิจที่พี่ด่วนหน้าคลังสินค้า' },
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: [], desc: 'ทำอาหารที่ครัวใหญ่: ซื้อวัตถุดิบ หั่น ผัด ต้ม ย่าง แล้วจัดจาน · อาหารที่เชฟทำขายให้ร้านอาหารได้ราคาดีกว่าคนทั่วไป (ยิ่งเลเวลสูงยิ่งได้มาก) · รับภารกิจเชฟที่เชฟหมีในครัว' },
+  bartender: { name: 'บาร์เทนเดอร์', icon: '🍸', where: 'bar', need: [], desc: 'ผสมเครื่องดื่มที่บาร์ชิลล์ราตรี (เปิด 18:00–03:00): ดูออเดอร์ หยิบส่วนผสมให้ถูกสูตรตามลำดับ ยิ่งไวยิ่งได้มาก · ลูกค้าในบาร์ให้ทิปได้' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
 // the degree comes from classes at the university; other licences are bought
@@ -2369,6 +2413,6 @@ module.exports = { DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,
   areaAt, roomAt, blocked, DAY_MS, TIME_OFF, hourAt, dayAt, HOURS, isOpen, SHIFT,
-  RARITY, FISH_RARITY, FOLK_LV, FOLK_LVN, FOLK_REWARD, FISH_COL, CASINO, ARCADE, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
+  RARITY, FISH_RARITY, FOLK_LV, FOLK_LVN, FOLK_REWARD, FISH_COL, CASINO, ARCADE, BAR, XMAS_END, RODS, ROD_ORDER, PETS, DOGQ, JOBGAMES, THIEFQ, COOK, FRAMES, waterPool, ITEMS, CATEGORIES, CROPS, RECIPES, FISH, BIG_FISH, CAREERS, LICENSES, DRIVING_TEST, JOB_COOLDOWN_MIN, OFFICE_TITLES, OFFICE_WAGE, RIDER, EVENTS,
   VEHICLES, TOOLS, TOOL_PRICES, HOUSE_PRICES, HOUSE_RENT, HOME_TIERS, HOME_STYLES, HOME_FLOORS, HOME_WALLS, FURNITURE, HOUSE_FLOORS, FLOOR_PRICE, floorRoom, BANK, DISEASES, TREATMENTS, NPC_NAMES, ACHIEVEMENTS,
 };

@@ -1674,3 +1674,8 @@ body.placing #placeBar.pick{padding:3px 9px;animation:pbFade .6s ease 3s forward
 .dgdoor span{font-size:38px}.dgdoor small{font-size:12px}
 .dglog{font-size:12.5px;margin-top:8px;padding:6px 8px;border-radius:10px;background:rgba(0,0,0,.06);min-height:60px}
 .dgres.dead{background:#fde3e3}.dgres.out{background:#e2f6e7}
+/* 🥴 drunk (the night bar): the town view sways (transform only, no filter: cheap on phones) */
+@keyframes drunkSway { 0%, 100% { transform: rotate(0) translateX(0) } 25% { transform: rotate(.5deg) translateX(3px) } 75% { transform: rotate(-.5deg) translateX(-3px) } }
+body.drunk1 #cv { animation: drunkSway 6s ease-in-out infinite }
+body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
+@media (prefers-reduced-motion: reduce) { body.drunk1 #cv, body.drunk2 #cv { animation: none } }

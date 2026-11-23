@@ -2288,6 +2288,7 @@ function apply(a, career) {
     merchant: 'ประมูลสินค้าที่โรงประมูล เดาราคาแข่งกับคู่แข่ง ซื้อได้ต่ำกว่ามูลค่าจริง = กำไร',
     doctor: 'ไปที่ ICU ในโรงพยาบาล รับเคสฉุกเฉิน (กู้ชีพ ผ่าตัด ห้ามเลือด ฯลฯ ลงมือทำในห้องจริง) ได้ค่ารักษาทุกเคส + เดินไปที่เตียงคนไข้ วินิจฉัยจากอาการแล้วรักษา',
     monk: 'ตื่นเช้ามาออกบิณฑบาต (กดที่หน้าโบสถ์ช่วง 05:00–10:00) แล้วฉันเช้าก่อนเที่ยงนะ',
+    bartender: 'ไปที่บาร์ชิลล์ราตรีช่วง 18:00–03:00 กดที่เคาน์เตอร์บาร์ แล้วเล่น "ผสมเครื่องดื่มตามออเดอร์" · ลูกค้าที่สั่งเครื่องดื่มตอนคุณอยู่ในบาร์จะทิปให้',
     cashier: 'ไปที่ร้านสะดวกซื้อสาขาไหนก็ได้ เปิดหน้าร้านแล้วกด "เข้ากะแคชเชียร์" คิดเงินทอนให้ลูกค้าให้ถูก',
     chef: 'เข้าครัวใหญ่ ซื้อวัตถุดิบที่ตู้กับข้าว แล้วทำอาหารตามสูตร ขายจานที่ทำได้ที่ตลาด (เชฟได้ราคาดีกว่า) · คุยกับเชฟหมีเพื่อรับภารกิจเชฟ',
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
@@ -2601,6 +2602,72 @@ function tarotLuck(a) {   // lucky number and colour: fixed for the day and the 
   let h = 0; for (const ch of dayKey() + (a.login || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return { num: h % 90 + 10, col: ['แดง', 'ชมพู', 'ส้ม', 'เหลือง', 'เขียว', 'ฟ้า', 'น้ำเงิน', 'ม่วง', 'ขาว', 'ทอง'][(h >> 8) % 10] };
 }
+// 🍸 the night bar: how drunk someone is (it wears off with time), the karaoke stage and a bar fight (one of each at a time)
+const drunkLv = a => a.dk ? Math.max(0, a.dk.v - (now() - a.dk.t) / 60000 * D.BAR.sober) : 0;
+// when the tipsy / very drunk looks wear off (others see you sway until then)
+const drunkPub = a => { const v = drunkLv(a), B0 = D.BAR, at = lim => v > lim ? now() + (v - lim) / B0.sober * 60000 : 0; return v > B0.tipsy ? [Math.round(at(B0.tipsy)), Math.round(at(B0.drunk))] : 0; };
+let barStage = null, barBrawl = null;
+const inBar = a => areaId(a) === 'r_bar';
+const barView = () => {
+  const t = now();
+  if (barStage && barStage.until < t) barStage = null;
+  if (barBrawl && barBrawl.until < t) barBrawl = null;
+  return { sg: barStage ? { id: barStage.id, n: barStage.name, song: barStage.song, until: barStage.until, tips: barStage.tips } : null, br: barBrawl ? { n: barBrawl.name, until: barBrawl.until } : null };
+};
+const barTell = () => { for (const o of online.values()) if (inBar(o)) markMe(o); };
+function barAct(a, s, m) {
+  const B0 = D.BAR, t = now();
+  if (s.type === 'bar' && m.a === 'drink') {
+    const d = B0.drinks[m.id]; if (!d) return;
+    if (!cd(a, 'bdrink', 1200, true)) return;
+    if (d.drunk > 0 && drunkLv(a) >= B0.max - 5) return toast(a, 'บาร์เทนเดอร์ไม่ขายแอลกอฮอล์ให้แล้ว คุณเมามากเกินไป! ลองน้ำเปล่าหรือกาแฟดำก่อนนะ', '🙅', false);
+    if (!pay(a, d.price)) return;
+    a.dk = { v: clamp(drunkLv(a) + d.drunk, 0, B0.max), t };
+    if (d.health) a.health = clamp(a.health + d.health, 1, 100);
+    joy(a, d.happy); stat(a, 'drinks'); markMe(a); sendRoster(); FX0(a, 'pick');
+    const bt = [...online.values()].find(o => o !== a && o.career === 'bartender' && inBar(o));   // 🍸 a bartender on shift gets a tip
+    if (bt) { earn(bt, Math.max(5, Math.round(d.price * .15)), true); toast(bt, `💵 ${a.name} สั่ง${d.icon}${d.name} ทิปให้คุณ ${money(Math.max(5, Math.round(d.price * .15)))}`, '🍸'); }
+    const v = drunkLv(a);
+    if (d.drunk > 0 && v >= B0.brawl && !barView().br && Math.random() < B0.brawlChance) {   // 🥊 too much: a fight breaks out, the police are called
+      barBrawl = { lk: lk(a), name: a.name, until: t + B0.brawlFor * 1000 };
+      joy(a, -6); feed(`🚨 ${a.name} เมาอาละวาดที่บาร์ชิลล์ราตรี! ตำรวจกำลังไป`);
+      for (const o of online.values()) if (o.career === 'police' && o !== a) toast(o, '🚨 แจ้งเหตุ: มีคนเมาก่อเรื่องที่บาร์ชิลล์ราตรี! รีบไประงับเหตุที่เคาน์เตอร์บาร์ ได้รางวัล', '🚓');
+      barTell();
+      return toast(a, `🥴 คุณเมาจนหาเรื่องคนอื่น! มีคนแจ้งตำรวจแล้ว... (ถ้าตำรวจมาจะโดนปรับ ${money(B0.brawlFine)})`, '🚨', false);
+    }
+    return toast(a, `${d.icon} ${d.name} ${d.drunk < 0 ? 'สร่างขึ้นหน่อยแล้ว' : v >= B0.drunk ? 'เริ่มเดินเซแล้วนะ 🥴' : v >= B0.tipsy ? 'กรึ่มๆ กำลังดี 😊' : 'ชื่นใจ!'}`, d.icon);
+  }
+  if (s.type === 'bar' && m.a === 'calm') {   // 🚓 an officer calms the fight down
+    const br = barView().br; if (!br) return toast(a, 'ตอนนี้ไม่มีเหตุวุ่นวายในบาร์', '🍸', false);
+    if (a.career !== 'police' && !allJobs(a)) return toast(a, 'ต้องเป็นตำรวจถึงจะระงับเหตุได้ (ไปสมัครที่สถานีตำรวจ)', '👮', false);
+    if (barBrawl.lk === lk(a)) return toast(a, 'คุณเป็นคนก่อเรื่องเองนะ!', '🥴', false);
+    const p = Math.round(B0.brawlPay * jobPay(a)), o = accounts.get(barBrawl.lk);
+    barBrawl = null; earn(a, p); quest(a, 'job_police'); addXp(a, 1); joy(a, 6); markMe(a);
+    if (o) { const f = Math.min(Math.max(0, Math.floor(o.money)), B0.brawlFine); o.money -= f; o.dk = { v: Math.min(drunkLv(o), B0.tipsy), t: now() }; markMe(o); if (o.ws) toast(o, `👮 ${a.name} มาระงับเหตุแล้ว โดนปรับ ${money(f)} · สร่างเมาขึ้นเยอะเลย`, '🚓', false); }
+    feed(`🚓 ${a.name} ระงับเหตุวุ่นวายที่บาร์ได้สำเร็จ`); barTell(); sendRoster();
+    return toast(a, `🚓 ระงับเหตุเรียบร้อย! ได้รางวัล ${money(p)}`, '🚓');
+  }
+  if (s.type === 'bstage' && m.a === 'sing') {   // 🎤 hold the stage for a minute
+    const st0 = barView().sg; if (st0 && st0.id !== a.id) return toast(a, `${st0.n} กำลังร้องอยู่ รอคิวก่อนนะ`, '🎤', false);
+    if (st0) return toast(a, 'คุณกำลังร้องอยู่แล้ว', '🎤', false);
+    if (!cd(a, 'bsing', B0.singCd * 1000)) return;
+    const song = B0.songs[+m.i] || B0.songs[Math.floor(Math.random() * B0.songs.length)];
+    barStage = { id: a.id, lk: lk(a), name: a.name, song, until: t + B0.sing * 1000, tips: 0 };
+    joy(a, B0.singJoy + (drunkLv(a) >= B0.tipsy ? 4 : 0)); stat(a, 'sing'); markMe(a); sendRoster();
+    for (const o of online.values()) if (inBar(o) && o !== a) toast(o, `🎤 ${a.name} ขึ้นเวทีร้องเพลง "${song}" · ให้ทิปได้ที่เวที`, '🎶');
+    barTell(); return toast(a, `🎤 ขึ้นเวทีแล้ว! ร้องเพลง "${song}" · คนในบาร์ให้ทิปได้นะ`, '🎶');
+  }
+  if (s.type === 'bstage' && m.a === 'tip') {
+    const st0 = barView().sg, amt = +m.amt; if (!st0) return toast(a, 'ตอนนี้ไม่มีใครร้องเพลง', '🎤', false);
+    if (st0.id === a.id) return toast(a, 'ทิปตัวเองไม่ได้นะ 😆', '🎤', false);
+    if (!B0.tips.includes(amt) || !cd(a, 'btip', 1500, true)) return;
+    const o = online.get(st0.id); if (!o) return;
+    if (!pay(a, amt)) return;
+    barStage.tips += amt; earn(o, amt, true); joy(o, 2); markMe(a);
+    toast(o, `💵 ${a.name} ทิปให้ ${money(amt)}! ร้องต่อเลย 🎶`, '🎤'); barTell();
+    return toast(a, `💵 ทิป ${money(amt)} ให้${o.name}แล้ว`, '🎤');
+  }
+}
 function act(a, m) {
   if (/^hbed\d+$/.test(m.st || '')) { const o = houses[ST[m.st]?.idx]; if (o) syncBed(o); }   // the bed may have been moved
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
@@ -2612,6 +2679,7 @@ function act(a, m) {
   if (!D.isOpen(s.type, h) && !(s.type === 'restaurant' && m.a === 'pickup')) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
   const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
   if (/^(slot|hilo|roul|bj)$/.test(s.type)) return czAct(a, s, m);
+  if (s.type === 'bar' && m.a !== 'apply' || s.type === 'bstage') return barAct(a, s, m);
   if (WORK.has(key) && a.hc && !isAdmin(a)) {   // 🤖 a person-check is waiting: hold work until it is tapped
     if (GD.blocked(a, now()) === 'late' && !a.hc.late) { a.hc.late = 1; sus(a, 'hcfail'); }
     send(a, { t: 'hc', tok: a.hc.tok, x: a.hc.x, y: a.hc.y, sec: Math.max(0, Math.ceil((a.hc.until - now()) / 1000)) });
@@ -4826,7 +4894,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(() => '🤒'),   // which disease it is: only the patient knows (a doctor reads the symptoms)
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0, ap: isAdmin(a) && a.god?.plain ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, mc: cardOn(a) ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, mc: cardOn(a) ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', dk: drunkPub(a), sg: barStage && barStage.id === a.id && barStage.until > now() ? barStage.until : 0, gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -4870,7 +4938,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb && !a.nb.done ? { p: a.nb.p } : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -5030,7 +5098,7 @@ function login(ws, m, pre) {
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
-    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
+    props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, bar: D.BAR, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());

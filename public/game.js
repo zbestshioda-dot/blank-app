@@ -11,6 +11,9 @@ const $ = s => document.querySelector(s);
 try { const rf = new URLSearchParams(location.search).get('ref'); if (rf) localStorage.setItem('ltRef', rf.toUpperCase()); } catch { }   // invite link: the code is used once this player is in the game
 const COLORS = ['#4aa3d1', '#7ac96b', '#e2b13c', '#d9907a', '#4fc3a1', '#4aa3d1', '#6b7fe0', '#a56be0', '#e06bb4', '#9aa4ad'];
 const job = c => me?.career === c || !!me?.admin && me.god?.alljobs !== false;   // admins can do every job's work (unless switched off)
+// 🍸 how drunk someone looks: 2 = very drunk (sways, 🥴), 1 = tipsy, 0 = sober (the server sends when each wears off)
+const dkLv = p => { const d = p?.dk; if (!d) return 0; const n = Date.now() + clockOff; return d[1] > n ? 2 : d[0] > n ? 1 : 0; };
+const dkSway = (p, t) => { const l = dkLv(p); return l ? Math.sin(t / 260 + (Math.abs(+p.id || 0) % 7)) * (l === 2 ? .08 : .03) : 0; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // ---- pixel icons: emoji anywhere in the page (panels, buttons, toasts, the HUD) are swapped for the game's own pixel-art
 // icons (public/assets/icons.webp). Text drawn on the canvas keeps its emoji.
@@ -177,7 +180,7 @@ function femOutfitFrame(sheet, step, lk) {
   return chPut(key, c);
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const OUTFIT_SHEET = { templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
+const OUTFIT_SHEET = { bartender: 'tuxedo', templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
   tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', tanktop: 'tanktop', bear: 'bear', panda: 'panda', cathood: 'cathood', kitsune: 'kitsune', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong', wedding: 'wedding' };   // women's versions are the 'f' + name sheets
@@ -1188,11 +1191,12 @@ setInterval(bgmTick, 100);
 const dayNow = () => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 }, mid = (c.dayMin + (24 - c.dusk) * (24 - c.dayMin) / (24 - (c.dusk - c.dawn))) * 60000; return Math.floor((Date.now() + clockOff + (wd?.toff || 0) + G.dayMs - mid) / G.dayMs); };
 const isInside = rid => { const m = P.get(myId); return !!m && roomOf(m.x, m.y)?.id === rid; };
 const FORCE_PHASE = new URLSearchParams(location.search).get('phase');   // ?phase=0.95 previews a time of day
-const isOpen = (kind, h = hourNow()) => { const o = G?.hours[kind]; return !o || (h >= o[0] && h < o[1]); };
+const isOpen = (kind, h = hourNow()) => { const o = G?.hours[kind]; return !o || (h >= o[0] && h < o[1]) || (o[1] > 24 && h < o[1] - 24); };   // past 24 = after midnight (the bar)
 setInterval(() => {
   if (!wd || !G) return;
   const h = hourNow();
   paintCardClock(h);
+  { const l = dkLv(P.get(myId)); document.body.classList.toggle('drunk1', l === 1); document.body.classList.toggle('drunk2', l === 2); }   // 🥴 the screen sways while drunk
   const dt = me?.date; $('#clock').innerHTML = `${dt ? `<span>📅 ${dt.day}/${G.monthDays} ${G.months[dt.month]}</span><i> · </i>` : ''}<span>🕐 ${hhmm(h)} · 👥 ${wd.on}</span>`;
   document.querySelectorAll('.qcd').forEach(el => {
     const s = Math.max(0, Math.floor((+el.dataset.t - (Date.now() + clockOff)) / 1000));
@@ -1901,6 +1905,7 @@ function frame(t) {
     const l = Math.hypot(dx, dy); meMoving = false;
     if (l > 0.01) {
       if (l > 1) { dx /= l; dy /= l; }
+      { const dl = dkLv(m); if (dl && !driving()) { const a0 = Math.sin(performance.now() / 380) * (dl === 2 ? .6 : .22), c0 = Math.cos(a0), s0 = Math.sin(a0); [dx, dy] = [dx * c0 - dy * s0, dx * s0 + dy * c0]; } }   // 🥴 drunk: the path weaves
       if (running && (!canRun() || me.run === false && performance.now() - runSetT > 1500)) setRun(false);
       const rv = me.ride && !roomOf(m.x, m.y) && !me.pose ? G.shop.vehicles[me.ride] : null, sp = G.speed * (me.speedBase || me.speed || 1) * (rv ? rv.speed : running ? G.run.mul : 1) * mdt;
       // round to what we send so client and server always agree
@@ -3181,7 +3186,7 @@ function drawPlayer(p, X, Y, t) {
   if (!chImg) return drawPlayerPixel(p, X, Y, t);
   const snap = v => Math.round(v * DPR) / DPR;
   const fo = p.pose === 'fun' && p.fn ? funPos(p) : null;   // on a park ride: drawn where the ride carries them
-  const px0 = snap(fo ? fo.x * TS + X : (p.rx + (p.ox || 0)) * TS + X), py0 = snap(fo ? (fo.y - fo.lift) * TS + Y : (p.ry + (p.oy || 0)) * TS + Y + TS * .32);
+  const px0 = snap(fo ? fo.x * TS + X : (p.rx + (p.ox || 0) + dkSway(p, t)) * TS + X), py0 = snap(fo ? (fo.y - fo.lift) * TS + Y : (p.ry + (p.oy || 0)) * TS + Y + TS * .32);
   if (px0 < -80 || py0 < -140 || px0 > VW + 80 || py0 > VH + 140) return;
   const pose = p.pose, lying = pose === 'bed' || pose === 'hosp' || pose === 'veg', sitting = pose === 'seat' || pose === 'chair' || pose === 'rest' || pose === 'beg' || pose === 'jail' || pose === 'study' || !!fo?.sit;
   const ang = (p.f / 8) * Math.PI * 2 - Math.PI, cx = Math.cos(ang), cy = Math.sin(ang);
@@ -3231,7 +3236,7 @@ function drawPlayer(p, X, Y, t) {
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
   const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? '💫' : mine && me?.craving ? '💡' : pose === 'seat' ? '❤️' : null;
   if (emote) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
-  const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : p.sad ? '😞' : '';
+  const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : p.sg > Date.now() + clockOff ? '🎤' : dkLv(p) === 2 ? '🥴' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
   nameAndBubble(p, px, umb ? top - TS * .42 : top, mine, t);
 }
@@ -3846,6 +3851,7 @@ const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FA
   chef:     { name: 'เชฟหมี (หัวหน้าครัวใหญ่)', short: 'เชฟหมี', of: 'chef', lk: { hair: 'black' }, hi: 'รักการทำอาหารไหม! มาเป็นเชฟกับพี่หมี ทำอาหารขายได้ราคาดีกว่าคนทั่วไป... แล้วพี่สอนใส่พริกให้ด้วย 🌶️', yes: 'มาแล้วเหรอเชฟ! วันนี้งานเพียบ รับภารกิจเลย ครัวพี่ร้อนแต่ใจพี่ร้อนกว่า!' },
   rider:    { name: 'พี่ต่อ (หัวหน้าไรเดอร์)', short: 'พี่ต่อ', of: '-', lk: { hair: 'black', shirt: '#237040', pants: '#222222' }, hi: 'มีใบขับขี่ไหม? มาวิ่งส่งอาหารกัน ลมเย็นๆ ตอนกลางคืน... ส่งไว แต่ใจเย็นนะ', yes: 'ออเดอร์เข้าเยอะ ดูในแอพเลย! ใบขับขี่ต้องต่ออายุทุกปีด้วยนะ อย่าให้พี่แบงค์ต้องเรียกวิทยุตาม' },
   police:   { name: 'ผู้กองเอก (สถานีตำรวจ)', short: 'ผู้กองเอก', lk: { hair: 'black' }, hi: 'เมืองนี้ต้องการผู้พิทักษ์ จบ ม.6 แล้วมาสอบนายสิบนะ ผมจะรอ... ด้วยสีหน้าจริงจัง', yes: 'มีแจ้งเหตุ 191 เมื่อไหร่ รีบไปเลย ผมเชื่อใจคุณ ...ระหว่างทางถ้าเจอรถไอติม บอกผมด้วย' },
+  bartender: { name: 'เจ๊แอน (เจ้าของบาร์)', short: 'เจ๊แอน', of: '-', g: 'f', lk: { hair: 'black', shirt: 'black', pants: 'black' }, hi: 'ยินดีต้อนรับสู่บาร์ชิลล์ราตรีจ้า 🍸 เจ๊กำลังหาบาร์เทนเดอร์มือไวอยู่ ไม่ต้องมีวุฒิ ผสมเครื่องดื่มตามสูตรเป็นก็พอ สนใจไหม?', yes: 'เยี่ยม! ไปหลังเคาน์เตอร์เลย กดที่เคาน์เตอร์บาร์แล้วเริ่มผสมเครื่องดื่ม ลูกค้าสั่งตอนเธออยู่ก็ได้ทิปด้วยนะ 💵' },
   cashier:  { name: 'พี่แนน (ผู้จัดการร้าน)', short: 'พี่แนน', of: '-', g: 'f', lk: { hair: 'brown', shirt: '#2f8f55', pants: '#333333' }, hi: 'สวัสดีค่า~ ร้านเรารับแคชเชียร์อยู่นะ ไม่ต้องมีวุฒิ มาทำงานกับพี่แนนไหม ทีมเราน่ารักทุกคน!', yes: 'ถึงกะแล้ว! ไปยืนแคชเชียร์ ทอนเงินให้ถูก ยิ้มให้หวาน พี่แนนเชื่อมือเธอนะ' },
   monk:     { name: 'หลวงพ่อเย็น (เจ้าอาวาส)', short: 'หลวงพ่อเย็น', lk: {}, hi: 'เจริญพร โยม... อยากบวชเรียนศึกษาธรรมไหม ชีวิตเรียบง่าย แต่อิ่มใจนะ เย็นไว้ๆ', yes: 'ตื่นเช้าออกบิณฑบาต แล้วอย่าฉันหลังเที่ยงนะ ...อาตมาก็อดทนมาหลายสิบปีแล้ว เจริญพร' },
   beggar:   { name: 'ลุงจุก (ศาลาประชาคม)', short: 'ลุงจุก', lk: { hair: 'black', shirt: 'white', pants: 'brown' }, hi: 'ไม่มีงานทำก็มาเป็นขอทานกับลุงได้นะ วิ่งเก็บขยะที่ถังขยะ หรือนั่งขอทานก็ได้ เก็บให้เกิน 2,000 บาทก็พ้นแล้ว', yes: 'ใครบริจาคก็ขอบคุณเขาด้วยนะหลาน รอยยิ้มเรามีค่าเหมือนกัน... ลุงยิ้มฟรีมาสามสิบปีแล้ว' },
@@ -4941,7 +4947,7 @@ function icuDraw() {
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
 const NPC_FACE = { staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
-  staff_doctor: 'doctor_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
+  staff_doctor: 'doctor_f', staff_bartender: 'shop_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
   keep_workshop: 'worker_m', keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_cstore2: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
 const TALK = {
@@ -5337,6 +5343,23 @@ function arcHtml(k, st) {
     hockey: 'ลากไม้ตีรับลูกพัคไม่ให้ผ่านไปได้ · พลาด 3 ครั้งจบเกม' }[STN(st).k];
   return `<h2>${g.icon} ${esc(g.name)}</h2><div class="sub">🕹️ เกมเซ็นเตอร์ · เล่นครั้งละ ${money(g.price)}<br>${how}<br>🎟️ ได้ตั๋วตามคะแนน เอาไปแลกตุ๊กตาที่เคาน์เตอร์ · ตอนนี้มี 🎟️ ${me.tix || 0}</div>
     ${B(`🎮 เล่นเลย (${money(g.price)})`, { t: 'act', st, a: 'start' }, 'primary big', me.money < g.price)}`;
+}
+// 🍸 the night bar: the counter (drinks, the police button in a fight, the bartender's mini-game) and the karaoke stage
+function barHtml(k, st) {
+  const B0 = G.bar, v = me.bar || {}, n0 = Date.now() + clockOff, dk = me.dk || 0;
+  const meter = `<div class="sub">🥴 ความเมา <span class="dgbar" style="display:inline-block;width:110px;height:8px;border-radius:4px;background:#0002;vertical-align:middle;overflow:hidden"><span style="display:block;height:100%;width:${Math.min(100, dk)}%;background:${dk >= B0.drunk ? '#e05555' : dk >= B0.tipsy ? '#f0a030' : '#3bb36b'}"></span></span> ${dk >= B0.brawl ? 'เมาหนักมาก!' : dk >= B0.drunk ? 'เดินเซแล้ว' : dk >= B0.tipsy ? 'กรึ่มๆ' : 'ยังไม่เมา'}</div>`;
+  if (k === 'bstage') {
+    const sg = v.sg && v.sg.until > n0 ? v.sg : null, left = sg ? Math.ceil((sg.until - n0) / 1000) : 0;
+    if (sg) return `<h2>🎤 เวทีคาราโอเกะ</h2><div class="jobbox">🎶 <b>${esc(sg.n)}</b> กำลังร้องเพลง <b>"${esc(sg.song)}"</b><br><small>เหลืออีก ${left} วินาที · ได้ทิปแล้ว ${money(sg.tips)}</small></div>
+      ${sg.id === myId ? '<div class="sub">ร้องให้สุดเสียงเลย! คนในบาร์ให้ทิปคุณได้ 🎶</div>' : `<div class="sub">ชอบไหม? ให้ทิปนักร้องเลย</div><div class="grid2">${B0.tips.map(a => B(`💵 ทิป ${money(a)}`, { t: 'act', st, a: 'tip', amt: a }, 'good', me.money < a)).join('')}</div>`}`;
+    return `<h2>🎤 เวทีคาราโอเกะ</h2><div class="sub">ขึ้นร้องเพลงได้ครั้งละ ${B0.sing} วินาที ความสุขเพิ่ม (กรึ่มๆ ร้องมันกว่า!) · คนในบาร์ให้ทิปได้ · เลือกเพลง:</div>
+      <div class="list">${B0.songs.map((x, i) => itemRowRaw('🎵', esc(x), '', B('🎤 ร้อง', { t: 'act', st, a: 'sing', i }, 'primary'))).join('')}</div>`;
+  }
+  const br = v.br && v.br.until > n0 ? v.br : null;
+  const fight = br ? `<div class="jobbox">🚨 <b>${esc(br.n)}</b> เมาอาละวาดอยู่ในบาร์!${job('police') ? `<div style="margin-top:6px">${B('🚓 ระงับเหตุ', { t: 'act', st, a: 'calm' }, 'primary big')}</div>` : '<br><small>แจ้งตำรวจแล้ว รอเจ้าหน้าที่มาระงับเหตุ</small>'}</div>` : '';
+  const mix = job('bartender') ? jgBox('mix', 'ดูออเดอร์ แล้วหยิบส่วนผสมตามสูตรให้ถูกลำดับ') : '';
+  const rows = Object.entries(B0.drinks).map(([id, d]) => itemRowRaw(d.icon, esc(d.name), `${money(d.price)} · 😊+${d.happy}${d.health ? ` · ❤️${d.health}` : ''}${d.drunk > 0 ? ` · 🥴+${d.drunk}` : ' · ช่วยสร่างเมา'}`, B('สั่ง', { t: 'act', st, a: 'drink', id }, 'good', me.money < d.price))).join('');
+  return `${fight}${mix}<h2>🍸 บาร์ชิลล์ราตรี</h2><div class="sub">เปิด 18:00–03:00 · ดื่มแล้วความสุขเพิ่ม แต่แอลกอฮอล์ลดสุขภาพนิดหน่อย · เมามากจะเดินเซ และอาจหาเรื่องคนอื่นจนตำรวจมา! · น้ำเปล่า/กาแฟดำช่วยสร่างเมา</div>${meter}<div class="list">${rows}</div>`;
 }
 // 📕 the developer's story (public/story.html), a flip book shown over the game; it posts {story:'close'} to close
 function storyOpen() {
@@ -6022,6 +6045,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27a', d: '23 พ.ย.', items: [
+    '🍸 <b>บาร์ชิลล์ราตรี เปิดแล้ว!</b> อยู่ข้างตึกบริษัทไทยเทค ริมถนนใหญ่ฝั่งตะวันออก เปิด 18:00–03:00',
+    '🍺 สั่งเบียร์ ค็อกเทล วิสกี้ ไวน์ ความสุขเพิ่ม · ดื่มเยอะจะเมา เดินเซ จอโยก 🥴 · น้ำเปล่า/กาแฟดำช่วยสร่างเมา',
+    '🚨 เมาหนักอาจอาละวาด! ตำรวจในเมืองได้รับแจ้ง ไประงับเหตุที่บาร์ได้รางวัล (คนก่อเรื่องโดนปรับ)',
+    '🎤 เวทีคาราโอเกะ ขึ้นร้องเพลงได้ คนในบาร์ให้ทิปนักร้องได้',
+    '🍸 อาชีพใหม่ <b>บาร์เทนเดอร์</b> สมัครกับเจ๊แอนในบาร์ ผสมเครื่องดื่มตามสูตร + ได้ทิปจากลูกค้า · ภารกิจใหม่ทั้งบาร์เทนเดอร์และตำรวจ']},
   { v: '2026-11-26d', d: '23 พ.ย.', items: [
     '🗝️ <b>ถ้ำสมบัติ เปิดแล้ว!</b> อยู่ข้างโรงช่างคราฟ เลือกประตูทีละชั้น เจอสมบัติ มอนสเตอร์ กับดัก น้ำพุ ห้องลึกลับ · ทุก 5 ชั้นมีบอส',
     '🎒 ออกจากถ้ำเมื่อไหร่ก็ได้พร้อมของทั้งหมด แต่ถ้าล้มจะเหลือเงินแค่ 30% จะเสี่ยงลงต่อหรือพอแค่นี้ก็เลือกเอง · ได้ของวิเศษติดตัวระหว่างรอบ',
@@ -7108,6 +7137,7 @@ function renderPanel(p) {
     case 'xmasshow': return xmasHtml();
     case 'casino': case 'slot': case 'hilo': case 'roul': case 'bj': return czHtml(k, st);
     case 'arcade': case 'arcm': case 'claw': return arcHtml(k, st);
+    case 'bar': case 'bstage': return barHtml(k, st);
     case 'craft': return craftHtml(st);
     case 'astats': return me.admin ? aStatsHtml() : '';
     case 'noti': return lbNotiHtml();
@@ -8696,7 +8726,7 @@ function targetOf(key) {
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
-const CAREER_TARGET = { monk: 'wat_pray', cashier: 'cstore', police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', doctor: 'hospital', rider: 'rider' };
+const CAREER_TARGET = { bartender: 'bar', monk: 'wat_pray', cashier: 'cstore', police: 'police', beggar: 'square', none: 'staff_fishing', office: 'office', farmer: 'coop', merchant: 'warehouse', doctor: 'hospital', rider: 'rider' };
 const QUEST_TARGET = { work: 'office', harvest: 'coop', fish: 'fishclub', buy: 'warehouse', cook: 'kitchen', treat: 'hospital', deliver: 'rider', sell: 'market', eat: 'restaurant', sit: 'seatb43.6', study: 'school' };
 const questTgt = t => QUEST_TARGET[t] || (t.startsWith('job_') ? CAREER_TARGET[t.slice(4)] || G.careers?.[t.slice(4)]?.where : null);
 function setGuide(key, quiet, auto) {
@@ -9567,7 +9597,7 @@ FN.jgClose = () => { jgStop(true); mgClose(); };
 function jgOpen(k, seed) {
   mgStop(); jgStop(false); $('#mg').classList.remove('hidden'); FX.play('notice');
   const g = JG.cur = { k, score: 0, r: jgRng(seed), t0: performance.now() };
-  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, slice: jgSlice, type: jgType, stock: jgStock, vend: jgVend })[k]?.(g);
+  ({ spot: jgSpot, shoot: jgShoot, cash: jgCash, slice: jgSlice, type: jgType, stock: jgStock, vend: jgVend, mix: jgMix })[k]?.(g);
 }
 const jgPick = (g, a) => a[Math.floor(g.r() * a.length)];
 
@@ -9627,6 +9657,29 @@ function jgShoot(g) {
   jgClock(g, 30); g.raf = requestAnimationFrame(loop);
 }
 
+// 🍸 bartender: an order comes in; tap the ingredients in the recipe's order (the shelf is shuffled every order). Wrong: -3 s, start the glass again
+function jgMix(g) {
+  const R = G.bar.recipes, SH = G.bar.shelf;
+  const next = () => {
+    if (JG.cur !== g) return;
+    if (g.score >= 12) { g.endWhy = 'เสิร์ฟครบ 12 ออเดอร์ ลูกค้าติดใจ!'; return jgFinish(g); }
+    const [name, icon, need] = jgPick(g, R), shelf = SH.slice().sort(() => g.r() - .5), face = jgPick(g, ['🧑', '👩', '👨', '🧔', '👱', '👵', '🧕']);
+    let got = 0;
+    const paint = () => {
+      $('#mgBody').innerHTML = jgHead(g, ` · ออเดอร์ ${g.score + 1}/12`) + `<div class="sub">${face} ขอ <b>${icon} ${esc(name)}</b> หนึ่งแก้ว!</div>
+        <div style="text-align:center;font-size:26px;margin:6px 0">${need.map((e, i) => `<span style="opacity:${i < got ? 1 : .35};margin:0 4px">${i < got ? '✅' : ''}${e}</span>`).join('➜')}</div>
+        <div class="sub" style="text-align:center">🥃 แก้ว: ${need.slice(0, got).join(' ') || '(ว่าง)'} · แตะตามลำดับซ้ายไปขวา (ผิด -3 วิ)</div>
+        <div class="jgGrid">${shelf.map(e => `<button data-e="${e}">${e}</button>`).join('')}</div>`;
+      $('#mgBody').querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
+        if (JG.cur !== g) return;
+        if (b.dataset.e === need[got]) { got++; FX.play('ding'); if (got >= need.length) { g.score++; jgScore(g); FX.play('levelup'); return setTimeout(next, 300); } paint(); }
+        else { got = 0; g.end -= 3000; FX.play('fail'); if (navigator.vibrate) navigator.vibrate(40); paint(); }
+      });
+    };
+    paint();
+  };
+  jgClock(g, 50); next();
+}
 // 🧾 cashier: add up the basket, see what the customer paid with, pick the right change
 function jgCash(g) {
   const GOODS = [['💧', 'น้ำดื่ม', 10], ['🍞', 'ขนมปัง', 25], ['🥛', 'นมกล่อง', 15], ['🍜', 'บะหมี่กึ่งฯ', 7], ['🥚', 'ไข่ 10 ฟอง', 45], ['🍱', 'ข้าวกล่อง', 39], ['☕', 'กาแฟเย็น', 30], ['🧼', 'สบู่', 22], ['🍫', 'ช็อกโกแลต', 20], ['🍌', 'กล้วย', 18], ['🧃', 'น้ำผลไม้', 12], ['🍦', 'ไอศกรีม', 16]];
