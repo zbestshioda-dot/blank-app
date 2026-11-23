@@ -1340,6 +1340,7 @@ const ITEMS = {
   cloth:    { name: 'ผ้า', icon: '🧵', kind: 'mat', base: 20 },
   shell:    { name: 'เปลือกหอยมุก', icon: '🐚', kind: 'mat', base: 25 },
   crystal:  { name: 'เศษคริสตัล', icon: '💠', kind: 'mat', base: 120 },
+  snow:     { name: 'เกล็ดหิมะ', icon: '❄️', kind: 'mat', base: 30 },   // December only
   gshard:   { name: 'ชิ้นส่วนเพชร', icon: '💎', kind: 'mat', base: 0, nosell: 1 },
   fcbait:   { name: 'เหยื่อแข่งตกปลา', icon: '🪱', kind: 'goods', base: 50, fcb: 1 },   // sold only during the fishing contest: each catch in the contest uses one, the fish comes out heavier
   umbrella: { name: 'ร่มกันฝน', icon: '☂️', kind: 'goods', base: 180, umb: 1 },   // sold only by the umbrella man who walks into the square when it rains · kept in the bag: opens by itself when it rains outdoors, keeps you dry (no cold from the rain)
@@ -1408,9 +1409,16 @@ const CRAFTS = [
   { id: 'cr_bonsai', in: { wood: 5, crystal: 2, tomato: 5 } },
   { id: 'cr_tank',   in: { shell: 10, crystal: 4, koi: 1 } },
   { id: 'cr_arch',   in: { wood: 20, crystal: 6, gshard: 3 } },   // legend: glows
+  // 🎄 Christmas: December only (season = Thai calendar month)
+  { id: 'xm_tree',    in: { snow: 15, wood: 6 }, season: 12 },
+  { id: 'xm_snowman', in: { snow: 25, cloth: 3 }, season: 12 },
+  { id: 'xm_wreath',  in: { snow: 10, sunflower: 4 }, season: 12 },
+  { id: 'xm_sleigh',  in: { snow: 10, wood: 12, cloth: 4 }, season: 12 },
+  { id: 'xm_candy',   in: { snow: 12, crystal: 1, sunflower: 2 }, season: 12 },
+  { id: 'xm_globe',   in: { snow: 30, crystal: 4, gshard: 2 }, season: 12 },   // legend: glows
 ];
 // chance per stat event (one roll per material)
-const MAT_DROPS = { fish: [['shell', .12], ['crystal', .03]], harvest: [['wood', .25], ['crystal', .03]], shifts: [['wood', .3], ['cloth', .25], ['crystal', .03]] };
+const MAT_DROPS = { fish: [['shell', .12], ['crystal', .03], ['snow', .15, 12]], harvest: [['wood', .25], ['crystal', .03], ['snow', .15, 12]], shifts: [['wood', .3], ['cloth', .25], ['crystal', .03], ['snow', .2, 12]] };   // [id, chance, only in this month]
 const SHARD_GEMS = 20;
 const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
 // 🎆 fireworks over the fountain square, bought with baht (a money sink everyone in town sees). n bursts over dur seconds
@@ -1923,6 +1931,57 @@ const FURNITURE = {
   auc_piano:  { name: 'เปียโนแกรนด์แสงจันทร์ 👑', icon: '👑', price: 0, comfort: 8, cat: 'fun', spr: 'xa_piano', craft: 1, auc: 1, glow: '#cfd8ff' },
   auc_rocker: { name: 'เก้าอี้โยกบัลลังก์ทอง 👑', icon: '👑', price: 0, comfort: 7, cat: 'fun', spr: 'xa_rocker', craft: 1, auc: 1, glow: '#ffb300' },
   auc_lamp:   { name: 'เสาไฟดาวตก 👑', icon: '👑', price: 0, comfort: 6, cat: 'garden', spr: 'xa_lamp', craft: 1, auc: 1, glow: '#7ff5ff' },
+  // 🎄 December craft-only pieces. Art: tools/sheets/xmas_furn.jpg via tools/add_sheet_furn.py xmas
+  xm_tree:    { name: 'ต้นคริสต์มาสประกายหิมะ 🎄', icon: '🎄', price: 0, comfort: 4, cat: 'fun', spr: 'xx_tree', craft: 1 },
+  xm_snowman: { name: 'ตุ๊กตาหิมะใส่หมวก ⛄', icon: '⛄', price: 0, comfort: 3, cat: 'garden', spr: 'xx_snowman', craft: 1 },
+  xm_wreath:  { name: 'พวงหรีดระฆังทอง 🔔', icon: '🔔', price: 0, comfort: 3, cat: 'fun', spr: 'xx_wreath', craft: 1 },
+  xm_sleigh:  { name: 'เลื่อนซานต้ากองของขวัญ 🛷', icon: '🛷', price: 0, comfort: 5, cat: 'garden', spr: 'xx_sleigh', craft: 1 },
+  xm_candy:   { name: 'แท่งลูกกวาดยักษ์คู่ 🍭', icon: '🍭', price: 0, comfort: 3, cat: 'garden', spr: 'xx_candy', craft: 1 },
+  xm_globe:   { name: 'ลูกแก้วหิมะยักษ์ ✨', icon: '🔮', price: 0, comfort: 6, cat: 'fun', spr: 'xx_globe', craft: 1, glow: '#bfe8ff' },
+  // 🛋️ shop sets 2026-11-23 (art: tools/sheets/*_furn.jpg via tools/add_sheet_furn.py): beach · Japanese · bathroom · kitchen
+  bhammock: { name: 'เปลญวนไม้ลอยน้ำ', icon: '🏖️', price: 6500, comfort: 2, cat: 'garden', spr: 'xb_hammock', multi: 1, solid: 1, sw: 1.8 },
+  bwheel:   { name: 'พวงมาลัยเรือโบราณ', icon: '☸️', price: 2500, comfort: 1, cat: 'deco', spr: 'xb_wheel' },
+  blight:   { name: 'โคมไฟประภาคาร', icon: '🗼', price: 3800, comfort: 1, cat: 'live', spr: 'xb_lighthouse' },
+  bchest:   { name: 'หีบสมบัติเปลือกหอย', icon: '🐚', price: 4500, comfort: 1, cat: 'bed', spr: 'xb_chest' },
+  brug:     { name: 'พรมเปลือกหอยถักมือ', icon: '🐚', price: 2200, comfort: 1, cat: 'live', spr: 'xb_rug' },
+  bfount:   { name: 'น้ำพุนางเงือก', icon: '🧜', price: 18000, comfort: 2, cat: 'garden', spr: 'xb_fountain', multi: 1, solid: 1, sw: 1.3 },
+  jkotatsu: { name: 'โต๊ะโคทัตสึ', icon: '🍊', price: 5500, comfort: 2, cat: 'live', spr: 'xj_kotatsu' },
+  jshoji:   { name: 'ฉากโชจิลายซากุระ', icon: '🌸', price: 3200, comfort: 1, cat: 'deco', spr: 'xj_shoji' },
+  jlantern: { name: 'โคมหินญี่ปุ่น', icon: '🏮', price: 2800, comfort: 1, cat: 'garden', spr: 'xj_lantern', multi: 1, solid: 1, sw: 0.6 },
+  jpond:    { name: 'บ่อปลาคาร์ป', icon: '🎏', price: 12000, comfort: 2, cat: 'garden', spr: 'xj_pond', multi: 1, solid: 1, sw: 1.7 },
+  jtea:     { name: 'ชุดน้ำชาญี่ปุ่น', icon: '🍵', price: 1800, comfort: 1, cat: 'kitchen', spr: 'xj_tea' },
+  jtorii:   { name: 'ประตูโทริอิ', icon: '⛩️', price: 25000, comfort: 2, cat: 'garden', spr: 'xj_torii', multi: 1 },
+  rtub:     { name: 'อ่างอาบน้ำขาสิงห์', icon: '🛁', price: 7500, comfort: 2, cat: 'bath', spr: 'xr_tub' },
+  rtoilet:  { name: 'ชักโครกฝาไม้', icon: '🚽', price: 1500, comfort: 0, cat: 'bath', spr: 'xr_toilet' },
+  rsink:    { name: 'อ่างล้างหน้าพร้อมกระจก', icon: '🪞', price: 3000, comfort: 1, cat: 'bath', spr: 'xr_sink' },
+  rshower:  { name: 'ห้องอาบน้ำฝักบัวกระจก', icon: '🚿', price: 6000, comfort: 1, cat: 'bath', spr: 'xr_shower' },
+  rtowel:   { name: 'ราวผ้าเช็ดตัว', icon: '🧺', price: 900, comfort: 0, cat: 'bath', spr: 'xr_towel' },
+  rmat:     { name: 'พรมเช็ดเท้ากับกระถางต้นไม้', icon: '🪴', price: 1200, comfort: 1, cat: 'bath', spr: 'xr_mat' },
+  kstove:   { name: 'เตาแก๊สพร้อมเตาอบ', icon: '🍳', price: 5000, comfort: 1, cat: 'kitchen', spr: 'xk_stove' },
+  kfridge:  { name: 'ตู้เย็นสองประตู', icon: '🧊', price: 6500, comfort: 1, cat: 'kitchen', spr: 'xk_fridge' },
+  kcounter: { name: 'เคาน์เตอร์เตรียมอาหาร', icon: '🔪', price: 3500, comfort: 1, cat: 'kitchen', spr: 'xk_counter' },
+  kisland:  { name: 'เกาะครัวพร้อมเก้าอี้', icon: '🪑', price: 7000, comfort: 1, cat: 'kitchen', spr: 'xk_island' },
+  kshelf:   { name: 'ชั้นเครื่องเทศแขวนกระทะ', icon: '🧂', price: 1500, comfort: 0, cat: 'kitchen', spr: 'xk_shelf' },
+  krice:    { name: 'ตู้วางหม้อหุงข้าวกาต้มน้ำ', icon: '🍚', price: 2500, comfort: 1, cat: 'kitchen', spr: 'xk_rice' },
+  // 🛋️ shop sets 2026-11-23 (2): Thai house · pastel princess room · gamer room
+  tcushion: { name: 'หมอนขวานผ้าไทยบนเสื่อ', icon: '🔺', price: 2500, comfort: 1, cat: 'live', spr: 'xt_cushion' },
+  tdaybed:  { name: 'ตั่งไม้สักแกะสลัก', icon: '🛋️', price: 9000, comfort: 2, cat: 'live', spr: 'xt_daybed' },
+  tjar:     { name: 'ขันลงหินบัวบาน', icon: '🪷', price: 3500, comfort: 1, cat: 'deco', spr: 'xt_jar' },
+  tcabinet: { name: 'ตู้ลายรดน้ำลายกนก', icon: '🗄️', price: 8000, comfort: 1, cat: 'bed', spr: 'xt_cabinet' },
+  tspirit:  { name: 'ศาลพระภูมิพวงมาลัย', icon: '🛕', price: 15000, comfort: 2, cat: 'garden', spr: 'xt_spirit', multi: 1, solid: 1, sw: 0.7 },
+  tlamp:    { name: 'โคมไม้ไผ่สาน', icon: '🏮', price: 2000, comfort: 1, cat: 'live', spr: 'xt_lamp' },
+  pbed:     { name: 'เตียงเจ้าหญิงมีม่าน', icon: '👑', price: 12000, comfort: 2, cat: 'bed', spr: 'xp_bed' },
+  pvanity:  { name: 'โต๊ะเครื่องแป้งกระจกรี', icon: '🪞', price: 6500, comfort: 1, cat: 'bed', spr: 'xp_vanity' },
+  pbear:    { name: 'ตุ๊กตาหมีตัวยักษ์', icon: '🧸', price: 3000, comfort: 1, cat: 'bed', spr: 'xp_bear' },
+  pcloud:   { name: 'ชั้นวางรูปก้อนเมฆ', icon: '☁️', price: 2800, comfort: 1, cat: 'bed', spr: 'xp_cloud' },
+  prug:     { name: 'พรมขนฟูลายดาว', icon: '⭐', price: 2200, comfort: 1, cat: 'bed', spr: 'xp_rug' },
+  pstar:    { name: 'โคมไฟรูปดาว', icon: '🌟', price: 1800, comfort: 1, cat: 'bed', spr: 'xp_star' },
+  gdesk:    { name: 'โต๊ะเกมมิ่งจอคู่', icon: '🖥️', price: 15000, comfort: 1, cat: 'fun', spr: 'xg_desk' },
+  gstream:  { name: 'ชุดสตรีมไมค์ไฟวงแหวน', icon: '🎙️', price: 8000, comfort: 1, cat: 'fun', spr: 'xg_stream' },
+  gbean:    { name: 'บีนแบ็กลายจอยเกม', icon: '🎮', price: 3500, comfort: 1, cat: 'fun', spr: 'xg_bean' },
+  gshelf:   { name: 'ชั้นวางไฟ RGB', icon: '🌈', price: 4500, comfort: 1, cat: 'fun', spr: 'xg_shelf' },
+  garcade:  { name: 'ตู้เกมย้อนยุค', icon: '🕹️', price: 22000, comfort: 1, cat: 'fun', spr: 'xg_arcade' },
+  gfridge:  { name: 'ตู้เย็นมินิเครื่องดื่ม', icon: '🥤', price: 5500, comfort: 1, cat: 'fun', spr: 'xg_fridge' },
   xtoolbox: { name: 'ตู้เครื่องมือช่าง', icon: '🧰', price: 6500, comfort: 0, cat: 'fun', spr: 'x_toolbox' },
 };
 // 💎 premium pieces: bought with gems only (one extra comfort each); no money back when the house is sold
@@ -2057,6 +2116,12 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   maid:      { name: 'ชุดเมดน่ารัก', how: 'ซื้อที่ร้านแฟชั่น', gems: 150, g: 'f' },
   dino:      { name: 'ชุดไดโนเสาร์', how: 'ซื้อที่ร้านแฟชั่น', gems: 200 },
   loykrathong: { name: 'ชุดไทยลอยกระทง', nf: 'ชุดไทยลอยกระทงสาว', how: 'กิจกรรมลอยกระทง 2569 (แจกฟรี ไม่มีขาย)' },
+  // collection 4 (2026-11-23)
+  tanktop:   { name: 'ชุดเสื้อกล้ามยีนส์ขาสั้น', how: 'ซื้อที่ร้านแฟชั่น', price: 14999, g: 'f' },
+  bear:      { name: 'ชุดหมีน้ำตาลขนนุ่ม', how: 'ซื้อที่ร้านแฟชั่น', price: 89999 },
+  panda:     { name: 'ชุดแพนด้าตัวกลม', how: 'ซื้อที่ร้านแฟชั่น', gems: 120 },
+  cathood:   { name: 'ชุดฮู้ดแมวพาสเทล', how: 'ซื้อที่ร้านแฟชั่น', gems: 150 },
+  kitsune:   { name: 'ชุดจิ้งจอกเก้าหาง', nf: 'ชุดจิ้งจอกเก้าหางสาว', how: 'เร็วๆ นี้ (ยังไม่เปิดขาย)' },   // locked for now: not in OUTFIT_CAT, so no shop slot
   winter:    { name: 'ชุดไหมพรมกันหนาว', nf: 'ชุดไหมพรมกันหนาวสาว', how: 'กิจกรรมล็อกอิน 7 วัน (แจกฟรี ไม่มีขาย)' } };
 // 🎁 a login event: log in on 7 different days between start and end; each day unlocks the next reward, day 7 is the outfit
 const EV7 = { id: 'winter26', title: 'ล็อกอิน 7 วัน รับชุดกันหนาวฟรี', start: Date.parse('2026-11-21T00:00:00+07:00'), end: Date.parse('2026-12-14T23:59:59+07:00'),
@@ -2068,9 +2133,9 @@ const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songk
   surf: ['pink', 'purple'], hiphop: ['blue', 'green'], martial: ['blue', 'purple'], knight: ['blue', 'red'] };
 const DYE_WHITE = ['catsuit', 'chicken', 'knight'];   // white / silver cloth also takes a soft tint
 // shop tabs
-const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop', 'swim', 'coat', 'racer'],
+const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop', 'swim', 'coat', 'racer', 'tanktop'],
   thai: ['songkran', 'lanna', 'phasin', 'muaythai', 'lukthung', 'chinese', 'chakri', 'thai', 'thairoyal'],
-  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune', 'maid', 'dino'] };
+  costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune', 'maid', 'dino', 'bear', 'panda', 'cathood'] };
 for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
   OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', nosale: 1, ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }

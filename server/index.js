@@ -10,7 +10,11 @@ const D = require('./data');
 const store = require('./store');
 const Q = require('./quests');
 const CR = require('./craft');
-const HM = require('./homes');   // 🏡 house contest (hearts, weekly prizes)   // 🔨 crafting rules (drops, recipes, gem shards)
+const HM = require('./homes');
+const AU = require('./auction');
+const { docFlag } = require('./doc');
+const GD = require('./guard');   // 🤖 "are you a person?" checks against auto-play tools
+const hcSend = (a, why) => { const q = GD.ask(a, why, now()); if (q) { send(a, { t: 'hc', ...q, sec: 90 }); toast(a, '🙋 ช่วยแตะปุ่มยืนยันว่าเป็นคนจริงก่อนนะ (ป้องกันโปรแกรมช่วยเล่น)', '🤖'); } };   // 🩺 doctor answer-timing flags (sus / bot)   // 🏆 weekly one-of-a-kind auction   // 🏡 house contest (hearts, weekly prizes)   // 🔨 crafting rules (drops, recipes, gem shards)
 const PUSH = require('./push');
 let vapidKeys = null;
 const PAY = require('./pay');
@@ -156,11 +160,7 @@ function bedSym(p) {
 }
 function docLog(a, ms, ok) {   // keep the last 40 answers: [ms after the exam finished, right?]
   a.docLog = [...(a.docLog || []), [Math.max(0, Math.round(ms)), ok ? 1 : 0]].slice(-40); a.sd = true;
-}
-function docFlag(a) {          // many answers, nearly all right, nearly all instant: worth an admin's look
-  const L = a.docLog || []; if (L.length < 20) return null;
-  const ms = L.map(x => x[0]).sort((p, q) => p - q), med = ms[Math.floor(ms.length / 2)], acc = L.filter(x => x[1]).length / L.length;
-  return { n: L.length, med, acc: Math.round(acc * 100), sus: acc >= .97 && med < 1200 ? 1 : 0 };
+  if (docFlag(a)?.bot && now() - (a.hcOk || 0) > 3600e3) hcSend(a, 'doc');
 }
 const dzProd = (a, key) => (a.dz || []).reduce((m, d) => m * (DZ[d]?.[key] || 1), 1);
 const newbie = a => now() - (a.created || now()) < 3 * 3600e3 || (a.earned || 0) < 3000;
@@ -363,7 +363,8 @@ function ledAdd(a, d, what) {   // call right after changing a.money by d
   const res = Math.round(a.money - d - a.ledBal); if (res) ledPush(a, res, a.ledCtx || 'อื่นๆ', a.money - d);
   ledPush(a, Math.round(d), what, a.money); a.ledBal = a.money;
 }
-function earn(a, amount) {
+function earn(a, amount, nocap) {
+  if (amount > 0 && !nocap) amount *= GD.payMul(a, dayKey());   // 💤 daily soft cap: less pay after 3 / 5 hours of work today
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
   if (amount > 0 && mayor?.pol === 'tax') amount *= 1 + MAYOR.tax;   // the mayor's low-tax policy
   if (amount > 0 && a.gang) { const g0 = gangOf(a); if (g0) amount *= 1 + GANG.lv[g0.lvl - 1].inc; }   // a bigger gang house pays its members a little extra
@@ -744,6 +745,20 @@ setInterval(() => { try { listingsTick(); } catch (e) { console.error('listingsT
 // (= every 2 real hours). A money sink: tickets cost ฿100, about 45% comes back as prizes. Prizes go out by mail (claim the gift).
 const LOTTO = { price: 100, max: 50, first: 3000000, l3: 6000, l2: 3000, hour: 16 };
 let lotto = { cur: '', last: null };
+// 🏆 weekly auction (state saved in __meta): a new week sells the lot to the top bid and opens the next one
+let auc = null;
+const aucEnds = () => Date.parse(weekKey() + 'T00:00:00+07:00') + 7 * 864e5;
+const aucView = a => { const f = auc?.lot && D.FURNITURE[auc.lot]; return { t: 'auc', lot: auc?.lot || null, name: f?.name || '', spr: f?.spr || '', comfort: f?.comfort || 0, bid: auc?.bid || 0, by: auc?.name || null, min: auc ? AU.next(auc) : AU.MIN, mine: !!auc?.by && auc.by === lk(a), ends: aucEnds() }; };
+function aucTick() {
+  const r = AU.roll(auc, weekKey(), D.AUC_LOTS); if (r.state === auc) return;
+  auc = r.state; dirty = true;
+  const e = r.ended, o = e && accounts.get(e.login), f = e && D.FURNITURE[e.lot]; if (!o || !f) return;
+  if (o.hown) o.furniture = [...(o.furniture || []), e.lot]; else o.keep = [...(o.keep || []), e.lot];
+  o.sd = true; if (o.ws) markMe(o);
+  sysMail(o, `🏆 ยินดีด้วย! คุณชนะการประมูล ${f.name} ด้วยราคา ${money(e.bid)} ของชิ้นนี้มีชิ้นเดียวในเมือง${o.hown ? ' ส่งไปที่บ้านแล้ว' : ' เก็บไว้ให้ก่อน มีบ้านเมื่อไหร่วางได้เลย'}`);
+  feed(`🏆 ${e.name} ชนะการประมูล ${f.name} ด้วยราคา ${money(e.bid)}!`);
+}
+setInterval(() => { try { aucTick(); } catch (e) { console.error('aucTick', e); } }, 60e3).unref?.();
 function lottoNext(t = now()) {   // the next draw: [key 'Y-MM-DD' (game date, Buddhist year), real time]
   const C = D.CLOCK, hMs = (LOTTO.hour - C.dawn) * C.dayMin / (C.dusk - C.dawn) * 60000;   // 16:00 sits in the daytime part of a cycle
   for (let n = D.dayAt(t); ; n++) {
@@ -1419,7 +1434,7 @@ function nbEv(a, ev, n = 1) {
     if (st.ev !== ev || (S.p[i] || 0) >= st.n) return;
     S.p[i] = Math.min(st.n, (S.p[i] || 0) + n); changed = true;
     if (S.p[i] < st.n) return;
-    if (st.money) earn(a, st.money); if (st.gems) a.gems = (a.gems || 0) + st.gems;
+    if (st.money) earn(a, st.money, true); if (st.gems) a.gems = (a.gems || 0) + st.gems;
     toast(a, `🌱 ภารกิจมือใหม่สำเร็จ: ${st.text} · ได้ ${st.money ? money(st.money) : `💎${st.gems}`}`, '🌱');
     send(a, { t: 'nbstep', i });
   });
@@ -1439,7 +1454,7 @@ function nbWelcomeChat(a) {
   const d = dayKey(); if (!a.nbw || a.nbw.d !== d) a.nbw = { d, n: 0 };
   if (a.nbw.n >= 3) return;
   const who = nbArrivals.find(x => x.id !== a.id && !x.by.has(a.id)); if (!who) return;
-  who.by.add(a.id); a.nbw.n++; earn(a, 50); a.sd = true;
+  who.by.add(a.id); a.nbw.n++; earn(a, 50, true); a.sd = true;
   toast(a, `🤝 ขอบคุณที่ทักทาย ${who.name} ชาวเมืองใหม่! +${money(50)}`, '🤝');
 }
 function quest(a, type, n = 1) {
@@ -1475,8 +1490,8 @@ function tradePrices(a) {
 // ⚡ energy history for the admins (last hour, in memory): what used it and where it came back from
 // 🛡️ silent cheat watch: suspicious events are only counted (nobody is told, nothing is announced); admins review them in God
 // mode (player card + "ผู้เล่นน่าสงสัย" list). Speed / wall / distance cheats are already refused by the server; this keeps the evidence.
-const SUS_W = { speed: 1, wall: 2, far: 1, flood: 3, bot: 6, doc: 10 };
-const SUS_NM = { speed: 'เดินเร็วเกิน', wall: 'ทะลุกำแพง', far: 'กดจากระยะไกล', flood: 'ส่งคำสั่งรัว', bot: 'จังหวะกดเหมือนบอท', doc: 'หมอตอบเร็ว/ถูกผิดปกติ' };
+const SUS_W = { speed: 1, wall: 2, far: 1, flood: 3, bot: 6, doc: 10, docbot: 20, hcfail: 8, hcfast: 4, marathon: 1, untrusted: 5 };
+const SUS_NM = { hcfail: 'ไม่แตะยืนยันตัวตนใน 90 วิ', hcfast: 'แตะยืนยันเร็วเกินคน', marathon: 'เล่นต่อเนื่องเกิน 2 ชม.', untrusted: 'คลิกที่มาจากสคริปต์', docbot: 'หมอตอบจังหวะเท่ากันทุกเคส (เหมือนบอท)', speed: 'เดินเร็วเกิน', wall: 'ทะลุกำแพง', far: 'กดจากระยะไกล', flood: 'ส่งคำสั่งรัว', bot: 'จังหวะกดเหมือนบอท', doc: 'หมอตอบเร็ว/ถูกผิดปกติ' };
 function sus(a, kind) {
   const t = now(), L = a.susL || (a.susL = []), last = L[L.length - 1];
   if (last && last[1] === kind && t - last[0] < 60000) last[2]++; else L.push([t, kind, 1]);   // one row a minute per kind
@@ -1484,7 +1499,7 @@ function sus(a, kind) {
 }
 function susSum(a) {   // the last 24 h: counts per kind and a weighted score (a few speed/far hits are normal lag)
   const by = {}; for (const [t, k, n] of a.susL || []) if (now() - t < 86400e3) by[k] = (by[k] || 0) + n;
-  if (docFlag(a)?.sus) by.doc = 1;
+  const df = docFlag(a); if (df?.sus) by.doc = 1; if (df?.bot) by.docbot = 1;
   const score = Object.entries(by).reduce((s0, [k, n]) => s0 + (SUS_W[k] || 1) * (k === 'speed' || k === 'far' ? Math.max(0, n - 20) : n), 0);
   return { score, rows: Object.entries(by).map(([k, n]) => [SUS_NM[k] || k, n]) };
 }
@@ -1493,7 +1508,7 @@ function botBeat(a) {
   const t = now(), T = a.beat || (a.beat = []); T.push(t); if (T.length > 16) T.shift();
   if (T.length < 16 || t - T[0] > 120000) return;
   const g = T.slice(1).map((x, i) => x - T[i]), mean = g.reduce((p, q) => p + q, 0) / g.length, sd = Math.sqrt(g.reduce((p, q) => p + (q - mean) ** 2, 0) / g.length);
-  if (mean > 300 && sd < 25) { sus(a, 'bot'); a.beat = []; }
+  if (mean > 300 && sd < 25) { sus(a, 'bot'); a.beat = []; hcSend(a, 'bot'); }
 }
 function enLog(a, d, why) {
   if (!d) return; const t = now(), L = a.enLog || (a.enLog = []);
@@ -1594,7 +1609,7 @@ const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext',
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -1677,7 +1692,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders, fishRecs }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, ideas, lotto, znDone, payOrders, fishRecs, auc }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -2498,6 +2513,15 @@ function act(a, m) {
   if (!D.isOpen(s.type, h) && !(s.type === 'restaurant' && m.a === 'pickup')) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
   const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
   if (/^(slot|hilo|roul|bj)$/.test(s.type)) return czAct(a, s, m);
+  if (WORK.has(key) && a.hc && !isAdmin(a)) {   // 🤖 a person-check is waiting: hold work until it is tapped
+    if (GD.blocked(a, now()) === 'late' && !a.hc.late) { a.hc.late = 1; sus(a, 'hcfail'); }
+    send(a, { t: 'hc', tok: a.hc.tok, x: a.hc.x, y: a.hc.y, sec: Math.max(0, Math.ceil((a.hc.until - now()) / 1000)) });
+    return toast(a, '🙋 แตะปุ่ม "ฉันเป็นคนจริง" บนจอก่อน แล้วทำต่อได้เลย', '🤖', false);
+  }
+  if (WORK.has(key)) {                     // 💤 count today's work minutes; say so when pay steps down
+    const st = GD.workMin(a, now(), dayKey());
+    if (st) toast(a, st === .5 ? '⏳ วันนี้ทำงานครบ 3 ชม. แล้ว ต่อจากนี้ได้รายได้ 50% จนถึงเที่ยงคืน · พักบ้างนะ 😊' : '⏳ วันนี้ทำงานเกิน 5 ชม. แล้ว รายได้เหลือ 20% (เริ่มใหม่เที่ยงคืน)', '💤');
+  }
   if (WORK.has(key) && depressed(a)) return toast(a, 'คุณซึมเศร้า ไม่มีจิตใจจะทำอะไรเลย... ลองกินของที่อยากกิน นั่งเล่นที่จัตุรัส หรือโทรคุยกับเพื่อน', '😞', false);
   const wb = wellbeing(a);
   if (m.a === 'apply') { if (s.type !== 'staff' && D.CAREERS[m.career]?.where !== s.type || s.type === 'staff' && s.career !== m.career) return; return apply(a, m.career); }
@@ -3685,7 +3709,7 @@ function aucTick(a, t) {
   const win = all[0]; c.stage = 'done'; c.result = all.map(x => [x.name, x.bid, x.me ? 1 : 0]); c.win = win.name;
   a.aucNext = t + 2500;
   if (win.me) {
-    const net = c.real - win.bid; a.money -= win.bid; earn(a, c.real); addXp(a, .6); quest(a, 'buy', 1); stat(a, 'wholesale', Object.values(c.items).reduce((x, y) => x + y, 0));
+    const net = c.real - win.bid; a.money -= win.bid; earn(a, c.real, true); addXp(a, .6); quest(a, 'buy', 1); stat(a, 'wholesale', Object.values(c.items).reduce((x, y) => x + y, 0));
     if (net > 0) joy(a, 3); c.net = net;
     toast(a, net >= 0 ? `🔨 ชนะประมูล! จ่าย ${money(win.bid)} ของจริงมีค่า ${money(c.real)} กำไร ${money(net)}` : `🔨 ชนะประมูล... แต่จ่าย ${money(win.bid)} ของมีค่าแค่ ${money(c.real)} ขาดทุน ${money(-net)}`, net >= 0 ? '💰' : '📉', net >= 0);
   } else toast(a, `🔨 ${win.name} ชนะไปที่ ${money(win.bid)} (มูลค่าจริง ${money(c.real)})`, '🔨', false);
@@ -4152,6 +4176,7 @@ function fcTick() {
   if (th.h === FC.hour - 1 && th.m === 60 - FC.warn && fcWarned !== th.day) {
     fcWarned = th.day; feed(`📣 อีก ${FC.warn} นาที (20:00) แข่งตกปลา! ปลาตัวหนักที่สุดชนะ ${money(FC.prizes[0])} เตรียมเบ็ดไว้ให้พร้อม`);
     for (const o of online.values()) toast(o, `📣 อีก ${FC.warn} นาทีแข่งตกปลา (20:00) ไปรอที่ท่าตกปลาได้เลย`, '🎣');
+    pushAll('🎣 อีก 10 นาทีแข่งตกปลา!', `20:00 ปลาตัวหนักที่สุดชนะ ${money(FC.prizes[0])} เข้าเกมไปรอที่ท่าตกปลาได้เลย`, 'fc');
   }
   if (th.h === FC.hour && th.m < FC.min && fcDay !== th.day) { fcDay = th.day; fcStart(FC.min - th.m); }
 }
@@ -4849,7 +4874,7 @@ function login(ws, m, pre) {
   send(a, {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
-    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
+    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
@@ -5067,7 +5092,7 @@ function onMessage0(ws, raw) {
   if (m.t === 'login') { if (!a) login(ws, m); return; }
   if (!a || a.ws !== ws) return;
   godTop(a);
-  if (m.t === 'act' && !isAdmin(a)) botBeat(a);
+  if (m.t === 'act' && !isAdmin(a)) { botBeat(a); if (GD.run(a, now())) { sus(a, 'marathon'); hcSend(a, 'run'); } }
   a.ledCtx = ledLabel(a, m);
   switch (m.t) {
     case 'p': return move(a, m);
@@ -5252,6 +5277,38 @@ function onMessage0(ws, raw) {
       addItem(a, 'fcbait', 5); markMe(a); return toast(a, 'ได้เหยื่อแข่งตกปลา 🪱 x5 · ใช้เองตอนแข่ง ปลาที่ตกได้หนักขึ้น 20–50%', '🪱');
     }
     case 'frecs': return send(a, recView());
+    case 'auc': aucTick(); return send(a, aucView(a));
+    case 'cal': {                            // 📅 phone app: every timed event in one place
+      aucTick(); const th = thNow(), wk = weekKey(), today20 = Date.parse(th.day + 'T20:00:00+07:00');
+      const top = HM.board([...accounts.values()], wk, 1)[0];
+      return send(a, { t: 'cal', fc: fc ? { end: fc.end } : { at: now() < today20 ? today20 : today20 + 864e5 }, prize: FC.prizes[0], weekEnd: aucEnds(),
+        auc: auc?.lot ? { name: D.FURNITURE[auc.lot].name, bid: auc.bid, by: auc.name } : null, home: top || null, lotto: lottoNext()[1], xmas: CR.thMonth() === 12 });
+    }
+    case 'aucbid': {                         // 🏆 bid baht on this week's lot: paid now, handed back if someone outbids you
+      if (!cd(a, 'aucbid', 1500)) return;
+      aucTick();
+      const amt = Math.floor(+m.amt);
+      if (!(amt > 0) || amt > 1e9) return toast(a, 'ใส่ราคาเป็นตัวเลข', '🏆', false);
+      if (a.money < amt) return toast(a, `เงินไม่พอ (มี ${money(a.money)})`, '💸', false);
+      const r = AU.bid(auc, a, amt); if (!r.ok) return toast(a, r.msg, '🏆', false);
+      a.money -= amt; a.sd = true; dirty = true; markMe(a);
+      const o = r.refund && accounts.get(r.refund.login);
+      if (o) { o.money += r.refund.amt; o.sd = true; if (o.ws) { markMe(o); toast(o, `🏆 ${a.name} ประมูลแซงคุณ! คืนเงิน ${money(r.refund.amt)} แล้ว`, '🏆'); send(o, aucView(o)); } }
+      feed(`🏆 ${a.name} เสนอราคา ${money(amt)} ประมูล ${D.FURNITURE[auc.lot].name}`);
+      send(a, aucView(a)); return toast(a, `เสนอราคา ${money(amt)} แล้ว คุณนำอยู่!`, '🏆');
+    }
+    case 'fw': {                             // 🎆 fireworks over the fountain square: everyone in town sees them
+      const f = D.FIREWORKS[m.k]; if (!f) return;
+      if (areaId(a) !== 'town') return toast(a, 'จุดพลุได้เฉพาะตอนอยู่ในตัวเมือง (พลุขึ้นที่ลานน้ำพุ)', '🎆', false);
+      if (!cd(a, 'fw', 10000)) return;
+      if (!pay(a, f.price)) return;
+      stat(a, 'fireworks'); joy(a, 10); markMe(a);
+      for (const o of online.values()) send(o, { t: 'fw', k: m.k, n: a.name });
+      if (f.price >= 5000) feed(`🎆 ${a.name} จุดพลุ${f.name}ที่ลานน้ำพุ!`);
+      return;
+    }
+    case 'hc': { const r = GD.answer(a, m.tok, now()); if (!r.ok) return; if (r.fast) sus(a, 'hcfast'); a.sd = true; return toast(a, 'ขอบคุณ! เล่นต่อได้เลย', '🙋'); }
+    case 'untr': if (cd(a, 'untr', 60000, true)) sus(a, 'untrusted'); return;   // the client saw clicks made by a script, not a finger
     case 'homelike': {                       // ❤️ like the home you are standing in (house contest)
       if (!cd(a, 'homelike', 1500)) return;
       const i = PLOT_AREAS.findIndex(set => set.has(areaId(a))), o = i >= 0 ? houses[i] : null;
@@ -5499,7 +5556,7 @@ function godAct(a, m) {
   if (!isAdmin(a)) return;
   a.god = a.god || {};
   if (m.op === 'suslist') {                 // 🛡️ the players the cheat watch counted the most against in the last day
-    const hits = [...accounts.values()].filter(x => x.login && (x.susL?.length || docFlag(x)?.sus)).map(x => [x, susSum(x).score]).filter(([, sc]) => sc >= 5).sort((p, q) => q[1] - p[1]).slice(0, 15).map(([x]) => x.login.toLowerCase());
+    const hits = [...accounts.values()].filter(x => x.login && (x.susL?.length || docFlag(x)?.sus || docFlag(x)?.bot)).map(x => [x, susSum(x).score]).filter(([, sc]) => sc >= 5).sort((p, q) => q[1] - p[1]).slice(0, 15).map(([x]) => x.login.toLowerCase());
     return godAct(a, { op: 'find', q: '', list: hits });
   }
   if (m.op === 'find') {                    // look a player up by login ID, display name or phone number
