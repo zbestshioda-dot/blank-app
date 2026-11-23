@@ -962,14 +962,22 @@ function logLine(html, cls, bubbleOnly) {
 
 // ------------------------------------------------------------------ toasts and popups
 const recentToasts = new Map();
+function toastDrain() { toast.drainT = 0; const n = toast.q.shift(); if (n) toast(...n); if (toast.q.length && !toast.drainT) toast.drainT = setTimeout(toastDrain, Math.max(50, toast.busyUntil - performance.now() + 50)); }
 function toast(msg, icon = '✅', ok = true) {
+  toast.q = toast.q || []; toast.busyUntil = toast.busyUntil || 0;
   // never stack the same message: identical text within 8 s is dropped
   const key = icon + msg, t0 = performance.now();
   if (recentToasts.get(key) > t0 - 8000) return;
   recentToasts.set(key, t0); if (recentToasts.size > 50) recentToasts.delete(recentToasts.keys().next().value);
   // notices float above your own character's head (the CBT ticker stays at the top of the screen)
   // notices pop up in the middle of the screen, as the same card as the fishing cue
+  if (nbQuiet() && toast.busyUntil > performance.now()) {   // newcomer: one notice at a time, the rest wait their turn
+    if (toast.q.length < 4 && !toast.q.some(x => x[0] === msg)) { recentToasts.delete(key); toast.q.push([msg, icon, ok]); }
+    if (!toast.drainT) toast.drainT = setTimeout(toastDrain, toast.busyUntil - performance.now() + 50);
+    return;
+  }
   const box = $('#notices'), d = document.createElement('div'), life = Math.min(7000, 3200 + msg.length * 45);
+  toast.busyUntil = performance.now() + Math.min(life, 3500);
   d.className = 'notice' + (ok ? '' : ' bad'); d.innerHTML = `<b>${esc(icon)}</b><small>${esc(msg)}</small>`;
   d.style.animationDuration = `.25s, ${life}ms`;
   box.prepend(d); while (box.children.length > 2) box.lastChild.remove();
@@ -1063,6 +1071,21 @@ function nbTap(i) {
 function nbActive() { return !!me?.nb && !me.nb.done; }
 function nbDay1() { return me?.nb?.v === 2; }
 function nextThaiMidnight() { const t = Date.now() + clockOff, D = 864e5, B = 7 * 3600e3; return (Math.floor((t + B) / D) + 1) * D - B; }   // server time, not the phone's clock
+const thaiDay = t => new Date(t + 7 * 3600e3).toISOString().slice(0, 10);
+function nbFirstDay() { return nbDay1() && thaiDay(me.nb.t0) === thaiDay(Date.now() + clockOff); }
+function nbQuiet() { return nbFirstDay() && nbActive(); }   // the newcomer's first day, starter path still running: one thing at a time
+// show / hide the HUD buttons for a v2 newcomer (tools/hud.test.js covers hudVisible); a button that appears glows once and is named
+const NB_HUD_NAME = { runBtn: '👟 วิ่ง (กดค้าง = วิ่ง)', restBtn: '😌 พัก (นั่งพักฟื้นพลัง)', cbOpen: '💬 แชท', emoBtn: '😀 อิโมจิ' };
+let nbHudShown = null;
+function nbHudApply() {
+  const on = nbQuiet(), p = me?.nb?.p || [], done = !!me?.nb?.done, was = nbHudShown; nbHudShown = {};
+  for (const id of Object.keys(NB_HUD)) {
+    const el = $('#' + id); if (!el) continue;
+    const vis = !on || hudVisible(id, p, done); nbHudShown[id] = vis;
+    el.classList.toggle('nbHide', !vis);
+    if (on && was && vis && was[id] === false) { el.classList.add('nbNew'); setTimeout(() => el.classList.remove('nbNew'), 2600); if (NB_HUD_NAME[id]) toast(`ปุ่มใหม่: ${NB_HUD_NAME[id]}`, '✨'); }
+  }
+}
 const nbEggWaiting = () => nbDay1() && !!me.nb.egg && !me.nb.egg.h;
 function nbTomorrowCard(tmr) {
   const d = document.createElement('div'); d.className = 'hatchPop nbCard';
@@ -1071,6 +1094,18 @@ function nbTomorrowCard(tmr) {
   document.body.appendChild(d); FX.play('chime');
   if (nbTomorrowCard.sent !== 1) { nbTomorrowCard.sent = 1; send({ t: 'nbev', k: 'card' }); }
 }
+// ---- NB_HUD start (pure: tools/hud.test.js reads this block)
+// a v2 newcomer's first day: which HUD buttons show. ['cur', k] = from when step k is the current one (or done);
+// ['done', k] = once step k is done; 'end' = after the whole path. Anything not listed is always shown.
+const NB_N = [1, 3, 1, 1, 1, 1];   // how many of each starter step (server NB: rod, fish ×3, sell, chat, buy, social)
+const NB_HUD = { runBtn: ['done', 0], restBtn: ['done', 1], cbOpen: ['cur', 3], emoBtn: ['cur', 5], ev7Btn: 'end', lkBtn: 'end', topupBtn: 'end', eventBar: 'end' };
+function hudVisible(id, p, done) {
+  const r = NB_HUD[id]; if (!r || done) return true;
+  if (r === 'end') return false;
+  const ok = k => (p[k] || 0) >= NB_N[k], cur = NB_N.findIndex((n, k) => !ok(k));
+  return r[0] === 'done' ? ok(r[1]) : ok(r[1]) || cur >= r[1] || cur < 0;
+}
+// ---- NB_HUD end
 function paintNb(box) {
   if (!paintNb.opened) { paintNb.opened = 1; if ($('#card')?.classList.contains('mini')) setCard(false); }   // newcomers see the list open (once; they can fold it)
   const S = G.nbSteps, p = me.nb.p || [], done = S.filter((st, i) => (p[i] || 0) >= st.n).length, first = S.findIndex((st, i) => (p[i] || 0) < st.n);
@@ -1098,6 +1133,7 @@ function paintQuestBox() {
   box.querySelector('[data-open-r]').onclick = () => { FX.play('click'); openPanel({ kind: 'rewards' }); };
 }
 function paintHud() {
+  try { nbHudApply(); } catch { }
   if (!me) return;
   const c = G.careers[me.career];
   if ((me.docjob?.dest || '') !== (window.__docDest || '')) { window.__docDest = me.docjob?.dest || ''; if (me.docjob) setGuide(me.docjob.dest, true); }   // a new envelope: point the way
@@ -4696,7 +4732,7 @@ function ev7Ui() {
   $('#ev7N').textContent = ev7Ready() ? 'รับเลย!' : `${EV7.n}/7`;
   b.onclick = () => { openPanel({ kind: 'ev7' }); send({ t: 'ev7' }); };
   if (ev7Ready()) { const k = 'lt_ev7t_' + new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); let seen = false; try { seen = !!localStorage.getItem(k); localStorage.setItem(k, '1'); } catch { }
-    if (!seen) setTimeout(() => toast('🎁 กิจกรรมล็อกอิน 7 วัน: มีรางวัลรอรับ! กดไอคอน 🎁 ใต้มือถือ', '🎁', true), 6000); }
+    if (!seen && !nbQuiet()) setTimeout(() => toast('🎁 กิจกรรมล็อกอิน 7 วัน: มีรางวัลรอรับ! กดไอคอน 🎁 ใต้มือถือ', '🎁', true), 6000); }
 }
 setInterval(() => { if (G && EV7?.on) send({ t: 'ev7' }); }, 10 * 60e3);   // still online after midnight: the new day counts too
 function ev7Html() {
@@ -5832,6 +5868,7 @@ const hasAngel = () => (me?.outfits || []).includes('angel'), vipOnC = () => (me
 // banner shown after entering the game (once a day at most if the player ticks "not today"); the ✕ closes it
 // 🏮 the festival poster after entering the game, once a day while the event runs ("coming soon" until the night itself)
 function lkBanner() {
+  if (nbQuiet()) return;   // newcomer's first day: one thing at a time
   if (!me || !lkOnC() || $('#lkBan')) return;
   const day = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); let seen = ''; try { seen = localStorage.getItem('lt_lkban') || ''; } catch { }
   if (seen === day) return;
@@ -5849,6 +5886,7 @@ function lkBanner() {
   document.body.appendChild(el); FX.play('chime');
 }
 function payBanner() {
+  if (nbQuiet()) return;
   if (!G?.pay?.on || !me || $('#payBan')) return;
   let skip = ''; try { skip = localStorage.getItem('lt_payban') || ''; } catch { }
   if (skip === new Date().toDateString()) return;
@@ -6156,6 +6194,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27n', d: '23 พ.ย.', items: [
+    '🧘 มือใหม่: จอเริ่มต้นสะอาดขึ้น ข้อความขึ้นทีละอัน ปุ่มค่อยๆ โผล่ตามภารกิจที่ทำ',
+  ] },
   { v: '2026-11-27m', d: '23 พ.ย.', items: [
     '🥚 มือใหม่: ทำภารกิจ 3 ขั้นแรก (ซื้อเบ็ด ตกปลา ขายปลา) ได้ไข่สัตว์เลี้ยงที่ฟักพรุ่งนี้ + ของขวัญวันที่ 2 ในจดหมาย',
   ] },
@@ -7099,6 +7140,7 @@ function newsHtml() {
   return `<h2>🆕 อัปเดตล่าสุด</h2>` + NEWS.slice(0, 5).map((n, i) => `<div class="sub" style="margin-top:${i ? 12 : 4}px"><b>${n.d}</b></div><ul style="margin:4px 0 0;padding-left:20px;line-height:1.7;font-size:14px">${n.items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('');
 }
 function checkNews() {
+  if (me && nbQuiet()) return;   // a newcomer sees the news from tomorrow on
   let seen = ''; try { seen = localStorage.getItem('lt_news') || ''; } catch { }
   if (seen === NEWS[0].v || !me) return;
   const dw = $('#dailyWrap'), busy = panel || $('#payBan') || (dw && dw.offsetParent) || $('#tut')?.offsetParent && !$('#tut').classList.contains('hidden') || !$('#mg')?.classList.contains('hidden');

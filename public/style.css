@@ -1691,3 +1691,6 @@ body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 
 /* 🌙 newcomer: tomorrow card and the egg waiting in the bag */
 .nbCard span{display:flex;align-items:center;justify-content:center;gap:6px;margin:6px 0;font-size:15px;white-space:nowrap}.nbCard span img,.nbCard span i{flex:none}.nbCard button{margin-top:12px;width:100%}.nbEggRow{background:linear-gradient(90deg,#fff3c9,#ffe0f0);border-radius:12px;padding:6px 10px}
+
+/* 🌱 newcomer HUD: buttons wait for their step; a new one glows once */
+#runBtn.nbHide,#restBtn.nbHide,#cbOpen.nbHide,#emoBtn.nbHide,#ev7Btn.nbHide,#lkBtn.nbHide,#topupBtn.nbHide,#eventBar.nbHide,.nbHide{display:none!important}.nbNew{animation:nbNewGlow .6s ease-in-out 4;z-index:20}@keyframes nbNewGlow{50%{transform:scale(1.18);filter:drop-shadow(0 0 12px #ffe27a) brightness(1.25)}}
