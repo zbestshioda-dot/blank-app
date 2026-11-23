@@ -963,7 +963,7 @@ function logLine(html, cls, bubbleOnly) {
 
 // ------------------------------------------------------------------ toasts and popups
 const recentToasts = new Map();
-function toastNow(msg, icon) { toast.q = []; toast.busyUntil = 0; recentToasts.delete(icon + msg); toast(msg, icon); }   // time-critical (fishing cues): skip the newcomer queue
+function toastNow(msg, icon) { toast.busyUntil = 0; recentToasts.delete(icon + msg); toast(msg, icon); }   // keeps what is queued; it shows after this one   // time-critical (fishing cues): skip the newcomer queue
 function toastDrain() { toast.drainT = 0; const n = toast.q.shift(); if (n) toast(...n); if (toast.q.length && !toast.drainT) toast.drainT = setTimeout(toastDrain, Math.max(50, toast.busyUntil - performance.now() + 50)); }
 function toast(msg, icon = '✅', ok = true) {
   toast.q = toast.q || []; toast.busyUntil = toast.busyUntil || 0;
@@ -973,13 +973,13 @@ function toast(msg, icon = '✅', ok = true) {
   recentToasts.set(key, t0); if (recentToasts.size > 50) recentToasts.delete(recentToasts.keys().next().value);
   // notices float above your own character's head (the CBT ticker stays at the top of the screen)
   // notices pop up in the middle of the screen, as the same card as the fishing cue
-  if (nbQuiet() && toast.busyUntil > performance.now()) {   // newcomer: one notice at a time, the rest wait their turn
+  if (nbQuiet() && ok && toast.busyUntil > performance.now()) {   // newcomer: one notice at a time, the rest wait their turn (warnings never wait)
     if (toast.q.length < 4 && !toast.q.some(x => x[0] === msg)) { recentToasts.delete(key); toast.q.push([msg, icon, ok]); }
     if (!toast.drainT) toast.drainT = setTimeout(toastDrain, toast.busyUntil - performance.now() + 50);
     return;
   }
   const box = $('#notices'), d = document.createElement('div'), life = Math.min(7000, 3200 + msg.length * 45);
-  toast.busyUntil = performance.now() + Math.min(life, 3500);
+  toast.busyUntil = performance.now() + Math.min(life, 2400);
   d.className = 'notice' + (ok ? '' : ' bad'); d.innerHTML = `<b>${esc(icon)}</b><small>${esc(msg)}</small>`;
   d.style.animationDuration = `.25s, ${life}ms`;
   box.prepend(d); while (box.children.length > 2) box.lastChild.remove();
@@ -1064,6 +1064,7 @@ function paintCardClock(h) {
 // today's quests listed in the card: tap one and you walk there by yourself
 // 🌱 starter path in the quest card (new players until it is done): tap a step to be walked there
 function nbTap(i) {
+  nbTapped.add(i); try { nbHudApply(); } catch { }
   const st = G.nbSteps[i]; FX.play('click');
   if (st.go) return setGuide(nbGo(i), false, true);
   if (i === 3) { foldChat(false); const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
@@ -1077,13 +1078,14 @@ const thaiDay = t => new Date(t + 7 * 3600e3).toISOString().slice(0, 10);
 function nbFirstDay() { return nbDay1() && thaiDay(me.nb.t0) === thaiDay(Date.now() + clockOff); }
 function nbQuiet() { return nbFirstDay() && nbActive(); }   // the newcomer's first day, starter path still running: one thing at a time
 // show / hide the HUD buttons for a v2 newcomer (tools/hud.test.js covers hudVisible); a button that appears glows once and is named
+const nbTapped = new Set();   // starter steps the player tapped: their buttons show at once (the list points at them)
 const NB_HUD_NAME = { runBtn: '👟 วิ่ง (กดค้าง = วิ่ง)', restBtn: '😌 พัก (นั่งพักฟื้นพลัง)', cbOpen: '💬 แชท', emoBtn: '😀 อิโมจิ' };
 let nbHudShown = null;
 function nbHudApply() {
   const on = nbQuiet(), p = me?.nb?.p || [], done = !!me?.nb?.done, was = nbHudShown; nbHudShown = {};
   for (const id of Object.keys(NB_HUD)) {
     const el = $('#' + id); if (!el) continue;
-    const vis = !on || hudVisible(id, p, done); nbHudShown[id] = vis;
+    const vis = !on || hudVisible(id, p, done) || (NB_HUD[id][0] === 'cur' && nbTapped.has(NB_HUD[id][1])); nbHudShown[id] = vis;
     el.classList.toggle('nbHide', !vis);
     if (on && was && vis && was[id] === false) { el.classList.add('nbNew'); setTimeout(() => el.classList.remove('nbNew'), 2600); if (NB_HUD_NAME[id]) toast(`ปุ่มใหม่: ${NB_HUD_NAME[id]}`, '✨'); }
   }

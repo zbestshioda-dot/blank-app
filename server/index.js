@@ -5217,7 +5217,7 @@ function login(ws, m, pre) {
     a.garden = null; a.money += back; a.sd = true;
     setTimeout(() => a.ws === ws && toast(a, `ไร่ชานเมืองปิดแล้ว คืนค่าสวนของคุณเต็มจำนวน ${money(back)} 💰`, '🌾'), 6000);
   }
-  const daily = dailyLogin(a); ev7Mark(a); nbDaily(a);
+  const daily = dailyLogin(a); ev7Mark(a);
   ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
@@ -5238,6 +5238,7 @@ function login(ws, m, pre) {
   meSend(a, true); send(a, worldView());
   send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); send(a, fcView(a)); send(a, folksView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
   if (daily) send(a, { t: 'daily', ...daily });
+  setTimeout(() => a.ws === ws && nbDaily(a), 4000);   // 🥚 the egg hatches / the day-2 gift arrives once the phone is connected (so the hatch card shows)
   if (!a.rod && a.career === 'none' && !NBM.isV2(a)) setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);
   sendRoster();
   if (!hidden(a)) feed(`👋 ${a.name} เข้าเมือง`);
