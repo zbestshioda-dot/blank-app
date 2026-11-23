@@ -14,6 +14,7 @@ IMG = os.path.join(ROOT, 'public', 'assets', 'atlas.webp')
 JS = os.path.join(ROOT, 'public', 'assets', 'atlas.json')
 SH = lambda n: os.path.join(ROOT, 'tools', 'sheets', n)
 TILE = 48
+GROW = {}   # sheet -> a bigger grow for sheets whose pieces come in parts
 # sheet -> rows of (sprite name, width in game tiles); None = skip that blob
 SHEETS = {
   'pixel_buildings_k.jpg': [[('b_casino', 7.4)], [('b_chipkiosk', 3.6), ('b_slotstall', 3.6)]],
@@ -27,14 +28,14 @@ SHEETS = {
     [('ci_dice', 1.3), ('ci_chips', .8), ('ci_card', .8), ('ci_coins', 1.1), ('ci_chest', 1.3)]],
 }
 
-def blobs(path, want):
+def blobs(path, want, grow=4):   # grow: how far apart two parts of one piece may be (chairs round a table, a neon glow ring)
     a = np.asarray(Image.open(path).convert('RGB')).astype(int); r, g, b = a[..., 0], a[..., 1], a[..., 2]
     mag = np.minimum(r, b) - g
     bg = (mag > 70) & (np.abs(r - b) < 110)
     if 'buildings' in path:                                # the night cell (top right) has a dark background: drop it
         H, W = bg.shape; bg[:H // 2, W // 2:] = True
     fg = ndimage.binary_opening(~bg, iterations=2)
-    lab, n = ndimage.label(ndimage.binary_dilation(fg, iterations=4))
+    lab, n = ndimage.label(ndimage.binary_dilation(fg, iterations=GROW.get(os.path.basename(path), grow)))
     objs = []
     for i, sl in enumerate(ndimage.find_objects(lab)):
         area = (lab[sl] == i + 1).sum()

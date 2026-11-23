@@ -2036,7 +2036,7 @@ function draw(t) {
   for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.sy ?? p.y, 1, p]);
   if (Date.now() + clockOff < (G.xmasEnd || 0) && vis(XMAS_DEER.x, XMAS_DEER.y, 3)) ents.push([XMAS_DEER.y + .3, 6, XMAS_DEER]);   // 🎄 the showcase reindeer pulling the sleigh   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
-  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|ad_mat|ad_neon|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
+  for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|ad_mat|ad_neon|br_stage|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
   if (A?.id === 'town') for (const s of G.stations) if (s.type === 'ride' && vis(s.cx, rideBottom(s), 10)) ents.push([s.k === 'pool' || s.k === 'bumper' ? -1e8 : rideBottom(s), 8, s]);
   if (A?.id === 'temple' || A?.id === 'town') crowdEnts(A, ents, vis);
   if (A?.id === 'town' && vis(AREA.park.x + 20, AREA.park.y + 14, 26)) crowdEnts(AREA.park, ents, vis);   // the park's visitors, only while it is near the view
@@ -2134,6 +2134,7 @@ function draw(t) {
     gl.addColorStop(0, 'rgba(255,214,150,.10)'); gl.addColorStop(.7, 'rgba(255,200,140,0)'); gl.addColorStop(1, 'rgba(30,15,5,.28)');
     ctx.fillStyle = gl; ctx.fillRect(r.x * TS + X, r.y * TS + Y, r.w * TS, r.h * TS);
   }
+  if (myRoom?.rk === 'bar') drawBarFx(myRoom, X, Y, t);
   if (!myRoom) { drawRain(t); drawAtmos(t, night, A); }
   // inside: no day/night, but the office turns its lights off after work hours
   let dark = myRoom ? 0 : night;
@@ -2146,6 +2147,48 @@ function draw(t) {
   const fp = (performance.now() - fadeT) / 350;
   if (fp < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fp})`; ctx.fillRect(0, 0, VW, VH); }
   if (!ECO || t - (window.__miniT || 0) > 250) { window.__miniT = t; drawMini(); }
+}
+// 🍸 the night bar's show lights: the room is dimmed, coloured spotlights sweep the floor, a mirror ball throws sparkles and
+// laser fans shoot from the stage. Everything pulses faster while someone sings. Closed (daytime): just the dim room.
+function drawBarFx(r, X, Y, t) {
+  const x0 = r.x * TS + X, y0 = r.y * TS + Y, W = r.w * TS, H = r.h * TS, P = (dx, dy) => [(r.x + dx) * TS + X, (r.y + dy) * TS + Y];
+  const sg = me?.bar?.sg && me.bar.sg.until > Date.now() + clockOff, on = isOpen('bar'), beat = sg ? .5 + .5 * Math.sin(t / 140) : .5 + .5 * Math.sin(t / 420);
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, W, H); ctx.clip();
+  ctx.fillStyle = on ? 'rgba(18,4,40,.38)' : 'rgba(10,8,20,.25)'; ctx.fillRect(x0, y0, W, H);
+  if (!on) { ctx.restore(); return; }
+  ctx.globalCompositeOperation = 'lighter';
+  const COL = ['255,40,120', '40,220,255', '140,60,255', '60,255,120', '255,200,40'];
+  // sweeping spotlights on the floor
+  for (let i = 0; i < (ECO ? 2 : 4); i++) {
+    const k = t / (2600 + i * 700) + i * 1.7, [cx, cy] = P(8 + Math.sin(k) * 5.5, 7 + Math.cos(k * 1.3) * 3), R0 = TS * (1.6 + beat * .5);
+    if (ECO) { ctx.fillStyle = `rgba(${COL[i]},.16)`; ctx.beginPath(); ctx.ellipse(cx, cy, R0, R0 * .55, 0, 0, 7); ctx.fill(); continue; }
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R0); g.addColorStop(0, `rgba(${COL[i]},.32)`); g.addColorStop(1, `rgba(${COL[i]},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, cy, R0, R0 * .55, 0, 0, 7); ctx.fill();
+  }
+  // lasers: two fans from the stage's top corners, sweeping across the room
+  const ci = Math.floor(t / 1800) % COL.length;
+  for (const [sx, sy, dir] of [[11.2, 1.4, -1], [14.2, 1.4, 1]]) {
+    const [ox, oy] = P(sx, sy), n = ECO ? 3 : 6, base = Math.PI / 2 + dir * .35 + Math.sin(t / 900 + sx) * .55;
+    for (let j = 0; j < n; j++) {
+      const a = base + (j - (n - 1) / 2) * .16 * (1 + .4 * Math.sin(t / 600)), L = TS * 13, ex = ox + Math.cos(a) * L, ey = oy + Math.sin(a) * L, c = COL[(ci + j) % COL.length];
+      if (!ECO) { ctx.strokeStyle = `rgba(${c},${.10 + beat * .08})`; ctx.lineWidth = TS * .22; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, ey); ctx.stroke(); }
+      ctx.strokeStyle = `rgba(${c},${.55 + beat * .35})`; ctx.lineWidth = Math.max(1, TS * .04); ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, ey); ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(255,255,255,${.6 + beat * .4})`; ctx.beginPath(); ctx.arc(ox, oy, TS * .1, 0, 7); ctx.fill();
+  }
+  // the mirror ball over the dance floor, and the sparkles it throws
+  const [bx, by] = P(8, 1.0), br = TS * .38;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = 'rgba(200,200,220,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, y0); ctx.lineTo(bx, by - br); ctx.stroke();
+  const bg = ctx.createRadialGradient(bx - br * .3, by - br * .3, br * .1, bx, by, br); bg.addColorStop(0, '#fff'); bg.addColorStop(.5, '#b8bcd0'); bg.addColorStop(1, '#5a5f78');
+  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 6; i++) { const a = t / 500 + i, fx = bx + Math.cos(a) * br * .6, fy = by + Math.sin(a * 1.3) * br * .6; ctx.fillStyle = `rgba(${COL[i % 5]},.8)`; ctx.fillRect(fx - 1.5, fy - 1.5, 3, 3); }
+  for (let i = 0; i < (ECO ? 14 : 34); i++) {
+    const a = i * 2.399 + t / 2200, d = (i * 37 % 100) / 100, [sx, sy] = P(8 + Math.cos(a) * (1 + d * 6.5), 6.5 + Math.sin(a) * (1 + d * 4.2)), tw = .5 + .5 * Math.sin(t / 160 + i * 1.9);
+    ctx.fillStyle = `rgba(${COL[i % 5]},${.25 + tw * .55})`; const z = TS * (.05 + tw * .05); ctx.fillRect(sx - z, sy - z, z * 2, z * 2);
+  }
+  ctx.restore();
 }
 // home yard: locked zones lie under a hazy overgrown fog with a lock and the price of the next unlock
 function drawYardLocks(A, X, Y, t) {
@@ -6045,6 +6088,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27c', d: '23 พ.ย.', items: [
+    '🍸 บาร์ชิลล์ราตรีโฉมใหม่! ตึกและของตกแต่งวาดใหม่ทั้งร้าน · 🪩 ไฟแสงสี สปอตไลต์ ลูกบอลดิสโก้ และ <b>เลเซอร์ยิงจากเวที</b> ตอนบาร์เปิด · มีคนร้องเพลงไฟจะเต้นเร็วขึ้น 🎤']},
   { v: '2026-11-27b', d: '23 พ.ย.', items: [
     '🏆 <b>อันดับเศรษฐีมีรางวัลแล้ว!</b> แจกทุกวันจันทร์ 00:00 ทางจดหมาย: 🥇 💎100 + ฉายา 💰 เศรษฐีอันดับ 1 ของเมือง 7 วัน · 🥈 💎60 · 🥉 💎40 · อันดับ 4–10 💎15']},
   { v: '2026-11-27a', d: '23 พ.ย.', items: [
@@ -8163,13 +8208,13 @@ fetch('assets/pets.json?v=4').then(r => r.json()).then(j => { PET_AT = j; setTim
 // 📱 phones get the half-size atlas (~25 MB decoded instead of ~100 MB: iPhones were reloading to a white screen, and it draws faster);
 // halving every sprite rectangle and the tile size keeps every draw call the same
 const HALF_ATLAS = TOUCH_UI || IOS;
-fetch('assets/atlas.json?v=v30').then(r => r.json()).then(j => {
+fetch('assets/atlas.json?v=v31').then(r => r.json()).then(j => {
   if (HALF_ATLAS) { j.tile /= 2; for (const k in j.sprites) j.sprites[k] = j.sprites[k].map(v => v / 2); }
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
-  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v30';
+  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v31';
 });
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
-if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v30').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v30'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v31').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v31'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp

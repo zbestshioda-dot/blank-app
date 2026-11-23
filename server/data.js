@@ -519,16 +519,16 @@ const LAYOUT = {
   // 🍸 night bar: the counter top left with stools in front (bottles and a drinks fridge behind), the karaoke stage top right,
   // round tables and a pool table at the bottom, a sofa corner; the aisle from the door is kept clear.
   // br_* pictures come from tools/add_bar.py; until then older furniture stands in (BRS below)
-  bar: [['br_neon', 8, 1.25, false], ['br_shelf', 4.6, 1.9, false], ['br_counter', 4.6, 3.3], ['br_fridge', 1.6, 2.8], ['br_tap', 7.2, 2.5, false],
+  bar: [['br_neon', 12.7, 1.75, false], ['br_shelf', 4.6, 1.9, false], ['br_counter', 4.6, 3.3], ['br_fridge', 1.6, 2.8], ['br_tap', 6.0, 2.75, false], ['br_dart', 9.4, 1.6, false],
     ['br_stool', 3.0, 4.7, false], ['br_stool', 4.6, 4.7, false], ['br_stool', 6.2, 4.7, false],
     ['br_stage', 12.7, 4.6, false], ['br_speaker', 10.9, 3.0], ['br_speaker', 14.5, 3.0], ['br_mic', 12.7, 3.9, false],
-    ['br_table', 3.2, 8.0], ['br_table', 12.8, 8.0], ['br_pool', 3.6, 11.0], ['br_dart', 14.6, 11.0], ['br_sofa', 12.4, 11.0, false], ['br_lamp', 1.3, 6.4], ['br_lamp', 14.8, 6.4], ['br_barrel', 6.0, 11.0]],
+    ['br_table', 3.2, 8.0], ['br_table', 12.8, 8.0], ['br_pool', 3.6, 11.0], ['br_sofa', 12.4, 11.0, false], ['br_lamp', 1.3, 6.4], ['br_lamp', 14.8, 6.4], ['br_barrel', 6.0, 11.0], ['br_barrel2', 14.6, 11.0]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
 };
 const BRS = { br_neon: 'ad_neon', br_shelf: 'f_wine_rack', br_counter: 'cz_bar', br_fridge: 'x_drinkfridge', br_tap: 'i_bottles', br_stool: 'x_barstool', br_stage: 'cz_carpet', br_speaker: 'x_flamp',
-  br_mic: 'f_guitar', br_table: 'f_round_table', br_pool: 'x_pool', br_dart: 'x_dart', br_sofa: 'f_sofa_red', br_lamp: 'f_floorlamp', br_barrel: 'barrel' };
+  br_mic: 'f_guitar', br_table: 'f_round_table', br_pool: 'x_pool', br_dart: 'x_dart', br_sofa: 'f_sofa_red', br_lamp: 'f_floorlamp', br_barrel: 'barrel', br_barrel2: 'barrel' };
 for (const e of LAYOUT.bar) if (!ATLAS.sprites[e[0]]) e[0] = BRS[e[0]];
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);

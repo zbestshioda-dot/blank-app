@@ -13,8 +13,10 @@ A.SHEETS = {
     [('br_counter', 4.2), ('br_shelf', 2.6), ('br_fridge', 1.5), ('br_tap', 1.0)],
     [('br_stool', .8), ('br_table', 2.2), ('br_sofa', 2.6), ('br_pool', 3.6)],
     [('br_stage', 3.2), ('br_mic', .7), ('br_speaker', 1.0), ('br_neon', 2.4)],
-    [('br_dart', 1.0), ('br_lamp', .9), ('br_barrel', 1.0)]],
+    [('br_dart', 1.6), ('br_lamp', .9), ('br_barrel', 1.0), ('br_barrel2', 1.0)]],
 }
+
+A.GROW['bar_props.jpg'] = 10   # the chairs stand apart from their table, the neon sign has a separate glow
 
 if __name__ == '__main__':
     A.main()
