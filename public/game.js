@@ -1109,8 +1109,7 @@ function paintHud() {
   if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">${ic('i_bulb')} อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
   if (me.desk >= 0 && me.enrolled) chips.push(`<span class="chip study" data-dz="_study">📖 เรียนอยู่ ${Math.round((me.study || 0) * 100)}%</span>`);
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
-  if (me.utilOff) chips.push('<span class="chip bad" data-dz="_bills">🔌 ถูกตัดน้ำไฟ</span>');
-  else if ((me.bills || []).length) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
+  if (0) chips.push(`<span class="chip warnc" data-dz="_bills">🧾 ค้างบิล ${money(me.bills.reduce((s, b) => s + b.water + b.elec, 0))}</span>`);
   $('#statusBox').classList.toggle('hidden', !chips.length);
   { const n = me.mailN || 0, f = $('#mailFab'); if (f) { f.classList.toggle('hidden', !n); $('#mailFabN').textContent = n > 9 ? '9+' : n; if (!f.onclick) f.onclick = () => openPanel({ kind: 'mail' }); } }
   paintPortrait(); $('#phoneBtn').classList.toggle('has', (me.mailN || 0) > 0 || (me.bills || []).length > 0 || achTodo().length > 0);
@@ -1911,7 +1910,7 @@ function frame(t) {
       // round to what we send so client and server always agree
       const r2 = v => Math.round(v * 100) / 100;
       const swim = swimming(), inPool0 = nearPoolW(m.x, m.y), ar0 = rv?.fly ? areaOf(m.x, m.y) : null, stuck = !ar0 && !swim && blockedAt(m.x, m.y), free0 = (x, y) => stuck && !solid(x, y) ? true : ar0 ? x > ar0.x + .6 && y > ar0.y + .8 && x < ar0.x + ar0.w - .6 && y < ar0.y + ar0.h - .4 : !blockedAt(x, y);   // helicopters fly over everything, but stay on this map
-      const free = (x, y) => swim ? inPoolW(x, y) : !inPool0 && nearPoolW(x, y) ? false : free0(x, y);   // swimmers stay in the water; nobody walks or drives into it
+      const free = (x, y) => swim ? inPoolW(x, y) : nearPoolW(x, y) && (!inPool0 || poolDeep(x, y) > poolDeep(m.x, m.y) + .001) ? false : free0(x, y);   // swimmers stay in the water; nobody walks or drives into it
       const bx = m.x, by = m.y;
       for (let i = 0, n = Math.max(1, Math.ceil(sp / .3)), ss = sp / n; i < n; i++) {   // long steps (fast car, slow phone) in small pieces: never jump through a wall
         const nx = r2(m.x + dx * ss); if (free(nx, m.y)) m.x = nx;
@@ -2819,8 +2818,9 @@ function stepPets(dt) {
       PETST.set(p.id, q); petPlay(q, false); q.big = 1.5; if (p.id === myId) FX.play('pet', [PET_VOICE[q.id] || 'squeak', .8]); if (vis0(q)) { FX.burst(q.x, q.y - .4, '#ffe27a', 10); FX.play('pop'); }
     }
     const last = q.trail[q.trail.length - 1];
-    if (area !== q.area || petDist(head, last) > 3) { q.area = area; q.trail = [head]; q.x = p.rx - .6; q.y = p.ry + .1; }   // door / teleport: it comes along
-    else if (petDist(head, last) > .1) q.trail.push(head);
+    const wet = nearPoolW(p.rx, p.ry);                               // owner in the park pool: the pet waits on the deck, never jumps in
+    if (area !== q.area || !wet && petDist(head, last) > 3) { q.area = area; q.trail = [head]; q.x = p.rx - .6; q.y = p.ry + .1; if (wet) { q.x = G.pool.x0 - 1; q.y = G.pool.y1 + 1; q.trail = [[q.x, q.y]]; } }   // door / teleport: it comes along
+    else if (!wet && petDist(head, last) > .1) q.trail.push(head);
     let tot = 0;                                                     // keep ~3 tiles of trail
     for (let i = q.trail.length - 1; i > 0; i--) { tot += petDist(q.trail[i], q.trail[i - 1]); if (tot > 3) { q.trail.splice(0, i - 1); break; } }
     const D = 1.0; let tgt = null, acc = 0;
@@ -2833,6 +2833,7 @@ function stepPets(dt) {
       const d = petDist([q.x, q.y], head);
       tgt = d < .6 ? [head[0] + (q.x - head[0]) / (d || 1) * .85 + (d ? 0 : .8), head[1] + (q.y - head[1]) / (d || 1) * .85] : [q.x, q.y];
     }
+    if (nearPoolW(tgt[0], tgt[1])) tgt = [q.x, q.y];
     const dx = tgt[0] - q.x, dy = tgt[1] - q.y, d = Math.hypot(dx, dy);
     let step = 0;
     if (d > .05) { const sp = Math.min(d * 6.5 + .6, 8.5); step = Math.min(d, sp * dt); q.x += dx / d * step; q.y += dy / d * step; }
@@ -3290,6 +3291,7 @@ const driving = () => { const m = P.get(myId); return !!m && m.pose === 'fun' &&
 const swimming = () => { const m = P.get(myId); return !!m && m.pose === 'fun' && String(m.fn).startsWith('pool:'); };
 const inPoolW = (x, y) => { const Q = G.pool; return !!Q?.x0 && x > Q.x0 + .4 && x < Q.x1 - .4 && y > Q.y0 + .7 && y < Q.y1 - .1; };
 const nearPoolW = (x, y) => { const Q = G.pool; return !!Q?.x0 && x > Q.x0 - .35 && x < Q.x1 + .35 && y > Q.y0 - .1 && y < Q.y1 + .45; };
+const poolDeep = (x, y) => { const Q = G.pool; return Math.min(x - Q.x0 + .35, Q.x1 + .35 - x, y - Q.y0 + .1, Q.y1 + .45 - y); };   // how far inside the pool's edge: on the rim you may only step back out
 const RIDE_SEATS = { carousel: 6, ferris: 8, coaster: 6, bumper: 4, pool: 10, shooting: 3 };
 const RIDE_COL = ['#ff7aa8', '#7ac8ff', '#ffd45e', '#8be08b', '#c79bff', '#ff9f5e', '#5ee0d0', '#ffb3c7', '#9fb6ff', '#ffe28a'];
 const rideBottom = s => s.cy + s.h / 2;
@@ -6088,6 +6090,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27e', d: '23 พ.ย.', items: [
+    '🐱 แก้บั๊ก: สัตว์เลี้ยงไม่กระโดดลงสระว่ายน้ำสวนสนุกแล้ว (รอเจ้าของอยู่ริมสระ)',
+    '🚗 แก้บั๊ก: ขับ/ขี่รถลงน้ำในสระไม่ได้แล้ว',
+    '⚡ ทุกอาชีพใช้พลังงานน้อยลงอีก (ลดลงราว 1 ใน 3)',
+    '🧾 เอาระบบค่าน้ำค่าไฟออกแล้ว — บิลที่ค้างถูกล้างให้หมด และไม่โดนตัดน้ำไฟอีก',
+  ] },
   { v: '2026-11-27d', d: '23 พ.ย.', items: [
     '🐼 แก้ชุดแพนด้า (และชุดหมี ชุดแมว ชุดไก่): หูและลายบนฮู้ดไม่ติดสีผมแล้ว']},
   { v: '2026-11-27c', d: '23 พ.ย.', items: [
@@ -7600,7 +7608,7 @@ function renderPanel(p) {
       const bk = G.shop.bank, btab = p.btab || 'acct';
       const tabs = `<div class="tabs">${B('💰 บัญชี', { fn: 'qtab', set: { btab: 'acct' } }, btab === 'acct' ? 'primary' : '')}${B('📈 ตลาดหุ้น', { fn: 'qtab', set: { btab: 'stock' } }, btab === 'stock' ? 'primary' : '')}</div>`;
       if (btab === 'stock') return `<h2>🏦 ธนาคาร · ตลาดหุ้น</h2>${tabs}${stockPanel(p, st)}`;
-      return `<h2>🏦 ธนาคาร</h2>${tabs}${billsBox()}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ยเงินฝาก <b>${+(bk.rate * 100).toFixed(2)}% ต่อวันเกม</b> (24 นาที · บนยอดไม่เกิน ${money(bk.cap)})</div>
+      return `<h2>🏦 ธนาคาร</h2>${tabs}<div class="sub">${hoursTxt('bank')} · ดอกเบี้ยเงินฝาก <b>${+(bk.rate * 100).toFixed(2)}% ต่อวันเกม</b> (24 นาที · บนยอดไม่เกิน ${money(bk.cap)})</div>
         <div class="grid2"><div class="item"><div class="nm">💵 เงินสด<small><b style="color:var(--acc);font-size:16px">${money(me.money)}</b></small></div></div><div class="item"><div class="nm">🏦 เงินฝาก<small><b style="color:var(--ok);font-size:16px">${money(me.bank)}</b></small></div></div></div>
         <div class="rowf" style="margin-top:10px"><input id="bankAmt" type="number" min="1" value="1000" inputmode="numeric"></div>
         <div class="grid2" style="margin-top:8px">${B('⬇️ ฝาก', { fn: 'bank', st, op: 'deposit' }, 'good')}${B('⬆️ ถอน', { fn: 'bank', st, op: 'withdraw' })}${B('ฝากทั้งหมด', { fn: 'bank', st, op: 'deposit', all: Math.floor(me.money) })}${B('ถอนทั้งหมด', { fn: 'bank', st, op: 'withdraw', all: me.bank })}</div>
@@ -8083,7 +8091,7 @@ function bindWall(root) {
 }
 const PH_APPS = [
   ['โทรศัพท์', { fn: 'qtab', set: { tab: 'contacts' } }, 0, 'call'], ['จดหมาย', { fn: 'open', kind: 'mail' }, 2, 'mail'], ['เดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 3],
-  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], ['บิล', { fn: 'qtab', set: { tab: 'bills' } }, 5, 'bills'], 
+  ['หุ้น', { fn: 'open', kind: 'bank', set: { btab: 'stock' } }, 4], 
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row

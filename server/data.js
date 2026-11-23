@@ -692,7 +692,7 @@ const floorRoom = (house, fl) => ROOMS.find(r => r.rk === 'house' && r.house ===
 // k: ride, cx/cy: centre of its footprint, w/h: footprint (solid), cap: riders at once, price: ticket, mins: ticket length,
 // gain: per second while riding
 const POOL = {};   // the park pool's water (filled in below): swimmers move freely inside it, nobody else (and no vehicle) can enter
-const ENERGY_MUL = 0.9;   // every energy cost (jobs, quests, fishing...) x this (was 1.3: players ran dry too fast)
+const ENERGY_MUL = 0.6;   // every energy cost (jobs, quests, fishing...) x this (was 0.9, 1.3: players ran dry too fast)
 const RIDES = {
   carousel: { name: 'ม้าหมุน', icon: '🎠', price: 0, mins: 3, cap: 6, gain: { energy: 2.0, health: 0.8, happy: .3 }, desc: 'นั่งม้าหมุนชิลๆ พลังงานคืนไว' },
   ferris:   { name: 'ชิงช้าสวรรค์', icon: '🎡', price: 0, mins: 4, cap: 8, gain: { energy: 1.8, health: 1.2, happy: .35 }, desc: 'ขึ้นไปชมวิวทั้งสวน ได้ทุกอย่างสมดุล' },

@@ -212,6 +212,7 @@ function rideOff(a) { const k = a.fun?.k; standUp(a); if (k === 'bumper' || k ==
 // the pool: swimmers stay inside the water; everyone else (on foot or in a vehicle) stays out of it
 const inPoolWater = (x, y) => { const P = D.POOL; return x > P.x0 + .4 && x < P.x1 - .4 && y > P.y0 + .7 && y < P.y1 - .1; };
 const nearPool = (x, y) => { const P = D.POOL; return x > P.x0 - .35 && x < P.x1 + .35 && y > P.y0 - .1 && y < P.y1 + .45; };
+const poolDeep = (x, y) => { const P = D.POOL; return Math.min(x - P.x0 + .35, P.x1 + .35 - x, y - P.y0 + .1, P.y1 + .45 - y); };
 function teleport(a, x, y) { a.cast = null; standUp(a); place(a, x, y, true); markMe(a); }
 function buildingOpen(bid, h = hourNow()) { return D.isOpen(bid, h); }
 function enterRoom(a, m) {
@@ -4503,6 +4504,8 @@ function begSpot(a) {
 
 // ------------------------------------------------------------------ water & electricity (billed every in-game month)
 function billUp(a) {
+  if (a.bills?.length || a.utilOff) { a.bills = []; a.utilOff = false; markMe(a); }   // ค่าน้ำค่าไฟ removed: clear old bills / cut-offs
+  return;
   const cur = D.monthIdx(now());
   if (a.billMonth == null) { a.billMonth = cur; return; }
   if (a.billMonth >= cur) return;
@@ -5295,7 +5298,7 @@ function move(a, m) {
   const swim = a.pose === 'fun' && a.fun?.k === 'pool';
   const trapped = d > 0.01 && D.blocked(a.x, a.y, D.RADIUS - 0.04) && !D.blocked(x, y, D.RADIUS - 0.04) && D.areaAt(x, y)?.id === D.areaAt(a.x, a.y)?.id && !swim;   // standing inside a wall margin (a bad seat spot): any step out to open ground is allowed
   if (d > a.mvb + 0.05) { if (d > a.mvb + 1.5) sus(a, 'speed'); return place(a, a.x, a.y); }   // (small overshoots are phone lag: only clear jumps are counted)
-  if ((swim ? !inPoolWater(x, y) : !trapped && !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && !nearPool(a.x, a.y))) { if (!swim && d > 1.2) sus(a, 'wall'); return place(a, a.x, a.y); }
+  if ((swim ? !inPoolWater(x, y) : !trapped && !(riding(a)?.fly ? flyClear(a.x, a.y, x, y) : pathClear(a.x, a.y, x, y)) || D.POOL.x0 && nearPool(x, y) && (!nearPool(a.x, a.y) || poolDeep(x, y) > poolDeep(a.x, a.y) + .05))) { if (!swim && d > 1.2) sus(a, 'wall'); return place(a, a.x, a.y); }
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper' && !swim) standUp(a);   // (bumper cars are driven, swimmers swim: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
