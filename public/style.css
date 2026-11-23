@@ -1713,3 +1713,91 @@ body.drunk2 #cv { animation: drunkSway 3.2s ease-in-out infinite }
 .nbCard>div>.nbI:first-child{display:block;margin:0 auto 4px}
 .festCard>div{max-width:min(92vw,520px);padding-top:10px}.festBan{display:block;width:100%;border-radius:12px;margin-bottom:8px;border:2px solid #b97a2a}
 .festCard b{display:flex;align-items:center;justify-content:center;gap:8px;font-size:20px}.festCard span{display:block;margin:6px 0 10px}.festCard button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* =====================================================================================================================
+   🎨 SKIN v2 "toy box": chunky pieces with an ink outline, a light top and a darker lip, one colour per button.
+   LOOKS ONLY: this layer never changes a size, padding or position (borders keep their widths; outlines are drawn inside).
+   ===================================================================================================================== */
+:root{--k-ink:#22284a;--k-cream:#fff7e8;--k-cream2:#f6ead2;--k-sun:#ffc93c;--k-sunDk:#e08a00;--k-berry:#ff5d73;--k-berryDk:#c02a4a;
+  --k-sky:#4cc3ff;--k-skyDk:#1a7fc4;--k-mint:#38d39f;--k-mintDk:#169069;--k-grape:#9b6bff;--k-grapeDk:#6236c9;--k-orange:#ff8a3d;--k-orangeDk:#d4581a;
+  --k-lip:0 3px 0 var(--k-ink);--k-drop:0 6px 14px rgba(20,20,50,.3);
+  --k-head:'Chonburi','Mitr',serif}   /* the body font stays Mitr: a wider font would change sizes */
+/* panels: same 16px transparent border as before, the colour now fills it and an ink outline sits on the edge */
+.paper,#card:not(.v2),.sheet,.box,.tutCard,.mapBox,.req,#downView{border-image:none!important;background:linear-gradient(#fffdf8,var(--k-cream) 70px) border-box!important;
+  outline:3px solid var(--k-ink);outline-offset:-3px;border-radius:22px!important;box-shadow:0 5px 0 var(--k-ink),var(--k-drop);color:var(--k-ink)}
+.sheet h2{font-family:var(--k-head);font-weight:400!important;color:var(--k-ink)!important;letter-spacing:.2px;background:none!important;border-bottom:3px dotted rgba(34,40,74,.25)!important}
+.secT{background:none!important;border-bottom:2px dotted rgba(34,40,74,.25);color:var(--k-ink)}
+/* buttons: toy buttons that press in */
+button{color:var(--k-ink);border-color:var(--k-ink);background:linear-gradient(#ffffff 0 46%,#efe6d4 47%);box-shadow:var(--k-lip)}
+button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--k-ink)}
+button.primary{background:linear-gradient(#ffe37a 0 46%,var(--k-sun) 47%);color:var(--k-ink);border-color:var(--k-ink);box-shadow:var(--k-lip)}
+button.good{background:linear-gradient(#7ff0c4 0 46%,var(--k-mint) 47%);color:var(--k-ink);border-color:var(--k-ink);box-shadow:var(--k-lip)}
+button.warn{background:linear-gradient(#ff9db1 0 46%,var(--k-berry) 47%);color:#fff;border-color:var(--k-ink);box-shadow:var(--k-lip);text-shadow:0 1px 0 rgba(0,0,0,.25)}
+button:disabled{background:#e6e0d4;box-shadow:none;color:#8a8fa8;opacity:1}
+input,select{border-color:var(--k-ink);background:#fff}
+input:focus{border-color:var(--k-skyDk);box-shadow:0 0 0 3px rgba(76,195,255,.35)}
+/* tabs, item planks, tags: keep their border widths, swap the wood art for colour + outline */
+.tabs button{border-image:none!important;border-color:transparent!important;background:linear-gradient(#e9f7ff 0 46%,#cde9fb 47%) border-box!important;
+  outline:2px solid var(--k-ink);outline-offset:-2px;border-radius:12px;color:var(--k-ink)!important;text-shadow:none!important;box-shadow:var(--k-lip)}
+.tabs button.primary{background:linear-gradient(#7fe0ff 0 46%,var(--k-sky) 47%) border-box!important;color:#fff!important;text-shadow:0 1px 0 var(--k-skyDk)!important}
+.item,.jobbox,#qline,.moreTile{border-image:none!important;border-color:transparent!important;background:#fff border-box!important;outline:2px solid var(--k-ink);outline-offset:-2px;border-radius:14px!important;box-shadow:var(--k-lip)}
+.tag{border-image:none!important;border-color:transparent!important;background:var(--k-grape) border-box!important;color:#fff;border-radius:10px!important}
+.money::before{background-image:url(assets/nb/coin.webp)!important;image-rendering:pixelated}
+button.x{background:linear-gradient(#ff9db1 0 46%,var(--k-berry) 47%)!important;border:2px solid var(--k-ink)!important;border-radius:12px!important;box-shadow:var(--k-lip)!important}
+button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:0 1px 0 var(--k-berryDk)}
+/* the status card (v2): cream plates with the ink outline */
+#card.v2{filter:drop-shadow(0 4px 8px rgba(20,20,50,.35))!important}
+#card.v2 #mePortrait{border-color:var(--k-ink)!important;background:#ffe2c2}
+#card.v2 #lvPct{background:var(--k-grape);color:#fff;border-color:var(--k-ink);font-family:var(--px)}
+#card.v2 .sInfo,#card.v2 .bars,#card.v2 #qBox,#card.v2 #statusBox{background:linear-gradient(#fffdf8,var(--k-cream))!important;border-color:var(--k-ink)!important;color:var(--k-ink)!important}
+#card.v2 .sInfo,#card.v2 #qBox{box-shadow:0 3px 0 var(--k-ink)}
+#card.v2 #meName{color:var(--k-ink)!important}
+#card.v2 .pfp #meName{background:linear-gradient(#fff 0 46%,var(--k-cream2) 47%)!important;border-color:var(--k-ink)!important;color:var(--k-ink)!important;box-shadow:0 2px 0 var(--k-ink)!important}#card.v2 #meCareer{color:#5b6285}
+#card.v2 .l2{color:#5b6285}#card.v2 #cTime{color:var(--k-skyDk)}
+#card.v2 .money{color:var(--k-ink)!important;font-family:var(--px)}
+#card.v2 .bar label{color:var(--k-ink)!important;text-shadow:none!important;-webkit-text-stroke:0!important}#card.v2 .bar em{color:#4a5070!important;text-shadow:none!important}
+#card.v2 .bar s{background:#e9e3d6!important;border-color:var(--k-ink)!important}
+#card.v2 .bar u{box-shadow:inset 0 2px 0 rgba(255,255,255,.55)}
+#card.v2 #bE{background:linear-gradient(#ffe066,var(--k-sun))!important}#card.v2 #bH{background:linear-gradient(#8ff0c5,var(--k-mint))!important}
+#card.v2 #bL{background:linear-gradient(#ff9cac,var(--k-berry))!important}#card.v2 #bJ{background:linear-gradient(#9ee2ff,var(--k-sky))!important}
+#card.v2 #qBox{background:linear-gradient(#ffe9a0,#ffd45c)!important}
+#card.v2 .qHead{color:var(--k-ink)!important}#card.v2 #qCount{color:#6b5a2a!important}
+#card.v2 #cardToggle{background:#fff!important;border-color:var(--k-ink)!important;color:var(--k-ink)!important}
+#card.v2 .qRow{color:var(--k-ink)!important}#card.v2 .qRow i{color:var(--k-sunDk)!important}#card.v2 .qRow small,#card.v2 .qRow em{color:#6b5a2a!important}
+#card.v2 .qRow.cur{background:rgba(255,255,255,.7)!important;border-color:var(--k-ink)!important}
+#card.v2 .qRow.done span{color:#9a8a5a!important}
+/* minimap, clock, online pill */
+#miniWrap{border-color:var(--k-ink)!important;box-shadow:0 4px 0 var(--k-ink),var(--k-drop)!important;background:var(--k-ink)!important;border-radius:16px!important}
+#miniName{color:#fff;text-shadow:0 1px 0 var(--k-ink),0 0 3px var(--k-ink)}
+#mClock{background:linear-gradient(#7fe0ff 0 48%,var(--k-sky) 49%)!important;border-color:var(--k-ink)!important;color:#fff!important;box-shadow:var(--k-lip)!important}
+#mClock *{color:#fff!important;text-shadow:0 1px 0 var(--k-skyDk)}
+/* the thumb buttons: one colour each, glossy top, ink lip; labels outlined so they read on any ground */
+#thumbs>button{border-color:var(--k-ink)!important;box-shadow:0 4px 0 var(--k-ink),var(--k-drop)!important}
+#thumbs>button small{color:#fff!important;text-shadow:none!important;-webkit-text-stroke:3px var(--k-ink);paint-order:stroke fill}
+#thumbs .round{background:radial-gradient(circle at 50% 28%,#fff6e0,#ffd9a8 40%,#e8a25e)!important}
+#thumbs #runBtn{background:radial-gradient(circle at 50% 28%,#d9f4ff,var(--k-sky) 52%,var(--k-skyDk))!important}
+#thumbs #bagBtn{background:radial-gradient(circle at 50% 28%,#ffe0c4,var(--k-orange) 52%,var(--k-orangeDk))!important}
+#thumbs #restBtn{background:radial-gradient(circle at 50% 28%,#d6fff0,var(--k-mint) 52%,var(--k-mintDk))!important}
+#thumbs #emoBtn{background:radial-gradient(circle at 50% 28%,#ffe6ee,var(--k-berry) 52%,var(--k-berryDk))!important}
+#thumbs #talkBtn,#thumbs #mgBtn{background:radial-gradient(circle at 50% 28%,#efe6ff,var(--k-grape) 52%,var(--k-grapeDk))!important}
+#thumbs #actBtn{background:radial-gradient(circle at 50% 30%,#fff3a8,var(--k-sun) 48%,var(--k-sunDk))!important;border-color:var(--k-ink)!important;box-shadow:0 5px 0 var(--k-ink),0 0 0 6px rgba(255,201,60,.3),0 0 22px 6px rgba(255,201,60,.45)!important}
+#actBtn small{color:var(--k-ink)!important;-webkit-text-stroke:0;font-weight:700}
+#thumbs #actBtn.idle{filter:saturate(.25) brightness(.95);opacity:.85;box-shadow:0 5px 0 var(--k-ink)!important}
+#thumbs #actBtn.closed{background:radial-gradient(circle at 50% 30%,#ffe6ee,var(--k-berry) 48%,var(--k-berryDk))!important}
+#thumbs #actBtn.run{background:radial-gradient(circle at 50% 30%,#ffe0c4,var(--k-orange) 48%,var(--k-orangeDk))!important}
+#stick{border-color:rgba(34,40,74,.45)!important;background:rgba(255,255,255,.16)!important}
+#stick i{background:linear-gradient(#fff 0 46%,var(--k-cream2) 47%)!important;border-color:var(--k-ink)!important;box-shadow:0 4px 0 var(--k-ink)}
+/* top tiles (phone, 7 days, events) */
+#menu .tile,#menuToggle,#phoneBtn,#tbRow .tile{background:linear-gradient(#fff 0 46%,var(--k-cream2) 47%)!important;outline:2px solid var(--k-ink);outline-offset:-2px;border-radius:14px!important;box-shadow:var(--k-lip)!important}
+#phoneBtn{background:linear-gradient(#ffc2cd 0 46%,var(--k-berry) 47%)!important}
+#tbRow .tile i,#tbRow .tile small{color:var(--k-ink)}
+/* notices and chat */
+.notice{background:rgba(255,253,248,.97)!important;color:var(--k-ink)!important;border-color:var(--k-ink)!important;box-shadow:0 3px 0 var(--k-ink),var(--k-drop)}
+.notice.bad{background:#fff0f2!important;border-color:var(--k-berryDk)!important}
+#cbOpen{background:radial-gradient(circle at 50% 25%,#efe6ff,var(--k-grape) 60%)!important;color:#fff!important;border:2px solid var(--k-ink)!important;box-shadow:var(--k-lip)!important;text-shadow:0 1px 0 var(--k-grapeDk)}
+#mailFab{background:linear-gradient(#fff 0 46%,#ffe9a0 47%)!important;border-color:var(--k-ink)!important;box-shadow:0 3px 0 var(--k-ink)!important}
+#navX{border-color:var(--k-ink)!important;box-shadow:var(--k-lip)!important}
+.chip{border-color:var(--k-ink)!important}
+/* the NPC talk box */
+#dlg{border-color:var(--k-ink)!important}
+#dlg .dlgName{font-family:var(--k-head);font-weight:400}
