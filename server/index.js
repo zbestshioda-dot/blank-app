@@ -755,7 +755,7 @@ let lotto = { cur: '', last: null };
 let auc = null;
 const aucEnds = () => Date.parse(weekKey() + 'T00:00:00+07:00') + 7 * 864e5;
 const aucView = a => { const f = auc?.lot && D.FURNITURE[auc.lot]; return { t: 'auc', lot: auc?.lot || null, name: f?.name || '', spr: f?.spr || '', comfort: f?.comfort || 0, bid: auc?.bid || 0, by: auc?.name || null, min: auc ? AU.next(auc) : AU.MIN, mine: !!auc?.by && auc.by === lk(a), ends: aucEnds() }; };
-function aucTick() {
+function wkAucTick() {
   const r = AU.roll(auc, weekKey(), D.AUC_LOTS); if (r.state === auc) return;
   auc = r.state; dirty = true;
   const e = r.ended, o = e && accounts.get(e.login), f = e && D.FURNITURE[e.lot]; if (!o || !f) return;
@@ -764,7 +764,7 @@ function aucTick() {
   sysMail(o, `🏆 ยินดีด้วย! คุณชนะการประมูล ${f.name} ด้วยราคา ${money(e.bid)} ของชิ้นนี้มีชิ้นเดียวในเมือง${o.hown ? ' ส่งไปที่บ้านแล้ว' : ' เก็บไว้ให้ก่อน มีบ้านเมื่อไหร่วางได้เลย'}`);
   feed(`🏆 ${e.name} ชนะการประมูล ${f.name} ด้วยราคา ${money(e.bid)}!`);
 }
-setInterval(() => { try { aucTick(); } catch (e) { console.error('aucTick', e); } }, 60e3).unref?.();
+setInterval(() => { try { wkAucTick(); } catch (e) { console.error('wkAucTick', e); } }, 60e3).unref?.();
 // 💞 closeness and weddings. Closeness grows for two friends (each has the other's number) who are near each other online.
 // One wedding at a time: the proposer's ring is used when the other says yes; both must reach the arch in the temple in 15 min.
 let wed = null;
@@ -5233,9 +5233,12 @@ function pathClear(x0, y0, x1, y1) {
   return D.areaAt(x1, y1)?.id === D.areaAt(x0, y0)?.id;
 }
 
+// 🛟 one bad message must never take the whole town down (a throw here used to crash the process: everyone disconnected and lost what wasn't saved yet)
+let errLog = 0;
+function logErr(where, e, extra) { if (Date.now() - errLog < 2000) return; errLog = Date.now(); console.error(`[${where}] ${extra || ''}`, e?.stack || e); }
 function onMessage(ws, raw) {
   const a = ws.acct; if (a && a.ws === ws) ledSweep(a, 'อื่นๆ');
-  onMessage0(ws, raw);
+  try { onMessage0(ws, raw); } catch (e) { logErr('msg', e, String(raw).slice(0, 120)); }
   const b = ws.acct; if (b && b.ledCtx) { ledSweep(b); b.ledCtx = null; }
 }
 function onMessage0(ws, raw) {
@@ -5430,7 +5433,7 @@ function onMessage0(ws, raw) {
       addItem(a, 'fcbait', 5); markMe(a); return toast(a, 'ได้เหยื่อแข่งตกปลา 🪱 x5 · ใช้เองตอนแข่ง ปลาที่ตกได้หนักขึ้น 20–50%', '🪱');
     }
     case 'frecs': return send(a, recView());
-    case 'auc': aucTick(); return send(a, aucView(a));
+    case 'auc': wkAucTick(); return send(a, aucView(a));
     case 'wedinfo': return send(a, wedView(a));
     case 'wedans': {                         // 💍 the answer to a proposal
       const q = a.wedAsk; a.wedAsk = null; if (!q || now() - q.at > WED.ask) return toast(a, 'คำขอนี้หมดเวลาแล้ว', '💍', false);
@@ -5459,14 +5462,14 @@ function onMessage0(ws, raw) {
       sendRoster(); send(a, wedView(a)); return toast(a, '💔 หย่าแล้ว แต่งงานใหม่ได้หลังครบ 7 วัน', '💔');
     }
     case 'cal': {                            // 📅 phone app: every timed event in one place
-      aucTick(); const th = thNow(), wk = weekKey(), today20 = Date.parse(th.day + 'T20:00:00+07:00');
+      wkAucTick(); const th = thNow(), wk = weekKey(), today20 = Date.parse(th.day + 'T20:00:00+07:00');
       const top = HM.board([...accounts.values()], wk, 1)[0];
       return send(a, { t: 'cal', fc: fc ? { end: fc.end } : { at: now() < today20 ? today20 : today20 + 864e5 }, prize: FC.prizes[0], weekEnd: aucEnds(),
         auc: auc?.lot ? { name: D.FURNITURE[auc.lot].name, bid: auc.bid, by: auc.name } : null, home: top || null, lotto: lottoNext()[1], xmas: CR.thMonth() === 12 });
     }
     case 'aucbid': {                         // 🏆 bid baht on this week's lot: paid now, handed back if someone outbids you
       if (!cd(a, 'aucbid', 1500)) return;
-      aucTick();
+      wkAucTick();
       const amt = Math.floor(+m.amt);
       if (!(amt > 0) || amt > 1e9) return toast(a, 'ใส่ราคาเป็นตัวเลข', '🏆', false);
       if (a.money < amt) return toast(a, `เงินไม่พอ (มี ${money(a.money)})`, '💸', false);
@@ -6360,6 +6363,9 @@ async function shutdown() {
   await save(true); await store.close(); process.exit(0);
 }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
+// 🛟 anything else that throws: log it and keep the town running (Fly logs show the line to fix)
+process.on('uncaughtException', e => console.error('[uncaught]', e?.stack || e));
+process.on('unhandledRejection', e => console.error('[unhandled promise]', e?.stack || e));
 
 async function main() {
   await store.init();
@@ -6368,7 +6374,7 @@ async function main() {
   try { const h = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 }); h.enable();
     setInterval(() => { const p = h.percentile(99) / 1e6, mx = h.max / 1e6; if (mx > 250) console.warn(`event loop stall: p99 ${p.toFixed(0)}ms max ${mx.toFixed(0)}ms · online ${online.size}`); h.reset(); }, 60e3).unref?.(); } catch { }
   let slowLog = 0;   // ⏱️ lag hunting: say in the Fly logs when one tick takes too long (at most once a minute)
-  setInterval(() => { const t0 = Date.now(); tick(); const ms = Date.now() - t0; if (ms > 60 && t0 > slowLog) { slowLog = t0 + 60e3; console.warn(`slow tick ${ms}ms · online ${online.size}`); } }, TICK);
+  setInterval(() => { const t0 = Date.now(); try { tick(); } catch (e) { logErr('tick', e); } const ms = Date.now() - t0; if (ms > 60 && t0 > slowLog) { slowLog = t0 + 60e3; console.warn(`slow tick ${ms}ms · online ${online.size}`); } }, TICK);
   server.listen(PORT, () => console.log(`Life Town running on http://localhost:${PORT}`));
 }
 if (require.main === module) main().catch(e => { console.error('fatal:', e); process.exit(1); });
