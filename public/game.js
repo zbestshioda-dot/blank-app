@@ -808,7 +808,7 @@ function handle(m) {
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
-    case 'folksay': { const o = P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
+    case 'folksay': { const o = m.id != null && P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } else toast(m.text, '💞'); FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
     case 'egg': eggFx(m); break;
     case 'amb': ambStart(m); break;
@@ -4885,7 +4885,7 @@ const FN = {
   jOpen(m) { if (panel) { panel.open = m.id; refreshPanel(true); } },
   storyGuide(m) { closePanel(); setGuide(m.at); },
   storyGo(m) { send({ t: 'story', o: m.o }); },
-  folkGive(m) { send({ t: 'folkgift', id: m.npc, item: m.item }); closePanel(); },
+  folkGive(m) { send({ t: 'folkgift', id: m.npc, fid: panel?.fid, item: m.item }); closePanel(); },
   fishRecs() { openRecs(); },
   wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
   morder(m, root) { const tip = Math.floor(+root.querySelector('#tipIn')?.value || 0); panel.tip = tip; send({ t: 'morder', item: m.item, qty: m.qty, tip }); },
@@ -5329,7 +5329,9 @@ function talkTo(n, st) {
   if (me?.nb?.v === 2) send({ t: 'nbev', k: 'talk' });
   const now = performance.now(), quick = now - (talkedAt[n.id] || -1e9) < 90000; talkedAt[n.id] = now;
   const openIt = () => { dialogClose(); openPanel({ kind: STN(st)?.type || 'staff', st }); };
-  if (quick && !(!n.keeper && MIS_CAREERS.includes(n.career) && job(n.career))) return openIt();   // mission givers always ask, so 📋 รับภารกิจ shows again right after a mission
+  const fd = staffFolk(n);   // 💞 staff and shopkeepers can be befriended too
+  if (fd) send({ t: 'folktalk', fid: fd.id });
+  if (quick && !fd && !(!n.keeper && MIS_CAREERS.includes(n.career) && job(n.career))) return openIt();   // mission givers always ask, so 📋 รับภารกิจ shows again right after a mission
   const key = TALK[n.id] ? n.id : n.id.startsWith('keep_cstore') ? 'cstore' : n.id, topics = TALK[key] || TALK.town;
   const act = n.keeper ? '🛒 ดูร้าน / ใช้บริการ' : n.career === 'fishing' ? '🎣 ดูเบ็ด' : me.career === n.career ? '📋 ดูงาน' : '📝 สมัครงาน';
   const more = () => dialog({ ...base, lines: [...topics[Math.floor(Math.random() * topics.length)]], choices });
@@ -5341,8 +5343,15 @@ function talkTo(n, st) {
   let choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   if (n.career === 'fishing' && nbDay1() && !me.rod && !(me.rods || []).length) choices = [{ label: `🎣 ซื้อเบ็ดแรก ${money(G.rods?.bamboo?.price || 150)}`, fn: () => { dialogClose(); send({ t: 'act', st, a: 'rod', rod: 'bamboo' }); }, cls: 'primary' }, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];   // 🌱 a newcomer's first rod: one tap
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
-  dialog({ ...base, lines: [hi], choices });
+  if (fd) {
+    const o = { id: n.id, fid: fd.id, name: n.name, face: NPC_FACE[n.id] }, rq = fd.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
+    const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n} (${money(rq.pay)})` : `📋 ขอ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', fid: fd.id }); dialogClose(); } else toast(`หา${G.items[rq.item]?.name || ''}ได้ที่${whereGet(rq.item)}`, '📋', false); } }] : [];
+    const gift = { label: fd.gave ? '🎁 ให้ของแล้ววันนี้' : `🎁 ให้ของขวัญ · ${FOLK_LVN[fd.lv]}`, cls: fd.gave ? '' : 'good', fn: () => { dialogClose(); if (!fd.gave) openPanel({ kind: 'folkgift', npc: n.id, fid: fd.id }); } };
+    choices = [choices[0], ...storyChoices(o), ...req, gift, ...choices.slice(1)];
+  }
+  dialog({ ...base, lines: [hi], choices, instant: !!fd });
 }
+const staffFolk = n => { const b = s => String(s || '').replace(/\s*\(.*$/, '').trim(), k = b(n.name); return FOLKS?.find(f => f.desk && b(f.name) === k) || null; };
 // tapping a townsperson NPC: a short chat (with their portrait), the profile one tap away
 const FOLK_TALK = {
   folk_m1: [['เพิ่งเลิกงานมาครับ วันนี้ส่งเอกสารไปสิบรอบ', 'ขาลากเลย ฮ่าๆ'], ['ถ้าอยากทำงานบริษัท ต้องเรียนจบปริญญาตรีก่อนนะครับ', 'แล้วไปสมัครกับคุณนภาฝ่ายบุคคล ...อย่าไปตอนเธองอนก็พอ'], ['กาแฟวันนี้แก้วที่ห้าแล้ว', 'แปลกนะ แก้วสุดท้ายรสชาติเหมือนนมอุ่นทุกที', 'สงสัยลิ้นพี่เพี้ยน'], ['ความฝันของพี่คือได้นอนกลางวันวันธรรมดา', 'แค่วันเดียวก็พอ', 'ไม่ต้องเที่ยว ไม่ต้องรวย ขอแค่หลับยาวๆ 😴']],
@@ -5403,7 +5412,7 @@ function talkToTown(o) {
     const extra = [fd?.today ? '🎂 วันนี้วันเกิดฉันเองนะ!' : null, fd?.doing && lv >= 1 ? `ตอนนี้${fd.doing}` : null].filter(Boolean);
     const rq = fd?.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
     if (rq && !rq.done) extra.push(`[n]ขอให้ช่วยหน่อยได้ไหม... อยากได้ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${rq.n} ชิ้น (${whereGet(rq.item)}) เดี๋ยวให้ค่าเหนื่อย ${money(rq.pay)}`);
-    const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id }); dialogClose(); } } }] : [];
+    const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id, fid: o.fid }); dialogClose(); } } }] : [];
     const gift = { label: fd?.gave ? '🎁 ให้ของแล้ววันนี้' : '🎁 ให้ของขวัญ', cls: fd?.gave ? '' : 'primary', fn: () => { dialogClose(); if (!fd?.gave) openPanel({ kind: 'folkgift', npc: o.id, fid: o.fid }); } };
     return dialog({ name: o.name, face: o.face || null, npc: o.id, instant: true, lines: [hi, ...extra, ...t], choices: [...storyChoices(o), ...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
   }
@@ -5841,7 +5850,7 @@ function journalPanel(p) {
 }
 function folksPanel() {
   if (!FOLKS) return `<h2>💞 ชาวเมือง</h2><div class="sub">กำลังโหลด...</div>`;
-  const row = f => `<div class="item folkRow"><div class="em">${dlgFace(f.face) || '🙂'}</div><div class="nm"><b>${esc(f.name)}</b> ${f.today ? '🎂' : ''}<small>${FOLK_LVN[f.lv]} · ${heartBar(f.p, f.lv)}</small>
+  const row = f => `<div class="item folkRow"><div class="em">${dlgFace(f.face || (picOf(f.name) ? 'pic:' + picOf(f.name) : NPC_FACE[STAFF.find(n => n.name.replace(/\s*\(.*$/, '') === f.name.replace(/\s*\(.*$/, ''))?.id])) || '🙂'}</div><div class="nm"><b>${esc(f.name)}</b> ${f.today ? '🎂' : ''}<small>${FOLK_LVN[f.lv]} · ${heartBar(f.p, f.lv)}</small>
     <small>${esc(f.doing || '')}${f.bday ? ` · 🎂 ${f.bday[1]} ${G.months?.[f.bday[0] - 1] || ''}` : ''}</small><small>${f.love ? `💖 ชอบที่สุด: ${G.items[f.love]?.icon || ''}${esc(G.items[f.love]?.name || '')} · ` : ''}${f.likes.length ? `❤️ ชอบ: ${f.likes.map(i => G.items[i]?.icon || '').join(' ')}` : '❔ ลองให้ของดูว่าชอบอะไร'}</small>
     <small>${f.talked ? '✅ คุยแล้ววันนี้' : '💬 ยังไม่ได้คุยวันนี้'} · ${f.gave ? '✅ ให้ของแล้ว' : '🎁 ยังไม่ได้ให้ของ'}</small>
     ${f.req ? `<small class="folkReq${f.req.done ? ' done' : ''}">📋 ${f.req.done ? 'ช่วยแล้ววันนี้ ✅' : `ขอ ${reqTxt(f.req)} (มี ${Math.min(me.inv?.[f.req.item] || 0, f.req.n)}/${f.req.n}) · ได้ ${money(f.req.pay)} · หาได้ที่${whereGet(f.req.item)}`}</small>` : ''}</div></div>`;
@@ -6332,6 +6341,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28o', d: '24 พ.ย.', items: [
+    '💞 <b>ผูกมิตรได้ทุกคนแล้ว!</b> พนักงานและเจ้าของร้านอีก 41 คน (หลวงพ่อ ผู้กอง หมอแพร เชฟหมี น้าเล็ก เจ๊ศรี ฯลฯ) คุยได้วันละครั้ง ให้ของขวัญได้ มีของชอบ วันเกิด และคำขอรายวันของตัวเอง',
+  ] },
   { v: '2026-11-28n', d: '24 พ.ย.', items: [
     '💬 คุยกับชาวเมืองง่ายขึ้น: เดินไปยืนใกล้ ๆ ปุ่มใหญ่จะเปลี่ยนเป็น "คุยกับ..." กดได้เลย ไม่ต้องจิ้มที่ตัวคน',
     '🎁 ปุ่มให้ของขวัญ / เรื่องราว ขึ้นทันทีตอนเริ่มคุย ไม่ต้องอ่านจนจบ',

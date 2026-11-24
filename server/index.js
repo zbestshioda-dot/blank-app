@@ -2649,14 +2649,24 @@ function folkAdd(a, def, n, why) {
   } else if (why) toast(a, `${why} · 💞 +${n} (${f.p}/${D.FOLK_LV[Math.min(4, lv + 1)]})`, '💞');
   markMe(a); send(a, folksView(a)); return before !== lv;
 }
+// the walking townsperson (npc) or the counter a staff member / shopkeeper stands at; null when not close enough
+function folkNear(a, def, npcId) {
+  if (def.desk) return def.sts.map(id => ST[id]).find(p => p && areaId(a) === p.area && dist(a, p) <= 5) ? { id: null } : null;
+  const n = npcs.find(x => (npcId != null ? x.id === npcId : true) && x.fid === def.id);
+  return n && areaId(a) === n.area && dist(a, n) <= 3.5 ? n : null;
+}
+function folkTalkDesk(a, m) {
+  const def = FOLK_DEF[String(m.fid || '')]; if (!def?.desk || !folkNear(a, def)) return;
+  const f = folkOf(a, def.id), d = dayKey(); if (f.talk === d) return; f.talk = d; folkAdd(a, def, 1, `คุยกับ${def.name}`); quest(a, 'folk');
+}
 function folkTalk(a, n) {
   const def = FOLK_DEF[n.fid]; if (!def || areaId(a) !== n.area || dist(a, n) > 3.5) return;
   const f = folkOf(a, def.id), d = dayKey();
   if (f.talk === d) return; f.talk = d; folkAdd(a, def, 1, `คุยกับ${def.name}`); quest(a, 'folk');
 }
 function folkGift(a, m) {
-  const n = npcs.find(x => x.id === m.id), def = n && FOLK_DEF[n.fid], id = String(m.item || '');
-  if (!def || areaId(a) !== n.area || dist(a, n) > 3.5) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะให้ของได้', '🎁', false);
+  const n0 = m.fid ? null : npcs.find(x => x.id === m.id), def = FOLK_DEF[m.fid || n0?.fid], id = String(m.item || ''), n = def && folkNear(a, def, n0?.id);
+  if (!def || !n) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะให้ของได้', '🎁', false);
   if (!(a.inv[id] > 0) || !D.ITEMS[id]) return toast(a, 'ไม่มีของชิ้นนี้ในกระเป๋า', '🎁', false);
   const f = folkOf(a, def.id), d = dayKey(); if (f.gift === d) return toast(a, `วันนี้ให้ของ${def.name}ไปแล้ว พรุ่งนี้ค่อยมาใหม่นะ`, '🎁', false);
   addItem(a, id, -1); f.gift = d;
@@ -2676,8 +2686,8 @@ function folkReq(a, def) {
   return { item, n, pay: Math.round((it.base || 50) * n * 1.8 + 120), done: (a.folk?.[def.id]?.req === d) ? 1 : 0, title: tale[0], story: tale[1].replace('{item}', it.name) };
 }
 function folkDo(a, m) {
-  const n = npcs.find(x => x.id === m.id), def = n && FOLK_DEF[n.fid];
-  if (!def || areaId(a) !== n.area || dist(a, n) > 3.5) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะส่งของได้', '📋', false);
+  const n0 = m.fid ? null : npcs.find(x => x.id === m.id), def = FOLK_DEF[m.fid || n0?.fid], n = def && folkNear(a, def, n0?.id);
+  if (!def || !n) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะส่งของได้', '📋', false);
   const r = folkReq(a, def), it = D.ITEMS[r.item];
   if (r.done) return toast(a, `วันนี้ช่วย${def.name}ไปแล้ว พรุ่งนี้มีเรื่องใหม่`, '📋', false);
   if ((a.inv[r.item] || 0) < r.n) return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[r.item] || 0}/${r.n})`, '📋', false);
@@ -2708,8 +2718,8 @@ function storyAdv(a, m) {
   const r = storyNow(a, o); if (r.state !== 'on') return;
   const st = r.step, s = storyOf(a, o);
   if (st.npc) {
-    const n = npcs.find(x => x.fid === st.npc), def = FOLK_DEF[st.npc];
-    if (!n || areaId(a) !== n.area || dist(a, n) > 4) return toast(a, `ต้องอยู่ใกล้${def?.name || 'คนนั้น'}ก่อน`, '📖', false);
+    const def = FOLK_DEF[st.npc];
+    if (!def || !folkNear(a, def)) return toast(a, `ต้องอยู่ใกล้${def?.name || 'คนนั้น'}ก่อน`, '📖', false);
   }
   if (st.k === 'give') {
     if ((a.inv[st.item] || 0) < st.n) { const it = D.ITEMS[st.item]; return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[st.item] || 0}/${st.n})`, '📖', false); }
@@ -2736,7 +2746,7 @@ function folksView(a) {
   return { t: 'folks', stories: storiesView(a), list: Object.values(FOLK_DEF).map(def => {
     const n = npcs.find(x => x.fid === def.id), f = (a.folk || {})[def.id] || { p: 0, lv: 0 }, lv = folkLv(f.p), d = dayKey();
     return { id: def.id, npc: n?.id, name: def.name, face: def.face, p: f.p, lv, next: D.FOLK_LV[lv + 1] ?? null, about: def.about,
-      bday: def.bday, today: folkBday(def) ? 1 : 0, doing: n ? folkDoing(n) : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0,
+      bday: def.bday, today: folkBday(def) ? 1 : 0, desk: def.desk ? 1 : 0, doing: n ? folkDoing(n) : def.desk ? 'ประจำอยู่ที่ร้าน/ที่ทำงาน' : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0,
       req: folkReq(a, def), known: f.known || [], love: lv >= 3 ? def.love : (f.known || []).includes(def.love) ? def.love : '', likes: lv >= 2 ? def.likes : (f.known || []).filter(x => def.likes.includes(x)) };
   }) };
 }
@@ -4819,7 +4829,7 @@ let npcRosterDirty = false;
 // townsfolk go in and out of open shops through the front door, just like players
 const PUBLIC_DOORS = D.STATIONS.filter(s => s.type === 'door' && s.area === 'town' && s.house === undefined && !s.renov && ROOM[s.to]);
 // 🕐 the townsfolk's day: which part of their schedule is now (game hours)
-const FOLK_DEF = Object.fromEntries([...D.FOLK.town, ...D.FOLK.housing].map(p => [p.id, p]));
+const FOLK_DEF = Object.fromEntries([...D.FOLK.town, ...D.FOLK.housing, ...require('./deskfolk')].map(p => [p.id, p]));   // + staff and shopkeepers (desk: they stay at their counter)
 function folkSlot(n) { if (!n.sched) return null; const h = hourNow(); let cur = n.sched[n.sched.length - 1]; for (const sl of n.sched) if (h >= sl[0]) cur = sl; return cur; }
 function folkDoing(n) {           // what they are up to, for the talk window and the townsfolk app
   const sl = folkSlot(n); if (!sl) return '';
@@ -5638,6 +5648,7 @@ function onMessage0(ws, raw) {
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) { eggMayor(a, n); if (n.fid) folkTalk(a, n); } return; }
     case 'folkgift': return folkGift(a, m);
     case 'folkdo': return folkDo(a, m);
+    case 'folktalk': return folkTalkDesk(a, m);
     case 'story': return storyAdv(a, m);
     case 'folks': return send(a, folksView(a));
 
