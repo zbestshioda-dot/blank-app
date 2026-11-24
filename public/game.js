@@ -728,7 +728,7 @@ function handle(m) {
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
-      if (tutPending) setTimeout(() => me && showTut(0), 400);
+      if (tutPending) setTimeout(() => me && (m.isNew ? showStory(0) : showTut(0)), 400);   // 📖 brand-new characters get the opening story first
       else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); }
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
@@ -6274,6 +6274,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28l', d: '24 พ.ย.', items: [
+    '📖 ผู้เล่นใหม่: มีเรื่องเปิดตัวสั้น ๆ หลังสร้างตัวละคร (มาถึงเมืองด้วยรถเมล์ ข่าวลือที่ลับ 5 แห่ง แล้วไปหาน้าเล็ก)',
+  ] },
   { v: '2026-11-28k', d: '24 พ.ย.', items: [
     '😴 ชุดใหม่ ๆ มีท่านอนจริงได้แล้ว (ไม่ใช่ท่ายืนเอียง) เริ่มเห็นเมื่อชุดนั้นมีรูปท่านอน',
   ] },
@@ -9266,6 +9269,21 @@ const TUT = () => [
   ['🗺️', 'หลงทาง?', 'แตะ<b>แผนที่เล็ก</b>มุมขวาบน แล้วแตะสถานที่ จะมี<b>ลูกศรสีเหลือง</b>พาไป · หางานทำได้กับ NPC เจ้าหน้าที่ 💬 ตามร้านต่างๆ'],
 ];
 let tutStep = 0, tutPending = false, pendingDaily = null, tutFull = false;
+// 📖 opening story: a few talking faces right after the character is made, then the usual tutorial
+let storyStep = -1;
+const STORY = () => { const n = `<b>${esc(me?.name || 'คุณ')}</b>`; return [
+  [null, '🚌 ป้ายรถเมล์ปลายทาง', `รถเมล์คันสุดท้ายจอดเทียบป้าย "เมืองชีวิตนี้เลือกได้"<br>${n} ก้าวลงมาพร้อมกระเป๋าใบเดียว กับเงินติดตัว <b>${money(me?.money || 0)}</b><br>ที่นี่... จะเริ่มชีวิตใหม่ทั้งหมด`],
+  ['elder_m', 'ลุงผู้ใหญ่ประจำเมือง', `"ยินดีต้อนรับ ${n}! เมืองเราไม่ถามว่าเคยเป็นใคร<br>อยากเป็น<b>หมอ ตำรวจ เชฟ</b> หรือ<b>เศรษฐี</b> ก็เลือกเอาเองเลย"`],
+  ['grandma', 'ยายแก่ข้างทาง', `"ได้ยินมาไหมหลาน... คนเก่าแก่เขาลือกันว่าในเมืองนี้มี<b>ที่ลับซ่อนอยู่ 5 แห่ง</b><br>ยังไม่มีใครหาเจอครบสักคน ลองตามหาดูสิ"`],
+  ['fisher_m', 'น้าเล็ก ริมบ่อน้ำ', `"แต่ก่อนจะไปล่าสมบัติ ท้องต้องอิ่มก่อนนะ 😄<br>มา! <b>ซื้อเบ็ดกับน้า</b> แล้วตกปลาหาเงินก้อนแรกกัน"`],
+]; };
+function showStory(i) {
+  const st = STORY(); storyStep = i; const [f, title, body] = st[i], face = f && FACES ? faceStyle(f, 96) : '';
+  $('#tut').classList.remove('hidden');
+  $('#tutBody').innerHTML = `<div class="storyPic">${face ? `<i class="qface" style="${face}"></i>` : '<span>🚌</span>'}</div><h2>${esc(title)}</h2><p>${body}</p><div class="dots">${st.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
+  $('#tutNext').textContent = i === st.length - 1 ? 'ไปกันเลย! →' : 'ต่อ →'; $('#tutSkip').textContent = 'ข้ามเรื่อง';
+}
+function endStory() { storyStep = -1; $('#tutSkip').textContent = 'ข้าม'; showTut(0); }
 const TUT_NB = () => [['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือคนที่มีป้ายชื่อ<b>สีเหลือง</b><br>เริ่มจาก<b>ซื้อเบ็ดกับน้าเล็ก</b> แล้วตกปลาหาเงินก้อนแรก · ลูกศรสีเหลืองจะพาไป']];
 const tutSteps = () => tutFull || !nbDay1() ? TUT() : TUT_NB();
 // the login bonus waits through the tutorial, and for newcomers until their first starter step is done (one thing at a time)
@@ -9277,8 +9295,8 @@ function showTut(i = 0, full) {
   $('#tutBody').innerHTML = `<div class="tutIcon">${icon}</div><h2>${esc(title)}</h2><p>${body}</p><div class="dots">${steps.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
   $('#tutNext').textContent = i === steps.length - 1 ? '🚀 เริ่มเลย! (พาไปซื้อเบ็ด)' : 'ถัดไป →';
 }
-$('#tutNext').onclick = () => { FX.play('click'); if (tutStep < tutSteps().length - 1) return showTut(tutStep + 1); endTut(); };
-$('#tutSkip').onclick = endTut;
+$('#tutNext').onclick = () => { FX.play('click'); if (storyStep >= 0) return storyStep < STORY().length - 1 ? showStory(storyStep + 1) : endStory(); if (tutStep < tutSteps().length - 1) return showTut(tutStep + 1); endTut(); };
+$('#tutSkip').onclick = () => storyStep >= 0 ? endStory() : endTut();
 function endTut() {
   if (me?.nb?.v === 2) send({ t: 'nbev', k: 'tut' });
   if (nbQuiet() && JOYFIX && TOUCH_UI && !nbMoved) { $('#stick')?.classList.add('nbHint'); setTimeout(() => $('#stick')?.classList.remove('nbHint'), 25000); }   // 🕹️ show where to drag, until the first drag

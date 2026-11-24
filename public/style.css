@@ -1894,3 +1894,5 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 #dzChips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:3px}#dzChips::-webkit-scrollbar{display:none}
 #dzChips .chip{flex:none;white-space:nowrap;font-size:10px;line-height:1.2;padding:1px 6px 1px 3px;gap:2px}
 #dzChips .chip img{width:12px;height:12px}
+/* 📖 opening story: a big round face (or the bus) above the line */
+.storyPic{display:flex;justify-content:center;margin:2px 0 4px}.storyPic .qface{width:96px;height:96px;border-radius:50%;box-shadow:0 0 0 3px #fff,0 4px 12px rgba(0,0,0,.3)}.storyPic span{font-size:64px;line-height:1.3}
