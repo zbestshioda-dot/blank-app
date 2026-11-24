@@ -6258,6 +6258,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27z', d: '24 พ.ย.', items: [
+    '💬 กล่องคุยกับ NPC และช่องกรอกชื่อ/ID เป็นแบบใหม่ · แก้บั๊กหน้าสร้างตัวละคร: รูปหมุดใหญ่บังชื่อหัวข้อ และปุ่ม "เข้าเมือง!" โดนตัด',
+  ] },
   { v: '2026-11-27y', d: '24 พ.ย.', items: [
     '🧹 จอโล่งขึ้น: ข้อความแจ้งเตือนย้ายลงไปใต้ตัวละคร ไม่ทับกล่องภารกิจแล้ว · บรรทัดรางวัลความคืบหน้าอ่านออกแล้ว',
   ] },

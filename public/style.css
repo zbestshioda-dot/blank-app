@@ -1849,3 +1849,15 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 #notices,body:has(#fishCue:not(.hidden)) #notices{transform:translate(-50%,0)!important}
 #card.v2 #qList .qRow.rew span{color:var(--k-ink)!important;font-weight:700}
 #card.v2 #qList .qRow.more{color:var(--k-skyDk)!important;font-weight:700}
+/* 💬 NPC talk box in the toy-box look (same size and place): cream card, ink outline + lip, blue name tag, framed portrait */
+#dlg{background:linear-gradient(#fffdf8,var(--k-cream))!important;border-color:var(--k-ink)!important;border-width:4px!important;box-shadow:0 5px 0 var(--k-ink),0 10px 28px rgba(20,20,50,.4)!important}
+#dlg .dlgPic{box-shadow:0 0 0 3px var(--k-ink),0 4px 0 3px var(--k-ink)!important}
+#dlg .dlgName{background:linear-gradient(#7fe0ff 0 48%,var(--k-sky) 49%)!important;color:#fff!important;border:2px solid var(--k-ink);box-shadow:0 2px 0 var(--k-ink);text-shadow:0 1px 0 var(--k-skyDk)}
+#dlg .dlgText{color:var(--k-ink)!important}
+#dlg .dlgNext{color:var(--k-skyDk)}
+#dlg .dlgX{background:linear-gradient(#ff9db1 0 46%,var(--k-berry) 47%)!important;color:#fff!important;border:2px solid var(--k-ink)!important;box-shadow:0 2px 0 var(--k-ink)!important}
+/* the login event banner rule (.evBan img{width:100%}) also stretched the pin in the create-character header: keep it small */
+#login .lfHead img{width:40px!important;height:auto!important;flex:none}
+#loginForm .lfHead img{width:30px!important}
+.fld{border-color:var(--k-ink)!important;background:#fff!important;box-shadow:0 3px 0 var(--k-ink)}
+.fld:focus-within{border-color:var(--k-skyDk)!important;box-shadow:0 3px 0 var(--k-ink),0 0 0 4px rgba(76,195,255,.35)!important}
