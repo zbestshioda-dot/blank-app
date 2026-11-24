@@ -808,6 +808,7 @@ function handle(m) {
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
+    case 'storylog': STORYLOG = m; if (panel?.kind === 'storylog') refreshPanel(true); break;
     case 'folksay': { const o = m.id != null && P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } else toast(m.text, '💞'); FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
     case 'egg': eggFx(m); break;
@@ -4883,6 +4884,7 @@ const FN = {
   homeVisit: m => { send({ t: 'homevisit', id: m.id }); closePanel(); },
   openJournal() { send({ t: 'folks' }); openPanel({ kind: 'journal' }); },
   jOpen(m) { if (panel) { panel.open = m.id; refreshPanel(true); } },
+  storyRead(m) { STORYLOG = null; send({ t: 'storylog', o: m.o }); openPanel({ kind: 'storylog', o: m.o }); },
   folkTab(m) { if (panel) { panel.tab = m.tab; refreshPanel(true); } },
   openStories() { send({ t: 'folks' }); openPanel({ kind: 'folks', tab: 'story' }); },
   storyGuide(m) { closePanel(); setGuide(m.at); },
@@ -5788,7 +5790,14 @@ async function shareOpen() {
 // 🏆 fishing contest: a chip at the top while it runs (time left, my rank); tap for the leaderboard
 let FCS = { on: 0 }, FRECS = null, FOLKS = null;
 // 📖 townsfolk stories: the current step of each arc (from the server's 'folks' message)
-let STORIES = [];
+let STORIES = [], STORYLOG = null;
+function storyLogPanel(p) {   // 📜 read a story back from the start
+  const L = STORYLOG && STORYLOG.o === p.o ? STORYLOG : null;
+  const back = B('← กลับแท็บเนื้อเรื่อง', { fn: 'openStories' });
+  if (!L) return `<h2>📜 อ่านย้อนหลัง</h2>${back}<div class="sub">กำลังโหลด...</div>`;
+  if (!L.chs.length) return `<h2>📜 ${esc(L.name)}</h2>${back}<div class="sub">ยังไม่ได้เล่นเรื่องนี้เลย</div>`;
+  return `<h2>📜 ${esc(L.name)}</h2>${back}` + L.chs.map((c, i) => `<details class="sub" style="margin:6px 0" ${i === L.chs.length - 1 ? 'open' : ''}><summary><b>บท ${i + 1} "${esc(c.t)}"</b>${c.done ? ' ✅' : ' · กำลังเล่น'}</summary>${c.lines.map(l => `<div style="margin:3px 0">${esc(stTxt(l))}</div>`).join('')}</details>`).join('');
+}
 const stTxt = l => String(l).replace(/<\/?b>/g, '').replace(/\{n\}/g, me?.name || '');
 const folkById = id => FOLKS?.find(f => f.id === id);
 const folkFace = (f, px = 66) => dlgFace(f.face || (picOf(f.name) ? 'pic:' + picOf(f.name) : NPC_FACE[STAFF.find(n => n.name.replace(/\s*\(.*$/, '') === f.name.replace(/\s*\(.*$/, ''))?.id]), null, px);   // a whole face in a list cell
@@ -5830,7 +5839,7 @@ function storiesBox() {
     const f = folkById(s.o), st = s.step, go = s.state === 'on' && st?.k === 'go', rep = s.state === 'on' && st && !st.npc && st.k !== 'go';   // a step with nobody to talk to: report from here
     return `<div class="item folkRow"><div class="em">${(f && folkFace(f)) || '📖'}</div><div class="nm"><b>${esc(s.name)}</b> <small style="display:inline">· ${esc(f?.name || '')} · ${esc(s.tone)}</small>
       <small>บท ${Math.min(s.n + 1, s.total)}/${s.total}${s.t ? ` "${esc(s.t)}"` : ''}${s.state === 'on' && s.sn ? ` · ขั้น ${s.si + 1}/${s.sn}` : ''}</small><small><b>${esc(storyHint(s))}</b></small>
-      ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}${rep ? `<div class="rowf" style="margin-top:4px">${B(st.k === 'pay' ? `💰 จ่าย ${money(st.cost)}` : '✅ ส่งรายงาน', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
+      ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}${s.n > 0 || s.si > 0 ? `<div class="rowf" style="margin-top:4px">${B('📜 อ่านย้อนหลัง', { fn: 'storyRead', o: s.o })}</div>` : ''}${rep ? `<div class="rowf" style="margin-top:4px">${B(st.k === 'pay' ? `💰 จ่าย ${money(st.cost)}` : '✅ ส่งรายงาน', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
   }).join('');
 }
 const heartBar = p => { const h = Math.min(10, Math.floor((p || 0) / 10)); return '💗'.repeat(h) + '🤍'.repeat(10 - h) + (p >= 100 ? ' <small>เต็ม 10 ดวง!</small>' : ` <small>${p || 0}/100</small>`); };   // 10 hearts, 10 points each
@@ -6351,6 +6360,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28u', d: '24 พ.ย.', items: [
+    '📜 อ่านเนื้อเรื่องย้อนหลังได้แล้ว: แท็บ 📖 เนื้อเรื่อง → ปุ่ม "อ่านย้อนหลัง" ของแต่ละคน (อ่านได้ทุกบทที่เล่นไปแล้ว)',
+  ] },
   { v: '2026-11-28t', d: '24 พ.ย.', items: [
     '📖 <b>เนื้อเรื่องครบทุกคนแล้ว 50 เรื่อง!</b> พนักงานและเจ้าของร้านอีก 31 คนมีเรื่องของตัวเอง เช่น MC ตุ๋ยเด็กวัดอยากเป็นแร็ปเปอร์ · เสี่ยเสือกลัวจิ้งจก · โต๊ะที่ทำไม่เสร็จของช่างโต · หมาที่รอที่ป้ายรถเมล์ · บัญชีที่ไม่มีใครถอน',
     '🏅 จบแต่ละเรื่องได้ฉายาของคนนั้น รวม 50 ฉายา',
@@ -8152,6 +8164,7 @@ function renderPanel(p) {
     case 'fw': return `<h2>🎆 จุดพลุ</h2><div class="sub">พลุขึ้นที่ลานน้ำพุ ทุกคนในเมืองเห็นพร้อมชื่อคุณ · ต้องอยู่ในตัวเมือง</div><div class="list">${Object.entries(G.fireworks || {}).map(([k, f]) => `<div class="item"><div class="em">🎆</div><div class="nm"><b>พลุ${f.name}</b><small>${f.n} ลูก · ${f.dur} วินาที</small></div>${B(money(f.price), { fn: 'fw', k }, 'primary', me.money < f.price)}</div>`).join('')}</div>`;
     case 'homes': return homesPanel();
     case 'folks': return folksPanel();
+    case 'storylog': return storyLogPanel(p);
     case 'journal': return journalPanel(p);
     case 'folkgift': return folkGiftPanel(p);
     case 'fishrecs': return fishRecsPanel();

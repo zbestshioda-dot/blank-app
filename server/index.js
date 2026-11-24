@@ -2722,6 +2722,16 @@ function storiesView(a) {
       step: st ? { k: st.k, npc: st.npc || null, item: st.item, items: st.items, n: st.n, at: st.at, label: st.label, h: st.h, q: st.q, opts: st.opts, hard: st.hard ? 1 : 0, cost: st.cost, prog: st.k === 'do' ? storyProg(a, s, st) : undefined } : null };
   });
 }
+// 📜 read back: every chapter you finished (and the steps done in the current one), as plain lines
+function storyLog(a, m) {
+  const o = String(m.o || ''), S = SY[o]; if (!S || !FOLK_DEF[o]) return;
+  const s = storyOf(a, o), nm = id => (FOLK_DEF[id]?.name || '').replace(/\s*\(.*$/, '');
+  const chs = S.ch.slice(0, Math.min(S.ch.length, s.ch + 1)).map((c, i) => {
+    const steps = i < s.ch ? c.steps : c.steps.slice(0, s.st);
+    return { t: c.t, done: i < s.ch ? 1 : 0, lines: steps.flatMap(st => [st.k === 'go' ? `📍 ${st.label}` : st.npc ? `💬 ${nm(st.npc)}` : '', ...(st.q ? [`❓ ${st.q}`] : []), ...(st.lines || [])].filter(Boolean)) };
+  }).filter(c => c.lines.length);
+  send(a, { t: 'storylog', o, name: S.name, chs });
+}
 function storyAdv(a, m) {
   const o = String(m.o || ''), S = SY[o]; if (!S || !FOLK_DEF[o]) return;
   const r = storyNow(a, o); if (r.state !== 'on') return;
@@ -5668,6 +5678,7 @@ function onMessage0(ws, raw) {
     case 'folkdo': return folkDo(a, m);
     case 'folktalk': return folkTalkDesk(a, m);
     case 'story': return storyAdv(a, m);
+    case 'storylog': return storyLog(a, m);
     case 'folks': return send(a, folksView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
