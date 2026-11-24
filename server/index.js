@@ -121,8 +121,10 @@ function stat(a, key, n = 1, absolute = false) {
     feed(`🏅 ${a.name} ได้รับฉายา "${ac.title}"`);
     sendRoster();
   }
+  if (!absolute && STORY_STATS.has(key) && a.folk && cd(a, 'stp', 2500, true)) send(a, folksView(a));   // 📖 a story step counting this (fish, prayers...) shows its new count
   markMe(a);
 }
+const STORY_STATS = new Set(['fish', 'rides', 'pray', 'harvest', 'calls', 'mails', 'trades', 'cravings', 'drinks', 'merit', 'arcade']);
 // catch up achievements whose stat was already past the goal (added later, or a goal lowered): stat() only checks when the number goes up
 // equipment counts (absolute): job-tool upgrade levels, maxed tools, vehicles, rods
 function eqSweep(a) {

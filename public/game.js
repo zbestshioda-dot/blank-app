@@ -1811,7 +1811,7 @@ function talkTarget() {
     if (!p.npc || p.bot || p.zb || p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
     const d = Math.hypot(p.x - m.x, p.y - m.y); if (d < bd) { bd = d; best = p; }
   }
-  if (!best || near && (near.type === 'pier' ? bd > 1.3 : Math.hypot(near.x - m.x, near.y - m.y) < bd)) return null;   // by the water: only someone right beside you
+  if (!best || near && (near.type !== 'pier' || bd > 1.3)) return null;   // a counter, door, bed or job in reach always wins (it stole the button in shops and the hospital); by the water only someone right beside you
   return best;
 }
 function talk() {
@@ -5323,12 +5323,14 @@ const GUIDE_TOPICS = [
 const GUIDE_GO = [['🎣 น้าเล็ก (ซื้อเบ็ด)', 'staff_fishing'], ['🎓 มหาวิทยาลัย', 'door_school'], ['🍜 ร้านอาหาร', 'door_restaurant'], ['🏦 ธนาคาร', 'door_bank'], ['🚗 โชว์รูมรถ', 'door_dealer'], ['🎡 สวนสนุก', 'ride_carousel'], ['⚽ สนามฟุตบอล', 'seat_fb8_0']];
 function guideTalk(n) {
   const base = { name: n.name, npc: n.id };
-  const menu = (lines) => dialog({ ...base, lines, choices: [
+  const fd = staffFolk(n); if (fd) send({ t: 'folktalk', fid: fd.id });   // 💞 พี่ฟ้า can be befriended too
+  const menu = (lines, first) => dialog({ ...base, lines, instant: !!(first && fd), choices: [
+    ...(first && fd ? staffFolkChoices(n, fd) : []),
     ...GUIDE_TOPICS.map(([l, ls]) => ({ label: l, fn: () => menu(ls) })),
     { label: '🧭 พาไปที่...', fn: () => dialog({ ...base, lines: ['อยากไปไหนจ๊ะ เดี๋ยวพี่ชี้ทางให้ เดินตามลูกศรสีเหลืองไปได้เลย'], choices: [...GUIDE_GO.map(([l, k]) => ({ label: l, fn: () => { dialogClose(); setGuide(k); } })), { label: '↩️ กลับ', fn: () => menu(['มีอะไรอยากถามอีกไหมจ๊ะ']) }] }) },
     { label: '👋 ขอบคุณครับ', fn: dialogClose, cls: 'primary' }] });
   const tip = !me.vehicles?.length && (me.money || 0) < 2000 ? 'ยังไม่มีเงินใช่ไหม ลองไปตกปลาก่อนเลย พี่พาไปหาน้าเล็กได้นะ' : me.career === 'none' ? 'ยังไม่มีงานทำเหรอ ลองดูว่ามีอาชีพอะไรบ้างสิ' : 'วันนี้อยากรู้อะไรจ๊ะ';
-  menu([`สวัสดีจ้า ${me.name || ''}! พี่ฟ้าประจำจุดแนะนำเมืองจ้า`, tip]);
+  menu([`สวัสดีจ้า ${me.name || ''}! พี่ฟ้าประจำจุดแนะนำเมืองจ้า`, tip], true);
 }
 // job missions: seconds until the next one can be taken, and a heads-up when it is ready
 const misWait = () => Math.max(0, Math.ceil(((me?.misAt || 0) - (Date.now() + clockOff)) / 1000));
@@ -5355,13 +5357,14 @@ function talkTo(n, st) {
   let choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   if (n.career === 'fishing' && nbDay1() && !me.rod && !(me.rods || []).length) choices = [{ label: `🎣 ซื้อเบ็ดแรก ${money(G.rods?.bamboo?.price || 150)}`, fn: () => { dialogClose(); send({ t: 'act', st, a: 'rod', rod: 'bamboo' }); }, cls: 'primary' }, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];   // 🌱 a newcomer's first rod: one tap
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
-  if (fd) {
-    const o = { id: n.id, fid: fd.id, name: n.name, face: NPC_FACE[n.id] }, rq = fd.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
-    const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n} (${money(rq.pay)})` : `📋 ขอ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', fid: fd.id }); dialogClose(); } else toast(`หา${G.items[rq.item]?.name || ''}ได้ที่${whereGet(rq.item)}`, '📋', false); } }] : [];
-    const gift = { label: fd.gave ? '🎁 ให้ของแล้ววันนี้' : `🎁 ให้ของขวัญ · ${FOLK_LVN[fd.lv]}`, cls: fd.gave ? '' : 'good', fn: () => { dialogClose(); if (!fd.gave) openPanel({ kind: 'folkgift', npc: n.id, fid: fd.id }); } };
-    choices = [choices[0], ...storyChoices(o), ...req, gift, ...choices.slice(1)];
-  }
+  if (fd) choices = [choices[0], ...staffFolkChoices(n, fd), ...choices.slice(1)];
   dialog({ ...base, lines: [hi], choices, instant: !!fd });
+}
+function staffFolkChoices(n, fd) {   // 💞 story / request / gift buttons for a staff member you can befriend
+  const o = { id: n.id, fid: fd.id, name: n.name, face: NPC_FACE[n.id] }, rq = fd.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
+  const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n} (${money(rq.pay)})` : `📋 ขอ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', fid: fd.id }); dialogClose(); } else toast(`หา${G.items[rq.item]?.name || ''}ได้ที่${whereGet(rq.item)}`, '📋', false); } }] : [];
+  const gift = { label: fd.gave ? '🎁 ให้ของแล้ววันนี้' : `🎁 ให้ของขวัญ · ${FOLK_LVN[fd.lv]}`, cls: fd.gave ? '' : 'good', fn: () => { dialogClose(); if (!fd.gave) openPanel({ kind: 'folkgift', npc: n.id, fid: fd.id }); } };
+  return [...storyChoices(o), ...req, gift];
 }
 const staffFolk = n => { const b = s => String(s || '').replace(/\s*\(.*$/, '').trim(), k = b(n.name); return FOLKS?.find(f => f.desk && b(f.name) === k) || null; };
 // tapping a townsperson NPC: a short chat (with their portrait), the profile one tap away
@@ -5874,7 +5877,6 @@ function storyChoices(o) {   // buttons for the story steps that happen with thi
       : st.k === 'pay' ? `📖 ${s.name}: 💰 จ่าย ${money(st.cost)}` : st.k === 'do' ? `📖 ${s.name}: 🎯 ${st.prog || 0}/${st.n}` : `📖 ${s.name} · บท ${s.n + 1}`;
     return { label, cls: 'primary', fn: () => {
       if (st.k === 'give' && miss) return toast(`ยังมี ${G.items[miss[0]]?.name || ''} ไม่ครบ (${me.inv?.[miss[0]] || 0}/${miss[1]}) · ${whereGet(miss[0])}`, '📖', false);
-      if (st.k === 'do' && (st.prog || 0) < st.n) return toast(`${st.label} ยังไม่ครบ (${st.prog || 0}/${st.n})`, '📖', false);
       if (st.k === 'choice') return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [stTxt(st.q)], choices: st.opts.map((t, c) => ({ label: t, fn: () => { dialogClose(); send({ t: 'story', o: s.o, c }); } })) });
       dialogClose(); send({ t: 'story', o: s.o });
     } };
@@ -6414,6 +6416,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-29a', d: '25 พ.ย.', items: [
+    '🐛 แก้แล้ว: ปุ่มใหญ่ถูกแย่งเป็น "คุยกับ..." จนกดซื้อของ/เข้างาน/นอนเตียงโรงพยาบาลไม่ได้ · ตอนนี้ร้าน ประตู เตียง และงาน มาก่อนเสมอ',
+    '🐛 แก้แล้ว: พี่ฟ้า (จุดแนะนำเมือง) มีปุ่มส่งคำขอ ให้ของขวัญ และเนื้อเรื่องแล้ว',
+    '🍫 ร้านสะดวกซื้อขายช็อกโกแลตแล้ว (คำขอ/เนื้อเรื่องที่ขอช็อกโกแลตทำได้แล้ว)',
+    '🐛 แก้แล้ว: เควสเนื้อเรื่องแบบ "ตกปลา/ไหว้พระ ให้ครบ" ตัวเลขไม่ขึ้นและกดส่งไม่ได้',
+  ] },
   { v: '2026-11-28y', d: '24 พ.ย.', items: [
     '🏗️ สิ่งก่อสร้างที่ทั้งเมืองสร้างเสร็จ <b>โผล่ในเมืองจริง</b>: 🚌 อนุสรณ์ใต้ลานน้ำพุ · 🎡 ชิงช้าสวรรค์หมุนได้ · 🕰️ หอนาฬิกาเข็มเดินตามเวลาในเกม · 🌉 สะพานเชื่อมท่าตกปลาสองฝั่ง เดินข้ามได้จริง',
   ] },
