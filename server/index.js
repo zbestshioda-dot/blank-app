@@ -5451,7 +5451,7 @@ function move(a, m) {
   a.mvb -= d;
   if (d > 0.04 && (a.pose || a.chair >= 0 || a.bed >= 0 || a.desk >= 0) && a.fun?.k !== 'bumper' && !swim) standUp(a);   // (bumper cars are driven, swimmers swim: moving keeps you on)
   if (d > 0.04 && a.afk) { a.afk = false; sendRoster(); }
-  if (a.run && !godLock(a) && !riding(a)) {               // running burns energy; too tired = back to walking
+  if (a.run && !godLock(a) && !riding(a) && !D.roomAt(x, y)) {   // running burns energy outdoors (inside a building — the kitchen, a shop — it is free); too tired = back to walking
     const e0 = a.energy; a.energy = Math.max(0, a.energy - d * D.RUN.energyPerTile); enLog(a, a.energy - e0, 'วิ่ง'); a.runT = t;
     if (a.energy <= D.RUN.minEnergy) { a.run = false; markMe(a); toast(a, 'เหนื่อยเกินไป วิ่งไม่ไหวแล้ว พักหรือกินอะไรก่อน', '🥵', false); }
   }
