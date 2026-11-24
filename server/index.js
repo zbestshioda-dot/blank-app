@@ -1708,7 +1708,8 @@ function altsOf(a) {
   return out.sort((p, q) => (p.how === q.how ? 0 : p.how === 'เครื่องเดียวกัน' ? -1 : 1)).slice(0, 10);
 }
 // 🚫 automatic 24 h suspension when the evidence is strong (scripted clicks, robot rhythm, ignored person-checks); admins are told
-const AUTO_BAN = { untrusted: 5, bot: 3, docbot: 2, hcfail: 3 };
+// only signals a person cannot produce by accident; a missed person-check (phone locked, gone for lunch) is left to the admins
+const AUTO_BAN = { untrusted: 5, bot: 3 };
 function autoBan(a, kind) {
   if (isAdmin(a) || banOn(a) || !AUTO_BAN[kind]) return;
   const n = (a.susL || []).filter(([t, k]) => k === kind && now() - t < 86400e3).reduce((s0, r) => s0 + r[2], 0);
