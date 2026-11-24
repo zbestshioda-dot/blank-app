@@ -475,19 +475,20 @@ function faceFrame(fr, ex) {
   g.putImageData(im, 0, 0);
   return (m[ex] = c);
 }
-function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
+function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated, asleep) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const ofd = G?.outfitDefs?.[p.of], sheet0 = OUTFIT_SHEET[ofd?.base || p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
   const sitF = seated && outfit && CH_ATLAS.rows[`${outfit}sit${view}`] !== undefined ? `sit${view}` : '';   // outfits with real sitting frames (pose_<id>.jpg)
-  const WF = sitF || WALK[view][step % 4], seat0 = seated; if (sitF) seated = false;
+  const slF = asleep && outfit && CH_ATLAS.rows[`${outfit}sleep`] !== undefined ? 'sleep' : '';   // outfits with a real sleeping frame (4th cell of pose_<id>.jpg)
+  const WF = slF || sitF || WALK[view][step % 4], seat0 = seated; if (sitF) seated = false;
   const lk = p.of === 'monk' ? MONK_LOOK : { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;   // 🙏 monks: saffron robe, shaved head
   if (outfit && !chSrc(outfit + WF)) return drawCharTo(g, { ...p, of: '', dye: 0 }, fx, fy, k, view, step, faceLeft, seat0);   // outfit sheet still loading: plain clothes for a moment
   const fem = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined;
-  const fr0 = fem ? femOutfitFrame(sheet, WF, lk) : charFrame(outfit + WF, lk);
+  const fr0 = fem && !slF ? femOutfitFrame(sheet, WF, lk) : charFrame(outfit + WF, lk);
   const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WF, p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
-  const fm = p.of === 'monk' && monkFrame(WF), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : ofd?.hue !== undefined ? outfitDye(frS, outfit + WF, ofd.hue, ofd.wt, fem && FEM_HEAD[sheet] === 'head' ? FEM_NECK : 0) : frS);
-  const frx = view === 'front' && EXPR && !sitF ? faceFrame(fr, exprOf(p)) : fr;   // 😊 the face's expression (front view only)
+  const fm = p.of === 'monk' && !slF && monkFrame(WF), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : ofd?.hue !== undefined ? outfitDye(frS, outfit + WF, ofd.hue, ofd.wt, fem && FEM_HEAD[sheet] === 'head' ? FEM_NECK : 0) : frS);
+  const frx = view === 'front' && EXPR && !sitF && !slF ? faceFrame(fr, exprOf(p)) : fr;   // 😊 the face's expression (front view only)
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -3414,7 +3415,7 @@ function drawPlayer(p, X, Y, t) {
   const aura = (p.of === 'admin' || p.of === 'thai' || p.of === 'angel' || p.of === 'kitsune') && !lying, gold = p.of === 'angel' ? (p.g === 'f' ? 'fairy' : 'angel') : p.of === 'kitsune' ? 'fox' : p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold · angel / fairy outfit: white-gold / pink
   if (aura) drawAura(px, py, H, now0, false, gold);
   ctx.save();
-  if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0); }
+  if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0, false, false, true); }
   else if (fo?.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, p, px, py + Math.sin(t / 380 + p.id) * TS * .05, k, 'front', 0); }   // swimming: only head and shoulders above the water
   else if (sitting) drawCharTo(ctx, p, px, py, k, view, 0, dir === 'left', true);   // seated: whole body, legs folded (facing the way the bench does)
   else { if (!moving) { const br = 1 + Math.sin(now0 / 650 + ((+p.id || 0) % 97)) * .012; ctx.translate(px, py); ctx.scale(2 - br, br); ctx.translate(-px, -py); } drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left'); }   // standing still: a soft breath
@@ -6273,6 +6274,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28k', d: '24 พ.ย.', items: [
+    '😴 ชุดใหม่ ๆ มีท่านอนจริงได้แล้ว (ไม่ใช่ท่ายืนเอียง) เริ่มเห็นเมื่อชุดนั้นมีรูปท่านอน',
+  ] },
   { v: '2026-11-28j', d: '24 พ.ย.', items: [
     '💰 ค่าจ้างได้เต็มทั้งวันแล้ว ไม่ลดเหลือ 50% / 20% หลังทำงานเกิน 3 / 5 ชม. อีกต่อไป',
   ] },

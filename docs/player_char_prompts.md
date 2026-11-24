@@ -33,3 +33,24 @@ light-blue jeans, white sneakers, a small brown crossbody bag.
 - **หญิง (คู่กัน):** `a young Thai woman, about 20, long dark brown hair in a low ponytail, a white hoodie with a small yellow star, light-blue jeans, white sneakers, a small brown crossbody bag.`
 - **นักเรียน:** `a Thai high-school boy, short neat black hair, white school shirt, navy shorts, white socks, black shoes, a blue backpack.`
 - **สาวคาเฟ่:** `a Thai woman, about 22, wavy chestnut bob hair with a pink clip, cream knitted cardigan, pastel pink pleated skirt, brown loafers.`
+
+## ท่านั่ง + ท่านอน → `tools/sheets/pose_<ชื่อ>.jpg` (และ `pose_f<ชื่อ>.jpg`)
+
+รูปแนวนอนยาว 1 แถว 4 ช่อง: นั่งหันหน้า · นั่งหันหลัง · นั่งด้านข้าง (หันซ้าย) · นอนหงายมองจากด้านบน
+(ท่านอนวาดแนวตั้ง หัวอยู่บน เท้าอยู่ล่าง เกมจะหมุนให้นอนบนเตียงเอง) ขนาดประมาณ 1600 x 400
+ถ้ามีแค่ 3 ช่อง (นั่งอย่างเดียว) ก็ใช้ได้ ตอนนอนจะใช้ท่ายืนหมุนแทนเหมือนเดิม
+
+```
+Pixel art pose sheet for the SAME character as the walking sprite sheet (identical face, hair, clothes,
+colours and pixel size), cozy top-down Thai life-sim game style: cute chibi proportions, clean dark
+outlines, soft warm shading, crisp pixels, no blur.
+Exactly 4 sprites in ONE row, 4 equal columns, evenly spaced, wide image (4 : 1),
+on a flat plain light grey background (#C8C8C8), no ground shadows, no furniture, no text, no watermark.
+1. sitting cross-legged on the floor, facing the viewer (front view), hands on knees, small smile
+2. sitting cross-legged, seen from behind (back view)
+3. sitting on the floor in side view, facing LEFT, legs stretched forward
+4. sleeping: lying flat on the back seen from directly above, VERTICAL (head at the top, feet at the
+   bottom), eyes closed, arms resting along the body, peaceful face, no blanket, no bed, no pillow
+
+CHARACTER: (copy the same CHARACTER line used for the walking sheet)
+```

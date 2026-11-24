@@ -99,7 +99,9 @@ for src in sorted(glob.glob('tools/sheets/fashion_*.jpg')):
     oid = os.path.basename(src)[8:-4]
     frames, k = cut(src)
     pose = src.replace('fashion_', 'pose_')
-    if os.path.exists(pose): frames.update(cut(pose, (1, 3), POSE, k)[0])
+    if os.path.exists(pose):   # 3 cells = sitting front / back / side; 4 cells (a wider sheet) = + sleeping, lying on the back seen from above
+        pw, ph = Image.open(pose).size; four = pw / ph > 3.5
+        frames.update(cut(pose, (1, 4 if four else 3), {**POSE, 'sleep': (0, 3)} if four else POSE, k)[0])
     for fname, c in frames.items():
         name = f'{oid}:{fname}'
         if name not in rows: order.append(name)
