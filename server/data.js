@@ -2294,6 +2294,23 @@ const ACHIEVEMENTS = [
     ['s_quiz5', 'quizOk', 5, 2, 'หัวไว', 'ตอบคำถามถูก 5 ข้อ'], ['s_miss3', 'missions', 3, 2, 'รับจ๊อบ', 'ทำภารกิจสำเร็จ 3 ครั้ง'],
     ['s_dogs1', 'dogs', 1, 1, 'เพื่อนสี่ขา', 'ดูแลน้องหมาครั้งแรก'], ['s_worth50k', 'worth', 50000, 3, 'เริ่มมีเก็บ', 'มีทรัพย์สินรวม ฿50,000']]
     .map(([id, stat, n, g, title, desc]) => ({ id, r: 1, nt: 1, g, stat, n, title, desc })),
+  // 💼 career levels for the jobs that had no achievements yet (stat lv_<career> = highest job level reached)
+  ...Object.entries({ police: ['สายตรวจหน้าใหม่', 'มือปราบประจำเมือง', 'ผู้พิทักษ์ในตำนาน'], monk: ['พระนวกะ', 'พระผู้ทรงศีล', 'หลวงพ่อศักดิ์สิทธิ์'],
+    cashier: ['แคชเชียร์มือไว', 'หัวหน้ากะ', 'เทพเครื่องคิดเงิน'], templeboy: ['ลูกศิษย์วัด', 'เด็กวัดขยัน', 'ศิษย์เอกแห่งวัด'],
+    undertaker: ['สัปเหร่อฝึกหัด', 'สัปเหร่อใจกล้า', 'ผู้ส่งวิญญาณ'], mechanic: ['ช่างมือใหม่', 'ช่างประจำอู่', 'หมอรถในตำนาน'],
+    thug: ['นักเลงหน้าใหม่', 'ลูกพี่ประจำตลาด', 'เจ้าพ่อใจดี'], photographer: ['ตากล้องมือใหม่', 'ช่างภาพมืออาชีพ', 'ปรมาจารย์ชัตเตอร์'],
+    detective: ['นักสืบฝึกหัด', 'นักสืบตาไว', 'ยอดนักสืบแห่งเมือง'], courier: ['คนส่งของขยัน', 'พนักงานส่งของดีเด่น', 'ตำนานส่งไว'],
+    bartender: ['บาร์เทนเดอร์มือใหม่', 'มือเชคเกอร์', 'เจ้าแห่งค็อกเทล'] })
+    .flatMap(([c, ts]) => [[5, 2], [15, 3], [30, 5]].map(([n, r], i) => ({ id: `cj_${c}${n}`, r, c, stat: 'lv_' + c, n, title: ts[i], desc: `อาชีพ${CAREERS[c].name}ถึง Lv.${n}` }))),
+  // 🛠️ equipment: job tools, vehicles, fishing rods (absolute counts, refreshed by eqSweep on the server)
+  { id: 'eq_t1', r: 1, nt: 1, g: 1, stat: 'toolup', n: 1, title: 'อุปกรณ์ชิ้นแรก', desc: 'อัปเกรดอุปกรณ์อาชีพครั้งแรก' },
+  { id: 'eq_t2', r: 2, c: null, stat: 'toolup', n: 6, title: 'คนมีของ', desc: 'อัปเกรดอุปกรณ์อาชีพรวม 6 ระดับ' },
+  { id: 'eq_t3', r: 3, c: null, stat: 'tooltop', n: 1, title: 'ช่างอัปเกรด', desc: 'อัปเกรดอุปกรณ์อาชีพจนสูงสุด 1 ชิ้น' },
+  { id: 'eq_t4', r: 5, c: null, stat: 'tooltop', n: 4, title: 'เจ้าแห่งอุปกรณ์', desc: 'อัปเกรดอุปกรณ์อาชีพจนสูงสุด 4 ชิ้น' },
+  { id: 'eq_v1', r: 1, nt: 1, g: 2, stat: 'garage', n: 1, title: 'พาหนะคันแรก', desc: 'มีรถหรือพาหนะเป็นของตัวเอง' },
+  { id: 'eq_v2', r: 3, c: null, stat: 'garage', n: 3, title: 'นักสะสมรถ', desc: 'มีพาหนะ 3 คัน' },
+  { id: 'eq_v3', r: 5, c: null, stat: 'garage', n: 8, title: 'เจ้าของโชว์รูม', desc: 'มีพาหนะ 8 คัน' },
+  { id: 'eq_r1', r: 2, c: null, stat: 'rods', n: 3, title: 'นักสะสมเบ็ด', desc: 'มีเบ็ดตกปลา 3 คัน' },
 ];
 // title rarity: common → legendary (colour on the name tag)
 const RARITY = [null, { name: 'ธรรมดา', col: '#e8e8e8' }, { name: 'ไม่ธรรมดา', col: '#7be07b' }, { name: 'หายาก', col: '#62b8ff' }, { name: 'มหากาพย์', col: '#d08cff' }, { name: 'ตำนาน', col: '#ffb43c' }];

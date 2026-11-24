@@ -1198,6 +1198,9 @@ function paintHud() {
   if (me.desk >= 0 && me.enrolled) chips.push(`<span class="chip study" data-dz="_study">📖 เรียนอยู่ ${Math.round((me.study || 0) * 100)}%</span>`);
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
   if (nbEggWaiting()) chips.push(`<span class="chip study" data-dz="_nbegg">${nbImg('moon', 18)} พรุ่งนี้: ${nbImg('egg', 18)} ไข่ฟัก + ${nbImg('gift', 18)}</span>`);
+  { const tn = Date.now() + clockOff, mn = x => Math.ceil((x - tn) / 60e3);   // 🙏 active buffs (blessing from praying / giving alms, merit from releasing fish)
+    if ((me.bless || 0) > tn) chips.push(`<span class="chip buff" data-dz="_bless">✨ ได้รับพร ${mn(me.bless)} นาที</span>`);
+    if ((me.merit || 0) > tn) chips.push(`<span class="chip buff" data-dz="_merit">🙏 บุญปลา ${mn(me.merit)} นาที</span>`); }
   if (me.prayed === 0 && (me.lv || 0) >= 2) chips.push('<span class="chip study" data-dz="_pray">🪷 ยังไม่ได้ทำบุญวันนี้</span>');
   $('#statusBox').classList.toggle('hidden', !chips.length);
   { const n = me.mailN || 0, f = $('#mailFab'); if (f) { f.classList.toggle('hidden', !n); $('#mailFabN').textContent = n > 9 ? '9+' : n; if (!f.onclick) f.onclick = () => openPanel({ kind: 'mail' }); } }
@@ -6266,6 +6269,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28e', d: '24 พ.ย.', items: [
+    '🏅 ความสำเร็จใหม่ของอาชีพ ตำรวจ พระ แคชเชียร์ เด็กวัด สัปเหร่อ ช่างซ่อมรถ นักเลง ช่างภาพ นักสืบ พนักงานส่งของ บาร์เทนเดอร์ (Lv.5 / 15 / 30)',
+    '🛠️ ความสำเร็จอุปกรณ์: อัปเกรดอุปกรณ์อาชีพ สะสมพาหนะ สะสมเบ็ดตกปลา',
+    '✨ โชว์บัฟที่ใช้อยู่ (ได้รับพรจากไหว้พระ/ตักบาตร, บุญปลา) พร้อมเวลาที่เหลือ แตะดูรายละเอียดได้',
+    '📌 แถบสถานะ (หิว ง่วง ป่วย บัฟ) ย้ายลงมาใต้เควสต์ และยังโชว์อยู่แม้ย่อแถบเควสต์',
+  ] },
   { v: '2026-11-28d', d: '24 พ.ย.', items: [
     '🍳 วิ่งในอาคาร (ครัว ร้านค้า บ้าน) ไม่เสียพลังงานแล้ว · วิ่งข้างนอกยังใช้พลังงานเหมือนเดิม',
   ] },
@@ -9598,6 +9607,8 @@ function drawRain(t) {
   ctx.stroke(); ctx.fillStyle = 'rgba(40,60,90,.12)'; ctx.fillRect(0, 0, VW, VH);
 }
 function dzInfo(id) {
+  if (id === '_bless') return toast(`✨ ได้รับพรจากการไหว้พระ/ตักบาตร: รายได้ทุกอย่าง +${Math.round(((G.templeq?.blessMul) || 1.05) * 100 - 100)}% · เหลืออีก ${Math.ceil((me.bless - Date.now() - clockOff) / 60e3)} นาที`, '✨');
+  if (id === '_merit') return toast(`🙏 บุญจากการปล่อยปลา: โชคตกปลาหายาก x1.3 ขยะน้อยลง · เหลืออีก ${Math.ceil((me.merit - Date.now() - clockOff) / 60e3)} นาที`, '🙏');
   if (id === '_sleepy') return toast('ไม่ได้นอนนานแล้ว นั่งพักหลับตา (😌) หรือนอนที่บ้าน ไม่งั้นจะป่วยเป็นอดนอน', '🥱', false);
   if (id === '_sad') return toast('ความสุขต่ำมาก ทำงานไม่ได้ · กินของที่อยากกิน นั่งเล่นที่จัตุรัส โทรหาเพื่อน บริจาคให้ขอทาน นอนในบ้านตัวเอง', '😞', false);
   if (id === '_crave') return toast(`อยากกิน${G.items[me.craving.item].name} หาซื้อที่ตลาด/ร้านอาหาร แล้วกินภายในเวลาจะมีความสุขเพิ่มมาก`, '🤤');

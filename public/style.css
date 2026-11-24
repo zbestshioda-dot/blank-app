@@ -213,7 +213,7 @@ pre{background:#3a2a1c;color:#fbecd2;border:2px solid var(--woodDk);border-radiu
 #cardToggle::after{content:'▴'}
 #card.mini #cardToggle::after{content:'▾'}
 #card.mini{width:150px}
-#card.mini #statusBox,#card.mini #qline,#card.mini .bar em,#card.mini #meCareer{display:none!important}
+#card.mini #qline,#card.mini .bar em,#card.mini #meCareer{display:none!important}
 #card.mini .who{margin:-6px 0 2px}#card.mini #mePortrait{width:30px;height:30px}
 #card.mini #meName{font-size:13px}#card.mini .money{font-size:14px}
 #card.mini .bars{gap:1px}#card.mini .bar img{width:13px;height:13px}#card.mini .bar s{height:7px;border-width:1.5px}
@@ -269,7 +269,7 @@ body.hasEvent #topBar{top:46px}
 /* status card extras */
 .bar{cursor:pointer}
 #navX{position:absolute;left:8px;font-size:12px;padding:3px 10px;border-radius:14px;background:linear-gradient(#ffd96b,#e9a92c);max-width:min(260px,60vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip.study{background:#3f6b8f;border-color:#1f3a50}.chip.duty{background:#2e7d5a;border-color:#174532}
+.chip.study{background:#3f6b8f;border-color:#1f3a50}.chip.buff{background:#b8862b;border-color:#6b4a12}.chip.duty{background:#2e7d5a;border-color:#174532}
 
 /* premium admin name: a rainbow that keeps moving */
 #card.admin #meName{background:linear-gradient(90deg,#ff5e5e,#ffbd3d,#5fe07a,#45c2ff,#b06bff,#ff5e5e);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:admName 3s linear infinite;filter:drop-shadow(0 0 2px rgba(255,220,120,.55))}
@@ -339,7 +339,7 @@ textarea{font:inherit;color:var(--ink);background:var(--paper3);border:2px solid
   #card .bars{grid-column:2;display:grid;grid-template-columns:1fr 1fr;column-gap:10px;row-gap:3px;min-width:230px}
   #card #statusBox,#card #qline{grid-column:1/-1}
   #mePortrait{width:36px;height:36px}
-  #card.mini #statusBox,#card.mini #qline,#card.mini .bar em,#card.mini #meCareer{display:revert!important}
+  #card.mini #qline,#card.mini .bar em,#card.mini #meCareer{display:revert!important}
   #card.mini #mePortrait{display:block}
   #cardToggle{display:none}
   #statusBox{margin-top:3px;padding:2px 4px}#statusBox .st{display:none}

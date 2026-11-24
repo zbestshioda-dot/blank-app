@@ -124,7 +124,14 @@ function stat(a, key, n = 1, absolute = false) {
   markMe(a);
 }
 // catch up achievements whose stat was already past the goal (added later, or a goal lowered): stat() only checks when the number goes up
+// equipment counts (absolute): job-tool upgrade levels, maxed tools, vehicles, rods
+function eqSweep(a) {
+  const tl = Object.values(a.tools || {});
+  for (const [k, v] of [['toolup', tl.reduce((s, x) => s + (+x || 0), 0)], ['tooltop', tl.filter(x => x >= 3).length], ['garage', (a.vehicles || []).length], ['rods', (a.rods || []).length]])
+    if (v > (a.stats?.[k] || 0)) stat(a, k, v, true);
+}
 function achSweep(a) {
+  try { eqSweep(a); for (const c of Object.keys(a.xp || {})) if (D.CAREERS[c] && c !== 'office' && lvl(a, c) > (a.stats?.['lv_' + c] || 0)) stat(a, 'lv_' + c, lvl(a, c), true); } catch {}
   if (!a.stats) return;
   const st = a.stats, ks = new Set(D.ACHIEVEMENTS.filter(ac => !(a.ach || []).includes(ac.id) && (st[ac.stat] || 0) >= ac.n).map(ac => ac.stat));
   for (const k of ks) stat(a, k, st[k], true);
@@ -1781,6 +1788,7 @@ function addXp(a, n = 1) {
   const c = a.career; if (!c || c === 'none') return;
   const before = lvl(a), g = c === 'office' ? n : n * xpGain(before);
   a.xp[c] = +((a.xp[c] || 0) + g).toFixed(3); markMe(a);
+  if (c !== 'office' && lvl(a) > (a.stats?.['lv_' + c] || 0)) stat(a, 'lv_' + c, lvl(a), true);
   if (c !== 'office' && lvl(a) > before) { toast(a, `🎉 เลเวลอาชีพ${D.CAREERS[c].name}อัปเป็น Lv.${lvl(a)}! ได้เงินจากงานเพิ่มเป็น +${Math.round((jobPay(a) - 1) * 100)}%`, '⭐'); if (lvl(a) % 5 === 0) feed(`⭐ ${a.name} เลเวล${D.CAREERS[c].name}ถึง Lv.${lvl(a)}`); }
 }
 // licences that expire: the driving licence must be renewed every in-game year (1 real day)
@@ -3174,7 +3182,7 @@ function act(a, m) {
       const cur = tier(a, c);
       if (cur >= 3) return toast(a, `${def.name}ของคุณอัปเกรดสูงสุดแล้ว`, 'ℹ️', false);
       if (!pay(a, D.TOOL_PRICES[cur])) return;
-      a.tools = { ...a.tools, [c]: cur + 1 }; markMe(a);
+      a.tools = { ...a.tools, [c]: cur + 1 }; markMe(a); eqSweep(a);
       if (cur + 1 === 3) feed(`🛠️ ${a.name} อัปเกรด${def.name}ถึงระดับสูงสุด!`);
       return toast(a, `อัปเกรด ${def.icon}${def.name} เป็นระดับ ${cur + 1}: ${def.fx[cur]}`, '🛠️');
     }
@@ -3389,7 +3397,7 @@ function act(a, m) {
       a.rods = a.rods || [];
       if (a.rods.includes(id)) return toast(a, `คุณมี${r.name}แล้ว`, 'ℹ️', false);
       if (!pay(a, r.price)) return;
-      a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); joy(a, 4); nbEv(a, 'rod');
+      a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); eqSweep(a); joy(a, 4); nbEv(a, 'rod');
       return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่มใหญ่เพื่อเหวี่ยงเบ็ด`, '🎣');
     }
     case 'wish.toss': {                    // the wishing fountain: a ฿10 coin, a fortune, and once a day maybe ฿1,000 back
@@ -3637,7 +3645,7 @@ function act(a, m) {
       if (v.gem && isAdmin(a)) { /* admins: unlimited diamonds */ }
       else if (v.gem) { if ((a.gems || 0) < v.gem) return toast(a, `เพชรไม่พอ ต้องใช้ 💎${v.gem} (มี 💎${a.gems || 0})`, '💎', false); a.gems -= v.gem; }
       else if (!pay(a, v.price)) return;
-      a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
+      a.vehicles = [...(a.vehicles || []), m.v]; a.ride = m.v; eqSweep(a); joy(a, 15); a.mvb = moveCap(a); markMe(a); sendRoster();
       if (v.until) feed(`🎄 ${a.name} ได้${v.icon} ${v.name}แล้ว! ของรุ่นจำกัด ขายถึง 31 ธ.ค. เท่านั้น`);
       if (v.gem || v.price >= 250000) feed(`${v.gem ? '💎' : ''}${v.icon} ${a.name} ถอย${v.name}${v.gem ? ' รุ่นพิเศษ!' : 'ป้ายแดง!'}`);
       return toast(a, `ได้${v.name}แล้ว! กดปุ่ม ${v.icon} ขี่/ลงรถ ได้ทุกที่นอกอาคาร`, v.icon);
