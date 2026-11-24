@@ -271,4 +271,5 @@ module.exports = {
     ] },
   ] },
 };
-Object.assign(module.exports, require('./stories_more'));   // more arcs live there
+Object.assign(module.exports, require('./stories_more'));
+Object.assign(module.exports, require('./stories_desk1'));   // staff & shopkeepers, batch 1   // more arcs live there

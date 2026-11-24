@@ -2646,7 +2646,7 @@ function folkAdd(a, def, n, why) {
     if (r) credit(a, r);
     toast(a, `💞 ${def.name} นับคุณเป็น "${D.FOLK_LVN[lv]}" แล้ว!${r ? ` ได้รับ ${money(r)}` : ''}`, '💞'); joy(a, 5);
     if (lv >= 3) feed(`💞 ${a.name} กลายเป็น${D.FOLK_LVN[lv]}ของ${def.name}`);
-  } else if (why) toast(a, `${why} · 💞 +${n} (${f.p}/${D.FOLK_LV[Math.min(4, lv + 1)]})`, '💞');
+  } else if (why) toast(a, `${why} · 💞 +${n} (${f.p}/${D.FOLK_LV[Math.min(D.FOLK_LV.length - 1, lv + 1)]})`, '💞');
   markMe(a); send(a, folksView(a)); return before !== lv;
 }
 // the walking townsperson (npc) or the counter a staff member / shopkeeper stands at; null when not close enough

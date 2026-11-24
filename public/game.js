@@ -5409,7 +5409,7 @@ function talkToTown(o) {
   const fd = o.fid && FOLKS?.find(f => f.id === o.fid);
   if (o.fid) {   // 💞 the townsfolk remember you: the greeting warms up with your friendship, a gift once a day
     const lv = fd?.lv || 0, nm = me.name;
-    const hi = (FOLK_HI[o.face] || [`สวัสดีจ้า`, `อ้าว สวัสดีคุณ{n}`, `{n} มาแล้ว! สบายดีไหม`, `{n}~ คิดถึงพอดีเลย`, `{n}! วันนี้เป็นไงบ้าง เล่าให้ฟังหน่อย`])[lv].replaceAll('{n}', nm || 'เธอ');
+    const hi = (FOLK_HI[o.face] || [`สวัสดีจ้า`, `อ้าว สวัสดีคุณ{n}`, `{n} มาแล้ว! สบายดีไหม`, `{n}~ คิดถึงพอดีเลย`, `{n}! วันนี้เป็นไงบ้าง เล่าให้ฟังหน่อย`])[Math.min(lv, 4)].replaceAll('{n}', nm || 'เธอ');
     const pool = FOLK_TALK[o.face] || TALK.town, t = pool[Math.floor(Math.random() * pool.length)];
     const extra = [fd?.today ? '🎂 วันนี้วันเกิดฉันเองนะ!' : null, fd?.doing && lv >= 1 ? `ตอนนี้${fd.doing}` : null].filter(Boolean);
     const rq = fd?.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
@@ -5833,10 +5833,10 @@ function storiesBox() {
       ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}${rep ? `<div class="rowf" style="margin-top:4px">${B(st.k === 'pay' ? `💰 จ่าย ${money(st.cost)}` : '✅ ส่งรายงาน', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
   }).join('');
 }
-const heartBar = (p, lv) => { const a = [0, 3, 10, 25, 50], lo = a[lv], hi = a[lv + 1]; return '💗'.repeat(lv) + '🤍'.repeat(4 - lv) + (hi ? ` <small>${p - lo}/${hi - lo}</small>` : ' <small>สูงสุด</small>'); };
+const heartBar = p => { const h = Math.min(10, Math.floor((p || 0) / 10)); return '💗'.repeat(h) + '🤍'.repeat(10 - h) + (p >= 100 ? ' <small>เต็ม 10 ดวง!</small>' : ` <small>${p || 0}/100</small>`); };   // 10 hearts, 10 points each
 const whereGet = id => { const k = G.items[id]?.kind; return k === 'crop' ? 'ปลูกที่ไร่หรือซื้อที่ตลาด' : k === 'fish' ? 'ตกปลา' : k === 'meal' ? 'ร้านอาหาร/ทำอาหารเอง' : /^py_|^parkplush|balloon|popcorn|cottoncandy|hotdog/.test(id) ? 'สวนสนุก' : /malai|offering|kanomthai|khaotom|namlamyai/.test(id) ? 'แถววัด' : 'ร้านสะดวกซื้อ/ร้านค้า'; };
 const reqTxt = r => `${G.items[r.item]?.icon || ''}${esc(G.items[r.item]?.name || r.item)} x${r.n}`;
-const FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว'];
+const FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว', 'คนพิเศษ', 'คนสำคัญที่สุด'];
 // 📜 the journal: today's favours as a list of little stories; tap one to open it (objective, progress, reward, where to find it)
 function journalPanel(p) {
   if (!FOLKS) return `<h2>📜 บันทึก</h2><div class="sub">กำลังโหลด...</div>`;
@@ -6350,6 +6350,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28r', d: '24 พ.ย.', items: [
+    '💗 ความสนิทมี 10 ดวงแล้ว (ดวงละ 10 แต้ม) · เพิ่มระดับใหม่ "คนพิเศษ" (75) ได้ ฿12,000 และ "คนสำคัญที่สุด" (100) ได้ ฿20,000 · ความสนิทเดิมไม่หาย',
+    '📖 เนื้อเรื่องใหม่ของพนักงาน 10 คน: ผู้กองเอก หมอแพร หลวงพ่อเย็น น้าเล็ก เชฟหมี เจ๊ศรี ผู้กองเดช พี่ฟ้า แม่หมอจันทรา ลุงจุก',
+  ] },
   { v: '2026-11-28q', d: '24 พ.ย.', items: [
     '📖 เนื้อเรื่องครบชาวเมืองทั้ง 9 คนแล้ว! ใหม่: พี่โจ้ "จดหมายที่ไม่เคยส่ง" · คุณเมย์ "นักสืบหัวใจ" · ป้านวล "หัวขโมยผักยามดึก" · น้องเจมส์ "ยูทูบเบอร์ร้อยซับ"',
     '⚠️ เควสยากแบบใหม่: บางบทต้องจ่ายเงิน หาของหลายอย่าง ทำงานให้ครบจำนวน (ตกปลา/ไหว้พระ/เก็บผัก/เล่นเครื่องเล่น) และคำถามบางข้อตอบผิดต้องเริ่มบทใหม่!',

@@ -2112,8 +2112,8 @@ const FOLK = {
   ],
 };
 // friendship with the townsfolk: points -> level (0 stranger … 4 like family); rewards the first time each level is reached
-const FOLK_LV = [0, 3, 10, 25, 50], FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว'];
-const FOLK_REWARD = [0, 300, 1000, 3000, 8000];
+const FOLK_LV = [0, 3, 10, 25, 50, 75, 100], FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว', 'คนพิเศษ', 'คนสำคัญที่สุด'];   // 10 hearts = 100 points (1 heart = 10)
+const FOLK_REWARD = [0, 300, 1000, 3000, 8000, 12000, 20000];
 const NPC_NAMES = ['ป้าสมศรี', 'ลุงมี', 'น้องเมย์', 'พี่ต้น', 'ยายจันทร์', 'ตาเหลือง', 'น้าแดง', 'พี่ฝน', 'น้องบอส', 'ป้าแจ๋ว', 'ลุงชัย', 'พี่นก'];
 
 // ================================================================= achievements -> titles shown over your head
