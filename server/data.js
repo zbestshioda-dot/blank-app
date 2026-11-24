@@ -1455,6 +1455,15 @@ const DUNGEON = { ticket: 300, perDay: 4, prize: [30, 20, 10],
           charm: { name: 'เครื่องรางนักสำรวจ', icon: '🧿', coin: 5, desc: 'รอบหน้าเริ่มพร้อมของวิเศษ 1 ชิ้น' } } };
 // 💍 wedding rings, bought at the wedding arch in the temple; the tier shows next to the couple's names
 const RINGS = { silver: { name: 'แหวนเงิน', icon: '💍', price: 19999 }, gold: { name: 'แหวนทอง', icon: '💛', price: 49999 }, diamond: { name: 'แหวนเพชร', icon: '💎', gems: 199 } };
+// 🏗️ build the town together: everyone donates to one project at a time; when it is full it is built and the next opens.
+// The top donors' names go on its plaque. (art: tools/sheets/proj_<id>.png, prompts in docs/town_project_prompts.md)
+const PROJECTS = [
+  { id: 'memorial', name: 'อนุสรณ์รถเมล์สาย 99', icon: '🚌', goal: 5000000, desc: 'ป้ายรถเมล์หินอ่อนพร้อมรายชื่อผู้โดยสารทั้ง 12 คน ให้ทุกคนที่ยังรอ ได้มีที่ระลึกถึง' },
+  { id: 'bridge13', name: 'สะพานซอย 13 ใหม่', icon: '🌉', goal: 20000000, desc: 'สร้างสะพานใหม่แทนสะพานที่รถเมล์ตกลงไป ให้ซอย 13 ไม่พาใครหลงอีกต่อไป' },
+  { id: 'wheel', name: 'ชิงช้าสวรรค์ยักษ์', icon: '🎡', goal: 50000000, desc: 'ชิงช้าสวรรค์ที่สูงที่สุดในเมือง มองเห็นทะเลสาบและป้ายรถเมล์ได้ทั้งหมด' },
+  { id: 'clock', name: 'หอนาฬิกากลางเมือง', icon: '🕰️', goal: 100000000, desc: 'หอนาฬิกาที่เดินตรงเวลา ไม่หยุดที่ 03:17 อีกแล้ว — สัญลักษณ์ว่าเมืองนี้เดินต่อไปได้' },
+];
+STATIONS.push({ id: 'proj_box', type: 'proj', label: 'กล่องระดมทุนสร้างเมือง', icon: '🏗️', x: 52.5, y: 38.5, r: 1.6, area: 'town' });
 const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
 // 🎆 fireworks over the fountain square, bought with baht (a money sink everyone in town sees). n bursts over dur seconds
 const FIREWORKS = { s: { name: 'ดอกเล็ก', price: 500, n: 4, dur: 3 }, m: { name: 'ชุดใหญ่', price: 5000, n: 12, dur: 7 }, l: { name: 'มหาพลุ', price: 50000, n: 40, dur: 15 } };
@@ -2308,6 +2317,10 @@ const ACHIEVEMENTS = [
   { id: 'st_choei', r: 5, c: null, stat: 'story_choei', n: 1, title: 'ผู้ทำให้ตาเฉยพูด', desc: 'ช่วยตาเฉยจนจบเรื่อง "ชายผู้ไม่พูด"' },
   { id: 'st_tonkla', r: 4, c: null, stat: 'story_tonkla', n: 1, title: 'ผู้เล่นคนที่ 2', desc: 'ช่วยต้นกล้าจนจบเรื่อง "ตู้เกมหมายเลขศูนย์"' },
   { id: 'st_mprang', r: 4, c: null, stat: 'story_mprang', n: 1, title: 'พี่เงาคนที่สอง', desc: 'ช่วยน้องมะปรางจนจบเรื่อง "พี่เงา"' },
+  // 🏗️ building the town together (stat 'built' = baht donated in total)
+  { id: 'build1', r: 3, c: null, stat: 'built', n: 100000, title: 'ผู้ร่วมสร้างเมือง', desc: 'ลงขันสร้างเมืองรวม ฿100,000' },
+  { id: 'build2', r: 5, c: null, stat: 'built', n: 1000000, title: 'เสาหลักของเมือง', desc: 'ลงขันสร้างเมืองรวม ฿1,000,000' },
+  { id: 'build3', r: 7, c: null, stat: 'built', n: 10000000, title: 'ผู้สร้างตำนานเมือง', desc: 'ลงขันสร้างเมืองรวม ฿10,000,000' },
   // 📖 finishing many stories: titles + diamonds (the 50th also pays ฿100,000, see storyAdv)
   { id: 'story10', r: 4, g: 30, c: null, stat: 'storyDone', n: 10, title: 'นักฟังเรื่องเล่า', desc: 'จบเนื้อเรื่องของชาวเมือง 10 เรื่อง' },
   { id: 'story25', r: 5, g: 80, c: null, stat: 'storyDone', n: 25, title: 'คนที่ทั้งเมืองไว้ใจ', desc: 'จบเนื้อเรื่องของชาวเมือง 25 เรื่อง' },
@@ -2449,7 +2462,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { PROJECTS, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

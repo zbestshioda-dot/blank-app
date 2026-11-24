@@ -833,6 +833,34 @@ const LOTTO = { price: 100, max: 50, first: 3000000, l3: 6000, l2: 3000, hour: 1
 let lotto = { cur: '', last: null };
 // 🏆 weekly auction (state saved in __meta): a new week sells the lot to the top bid and opens the next one
 let auc = null;
+// 🏗️ build the town together (D.PROJECTS): one open project, the baht given by each login, the ones already built
+let proj = { i: 0, got: 0, by: {}, done: [] };
+const projTop = (by, n = 10) => Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, n).map(([l, v]) => [accounts.get(l)?.name || l, v]);
+function projView(a) {
+  const P = D.PROJECTS[proj.i];
+  return { t: 'proj', cur: P ? { id: P.id, name: P.name, icon: P.icon, desc: P.desc, goal: P.goal, got: proj.got } : null, n: proj.i, total: D.PROJECTS.length,
+    top: projTop(proj.by), mine: proj.by[lk(a)] || 0, done: proj.done.map(d => ({ name: D.PROJECTS.find(x => x.id === d.id)?.name || d.id, icon: D.PROJECTS.find(x => x.id === d.id)?.icon || '🏗️', t: d.t, top: d.top })) };
+}
+function projGive(a, m) {
+  const P = D.PROJECTS[proj.i]; if (!P) return toast(a, 'เมืองสร้างครบทุกโปรเจกต์แล้ว ขอบคุณทุกคน!', '🏗️', false);
+  const box = ST.proj_box; if (!box || areaId(a) !== box.area || dist(a, box) > 3.5) return toast(a, 'ต้องมาลงขันที่กล่องระดมทุนหน้าน้ำพุ', '🏗️', false);
+  if (godInf(a)) return toast(a, 'แอดมินเงินไม่จำกัด ร่วมลงขันไม่ได้ (ไม่งั้นสร้างเสร็จทันที)', '🏗️', false);
+  const amt = Math.floor(+m.amt) || 0; if (amt < 1000) return toast(a, 'ลงขันขั้นต่ำ ฿1,000', '🏗️', false);
+  if (!pay(a, amt)) return;
+  const before = proj.got / P.goal; proj.got += amt; proj.by[lk(a)] = (proj.by[lk(a)] || 0) + amt; dirty = true;
+  stat(a, 'built', amt); joy(a, Math.min(15, 3 + Math.floor(amt / 100000)));
+  toast(a, `🏗️ ลงขัน ${money(amt)} ให้ "${P.name}" แล้ว · รวมของคุณ ${money(proj.by[lk(a)])}`, '🏗️');
+  if (amt >= 1000000) feed(`🏗️ ${a.name} ลงขัน ${money(amt)} สร้าง${P.name}!`);
+  const after = proj.got / P.goal;
+  for (const q of [.25, .5, .75]) if (before < q && after >= q && after < 1) feed(`🏗️ ${P.icon} ${P.name} สร้างไปแล้ว ${q * 100}%! มาช่วยกันลงขันที่หน้าน้ำพุ`);
+  if (proj.got >= P.goal) {   // built! the plaque keeps the top three; the extra money goes to the next project
+    const top = projTop(proj.by, 3).map(x => x[0]);
+    proj.done.push({ id: P.id, t: now(), top }); proj.got -= P.goal; proj.by = {}; proj.i++;
+    feed(`🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ขอบคุณทุกคน · ผู้ให้มากที่สุด: ${top.join(', ')}`);
+    for (const o of online.values()) { toast(o, `🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ทั้งเมืองช่วยกันสำเร็จ`, '🎉'); joy(o, 10); }
+  }
+  send(a, projView(a));
+}
 const aucEnds = () => Date.parse(weekKey() + 'T00:00:00+07:00') + 7 * 864e5;
 const aucView = a => { const f = auc?.lot && D.FURNITURE[auc.lot]; return { t: 'auc', lot: auc?.lot || null, name: f?.name || '', spr: f?.spr || '', comfort: f?.comfort || 0, bid: auc?.bid || 0, by: auc?.name || null, min: auc ? AU.next(auc) : AU.MIN, mine: !!auc?.by && auc.by === lk(a), ends: aucEnds() }; };
 function wkAucTick() {
@@ -1852,7 +1880,7 @@ const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNe
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.proj) proj = meta.proj; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -1935,7 +1963,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -5684,6 +5712,7 @@ function onMessage0(ws, raw) {
     case 'story': return storyAdv(a, m);
     case 'storylog': return storyLog(a, m);
     case 'folks': return send(a, folksView(a));
+    case 'proj': return m.op === 'give' ? projGive(a, m) : send(a, projView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
     case 'achsync': return achSweep(a);

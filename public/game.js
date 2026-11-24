@@ -808,6 +808,7 @@ function handle(m) {
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
+    case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
     case 'storylog': STORYLOG = m; if (panel?.kind === 'storylog') refreshPanel(true); break;
     case 'folksay': { const o = m.id != null && P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } else toast(m.text, '💞'); FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
@@ -5790,7 +5791,17 @@ async function shareOpen() {
 // 🏆 fishing contest: a chip at the top while it runs (time left, my rank); tap for the leaderboard
 let FCS = { on: 0 }, FRECS = null, FOLKS = null;
 // 📖 townsfolk stories: the current step of each arc (from the server's 'folks' message)
-let STORIES = [], STORYLOG = null;
+let STORIES = [], STORYLOG = null, PROJ = null;
+function projPanel(p) {   // 🏗️ the town's donation box
+  if (!p.asked) { p.asked = 1; send({ t: 'proj' }); }
+  const P = PROJ; if (!P) return '<h2>🏗️ สร้างเมืองด้วยกัน</h2><div class="sub">กำลังโหลด...</div>';
+  const c = P.cur, pct = c ? Math.min(100, c.got / c.goal * 100) : 100;
+  const bar = c ? `<div style="background:#0002;border-radius:9px;height:16px;overflow:hidden;margin:6px 0"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffb84d,#ff7a3d)"></div></div><div class="sub" style="margin:0"><b>${money(c.got)}</b> / ${money(c.goal)} (${pct.toFixed(pct < 1 ? 2 : 1)}%)</div>` : '';
+  const give = c ? `<div class="rowf" style="margin:8px 0;flex-wrap:wrap;gap:6px">${[10000, 100000, 1000000, 10000000].map(v => B(`ลงขัน ${money(v)}`, { t: 'proj', op: 'give', amt: v }, v >= 1000000 ? 'primary' : '', me.money < v)).join('')}</div><div class="sub">คุณลงขันโปรเจกต์นี้แล้ว <b>${money(P.mine)}</b> · ลงขันรวมได้ฉายา: ฿100,000 "ผู้ร่วมสร้างเมือง" · ฿1 ล้าน "เสาหลักของเมือง" · ฿10 ล้าน "ผู้สร้างตำนานเมือง"</div>` : '';
+  const top = P.top.length ? `<h3 style="margin:8px 0 4px">🏅 ผู้ให้มากที่สุด (ชื่อจะสลักบนป้าย)</h3>${P.top.map(([n, v], i) => `<div class="sub" style="margin:2px 0">${['🥇', '🥈', '🥉'][i] || `${i + 1}.`} ${esc(n)} · ${money(v)}</div>`).join('')}` : '<div class="sub">ยังไม่มีใครลงขัน เป็นคนแรกเลย!</div>';
+  const done = P.done.length ? `<h3 style="margin:10px 0 4px">✅ สร้างเสร็จแล้ว</h3>${P.done.map(d => `<div class="sub" style="margin:2px 0">${d.icon} <b>${esc(d.name)}</b> · ผู้สร้างหลัก: ${d.top.map(esc).join(', ')}</div>`).join('')}` : '';
+  return `<h2>🏗️ สร้างเมืองด้วยกัน${c ? ` · ${P.n + 1}/${P.total}` : ''}</h2>${c ? `<div class="item"><div class="em" style="font-size:34px">${c.icon}</div><div class="nm"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></div></div>${bar}${give}` : '<div class="sub">🎉 เมืองสร้างครบทุกโปรเจกต์แล้ว ขอบคุณทุกคน!</div>'}${top}${done}`;
+}
 function storyLogPanel(p) {   // 📜 read a story back from the start
   const L = STORYLOG && STORYLOG.o === p.o ? STORYLOG : null;
   const back = B('← กลับแท็บเนื้อเรื่อง', { fn: 'openStories' });
@@ -6360,6 +6371,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28w', d: '24 พ.ย.', items: [
+    '🏗️ <b>สร้างเมืองด้วยกัน!</b> กล่องระดมทุนหน้าน้ำพุ ทั้งเมืองลงขันสร้างทีละโปรเจกต์: 🚌 อนุสรณ์รถเมล์สาย 99 → 🌉 สะพานซอย 13 → 🎡 ชิงช้าสวรรค์ยักษ์ → 🕰️ หอนาฬิกา',
+    '🏅 ชื่อผู้ให้มากที่สุดสลักบนป้าย · ลงขันรวม ฿100,000 / ฿1 ล้าน / ฿10 ล้าน ได้ฉายา "ผู้ร่วมสร้างเมือง" / "เสาหลักของเมือง" / "ผู้สร้างตำนานเมือง"',
+  ] },
   { v: '2026-11-28v', d: '24 พ.ย.', items: [
     '🏆 รางวัลนักอ่านเนื้อเรื่อง: จบ 10 เรื่อง ฉายา "นักฟังเรื่องเล่า" +💎30 · 25 เรื่อง "คนที่ทั้งเมืองไว้ใจ" +💎80 · ครบ 50 เรื่อง ฉายาตำนาน "ผู้รู้ความลับของเมือง" +💎300 และ ฿100,000',
   ] },
@@ -8167,6 +8182,7 @@ function renderPanel(p) {
     case 'fw': return `<h2>🎆 จุดพลุ</h2><div class="sub">พลุขึ้นที่ลานน้ำพุ ทุกคนในเมืองเห็นพร้อมชื่อคุณ · ต้องอยู่ในตัวเมือง</div><div class="list">${Object.entries(G.fireworks || {}).map(([k, f]) => `<div class="item"><div class="em">🎆</div><div class="nm"><b>พลุ${f.name}</b><small>${f.n} ลูก · ${f.dur} วินาที</small></div>${B(money(f.price), { fn: 'fw', k }, 'primary', me.money < f.price)}</div>`).join('')}</div>`;
     case 'homes': return homesPanel();
     case 'folks': return folksPanel();
+    case 'proj': return projPanel(p);
     case 'storylog': return storyLogPanel(p);
     case 'journal': return journalPanel(p);
     case 'folkgift': return folkGiftPanel(p);
