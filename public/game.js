@@ -5792,6 +5792,8 @@ async function shareOpen() {
 let FCS = { on: 0 }, FRECS = null, FOLKS = null;
 // 📖 townsfolk stories: the current step of each arc (from the server's 'folks' message)
 let STORIES = [], STORYLOG = null, PROJ = null;
+const PROJ_DOES = { memorial: 'วางพวงมาลัยวันละครั้ง ได้รับพร 30 นาที + ผู้โดยสารสาย 99 สนิทขึ้น', bridge13: 'ทั้งเมืองตกปลาหายากง่ายขึ้นตลอดไป + เดินเล่นวันละครั้ง พลังงาน +25',
+  wheel: 'ขึ้นชิงช้าสวรรค์ได้ทุกเมื่อ (฿500) ความสุข +30 ขึ้นกับเพื่อนได้เพิ่ม', clock: 'ตีระฆังวันละครั้ง ได้ 💎2 และทั้งเมืองอารมณ์ดีขึ้น' };
 function projPanel(p) {   // 🏗️ the town's donation box
   if (!p.asked) { p.asked = 1; send({ t: 'proj' }); }
   const P = PROJ; if (!P) return '<h2>🏗️ สร้างเมืองด้วยกัน</h2><div class="sub">กำลังโหลด...</div>';
@@ -5799,8 +5801,9 @@ function projPanel(p) {   // 🏗️ the town's donation box
   const bar = c ? `<div style="background:#0002;border-radius:9px;height:16px;overflow:hidden;margin:6px 0"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#ffb84d,#ff7a3d)"></div></div><div class="sub" style="margin:0"><b>${money(c.got)}</b> / ${money(c.goal)} (${pct.toFixed(pct < 1 ? 2 : 1)}%)</div>` : '';
   const give = c ? `<div class="rowf" style="margin:8px 0;flex-wrap:wrap;gap:6px">${[10000, 100000, 1000000, 10000000].map(v => B(`ลงขัน ${money(v)}`, { t: 'proj', op: 'give', amt: v }, v >= 1000000 ? 'primary' : '', me.money < v)).join('')}</div><div class="sub">คุณลงขันโปรเจกต์นี้แล้ว <b>${money(P.mine)}</b> · ลงขันรวมได้ฉายา: ฿100,000 "ผู้ร่วมสร้างเมือง" · ฿1 ล้าน "เสาหลักของเมือง" · ฿10 ล้าน "ผู้สร้างตำนานเมือง"</div>` : '';
   const top = P.top.length ? `<h3 style="margin:8px 0 4px">🏅 ผู้ให้มากที่สุด (ชื่อจะสลักบนป้าย)</h3>${P.top.map(([n, v], i) => `<div class="sub" style="margin:2px 0">${['🥇', '🥈', '🥉'][i] || `${i + 1}.`} ${esc(n)} · ${money(v)}</div>`).join('')}` : '<div class="sub">ยังไม่มีใครลงขัน เป็นคนแรกเลย!</div>';
+  const use = P.use?.length ? `<h3 style="margin:10px 0 4px">🎮 ใช้งานสิ่งก่อสร้าง</h3><div class="rowf" style="flex-wrap:wrap;gap:6px">${P.use.map(u => B(u.used ? `${u.label} ✅` : u.label, { t: 'proj', op: 'use', id: u.id }, u.used ? '' : 'good', !!u.used)).join('')}</div>` : '';
   const done = P.done.length ? `<h3 style="margin:10px 0 4px">✅ สร้างเสร็จแล้ว</h3>${P.done.map(d => `<div class="sub" style="margin:2px 0">${d.icon} <b>${esc(d.name)}</b> · ผู้สร้างหลัก: ${d.top.map(esc).join(', ')}</div>`).join('')}` : '';
-  return `<h2>🏗️ สร้างเมืองด้วยกัน${c ? ` · ${P.n + 1}/${P.total}` : ''}</h2>${c ? `<div class="item"><div class="em" style="font-size:34px">${c.icon}</div><div class="nm"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></div></div>${bar}${give}` : '<div class="sub">🎉 เมืองสร้างครบทุกโปรเจกต์แล้ว ขอบคุณทุกคน!</div>'}${top}${done}`;
+  return `<h2>🏗️ สร้างเมืองด้วยกัน${c ? ` · ${P.n + 1}/${P.total}` : ''}</h2>${c ? `<div class="item"><div class="em" style="font-size:34px">${c.icon}</div><div class="nm"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small><small>🎁 สร้างเสร็จแล้ว: ${esc(PROJ_DOES[c.id] || '')}</small></div></div>${bar}${give}` : '<div class="sub">🎉 เมืองสร้างครบทุกโปรเจกต์แล้ว ขอบคุณทุกคน!</div>'}${use}${top}${done}`;
 }
 function storyLogPanel(p) {   // 📜 read a story back from the start
   const L = STORYLOG && STORYLOG.o === p.o ? STORYLOG : null;
@@ -6371,6 +6374,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28x', d: '24 พ.ย.', items: [
+    '🏗️ สิ่งก่อสร้างที่ทั้งเมืองสร้างเสร็จ ใช้งานได้จริง: 💐 วางพวงมาลัยที่อนุสรณ์ (ได้รับพร) · 🌉 สะพานทำให้ทั้งเมืองตกปลาหายากง่ายขึ้น · 🎡 ขึ้นชิงช้าสวรรค์ ฿500 · 🔔 ตีระฆังหอนาฬิกาได้เพชร',
+  ] },
   { v: '2026-11-28w', d: '24 พ.ย.', items: [
     '🏗️ <b>สร้างเมืองด้วยกัน!</b> กล่องระดมทุนหน้าน้ำพุ ทั้งเมืองลงขันสร้างทีละโปรเจกต์: 🚌 อนุสรณ์รถเมล์สาย 99 → 🌉 สะพานซอย 13 → 🎡 ชิงช้าสวรรค์ยักษ์ → 🕰️ หอนาฬิกา',
     '🏅 ชื่อผู้ให้มากที่สุดสลักบนป้าย · ลงขันรวม ฿100,000 / ฿1 ล้าน / ฿10 ล้าน ได้ฉายา "ผู้ร่วมสร้างเมือง" / "เสาหลักของเมือง" / "ผู้สร้างตำนานเมือง"',

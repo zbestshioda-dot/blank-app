@@ -839,7 +839,45 @@ const projTop = (by, n = 10) => Object.entries(by).sort((x, y) => y[1] - x[1]).s
 function projView(a) {
   const P = D.PROJECTS[proj.i];
   return { t: 'proj', cur: P ? { id: P.id, name: P.name, icon: P.icon, desc: P.desc, goal: P.goal, got: proj.got } : null, n: proj.i, total: D.PROJECTS.length,
+    use: proj.done.filter(d => PROJ_USE[d.id]).map(d => ({ id: d.id, label: PROJ_USE[d.id].label, used: !PROJ_USE[d.id].many && a.projUse?.d === dayKey() && a.projUse.used.includes(d.id) ? 1 : 0 })),
     top: projTop(proj.by), mine: proj.by[lk(a)] || 0, done: proj.done.map(d => ({ name: D.PROJECTS.find(x => x.id === d.id)?.name || d.id, icon: D.PROJECTS.find(x => x.id === d.id)?.icon || '🏗️', t: d.t, top: d.top })) };
+}
+const projBuilt = id => proj.done.some(d => d.id === id);
+// what each finished building does (once a day each, except the paid Ferris wheel)
+const PROJ_USE = {
+  memorial: { label: '💐 วางพวงมาลัยที่อนุสรณ์', need: 'malai' },
+  bridge13: { label: '🌉 เดินเล่นบนสะพานใหม่' },
+  wheel: { label: '🎡 ขึ้นชิงช้าสวรรค์ (฿500)', cost: 500, many: 1 },
+  clock: { label: '🔔 ตีระฆังหอนาฬิกา' },
+};
+function projUse(a, m) {
+  const id = String(m.id || ''), U = PROJ_USE[id]; if (!U || !projBuilt(id)) return;
+  const box = ST.proj_box; if (!box || areaId(a) !== box.area || dist(a, box) > 3.5) return toast(a, 'ต้องมาที่ลานหน้าน้ำพุก่อน', '🏗️', false);
+  const d = dayKey(), u = a.projUse?.d === d ? a.projUse : (a.projUse = { d, used: [] });
+  if (!U.many && u.used.includes(id)) return toast(a, 'วันนี้ทำไปแล้ว พรุ่งนี้มาใหม่นะ', '🏗️', false);
+  if (U.need && !(a.inv[U.need] > 0)) return toast(a, `ต้องมี ${D.ITEMS[U.need].icon}${D.ITEMS[U.need].name} 1 พวง (ซื้อได้แถววัด/ตลาด)`, '💐', false);
+  if (U.cost && !pay(a, U.cost)) return;
+  if (U.need) addItem(a, U.need, -1);
+  if (!U.many) u.used.push(id); a.sd = true;
+  if (id === 'memorial') {   // remember the passengers: a blessing, and the ones who came on that bus feel it
+    a.bless = Math.max(a.bless || 0, now()) + 30 * 60000; joy(a, 10);
+    for (const f of ['joe', 'choei', 'd_guide', 'd_fortune']) if (FOLK_DEF[f]) folkOf(a, f).p += 1;
+    toast(a, '💐 วางพวงมาลัยที่อนุสรณ์แล้ว · ได้รับพร 30 นาที (รายได้ +5%) · ความสุข +10 · ผู้โดยสารสาย 99 ทุกคนสนิทกับคุณขึ้น +1', '🚌');
+  } else if (id === 'bridge13') {
+    const e = 25; enLog(a, Math.min(100, a.energy + e) - a.energy, 'เดินเล่นบนสะพาน'); a.energy = Math.min(100, a.energy + e); joy(a, 8);
+    toast(a, '🌉 เดินเล่นบนสะพานใหม่ ลมเย็นสบาย · พลังงาน +25 · ความสุข +8 (และทั้งเมืองตกปลาหายากได้ง่ายขึ้นตลอดไป)', '🌉');
+  } else if (id === 'wheel') {
+    joy(a, 30); a.health = Math.min(100, a.health + 10); stat(a, 'rides');
+    const mates = [...online.values()].filter(o => o !== a && areaId(o) === areaId(a) && dist(o, a) < 4).length;
+    toast(a, `🎡 ขึ้นชิงช้าสวรรค์ เห็นทั้งเมืองจากด้านบน! ความสุข +30 · สุขภาพ +10${mates ? ` · ขึ้นกับเพื่อน ${mates} คน สนุกกว่าเดิม` : ''}`, '🎡');
+    if (mates) joy(a, 10);
+  } else if (id === 'clock') {
+    a.gems = (a.gems || 0) + 2; joy(a, 5);
+    for (const o of online.values()) if (o !== a) joy(o, 2);
+    feed(`🔔 ${a.name} ตีระฆังหอนาฬิกา ตง~ ทั้งเมืองได้ยิน`);
+    toast(a, '🔔 ตง~~ ตีระฆังหอนาฬิกา · ได้ 💎2 · คนในเมืองทุกคนได้ยินและอารมณ์ดีขึ้น', '🕰️');
+  }
+  markMe(a); send(a, projView(a));
 }
 function projGive(a, m) {
   const P = D.PROJECTS[proj.i]; if (!P) return toast(a, 'เมืองสร้างครบทุกโปรเจกต์แล้ว ขอบคุณทุกคน!', '🏗️', false);
@@ -1872,7 +1910,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'projUse', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
@@ -2484,7 +2522,8 @@ function resign(a) {
 // ------------------------------------------------------------------ fishing
 function rollFish(a, pool) {
   const l = fishLv(a), rod0 = rodOf(a) || D.RODS.bamboo, blessed = (a.merit || 0) > now();
-  const rod = blessed ? { ...rod0, luck: rod0.luck * 1.3, junk: rod0.junk * .8 } : rod0;   // 🙏 merit from releasing fish at the temple
+  const rod0b = projBuilt('bridge13') ? { ...rod0, luck: rod0.luck * 1.15 } : rod0;   // 🌉 the town built the new bridge: rarer fish for everyone
+  const rod = blessed ? { ...rod0b, luck: rod0b.luck * 1.3, junk: rod0b.junk * .8 } : rod0b;   // 🙏 merit from releasing fish at the temple
   const table = D.FISH[pool] || D.FISH.lake;
   const ws = table.map(([id, w]) => {
     if (id === null) return Math.max(5, w - l) * rod.junk;
@@ -5712,7 +5751,7 @@ function onMessage0(ws, raw) {
     case 'story': return storyAdv(a, m);
     case 'storylog': return storyLog(a, m);
     case 'folks': return send(a, folksView(a));
-    case 'proj': return m.op === 'give' ? projGive(a, m) : send(a, projView(a));
+    case 'proj': return m.op === 'give' ? projGive(a, m) : m.op === 'use' ? projUse(a, m) : send(a, projView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
     case 'achsync': return achSweep(a);
