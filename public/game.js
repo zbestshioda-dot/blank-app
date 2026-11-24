@@ -4922,7 +4922,11 @@ const FN = {
   soilStore() { const h = wd?.houses?.[me.house]; if (!h) return; for (const k of me.furniture || []) if (G.shop.furniture[fbase(k)]?.tile && furnPos(h, k)) send({ t: 'hplace', k, store: 1 }); },
   stock(m, root) { const q = m.qty || Math.floor(+root.querySelector('#skQty')?.value || 0); if (!(q > 0)) return toast('ใส่จำนวนหุ้น', '📈', false); send(m.st ? { t: 'act', st: m.st, a: 'stock', op: m.op, id: m.id, qty: q } : { t: 'stock', op: m.op, id: m.id, qty: q }); },   // from the phone: no bank needed
   callMin() { closePanel(); toast('ย่อสายไว้แล้ว แตะแถบ 📞 ด้านบนเพื่อเปิด', '📞'); },
-  list(m, root) { const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0); send({ t: 'act', st: m.st, a: 'list', item: m.item, qty: m.qty, price: v }); },
+  list(m, root) {
+    const v = Math.floor(+root.querySelector('#lp_' + m.item).value || 0), qi = root.querySelector('#lq_' + m.item);
+    const qty = m.qty || Math.max(1, Math.min(m.max || 1, Math.floor(+qi?.value || 0)));   // qty 0 = the amount typed in the box
+    send({ t: 'act', st: m.st, a: 'list', item: m.item, qty, price: v });
+  },
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt')?.value || 0; send(m.st ? { t: 'act', st: m.st, a: m.op, amt: v } : { t: 'bankop', op: m.op, amt: v }); },   // from the phone: no bank needed
   price(m, root) { send({ t: 'act', st: m.st, a: m.op, price: m.zero ? 0 : +root.querySelector('#' + m.inp).value || 0 }); },
   guide(m) { closePanel(); setGuide(m.key, false, true); },
@@ -6269,6 +6273,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28f', d: '24 พ.ย.', items: [
+    '🏪 วางขายที่ตลาดกลาง เลือกจำนวนชิ้นเองได้แล้ว (ช่องจำนวน + ปุ่ม "วางตามจำนวน") ไม่ต้องวางทีละ 1 หรือวางหมด',
+  ] },
   { v: '2026-11-28e', d: '24 พ.ย.', items: [
     '🏅 ความสำเร็จใหม่ของอาชีพ ตำรวจ พระ แคชเชียร์ เด็กวัด สัปเหร่อ ช่างซ่อมรถ นักเลง ช่างภาพ นักสืบ พนักงานส่งของ บาร์เทนเดอร์ (Lv.5 / 15 / 30)',
     '🛠️ ความสำเร็จอุปกรณ์: อัปเกรดอุปกรณ์อาชีพ สะสมพาหนะ สะสมเบ็ดตกปลา',
@@ -7538,7 +7545,7 @@ function renderPanel(p) {
         body = inv.map(([id, q]) => {
           const it = G.items[id], m2 = { ...(mk[id] || {}), ...(me.npcp?.[id] ? { npc: me.npcp[id] } : {}) }, sug = m2.n ? Math.max(1, m2.best - 1) : Math.round(m2.ref || it.base);
           return itemRow(id, '', `มี ${q} · ราคาตลาด ~${money(m2.ref || it.base)} · ผู้เล่นขายถูกสุด ${m2.n ? money(m2.best) : '—'} · <span style="color:var(--bad)">NPC รับซื้อแค่ ${money(m2.npc || 0)}</span>`) +
-            `<div class="rowf" style="margin:-2px 0 6px"><input id="lp_${id}" type="number" min="1" value="${sug}" style="width:90px"> <span class="sub" style="margin:0">฿/ชิ้น</span>${B('วาง 1', { fn: 'list', st, item: id, qty: 1 })}${B(`วางหมด ${q}`, { fn: 'list', st, item: id, qty: q }, 'good')}${B(`NPC ${money((m2.npc || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' })}</div>`;
+            `<div class="rowf" style="margin:-2px 0 6px"><input id="lp_${id}" type="number" min="1" value="${sug}" style="width:90px"> <span class="sub" style="margin:0">฿/ชิ้น</span>${q > 1 ? `<input id="lq_${id}" type="number" inputmode="numeric" min="1" max="${q}" value="${Math.ceil(q / 2)}" style="width:60px" title="จำนวนที่จะวาง"> <span class="sub" style="margin:0">ชิ้น</span>${B('วางตามจำนวน', { fn: 'list', st, item: id, qty: 0, max: q })}` : ''}${B('วาง 1', { fn: 'list', st, item: id, qty: 1 })}${B(`วางหมด ${q}`, { fn: 'list', st, item: id, qty: q }, 'good')}${B(`NPC ${money((m2.npc || 0) * q)}`, { t: 'act', st, a: 'sell', item: id, qty: 'all' })}</div>`;
         }).join('');
         body = `<div class="sub">💡 <b>วางขายให้ผู้เล่น</b>ได้ราคาดีกว่ามาก (ตลาดหัก 5% · ขายได้แม้ออฟไลน์) · ขาย NPC ได้เงินทันทีแต่ราคาต่ำมาก</div>${search}${cats}${body || '<div class="sub">ไม่มีของที่ตรงกับตัวกรอง</div>'}`;
       } else {
