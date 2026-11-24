@@ -6273,6 +6273,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28i', d: '24 พ.ย.', items: [
+    '📋 ข้อความจบภารกิจบอกค่าจ้างที่ได้จริง และบอกเมื่อค่าแรงลดเพราะวันนี้ทำงานเกิน 3 ชม. (ได้ 50%) / 5 ชม. (ได้ 20%)',
+  ] },
   { v: '2026-11-28h', d: '24 พ.ย.', items: [
     '📌 แถบสถานะ (หิว ง่วง ป่วย บัฟ) เล็กลง เหลือแถวเดียว ไม่มีกรอบใหญ่บังจอแล้ว',
   ] },

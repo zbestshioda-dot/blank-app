@@ -379,7 +379,8 @@ function ledAdd(a, d, what) {   // call right after changing a.money by d
   ledPush(a, Math.round(d), what, a.money); a.ledBal = a.money;
 }
 function earn(a, amount, nocap) {
-  if (amount > 0 && !nocap) amount *= GD.payMul(a, dayKey());   // 💤 daily soft cap: less pay after 3 / 5 hours of work today
+  const capMul = amount > 0 && !nocap ? GD.payMul(a, dayKey()) : 1;
+  if (capMul !== 1) amount *= capMul;   // 💤 daily soft cap: less pay after 3 / 5 hours of work today
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
   if (amount > 0 && mayor?.pol === 'tax') amount *= 1 + MAYOR.tax;   // the mayor's low-tax policy
   if (amount > 0 && !nocap && spouseNear(a)) amount *= 1.1;   // 💞 working near your spouse pays 10% more
@@ -392,7 +393,7 @@ function earn(a, amount, nocap) {
     quest(a, 'earn', amount); gangPts(a, amount);
     if (a.loan > 0) { rp = Math.min(a.loan, Math.ceil(amount * D.BANK.repayShare)); a.money -= rp; a.loan -= rp; ledAdd(a, -rp, '🏦 ผ่อนเงินกู้อัตโนมัติ'); }   // loans auto-repay from income
   }
-  a.lastDed = { tax: tx, loan: rp, net: amount - rp };
+  a.lastDed = { tax: tx, loan: rp, net: amount - rp, gross: amount + tx, cap: capMul };
   if (tx + rp > 0) {   // say where the missing money went (batched so small earnings don't spam)
     const p = a.dedPend || (a.dedPend = { tax: 0, loan: 0 }); p.tax += tx; p.loan += rp;
     if (cd(a, 'dedT', 8000, true)) { toast(a, `หัก${p.tax ? `ภาษี ${money(p.tax)}` : ''}${p.tax && p.loan ? ' · ' : ''}${p.loan ? `ผ่อนเงินกู้อัตโนมัติ ${money(p.loan)}` : ''}`, '🧾', false); a.dedPend = null; }
@@ -4252,7 +4253,7 @@ function misNext(a) {
   const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((80 + 55 * Math.min(min, m.limit / 60000 * .5)) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
   a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); if (m.car === 'detective') a.cases = [...(a.cases || []), { t: m.title, i: m.icon, d: t, c: m.steps.filter(s => s.k === 'talk' || s.k === 'find').map(s => s.label).slice(0, 4) }].slice(-40); }   /* 🕵️ the case notebook */ earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
-  toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(pay)}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
+  toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(dd.gross ?? pay)}${dd.cap < 1 ? ` (เต็ม ${money(pay)} แต่วันนี้ทำงานเกิน ${dd.cap < .5 ? 5 : 3} ชม. ได้ ${Math.round(dd.cap * 100)}%)` : ''}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
 }
 const FX0 = (a, kind) => send(a, { t: 'mfx', kind });
 function misTick(a, t, dt) {
