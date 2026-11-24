@@ -2685,8 +2685,55 @@ function folkDo(a, m) {
   send(a, { t: 'folksay', id: n.id, text: `ได้ ${it.name} แล้ว! ขอบคุณมากเลยนะ นี่ค่าเหนื่อย ${money(r.pay)}`, mood: 'like' });
   folkAdd(a, def, 4, `ช่วย${def.name} สำเร็จ · ได้ ${money(r.pay)}`);
 }
+// 📖 townsfolk story arcs (server/stories.js): progress lives in a.folk[owner].s = { ch, st, day } (saved with the friendship)
+const SY = require('./stories');
+const storyOf = (a, o) => { const f = folkOf(a, o); return f.s || (f.s = { ch: 0, st: 0 }); };
+const inHours = (h, r) => !r || (r[0] <= r[1] ? h >= r[0] && h < r[1] : h >= r[0] || h < r[1]);
+function storyNow(a, o) {
+  const S = SY[o], s = storyOf(a, o), ch = S.ch[s.ch];
+  if (!ch) return { state: 'done' };
+  if ((folkOf(a, o).p || 0) < ch.need) return { state: 'locked', ch };
+  if (s.day === dayKey() && s.st === 0) return { state: 'wait', ch };   // one chapter a day: the next one opens tomorrow
+  return { state: 'on', ch, step: ch.steps[s.st] };
+}
+function storiesView(a) {
+  return Object.keys(SY).filter(o => FOLK_DEF[o]).map(o => {
+    const S = SY[o], s = storyOf(a, o), r = storyNow(a, o), st = r.step;
+    return { o, name: S.name, tone: S.tone, n: s.ch, total: S.ch.length, t: r.ch?.t || '', state: r.state, need: r.ch?.need || 0, p: folkOf(a, o).p || 0, si: s.st, sn: r.ch?.steps.length || 0,
+      step: st ? { k: st.k, npc: st.npc || null, item: st.item, n: st.n, at: st.at, label: st.label, h: st.h, q: st.q, opts: st.opts } : null };
+  });
+}
+function storyAdv(a, m) {
+  const o = String(m.o || ''), S = SY[o]; if (!S || !FOLK_DEF[o]) return;
+  const r = storyNow(a, o); if (r.state !== 'on') return;
+  const st = r.step, s = storyOf(a, o);
+  if (st.npc) {
+    const n = npcs.find(x => x.fid === st.npc), def = FOLK_DEF[st.npc];
+    if (!n || areaId(a) !== n.area || dist(a, n) > 4) return toast(a, `ต้องอยู่ใกล้${def?.name || 'คนนั้น'}ก่อน`, '📖', false);
+  }
+  if (st.k === 'give') {
+    if ((a.inv[st.item] || 0) < st.n) { const it = D.ITEMS[st.item]; return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[st.item] || 0}/${st.n})`, '📖', false); }
+    addItem(a, st.item, -st.n);
+  }
+  if (st.k === 'go') {
+    const p = ST[st.at]; if (!p) return;
+    if (areaId(a) !== p.area || dist(a, p) > (p.r || 1) + 2.5) return toast(a, `ยังไม่ถึง${st.label} · กด 📍 นำทางได้`, '📖', false);
+    if (!inHours(hourNow(), st.h)) return toast(a, `ต้องมาช่วง ${hhmm(st.h[0])}–${hhmm(st.h[1] % 24)} (เวลาในเกม)`, '🕰️', false);
+  }
+  if (st.k === 'choice' && Math.floor(+m.c) !== st.ok) { send(a, { t: 'storysay', o, npc: st.npc, lines: [st.wrong || 'ลองคิดใหม่อีกทีนะ'] }); return; }
+  s.st++; let end = null;
+  if (s.st >= r.ch.steps.length) {
+    credit(a, r.ch.pay); s.ch++; s.st = 0; s.day = dayKey(); joy(a, 8);
+    end = { t: r.ch.t, pay: r.ch.pay, last: s.ch >= S.ch.length, next: S.ch[s.ch]?.need ?? null };
+    folkAdd(a, FOLK_DEF[o], 3, `📖 จบบท "${r.ch.t}" · ได้ ${money(r.ch.pay)}`);
+    if (end.last) { stat(a, 'story_' + o); feed(`📖 ${a.name} ช่วย${FOLK_DEF[o].name}จนจบเรื่อง "${S.name}"!`); }
+  }
+  a.sd = true; dirty = true; markMe(a);
+  send(a, { t: 'storysay', o, npc: st.npc || null, label: st.label || '', lines: st.lines || [], end });
+  send(a, folksView(a));
+}
 function folksView(a) {
-  return { t: 'folks', list: Object.values(FOLK_DEF).map(def => {
+  return { t: 'folks', stories: storiesView(a), list: Object.values(FOLK_DEF).map(def => {
     const n = npcs.find(x => x.fid === def.id), f = (a.folk || {})[def.id] || { p: 0, lv: 0 }, lv = folkLv(f.p), d = dayKey();
     return { id: def.id, npc: n?.id, name: def.name, face: def.face, p: f.p, lv, next: D.FOLK_LV[lv + 1] ?? null, about: def.about,
       bday: def.bday, today: folkBday(def) ? 1 : 0, doing: n ? folkDoing(n) : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0,
@@ -5591,6 +5638,7 @@ function onMessage0(ws, raw) {
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) { eggMayor(a, n); if (n.fid) folkTalk(a, n); } return; }
     case 'folkgift': return folkGift(a, m);
     case 'folkdo': return folkDo(a, m);
+    case 'story': return storyAdv(a, m);
     case 'folks': return send(a, folksView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));

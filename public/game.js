@@ -806,7 +806,8 @@ function handle(m) {
     case 'cal': CAL = m; if (panel?.kind === 'cal') refreshPanel(true); break;
     case 'auc': AUC = m; if (panel?.kind === 'auc') refreshPanel(true); break;
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
-    case 'folks': FOLKS = m.list || []; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
+    case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
+    case 'storysay': storySay(m); break;
     case 'folksay': { const o = P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
     case 'egg': eggFx(m); break;
@@ -4868,6 +4869,8 @@ const FN = {
   homeVisit: m => { send({ t: 'homevisit', id: m.id }); closePanel(); },
   openJournal() { send({ t: 'folks' }); openPanel({ kind: 'journal' }); },
   jOpen(m) { if (panel) { panel.open = m.id; refreshPanel(true); } },
+  storyGuide(m) { closePanel(); setGuide(m.at); },
+  storyGo(m) { send({ t: 'story', o: m.o }); },
   folkGive(m) { send({ t: 'folkgift', id: m.npc, item: m.item }); closePanel(); },
   fishRecs() { openRecs(); },
   wallSet(m) { PWALL = m.c >= 0 ? { c: m.c } : null; wallSave(); refreshPanel(true); },
@@ -5388,7 +5391,7 @@ function talkToTown(o) {
     if (rq && !rq.done) extra.push(`[n]ขอให้ช่วยหน่อยได้ไหม... อยากได้ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${rq.n} ชิ้น (${whereGet(rq.item)}) เดี๋ยวให้ค่าเหนื่อย ${money(rq.pay)}`);
     const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id }); dialogClose(); } } }] : [];
     const gift = { label: fd?.gave ? '🎁 ให้ของแล้ววันนี้' : '🎁 ให้ของขวัญ', cls: fd?.gave ? '' : 'primary', fn: () => { dialogClose(); if (!fd?.gave) openPanel({ kind: 'folkgift', npc: o.id, fid: o.fid }); } };
-    return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [hi, ...extra, ...t], choices: [...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
+    return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [hi, ...extra, ...t], choices: [...storyChoices(o), ...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
   }
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
     const q = me.quests?.list.find(x => x.type === 'trade');
@@ -5759,6 +5762,47 @@ async function shareOpen() {
 }
 // 🏆 fishing contest: a chip at the top while it runs (time left, my rank); tap for the leaderboard
 let FCS = { on: 0 }, FRECS = null, FOLKS = null;
+// 📖 townsfolk stories: the current step of each arc (from the server's 'folks' message)
+let STORIES = [];
+const stTxt = l => String(l).replace(/<\/?b>/g, '').replace(/\{n\}/g, me?.name || '');
+const folkById = id => FOLKS?.find(f => f.id === id);
+function storyHint(s) {
+  const st = s.step; if (s.state === 'done') return '✅ จบเรื่องแล้ว';
+  if (s.state === 'locked') return `🔒 บทต่อไปเปิดเมื่อความสนิท ${s.p}/${s.need}`;
+  if (s.state === 'wait') return '🌙 บทต่อไปเปิดพรุ่งนี้';
+  if (!st) return '';
+  const who = folkById(st.npc)?.name || '', it = st.item && G.items[st.item];
+  const hr = st.h ? ` (ช่วง ${String(st.h[0]).padStart(2, '0')}:00–${String(st.h[1] % 24).padStart(2, '0')}:00)` : '';
+  return st.k === 'talk' ? `💬 ไปคุยกับ${who}` : st.k === 'give' ? `🎁 เอา ${it?.icon || ''}${it?.name || ''} x${st.n} ไปให้${who} (มี ${Math.min(me.inv?.[st.item] || 0, st.n)}/${st.n})`
+    : st.k === 'go' ? `📍 ไปที่${st.label}${hr}` : `❓ ไปตอบคำถามของ${who}`;
+}
+function storyChoices(o) {   // buttons for the story steps that happen with this townsperson
+  return STORIES.filter(s => s.state === 'on' && s.step?.npc === o.fid).map(s => {
+    const st = s.step, it = st.item && G.items[st.item], have = me.inv?.[st.item] || 0;
+    const label = st.k === 'give' ? `📖 ${s.name}: ให้ ${it?.icon || ''}x${st.n}${have < st.n ? ` (มี ${have})` : ''}` : st.k === 'choice' ? `📖 ${s.name}: ❓ ตอบคำถาม` : `📖 ${s.name} · บท ${s.n + 1}`;
+    return { label, cls: 'primary', fn: () => {
+      if (st.k === 'give' && have < st.n) return toast(`ยังมี ${it?.name || ''} ไม่ครบ (${have}/${st.n}) · ${whereGet(st.item)}`, '📖', false);
+      if (st.k === 'choice') return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [stTxt(st.q)], choices: st.opts.map((t, c) => ({ label: t, fn: () => { dialogClose(); send({ t: 'story', o: s.o, c }); } })) });
+      dialogClose(); send({ t: 'story', o: s.o });
+    } };
+  });
+}
+function storySay(m) {
+  const f = m.npc && folkById(m.npc), lines = (m.lines || []).map(stTxt);
+  if (m.end) lines.push(`📖 จบบท "${m.end.t}" · ได้ ${money(m.end.pay)}${m.end.last ? ' · 🏅 จบเรื่องนี้แล้ว!' : ' · บทต่อไปเปิดพรุ่งนี้'}`);
+  if (!lines.length) return;
+  FX.play(m.end ? 'chime' : 'click');
+  dialog({ name: f?.name || m.label || '📖 เรื่องราว', face: f?.face || null, lines, choices: [{ label: '👌 ต่อ', fn: dialogClose }, { label: '📖 ดูเรื่องราว', fn: () => { dialogClose(); FN.openFolks(); } }] });
+}
+function storiesBox() {
+  if (!STORIES.length) return '';
+  return `<h3 style="margin:6px 0 4px">📖 เรื่องราวของชาวเมือง</h3>` + STORIES.map(s => {
+    const f = folkById(s.o), st = s.step, go = s.state === 'on' && st?.k === 'go';
+    return `<div class="item folkRow"><div class="em">${dlgFace(f?.face) || '📖'}</div><div class="nm"><b>${esc(s.name)}</b> <small style="display:inline">· ${esc(f?.name || '')} · ${esc(s.tone)}</small>
+      <small>บท ${Math.min(s.n + 1, s.total)}/${s.total}${s.t ? ` "${esc(s.t)}"` : ''}${s.state === 'on' && s.sn ? ` · ขั้น ${s.si + 1}/${s.sn}` : ''}</small><small><b>${esc(storyHint(s))}</b></small>
+      ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
+  }).join('');
+}
 const heartBar = (p, lv) => { const a = [0, 3, 10, 25, 50], lo = a[lv], hi = a[lv + 1]; return '💗'.repeat(lv) + '🤍'.repeat(4 - lv) + (hi ? ` <small>${p - lo}/${hi - lo}</small>` : ' <small>สูงสุด</small>'); };
 const whereGet = id => { const k = G.items[id]?.kind; return k === 'crop' ? 'ปลูกที่ไร่หรือซื้อที่ตลาด' : k === 'fish' ? 'ตกปลา' : k === 'meal' ? 'ร้านอาหาร/ทำอาหารเอง' : /^py_|^parkplush|balloon|popcorn|cottoncandy|hotdog/.test(id) ? 'สวนสนุก' : /malai|offering|kanomthai|khaotom|namlamyai/.test(id) ? 'แถววัด' : 'ร้านสะดวกซื้อ/ร้านค้า'; };
 const reqTxt = r => `${G.items[r.item]?.icon || ''}${esc(G.items[r.item]?.name || r.item)} x${r.n}`;
@@ -5788,7 +5832,7 @@ function folksPanel() {
     <small>${f.talked ? '✅ คุยแล้ววันนี้' : '💬 ยังไม่ได้คุยวันนี้'} · ${f.gave ? '✅ ให้ของแล้ว' : '🎁 ยังไม่ได้ให้ของ'}</small>
     ${f.req ? `<small class="folkReq${f.req.done ? ' done' : ''}">📋 ${f.req.done ? 'ช่วยแล้ววันนี้ ✅' : `ขอ ${reqTxt(f.req)} (มี ${Math.min(me.inv?.[f.req.item] || 0, f.req.n)}/${f.req.n}) · ได้ ${money(f.req.pay)} · หาได้ที่${whereGet(f.req.item)}`}</small>` : ''}</div></div>`;
   const open = FOLKS.filter(f => f.req && !f.req.done).length;
-  return `<h2>💞 ชาวเมือง</h2>${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
+  return `<h2>💞 ชาวเมือง</h2>${storiesBox()}${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
 }
 // ⭐ starred bag items (this device): always listed first in the bag and in the gift list, so a gift is found before the NPC walks off
 const STARS = new Set((() => { try { return JSON.parse(localStorage.getItem('lt_star') || '[]'); } catch { return []; } })());
@@ -6274,6 +6318,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28m', d: '24 พ.ย.', items: [
+    '📖 <b>เรื่องราวของชาวเมือง!</b> พี่ดำ "ตำนานเจ้าดำน้อย" (ฮา) กับป้าสมใจ "ขนมห่อที่เกิน" (ดราม่า) คนละ 10 บท มีปมให้เดา ปลดล็อกตามความสนิท วันละบท',
+    '🏅 จบเรื่องได้ฉายา "คู่หูล่าตำนาน" / "ผู้พาลูกกลับบ้าน" · ดูเรื่องราวได้ที่ 💞 ชาวเมือง',
+  ] },
   { v: '2026-11-28l', d: '24 พ.ย.', items: [
     '📖 ผู้เล่นใหม่: มีเรื่องเปิดตัวหลังสร้างตัวละคร (พนักงานบริษัทนั่งรถเมล์กลับบ้าน รถเกิดอุบัติเหตุ ตื่นมาในอีกโลก จำอะไรไม่ได้)',
   ] },

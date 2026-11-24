@@ -2302,6 +2302,9 @@ const ACHIEVEMENTS = [
     detective: ['นักสืบฝึกหัด', 'นักสืบตาไว', 'ยอดนักสืบแห่งเมือง'], courier: ['คนส่งของขยัน', 'พนักงานส่งของดีเด่น', 'ตำนานส่งไว'],
     bartender: ['บาร์เทนเดอร์มือใหม่', 'มือเชคเกอร์', 'เจ้าแห่งค็อกเทล'] })
     .flatMap(([c, ts]) => [[5, 2], [15, 3], [30, 5]].map(([n, r], i) => ({ id: `cj_${c}${n}`, r, c, stat: 'lv_' + c, n, title: ts[i], desc: `อาชีพ${CAREERS[c].name}ถึง Lv.${n}` }))),
+  // 📖 townsfolk stories (server/stories.js): finishing an arc gives its title
+  { id: 'st_dam', r: 4, c: null, stat: 'story_dam', n: 1, title: 'คู่หูล่าตำนาน', desc: 'ช่วยพี่ดำจนจบเรื่อง "ตำนานเจ้าดำน้อย"' },
+  { id: 'st_somjai', r: 5, c: null, stat: 'story_somjai', n: 1, title: 'ผู้พาลูกกลับบ้าน', desc: 'ช่วยป้าสมใจจนจบเรื่อง "ขนมห่อที่เกิน"' },
   // 🛠️ equipment: job tools, vehicles, fishing rods (absolute counts, refreshed by eqSweep on the server)
   { id: 'eq_t1', r: 1, nt: 1, g: 1, stat: 'toolup', n: 1, title: 'อุปกรณ์ชิ้นแรก', desc: 'อัปเกรดอุปกรณ์อาชีพครั้งแรก' },
   { id: 'eq_t2', r: 2, c: null, stat: 'toolup', n: 6, title: 'คนมีของ', desc: 'อัปเกรดอุปกรณ์อาชีพรวม 6 ระดับ' },
