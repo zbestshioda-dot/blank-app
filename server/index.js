@@ -847,6 +847,7 @@ const projBuilt = id => proj.done.some(d => d.id === id);
 function projPlace(id) {
   const P = D.PROJ_PLACE[id], ch = []; if (!P) return ch;
   for (const [x0, y0, x1, y1] of P.solid || []) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!'wBT#'.includes(D.TILES[y][x]) && D.setTile(x, y, 'o')) ch.push([x, y, 'o']);
+  if (P.hide) { const [x0, y0, x1, y1] = P.hide; for (let i = D.STATIONS.length - 1; i >= 0; i--) { const t = D.STATIONS[i]; if (t.area === 'town' && t.x >= x0 && t.x <= x1 && t.y >= y0 && t.y <= y1) { delete ST[t.id]; D.STATIONS.splice(i, 1); } } }   // the bench it replaces: no more sitting there
   for (const [x0, y0, x1, y1] of P.walk || []) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (D.TILES[y][x] === 'w' && D.setTile(x, y, 'p')) ch.push([x, y, 'p']);
   return ch;
 }

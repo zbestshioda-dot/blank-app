@@ -1923,6 +1923,7 @@ function findNear() {
   let best = null, bd = 1e9;
   for (const s of G.stations) {
     if (s.until && Date.now() + clockOff >= s.until) continue;
+    if (s.area === 'town' && projHides(s)) continue;
     if (s.area !== here || s.type === 'yzone' && yzOpen(s.idx, s.z) || (s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
     const d = Math.hypot(s.x - m.x, s.y - m.y);
     if (d <= s.r && d < bd) { bd = d; best = s; }
@@ -2194,7 +2195,7 @@ function draw(t) {
   const ents = [];
   const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
-  for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.sy ?? p.y, 1, p]);
+  for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until) && !projHides(p)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.sy ?? p.y, 1, p]);
   if (PROJ?.done?.length && PART.ok && (A?.id === 'town')) for (const d of PROJ.done) { const L = G.projPlace?.[d.id]; if (!L || !vis(L.cx, L.by - 3, 10)) continue;   // 🏗️ what the town built
     if (d.id === 'bridge13') { ents.push([L.by - 3.2, 31, { id: d.id, part: 'deck', L }]); ents.push([L.by - .7, 31, { id: d.id, part: 'rail', L }]); }
     else ents.push([L.by, 31, { id: d.id, L }]); }
@@ -5798,6 +5799,7 @@ async function shareOpen() {
 let FCS = { on: 0 }, FRECS = null, FOLKS = null;
 // 📖 townsfolk stories: the current step of each arc (from the server's 'folks' message)
 let STORIES = [], STORYLOG = null, PROJ = null;
+const projHides = p => PROJ?.done?.some(d => { const h = G.projPlace?.[d.id]?.hide; return h && p.x >= h[0] && p.x <= h[2] && p.y >= h[1] && p.y <= h[3]; });   // a built project replaced what stood there
 // 🏗️ art for the finished town projects (tools/add_projects.py): parts + anchors measured from the art
 const PART = { ok: false, img: {}, m: null };
 fetch('assets/proj/proj.json?v=1').then(r => r.json()).then(m => { PART.m = m; let n = 0, all = 0;
@@ -5817,13 +5819,16 @@ function drawProj(e, X, Y, t) {
     draw('stand', left, top); return;
   }
   if (id === 'clock') {   // the hands follow the town clock (game time)
+    const m0 = P.get(myId), w0 = M.tower.w * sc / TS, h0 = M.tower.h * sc / TS;   // see-through while you stand behind it
+    const behind = L.fade && m0 && m0.x > L.cx - w0 / 2 && m0.x < L.cx + w0 / 2 && m0.y < L.by - .4 && m0.y > L.by - h0;
+    ctx.save(); if (behind) ctx.globalAlpha = .4;
     draw('tower', left, top);
     const f = M.tower.face, cx = left + f[0] * M.tower.w * sc, cy = top + f[1] * M.tower.h * sc, r = f[2] * M.tower.w * sc, h = hourNow();
     for (const [k, ang, len] of [['hour', (h % 12) / 12, .55], ['min', h % 1, .85]]) {
       const hh = r * len * 1.15, ww = M[k].w * hh / M[k].h;   // the hand art: pivot ring at the bottom
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang * Math.PI * 2); ctx.drawImage(I(k), -ww / 2, -hh + ww / 2, ww, hh); ctx.restore();
     }
-    return;
+    ctx.restore(); return;
   }
   draw('main', left, top);
 }

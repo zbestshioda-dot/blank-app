@@ -1472,7 +1472,7 @@ const PROJ_PLACE = {
   memorial: { cx: 56, by: 65.3, w: 4.5, solid: [[54, 64, 57, 65]] },
   bridge13: { cx: 26.5, by: 63.7, w: 13, walk: [[22, 61, 30, 62]] },
   wheel: { cx: 61, by: 53.6, w: 7, solid: [[58, 52, 64, 53]] },
-  clock: { cx: 67, by: 61.6, w: 4, solid: [[65, 60, 68, 61]] },
+  clock: { cx: 44.6, by: 30.5, w: 3.6, solid: [[43, 29, 46, 29]], hide: [42.6, 28.5, 46.6, 30.6], fade: 1 },   // replaces the bench at the top of the fountain plaza (hide: props/seats in this box go away)
 };
 STATIONS.push({ id: 'proj_box', type: 'proj', label: 'กล่องระดมทุนสร้างเมือง', icon: '🏗️', x: 52.5, y: 38.5, r: 1.6, area: 'town' });
 const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
