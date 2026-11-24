@@ -11,7 +11,9 @@ const store = require('./store');
 const Q = require('./quests');
 const CR = require('./craft');
 const HM = require('./homes');
-const NBM = require('./newbie');   // 🌱 newcomer (v2) rules: event log, egg, day-2 gift, first fish
+const NBM = require('./newbie');
+const BG = require('./banguard');   // 🚫 banned devices / IPs: a banned scripter cannot just sign up again
+let banSt = BG.store();   // 🌱 newcomer (v2) rules: event log, egg, day-2 gift, first fish
 const AU = require('./auction');
 const { docFlag } = require('./doc');
 const MR = require('./marry');
@@ -1800,7 +1802,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'festGot', 'devs', 'ips', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
@@ -1808,7 +1810,7 @@ const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext',
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.banSt) banSt = BG.store(meta.banSt); if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -1891,7 +1893,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, banSt, ideas, lotto, znDone, payOrders, fishRecs, auc }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -5189,11 +5191,13 @@ function login(ws, m, pre) {
       loginFail('n:' + lname, 5, 5 * 60000); loginFail('i:' + ws.ip, 15, 10 * 60000);
       return fail(ws, 'ID นี้มีคนใช้แล้ว หรือ PIN ไม่ถูกต้อง');
     }
+    if (a.ban && (!a.ban.until || a.ban.until > now())) { BG.seen(a, m.dev, ws.ip, now()); BG.mark(banSt, a, now()); dirty = true; }
     if (a.ban && (!a.ban.until || a.ban.until > now())) return fail(ws, `บัญชีนี้ถูกระงับ${a.ban.until ? ' ถึง ' + new Date(a.ban.until).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }) : 'ถาวร'}${a.ban.why ? ' · เหตุผล: ' + a.ban.why : ''} · ติดต่อแอดมินหากคิดว่าผิดพลาด`);
-    loginFails.delete('n:' + lname);
+    loginFails.delete('n:' + lname); BG.seen(a, m.dev, ws.ip, now());
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
     // a brand-new ID: the client first shows the one-time character creator, then logs in again with create:1
+    { const by = BG.newBlocked(banSt, m.dev, ws.ip, now()); if (by) { console.log(`[ban] new account ${lname} refused: device/IP of banned ${by}`); return fail(ws, 'เครื่องนี้ถูกระงับการสมัครบัญชีใหม่ เพราะเคยถูกแบนจากการใช้สคริปต์/โกง · ติดต่อแอดมินในกลุ่มเฟสบุ๊คถ้าคิดว่าผิดพลาด'); } }
     if (!m.create) return ws.send(JSON.stringify({ t: 'newchar', name }));
     const cname = String(m.cname ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
     if (!/^[\p{L}\p{M}\p{N}_. -]{2,16}$/u.test(cname)) return send({ ws }, { t: 'loginfail', msg: 'ชื่อตัวละครต้องยาว 2-16 ตัว (ไทย/อังกฤษ/ตัวเลข)', create: 1 });
@@ -5203,7 +5207,7 @@ function login(ws, m, pre) {
     const sh = D.SHIRTS.includes(m.shirt) ? m.shirt : 'white';
     a = hydrate({ v: VERSION, login: name, name: cname, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
-    accounts.set(lname, a); isNew = true; a.nb = NBM.start(now());
+    accounts.set(lname, a); isNew = true; a.nb = NBM.start(now()); BG.seen(a, m.dev, ws.ip, now());
   }
   Q.ensure(a); santaGift(a); achSweep(a);
   if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) {   // a career that has been closed
@@ -5954,7 +5958,7 @@ function godAct(a, m) {
     const hits = m.list ? m.list.map(l => accounts.get(l)).filter(Boolean) : [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
     return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
-      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x), ban: x.ban && (!x.ban.until || x.ban.until > now()) ? x.ban : null })) });
+      alts: BG.sameDevice(x, [...accounts.values()]).slice(0, 8).map(o => (o.ban && (!o.ban.until || o.ban.until > now()) ? '🚫' : '') + o.login), on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x), ban: x.ban && (!x.ban.until || x.ban.until > now()) ? x.ban : null })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
@@ -6008,10 +6012,10 @@ function godAct(a, m) {
   }
   if (m.op === 'ban' || m.op === 'unban') {   // 🚫 suspend an account (days 0 = for good): they are kicked now and cannot log in until it ends
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
-    if (m.op === 'unban') { x.ban = null; x.sd = true; dirty = true; toast(a, `ปลดแบน ${x.login} แล้ว`, '✅'); return godAct(a, { op: 'find', q: x.login }); }
+    if (m.op === 'unban') { BG.unmark(banSt, x); x.ban = null; x.sd = true; dirty = true; toast(a, `ปลดแบน ${x.login} แล้ว`, '✅'); return godAct(a, { op: 'find', q: x.login }); }
     if (isAdmin(x)) return toast(a, 'แบนแอดมินไม่ได้', '🛡️', false);
     const days = Math.max(0, Math.min(3650, +m.days || 0)), why = cleanText(String(m.why || ''), 80);
-    x.ban = { until: days ? now() + days * 86400e3 : 0, why, by: a.login, at: now() }; x.sd = true; dirty = true;
+    x.ban = { until: days ? now() + days * 86400e3 : 0, why, by: a.login, at: now() }; x.sd = true; dirty = true; BG.mark(banSt, x, now());
     if (x.ws) { send(x, { t: 'kicked', msg: `บัญชีนี้ถูกระงับ${days ? ` ${days} วัน` : 'ถาวร'}${why ? ' · เหตุผล: ' + why : ''}` }); try { x.ws.close(); } catch { } detach(x); }
     console.log(`[ban] ${a.login} banned ${x.login} for ${days || 'ever'} days: ${why}`);
     toast(a, `แบน ${x.login} ${days ? days + ' วัน' : 'ถาวร'} แล้ว`, '🚫'); return godAct(a, { op: 'find', q: x.login });
