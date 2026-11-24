@@ -1099,6 +1099,8 @@ const ZONES = [PARK, FIELD];   // parts of a map with their own rules (rides, th
 const zoneAt = (x, y) => ZONES.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || areaAt(x, y);
 for (const s of STATIONS) { if (!s.area) s.area = areaAt(s.x, s.y)?.id; const z = AREAS.find(r => r.id === s.area); if (z?.in) { s.zone = s.area; s.area = z.in; } }
 const TILES = grid.map(r => r.join(''));
+// change one map tile at runtime (town projects: a finished bridge becomes walkable, a building's base becomes solid)
+const setTile = (x, y, c) => { if (!grid[y] || grid[y][x] === undefined || grid[y][x] === c) return false; grid[y][x] = c; TILES[y] = grid[y].join(''); return true; };
 const SOLID = 'wBT# og';
 const isSolidTile = (tx, ty) => tx < 0 || ty < 0 || tx >= W || ty >= H || SOLID.includes(grid[ty][tx]);
 const RADIUS = 0.3;
@@ -1464,6 +1466,14 @@ const PROJECTS = [
   { id: 'clock', name: 'หอนาฬิกากลางเมือง', icon: '🕰️', goal: 100000000, desc: 'หอนาฬิกาที่เดินตรงเวลา ไม่หยุดที่ 03:17 อีกแล้ว — สัญลักษณ์ว่าเมืองนี้เดินต่อไปได้' },
 ];
 PROPS.push({ s: 'o_noticeboard', x: 52.5, y: 38.6 });   // the box stands by a notice board so it can be seen from afar (not solid)
+// where each finished project stands: cx / by = bottom centre in tiles, w = width in tiles; solid = its base,
+// walk = water that becomes a walkway (the bridge links the two fishing piers)
+const PROJ_PLACE = {
+  memorial: { cx: 56, by: 65.3, w: 4.5, solid: [[54, 64, 57, 65]] },
+  bridge13: { cx: 26.5, by: 63.7, w: 13, walk: [[22, 61, 30, 62]] },
+  wheel: { cx: 61, by: 53.6, w: 7, solid: [[58, 52, 64, 53]] },
+  clock: { cx: 67, by: 61.6, w: 4, solid: [[65, 60, 68, 61]] },
+};
 STATIONS.push({ id: 'proj_box', type: 'proj', label: 'กล่องระดมทุนสร้างเมือง', icon: '🏗️', x: 52.5, y: 38.5, r: 1.6, area: 'town' });
 const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
 // 🎆 fireworks over the fountain square, bought with baht (a money sink everyone in town sees). n bursts over dur seconds
@@ -2463,7 +2473,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { PROJECTS, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, RADIUS, SOLID,

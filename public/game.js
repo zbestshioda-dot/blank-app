@@ -809,6 +809,7 @@ function handle(m) {
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
     case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
+    case 'tiles': for (const [x, y, c] of m.set || []) { const r = G.map.tiles[y]; if (r) G.map.tiles[y] = r.slice(0, x) + c + r.slice(x + 1); } gCache.clear(); break;   // 🏗️ the map changed (a town project was built)
     case 'storylog': STORYLOG = m; if (panel?.kind === 'storylog') refreshPanel(true); break;
     case 'folksay': { const o = m.id != null && P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } else toast(m.text, '💞'); FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
@@ -2194,6 +2195,9 @@ function draw(t) {
   const vis = (x, y, r = 8) => inside(x, y) && x * TS + X > -r * TS && x * TS + X < VW + r * TS && y * TS + Y > -2 * TS && y * TS + Y < VH + r * TS;
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) ents.push([b.y + b.h, 0, b]);
   for (const p of G.props) if (vis(p.x, p.y, 4) && !(p.until && Date.now() + clockOff >= p.until)) ents.push([GROUND_PROP.test(p.s) ? -1e9 : p.sy ?? p.y, 1, p]);
+  if (PROJ?.done?.length && PART.ok && (A?.id === 'town')) for (const d of PROJ.done) { const L = G.projPlace?.[d.id]; if (!L || !vis(L.cx, L.by - 3, 10)) continue;   // 🏗️ what the town built
+    if (d.id === 'bridge13') { ents.push([L.by - 3.2, 31, { id: d.id, part: 'deck', L }]); ents.push([L.by - .7, 31, { id: d.id, part: 'rail', L }]); }
+    else ents.push([L.by, 31, { id: d.id, L }]); }
   if (Date.now() + clockOff < (G.xmasEnd || 0) && vis(XMAS_DEER.x, XMAS_DEER.y, 3)) ents.push([XMAS_DEER.y + .3, 6, XMAS_DEER]);   // 🎄 the showcase reindeer pulling the sleigh   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|ad_mat|ad_neon|br_stage|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
@@ -2250,6 +2254,7 @@ function draw(t) {
     else if (k === 10) drawParkGate(e.x, e.y + .7, X, Y, e.id === 'gate_park');
     else if (k === 11) drawWat(e, X, Y, t);
     else if (k === 12) drawWatWall(e, X, Y);
+    else if (k === 31) drawProj(e, X, Y, t);
     else if (k === 13) drawWatTownGate(e, X, Y);
     else if (k === 15) drawFb(e, X, Y, t);
     else if (k === 17) drawLk(e, X, Y, t);
@@ -5793,6 +5798,35 @@ async function shareOpen() {
 let FCS = { on: 0 }, FRECS = null, FOLKS = null;
 // 📖 townsfolk stories: the current step of each arc (from the server's 'folks' message)
 let STORIES = [], STORYLOG = null, PROJ = null;
+// 🏗️ art for the finished town projects (tools/add_projects.py): parts + anchors measured from the art
+const PART = { ok: false, img: {}, m: null };
+fetch('assets/proj/proj.json?v=1').then(r => r.json()).then(m => { PART.m = m; let n = 0, all = 0;
+  for (const [id, parts] of Object.entries(m)) for (const k of Object.keys(parts)) { all++; const im = new Image(); im.onload = () => { if (++n === all) PART.ok = true; }; im.src = `assets/proj/${id}_${k}.webp?v=1`; PART.img[id + '_' + k] = im; } }).catch(() => { });
+function drawProj(e, X, Y, t) {
+  const { id, L } = e, M = PART.m[id], I = k => PART.img[id + '_' + k];
+  const main = id === 'bridge13' ? 'deck' : id === 'clock' ? 'tower' : id === 'wheel' ? 'stand' : 'main', sc = L.w * TS / M[main].w;   // px per art pixel
+  const draw = (k, x, y) => ctx.drawImage(I(k), x, y, M[k].w * sc, M[k].h * sc);
+  const left = L.cx * TS + X - M[main].w * sc / 2, top = L.by * TS + Y - M[main].h * sc;
+  ctx.imageSmoothingEnabled = false;
+  if (id === 'bridge13') { if (e.part === 'deck') draw('deck', left, top); else draw('rail', L.cx * TS + X - M.rail.w * sc / 2, L.by * TS + Y - M.rail.h * sc - TS * .35); return; }
+  if (id === 'wheel') {   // the ring turns slowly; the cabins hang straight down from its hooks; the stand is drawn last (in front)
+    const hx = left + M.stand.hub[0] * M.stand.w * sc, hy = top + M.stand.hub[1] * M.stand.h * sc, rs = sc * .8, R = M.ring.w * rs / 2, a0 = t / 9000;
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(a0); ctx.drawImage(I('ring'), -R, -M.ring.h * rs / 2, M.ring.w * rs, M.ring.h * rs); ctx.restore();
+    const cw = M.cabin.w * rs, ch = M.cabin.h * rs;
+    for (let i = 0; i < 12; i++) { const a = a0 + i * Math.PI / 6 - Math.PI / 2, x = hx + Math.cos(a) * R * .93, y = hy + Math.sin(a) * R * .93; ctx.drawImage(I('cabin'), x - cw / 2, y - ch * .12, cw, ch); }
+    draw('stand', left, top); return;
+  }
+  if (id === 'clock') {   // the hands follow the town clock (game time)
+    draw('tower', left, top);
+    const f = M.tower.face, cx = left + f[0] * M.tower.w * sc, cy = top + f[1] * M.tower.h * sc, r = f[2] * M.tower.w * sc, h = hourNow();
+    for (const [k, ang, len] of [['hour', (h % 12) / 12, .55], ['min', h % 1, .85]]) {
+      const hh = r * len * 1.15, ww = M[k].w * hh / M[k].h;   // the hand art: pivot ring at the bottom
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang * Math.PI * 2); ctx.drawImage(I(k), -ww / 2, -hh + ww / 2, ww, hh); ctx.restore();
+    }
+    return;
+  }
+  draw('main', left, top);
+}
 const PROJ_DOES = { memorial: 'วางพวงมาลัยวันละครั้ง ได้รับพร 30 นาที + ผู้โดยสารสาย 99 สนิทขึ้น', bridge13: 'ทั้งเมืองตกปลาหายากง่ายขึ้นตลอดไป + เดินเล่นวันละครั้ง พลังงาน +25',
   wheel: 'ขึ้นชิงช้าสวรรค์ได้ทุกเมื่อ (฿500) ความสุข +30 ขึ้นกับเพื่อนได้เพิ่ม', clock: 'ตีระฆังวันละครั้ง ได้ 💎2 และทั้งเมืองอารมณ์ดีขึ้น' };
 function projPanel(p) {   // 🏗️ the town's donation box
@@ -6375,6 +6409,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28y', d: '24 พ.ย.', items: [
+    '🏗️ สิ่งก่อสร้างที่ทั้งเมืองสร้างเสร็จ <b>โผล่ในเมืองจริง</b>: 🚌 อนุสรณ์ใต้ลานน้ำพุ · 🎡 ชิงช้าสวรรค์หมุนได้ · 🕰️ หอนาฬิกาเข็มเดินตามเวลาในเกม · 🌉 สะพานเชื่อมท่าตกปลาสองฝั่ง เดินข้ามได้จริง',
+  ] },
   { v: '2026-11-28x', d: '24 พ.ย.', items: [
     '🏗️ สิ่งก่อสร้างที่ทั้งเมืองสร้างเสร็จ ใช้งานได้จริง: 💐 วางพวงมาลัยที่อนุสรณ์ (ได้รับพร) · 🌉 สะพานทำให้ทั้งเมืองตกปลาหายากง่ายขึ้น · 🎡 ขึ้นชิงช้าสวรรค์ ฿500 · 🔔 ตีระฆังหอนาฬิกาได้เพชร',
   ] },

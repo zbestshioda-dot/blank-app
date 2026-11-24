@@ -840,9 +840,16 @@ function projView(a) {
   const P = D.PROJECTS[proj.i];
   return { t: 'proj', cur: P ? { id: P.id, name: P.name, icon: P.icon, desc: P.desc, goal: P.goal, got: proj.got } : null, n: proj.i, total: D.PROJECTS.length,
     use: proj.done.filter(d => PROJ_USE[d.id]).map(d => ({ id: d.id, label: PROJ_USE[d.id].label, used: !PROJ_USE[d.id].many && a.projUse?.d === dayKey() && a.projUse.used.includes(d.id) ? 1 : 0 })),
-    top: projTop(proj.by), mine: proj.by[lk(a)] || 0, done: proj.done.map(d => ({ name: D.PROJECTS.find(x => x.id === d.id)?.name || d.id, icon: D.PROJECTS.find(x => x.id === d.id)?.icon || '🏗️', t: d.t, top: d.top })) };
+    top: projTop(proj.by), mine: proj.by[lk(a)] || 0, done: proj.done.map(d => ({ id: d.id, name: D.PROJECTS.find(x => x.id === d.id)?.name || d.id, icon: D.PROJECTS.find(x => x.id === d.id)?.icon || '🏗️', t: d.t, top: d.top })) };
 }
 const projBuilt = id => proj.done.some(d => d.id === id);
+// put a finished project on the map: its base turns solid, the bridge's water turns into a walkway; returns the changed tiles
+function projPlace(id) {
+  const P = D.PROJ_PLACE[id], ch = []; if (!P) return ch;
+  for (const [x0, y0, x1, y1] of P.solid || []) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!'wBT#'.includes(D.TILES[y][x]) && D.setTile(x, y, 'o')) ch.push([x, y, 'o']);
+  for (const [x0, y0, x1, y1] of P.walk || []) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (D.TILES[y][x] === 'w' && D.setTile(x, y, 'p')) ch.push([x, y, 'p']);
+  return ch;
+}
 // what each finished building does (once a day each, except the paid Ferris wheel)
 const PROJ_USE = {
   memorial: { label: '💐 วางพวงมาลัยที่อนุสรณ์', need: 'malai' },
@@ -895,7 +902,8 @@ function projGive(a, m) {
     const top = projTop(proj.by, 3).map(x => x[0]);
     proj.done.push({ id: P.id, t: now(), top }); proj.got -= P.goal; proj.by = {}; proj.i++;
     feed(`🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ขอบคุณทุกคน · ผู้ให้มากที่สุด: ${top.join(', ')}`);
-    for (const o of online.values()) { toast(o, `🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ทั้งเมืองช่วยกันสำเร็จ`, '🎉'); joy(o, 10); }
+    const tiles = projPlace(P.id);   // it appears in town right away, for everyone
+    for (const o of online.values()) { toast(o, `🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ทั้งเมืองช่วยกันสำเร็จ`, '🎉'); joy(o, 10); if (tiles.length) send(o, { t: 'tiles', set: tiles }); if (o !== a) send(o, projView(o)); }
   }
   send(a, projView(a));
 }
@@ -1918,7 +1926,7 @@ const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNe
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.proj) proj = meta.proj; if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -5435,7 +5443,7 @@ function login(ws, m, pre) {
   setTimeout(() => a.ws === ws && billUp(a), 1500);
   send(a, {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
-    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
+    map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, projPlace: D.PROJ_PLACE, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, bar: D.BAR, rich: RICH.gems, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
