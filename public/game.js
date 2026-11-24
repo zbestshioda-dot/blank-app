@@ -9615,9 +9615,8 @@ function layoutFurniture() {
 function drawRoomLabels(r, X, Y, t) {
   const px = r.x * TS + X, py = r.y * TS + Y;
   const h = r.rk === 'house' ? wd?.houses?.[r.house] : null;
-  sign(r.rk === 'house' ? (h && h[0] ? `🏠 บ้านของ ${h[0]}` : `🏠 บ้านเลขที่ ${r.house + 1}`) + (r.floor ? ` · ชั้น ${r.floor}` : (h && h[8] ? ' · ชั้น 1' : '')) : `${r.icon} ${r.label}`, px + r.w * TS / 2, py - TS * .1, { size: TS * .34, border: '#ffc94d88' });
-  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = `700 ${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`;
-  if (!r.floor) ctx.fillText('⬇ ทางออก', px + Math.floor(r.w / 2) * TS, py + (r.h + .45) * TS + Math.sin(t / 300) * 2);
+  const exit = r.floor ? '' : '  ·  ⬇ ทางออก';   // the room's name sits at the bottom with the way out (on the top wall it covered the desk staff's name tags)
+  sign((r.rk === 'house' ? (h && h[0] ? `🏠 บ้านของ ${h[0]}` : `🏠 บ้านเลขที่ ${r.house + 1}`) + (r.floor ? ` · ชั้น ${r.floor}` : (h && h[8] ? ' · ชั้น 1' : '')) : `${r.icon} ${r.label}`) + exit, px + Math.floor(r.w / 2) * TS, py + (r.h + .5) * TS + Math.sin(t / 300) * 2, { size: TS * .3, border: '#ffc94d88' });
 }
 
 // ---- atmosphere: dusk/dawn colour grade, fireflies at night, morning mist, drifting leaves/petals, rain ripples
