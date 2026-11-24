@@ -50,12 +50,10 @@ T('payMul: full pay for the first 3 hours of the day', () => {
   for (let i = 0; i < 180; i++) G.workMin(a, i * MIN, 'd1');
   assert.equal(G.payMul(a, 'd1'), 1);
 });
-T('payMul: half after 3 hours, a fifth after 5 hours', () => {
+T('payMul: full pay all day (cap turned off)', () => {
   const a = {};
-  for (let i = 0; i < 181; i++) G.workMin(a, i * MIN, 'd1');
-  assert.equal(G.payMul(a, 'd1'), .5);
-  for (let i = 181; i < 301; i++) G.workMin(a, i * MIN, 'd1');
-  assert.equal(G.payMul(a, 'd1'), .2);
+  for (let i = 0; i < 600; i++) G.workMin(a, i * MIN, 'd1');
+  assert.equal(G.payMul(a, 'd1'), 1);
 });
 T('workMin: many actions in one minute count once; a new day starts over', () => {
   const a = {};
@@ -65,8 +63,8 @@ T('workMin: many actions in one minute count once; a new day starts over', () =>
   assert.equal(G.payMul(a, 'd2'), 1);
   G.workMin(a, 999 * MIN, 'd2'); assert.equal(a.wk.m, 1);
 });
-T('workMin: says when a step is crossed (once)', () => {
+T('workMin: no pay steps any more', () => {
   const a = {}; const steps = [];
   for (let i = 0; i < 400; i++) { const s = G.workMin(a, i * MIN, 'd1'); if (s) steps.push(s); }
-  assert.deepEqual(steps, [.5, .2]);
+  assert.deepEqual(steps, []);
 });

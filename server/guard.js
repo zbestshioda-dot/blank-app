@@ -28,7 +28,7 @@ function answer(a, tok, t) {
 const blocked = (a, t) => !a.hc ? null : t > a.hc.until ? 'late' : 'wait';
 
 // 💤 daily soft cap: an auto-player that never stops should earn little more than a person. a.wk = { d: day, m: work minutes, last: minute }
-const CAP = [[180, 1], [300, .5], [Infinity, .2]];   // up to 3 h full pay, up to 5 h half, after that a fifth
+const CAP = [[Infinity, 1]];   // turned off at the owner's request: full pay all day (was 3 h full, then 50%, after 5 h 20%)
 const mulAt = m => CAP.find(([lim]) => m <= lim)[1];
 function workMin(a, t, day) {   // count one minute of work; returns the new pay step when one is crossed
   const mi = Math.floor(t / 60e3);

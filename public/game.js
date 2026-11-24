@@ -6273,6 +6273,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28j', d: '24 พ.ย.', items: [
+    '💰 ค่าจ้างได้เต็มทั้งวันแล้ว ไม่ลดเหลือ 50% / 20% หลังทำงานเกิน 3 / 5 ชม. อีกต่อไป',
+  ] },
   { v: '2026-11-28i', d: '24 พ.ย.', items: [
     '📋 ข้อความจบภารกิจบอกค่าจ้างที่ได้จริง และบอกเมื่อค่าแรงลดเพราะวันนี้ทำงานเกิน 3 ชม. (ได้ 50%) / 5 ชม. (ได้ 20%)',
   ] },
