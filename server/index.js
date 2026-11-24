@@ -2763,7 +2763,11 @@ function storyAdv(a, m) {
     credit(a, r.ch.pay); s.ch++; s.st = 0; s.day = dayKey(); joy(a, 8);
     end = { t: r.ch.t, pay: r.ch.pay, last: s.ch >= S.ch.length, next: S.ch[s.ch]?.need ?? null };
     folkAdd(a, FOLK_DEF[o], 3, `📖 จบบท "${r.ch.t}" · ได้ ${money(r.ch.pay)}`);
-    if (end.last) { stat(a, 'story_' + o); feed(`📖 ${a.name} ช่วย${FOLK_DEF[o].name}จนจบเรื่อง "${S.name}"!`); }
+    if (end.last) {
+      stat(a, 'story_' + o); stat(a, 'storyDone'); feed(`📖 ${a.name} ช่วย${FOLK_DEF[o].name}จนจบเรื่อง "${S.name}"!`);
+      const all = Object.keys(SY).length;
+      if (a.stats.storyDone === all) { credit(a, 100000); feed(`🏆 ${a.name} จบเนื้อเรื่องครบทั้ง ${all} เรื่อง! รู้ความลับทั้งหมดของเมืองแล้ว`); toast(a, `🏆 จบครบทุกเรื่อง! ได้ ฿100,000 และฉายา "ผู้รู้ความลับของเมือง"`, '🏆'); }
+    }
   }
   a.sd = true; dirty = true; markMe(a);
   send(a, { t: 'storysay', o, npc: st.npc || null, label: st.label || '', lines: st.lines || [], end });

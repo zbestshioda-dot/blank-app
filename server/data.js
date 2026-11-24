@@ -2308,6 +2308,10 @@ const ACHIEVEMENTS = [
   { id: 'st_choei', r: 5, c: null, stat: 'story_choei', n: 1, title: 'ผู้ทำให้ตาเฉยพูด', desc: 'ช่วยตาเฉยจนจบเรื่อง "ชายผู้ไม่พูด"' },
   { id: 'st_tonkla', r: 4, c: null, stat: 'story_tonkla', n: 1, title: 'ผู้เล่นคนที่ 2', desc: 'ช่วยต้นกล้าจนจบเรื่อง "ตู้เกมหมายเลขศูนย์"' },
   { id: 'st_mprang', r: 4, c: null, stat: 'story_mprang', n: 1, title: 'พี่เงาคนที่สอง', desc: 'ช่วยน้องมะปรางจนจบเรื่อง "พี่เงา"' },
+  // 📖 finishing many stories: titles + diamonds (the 50th also pays ฿100,000, see storyAdv)
+  { id: 'story10', r: 4, g: 30, c: null, stat: 'storyDone', n: 10, title: 'นักฟังเรื่องเล่า', desc: 'จบเนื้อเรื่องของชาวเมือง 10 เรื่อง' },
+  { id: 'story25', r: 5, g: 80, c: null, stat: 'storyDone', n: 25, title: 'คนที่ทั้งเมืองไว้ใจ', desc: 'จบเนื้อเรื่องของชาวเมือง 25 เรื่อง' },
+  { id: 'story50', r: 7, g: 300, c: null, stat: 'storyDone', n: 50, title: 'ผู้รู้ความลับของเมือง', desc: 'จบเนื้อเรื่องครบทั้ง 50 เรื่อง · ได้ ฿100,000 ด้วย' },
   ...Object.entries(require('./stories')).filter(([, v]) => v.ttl).map(([o, v]) => ({ id: 'st_' + o, r: 4, c: null, stat: 'story_' + o, n: 1, title: v.ttl, desc: `จบเรื่อง "${v.name}"` })),   // 📖 newer arcs carry their own title
   // 🛠️ equipment: job tools, vehicles, fishing rods (absolute counts, refreshed by eqSweep on the server)
   { id: 'eq_t1', r: 1, nt: 1, g: 1, stat: 'toolup', n: 1, title: 'อุปกรณ์ชิ้นแรก', desc: 'อัปเกรดอุปกรณ์อาชีพครั้งแรก' },
