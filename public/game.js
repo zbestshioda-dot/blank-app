@@ -695,9 +695,7 @@ function restartBar(on) {
   b.innerHTML = '🔧 <b>กำลังอัปเดตเกม</b> กลับมาใน ~20 วินาที<br><small>ไม่ต้องทำอะไร ข้อมูลไม่หาย เกมจะต่อใหม่เอง</small>';
 }
 setInterval(() => { if (restartAt && Date.now() - restartAt > 120000) { restartAt = 0; restartBar(false); } }, 5000);   // never stuck on screen
-// a random id this phone keeps (so a banned scripter's phone cannot open new accounts); no personal data in it
-const DEV_ID = (() => { try { let d = localStorage.getItem('lt_dev'); if (!/^[a-f0-9]{16}$/.test(d || '')) { d = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('lt_dev', d); } return d; } catch { return ''; } })();
-function sendLogin() { send({ t: 'login', ...creds, dev: DEV_ID }); }
+function sendLogin() { send({ t: 'login', ...creds }); }
 // a socket that stopped talking while the game is on screen (the phone switched networks): the world froze for players. The server
 // sends the world every second, so 8 quiet seconds means the line is dead: drop it and reconnect.
 setInterval(() => {
@@ -6042,7 +6040,6 @@ function godFindHtml() {
   const d = t => t ? new Date(t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
     <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.sus?.rows?.length ? `<br>🛡️ <b style="color:${x.sus.score >= 20 ? 'var(--bad)' : 'inherit'}">จับตา 24 ชม. (คะแนน ${x.sus.score})</b>: ${x.sus.rows.map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}` : ''}${x.en ? `<br>⚡ พลังงานตอนนี้ ${x.en.now} · 1 ชม.ล่าสุด: ${x.en.rows.length ? x.en.rows.map(([k, d, n]) => `${esc(k.replace(/^-/, ''))} ${d > 0 ? '+' : ''}${d} (${n})`).join(' · ') : 'ยังไม่มีข้อมูล'}` : ''}${x.doc ? `<br>${x.doc.bot ? '🤖 <b style="color:var(--bad)">หมอ: เหมือนบอท</b>' : x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ · จังหวะคลาด ±${((x.doc.sd ?? 0) / 1000).toFixed(2)} วิ ${x.doc.sd == null ? '' : x.doc.sd < 150 ? '(เท่ากันผิดปกติ)' : '(ไม่เท่ากัน แบบคน)'}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
-    ${x.alts?.length ? `<div class="sub" style="margin-top:4px">📱 เครื่องเดียวกับ: <b>${x.alts.map(esc).join(', ')}</b></div>` : ''}
     ${x.ban ? `<div class="jobbox" style="margin-top:4px">🚫 <b style="color:var(--bad)">ถูกแบน${x.ban.until ? ' ถึง ' + new Date(x.ban.until).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ถาวร'}</b>${x.ban.why ? ' · ' + esc(x.ban.why) : ''} <small>(โดย ${esc(x.ban.by || '')})</small> ${B('✅ ปลดแบน', { fn: 'godUnban', login: x.login }, 'good')}</div>`
       : `<div class="rowf" style="margin-top:4px"><select id="godBanD_${esc(x.login)}"><option value="1">1 วัน</option><option value="3">3 วัน</option><option value="7">7 วัน</option><option value="30">30 วัน</option><option value="0">ถาวร</option></select><input id="godBanW_${esc(x.login)}" maxlength="80" placeholder="เหตุผลการแบน">${B('🚫 แบน', { fn: 'godBan', login: x.login }, 'warn')}</div>`}
     <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>
@@ -6261,9 +6258,6 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
-  { v: '2026-11-28b', d: '24 พ.ย.', items: [
-    '🛡️ กันคนโกง: คนที่ถูกแบนเพราะใช้สคริปต์ สมัครบัญชีใหม่จากเครื่องเดิมไม่ได้แล้ว',
-  ] },
   { v: '2026-11-28a', d: '24 พ.ย.', items: [
     '🖼️ ไอคอนพิกเซลชุดใหม่: กระเป๋า วิ่ง พัก อิโมจิ มือถือ แชท จดหมาย ปุ่มใช้งาน และไอคอนพลัง/อิ่ม/เลือด/สุข',
     '🏙️ หน้าเข้าเกมมีภาพเมืองใหม่ (หลังจบเทศกาลลอยกระทง) · หน้าสร้างตัวละครมีป้ายต้อนรับ',
