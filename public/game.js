@@ -1199,8 +1199,8 @@ function paintHud() {
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
   if (nbEggWaiting()) chips.push(`<span class="chip study" data-dz="_nbegg">${nbImg('moon', 18)} พรุ่งนี้: ${nbImg('egg', 18)} ไข่ฟัก + ${nbImg('gift', 18)}</span>`);
   { const tn = Date.now() + clockOff, mn = x => Math.ceil((x - tn) / 60e3);   // 🙏 active buffs (blessing from praying / giving alms, merit from releasing fish)
-    if ((me.bless || 0) > tn) chips.push(`<span class="chip buff" data-dz="_bless">✨ ได้รับพร ${mn(me.bless)} นาที</span>`);
-    if ((me.merit || 0) > tn) chips.push(`<span class="chip buff" data-dz="_merit">🙏 บุญปลา ${mn(me.merit)} นาที</span>`); }
+    if ((me.bless || 0) > tn) chips.push(`<span class="chip buff" data-dz="_bless">✨ พร ${mn(me.bless)}น.</span>`);
+    if ((me.merit || 0) > tn) chips.push(`<span class="chip buff" data-dz="_merit">🙏 บุญ ${mn(me.merit)}น.</span>`); }
   if (me.prayed === 0 && (me.lv || 0) >= 2) chips.push('<span class="chip study" data-dz="_pray">🪷 ยังไม่ได้ทำบุญวันนี้</span>');
   $('#statusBox').classList.toggle('hidden', !chips.length);
   { const n = me.mailN || 0, f = $('#mailFab'); if (f) { f.classList.toggle('hidden', !n); $('#mailFabN').textContent = n > 9 ? '9+' : n; if (!f.onclick) f.onclick = () => openPanel({ kind: 'mail' }); } }
@@ -6273,6 +6273,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28h', d: '24 พ.ย.', items: [
+    '📌 แถบสถานะ (หิว ง่วง ป่วย บัฟ) เล็กลง เหลือแถวเดียว ไม่มีกรอบใหญ่บังจอแล้ว',
+  ] },
   { v: '2026-11-28g', d: '24 พ.ย.', items: [
     '🏠 แก้บั๊ก: ขายบ้านแล้วเฟอร์นิเจอร์ 💎 / ของรางวัล / ของคราฟต์ / ของประมูลไม่หายแล้ว จะเก็บไว้ให้ย้ายไปบ้านหลังใหม่',
     '📋 แก้บั๊ก: ภารกิจอาชีพจ่ายตามเวลามาตรฐานของภารกิจ ไม่ได้มากขึ้นเพราะทำช้า (ทำเร็วยังได้โบนัส +25%)',

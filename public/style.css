@@ -1889,3 +1889,8 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 .townLogo b{color:#fff!important;-webkit-text-stroke:0!important;text-shadow:0 3px 0 var(--k-ink),3px 0 0 var(--k-ink),-3px 0 0 var(--k-ink),0 -3px 0 var(--k-ink),2px 2px 0 var(--k-ink),-2px 2px 0 var(--k-ink),2px -2px 0 var(--k-ink),-2px -2px 0 var(--k-ink),0 6px 0 var(--k-ink)}
 .townLogo small{color:#fff!important;-webkit-text-stroke:0!important;text-shadow:0 2px 0 var(--k-ink),2px 0 0 var(--k-ink),-2px 0 0 var(--k-ink),0 -2px 0 var(--k-ink)}
 #login.townPic::after{display:none}
+/* status pills: one slim row under the quests, no panel behind them (players found the box too big) */
+#card #statusBox,#card.v2 #statusBox{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;margin-top:3px!important}
+#dzChips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:3px}#dzChips::-webkit-scrollbar{display:none}
+#dzChips .chip{flex:none;white-space:nowrap;font-size:10px;line-height:1.2;padding:1px 6px 1px 3px;gap:2px}
+#dzChips .chip img{width:12px;height:12px}
