@@ -5799,15 +5799,19 @@ function storyHint(s) {
   if (!st) return '';
   const who = folkById(st.npc)?.name || '', it = st.item && G.items[st.item];
   const hr = st.h ? ` (ช่วง ${String(st.h[0]).padStart(2, '0')}:00–${String(st.h[1] % 24).padStart(2, '0')}:00)` : '';
-  return st.k === 'talk' ? `💬 ไปคุยกับ${who}` : st.k === 'give' ? `🎁 เอา ${it?.icon || ''}${it?.name || ''} x${st.n} ไปให้${who} (มี ${Math.min(me.inv?.[st.item] || 0, st.n)}/${st.n})`
-    : st.k === 'go' ? `📍 ไปที่${st.label}${hr}` : `❓ ไปตอบคำถามของ${who}`;
+  const need = st.items || (st.item ? [[st.item, st.n]] : []), list = need.map(([id, n]) => `${G.items[id]?.icon || ''}${G.items[id]?.name || id} ${Math.min(me.inv?.[id] || 0, n)}/${n}`).join(', ');
+  return st.k === 'talk' ? `💬 ไปคุยกับ${who}` : st.k === 'give' ? `🎁 เอา ${list} ไปให้${who}` : st.k === 'pay' ? `💰 จ่าย ${money(st.cost)} ให้${who}`
+    : st.k === 'do' ? `🎯 ${st.label} ${st.prog || 0}/${st.n}${who ? ` แล้วไปบอก${who}` : ''}`
+    : st.k === 'go' ? `📍 ไปที่${st.label}${hr}` : `❓ ไปตอบคำถามของ${who}${st.hard ? ' (⚠️ ตอบผิดเริ่มบทใหม่)' : ''}`;
 }
 function storyChoices(o) {   // buttons for the story steps that happen with this townsperson
   return STORIES.filter(s => s.state === 'on' && s.step?.npc === o.fid).map(s => {
-    const st = s.step, it = st.item && G.items[st.item], have = me.inv?.[st.item] || 0;
-    const label = st.k === 'give' ? `📖 ${s.name}: ให้ ${it?.icon || ''}x${st.n}${have < st.n ? ` (มี ${have})` : ''}` : st.k === 'choice' ? `📖 ${s.name}: ❓ ตอบคำถาม` : `📖 ${s.name} · บท ${s.n + 1}`;
+    const st = s.step, need = st.items || (st.item ? [[st.item, st.n]] : []), miss = need.find(([id, n]) => (me.inv?.[id] || 0) < n);
+    const label = st.k === 'give' ? `📖 ${s.name}: ให้ ${need.map(([id, n]) => `${G.items[id]?.icon || ''}x${n}`).join(' ')}${miss ? ' (ยังไม่ครบ)' : ''}` : st.k === 'choice' ? `📖 ${s.name}: ❓ ตอบคำถาม${st.hard ? ' ⚠️' : ''}`
+      : st.k === 'pay' ? `📖 ${s.name}: 💰 จ่าย ${money(st.cost)}` : st.k === 'do' ? `📖 ${s.name}: 🎯 ${st.prog || 0}/${st.n}` : `📖 ${s.name} · บท ${s.n + 1}`;
     return { label, cls: 'primary', fn: () => {
-      if (st.k === 'give' && have < st.n) return toast(`ยังมี ${it?.name || ''} ไม่ครบ (${have}/${st.n}) · ${whereGet(st.item)}`, '📖', false);
+      if (st.k === 'give' && miss) return toast(`ยังมี ${G.items[miss[0]]?.name || ''} ไม่ครบ (${me.inv?.[miss[0]] || 0}/${miss[1]}) · ${whereGet(miss[0])}`, '📖', false);
+      if (st.k === 'do' && (st.prog || 0) < st.n) return toast(`${st.label} ยังไม่ครบ (${st.prog || 0}/${st.n})`, '📖', false);
       if (st.k === 'choice') return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [stTxt(st.q)], choices: st.opts.map((t, c) => ({ label: t, fn: () => { dialogClose(); send({ t: 'story', o: s.o, c }); } })) });
       dialogClose(); send({ t: 'story', o: s.o });
     } };
@@ -5823,10 +5827,10 @@ function storySay(m) {
 function storiesBox() {
   if (!STORIES.length) return '';
   return STORIES.map(s => {
-    const f = folkById(s.o), st = s.step, go = s.state === 'on' && st?.k === 'go';
+    const f = folkById(s.o), st = s.step, go = s.state === 'on' && st?.k === 'go', rep = s.state === 'on' && st && !st.npc && st.k !== 'go';   // a step with nobody to talk to: report from here
     return `<div class="item folkRow"><div class="em">${(f && folkFace(f)) || '📖'}</div><div class="nm"><b>${esc(s.name)}</b> <small style="display:inline">· ${esc(f?.name || '')} · ${esc(s.tone)}</small>
       <small>บท ${Math.min(s.n + 1, s.total)}/${s.total}${s.t ? ` "${esc(s.t)}"` : ''}${s.state === 'on' && s.sn ? ` · ขั้น ${s.si + 1}/${s.sn}` : ''}</small><small><b>${esc(storyHint(s))}</b></small>
-      ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
+      ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}${rep ? `<div class="rowf" style="margin-top:4px">${B(st.k === 'pay' ? `💰 จ่าย ${money(st.cost)}` : '✅ ส่งรายงาน', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
   }).join('');
 }
 const heartBar = (p, lv) => { const a = [0, 3, 10, 25, 50], lo = a[lv], hi = a[lv + 1]; return '💗'.repeat(lv) + '🤍'.repeat(4 - lv) + (hi ? ` <small>${p - lo}/${hi - lo}</small>` : ' <small>สูงสุด</small>'); };
@@ -6346,6 +6350,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28q', d: '24 พ.ย.', items: [
+    '📖 เนื้อเรื่องครบชาวเมืองทั้ง 9 คนแล้ว! ใหม่: พี่โจ้ "จดหมายที่ไม่เคยส่ง" · คุณเมย์ "นักสืบหัวใจ" · ป้านวล "หัวขโมยผักยามดึก" · น้องเจมส์ "ยูทูบเบอร์ร้อยซับ"',
+    '⚠️ เควสยากแบบใหม่: บางบทต้องจ่ายเงิน หาของหลายอย่าง ทำงานให้ครบจำนวน (ตกปลา/ไหว้พระ/เก็บผัก/เล่นเครื่องเล่น) และคำถามบางข้อตอบผิดต้องเริ่มบทใหม่!',
+  ] },
   { v: '2026-11-28p', d: '24 พ.ย.', items: [
     '📖 เนื้อเรื่องแยกเป็นแท็บของตัวเองแล้ว (💞 ชาวเมือง → 📖 เนื้อเรื่อง)',
     '📖 เรื่องใหม่ 3 เรื่อง: ตาเฉย "ชายผู้ไม่พูด" (ฮา→ซึ้ง) · ต้นกล้า "ตู้เกมหมายเลขศูนย์" (ไซไฟ) · น้องมะปราง "พี่เงา" (อบอุ่น ขนลุกนิด ๆ) · ปมรถเมล์สาย 99 เริ่มเฉลยแล้ว!',

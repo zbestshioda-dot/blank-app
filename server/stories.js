@@ -271,3 +271,4 @@ module.exports = {
     ] },
   ] },
 };
+Object.assign(module.exports, require('./stories_more'));   // more arcs live there

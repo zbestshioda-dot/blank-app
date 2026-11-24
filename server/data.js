@@ -2308,6 +2308,7 @@ const ACHIEVEMENTS = [
   { id: 'st_choei', r: 5, c: null, stat: 'story_choei', n: 1, title: 'ผู้ทำให้ตาเฉยพูด', desc: 'ช่วยตาเฉยจนจบเรื่อง "ชายผู้ไม่พูด"' },
   { id: 'st_tonkla', r: 4, c: null, stat: 'story_tonkla', n: 1, title: 'ผู้เล่นคนที่ 2', desc: 'ช่วยต้นกล้าจนจบเรื่อง "ตู้เกมหมายเลขศูนย์"' },
   { id: 'st_mprang', r: 4, c: null, stat: 'story_mprang', n: 1, title: 'พี่เงาคนที่สอง', desc: 'ช่วยน้องมะปรางจนจบเรื่อง "พี่เงา"' },
+  ...Object.entries(require('./stories')).filter(([, v]) => v.ttl).map(([o, v]) => ({ id: 'st_' + o, r: 4, c: null, stat: 'story_' + o, n: 1, title: v.ttl, desc: `จบเรื่อง "${v.name}"` })),   // 📖 newer arcs carry their own title
   // 🛠️ equipment: job tools, vehicles, fishing rods (absolute counts, refreshed by eqSweep on the server)
   { id: 'eq_t1', r: 1, nt: 1, g: 1, stat: 'toolup', n: 1, title: 'อุปกรณ์ชิ้นแรก', desc: 'อัปเกรดอุปกรณ์อาชีพครั้งแรก' },
   { id: 'eq_t2', r: 2, c: null, stat: 'toolup', n: 6, title: 'คนมีของ', desc: 'อัปเกรดอุปกรณ์อาชีพรวม 6 ระดับ' },

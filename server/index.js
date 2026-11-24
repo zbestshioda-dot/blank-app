@@ -2698,6 +2698,12 @@ function folkDo(a, m) {
 // 📖 townsfolk story arcs (server/stories.js): progress lives in a.folk[owner].s = { ch, st, day } (saved with the friendship)
 const SY = require('./stories');
 const storyOf = (a, o) => { const f = folkOf(a, o); return f.s || (f.s = { ch: 0, st: 0 }); };
+// 'do' steps count from the moment the step became current (base kept per chapter:step)
+function storyProg(a, s, st) {
+  const k = s.ch + ':' + s.st, v = a.stats?.[st.stat] || 0;
+  if (s.bk !== k) { s.bk = k; s.b = v; a.sd = true; }
+  return Math.max(0, v - (s.b || 0));
+}
 const inHours = (h, r) => !r || (r[0] <= r[1] ? h >= r[0] && h < r[1] : h >= r[0] || h < r[1]);
 function storyNow(a, o) {
   const S = SY[o], s = storyOf(a, o), ch = S.ch[s.ch];
@@ -2710,7 +2716,7 @@ function storiesView(a) {
   return Object.keys(SY).filter(o => FOLK_DEF[o]).map(o => {
     const S = SY[o], s = storyOf(a, o), r = storyNow(a, o), st = r.step;
     return { o, name: S.name, tone: S.tone, n: s.ch, total: S.ch.length, t: r.ch?.t || '', state: r.state, need: r.ch?.need || 0, p: folkOf(a, o).p || 0, si: s.st, sn: r.ch?.steps.length || 0,
-      step: st ? { k: st.k, npc: st.npc || null, item: st.item, n: st.n, at: st.at, label: st.label, h: st.h, q: st.q, opts: st.opts } : null };
+      step: st ? { k: st.k, npc: st.npc || null, item: st.item, items: st.items, n: st.n, at: st.at, label: st.label, h: st.h, q: st.q, opts: st.opts, hard: st.hard ? 1 : 0, cost: st.cost, prog: st.k === 'do' ? storyProg(a, s, st) : undefined } : null };
   });
 }
 function storyAdv(a, m) {
@@ -2721,16 +2727,24 @@ function storyAdv(a, m) {
     const def = FOLK_DEF[st.npc];
     if (!def || !folkNear(a, def)) return toast(a, `ต้องอยู่ใกล้${def?.name || 'คนนั้น'}ก่อน`, '📖', false);
   }
-  if (st.k === 'give') {
-    if ((a.inv[st.item] || 0) < st.n) { const it = D.ITEMS[st.item]; return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[st.item] || 0}/${st.n})`, '📖', false); }
-    addItem(a, st.item, -st.n);
+  if (st.k === 'give') {   // one item (item, n) or several (items: [[id, n], ...])
+    const need = st.items || [[st.item, st.n]], miss = need.find(([id, n]) => (a.inv[id] || 0) < n);
+    if (miss) { const it = D.ITEMS[miss[0]]; return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[miss[0]] || 0}/${miss[1]})`, '📖', false); }
+    for (const [id, n] of need) addItem(a, id, -n);
+  }
+  if (st.k === 'pay' && !pay(a, st.cost)) return;   // a story that costs money (pay() says why not)
+  if (st.k === 'do') {   // do something N times from when this step began (catch fish, cook, harvest...)
+    const got = storyProg(a, s, st); if (got < st.n) return toast(a, `${st.label} ยังไม่ครบ (${got}/${st.n})`, '📖', false);
   }
   if (st.k === 'go') {
     const p = ST[st.at]; if (!p) return;
     if (areaId(a) !== p.area || dist(a, p) > (p.r || 1) + 2.5) return toast(a, `ยังไม่ถึง${st.label} · กด 📍 นำทางได้`, '📖', false);
     if (!inHours(hourNow(), st.h)) return toast(a, `ต้องมาช่วง ${hhmm(st.h[0])}–${hhmm(st.h[1] % 24)} (เวลาในเกม)`, '🕰️', false);
   }
-  if (st.k === 'choice' && st.ok >= 0 && Math.floor(+m.c) !== st.ok) { /* ok -1: any answer moves the story on */ send(a, { t: 'storysay', o, npc: st.npc, lines: [st.wrong || 'ลองคิดใหม่อีกทีนะ'] }); return; }
+  if (st.k === 'choice' && st.ok >= 0 && Math.floor(+m.c) !== st.ok) {   // ok -1: any answer moves the story on · hard: a wrong answer restarts the chapter
+    if (st.hard) { s.st = 0; a.sd = true; send(a, folksView(a)); }
+    send(a, { t: 'storysay', o, npc: st.npc, lines: [st.wrong || 'ลองคิดใหม่อีกทีนะ', ...(st.hard ? ['❌ ตอบผิด! ต้องเริ่มบทนี้ใหม่ตั้งแต่ต้น'] : [])] }); return;
+  }
   s.st++; let end = null;
   if (s.st >= r.ch.steps.length) {
     credit(a, r.ch.pay); s.ch++; s.st = 0; s.day = dayKey(); joy(a, 8);
