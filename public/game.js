@@ -119,7 +119,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b10', chSheets = {};
+const CH_V = 'b11', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -183,7 +183,7 @@ function femOutfitFrame(sheet, step, lk) {
 const OUTFIT_SHEET = { bartender: 'tuxedo', templeboy: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
-  tigerpj: 'tigerpj', photog: 'photog', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', tanktop: 'tanktop', bear: 'bear', panda: 'panda', cathood: 'cathood', kitsune: 'kitsune', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong', wedding: 'wedding' };   // women's versions are the 'f' + name sheets
+  tigerpj: 'tigerpj', photog: 'photog', scrubs: 'scrubs', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', tanktop: 'tanktop', bear: 'bear', panda: 'panda', cathood: 'cathood', kitsune: 'kitsune', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong', wedding: 'wedding' };   // women's versions are the 'f' + name sheets
 const ofName = o => o ? (me?.gender === 'f' && o.nf ? o.nf : o.name) : '';
 const WALK = { front: ['down0', 'down1', 'down0', 'down2'], back: ['up0', 'up1', 'up0', 'up1'], side: ['left0', 'left1', 'left0', 'left2'] };
 // admin cloak aura: a pulsing dark-violet glow behind the body, sparks orbiting around it (front half drawn over the sprite)
@@ -316,7 +316,7 @@ function sheetHasHair(sheet) {
   let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
   return HAIR_MASKED[sheet] = n > 50;
 }
-const HAIR_HAT = { detective: 1, farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1, panda: 1, bear: 1, catsuit: 1, cathood: 1, chicken: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
+const HAIR_HAT = { scrubs: 1, detective: 1, farmer: 1, fisher: 1, cowboy: 1, scout: 1, beggar: 1, magician: 1, police: 1, chef: 1, rider: 1, pilot: 1, santa: 1 }, HAIR_NONE = { admin: 1, thief: 1, panda: 1, bear: 1, catsuit: 1, cathood: 1, chicken: 1 };   // hats: dye only the hair below the brim · hood / mask: none shows
 function hairFix(fr, outfit, step, gender, lk) {
   const sh = outfit.slice(0, -1).replace(/^f(?=[a-z]{3})/, m => CH_ATLAS.rows[outfit.slice(1) + 'down0'] !== undefined ? '' : m);
   if (!lk.hair || lk.hair === 'brown' || HAIR_NONE[sh]) return fr;
@@ -479,13 +479,15 @@ function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const ofd = G?.outfitDefs?.[p.of], sheet0 = OUTFIT_SHEET[ofd?.base || p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
     outfit = sheet && CH_ATLAS.rows[`${sheet}:down0`] !== undefined ? sheet + ':' : p.g === 'f' && CH_ATLAS.rows['f:down0'] !== undefined ? 'f:' : '';   // women have their own base sprite
+  const sitF = seated && outfit && CH_ATLAS.rows[`${outfit}sit${view}`] !== undefined ? `sit${view}` : '';   // outfits with real sitting frames (pose_<id>.jpg)
+  const WF = sitF || WALK[view][step % 4], seat0 = seated; if (sitF) seated = false;
   const lk = p.of === 'monk' ? MONK_LOOK : { ...DEFAULT_LOOK, ...(p.lk || {}) }, [ax, ay] = CH_ATLAS.feet;   // 🙏 monks: saffron robe, shaved head
-  if (outfit && !chSrc(outfit + WALK[view][step % 4])) return drawCharTo(g, { ...p, of: '', dye: 0 }, fx, fy, k, view, step, faceLeft, seated);   // outfit sheet still loading: plain clothes for a moment
+  if (outfit && !chSrc(outfit + WF)) return drawCharTo(g, { ...p, of: '', dye: 0 }, fx, fy, k, view, step, faceLeft, seat0);   // outfit sheet still loading: plain clothes for a moment
   const fem = p.g === 'f' && sheet && outfit === sheet + ':' && sheet === sheet0 && FEM_HEAD[sheet] && CH_ATLAS.rows['f:down0'] !== undefined;
-  const fr0 = fem ? femOutfitFrame(sheet, WALK[view][step % 4], lk) : charFrame(outfit + WALK[view][step % 4], lk);
-  const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WALK[view][step % 4], p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
-  const fm = p.of === 'monk' && monkFrame(WALK[view][step % 4]), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : ofd?.hue !== undefined ? outfitDye(frS, outfit + WALK[view][step % 4], ofd.hue, ofd.wt, fem && FEM_HEAD[sheet] === 'head' ? FEM_NECK : 0) : frS);
-  const frx = view === 'front' && EXPR ? faceFrame(fr, exprOf(p)) : fr;   // 😊 the face's expression (front view only)
+  const fr0 = fem ? femOutfitFrame(sheet, WF, lk) : charFrame(outfit + WF, lk);
+  const fr1 = !fem && outfit && outfit !== 'f:' ? hairFix(fr0, outfit, WF, p.g, lk) : fr0;   // outfit sheets with the hair painted in: dye it
+  const fm = p.of === 'monk' && monkFrame(WF), frS = lk.skin && lk.skin !== 'warm' ? skinFix(fr1, lk.skin) : fr1, fr = fm || (p.dye ? dyeFrame(frS, p.dye) : ofd?.hue !== undefined ? outfitDye(frS, outfit + WF, ofd.hue, ofd.wt, fem && FEM_HEAD[sheet] === 'head' ? FEM_NECK : 0) : frS);
+  const frx = view === 'front' && EXPR && !sitF ? faceFrame(fr, exprOf(p)) : fr;   // 😊 the face's expression (front view only)
   g.save(); g.translate(fx, fy); if (view === 'side' && !faceLeft) g.scale(-1, 1);
   g.imageSmoothingEnabled = false;
   if (seated) {
@@ -695,7 +697,9 @@ function restartBar(on) {
   b.innerHTML = '🔧 <b>กำลังอัปเดตเกม</b> กลับมาใน ~20 วินาที<br><small>ไม่ต้องทำอะไร ข้อมูลไม่หาย เกมจะต่อใหม่เอง</small>';
 }
 setInterval(() => { if (restartAt && Date.now() - restartAt > 120000) { restartAt = 0; restartBar(false); } }, 5000);   // never stuck on screen
-function sendLogin() { send({ t: 'login', ...creds }); }
+// a random id for this phone/browser (kept in localStorage): lets admins see accounts played from the same device
+const DEVID = (() => { try { let d = localStorage.getItem('lt_dev'); if (!d) { d = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); localStorage.setItem('lt_dev', d); } return d; } catch { return ''; } })();
+function sendLogin() { send({ t: 'login', ...creds, dev: DEVID }); }
 // a socket that stopped talking while the game is on screen (the phone switched networks): the world froze for players. The server
 // sends the world every second, so 8 quiet seconds means the line is dead: drop it and reconnect.
 setInterval(() => {
@@ -6039,7 +6043,7 @@ function godFindHtml() {
   if (!godFindRes.list.length) return `<div class="sub">ไม่พบผู้เล่นที่ตรงกับ "${esc(godFindRes.q)}"</div>`;
   const d = t => t ? new Date(t).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   return `<div class="list">${godFindRes.list.map(x => `<div class="item" style="display:block"><div class="nm"><b>${esc(x.name)}</b> <span class="tag">ID: ${esc(x.login)}</span> ${x.on ? '<span class="tag" style="background:var(--good)">ออนไลน์</span>' : ''}
-    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.sus?.rows?.length ? `<br>🛡️ <b style="color:${x.sus.score >= 20 ? 'var(--bad)' : 'inherit'}">จับตา 24 ชม. (คะแนน ${x.sus.score})</b>: ${x.sus.rows.map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}` : ''}${x.en ? `<br>⚡ พลังงานตอนนี้ ${x.en.now} · 1 ชม.ล่าสุด: ${x.en.rows.length ? x.en.rows.map(([k, d, n]) => `${esc(k.replace(/^-/, ''))} ${d > 0 ? '+' : ''}${d} (${n})`).join(' · ') : 'ยังไม่มีข้อมูล'}` : ''}${x.doc ? `<br>${x.doc.bot ? '🤖 <b style="color:var(--bad)">หมอ: เหมือนบอท</b>' : x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ · จังหวะคลาด ±${((x.doc.sd ?? 0) / 1000).toFixed(2)} วิ ${x.doc.sd == null ? '' : x.doc.sd < 150 ? '(เท่ากันผิดปกติ)' : '(ไม่เท่ากัน แบบคน)'}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
+    <small>💰 ${money(x.money)} · 🏦 ${money(x.bank)} · 💎 ${x.gems} · 💼 ${esc(x.career)}${x.house ? ` · 🏠 บ้าน #${x.house}` : ''}${x.sus?.rows?.length ? `<br>🛡️ <b style="color:${x.sus.score >= 20 ? 'var(--bad)' : 'inherit'}">จับตา 24 ชม. (คะแนน ${x.sus.score})</b>: ${x.sus.rows.map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}` : ''}${x.alts?.length ? `<br>🔗 บัญชีที่อาจเป็นคนเดียวกัน: ${x.alts.map(o => `<b${o.ban ? ' style="color:var(--bad)"' : ''}>${esc(o.name || o.login)}</b> (${esc(o.login)} · ${o.how}${o.ban ? ' · 🚫 แบนอยู่' : ''})`).join(', ')}` : ''}${x.en ? `<br>⚡ พลังงานตอนนี้ ${x.en.now} · 1 ชม.ล่าสุด: ${x.en.rows.length ? x.en.rows.map(([k, d, n]) => `${esc(k.replace(/^-/, ''))} ${d > 0 ? '+' : ''}${d} (${n})`).join(' · ') : 'ยังไม่มีข้อมูล'}` : ''}${x.doc ? `<br>${x.doc.bot ? '🤖 <b style="color:var(--bad)">หมอ: เหมือนบอท</b>' : x.doc.sus ? '🚩 <b style="color:var(--bad)">หมอ: น่าสงสัย</b>' : '🩺 หมอ'} ${x.doc.n} เคสล่าสุด · ถูก ${x.doc.acc}% · ตอบหลังตรวจเสร็จเฉลี่ย ${(x.doc.med / 1000).toFixed(1)} วิ · จังหวะคลาด ±${((x.doc.sd ?? 0) / 1000).toFixed(2)} วิ ${x.doc.sd == null ? '' : x.doc.sd < 150 ? '(เท่ากันผิดปกติ)' : '(ไม่เท่ากัน แบบคน)'}` : ''}<br>📱 ${esc(String(x.phone || '—'))} · เข้าเกม ${x.days} วัน · ${x.gmail ? 'ผูก Google แล้ว' : 'ไม่ได้ผูก Google'}<br>สมัคร ${d(x.created)} · ออนไลน์ล่าสุด ${x.on ? 'ตอนนี้' : x.last ? d(x.last) : esc(x.lastDay || '—')}</small></div>
     ${x.ban ? `<div class="jobbox" style="margin-top:4px">🚫 <b style="color:var(--bad)">ถูกแบน${x.ban.until ? ' ถึง ' + new Date(x.ban.until).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ถาวร'}</b>${x.ban.why ? ' · ' + esc(x.ban.why) : ''} <small>(โดย ${esc(x.ban.by || '')})</small> ${B('✅ ปลดแบน', { fn: 'godUnban', login: x.login }, 'good')}</div>`
       : `<div class="rowf" style="margin-top:4px"><select id="godBanD_${esc(x.login)}"><option value="1">1 วัน</option><option value="3">3 วัน</option><option value="7">7 วัน</option><option value="30">30 วัน</option><option value="0">ถาวร</option></select><input id="godBanW_${esc(x.login)}" maxlength="80" placeholder="เหตุผลการแบน">${B('🚫 แบน', { fn: 'godBan', login: x.login }, 'warn')}</div>`}
     <div class="rowf" style="margin-top:4px"><input id="godPin_${esc(x.login)}" type="text" inputmode="numeric" maxlength="8" placeholder="PIN ใหม่ 4–8 หลัก">${B('🔑 ตั้ง PIN', { fn: 'godPin', login: x.login }, 'warn')}</div>
@@ -6258,6 +6262,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28b', d: '24 พ.ย.', items: [
+    '🩺 ชุดใหม่: ชุดหมอผ่าตัดสีเขียว ฿39,999 ที่ร้านแฟชั่น',
+    '🪑 ใส่ชุดนี้แล้วกด "พัก" หรือนั่งม้านั่ง จะนั่งท่าจริง (หันหน้า/หันหลัง/ด้านข้าง)',
+  ] },
   { v: '2026-11-28a', d: '24 พ.ย.', items: [
     '🖼️ ไอคอนพิกเซลชุดใหม่: กระเป๋า วิ่ง พัก อิโมจิ มือถือ แชท จดหมาย ปุ่มใช้งาน และไอคอนพลัง/อิ่ม/เลือด/สุข',
     '🏙️ หน้าเข้าเกมมีภาพเมืองใหม่ (หลังจบเทศกาลลอยกระทง) · หน้าสร้างตัวละครมีป้ายต้อนรับ',

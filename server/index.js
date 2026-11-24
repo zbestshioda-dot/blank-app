@@ -1687,12 +1687,44 @@ function tradePrices(a) {
 // ⚡ energy history for the admins (last hour, in memory): what used it and where it came back from
 // 🛡️ silent cheat watch: suspicious events are only counted (nobody is told, nothing is announced); admins review them in God
 // mode (player card + "ผู้เล่นน่าสงสัย" list). Speed / wall / distance cheats are already refused by the server; this keeps the evidence.
-const SUS_W = { speed: 1, wall: 2, far: 1, flood: 3, bot: 6, doc: 10, docbot: 20, hcfail: 8, hcfast: 4, marathon: 1, untrusted: 5 };
-const SUS_NM = { hcfail: 'ไม่แตะยืนยันตัวตนใน 90 วิ', hcfast: 'แตะยืนยันเร็วเกินคน', marathon: 'เล่นต่อเนื่องเกิน 2 ชม.', untrusted: 'คลิกที่มาจากสคริปต์', docbot: 'หมอตอบจังหวะเท่ากันทุกเคส (เหมือนบอท)', speed: 'เดินเร็วเกิน', wall: 'ทะลุกำแพง', far: 'กดจากระยะไกล', flood: 'ส่งคำสั่งรัว', bot: 'จังหวะกดเหมือนบอท', doc: 'หมอตอบเร็ว/ถูกผิดปกติ' };
+const SUS_W = { bandev: 10, speed: 1, wall: 2, far: 1, flood: 3, bot: 6, doc: 10, docbot: 20, hcfail: 8, hcfast: 4, marathon: 1, untrusted: 5 };
+const SUS_NM = { bandev: 'เล่นจากเครื่องของบัญชีที่ถูกแบน', hcfail: 'ไม่แตะยืนยันตัวตนใน 90 วิ', hcfast: 'แตะยืนยันเร็วเกินคน', marathon: 'เล่นต่อเนื่องเกิน 2 ชม.', untrusted: 'คลิกที่มาจากสคริปต์', docbot: 'หมอตอบจังหวะเท่ากันทุกเคส (เหมือนบอท)', speed: 'เดินเร็วเกิน', wall: 'ทะลุกำแพง', far: 'กดจากระยะไกล', flood: 'ส่งคำสั่งรัว', bot: 'จังหวะกดเหมือนบอท', doc: 'หมอตอบเร็ว/ถูกผิดปกติ' };
+// 🔗 which devices / networks an account plays from (last 8 of each): same device = very likely the same person; same network
+// is only a hint (phone carriers share addresses). A device with a banned account cannot make new accounts.
+const banOn = x => !!(x?.ban && (!x.ban.until || x.ban.until > now()));
+function seenOn(a, ws) {
+  const add = (k, v) => { if (!v) return; const L = (a[k] || []).filter(x => x !== v); L.push(v); a[k] = L.slice(-8); };
+  add('devs', ws.dev); add('ips', ws.ip); a.sd = true;
+  if (ws.dev && !isAdmin(a) && [...accounts.values()].some(o => o !== a && banOn(o) && (o.devs || []).includes(ws.dev))) sus(a, 'bandev');
+}
+const devBanned = dev => !!dev && [...accounts.values()].some(o => banOn(o) && (o.devs || []).includes(dev));
+function altsOf(a) {
+  const out = [];
+  for (const o of accounts.values()) {
+    if (o === a || !o.login) continue;
+    const dev = (o.devs || []).some(d => (a.devs || []).includes(d)), ip = !dev && (o.ips || []).some(i => (a.ips || []).includes(i));
+    if (dev || ip) out.push({ login: o.login, name: o.name, how: dev ? 'เครื่องเดียวกัน' : 'เน็ตเดียวกัน', ban: banOn(o) ? 1 : 0 });
+  }
+  return out.sort((p, q) => (p.how === q.how ? 0 : p.how === 'เครื่องเดียวกัน' ? -1 : 1)).slice(0, 10);
+}
+// 🚫 automatic 24 h suspension when the evidence is strong (scripted clicks, robot rhythm, ignored person-checks); admins are told
+// only signals a person cannot produce by accident; a missed person-check (phone locked, gone for lunch) is left to the admins
+const AUTO_BAN = { untrusted: 5, bot: 3 };
+function autoBan(a, kind) {
+  if (isAdmin(a) || banOn(a) || !AUTO_BAN[kind]) return;
+  const n = (a.susL || []).filter(([t, k]) => k === kind && now() - t < 86400e3).reduce((s0, r) => s0 + r[2], 0);
+  if (n < AUTO_BAN[kind]) return;
+  const why = `ระบบตรวจพบ: ${SUS_NM[kind] || kind} ${n} ครั้งใน 24 ชม.`;
+  a.ban = { until: now() + 86400e3, why, by: 'ระบบอัตโนมัติ', at: now() }; a.sd = true; dirty = true;
+  if (a.ws) { send(a, { t: 'kicked', msg: `บัญชีถูกระงับ 24 ชั่วโมง · ${why}` }); try { a.ws.close(); } catch { } detach(a); }
+  console.log(`[autoban] ${a.login}: ${why}`);
+  for (const o of online.values()) if (isAdmin(o)) toast(o, `🚫 ระงับอัตโนมัติ 24 ชม.: ${a.name} (${a.login}) · ${why}`, '🛡️', false);
+}
 function sus(a, kind) {
   const t = now(), L = a.susL || (a.susL = []), last = L[L.length - 1];
   if (last && last[1] === kind && t - last[0] < 60000) last[2]++; else L.push([t, kind, 1]);   // one row a minute per kind
   while (L.length && t - L[0][0] > 7 * 86400e3) L.shift(); if (L.length > 400) L.shift(); a.sd = true;
+  autoBan(a, kind);
 }
 function susSum(a) {   // the last 24 h: counts per kind and a weighted score (a few speed/far hits are normal lag)
   const by = {}; for (const [t, k, n] of a.susL || []) if (now() - t < 86400e3) by[k] = (by[k] || 0) + n;
@@ -1799,7 +1831,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -5155,7 +5187,7 @@ async function googleLogin(ws, m) {
   const a = byGsub(g.sub);
   if (!a) return fail(ws, `บัญชี Google (${g.email}) ยังไม่ได้ผูกกับตัวละคร · เข้าเกมด้วย ID/PIN ก่อน แล้วไปที่ ตั้งค่า → ผูกบัญชี Google`);
   if (!a.stok) a.stok = crypto.randomBytes(16).toString('hex');
-  return login(ws, { name: a.login }, a);
+  return login(ws, { name: a.login, dev: m.dev }, a);
 }
 async function googleLink(a, m) {
   if (m.off) { a.gsub = ''; a.gmail = ''; a.stok = ''; markMe(a); dirty = true; return toast(a, 'ยกเลิกการผูกบัญชี Google แล้ว', '🔑'); }
@@ -5172,6 +5204,7 @@ function login(ws, m, pre) {
     if (t0 && t0.stok && t0.gsub && t0.stok === m.tok) pre = t0; else return fail(ws, 'การเข้าสู่ระบบหมดอายุ กด "เข้าสู่ระบบด้วย Google" อีกครั้ง');
   }
   // m.name is the login ID; the character's display name (a.name) is chosen once at creation
+  ws.dev = String(m.dev || ws.dev || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);   // this phone/browser's random id (kept in its localStorage)
   const name = pre ? pre.login : cleanText(m.name, 16);
   if (!accounts.has(name.toLowerCase())) {     // new IDs: English letters and digits only (older Thai IDs still log in)
     if (/[^\x20-\x7e]/.test(name)) return fail(ws, 'ID ใช้ได้เฉพาะภาษาอังกฤษและตัวเลขเท่านั้น (A-Z, 0-9, _ - .)');
@@ -5194,6 +5227,7 @@ function login(ws, m, pre) {
     if (a.ws) { send(a, { t: 'kicked', msg: 'มีการเข้าสู่ระบบจากที่อื่น' }); a.ws.close(); detach(a); }
   } else {
     // a brand-new ID: the client first shows the one-time character creator, then logs in again with create:1
+    if (devBanned(ws.dev)) return fail(ws, 'เครื่องนี้มีบัญชีที่ถูกระงับอยู่ สมัครบัญชีใหม่ไม่ได้ · ติดต่อแอดมินหากคิดว่าผิดพลาด');
     if (!m.create) return ws.send(JSON.stringify({ t: 'newchar', name }));
     const cname = String(m.cname ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
     if (!/^[\p{L}\p{M}\p{N}_. -]{2,16}$/u.test(cname)) return send({ ws }, { t: 'loginfail', msg: 'ชื่อตัวละครต้องยาว 2-16 ตัว (ไทย/อังกฤษ/ตัวเลข)', create: 1 });
@@ -5224,7 +5258,7 @@ function login(ws, m, pre) {
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
-  online.set(a.id, a);
+  online.set(a.id, a); seenOn(a, ws);
   dirty = true;
   if (isNew) { nbArrivals.push({ id: a.id, name: a.name, t: now(), by: new Set() }); feed(`🎉 ${a.name} เพิ่งย้ายมาเมืองนี้ครั้งแรก! ทักทายในแชทโลกหน่อย 👋`); }
   setTimeout(() => a.ws === ws && billUp(a), 1500);
@@ -5453,7 +5487,8 @@ function onMessage0(ws, raw) {
   if (m.t === 'login') { if (!a) login(ws, m); return; }
   if (!a || a.ws !== ws) return;
   godTop(a);
-  if (m.t === 'act' && !isAdmin(a)) { botBeat(a); if (GD.run(a, now())) { sus(a, 'marathon'); hcSend(a, 'run'); } }
+  if (m.t === 'act' && !isAdmin(a)) { botBeat(a); if (GD.run(a, now())) { sus(a, 'marathon'); hcSend(a, 'run'); }
+    else if (!a.hc && now() - (a.hcOk || 0) > 20 * 60e3 && now() - (a.hcWatchT || 0) > 20 * 60e3 && susSum(a).score >= 10) { a.hcWatchT = now(); hcSend(a, 'watch'); } }   // watched accounts are asked more often
   a.ledCtx = ledLabel(a, m);
   switch (m.t) {
     case 'p': return move(a, m);
@@ -5698,7 +5733,7 @@ function onMessage0(ws, raw) {
       return;
     }
     case 'hc': { const r = GD.answer(a, m.tok, now()); if (!r.ok) return; if (r.fast) sus(a, 'hcfast'); a.sd = true; return toast(a, 'ขอบคุณ! เล่นต่อได้เลย', '🙋'); }
-    case 'untr': if (cd(a, 'untr', 60000, true)) sus(a, 'untrusted'); return;   // the client saw clicks made by a script, not a finger
+    case 'untr': if (cd(a, 'untr', 60000, true)) { sus(a, 'untrusted'); if (a.ws) hcSend(a, 'untr'); } return;   // the client saw clicks made by a script, not a finger
     case 'homelike': {                       // ❤️ like the home you are standing in (house contest)
       if (!cd(a, 'homelike', 1500)) return;
       const i = PLOT_AREAS.findIndex(set => set.has(areaId(a))), o = i >= 0 ? houses[i] : null;
@@ -5954,7 +5989,7 @@ function godAct(a, m) {
     const hits = m.list ? m.list.map(l => accounts.get(l)).filter(Boolean) : [...accounts.values()].filter(x => x.login && (x.login.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q) || String(x.phone || '') === q))
       .sort((x, y) => (x.login.toLowerCase() === q ? -1 : 0) - (y.login.toLowerCase() === q ? -1 : 0)).slice(0, 15);
     return send(a, { t: 'godfind', q, list: hits.map(x => ({ cardTo: x.card?.until > now() ? x.card.until : 0, buys: (x.outfits || []).filter(k => D.OUTFITS[k] && (D.OUTFITS[k].price || D.OUTFITS[k].gems)).map(k => [k, D.OUTFITS[k].name, D.OUTFITS[k].price || 0, D.OUTFITS[k].gems || 0]), login: x.login, name: x.name, phone: x.phone, money: x.money, bank: x.bank || 0, gems: x.gems || 0, career: D.CAREERS[x.career]?.name || 'ว่างงาน',
-      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x), ban: x.ban && (!x.ban.until || x.ban.until > now()) ? x.ban : null })) });
+      on: !!x.ws, last: x.ws ? 0 : x.lastOff || 0, created: x.created || 0, days: x.loginDays || 0, lastDay: x.lastLogin || '', gmail: x.gmail ? 1 : 0, house: x.house >= 0 ? x.house + 1 : 0, doc: docFlag(x), en: enSum(x), sus: susSum(x), alts: altsOf(x), ban: x.ban && (!x.ban.until || x.ban.until > now()) ? x.ban : null })) });
   }
   if (m.op === 'ledger') {                  // a player's money history (support)
     const x = accounts.get(String(m.login || '').toLowerCase()); if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);

@@ -2163,6 +2163,7 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   angel:     { name: 'ชุดเทวดา', nf: 'ชุดนางฟ้า', how: 'แพ็กเติมเงิน ฿99 (ไม่มีขายในร้าน)' },
   santa:     { name: 'ชุดซานต้า', nf: 'ชุดซานต้าสาว', how: 'ของขวัญปีใหม่ 2570 จากเมือง (ไม่มีขาย)' },
   // fashion collection 2 (normal money for the plain ones, diamonds for the prettiest)
+  scrubs:    { name: 'ชุดหมอผ่าตัดสีเขียว', how: 'ซื้อที่ร้านแฟชั่น', price: 39999 },
   tigerpj:   { name: 'ชุดนอนลายเสือ', how: 'ซื้อที่ร้านแฟชั่น', price: 29999 },
   photog:    { name: 'ชุดช่างภาพสายลุย', how: 'ซื้อที่ร้านแฟชั่น', price: 49999, g: 'm' },
   raincoat:  { name: 'ชุดกันฝนสีเหลือง', how: 'ซื้อที่ร้านแฟชั่น', price: 69999 },
@@ -2211,7 +2212,7 @@ const DYE_SETS = { tracksuit: ['sky', 'green'], hoodie: ['purple', 'red'], songk
   surf: ['pink', 'purple'], hiphop: ['blue', 'green'], martial: ['blue', 'purple'], knight: ['blue', 'red'] };
 const DYE_WHITE = ['catsuit', 'chicken', 'knight'];   // white / silver cloth also takes a soft tint
 // shop tabs
-const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop', 'swim', 'coat', 'racer', 'tanktop'],
+const OUTFIT_CAT = { casual: ['pajama', 'tracksuit', 'hoodie', 'student', 'scout', 'tigerpj', 'scrubs', 'photog', 'raincoat', 'explorer', 'surf', 'hiphop', 'swim', 'coat', 'racer', 'tanktop'],
   thai: ['songkran', 'lanna', 'phasin', 'muaythai', 'lukthung', 'chinese', 'chakri', 'thai', 'thairoyal'],
   costume: ['bunny', 'catsuit', 'chicken', 'devil', 'cowboy', 'pilot', 'tuxedo', 'magician', 'martial', 'knight', 'fortune', 'maid', 'dino', 'bear', 'panda', 'cathood', 'wedding'] };
 for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS[id].cat = c;
