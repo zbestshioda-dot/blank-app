@@ -979,6 +979,7 @@ function toast(msg, icon = '✅', ok = true) {
     return;
   }
   const box = $('#notices'), d = document.createElement('div'), life = Math.min(7000, 3200 + msg.length * 45);
+  placeNotices();
   toast.busyUntil = performance.now() + Math.min(life, 2400);
   d.className = 'notice' + (ok ? '' : ' bad'); d.innerHTML = `<b>${esc(icon)}</b><small>${esc(msg)}</small>`;
   d.style.animationDuration = `.25s, ${life}ms`;
@@ -1318,6 +1319,14 @@ $('#panelX').onclick = closePanel;
 $('#mini').onclick = () => { if (!G) return; mapZoom = 1; openMap(); };
 // the status card folds down to a small strip (face, money, slim bars); folded by default on phones
 const PORTRAIT_MQ = matchMedia('(max-width:600px) and (orientation:portrait)');
+// notices go in the open ground just under the player's feet (the camera keeps the player in the middle), below the
+// left column (status card, quest box, nav/chat/mail): they used to sit at 34% height, on top of the quest list
+function placeNotices() {
+  const box = $('#notices'); if (!box) return;
+  let low = 0; for (const id of ['card', 'navX', 'cbOpen', 'mailFab', 'docBack']) { const e = $('#' + id); if (e && e.getClientRects().length && !e.classList.contains('hidden')) low = Math.max(low, e.getBoundingClientRect().bottom); }
+  box.style.top = Math.round(Math.min(innerHeight * .62, Math.max(low, innerHeight / 2 + 70) + 8)) + 'px';
+}
+addEventListener('resize', () => { try { placeNotices(); } catch { } });
 const placeLog = () => { const cd = $('#card'), db = $('#docBack'), ev = $('#eventBar'); let top = cd.offsetTop + cd.offsetHeight + (guide ? 36 : 6) + (db && !db.classList.contains('hidden') ? 34 : 0);
   if (ev) { if (PORTRAIT_MQ.matches && !ev.classList.contains('hidden')) { ev.style.setProperty('top', top + 'px', 'important'); top += ev.offsetHeight + 6; } else ev.style.removeProperty('top'); }   // phones: the event line sits under the card and pushes the rest down (it used to cover the buttons there)
   $('#feed').style.top = top + 'px'; document.body.style.setProperty('--cardW', (cd.offsetLeft + cd.offsetWidth) + 'px'); const tr = $('#topRight'); if (tr) document.body.style.setProperty('--miniW', tr.offsetWidth + 'px'); };
@@ -6249,6 +6258,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27y', d: '24 พ.ย.', items: [
+    '🧹 จอโล่งขึ้น: ข้อความแจ้งเตือนย้ายลงไปใต้ตัวละคร ไม่ทับกล่องภารกิจแล้ว · บรรทัดรางวัลความคืบหน้าอ่านออกแล้ว',
+  ] },
   { v: '2026-11-27x', d: '23 พ.ย.', items: [
     '✍️ เปลี่ยนฟอนต์ทั้งเกมเป็น Itim ลายมือน่ารัก อ่านง่าย ขนาดเท่าเดิม',
   ] },
