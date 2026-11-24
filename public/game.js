@@ -1799,6 +1799,18 @@ function nearestPerson(r = 3) {
   }
   return best;
 }
+// 💬 the big button talks to a townsperson standing right next to you (no need to tap them), unless a place is closer
+const TT = { p: null };
+function talkTarget() {
+  const m = P.get(myId); if (!m || me?.cast || me?.pass || driving() || swimming() || placing || picking) return null;
+  const here = areaOf(m.x, m.y)?.id; let best = null, bd = 2.3;
+  for (const p of P.values()) {
+    if (!p.npc || p.bot || p.zb || p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
+    const d = Math.hypot(p.x - m.x, p.y - m.y); if (d < bd) { bd = d; best = p; }
+  }
+  if (!best || near && (near.type === 'pier' || Math.hypot(near.x - m.x, near.y - m.y) < bd)) return null;
+  return best;
+}
 function talk() {
   if (!G || !me) return;
   FX.play('click');
@@ -1946,6 +1958,7 @@ function onAction() {
   if (!nbGlowDone && near && (near.id === 'water' || STAFF_AT[near.id])) { nbGlowDone = true; $('#actBtn').classList.remove('nbGlow'); }
   if (driving() || swimming()) return send({ t: 'rideoff' });
   if (me.pass) return send({ t: 'hopoff' });
+  { const tp = talkTarget(); if (tp) return talkToTown(tp); }
   if (!near && onBike()) { const t0 = performance.now(); if (t0 < actCd) return; actCd = t0 + 1800; return send({ t: 'wheelie' }); }
   if (!near) { toast('เดินเข้าไปใกล้สถานที่ต่างๆ (ไอคอนลอย) เพื่อใช้งาน', '👣', true); return; }
   if (near.type === 'ball') return fbKick();
@@ -2100,6 +2113,7 @@ function frame(t) {
   if (wwIsWolf()) { const cd = wwCdLeft('summon'); ab.classList.remove('closed'); ab.classList.toggle('idle', cd > 0); actIco('📯'); ACT_LBL.v = cd ? `สมุน ${cd} วิ` : 'เรียกสมุน'; }
   else if (placing) { ab.classList.remove('idle', 'closed'); actIco('🔄'); ACT_LBL.v = 'หมุน'; }
   else if (picking) { ab.classList.add('idle'); actIco('✋'); ACT_LBL.v = 'แตะของ'; }
+  else if (TT.p = talkTarget()) { ab.classList.remove('idle', 'closed'); actIco('💬'); ACT_LBL.v = 'คุยกับ' + String(TT.p.name || '').replace(/\s*\(.*$/, ''); }
   else if (near) {
     ab.classList.remove('idle'); let ico = near.icon;
     const closed = near.type === 'door' && near.house === undefined && (near.renov || !isOpen(near.bld));
@@ -6318,6 +6332,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28n', d: '24 พ.ย.', items: [
+    '💬 คุยกับชาวเมืองง่ายขึ้น: เดินไปยืนใกล้ ๆ ปุ่มใหญ่จะเปลี่ยนเป็น "คุยกับ..." กดได้เลย ไม่ต้องจิ้มที่ตัวคน',
+  ] },
   { v: '2026-11-28m', d: '24 พ.ย.', items: [
     '📖 <b>เรื่องราวของชาวเมือง!</b> พี่ดำ "ตำนานเจ้าดำน้อย" (ฮา) กับป้าสมใจ "ขนมห่อที่เกิน" (ดราม่า) คนละ 10 บท มีปมให้เดา ปลดล็อกตามความสนิท วันละบท',
     '🏅 จบเรื่องได้ฉายา "คู่หูล่าตำนาน" / "ผู้พาลูกกลับบ้าน" · ดูเรื่องราวได้ที่ 💞 ชาวเมือง',
