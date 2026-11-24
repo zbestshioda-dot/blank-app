@@ -2730,7 +2730,7 @@ function storyAdv(a, m) {
     if (areaId(a) !== p.area || dist(a, p) > (p.r || 1) + 2.5) return toast(a, `ยังไม่ถึง${st.label} · กด 📍 นำทางได้`, '📖', false);
     if (!inHours(hourNow(), st.h)) return toast(a, `ต้องมาช่วง ${hhmm(st.h[0])}–${hhmm(st.h[1] % 24)} (เวลาในเกม)`, '🕰️', false);
   }
-  if (st.k === 'choice' && Math.floor(+m.c) !== st.ok) { send(a, { t: 'storysay', o, npc: st.npc, lines: [st.wrong || 'ลองคิดใหม่อีกทีนะ'] }); return; }
+  if (st.k === 'choice' && st.ok >= 0 && Math.floor(+m.c) !== st.ok) { /* ok -1: any answer moves the story on */ send(a, { t: 'storysay', o, npc: st.npc, lines: [st.wrong || 'ลองคิดใหม่อีกทีนะ'] }); return; }
   s.st++; let end = null;
   if (s.st >= r.ch.steps.length) {
     credit(a, r.ch.pay); s.ch++; s.st = 0; s.day = dayKey(); joy(a, 8);

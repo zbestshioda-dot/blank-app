@@ -4883,6 +4883,8 @@ const FN = {
   homeVisit: m => { send({ t: 'homevisit', id: m.id }); closePanel(); },
   openJournal() { send({ t: 'folks' }); openPanel({ kind: 'journal' }); },
   jOpen(m) { if (panel) { panel.open = m.id; refreshPanel(true); } },
+  folkTab(m) { if (panel) { panel.tab = m.tab; refreshPanel(true); } },
+  openStories() { send({ t: 'folks' }); openPanel({ kind: 'folks', tab: 'story' }); },
   storyGuide(m) { closePanel(); setGuide(m.at); },
   storyGo(m) { send({ t: 'story', o: m.o }); },
   folkGive(m) { send({ t: 'folkgift', id: m.npc, fid: panel?.fid, item: m.item }); closePanel(); },
@@ -5221,10 +5223,10 @@ const TALK = {
   town: [['ได้ยินว่าเที่ยงคืนที่มุมทะเลสาบฝั่งตะวันออก มีอะไรแปลกๆ ว่ายวนอยู่', 'ใครจะไปรู้... อาจเป็นแค่ข่าวลือก็ได้'], ['ลือกันว่านายกฯ ชอบปลอมตัวเป็นคนธรรมดามาเดินเล่นในเมือง', 'ถ้าเห็นใครท่าทางแปลกๆ ลองเดินไปทักใกล้ๆ ดูสิ'], ['เคยลองโยนเหรียญที่น้ำพุกลางเมืองไหม', 'เขาว่าน้ำพุทำนายดวงได้ บางทีก็คืนเงินให้ด้วยนะ'], ['มีคนบอกว่าเจอป้ายเล็กๆ ซ่อนอยู่ตามมุมเมืองที่ไม่ค่อยมีใครเดินไป', 'หลังตึกใหญ่ ริมขอบเมือง... ใครจะไปรู้มีกี่ป้าย'], ['ได้ยินว่ามีคนตกปลาทองคำได้ด้วยนะ', 'ฉันลองมาทั้งเดือนยังไม่เคยเห็นเลย'], ['เคยไปทะเลฝั่งตะวันออกหรือยัง', 'ตอนเย็นสวยมาก พี่โฟกัสไปนั่งรอถ่ายทุกวัน'], ['รู้ไหม ผู้กองเอกกินไอติมเดือนละสี่สิบกว่าแท่ง', 'ดาบสมศรีจดไว้หมดเลย 📒'], ['ต้มยำร้านไหนอร่อยกว่า ป้าแดงหรือเชฟหมี?', 'ทั้งเมืองเถียงกันมาสามปียังไม่จบ ลองไปชิมเองสิ'], ['ค่าไฟเดือนนี้แพงจัง', 'คงต้องเปิดแอร์น้อยลงหน่อย']],
 };
 let dlgQ = null;
-function dlgFace(face, npc) {
-  const z = innerWidth <= 600 ? 64 : 84;
-  if (typeof face === 'string' && face.startsWith('pic:')) { const b = innerWidth <= 600 ? 120 : 150; return `<i class="dlgPic dlgImg" style="width:${b}px;height:${b}px;background-image:url(assets/pics.webp?v=${PICS_V});${picPos(face.slice(4), b)}"></i>`; }
-  if (typeof face === 'string' && face.startsWith('an:') && ANI) { const [, k, m] = face.split(':'), b = innerWidth <= 600 ? 150 : 200; return `<i class="dlgPic dlgAni" style="width:${b}px;height:${b}px;${aniBg(k, m, b)}"></i>`; }
+function dlgFace(face, npc, px) {   // px: draw at this size (small list icons) instead of the dialog size
+  const z = px || (innerWidth <= 600 ? 64 : 84);
+  if (typeof face === 'string' && face.startsWith('pic:')) { const b = px || (innerWidth <= 600 ? 120 : 150); return `<i class="dlgPic dlgImg" style="width:${b}px;height:${b}px;background-image:url(assets/pics.webp?v=${PICS_V});${picPos(face.slice(4), b)}"></i>`; }
+  if (typeof face === 'string' && face.startsWith('an:') && ANI) { const [, k, m] = face.split(':'), b = px || (innerWidth <= 600 ? 150 : 200); return `<i class="dlgPic dlgAni" style="width:${b}px;height:${b}px;${aniBg(k, m, b)}"></i>`; }
   if (face && FACES?.faces?.[face] !== undefined) { const i = FACES.faces[face], n = Object.keys(FACES.faces).length; return `<i class="qface dlgPic" style="width:${z}px;height:${z}px;background-size:${n * z}px ${z}px;background-position:-${i * z}px 0"></i>`; }
   return npc ? `<canvas class="dlgPic dlgPix" data-dlg="${esc(npc)}" width="84" height="84"></canvas>` : '';
 }
@@ -5789,6 +5791,7 @@ let FCS = { on: 0 }, FRECS = null, FOLKS = null;
 let STORIES = [];
 const stTxt = l => String(l).replace(/<\/?b>/g, '').replace(/\{n\}/g, me?.name || '');
 const folkById = id => FOLKS?.find(f => f.id === id);
+const folkFace = (f, px = 66) => dlgFace(f.face || (picOf(f.name) ? 'pic:' + picOf(f.name) : NPC_FACE[STAFF.find(n => n.name.replace(/\s*\(.*$/, '') === f.name.replace(/\s*\(.*$/, ''))?.id]), null, px);   // a whole face in a list cell
 function storyHint(s) {
   const st = s.step; if (s.state === 'done') return '✅ จบเรื่องแล้ว';
   if (s.state === 'locked') return `🔒 บทต่อไปเปิดเมื่อความสนิท ${s.p}/${s.need}`;
@@ -5815,13 +5818,13 @@ function storySay(m) {
   if (m.end) lines.push(`📖 จบบท "${m.end.t}" · ได้ ${money(m.end.pay)}${m.end.last ? ' · 🏅 จบเรื่องนี้แล้ว!' : ' · บทต่อไปเปิดพรุ่งนี้'}`);
   if (!lines.length) return;
   FX.play(m.end ? 'chime' : 'click');
-  dialog({ name: f?.name || m.label || '📖 เรื่องราว', face: f?.face || null, lines, choices: [{ label: '👌 ต่อ', fn: dialogClose }, { label: '📖 ดูเรื่องราว', fn: () => { dialogClose(); FN.openFolks(); } }] });
+  dialog({ name: f?.name || m.label || '📖 เรื่องราว', face: f?.face || null, lines, choices: [{ label: '👌 ต่อ', fn: dialogClose }, { label: '📖 ดูเนื้อเรื่อง', fn: () => { dialogClose(); FN.openStories(); } }] });
 }
 function storiesBox() {
   if (!STORIES.length) return '';
-  return `<h3 style="margin:6px 0 4px">📖 เรื่องราวของชาวเมือง</h3>` + STORIES.map(s => {
+  return STORIES.map(s => {
     const f = folkById(s.o), st = s.step, go = s.state === 'on' && st?.k === 'go';
-    return `<div class="item folkRow"><div class="em">${dlgFace(f?.face) || '📖'}</div><div class="nm"><b>${esc(s.name)}</b> <small style="display:inline">· ${esc(f?.name || '')} · ${esc(s.tone)}</small>
+    return `<div class="item folkRow"><div class="em">${(f && folkFace(f)) || '📖'}</div><div class="nm"><b>${esc(s.name)}</b> <small style="display:inline">· ${esc(f?.name || '')} · ${esc(s.tone)}</small>
       <small>บท ${Math.min(s.n + 1, s.total)}/${s.total}${s.t ? ` "${esc(s.t)}"` : ''}${s.state === 'on' && s.sn ? ` · ขั้น ${s.si + 1}/${s.sn}` : ''}</small><small><b>${esc(storyHint(s))}</b></small>
       ${go ? `<div class="rowf" style="margin-top:4px">${B('📍 นำทาง', { fn: 'storyGuide', at: st.at })}${B('🔍 สำรวจตรงนี้', { fn: 'storyGo', o: s.o }, 'primary')}</div>` : ''}</div></div>`;
   }).join('');
@@ -5850,12 +5853,14 @@ function journalPanel(p) {
 }
 function folksPanel() {
   if (!FOLKS) return `<h2>💞 ชาวเมือง</h2><div class="sub">กำลังโหลด...</div>`;
-  const row = f => `<div class="item folkRow"><div class="em">${dlgFace(f.face || (picOf(f.name) ? 'pic:' + picOf(f.name) : NPC_FACE[STAFF.find(n => n.name.replace(/\s*\(.*$/, '') === f.name.replace(/\s*\(.*$/, ''))?.id])) || '🙂'}</div><div class="nm"><b>${esc(f.name)}</b> ${f.today ? '🎂' : ''}<small>${FOLK_LVN[f.lv]} · ${heartBar(f.p, f.lv)}</small>
+  const row = f => `<div class="item folkRow"><div class="em">${folkFace(f) || '🙂'}</div><div class="nm"><b>${esc(f.name)}</b> ${f.today ? '🎂' : ''}<small>${FOLK_LVN[f.lv]} · ${heartBar(f.p, f.lv)}</small>
     <small>${esc(f.doing || '')}${f.bday ? ` · 🎂 ${f.bday[1]} ${G.months?.[f.bday[0] - 1] || ''}` : ''}</small><small>${f.love ? `💖 ชอบที่สุด: ${G.items[f.love]?.icon || ''}${esc(G.items[f.love]?.name || '')} · ` : ''}${f.likes.length ? `❤️ ชอบ: ${f.likes.map(i => G.items[i]?.icon || '').join(' ')}` : '❔ ลองให้ของดูว่าชอบอะไร'}</small>
     <small>${f.talked ? '✅ คุยแล้ววันนี้' : '💬 ยังไม่ได้คุยวันนี้'} · ${f.gave ? '✅ ให้ของแล้ว' : '🎁 ยังไม่ได้ให้ของ'}</small>
     ${f.req ? `<small class="folkReq${f.req.done ? ' done' : ''}">📋 ${f.req.done ? 'ช่วยแล้ววันนี้ ✅' : `ขอ ${reqTxt(f.req)} (มี ${Math.min(me.inv?.[f.req.item] || 0, f.req.n)}/${f.req.n}) · ได้ ${money(f.req.pay)} · หาได้ที่${whereGet(f.req.item)}`}</small>` : ''}</div></div>`;
   const open = FOLKS.filter(f => f.req && !f.req.done).length;
-  return `<h2>💞 ชาวเมือง</h2>${storiesBox()}${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
+  const tabs = `<div class="rowf" style="margin:0 0 8px">${B('💞 ชาวเมือง', { fn: 'folkTab', tab: 'list' }, panel?.tab === 'story' ? '' : 'primary')}${B(`📖 เนื้อเรื่อง${STORIES.some(x => x.state === 'on') ? ' •' : ''}`, { fn: 'folkTab', tab: 'story' }, panel?.tab === 'story' ? 'primary' : '')}</div>`;
+  if (panel?.tab === 'story') return `<h2>📖 เนื้อเรื่อง</h2>${tabs}<div class="sub">เรื่องราวของแต่ละคน ปลดล็อกตามความสนิท วันละบท · คุยกับคนในเรื่องเพื่อเล่นต่อ (มีปุ่ม 📖 ในหน้าคุย)</div>${storiesBox()}`;
+  return `<h2>💞 ชาวเมือง</h2>${tabs}${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
 }
 // ⭐ starred bag items (this device): always listed first in the bag and in the gift list, so a gift is found before the NPC walks off
 const STARS = new Set((() => { try { return JSON.parse(localStorage.getItem('lt_star') || '[]'); } catch { return []; } })());
@@ -6341,6 +6346,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28p', d: '24 พ.ย.', items: [
+    '📖 เนื้อเรื่องแยกเป็นแท็บของตัวเองแล้ว (💞 ชาวเมือง → 📖 เนื้อเรื่อง)',
+    '📖 เรื่องใหม่ 3 เรื่อง: ตาเฉย "ชายผู้ไม่พูด" (ฮา→ซึ้ง) · ต้นกล้า "ตู้เกมหมายเลขศูนย์" (ไซไฟ) · น้องมะปราง "พี่เงา" (อบอุ่น ขนลุกนิด ๆ) · ปมรถเมล์สาย 99 เริ่มเฉลยแล้ว!',
+    '🖼️ รูปหน้าในรายชื่อชาวเมืองเห็นเต็มหน้าแล้ว ไม่โดนตัดครึ่ง',
+  ] },
   { v: '2026-11-28o', d: '24 พ.ย.', items: [
     '💞 <b>ผูกมิตรได้ทุกคนแล้ว!</b> พนักงานและเจ้าของร้านอีก 41 คน (หลวงพ่อ ผู้กอง หมอแพร เชฟหมี น้าเล็ก เจ๊ศรี ฯลฯ) คุยได้วันละครั้ง ให้ของขวัญได้ มีของชอบ วันเกิด และคำขอรายวันของตัวเอง',
   ] },

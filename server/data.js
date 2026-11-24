@@ -2305,6 +2305,9 @@ const ACHIEVEMENTS = [
   // 📖 townsfolk stories (server/stories.js): finishing an arc gives its title
   { id: 'st_dam', r: 4, c: null, stat: 'story_dam', n: 1, title: 'คู่หูล่าตำนาน', desc: 'ช่วยพี่ดำจนจบเรื่อง "ตำนานเจ้าดำน้อย"' },
   { id: 'st_somjai', r: 5, c: null, stat: 'story_somjai', n: 1, title: 'ผู้พาลูกกลับบ้าน', desc: 'ช่วยป้าสมใจจนจบเรื่อง "ขนมห่อที่เกิน"' },
+  { id: 'st_choei', r: 5, c: null, stat: 'story_choei', n: 1, title: 'ผู้ทำให้ตาเฉยพูด', desc: 'ช่วยตาเฉยจนจบเรื่อง "ชายผู้ไม่พูด"' },
+  { id: 'st_tonkla', r: 4, c: null, stat: 'story_tonkla', n: 1, title: 'ผู้เล่นคนที่ 2', desc: 'ช่วยต้นกล้าจนจบเรื่อง "ตู้เกมหมายเลขศูนย์"' },
+  { id: 'st_mprang', r: 4, c: null, stat: 'story_mprang', n: 1, title: 'พี่เงาคนที่สอง', desc: 'ช่วยน้องมะปรางจนจบเรื่อง "พี่เงา"' },
   // 🛠️ equipment: job tools, vehicles, fishing rods (absolute counts, refreshed by eqSweep on the server)
   { id: 'eq_t1', r: 1, nt: 1, g: 1, stat: 'toolup', n: 1, title: 'อุปกรณ์ชิ้นแรก', desc: 'อัปเกรดอุปกรณ์อาชีพครั้งแรก' },
   { id: 'eq_t2', r: 2, c: null, stat: 'toolup', n: 6, title: 'คนมีของ', desc: 'อัปเกรดอุปกรณ์อาชีพรวม 6 ระดับ' },
