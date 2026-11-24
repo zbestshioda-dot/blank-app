@@ -1808,7 +1808,7 @@ function talkTarget() {
     if (!p.npc || p.bot || p.zb || p.id === myId || areaOf(p.x, p.y)?.id !== here) continue;
     const d = Math.hypot(p.x - m.x, p.y - m.y); if (d < bd) { bd = d; best = p; }
   }
-  if (!best || near && (near.type === 'pier' || Math.hypot(near.x - m.x, near.y - m.y) < bd)) return null;
+  if (!best || near && (near.type === 'pier' ? bd > 1.3 : Math.hypot(near.x - m.x, near.y - m.y) < bd)) return null;   // by the water: only someone right beside you
   return best;
 }
 function talk() {
@@ -5272,7 +5272,7 @@ function dlgRender() {
   d.querySelector('.dlgText').textContent = line.slice(0, Math.floor(dlgQ.shown));
   d.querySelector('.dlgNext').style.visibility = done && !last ? 'visible' : 'hidden';
   const ch = d.querySelector('.dlgCh');
-  if (done && last && !ch.dataset.on) {
+  if ((done && last || dlgQ.instant) && !ch.dataset.on) {   // instant: the choices show right away (townsfolk: gift / story without reading to the end)
     ch.dataset.on = 1;
     const list = dlgQ.choices?.length ? dlgQ.choices : [{ label: '👋 ลาก่อน', fn: () => dialogClose() }];
     ch.innerHTML = list.map((c, k) => `<button data-k="${k}" class="${c.cls || ''}">${esc(c.label)}</button>`).join('');
@@ -5405,7 +5405,7 @@ function talkToTown(o) {
     if (rq && !rq.done) extra.push(`[n]ขอให้ช่วยหน่อยได้ไหม... อยากได้ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${rq.n} ชิ้น (${whereGet(rq.item)}) เดี๋ยวให้ค่าเหนื่อย ${money(rq.pay)}`);
     const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id }); dialogClose(); } } }] : [];
     const gift = { label: fd?.gave ? '🎁 ให้ของแล้ววันนี้' : '🎁 ให้ของขวัญ', cls: fd?.gave ? '' : 'primary', fn: () => { dialogClose(); if (!fd?.gave) openPanel({ kind: 'folkgift', npc: o.id, fid: o.fid }); } };
-    return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [hi, ...extra, ...t], choices: [...storyChoices(o), ...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
+    return dialog({ name: o.name, face: o.face || null, npc: o.id, instant: true, lines: [hi, ...extra, ...t], choices: [...storyChoices(o), ...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
   }
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
     const q = me.quests?.list.find(x => x.type === 'trade');
@@ -6334,6 +6334,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-28n', d: '24 พ.ย.', items: [
     '💬 คุยกับชาวเมืองง่ายขึ้น: เดินไปยืนใกล้ ๆ ปุ่มใหญ่จะเปลี่ยนเป็น "คุยกับ..." กดได้เลย ไม่ต้องจิ้มที่ตัวคน',
+    '🎁 ปุ่มให้ของขวัญ / เรื่องราว ขึ้นทันทีตอนเริ่มคุย ไม่ต้องอ่านจนจบ',
   ] },
   { v: '2026-11-28m', d: '24 พ.ย.', items: [
     '📖 <b>เรื่องราวของชาวเมือง!</b> พี่ดำ "ตำนานเจ้าดำน้อย" (ฮา) กับป้าสมใจ "ขนมห่อที่เกิน" (ดราม่า) คนละ 10 บท มีปมให้เดา ปลดล็อกตามความสนิท วันละบท',
