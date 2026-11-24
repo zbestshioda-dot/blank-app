@@ -5859,6 +5859,7 @@ function folksPanel() {
   if (!FOLKS) return `<h2>💞 ชาวเมือง</h2><div class="sub">กำลังโหลด...</div>`;
   const row = f => `<div class="item folkRow"><div class="em">${folkFace(f) || '🙂'}</div><div class="nm"><b>${esc(f.name)}</b> ${f.today ? '🎂' : ''}<small>${FOLK_LVN[f.lv]} · ${heartBar(f.p, f.lv)}</small>
     <small>${esc(f.doing || '')}${f.bday ? ` · 🎂 ${f.bday[1]} ${G.months?.[f.bday[0] - 1] || ''}` : ''}</small><small>${f.love ? `💖 ชอบที่สุด: ${G.items[f.love]?.icon || ''}${esc(G.items[f.love]?.name || '')} · ` : ''}${f.likes.length ? `❤️ ชอบ: ${f.likes.map(i => G.items[i]?.icon || '').join(' ')}` : '❔ ลองให้ของดูว่าชอบอะไร'}</small>
+    ${f.rel?.length ? `<small>🔗 ${f.rel.filter(r => r.w).map(r => `${r.ic} ${esc(r.n)}: ${esc(r.d)}`).join(' · ')}${f.rel.some(r => !r.w) ? `${f.rel.some(r => r.w) ? ' · ' : ''}🔒 ความลับอีก ${f.rel.filter(r => !r.w).length} เรื่อง (สนิทถึง "เพื่อนสนิท" ถึงจะรู้)` : ''}</small>` : ''}
     <small>${f.talked ? '✅ คุยแล้ววันนี้' : '💬 ยังไม่ได้คุยวันนี้'} · ${f.gave ? '✅ ให้ของแล้ว' : '🎁 ยังไม่ได้ให้ของ'}</small>
     ${f.req ? `<small class="folkReq${f.req.done ? ' done' : ''}">📋 ${f.req.done ? 'ช่วยแล้ววันนี้ ✅' : `ขอ ${reqTxt(f.req)} (มี ${Math.min(me.inv?.[f.req.item] || 0, f.req.n)}/${f.req.n}) · ได้ ${money(f.req.pay)} · หาได้ที่${whereGet(f.req.item)}`}</small>` : ''}</div></div>`;
   const open = FOLKS.filter(f => f.req && !f.req.done).length;
@@ -6350,6 +6351,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28s', d: '24 พ.ย.', items: [
+    '🔗 ชาวเมืองมีความสัมพันธ์กันแล้ว! ครอบครัว 👪 แอบชอบ 💘 เพื่อน 🤝 คู่แข่ง ⚔️ ที่ทำงาน 💼 ศิษย์-อาจารย์ 🎓 ดูได้ที่ 💞 ชาวเมือง · บางคู่เป็นความลับ ต้องสนิทถึง "เพื่อนสนิท" ก่อน',
+    '🔗 สนิทกับใครขึ้นระดับใหม่ เขาจะเล่าเรื่องคุณให้ครอบครัวและเพื่อนฟัง ได้ความสนิทกับคนเหล่านั้นด้วย +1',
+  ] },
   { v: '2026-11-28r', d: '24 พ.ย.', items: [
     '💗 ความสนิทมี 10 ดวงแล้ว (ดวงละ 10 แต้ม) · เพิ่มระดับใหม่ "คนพิเศษ" (75) ได้ ฿12,000 และ "คนสำคัญที่สุด" (100) ได้ ฿20,000 · ความสนิทเดิมไม่หาย',
     '📖 เนื้อเรื่องใหม่ของพนักงาน 10 คน: ผู้กองเอก หมอแพร หลวงพ่อเย็น น้าเล็ก เชฟหมี เจ๊ศรี ผู้กองเดช พี่ฟ้า แม่หมอจันทรา ลุงจุก',

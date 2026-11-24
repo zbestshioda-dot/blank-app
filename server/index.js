@@ -2646,6 +2646,9 @@ function folkAdd(a, def, n, why) {
     if (r) credit(a, r);
     toast(a, `💞 ${def.name} นับคุณเป็น "${D.FOLK_LVN[lv]}" แล้ว!${r ? ` ได้รับ ${money(r)}` : ''}`, '💞'); joy(a, 5);
     if (lv >= 3) feed(`💞 ${a.name} กลายเป็น${D.FOLK_LVN[lv]}ของ${def.name}`);
+    const near = (REL[def.id] || []).filter(r => r.t !== 'rival' && r.t !== 'work' && FOLK_DEF[r.w]);   // 🔗 family and friends hear about you: +1 with each of them
+    for (const r of near) folkOf(a, r.w).p += 1;
+    if (near.length) toast(a, `🔗 ${def.name.replace(/\s*\(.*$/, '')}เล่าเรื่องคุณให้${near.map(r => FOLK_DEF[r.w].name.replace(/\s*\(.*$/, '')).join(', ')}ฟัง · 💞 +1`, '🔗');
   } else if (why) toast(a, `${why} · 💞 +${n} (${f.p}/${D.FOLK_LV[Math.min(D.FOLK_LV.length - 1, lv + 1)]})`, '💞');
   markMe(a); send(a, folksView(a)); return before !== lv;
 }
@@ -2696,7 +2699,7 @@ function folkDo(a, m) {
   folkAdd(a, def, 4, `ช่วย${def.name} สำเร็จ · ได้ ${money(r.pay)}`);
 }
 // 📖 townsfolk story arcs (server/stories.js): progress lives in a.folk[owner].s = { ch, st, day } (saved with the friendship)
-const SY = require('./stories');
+const SY = require('./stories'), REL = require('./relations');
 const storyOf = (a, o) => { const f = folkOf(a, o); return f.s || (f.s = { ch: 0, st: 0 }); };
 // 'do' steps count from the moment the step became current (base kept per chapter:step)
 function storyProg(a, s, st) {
@@ -2761,6 +2764,7 @@ function folksView(a) {
     const n = npcs.find(x => x.fid === def.id), f = (a.folk || {})[def.id] || { p: 0, lv: 0 }, lv = folkLv(f.p), d = dayKey();
     return { id: def.id, npc: n?.id, name: def.name, face: def.face, p: f.p, lv, next: D.FOLK_LV[lv + 1] ?? null, about: def.about,
       bday: def.bday, today: folkBday(def) ? 1 : 0, desk: def.desk ? 1 : 0, doing: n ? folkDoing(n) : def.desk ? 'ประจำอยู่ที่ร้าน/ที่ทำงาน' : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0,
+      rel: (REL[def.id] || []).filter(r => FOLK_DEF[r.w]).map(r => r.sec && lv < 3 ? { ic: '🔒' } : { ic: r.ic, w: r.w, n: FOLK_DEF[r.w].name.replace(/\s*\(.*$/, ''), d: r.d }),
       req: folkReq(a, def), known: f.known || [], love: lv >= 3 ? def.love : (f.known || []).includes(def.love) ? def.love : '', likes: lv >= 2 ? def.likes : (f.known || []).filter(x => def.likes.includes(x)) };
   }) };
 }
