@@ -272,4 +272,5 @@ module.exports = {
   ] },
 };
 Object.assign(module.exports, require('./stories_more'));
-Object.assign(module.exports, require('./stories_desk1'));   // staff & shopkeepers, batch 1   // more arcs live there
+Object.assign(module.exports, require('./stories_desk1'));   // staff & shopkeepers, batch 1
+for (const f of ['./stories_desk2', './stories_desk3', './stories_desk4']) { try { Object.assign(module.exports, require(f)); } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e; } }   // more arcs live there
