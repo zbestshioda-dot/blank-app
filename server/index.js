@@ -5442,7 +5442,7 @@ function login(ws, m, pre) {
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });
   meSend(a, true); send(a, worldView());
-  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); send(a, fcView(a)); send(a, folksView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
+  send(a, { t: 'mypic', pic: a.pic || '' }); send(a, projView(a)); send(a, { t: 'mail', list: a.mail || [] }); send(a, ev7View(a)); send(a, lkView(a)); send(a, fcView(a)); send(a, folksView(a)); { const t = now(); send(a, { t: 'lkfl', list: lkFloats.filter(f => t - f.k < 300e3).map(f => ({ ...f, age: t - f.k })) }); }
   if (daily) send(a, { t: 'daily', ...daily });
   setTimeout(() => a.ws === ws && nbDaily(a), 4000);   // 🥚 the egg hatches / the day-2 gift arrives once the phone is connected (so the hatch card shows)
   if (!a.rod && a.career === 'none' && !NBM.isV2(a)) setTimeout(() => a.ws === ws && toast(a, `💡 ยังไม่มีเงิน? ซื้อเบ็ด ${money(D.FISHING.rod)} กับน้าเล็กที่สมาคมประมง แล้วตกปลาขาย — วิธีหาเงินที่ง่ายที่สุดสำหรับมือใหม่!`, '🎣'), 6000);

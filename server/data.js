@@ -1463,6 +1463,7 @@ const PROJECTS = [
   { id: 'wheel', name: 'ชิงช้าสวรรค์ยักษ์', icon: '🎡', goal: 50000000, desc: 'ชิงช้าสวรรค์ที่สูงที่สุดในเมือง มองเห็นทะเลสาบและป้ายรถเมล์ได้ทั้งหมด' },
   { id: 'clock', name: 'หอนาฬิกากลางเมือง', icon: '🕰️', goal: 100000000, desc: 'หอนาฬิกาที่เดินตรงเวลา ไม่หยุดที่ 03:17 อีกแล้ว — สัญลักษณ์ว่าเมืองนี้เดินต่อไปได้' },
 ];
+PROPS.push({ s: 'o_noticeboard', x: 52.5, y: 38.6 });   // the box stands by a notice board so it can be seen from afar (not solid)
 STATIONS.push({ id: 'proj_box', type: 'proj', label: 'กล่องระดมทุนสร้างเมือง', icon: '🏗️', x: 52.5, y: 38.5, r: 1.6, area: 'town' });
 const AUC_LOTS = ['auc_arch', 'auc_piano', 'auc_bonsai', 'auc_tank', 'auc_rocker', 'auc_lamp'];   // 🏆 weekly auction order
 // 🎆 fireworks over the fountain square, bought with baht (a money sink everyone in town sees). n bursts over dur seconds

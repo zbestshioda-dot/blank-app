@@ -2269,6 +2269,7 @@ function draw(t) {
     if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
     if (s.type === 'yzone' && yzOpen(s.idx, s.z)) continue;
+    if (s.type === 'proj') sign(`🏗️ สร้างเมืองด้วยกัน${PROJ?.cur ? ` · ${Math.floor(PROJ.cur.got / PROJ.cur.goal * 100)}%` : ''}`, px, py - TS * 2.6 + Math.sin(t / 500) * 3, { size: TS * .42, bg: 'rgba(200,110,30,.95)', border: '#ffd77a' });   // big floating sign over the donation box
     if (s.type === 'craft') sign('🔨 โรงช่างคราฟ ✨', px + TS * .5, py - TS * 3 + Math.sin(t / 500) * 3, { size: TS * .5, bg: 'rgba(170,95,25,.95)', border: '#ffd77a' });   // floating sign over the workshop
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
     ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
