@@ -1789,6 +1789,9 @@ function addXp(a, n = 1) {
   const before = lvl(a), g = c === 'office' ? n : n * xpGain(before);
   a.xp[c] = +((a.xp[c] || 0) + g).toFixed(3); markMe(a);
   if (c !== 'office' && lvl(a) > (a.stats?.['lv_' + c] || 0)) stat(a, 'lv_' + c, lvl(a), true);
+  if (c === 'office' && lvl(a) > before && lvl(a) <= D.OFFICE_TITLES.length) {   // 🎊 promotion, whatever gave the XP (shift, mission, typing game)
+    const ti = D.OFFICE_TITLES[lvl(a) - 1]; stat(a, 'promo'); feed(`🎊 ${a.name} ได้เลื่อนตำแหน่งเป็น${ti}`); toast(a, `🎊 ได้เลื่อนตำแหน่งเป็น${ti}! เงินเดือนขึ้น`, '🎊');
+  }
   if (c !== 'office' && lvl(a) > before) { toast(a, `🎉 เลเวลอาชีพ${D.CAREERS[c].name}อัปเป็น Lv.${lvl(a)}! ได้เงินจากงานเพิ่มเป็น +${Math.round((jobPay(a) - 1) * 100)}%`, '⭐'); if (lvl(a) % 5 === 0) feed(`⭐ ${a.name} เลเวล${D.CAREERS[c].name}ถึง Lv.${lvl(a)}`); }
 }
 // licences that expire: the driving licence must be renewed every in-game year (1 real day)
@@ -2296,8 +2299,7 @@ function officeTick(a, t, h, dt) {
     if ((o.n || 0) >= 4) { addXp(a); stat(a, 'shifts'); }
     let msg = `เลิกงานแล้ว! วันนี้ส่งเอกสาร ${o.n || 0} งาน`;
     if (lvl(a, 'office') > before && lvl(a, 'office') <= D.OFFICE_TITLES.length) {
-      msg += ` 🎊 เลื่อนเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`; stat(a, 'promo');
-      feed(`🎊 ${a.name} ได้เลื่อนตำแหน่งเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`);
+      msg += ` 🎊 เลื่อนเป็น${D.OFFICE_TITLES[lvl(a, 'office') - 1]}`;   // stat + feed already done in addXp
     }
     toast(a, msg, '🏢');
   }
@@ -3561,11 +3563,15 @@ function act(a, m) {
     case 'house.sell': case 'estate.sell': {
       if (!a.hown) return toast(a, 'คุณยังไม่มีบ้าน', '🏠', false);
       if (m.a === 'sell' && s.type !== 'estate' && houses[s.house] !== a) return toast(a, 'นี่ไม่ใช่บ้านของคุณ', '🔒', false);
-      const back = Math.round(D.HOME_TIERS[a.hown.tier || 0].price * 0.6 + (a.furniture || []).reduce((t, k) => t + (D.FURNITURE[fbase(k)]?.gem ? 0 : D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
+      // 💎 special pieces (diamonds, gifts, crafted, dungeon coins, auction) are not sold back: they move to storage (a.keep) for the next house
+      const spec = k => { const f = D.FURNITURE[fbase(k)]; return !!f && (f.gem || f.gift || f.craft || f.dgc || D.AUC_LOTS.includes(fbase(k))); };
+      const kept = (a.furniture || []).filter(k => spec(k) && !(a.keep || []).includes(k));
+      const back = Math.round(D.HOME_TIERS[a.hown.tier || 0].price * 0.6 + (a.furniture || []).reduce((t, k) => t + (spec(k) ? 0 : D.FURNITURE[fbase(k)]?.price || 0) * 0.4, 0) + (a.yz || []).reduce((t, z, n) => t + D.YARD.price[n] * 0.5, 0));
       if (a.house >= 0 && houses[a.house] === a) { const r = D.roomAt(a.x, a.y), y = D.areaAt(a.x, a.y); if (r?.house === a.house || y?.yard && y.house === a.house) teleport(a, D.GATES.housing_in.x, D.GATES.housing_in.y); houses[a.house] = null; }
       for (const id of a.aq || []) addItem(a, id, 1); a.aq = [];   // the fish come back to the bag
+      if (kept.length) a.keep = [...(a.keep || []), ...kept];
       a.hown = null; a.house = -1; a.furniture = []; a.hlv = 0; a.fpos = {}; a.yz = []; a.ycrops = {}; a.money += back; markMe(a); wdAt = 0;
-      return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}`, '🏠');
+      return toast(a, `ขายบ้านคืนโครงการได้ ${money(back)}${kept.length ? ` · เฟอร์นิเจอร์พิเศษ ${kept.length} ชิ้น (💎/ของรางวัล/คราฟต์) เก็บไว้ให้ ย้ายไปบ้านใหม่ได้` : ''}`, '🏠');
     }
     case 'estate.buy': {                    // buy a home from the agent: a size and a look; it stands in the village whenever you are online
       const T = D.HOME_TIERS[+m.tier], st = clamp(Math.floor(+m.style) || 0, 0, D.HOME_STYLES.length - 1); if (!T) return;
@@ -4243,7 +4249,7 @@ function misNext(a) {
   const m = a.mis; m.i++;
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
-  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((80 + 55 * min) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
+  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((80 + 55 * Math.min(min, m.limit / 60000 * .5)) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
   a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); if (m.car === 'detective') a.cases = [...(a.cases || []), { t: m.title, i: m.icon, d: t, c: m.steps.filter(s => s.k === 'talk' || s.k === 'find').map(s => s.label).slice(0, 4) }].slice(-40); }   /* 🕵️ the case notebook */ earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(pay)}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
