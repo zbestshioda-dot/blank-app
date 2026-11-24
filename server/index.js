@@ -2400,7 +2400,7 @@ function policeCarTake(a) {
 function apply(a, career) {
   const c = D.CAREERS[career]; if (!c || career === 'none') return;
   if (a.career === career) return toast(a, `คุณเป็น${c.name}อยู่แล้ว`, 'ℹ️', false);
-  for (const l of c.need || []) if (!hasLic(a, l)) return toast(a, licExpired(a, l) ? `${D.LICENSES[l].name}หมดอายุแล้ว ต่ออายุที่มหาวิทยาลัยก่อน` : `ต้องมี${D.LICENSES[l].name}ก่อน (ที่มหาวิทยาลัย)`, '🎓', false);
+  for (const l of c.need || []) if (!hasLic(a, l)) return toast(a, licExpired(a, l) ? `${D.LICENSES[l].name}หมดอายุแล้ว ต่ออายุที่${D.LICENSES[l].where === 'dealer' ? 'โชว์รูมรถ' : 'มหาวิทยาลัย'}ก่อน` : `ต้องมี${D.LICENSES[l].name}ก่อน (ที่มหาวิทยาลัย)`, '🎓', false);
   if (career === 'beggar' && a.money + (a.bank || 0) > 2000) return toast(a, `มีเงินเกิน ${money(2000)} (รวมเงินฝาก) เป็นขอทานไม่ได้แล้ว`, '🥣', false);
   const wait = jobCooldown(a);
   if (wait > 0) return toast(a, `เพิ่งเปลี่ยนงานไป ต้องรออีก ${Math.ceil(wait / 60000)} นาทีถึงจะสมัครงานใหม่ได้`, '⏳', false);
@@ -3221,7 +3221,7 @@ function act(a, m) {
       const L = D.LICENSES.driving;
       if (!(a.licenses || []).includes('driving')) return toast(a, 'ยังไม่มีใบขับขี่ ต้องสอบก่อน', '🪪', false);
       const left = (a.licExp?.driving || 0) - now();
-      if (left > LICENSE_YEAR / 4) return toast(a, `ใบขับขี่ยังไม่หมดอายุ (ต่ออายุได้เมื่อเหลือไม่ถึง 3 เดือนในเกม)`, '🪪', false);
+      if (left > LICENSE_YEAR) return toast(a, `ใบขับขี่ต่อล่วงหน้าไว้แล้ว ใช้ได้อีกเกิน 1 ปีในเกม`, '🪪', false);   // renew any time, up to 2 years ahead
       if (!pay(a, L.renew)) return;
       a.licExp = { ...(a.licExp || {}), driving: Math.max(now(), a.licExp?.driving || 0) + LICENSE_YEAR }; markMe(a);
       return toast(a, `ต่ออายุใบขับขี่แล้ว ${money(L.renew)} ใช้ได้อีก 1 ปีในเกม`, '🪪');
@@ -5660,6 +5660,15 @@ function onMessage0(ws, raw) {
       a.show = sh; markMe(a); return;
     }
     case 'bug': return bugReport(a, m);
+    case 'rescue': {                          // 🆘 the player is stuck (can't walk, nothing responds): clear what pins them and take them to the town square
+      if (a.pose === 'jail') return toast(a, 'อยู่ในห้องขัง ออกไม่ได้จนกว่าจะพ้นโทษ', '🚔', false);
+      if (a.down) return toast(a, 'คุณหมดสติอยู่ รอหมอหรือรอฟื้นก่อน', '💤', false);
+      if (!cd(a, 'rescue', 60000)) return;
+      if (a.pass) hopOff(a); if (a.fun) rideOff(a); a.ride = ''; a.cast = null; a.fixId = 0;
+      const g = D.GATES.town_from_housing; console.log(`[rescue] ${a.name} from ${a.x.toFixed(1)},${a.y.toFixed(1)} (${areaId(a) || '-'})`);
+      teleport(a, g.x, g.y); sendRoster();
+      return toast(a, 'พากลับเข้าเมืองแล้ว 🏙️ ถ้ายังติดอยู่ แจ้งบั๊กอีกครั้งได้เลย', '🆘');
+    }
     case 'unstick': {                         // the client could not walk for a while: drop anything that pins the player, resync the position
       if (!cd(a, 'unstick', 3000, true)) return;
       if (a.cast) a.cast = null; if (a.pose && a.pose !== 'jail' && !a.down) standUp(a);

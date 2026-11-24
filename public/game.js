@@ -4429,6 +4429,8 @@ function refreshPanel(force) {
   for (const id of ['chatMsgs', 'callMsgs']) { const cm = document.getElementById(id); if (cm) cm.scrollTop = cm.scrollHeight; }
 }
 function bindStocks(root) {
+  const qi = root.querySelector('#skQty');   // the typed amount is kept in the panel state, so a refresh (price tick, money change) no longer snaps it back
+  if (qi) qi.oninput = () => { if (panel) panel.skq = qi.value; const c = root.querySelector('#skCost'), q = Math.floor(+qi.value || 0); if (c && q > 0) c.innerHTML = skCostTxt(q, +qi.dataset.price); };
   root.querySelectorAll('canvas[data-spark]').forEach(drawSpark);
   root.querySelectorAll('canvas[data-chart]').forEach(c => { drawStockChart(c); const hv = e => { const r = c.getBoundingClientRect(); drawStockChart(c, e.clientX - r.left); }; c.onpointermove = hv; c.onpointerdown = hv; c.onpointerleave = () => drawStockChart(c); });
 }
@@ -6139,6 +6141,7 @@ function achvPanel() {
 // ---- stock market (bank tab): price list with sparklines, a candlestick chart with moving averages and volume, holdings and trading
 const stockHist = {};
 const SK_COL = { up: '#26a69a', dn: '#ef5350' };
+const skCostTxt = (q, price) => { const g = q * price, fee = Math.max(G.stockFee[1], Math.round(g * G.stockFee[0])), tot = Math.ceil(g) + fee; return `💰 เงินที่มี <b>${money(me.money)}</b> · ${q.toLocaleString()} หุ้น ใช้เงิน <b style="color:${tot > me.money ? 'var(--bad)' : 'inherit'}">${money(tot)}</b> (รวมค่าธรรมเนียม ${money(fee)})${tot > me.money ? ' · เงินไม่พอ' : ''}`; };
 function stockPanel(p, st) {
   const sk = wd?.sk; if (!sk) return '<div class="sub">กำลังโหลดตลาด...</div>';
   const sid = p.sid || sk.l[0][0], row = sk.l.find(x => x[0] === sid) || sk.l[0], meta = G.stocks.find(x => x.id === row[0]);
@@ -6158,7 +6161,8 @@ function stockPanel(p, st) {
     <div class="tabs skR">${ranges}</div>
     <canvas class="skChart" data-chart="${row[0]}" data-n="${n}"></canvas>
     <div class="grid2" style="margin-top:6px"><div class="item"><div class="nm">📦 ถืออยู่<small><b>${hold ? hold[0].toLocaleString() : 0}</b> หุ้น${hold ? ` · ทุนเฉลี่ย ${hold[1].toFixed(2)}` : ''}</small></div></div><div class="item"><div class="nm">${pl >= 0 ? '💹 กำไร' : '📉 ขาดทุน'}<small><b style="color:${pl >= 0 ? SK_COL.up : SK_COL.dn}">${money(Math.round(Math.abs(pl)))}</b>${hold ? ` (${((price / hold[1] - 1) * 100).toFixed(1)}%)` : ''}</small></div></div></div>
-    <div class="rowf" style="margin-top:8px"><input id="skQty" type="number" min="1" value="${Math.min(10, maxBuy) || 1}" inputmode="numeric"><span class="sub" style="margin:0">หุ้น · ซื้อได้สูงสุด ${maxBuy.toLocaleString()}</span></div>
+    <div class="rowf" style="margin-top:8px"><input id="skQty" type="number" min="1" value="${+p.skq > 0 ? Math.floor(+p.skq) : Math.min(10, maxBuy) || 1}" inputmode="numeric" data-price="${price}"><span class="sub" style="margin:0">หุ้น · ซื้อได้สูงสุด ${maxBuy.toLocaleString()}</span></div>
+    <div class="sub" id="skCost" style="margin-top:4px">${skCostTxt(+p.skq > 0 ? Math.floor(+p.skq) : Math.min(10, maxBuy) || 1, price)}</div>
     <div class="grid2" style="margin-top:6px">${B('🟢 ซื้อ', { fn: 'stock', st, op: 'buy', id: row[0] }, 'good')}${B('🔴 ขาย', { fn: 'stock', st, op: 'sell', id: row[0] }, 'warn', !hold)}${B(`ซื้อเต็มเงิน (${maxBuy.toLocaleString()})`, { fn: 'stock', st, op: 'buy', id: row[0], qty: maxBuy }, '', !maxBuy)}${B('ขายหมด', { fn: 'stock', st, op: 'sell', id: row[0], qty: hold ? hold[0] : 0 }, '', !hold)}</div>`;
 }
 function drawSpark(c) {
@@ -6262,6 +6266,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28c', d: '24 พ.ย.', items: [
+    '📈 ซื้อหุ้นง่ายขึ้น: จำนวนที่พิมพ์ไม่เด้งกลับแล้ว · บอกเงินที่มีและเงินที่ต้องใช้ (รวมค่าธรรมเนียม) ทันทีที่พิมพ์',
+    '🪪 ต่ออายุใบขับขี่ได้ทุกเมื่อที่โชว์รูมรถ (ต่อล่วงหน้าได้) · แก้ข้อความที่บอกให้ไปต่อที่มหาวิทยาลัยผิดที่',
+    '🆘 ตัวติดเดินไม่ได้? เปิดหน้า "แจ้งบั๊ก" แล้วกด "ตัวติด พากลับเมือง" ได้เลย',
+  ] },
   { v: '2026-11-28b', d: '24 พ.ย.', items: [
     '🩺 ชุดใหม่: ชุดหมอผ่าตัดสีเขียว ฿39,999 ที่ร้านแฟชั่น',
     '🪑 ใส่ชุดนี้แล้วกด "พัก" หรือนั่งม้านั่ง จะนั่งท่าจริง (หันหน้า/หันหลัง/ด้านข้าง)',
@@ -7841,7 +7850,7 @@ function renderPanel(p) {
     case 'dealer': {
       const dl = G.licenses.driving, hasDL = (me.licenses || []).includes('driving'), exp = me.licExp?.driving || 0, leftD = Math.round((exp - Date.now() - clockOff) / G.dayMs * 10) / 10;
       const drive = !hasDL ? itemRowRaw('🪪', 'สอบใบขับขี่', `ค่าสอบ ${money(dl.price)} · ตอบคำถามจราจร 3 ข้อ ต้องถูกทุกข้อ · ต้องต่ออายุทุกปีในเกม (${money(dl.renew)})`, B('📝 สอบ', { t: 'act', st, a: 'dtest' }, 'good'))
-        : itemRowRaw('🪪', `ใบขับขี่ ${licExp('driving') ? '<span class="tag" style="background:var(--bad)">หมดอายุ</span>' : ''}`, licExp('driving') ? 'หมดอายุแล้ว — ต่ออายุเพื่อทำงานไรเดอร์ต่อ' : `ใช้ได้อีก ${leftD} วันในเกม (1 ปี = 60 วันในเกม = 1 วันจริง)`, B(`ต่ออายุ ${money(dl.renew)}`, { t: 'act', st, a: 'renew' }, licExp('driving') ? 'primary' : '', !licExp('driving') && leftD > 15));
+        : itemRowRaw('🪪', `ใบขับขี่ ${licExp('driving') ? '<span class="tag" style="background:var(--bad)">หมดอายุ</span>' : ''}`, licExp('driving') ? 'หมดอายุแล้ว — ต่ออายุเพื่อทำงานไรเดอร์ต่อ' : `ใช้ได้อีก ${leftD} วันในเกม (1 ปี = 60 วันในเกม = 1 วันจริง)`, B(`ต่ออายุ ${money(dl.renew)}`, { t: 'act', st, a: 'renew' }, licExp('driving') ? 'primary' : '', !licExp('driving') && leftD > 60));
       const tab = ['car', 'gem'].includes(p.vtab) ? p.vtab : 'moto', lic = (me.licenses || []).includes('driving'), mine = me.vehicles || [];
       const cards = Object.entries(G.shop.vehicles).filter(([k, v]) => (!v.hidden && (!v.until || Date.now() + clockOff < v.until) || (me.vehicles || []).includes(k)) && (tab === 'gem' ? !!v.gem : v.kind === tab && !v.gem) && (!v.job || v.job === me.career)).sort((a, b) => (a[1].gem || a[1].price) - (b[1].gem || b[1].price)).map(([key, v]) => {
         const has = mine.includes(key), on = me.ride === key, need = v.license && !lic, cost = v.gem ? `💎${v.gem.toLocaleString()}` : money(v.price), afford = v.gem ? me.gemInf || (me.gems || 0) >= v.gem : me.money >= v.price;
@@ -8184,7 +8193,8 @@ function renderPanel(p) {
     }
     case 'bug':
       return `<h2>🐞 แจ้งบัค / ปัญหา</h2><div class="sub">เล่าว่าเกิดอะไรขึ้น ทำอะไรอยู่ตอนนั้น (ระบบจะแนบตำแหน่งและรุ่นเครื่องให้อัตโนมัติ)</div>
-        <textarea id="bugIn" maxlength="600" placeholder="เช่น เดินเข้าโรงพยาบาลแล้วตัวละครติดผนัง..."></textarea>${B('📨 ส่งรายงาน', { fn: 'bug' }, 'primary big')}`;
+        <textarea id="bugIn" maxlength="600" placeholder="เช่น เดินเข้าโรงพยาบาลแล้วตัวละครติดผนัง..."></textarea>${B('📨 ส่งรายงาน', { fn: 'bug' }, 'primary big')}
+        <div class="jobbox" style="margin-top:10px">🆘 ตัวติด เดินไม่ได้ หรือกดอะไรก็ไม่ทำงาน? กดปุ่มนี้ พากลับจัตุรัสกลางเมือง (ใช้ได้ทุก 1 นาที)${B('🆘 ตัวติด พากลับเมือง', { t: 'rescue' }, 'warn')}</div>`;
     case 'god': {
       if (!me.admin) return '';
       const g = me.god || {};
