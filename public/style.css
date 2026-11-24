@@ -1861,3 +1861,31 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 #loginForm .lfHead img{width:30px!important}
 .fld{border-color:var(--k-ink)!important;background:#fff!important;box-shadow:0 3px 0 var(--k-ink)}
 .fld:focus-within{border-color:var(--k-skyDk)!important;box-shadow:0 3px 0 var(--k-ink),0 0 0 4px rgba(76,195,255,.35)!important}
+/* 🖼️ pixel HUD icons (tools/add_hud_icons.py → assets/hud) in place of the phone's emoji — same button sizes */
+.hudI{display:inline-block;vertical-align:middle;object-fit:contain;image-rendering:pixelated}
+#cbOpen .hudI{width:18px;height:18px;margin-top:-2px}
+#mailFab .hudI{width:30px;height:30px;display:block}
+#thumbs>button>span:first-child{background:center/contain no-repeat;image-rendering:pixelated}
+#thumbs #bagBtn>span:first-child,#thumbs #runBtn>span:first-child,#thumbs #restBtn>span:first-child,#thumbs #emoBtn>span:first-child,#thumbs #talkBtn>span:first-child{font-size:0!important;width:26px;height:26px;display:block;margin:0 auto 1px}
+#thumbs #bagBtn>span:first-child{background-image:url(assets/hud/bag.webp?v=1)}
+#thumbs #runBtn>span:first-child{background-image:url(assets/hud/run.webp?v=1)}
+#thumbs #restBtn>span:first-child{background-image:url(assets/hud/rest.webp?v=1)}
+#thumbs #emoBtn>span:first-child{background-image:url(assets/hud/laugh.webp?v=1)}
+#thumbs #talkBtn>span:first-child{background-image:url(assets/hud/chat.webp?v=1)}
+#phoneBtn img{content:url(assets/hud/phone.webp?v=1);object-fit:contain;image-rendering:pixelated}
+#card.v2 .bar label::before{content:''!important;background:center/contain no-repeat!important;border:0!important;image-rendering:pixelated;width:15px!important;height:15px!important}
+#card.v2 .bar[data-bar=energy] label::before{background-image:url(assets/hud/energy.webp?v=1)!important}
+#card.v2 .bar[data-bar=hunger] label::before{background-image:url(assets/hud/rice.webp?v=1)!important}
+#card.v2 .bar[data-bar=health] label::before{background-image:url(assets/hud/heart.webp?v=1)!important}
+#card.v2 .bar[data-bar=happy] label::before{background-image:url(assets/hud/smile.webp?v=1)!important}
+#createBox .lfHead img{content:url(assets/hud/welcome.webp?v=1);object-fit:contain;image-rendering:pixelated}
+/* 🏙️ login without an event: the town picture with the game's name on its sky */
+.townLogo{position:absolute;left:50%;top:calc(6% + env(safe-area-inset-top));transform:translateX(-50%);display:flex;align-items:center;gap:10px;z-index:2;pointer-events:none;width:max-content;max-width:92%}
+.townLogo img{width:58px;height:58px;border-radius:14px;border:3px solid var(--k-ink);box-shadow:0 4px 0 var(--k-ink)}
+.townLogo b{display:block;font:400 clamp(20px,6.4vw,30px)/1.15 var(--k-head);color:#fff;-webkit-text-stroke:5px var(--k-ink);paint-order:stroke fill}
+.townLogo small{display:block;font:700 12px var(--ui);color:var(--k-ink);letter-spacing:.5px}
+.townLogo{text-align:center;justify-content:center}.townLogo small{color:#fff!important;-webkit-text-stroke:3px var(--k-ink);paint-order:stroke fill;font-size:13px!important;margin-top:4px}
+.townLogo b{font-size:clamp(28px,9vw,40px)!important}
+.townLogo b{color:#fff!important;-webkit-text-stroke:0!important;text-shadow:0 3px 0 var(--k-ink),3px 0 0 var(--k-ink),-3px 0 0 var(--k-ink),0 -3px 0 var(--k-ink),2px 2px 0 var(--k-ink),-2px 2px 0 var(--k-ink),2px -2px 0 var(--k-ink),-2px -2px 0 var(--k-ink),0 6px 0 var(--k-ink)}
+.townLogo small{color:#fff!important;-webkit-text-stroke:0!important;text-shadow:0 2px 0 var(--k-ink),2px 0 0 var(--k-ink),-2px 0 0 var(--k-ink),0 -2px 0 var(--k-ink)}
+#login.townPic::after{display:none}

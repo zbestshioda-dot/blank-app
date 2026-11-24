@@ -641,8 +641,8 @@ const promo = (() => {
   let wantSound = false; try { wantSound = localStorage.getItem('lt_snd') === '1'; } catch { }
   const off = () => login.classList.remove('hasVid');
   const label = () => { snd.textContent = v.muted ? '🔇' : '🔊'; $('#sndHint')?.classList.toggle('hidden', !v.muted); };
-  const EVBAN = Date.now() < Date.parse('2026-11-30T23:59:59+07:00') ? 'assets/lkbanner_tall.webp?v=1' : '';   // 🏮 festival weeks: the event poster replaces the video
-  if (EVBAN) { v.removeAttribute('autoplay'); v.removeAttribute('poster'); v.style.display = 'none'; login.classList.add('posterOnly', 'evBan'); $('#promoPhone').style.background = `#0b1230 url(${EVBAN}) center/cover`; snd.style.display = 'none'; $('#sndHint')?.classList.add('hidden'); }
+  const EVBAN = Date.now() < Date.parse('2026-11-30T23:59:59+07:00') ? 'assets/lkbanner_tall.webp?v=1' : 'assets/ui/login_town.webp?v=1';   // 🏮 festival weeks: the event poster; otherwise the town picture (a still loads far faster than the video for a first visit)
+  if (EVBAN) { v.removeAttribute('autoplay'); v.removeAttribute('poster'); v.style.display = 'none'; login.classList.add('posterOnly', 'evBan'); $('#promoPhone').style.background = `#0b1230 url(${EVBAN}) center/cover`; if (/login_town/.test(EVBAN)) { login.classList.add('townPic'); $('#promoPhone').insertAdjacentHTML('beforeend', '<div class="townLogo"><div><b>เมืองชีวิตนี้เลือกได้</b><small>LIFE TOWN · เกมใช้ชีวิตออนไลน์</small></div></div>'); } snd.style.display = 'none'; $('#sndHint')?.classList.add('hidden'); }
   else if (lite) { v.removeAttribute('autoplay'); login.classList.add('posterOnly'); }
   else {
     v.src = 'assets/ui/login_promo.mp4?v=3'; v.addEventListener('error', off); v.play().catch(() => { });
@@ -2102,7 +2102,7 @@ function frame(t) {
       : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? 'นั่งเรียน'
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
-  } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('👆'); ACT_LBL.v = 'ใช้งาน'; }
+  } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('tap', '<img class="hudI" src="assets/hud/tap.webp?v=1" alt="" style="width:1.15em;height:1.15em">'); ACT_LBL.v = 'ใช้งาน'; }
   if (placing) { }
   else if (driving()) { ab.classList.remove('idle', 'closed'); actIco('🚪'); ACT_LBL.v = 'ลงจากรถ'; }
   else if (swimming()) { ab.classList.remove('idle', 'closed'); actIco('🪜'); ACT_LBL.v = 'ขึ้นจากสระ'; }   // in a bumper car the big button gets you out
@@ -6258,6 +6258,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28a', d: '24 พ.ย.', items: [
+    '🖼️ ไอคอนพิกเซลชุดใหม่: กระเป๋า วิ่ง พัก อิโมจิ มือถือ แชท จดหมาย ปุ่มใช้งาน และไอคอนพลัง/อิ่ม/เลือด/สุข',
+    '🏙️ หน้าเข้าเกมมีภาพเมืองใหม่ (หลังจบเทศกาลลอยกระทง) · หน้าสร้างตัวละครมีป้ายต้อนรับ',
+  ] },
   { v: '2026-11-27z', d: '24 พ.ย.', items: [
     '💬 กล่องคุยกับ NPC และช่องกรอกชื่อ/ID เป็นแบบใหม่ · แก้บั๊กหน้าสร้างตัวละคร: รูปหมุดใหญ่บังชื่อหัวข้อ และปุ่ม "เข้าเมือง!" โดนตัด',
   ] },
