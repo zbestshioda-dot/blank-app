@@ -1187,7 +1187,7 @@ function paintHud() {
   $('#jx').classList.toggle('hidden', !jx);
   if (jx) {
     $('#jxL').textContent = `EXP ${c.name} Lv.${jx.L}${jx.pay ? ` · เงิน +${jx.pay}%` : ''}`;
-    $('#jxV').textContent = jx.max ? 'MAX' : me.career === 'office' ? `${jx.cur}/${jx.need} กะ` : `${(+jx.cur).toFixed(1)}/${jx.need}${jx.gain < 100 ? ` · ได้ ${jx.gain}%` : ''}`;
+    $('#jxV').textContent = jx.max ? 'MAX' : me.career === 'office' ? `${Math.floor(jx.cur)}/${jx.need} กะ` : `${(Math.floor(jx.cur * 10) / 10).toFixed(1)}/${jx.need}${jx.gain < 100 ? ` · ได้ ${jx.gain}%` : ''}`;
     $('#jxU').style.width = pct + '%';
   }
   $('#lvRing').style.background = `conic-gradient(#ffc94d ${pct}%, rgba(255,255,255,.12) 0)`; $('#lvPct').textContent = `★ ${pct.toFixed(1)}%`;
@@ -6421,6 +6421,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-29b', d: '25 พ.ย.', items: [
+    '🐛 แก้แล้ว: แถบ EXP อาชีพเคยปัดเลขขึ้นจนดูเหมือนเต็ม (เช่น 10.0/10) แต่ยังไม่อัปเลเวล · ตอนนี้แสดงตามจริง ทำงานอีกครั้งก็อัปเลเวล',
+  ] },
   { v: '2026-11-29a', d: '25 พ.ย.', items: [
     '🐛 แก้แล้ว: ปุ่มใหญ่ถูกแย่งเป็น "คุยกับ..." จนกดซื้อของ/เข้างาน/นอนเตียงโรงพยาบาลไม่ได้ · ตอนนี้ร้าน ประตู เตียง และงาน มาก่อนเสมอ',
     '🐛 แก้แล้ว: พี่ฟ้า (จุดแนะนำเมือง) มีปุ่มส่งคำขอ ให้ของขวัญ และเนื้อเรื่องแล้ว',
@@ -8073,7 +8076,7 @@ function renderPanel(p) {
       }).join('');
       const starter = `<div class="jobbox">💡 <b>เพิ่งเริ่มเล่น ยังไม่มีเงิน?</b> ไปซื้อเบ็ด ${money(G.fishing.rod)} กับน้าเล็กที่สมาคมประมง แล้ว<b>ตกปลาขาย</b> ทำได้ทุกคนทุกเวลาไม่ต้องสมัครงาน ${me.rod ? '' : B('🎣 ไปซื้อเบ็ด', { fn: 'guide', key: 'staff_fishing' }, 'good')}</div>`;
       return `<h2>💼 งานของฉัน</h2>
-        <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(+me.jx.cur).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
+        <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(Math.floor(me.jx.cur * 10) / 10).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
         ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
         ${caseBook()}${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;
