@@ -6421,6 +6421,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-29c', d: '25 พ.ย.', items: [
+    '🐛 แก้แล้ว: กดเมล็ด/เก็บผักแล้วหน้าข่าวอัปเดตเด้งขึ้นมาบัง จนปลูกหรือเก็บไม่ได้ · ตอนนี้ข่าวขึ้นเฉพาะตอนว่าง และขึ้นครั้งเดียว',
+  ] },
   { v: '2026-11-29b', d: '25 พ.ย.', items: [
     '🐛 แก้แล้ว: แถบ EXP อาชีพเคยปัดเลขขึ้นจนดูเหมือนเต็ม (เช่น 10.0/10) แต่ยังไม่อัปเลเวล · ตอนนี้แสดงตามจริง ทำงานอีกครั้งก็อัปเลเวล',
   ] },
@@ -7504,13 +7507,16 @@ function fbText(n) {
 function newsHtml() {
   return `<h2>🆕 อัปเดตล่าสุด</h2>` + NEWS.slice(0, 5).map((n, i) => `<div class="sub" style="margin-top:${i ? 12 : 4}px"><b>${n.d}</b></div><ul style="margin:4px 0 0;padding-left:20px;line-height:1.7;font-size:14px">${n.items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('');
 }
+// the news pops up only while the player is idle: it used to open the moment a farm/shop panel closed and swallow the next tap
+let newsDone = false, lastTapT = 0;
+addEventListener('pointerdown', () => { lastTapT = Date.now(); }, true);
 function checkNews() {
-  if (me && nbQuiet()) return;   // a newcomer sees the news from tomorrow on
+  if (newsDone || me && nbQuiet()) return;   // a newcomer sees the news from tomorrow on
   let seen = ''; try { seen = localStorage.getItem('lt_news') || ''; } catch { }
   if (seen === NEWS[0].v || !me) return;
   const dw = $('#dailyWrap'), busy = panel || $('#payBan') || (dw && dw.offsetParent) || $('#tut')?.offsetParent && !$('#tut').classList.contains('hidden') || !$('#mg')?.classList.contains('hidden');
-  if (busy) return void setTimeout(checkNews, 2500);   // wait until nothing else is on screen (daily reward, top-up banner, a panel...)
-  try { localStorage.setItem('lt_news', NEWS[0].v); } catch { }
+  if (busy || Date.now() - lastTapT < 8000) return void setTimeout(checkNews, 2500);   // wait until nothing else is on screen (daily reward, top-up banner, a panel...) and the player has stopped tapping
+  newsDone = true; try { localStorage.setItem('lt_news', NEWS[0].v); } catch { }
   openPanel({ kind: 'news' });
 }
 
