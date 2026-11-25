@@ -1921,7 +1921,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'projUse', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
@@ -5589,6 +5589,7 @@ function dailyLogin(a) {
   return { streak: a.loginStreak, reward, gems, table: LOGIN_BONUS, days: a.loginDays, big, login: loginView(a) };
 }
 // achievements: each one has a cash reward by rarity, collected from the achievements page
+const GEM_RATE = 500, GEM_DAY = 500;   // 💎 → ฿ exchange
 const ACH_GEMS = [0, 5, 7, 10, 12, 15, 15, 20];   // achievements pay 💎 diamonds by rarity (no cash)
 function achClaim(a, id) {
   const got = a.achGot || [], todo = (a.ach || []).filter(x => !got.includes(x) && (id === 'all' || x === id));
@@ -5744,6 +5745,16 @@ function onMessage0(ws, raw) {
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
     case 'pay': { if (!cd(a, 'pay', 800, true)) return; return payOp(a, m); }
+    case 'gemswap': {   // 💎 → ฿: 1 gem = GEM_RATE baht, at most GEM_DAY gems a day
+      if (!cd(a, 'gsw', 800, true)) return;
+      if (godInf(a)) return toast(a, 'แอดมินเพชรไม่จำกัด แลกเป็นเงินไม่ได้', '💎', false);
+      const d = dayKey(), u = a.gsw?.d === d ? a.gsw : (a.gsw = { d, n: 0 }), n = Math.floor(+m.n) || 0;
+      if (n < 10) return toast(a, 'แลกขั้นต่ำ 💎10', '💎', false);
+      if (u.n + n > GEM_DAY) return toast(a, `วันนี้แลกได้อีก 💎${GEM_DAY - u.n} (วันละไม่เกิน 💎${GEM_DAY})`, '💎', false);
+      if ((a.gems || 0) < n) return toast(a, `เพชรไม่พอ (มี 💎${a.gems || 0})`, '💎', false);
+      a.gems -= n; u.n += n; const got = n * GEM_RATE; a.money += got; ledAdd(a, got, `💎 แลกเพชร ${n} เม็ด`); a.sd = true; markMe(a);
+      return toast(a, `แลก 💎${n} ได้ ${money(got)} แล้ว · วันนี้แลกไป 💎${u.n}/${GEM_DAY}`, '💎');
+    }
     case 'bankop': { if (a.down) return; if (!cd(a, 'bankop', 400, true)) return; if (!['deposit', 'withdraw', 'borrow', 'repay'].includes(m.op)) return; return bankOp(a, { a: m.op, amt: m.amt }); }   // banking from the phone app
     case 'rideoff': { if (a.fun) { rideOff(a); markMe(a); } return; }
     case 'stock': { if (a.down) return; if (!cd(a, 'stock', 400, true)) return; return stockTrade(a, m); }   // trading from the phone app

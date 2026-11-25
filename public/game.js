@@ -6122,6 +6122,11 @@ function payBanner() {
   el.querySelector('.pbGo').onclick = () => { close(); FN.openTopup(); };
   document.body.appendChild(el); ppStart();
 }
+function gemSwapBox() {   // 💎 → ฿ (1💎 = ฿500, up to 💎500 a day; the server checks)
+  const g = me?.gems || 0;
+  return `<div class="item" style="display:block;margin:6px 0 10px"><b>💱 แลกเพชรเป็นเงิน</b> <small>1💎 = ฿500 · วันละไม่เกิน 💎500 · มี 💎${me?.gemInf ? '∞' : g.toLocaleString()}</small>
+    <div class="rowf" style="flex-wrap:wrap;gap:6px;margin-top:6px">${[10, 50, 100, 500].map(n => B(`💎${n} → ${money(n * 500)}`, { t: 'gemswap', n }, n >= 100 ? 'primary' : '', !me?.gemInf && g < n)).join('')}</div></div>`;
+}
 function topupHtml() {
   const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า SLIP2GO_SECRET และ PROMPTPAY_ID ใน Fly.io ก่อน' : ''}</div>`;
@@ -8305,7 +8310,7 @@ function renderPanel(p) {
     case 'rewards': return rewardsPanel();
     case 'ach':
     case 'ledger': return ledgerHtml(p);
-    case 'topup': return topupHtml();
+    case 'topup': return topupHtml().replace('</h2>', '</h2>' + gemSwapBox());
     case 'payadmin': return me.admin ? payAdminHtml() : '';
     case 'profile': {
       const ti = G.ach.find(x => x.id === me.title) || (G.lux || []).find(x => x.id === me.title) || (me.title === 'vip' && me.vipT > Date.now() + clockOff ? G.payTitle : null), got = (me.ach || []).length;
