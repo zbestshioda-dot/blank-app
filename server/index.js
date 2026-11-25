@@ -5321,7 +5321,7 @@ function worldView() {
     .concat((ghostLook(), ghosts).map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: ghostTi(g) })))
     .sort((x, y) => y.w - x.w).slice(0, 10));
   return {
-    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, fest: festView(), on: [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length + bots().length,   // admins never count as online mk: marketView(),
+    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, fest: festView(), on: [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length + bots().length, mk: marketView(),   // (admins never count as online)
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? bedSym(p) : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
