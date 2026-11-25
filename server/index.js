@@ -495,7 +495,7 @@ function gangView(a) {
   const g = gangOf(a); if (!g) return null; gangRoll(g);
   const L = GANG.lv[g.lvl - 1], N = GANG.lv[g.lvl], my = g.mem[lk(a)], role = my.r;
   const rk = { boss: 0, vice: 1, mem: 2 };
-  const mem = Object.entries(g.mem).map(([l, v]) => { const o = accounts.get(l); return { l, n: o?.name || l, r: v.r, p: v.p || 0, on: o?.ws ? 1 : 0 }; }).sort((x, y) => rk[x.r] - rk[y.r] || y.p - x.p);
+  const mem = Object.entries(g.mem).map(([l, v]) => { const o = accounts.get(l); return { l, n: o?.name || l, r: v.r, p: v.p || 0, on: o?.ws && !isAdmin(o) ? 1 : 0 }; }).sort((x, y) => rk[x.r] - rk[y.r] || y.p - x.p);
   const rank = 1 + [...gangs.values()].filter(o => o.wpts > g.wpts).length;
   return { my: lk(a), id: g.id, name: g.name, icon: g.icon, color: g.color, role, lvl: g.lvl, ln: L.n, cap: L.cap, pts: g.pts, wpts: g.wpts, bank: g.bank, inc: L.inc, rest: L.rest, restLeft: Math.max(0, Math.ceil(((a.cd?.gangrest || 0) - now()) / 1000)),
     next: N ? { n: N.n, cost: N.cost, pts: N.pts, cap: N.cap, inc: N.inc, rest: N.rest } : null, mem, req: role === 'mem' ? [] : g.req, rank, msn: { goal: gangGoal(g), prog: g.msn.prog, done: g.msn.done, pay: GANG.msnPay }, mine: my.p || 0 };
@@ -5294,7 +5294,7 @@ function meView(a) {
     cook: a.cook ? { rid: a.cook.rid, hand: a.cook.hand, plated: a.cook.plated, until: a.cook.until, limit: a.cook.limit, comps: a.cook.comps.map(c => ({ ing: c.ing, ops: c.ops, k: c.k, at: c.at, t: c.t, prog: c.prog, ready: c.ready, burnt: c.burnt })) } : null,
     dogq: a.dogq ? { kind: a.dogq.kind || 'dog', stole: a.dogq.stole, dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0, thiefNext: a.thiefNext || 0, jgNext: a.jgNext || {},
     icu: null, icuNext: a.icuNext || 0,
-    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
+    friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o) && !isAdmin(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
     happy: a.happy, craving: a.craving, prayed: a.prayDay === dayKey() ? 1 : 0, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
     jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], case: detView(a), detAt: a.detNext || 0, stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
@@ -5321,7 +5321,7 @@ function worldView() {
     .concat((ghostLook(), ghosts).map(g => ({ name: g.n, c: g.c, w: Math.round(g.w), on: 0, ti: ghostTi(g) })))
     .sort((x, y) => y.w - x.w).slice(0, 10));
   return {
-    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, fest: festView(), on: [...online.values()].filter(o => !hidden(o)).length + bots().length, mk: marketView(),
+    t: 'wd', now: t, toff: D.TIME_OFF, ann: announceText, fest: festView(), on: [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length + bots().length,   // admins never count as online mk: marketView(),
     stock: Object.fromEntries(Object.entries(stock).map(([k, v]) => [k, Math.floor(v)])),
     lots: lots.map(o => o && o.garden ? [o.name, o.garden.n, o.garden.crops.map(c => c ? [c[0], c[1]] : 0), o.id || 0] : 0),
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? bedSym(p) : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
@@ -6738,7 +6738,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': mt[1], 'Cache-Control': 'public, max-age=86400' }); return res.end(Buffer.from(mt[2], 'base64'));
   }
   if (url === '/api/gcfg') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ gid: GOOGLE_ID })); }
-  if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: online.size })); }   // login screen: how many real players are in town
+  if (url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ online: [...online.values()].filter(o => !isAdmin(o)).length })); }   // login screen: how many real players are in town
   const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   if (path.extname(file) === '.mp4') {            // video: streamed with Range support (Safari/iOS refuse to play video without it)
