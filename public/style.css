@@ -1896,3 +1896,169 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 #dzChips .chip img{width:12px;height:12px}
 /* 📖 opening story: a big round face (or the bus) above the line */
 .storyPic{display:flex;justify-content:center;margin:2px 0 4px}.storyPic .qface{width:96px;height:96px;border-radius:50%;box-shadow:0 0 0 3px #fff,0 4px 12px rgba(0,0,0,.3)}.storyPic span{font-size:64px;line-height:1.3}
+/* =====================================================================
+   ✨ COZY WARM HUD POLISH — วางต่อท้ายสุดของไฟล์ style.css
+   ===================================================================== */
+:root {
+  --cw-cream: #FFF8EB;
+  --cw-cream2: #F3E3C3;
+  --cw-dark: rgba(45, 34, 26, 0.90);
+  --cw-ink: #4A3222;
+  --cw-gold: #F4C44E;
+  --cw-green: #5FB865;
+  --cw-green-dk: #3E8E44;
+}
+
+/* 1. แก้ชื่อ ADMIN ให้อ่านชัด + คุมโทนการ์ดสถานะซ้ายบนเป็นน้ำตาลอุ่น */
+#card.v2 .sInfo,
+#card.v2 .bars {
+  background: var(--cw-dark) !important;
+  border: 2px solid var(--cw-ink) !important;
+  box-shadow: 0 3px 0 var(--cw-ink) !important;
+}
+
+#card.v2 .pfp #meName,
+#card.v2.admin .pfp #meName {
+  background: #3A2618 !important;
+  color: #FFE082 !important;
+  border: 2px solid var(--cw-ink) !important;
+  box-shadow: 0 2px 0 var(--cw-ink) !important;
+  max-width: 96px !important;
+  padding: 1px 8px !important;
+}
+
+#card.v2 #qBox {
+  background: linear-gradient(#FFF6D6, #F7DE96) !important;
+  border: 2px solid var(--cw-ink) !important;
+  box-shadow: 0 3px 0 var(--cw-ink) !important;
+  color: var(--cw-ink) !important;
+}
+
+/* ปุ่มแชท (#cbOpen) ปรับขอบเป็นน้ำตาลอุ่นให้เข้าชุด */
+#cbOpen {
+  background: linear-gradient(#9F85E8, #7A5CC7) !important;
+  border-color: var(--cw-ink) !important;
+  box-shadow: 0 3px 0 var(--cw-ink) !important;
+}
+
+/* 2. แก้ขวาบนไม่ให้ซ้อนทับกล่องเวลา และไม่ให้ป้าย "ได้ชุดแล้ว" โดนตัดขอบขวา */
+#miniWrap {
+  border-color: var(--cw-ink) !important;
+  background: var(--cw-ink) !important;
+  box-shadow: 0 3px 0 var(--cw-ink), 0 4px 10px rgba(0, 0, 0, .3) !important;
+}
+
+#mClock {
+  background: var(--cw-dark) !important;
+  border: 2px solid var(--cw-ink) !important;
+  color: #FFFDF7 !important;
+  box-shadow: 0 2px 0 var(--cw-ink) !important;
+}
+#mClock * {
+  color: #FFFDF7 !important;
+  text-shadow: none !important;
+}
+#mClock #cTime {
+  color: #FFD86B !important;
+}
+
+/* ดันแถบปุ่มเพชร/มือถือ/ของขวัญลงมาใต้กล่องเวลา (เฉพาะแนวตั้ง) */
+@media (max-width: 600px) and (orientation: portrait) {
+  #topBar,
+  body.hasEvent #topBar {
+    top: calc(176px + env(safe-area-inset-top)) !important;
+    right: 8px !important;
+    gap: 10px !important;
+  }
+}
+
+/* ปรับป้าย badge ใต้ปุ่มกิจกรรมให้ชิดขวาแทนกึ่งกลาง จะได้ไม่ล้นขอบจอ */
+#ev7Btn em,
+#lkBtn em {
+  left: auto !important;
+  right: -2px !important;
+  transform: none !important;
+  border-color: var(--cw-ink) !important;
+}
+
+/* 3. ย้ายแถบประกาศ (#ticker) ขึ้นบนสุดในมือถือแนวตั้ง ไม่ให้ทับปุ่มกระเป๋า/ใช้งาน */
+@media (max-width: 600px) and (orientation: portrait) {
+  #ticker {
+    top: calc(4px + env(safe-area-inset-top)) !important;
+    bottom: auto !important;
+    left: 10px !important;
+    right: 10px !important;
+    height: 22px !important;
+    border-radius: 999px !important;
+    background: rgba(155, 38, 38, 0.92) !important;
+    border: 1.5px solid var(--cw-ink) !important;
+    z-index: 30 !important;
+  }
+  /* เผื่อระยะด้านบนเล็กน้อยเมื่อมีแถบประกาศ */
+  #card.v2,
+  #topRight {
+    top: calc(30px + env(safe-area-inset-top)) !important;
+  }
+  #topBar,
+  body.hasEvent #topBar {
+    top: calc(200px + env(safe-area-inset-top)) !important;
+  }
+}
+
+/* 4. โซนปุ่มนิ้วโป้งขวาล่าง (#thumbs): คุมโทนครีม-น้ำตาลอุ่น และให้ปุ่ม "ใช้งาน" เด่นสุด */
+#thumbs {
+  bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+}
+
+#thumbs > button {
+  border-color: var(--cw-ink) !important;
+  box-shadow: 0 3px 0 var(--cw-ink), 0 5px 10px rgba(0, 0, 0, .28) !important;
+}
+
+#thumbs .round {
+  background: linear-gradient(var(--cw-cream) 0 50%, var(--cw-cream2) 51%) !important;
+}
+
+#thumbs #runBtn {
+  background: linear-gradient(#E3F4FF 0 50%, #B8E0FA 51%) !important;
+}
+#thumbs #bagBtn {
+  background: linear-gradient(#FFEBD6 0 50%, #F7CFA3 51%) !important;
+}
+#thumbs #restBtn {
+  background: linear-gradient(#E2F7E9 0 50%, #BCE8CB 51%) !important;
+}
+#thumbs #emoBtn {
+  background: linear-gradient(#FFE6EC 0 50%, #F8C4D0 51%) !important;
+}
+#thumbs #godBtn {
+  background: linear-gradient(#FFF2B8 0 50%, #F4C44E 51%) !important;
+}
+
+#thumbs > button small {
+  color: var(--cw-ink) !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .85) !important;
+  font-weight: 700 !important;
+}
+
+/* ปุ่มหลัก "ใช้งาน" (#actBtn) สีเขียวอุ่นเด่นชัด */
+#thumbs #actBtn {
+  background: radial-gradient(circle at 50% 30%, #8EE093, var(--cw-green) 55%, var(--cw-green-dk)) !important;
+  border-color: var(--cw-ink) !important;
+  box-shadow: 0 4px 0 var(--cw-ink), 0 0 0 5px rgba(95, 184, 101, .28) !important;
+}
+#thumbs #actBtn small {
+  color: #FFFDF7 !important;
+  text-shadow: 0 1px 0 var(--cw-ink) !important;
+}
+#thumbs #actBtn.idle {
+  background: linear-gradient(#EFE5D5, #D8C7AE) !important;
+  filter: none !important;
+  opacity: .92 !important;
+  box-shadow: 0 4px 0 var(--cw-ink) !important;
+}
+#thumbs #actBtn.idle small {
+  color: var(--cw-ink) !important;
+  text-shadow: none !important;
+}
