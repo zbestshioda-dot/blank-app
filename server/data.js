@@ -2116,7 +2116,7 @@ const FOLK = {
       likes: ['soda', 'popcorn', 'hotdog', 'snack'], love: 'py_dino', bday: [11, 5], about: 'นักศึกษามหาวิทยาลัย ติดเกม ชอบไปเกมเซ็นเตอร์',
       sched: [[0, 'home'], [9, 'work', 'door_school'], [15, 'work', 'door_inn'], [17, 'work', 'door_arcade'], [21, 'stroll'], [23, 'home']] },
     { id: 'mprang', tales: [['ของขวัญให้คุณยาย', 'น้องมะปรางอยากให้ของขวัญคุณยายที่บ้าน แต่เงินในกระปุกไม่พอ ช่วยหา{item}ให้หน่อย'], ['ปาร์ตี้ตุ๊กตา', 'น้องมะปรางจะจัดปาร์ตี้ให้ตุ๊กตา ขาด{item}อีกนิดเดียว']],  asks: ['icecream', 'balloon', 'py_duck', 'cottoncandy'],  name: 'น้องมะปราง', g: 'f', face: 'mprang_happy', look: { hair: 'brown', shirt: 'pink', pants: 'gray' }, kid: 1,
-      likes: ['icecream', 'cottoncandy', 'balloon', 'py_duck'], love: 'py_star', bday: [1, 2], about: 'เด็กข้างบ้าน ชอบแลกสติกเกอร์ ชอบลูกโป่งกับตุ๊กตา',
+      likes: ['icecream', 'cottoncandy', 'popcorn', 'py_duck'], love: 'py_star', bday: [1, 2], about: 'เด็กข้างบ้าน ชอบแลกสติกเกอร์ ชอบลูกโป่งกับตุ๊กตา',
       sched: [[0, 'home'], [8, 'work', 'door_school'], [13, 'hang', ['square']], [16, 'work', 'door_pet1'], [18, 'hang', ['square']], [20, 'home']] },
   ],
   housing: [
