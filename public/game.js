@@ -223,4 +223,5 @@ function drawAura(px, py, H, t, front, gold) {
     for (let i = 0; i < 6; i++) { const a = t / 1100 + i * 1.05, tw = .5 + .5 * Math.sin(t / 220 + i * 2), x = px + Math.cos(a) * H * .45, y = py - H * (.25 + (i % 3) * .28) + Math.sin(a * 1.3) * H * .06, r = Math.max(1.5, H * .04) * (.6 + tw * .8);
       ctx.fillStyle = `rgba(255,${i % 2 ? 235 : 200},255,${.5 + tw * .5})`; ctx.fillRect(x - r * .3, y - r, r * .6, r * 2); ctx.fillRect(x - r, y - r * .3, r * 2, r * .6); }
   }
-  ctx.restore(
+  ctx.restore();
+}
