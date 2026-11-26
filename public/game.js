@@ -8715,7 +8715,6 @@ function shade(hex, f) {
   return `rgb(${Math.round((t - r) * p + r)},${Math.round((t - g) * p + g)},${Math.round((t - b) * p + b)})`;
 }
 const signCache = new Map();
-const signCache = new Map();
 document.fonts?.ready?.then(() => signCache.clear());
 function sign(text, x, y, o = {}) {
   const fs = Math.max(10, Math.round(o.size || TS * .36)), h = o.h || fs * 1.55;
