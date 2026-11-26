@@ -6,9 +6,9 @@ const RUN_MS = 2 * 3600e3, GAP_MS = 10 * 60e3, ANSWER_MS = 90e3, QUIET_MS = 3600
 
 // call on every action; true = time to ask (the run restarts after any 10-minute break)
 function run(a, t) {
-  if (!a.run || t - a.run.last > GAP_MS) a.run = { start: t, last: t };
-  a.run.last = t;
-  return t - a.run.start >= RUN_MS && t - (a.hcOk ?? -Infinity) >= QUIET_MS && !a.hc;
+  if (!a.gdRun || t - a.gdRun.last > GAP_MS) a.gdRun = { start: t, last: t };
+  a.gdRun.last = t;
+  return t - a.gdRun.start >= RUN_MS && t - (a.hcOk ?? -Infinity) >= QUIET_MS && !a.hc;
 }
 
 function ask(a, why, t, rnd = Math.random) {
@@ -21,7 +21,7 @@ function ask(a, why, t, rnd = Math.random) {
 function answer(a, tok, t) {
   if (!a.hc || String(tok) !== a.hc.tok) return { ok: false };
   const fast = t - a.hc.at < HUMAN_MS;
-  a.hc = null; a.hcOk = t; if (a.run) a.run.start = t;
+  a.hc = null; a.hcOk = t; if (a.gdRun) a.gdRun.start = t;
   return { ok: true, fast };
 }
 
