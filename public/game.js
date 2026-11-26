@@ -8709,7 +8709,29 @@ function shade(hex, f) {
   return `rgb(${Math.round((t - r) * p + r)},${Math.round((t - g) * p + g)},${Math.round((t - b) * p + b)})`;
 }
 const signCache = new Map();
+const signCache = new Map();
+document.fonts?.ready?.then(() => signCache.clear());
 function sign(text, x, y, o = {}) {
+  const fs = Math.max(10, Math.round(o.size || TS * .36)), h = o.h || fs * 1.55;
+  const key = `${text}|${fs}|${h}|${o.bg || ''}|${o.border || ''}|${o.color || ''}|${DPR}`;
+  let c = signCache.get(key);
+  if (!c) {
+    const font = `700 ${fs}px 'Mitr','Noto Sans Thai',sans-serif`;
+    ctx.font = font;
+    const tw = Math.max(textW(text), ctx.measureText(text).width), w = tw + fs * .9, pad = 2;
+    c = document.createElement('canvas'); c.width = Math.ceil((w + pad * 2) * DPR); c.height = Math.ceil((h + pad * 2) * DPR); c.w = w + pad * 2; c.h = h + pad * 2;
+    const g = c.getContext('2d'); g.scale(DPR, DPR); g.translate(pad + w / 2, pad + h / 2);
+    g.font = font; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillStyle = o.bg || 'rgba(58,36,20,.88)'; g.beginPath(); g.roundRect(-w / 2, -h / 2, w, h, h / 2); g.fill();
+    if (o.border) { g.strokeStyle = o.border; g.lineWidth = 2; g.stroke(); }
+    g.fillStyle = o.color || '#fff'; g.fillText(text, -tw / 2, fs * .04);
+    if (signCache.size > 400) signCache.delete(signCache.keys().next().value);
+    signCache.set(key, c);
+  }
+  ctx.drawImage(c, Math.round((x - c.w / 2) * DPR) / DPR, Math.round((y - c.h / 2) * DPR) / DPR, c.w, c.h);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // callers draw text after a sign with these (setting the font every time is slow)
+}
+  {
   const fs = Math.max(10, Math.round(o.size || TS * .36)), h = o.h || fs * 1.55;
   const key = `${text}|${fs}|${h}|${o.bg || ''}|${o.border || ''}|${o.color || ''}|${DPR}`;
   let c = signCache.get(key);
