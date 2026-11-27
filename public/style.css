@@ -2147,7 +2147,7 @@ body.dlgOn #hud #card{opacity:0;pointer-events:none}
 #hud #card.v2 .sInfo #meGems{color:#c9b6ff!important}
 /* 💬 RPG-style talk box: nothing else on screen, box at the bottom, name tag top-left, big portrait top-right, menu fits inside the same box */
 body.dlgOn #hud,body.dlgOn #nearBtns,body.dlgOn #keyHint,body.dlgOn #placeBar{opacity:0!important;pointer-events:none!important;transition:opacity .2s}
-#dlg{bottom:calc(14px + env(safe-area-inset-bottom))!important;height:150px;padding:22px 16px 12px!important;display:block!important}
+#dlg{bottom:calc(14px + env(safe-area-inset-bottom))!important;height:190px;padding:22px 16px 12px!important;display:block!important}
 #dlg .dlgBody{position:static;height:100%}
 #dlg .dlgName{position:absolute;left:14px;top:-17px;margin:0;font-size:15px;padding:3px 14px;z-index:2}
 #dlg .dlgPic{position:absolute!important;left:auto!important;right:34px;bottom:calc(100% - 4px);top:auto;z-index:1}
@@ -2157,4 +2157,4 @@ body.dlgOn #hud,body.dlgOn #nearBtns,body.dlgOn #keyHint,body.dlgOn #placeBar{op
 #dlg .dlgBody:has(.dlgCh:not(:empty)) .dlgText{display:none}
 #dlg .dlgCh{display:grid!important;grid-template-columns:1fr 1fr;gap:5px;margin:0;height:100%;overflow-y:auto;align-content:start}
 #dlg .dlgCh button{width:100%;margin:0!important;padding:4px!important;font-size:13.5px!important;line-height:1.2;min-height:0!important;height:30px}
-@media(min-width:601px){#dlg{height:160px}#dlg .dlgCh{grid-template-columns:1fr 1fr 1fr}}
+@media(min-width:601px){#dlg{height:200px}#dlg .dlgCh{grid-template-columns:1fr 1fr 1fr}}
