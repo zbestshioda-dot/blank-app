@@ -6102,10 +6102,10 @@ function msShow(q) {
     document.body.appendChild(ov);
     ov.onclick = e => { if (e.target.closest('.msOpts button')) return; if (e.target.closest('.msSkip')) { msQ.i = msQ.lines.length - 1; msQ.typed = 1; return msLine(); } msTap(); };
   }
-  ov.classList.remove('hidden'); ov.dataset.ch = MSV?.ch ?? 0;
+  ov.classList.remove('hidden'); ov.dataset.ch = q.side ? 'ev' : MSV?.ch ?? 0;
   const w = q.lines.some(l => msWho(l.s)), m = P.get(myId); ov.classList.toggle('world', w); document.body.classList.toggle('msw', w);
   msCam = w && m ? { cx: camS.x || m.rx, cy: camS.y || m.ry, x: m.rx, y: m.ry } : null;
-  msQ = { ...q, i: 0 }; ov.querySelector('.msTitle').textContent = q.title ? `📕 ${q.title}` : ''; msLine();
+  msQ = { ...q, i: 0 }; ov.querySelector('.msTitle').textContent = q.title ? `${q.side ? '' : '📕 '}${q.title}` : ''; msLine();
 }
 function msLine() {
   const ov = $('#msCut'), l = msQ.lines[msQ.i] || { x: '' }, f = l.s && folkById(l.s), p = ov.querySelector('.msTxt p'), last = msQ.i >= msQ.lines.length - 1;
@@ -6131,9 +6131,47 @@ function msTap() {
   if (!msQ.typed) return msQ.done();
   if (msQ.i < msQ.lines.length - 1) { msQ.i++; return msLine(); }
   if (msQ.opts || msQ.end) return;   // wait for a button
-  msClose();
+  const side = msQ.side; msClose(); if (side) return;   // a townsfolk scene: nothing to advance
   const st = MSV?.step; if (st?.k === 'scene') FN.msAdv(); else if (st) toast(msHint(st), '📕');   // scenes play on by themselves; otherwise a toast says what's next (no panel to close)
 }
+// 🎭 townsfolk scenes: walk into a place and sometimes catch the locals living their lives (once per scene per game day)
+const NEV = [
+  { id: 'bar1', rk: 'bar', h: [18, 4], t: 'คืนนี้ที่บาร์', L: [[0, 'แสงไฟสลัว เพลงลูกทุ่งเปิดเบาๆ กลิ่นมะนาวกับน้ำแข็ง'], ['dam', 'เจ๊แอน ขออีกแก้วนะ วันนี้โดนลูกค้าด่าทั้งวันเลย'], ['d_bartender', 'แก้วที่สามแล้วนะดำ... เอาน้ำเปล่าไปก่อน แล้วเล่ามาซิ'], ['dam', 'เฮ้อ... อ้าว {n} มาพอดี! นั่งๆ วันนี้พี่เลี้ยงน้ำอัดลม 555']] },
+  { id: 'bar2', rk: 'bar', h: [20, 3], t: 'ไมค์ทองคำ', L: [['d_thug', 'เจ๊แอน! เปิดคาราโอเกะหน่อย คืนนี้เสี่ยจะร้อง!'], ['d_bartender', 'เสี่ยร้องทีไรลูกค้าหนีทุกที...'], ['d_thug', '♪ ตะวันลับฟ้า~ ♪'], [0, 'ทั้งร้านเงียบกริบ มีแค่เสียงจิ้งหรีดกับเสียงเสี่ย'], ['d_bartender', '{n} ช่วยตบมือหน่อยเถอะ ไม่งั้นเขาร้องอีกสิบเพลง']] },
+  { id: 'rest1', rk: 'restaurant', h: [11, 14], t: 'ศึกน้ำพริก', L: [['d_restaurant', 'เชฟหมี! น้ำพริกตาแดงของฉันเผ็ดกำลังดีย่ะ!'], ['d_chef', 'ป้าแดงครับ ลูกค้าน้ำตาไหลไปสามโต๊ะแล้ว'], ['d_restaurant', 'นั่นน้ำตาแห่งความอร่อย!'], ['d_chef', '...งั้นให้ {n} ชิมตัดสินเลยครับ'], [0, 'ทั้งสองหันมามองคุณพร้อมกัน ช้อนในมือสั่นนิดๆ']] },
+  { id: 'bake1', rk: 'bakery', h: [6, 11], t: 'เค้กก้อนแรก', L: [['d_cstore2', 'เสร็จแล้ว! เค้กส้มสูตรที่ผมคิดเองครั้งแรก'], ['mprang', 'ว้าว หอมจัง! ขอชิมได้ไหมพี่ภูมิ'], ['d_cstore2', 'ได้เลย แต่อย่าบอกป้านะว่าผมแอบใช้เนยของร้าน'], ['mprang', 'อร่อยมาก! พี่ {n} มาชิมด้วยกันสิ!']] },
+  { id: 'hosp1', rk: 'hospital', t: 'คนไข้ประจำ', L: [['d_doctor', 'คุณโจ้ มาอีกแล้วเหรอคะ อาทิตย์นี้ครั้งที่สามแล้วนะ'], ['joe', 'หมอครับ ผมแค่ปวดหลัง... นั่งทำงานวันละ 14 ชั่วโมงเอง'], ['d_doctor', '"เอง"? ยานี้ช่วยได้ไม่เท่าการลาพักร้อนหรอกค่ะ'], ['joe', '{n} ช่วยบอกหัวหน้าผมหน่อยได้ไหม...']] },
+  { id: 'pol1', rk: 'police', t: 'สองผู้กอง', L: [['d_police', 'ผู้กองเดช คดีขโมยไก่ชนเมื่อวาน ตำรวจปิดคดีได้แล้วนะ'], ['d_detective', 'ไก่ตัวนั้นเดินกลับบ้านเองครับผู้กอง ผมเห็นกับตา'], ['d_policedesk', '(กระซิบ) สองคนนี้เถียงกันเรื่องไก่มาสามวันแล้วค่ะ'], ['d_police', 'แฟ้มคดีเขียนว่าจับได้! {n} เป็นพยานให้ผมด้วย!']] },
+  { id: 'cas1', rk: 'casino', t: 'ตาเดียวเท่านั้น', L: [['d_thug', 'ตาเดียว! อีกตาเดียวเสี่ยถอนทุนคืนแน่นอน!'], ['choei', '...'], ['d_thug', 'ตาเฉย ทำไมมองแบบนั้น'], ['choei', 'ได้ยินประโยคนี้มาสามสิบปีแล้วไอ้หนู'], [0, 'วงล้อหมุน... เสี่ยเสือหน้าซีด ตาเฉยจิบชาต่ออย่างสงบ']] },
+  { id: 'sch1', rk: 'school', h: [7, 12], t: 'มาสายอีกแล้ว', L: [['d_school', 'เจมส์! เก้าโมงครึ่งแล้ว! วันนี้ข้ออ้างอะไร'], ['james', 'รถเมล์สาย 99 มันไม่มาครับ ผอ.!'], ['d_school', '...สาย 99 ไม่มีมาตั้งแต่ปีที่แล้ว'], ['james', 'นั่นแหละครับ ผมถึงรอนานไง! ใช่ไหมพี่ {n}!']] },
+  { id: 'bank1', rk: 'bank', t: 'ลูกค้าวีไอพี', L: [['d_merchant', 'คุณนิด ฝากเงินครับ วันนี้ประมูลได้กำไรงาม'], ['d_bank', 'ยินดีด้วยค่ะเฮียชัย... เหรียญหนึ่งบาท 4,000 เหรียญเลยเหรอคะ'], ['d_merchant', 'เงินก็คือเงินครับ นับเลยๆ'], ['d_bank', '{n} คะ ถ้ารีบ ใช้ตู้อีกช่องนะคะ วันนี้อีกนาน...']] },
+  { id: 'barb1', rk: 'barber', t: 'ทรงใหม่', L: [['may', 'ช่างโอ๋ ขอทรงแบบดาราเกาหลีนะ เอาให้ปังเลย'], ['d_barber', 'จัดไปครับคุณเมย์! ...อุ๊ย'], ['may', '"อุ๊ย" อะไร ช่างโอ๋ "อุ๊ย" อะไร!'], ['d_barber', 'เปล่าครับ! ทรงนี้กำลังฮิตที่เกาหลี... ใช่ไหมครับ {n}'], [0, 'ช่างโอ๋ส่งสายตาขอความช่วยเหลือมาที่คุณ']] },
+  { id: 'arc1', rk: 'arcade', t: 'สถิติใหม่', L: [['tonkla', 'อีกนิด... อีกนิดเดียว!'], ['james', 'พี่ต้นกล้า! สถิติผมจะโดนทำลายแล้ว!'], [0, '💥 NEW RECORD! 💥'], ['tonkla', 'เย่! ชื่อพี่อยู่อันดับหนึ่งแล้ว!'], ['james', '{n} ครับ มาล้างแค้นให้ผมที!']] },
+  { id: 'fash1', rk: 'fashion', t: 'ชุดออกงาน', L: [['d_fashion', 'คุณเมย์ ชุดนี้สวยที่สุดในร้านแล้วค่ะ'], ['may', 'แต่มุกบอกแบบนี้กับชุดที่แล้วด้วย'], ['d_fashion', 'ก็...ทุกชุดในร้านสวยที่สุดไงคะ!'], ['may', '{n} ว่าตัวไหนดี ช่วยเลือกหน่อย']] },
+  { id: 'off1', rk: 'office', h: [8, 18], t: 'ประชุมด่วน', L: [['d_office', 'คุณโจ้ รายงานที่ส่งเมื่อคืน มีแต่ตัว "ก" ทั้งหน้าเลยนะคะ'], ['joe', 'ผมหลับคาคีย์บอร์ดครับคุณนภา...'], ['d_office', 'งั้นวันนี้กลับบ้านตรงเวลา ห้ามโอทีเด็ดขาด'], ['joe', 'นี่คือ... การลงโทษที่ดีที่สุดในชีวิตผม! ได้ยินไหม {n}!']] },
+  { id: 'pet1', rk: 'petshop', t: 'แมวหนีบ้าน', L: [['d_pet1', 'เจ้าส้ม! ลงมาจากชั้นอาหารเดี๋ยวนี้!'], [0, 'แมวส้มตัวอ้วนนั่งมองลงมาอย่างผู้ชนะ'], ['d_pet1', '{n} ช่วยหน่อยค่ะ มันชอบคนแปลกหน้า...'], [0, 'เจ้าส้มกระโดดลงมาเกาะไหล่คุณทันที แล้วครางครืดๆ']] },
+];
+const NEV_PARTY = ['bar', 'restaurant', 'bakery'], NEV_HOST = { bar: 'd_bartender', restaurant: 'd_restaurant', bakery: 'd_cstore2' };
+let nevRoom = null, nevT = 0;
+const nevSeen = k => { try { return localStorage.getItem('nev_' + k); } catch { return 1; } }, nevMark = k => { try { localStorage.setItem('nev_' + k, 1); } catch {} };
+const nevHourOk = h => { if (!h) return true; const x = hourNow(); return h[0] < h[1] ? x >= h[0] && x < h[1] : x >= h[0] || x < h[1]; };
+function nevParty(rk, dt) {   // 🎂 a townsperson's birthday today: the place throws them a party
+  const b = FOLKS?.find(f => f.bday && f.bday[0] === dt.month + 1 && f.bday[1] === dt.day && f.id !== NEV_HOST[rk]); if (!b) return null;
+  const nm = msNm(b.id), h = NEV_HOST[rk], g = ['dam', 'may', 'joe', 'mprang', 'tonkla'].filter(x => x !== b.id).slice(0, 2);
+  return { id: 'bd_' + b.id, t: `🎂 วันเกิด${nm}`, L: [[0, 'ไฟในร้านดับวูบ... แล้วเทียนบนเค้กก็ค่อยๆ สว่างขึ้น'], [g[0], '♪ แฮปปี้เบิร์ธเดย์ ทู ยู~ ♪'], [g[1], `♪ สุขสันต์วันเกิด${nm}~ ♪`], [b.id, 'ทุกคน... นี่เตรียมเซอร์ไพรส์กันตั้งแต่เมื่อไหร่!'], [h, `ตั้งแต่เมื่อวานแล้วจ้ะ อธิษฐานแล้วเป่าเทียนเลย!`], [b.id, `{n} มาพอดีเลย! มากินเค้กด้วยกันสิ วันนี้ฉลองกันยาวๆ`]] };
+}
+function nevTick() {
+  const m = G && me && P.get(myId), r = m && roomOf(m.x, m.y), rk = r?.rk || null;
+  if (rk === nevRoom) return; nevRoom = rk;
+  if (!rk || !me.date || msQ || panel || dlgQ || !$('#tut')?.classList.contains('hidden') || Date.now() - nevT < 6 * 60000) return;
+  if (!FOLKS) return send({ t: 'folks' }), nevRoom = null;   // load the townsfolk first, try again next tick
+  const dt = me.date, day = `${dt.year}-${dt.month}-${dt.day}`;
+  const ev = (NEV_PARTY.includes(rk) && nevParty(rk, dt)) || NEV.filter(e => e.rk === rk && nevHourOk(e.h) && !nevSeen(e.id + '_' + day)).sort(() => Math.random() - .5)[0];
+  if (!ev || nevSeen(ev.id + '_' + day) || (!ev.id.startsWith('bd_') && Math.random() > .7)) return;
+  nevMark(ev.id + '_' + day); nevT = Date.now();
+  setTimeout(() => { if (msQ || panel || dlgQ) return; FX.play('chime'); msShow({ title: ev.t, side: 1, lines: ev.L.map(([s, x]) => s ? { s, nm: msNm(s), x } : { x }) }); }, 900);
+}
+setInterval(() => { try { nevTick(); } catch (e) { console.error('nev', e); } }, 1000);
 function msClose() { clearInterval(msQ?.tm); msQ = null; msCam = null; document.body.classList.remove('msw'); $('#msCut')?.classList.add('hidden'); }
 function storiesBox() {
   if (!STORIES.length) return '';
@@ -6673,7 +6711,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
     '📅 ปฏิทินในเกมครบเดือนแล้ว: เดือนละ 30 วัน (1 เดือน = 12 ชม. จริง) เริ่มนับใหม่ 1 ม.ค. 2596',
-    '🎫 ลอตเตอรี่ยังออกทุก 2 ชม. เหมือนเดิม: วันที่ 1, 6, 11, 16, 21, 26 ของเดือน',
+    '🎫 ลอตเตอรี่ออกวันที่ 1 และ 16 ของเดือนในเกม เหมือนหวยจริง (ทุก 6 ชม. จริง)',
+    '🎭 คัทซีนชีวิตคนในเมือง 14 ฉาก: เดินเข้าร้านแล้วอาจเจอ NPC คุยกัน ทะเลาะกัน หรือจัดปาร์ตี้วันเกิดให้เพื่อน (วันเกิดใครก็ไปเจอที่บาร์ ร้านอาหาร หรือร้านเบเกอรี่)',
   ] },
   { v: '2026-11-28e', d: '28 พ.ย.', items: [
     '📕 เรื่องหลักโชว์ใต้เควสต์วันนี้แล้ว บอกว่าต้องทำอะไรต่อ แตะเพื่อเปิดดู',
@@ -7907,7 +7946,7 @@ function lottoPanel() {
   const tk = n => `<span style="display:inline-block;margin:2px;padding:3px 7px;border-radius:7px;background:#fff;border:2px solid #e0404a;font:800 14px monospace;letter-spacing:2px;color:#b0202a">${n}</span>`;
   const last = L.last ? `<div class="jobbox"><b>ผลงวด ${th(L.last.key)}</b><br>🥇 รางวัลที่ 1: <b style="font:800 20px monospace;letter-spacing:3px">${L.last.first}</b><br>3 ตัวท้าย: <b>${L.last.l3.join(' , ')}</b> · 2 ตัวท้าย: <b>${L.last.l2}</b>${L.myLast && L.myLast.key === L.last.key ? `<br>คุณซื้อ ${L.myLast.n} ใบ · ${L.myLast.won ? `🎉 ถูกรางวัล ${money(L.myLast.won)} (รับที่จดหมาย ✉️)` : 'ไม่ถูกรางวัล'}` : ''}</div>` : '';
   return `<h2>🎫 ลอตเตอรี่</h2>
-    <div class="sub">ออกวันที่ 1, 6, 11, 16, 21, 26 ของเดือนในเกม เวลา 16:00 น. (ทุก 2 ชม. จริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
+    <div class="sub">ออกวันที่ 1 และ 16 ของเดือนในเกม เวลา 16:00 น. (ทุก 6 ชม. จริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
     <div class="jobbox">งวดถัดไป <b>${th(L.key)}</b> · อีก ${dd ? dd + ' วัน ' : ''}${hh} ชม. ${mm} นาที</div>
     <div class="grid2">${B('🎲 สุ่ม 1 ใบ', { fn: 'lotto', qty: 1 }, 'primary')}${B('🎲 สุ่ม 5 ใบ', { fn: 'lotto', qty: 5 })}${B('🎲 สุ่ม 10 ใบ', { fn: 'lotto', qty: 10 })}</div>
     <div class="rowf" style="margin-top:6px"><input id="lottoIn" inputmode="numeric" maxlength="6" placeholder="เลือกเลขเอง 6 หลัก">${B('ซื้อเลขนี้', { fn: 'lotto', pick: 1 }, 'good')}</div>

@@ -1059,7 +1059,7 @@ setInterval(() => { try { wedTick(); } catch (e) { console.error('wedTick', e); 
 function lottoNext(t = now()) {   // the next draw: [key 'Y-MM-DD' (game date, Buddhist year), real time]
   const C = D.CLOCK, hMs = (LOTTO.hour - C.dawn) * C.dayMin / (C.dusk - C.dawn) * 60000;   // 16:00 sits in the daytime part of a cycle
   for (let n = D.dayAt(t); ; n++) {
-    if ((n - D.YEAR0) % 5) continue;   // every 5 game days (1, 6, 11, 16, 21, 26 of the month): same 2-hour rhythm as before
+    if ((n - D.YEAR0) % 15) continue;   // the 1st and 16th of each game month (every 6 real hours), like the real Thai lottery
     const at = n * D.DAY_MS + hMs - D.TIME_OFF;
     if (at > t) { const g = D.dateAt(at); return [`${g.year}-${String(g.month + 1).padStart(2, '0')}-${String(g.day).padStart(2, '0')}`, at]; }
   }
