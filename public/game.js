@@ -761,7 +761,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && (m.isNew ? showStory(0) : showTut(0)), 400);   // 📖 brand-new characters get the opening story first
-      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); }
+      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => send({ t: 'ms', a: 'view' }), 1500);   // 📕 know the main-story step so townsfolk can offer it
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
@@ -5970,7 +5970,8 @@ function storyHint(s) {
     : st.k === 'go' ? `📍 ไปที่${st.label}${hr}` : `❓ ไปตอบคำถามของ${who}${st.hard ? ' (⚠️ ตอบผิดเริ่มบทใหม่)' : ''}`;
 }
 function storyChoices(o) {   // buttons for the story steps that happen with this townsperson
-  return STORIES.filter(s => s.state === 'on' && s.step?.npc === o.fid).map(s => {
+  const ms = MSV?.step, main = ms && !MSV.end && ms.npc === o.fid && ms.k !== 'scene' ? [{ label: `📕 เรื่องหลัก: ${{ choice: '❓ ตัดสินใจ', give: '🎁 ให้ของ', do: '✅ รายงานผล' }[ms.k] || '💬 คุย'}`, cls: 'primary', fn: () => { dialogClose(); ms.k === 'choice' ? FN.msAsk() : FN.msAdv(); } }] : [];
+  return [...main, ...STORIES.filter(s => s.state === 'on' && s.step?.npc === o.fid).map(s => {
     const st = s.step, need = st.items || (st.item ? [[st.item, st.n]] : []), miss = need.find(([id, n]) => (me.inv?.[id] || 0) < n);
     const label = st.k === 'give' ? `📖 ${s.name}: ให้ ${need.map(([id, n]) => `${G.items[id]?.icon || ''}x${n}`).join(' ')}${miss ? ' (ยังไม่ครบ)' : ''}` : st.k === 'choice' ? `📖 ${s.name}: ❓ ตอบคำถาม${st.hard ? ' ⚠️' : ''}`
       : st.k === 'pay' ? `📖 ${s.name}: 💰 จ่าย ${money(st.cost)}` : st.k === 'do' ? `📖 ${s.name}: 🎯 ${st.prog || 0}/${st.n}` : `📖 ${s.name} · บท ${s.n + 1}`;
@@ -5979,7 +5980,7 @@ function storyChoices(o) {   // buttons for the story steps that happen with thi
       if (st.k === 'choice') return dialog({ name: o.name, face: o.face || null, npc: o.id, lines: [stTxt(st.q)], choices: st.opts.map((t, c) => ({ label: t, fn: () => { dialogClose(); send({ t: 'story', o: s.o, c }); } })) });
       dialogClose(); send({ t: 'story', o: s.o });
     } };
-  });
+  })];
 }
 function storySay(m) {
   const f = m.npc && folkById(m.npc), lines = (m.lines || []).map(stTxt);
@@ -6065,7 +6066,7 @@ function msTap() {
   if (msQ.i < msQ.lines.length - 1) { msQ.i++; return msLine(); }
   if (msQ.opts || msQ.end) return;   // wait for a button
   msClose();
-  const st = MSV?.step; if (st?.k === 'scene') FN.msAdv(); else FN.openMain();   // scenes play on by themselves; otherwise show what to do next
+  const st = MSV?.step; if (st?.k === 'scene') FN.msAdv(); else if (st) toast(msHint(st), '📕');   // scenes play on by themselves; otherwise a toast says what's next (no panel to close)
 }
 function msClose() { clearInterval(msQ?.tm); msQ = null; $('#msCut')?.classList.add('hidden'); }
 function storiesBox() {
@@ -6604,6 +6605,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27p', d: '27 พ.ย.', items: [
+    '📕 เรื่องหลัก: ไม่ต้องเปิดสมุดแล้ว · คุยกับตัวละครในเรื่องจะมีปุ่ม "📕 เรื่องหลัก" ให้กดต่อได้เลย · ดูฉากจบแล้วบอกขั้นต่อไปเป็นข้อความเด้ง',
+  ] },
   { v: '2026-11-27o', d: '27 พ.ย.', items: [
     '🐛 แก้แล้ว: หมอรักษาถูกแล้วได้ ฿NaN จนเงินหาย · คนที่โดนได้เงินคืนตามยอดก่อนเกิดบั๊ก',
     '👩‍🏫 <b>อาชีพใหม่: อาจารย์</b> (ต้องจบปริญญาตรี) สมัครกับ อ.สมศรี ที่มหาวิทยาลัย · ใส่ชุดกากี · ยืนข้างโต๊ะคนที่นั่งเรียนแล้วกด "สอน" ช่วยให้เขาจบคาบเร็วขึ้น ได้ค่าสอน · ภารกิจตรวจการบ้าน ทำเอกสาร ตามเด็กโดดเรียน',
