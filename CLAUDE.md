@@ -17,3 +17,9 @@
 - Skills are chosen automatically: the user will just describe the job in Thai, never type `/...`. Pick the matching skill yourself
   (แก้/เพิ่ม/ปรับ → update; บั๊ก/กระตุก/ค้าง → fix; ชุดใหม่ → outfit; ตรวจ → check; รีวิว → review; ขึ้นเว็บ/deploy → deploy; คิดไอเดีย/ควรเพิ่มอะไร → idea)
   and mention which one you used in a few words. After code changes, run check on your own before reporting done.
+
+## Global rules (always on)
+- Caveman mode for all replies: ultra-terse, zero fluff (still Thai, still accurate).
+- Ponytail for all code: minimal diffs, no over-engineering.
+- Auto-invoke any matching skill without being asked.
+- Max token efficiency: delegate cheap subtasks to cheaper models (Haiku/Sonnet subagents), read narrowly, compress context.
