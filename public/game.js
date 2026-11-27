@@ -6658,6 +6658,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28d', d: '28 พ.ย.', items: [
+    '📱 หน้าจอมือถือใหม่: แอปแบ่งเป็นหน้า ปัดซ้าย-ขวาเพื่อเลื่อน ไม่ต้องเลื่อนลงแล้ว (มีจุดบอกหน้าและคำแนะนำ)',
+    '💎 เอาแอปเติมเงินออกจากมือถือ',
+    '💬 ชื่อในกรอบคุยยาว ๆ จะขึ้นบรรทัดใหม่ด้านบน ไม่ทับข้อความแล้ว',
+  ] },
   { v: '2026-11-28c', d: '28 พ.ย.', items: [
     '📱 เมนูร้านค้าแนวตั้งสูงเกือบเต็มจอ เห็นของมากขึ้นเกือบเท่าตัว · แนวนอนหัวร้านเตี้ยลง เห็นสินค้าทันที',
     '🛒 <b>ร้านค้าแบบใหม่</b>: แตะสินค้าเพื่อเลือก แล้วซื้อจากแถบด้านล่าง กด − / + เลือกจำนวนได้ 1–10 ชิ้น (โชว์ราคารวมให้เลย)',
@@ -8966,19 +8971,21 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['เรื่องหลัก', '📕', { fn: 'openMain' }, 0, 'linear-gradient(#ffd38a,#8a3b2a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['เรื่องหลัก', '📕', { fn: 'openMain' }, 0, 'linear-gradient(#ffd38a,#8a3b2a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['ตู้เสื้อผ้า', '👗', { fn: 'open', kind: 'bag', set: { gtab: 'wear' } }, 0, 'linear-gradient(#ffe0f0,#c95fa0)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first
 const PH_GROUPS = [   // 4 apps a row: every app has a group, most-used first (the 'rest' row only catches future apps)
   ['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'ชาวเมือง', 'เรื่องหลัก', 'คู่รัก', 'บันทึก', 'แก๊ง', 'เลือกตั้ง']],
-  ['เงินทอง', ['การเงิน', 'บิล', 'หุ้น', 'ลอตเตอรี่', 'ประมูล', 'เติมเงิน']],
+  ['เงินทอง', ['การเงิน', 'บิล', 'หุ้น', 'ลอตเตอรี่', 'ประมูล']],
   ['ไลฟ์สไตล์', ['ตู้เสื้อผ้า', 'กิจกรรม', 'บ้านสวย', 'จุดพลุ', 'เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา']],
   ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
   ['ช่วยเหลือ & ตั้งค่า', ['อัปเดต', 'เรื่องเล่า', 'บทช่วยสอน', 'ตั้งค่า', 'วอลเปเปอร์', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
 const PH_TITLE = { wall: 'วอลเปเปอร์', mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
+let phPg = 0;   // the phone home page the player swiped to (kept across re-renders)
+document.addEventListener('scroll', e => { const el = e.target; if (!el.classList?.contains('phPages')) return; phPg = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)); el.parentNode.querySelectorAll('.phDots i').forEach((d, i) => d.classList.toggle('on', i === phPg)); }, true);
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
   const dt = me?.date, clock = hhmm(hourNow());
@@ -8989,9 +8996,13 @@ function phonePanel(p) {
     const emApp = ([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i>${l === 'lifebook' && lbUnread() ? '<em></em>' : ''}<small>${l}</small></button>`;
     const all = {}; for (const a of PH_APPS) all[a[0]] = app(a);
     for (const a of PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay))) all[a[0]] = emApp(a);
-    const used = new Set(), sec = PH_GROUPS.map(([t, names]) => { const h = names.filter(n => all[n]).map(n => (used.add(n), all[n])).join(''); return h ? `<div class="phSec">${t}</div><div class="phApps">${h}</div>` : ''; }).join('');
-    const rest = Object.keys(all).filter(n => !used.has(n)).map(n => all[n]).join('');   // anything not listed in a group still shows, at the end
-    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div>${evBanners()}<div class="phList">${sec}${rest ? `<div class="phApps">${rest}</div>` : ''}</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
+    // one swipeable page per group (no scrolling down); anything not in a group goes on the last page
+    const used = new Set(), pgs = PH_GROUPS.map(([t, names]) => [t, names.filter(n => all[n]).map(n => (used.add(n), all[n])).join('')]).filter(g => g[1]);
+    const rest = Object.keys(all).filter(n => !used.has(n)).map(n => all[n]).join(''); if (rest) pgs.push(['อื่น ๆ', rest]);
+    phPg = Math.min(phPg, pgs.length - 1); setTimeout(() => { const el = document.querySelector('.phPages'); if (el && phPg) el.scrollLeft = phPg * el.clientWidth; }, 0);
+    const pages = pgs.map(([t, h]) => `<div class="phPage"><div class="phSec">${t}</div><div class="phApps">${h}</div></div>`).join('');
+    const dots = pgs.map((g, i) => `<i class="${i === phPg ? 'on' : ''}"></i>`).join('');
+    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div>${evBanners()}<div class="phPages">${pages}</div><div class="phDots">${dots}</div><div class="phHint">👆 ปัดซ้าย-ขวา เพื่อเลื่อนดูแอปอื่น</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
   if (tab === 'contacts') {
