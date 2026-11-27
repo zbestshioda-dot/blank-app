@@ -362,8 +362,17 @@ function ledLabel(a, m) {
   if (m.t === 'act') { const s0 = m.st === 'water' ? { icon: '🎣', label: 'ตกปลา' } : ST[m.st]; if (s0) return `${s0.icon || ''} ${s0.label || s0.type}${LED_A[m.a] ? ' · ' + LED_A[m.a] : ''}`.trim(); }
   return LED_T[m.t] || m.t;
 }
+// 💰 town money flow per real day (admin 📊): every ledger line, summed by label; job pay summed by career.
+// Trades between players show on both sides and cancel out in the net; the real change in money is `sup` (cash + bank) day to day.
+let econLog = {};
+function ecoDay() { const k = dayKey(); if (!econLog[k]) { econLog[k] = { in: {}, out: {}, car: {} }; const ks = Object.keys(econLog).sort(); while (ks.length > 14) delete econLog[ks.shift()]; } return econLog[k]; }
+function ecoNote(a, d, what) {
+  if (!a?.login || a.login === '__meta' || isAdmin(a)) return;
+  const B = d > 0 ? ecoDay().in : ecoDay().out, w = String(what || 'อื่นๆ').slice(0, 40); B[w] = (B[w] || 0) + Math.abs(d);
+}
 function ledPush(a, d, what, bal) {
   if (!d) return;
+  ecoNote(a, d, what);
   const L = a.ledger || (a.ledger = []), t = now(), last = L[L.length - 1];
   if (last && last[2] === what && Math.sign(last[1]) === Math.sign(d) && t - last[0] < 90e3) { last[1] += d; last[3] = bal; last[0] = t; }   // merge a run of the same thing
   else { L.push([t, d, what, bal]); if (L.length > LED_MAX) L.splice(0, L.length - LED_MAX); }
@@ -389,7 +398,7 @@ function earn(a, amount, nocap) {
   if (amount > 0 && a.gang) { const g0 = gangOf(a); if (g0) amount *= 1 + GANG.lv[g0.lvl - 1].inc; }   // a bigger gang house pays its members a little extra
   ledSweep(a);
   amount = Math.round(amount); const tx = amount > 0 ? taxOf(a, amount) : 0; amount -= tx; a.money += amount; a.earned += amount; markMe(a);
-  ledPush(a, amount + tx, a.ledCtx || 'รายได้', a.money + tx); ledPush(a, -tx, '🧾 ภาษีรายได้', a.money); a.ledBal = a.money;
+  ledPush(a, amount + tx, a.ledCtx || 'รายได้', a.money + tx); if (amount + tx > 0 && !isAdmin(a)) { const C = ecoDay().car, c = a.career || 'none'; C[c] = (C[c] || 0) + amount + tx; } ledPush(a, -tx, '🧾 ภาษีรายได้', a.money); a.ledBal = a.money;
   let rp = 0;
   if (amount > 0) {
     quest(a, 'earn', amount); gangPts(a, amount);
@@ -810,6 +819,12 @@ function adminStats() {
     const pm = W.map(x => x.playMin || 0).filter(Boolean).sort((p, q) => p - q); S.playMed = pm.length ? pm[pm.length >> 1] : 0; S.playN = pm.length;
     const dd = W.map(x => (x.seen || []).length).sort((p, q) => p - q); S.daysMed = dd.length ? dd[dd.length >> 1] : 0; }
   S.ftue = NBM.funnel([...accounts.values()].filter(x => x.login && x.login !== '__meta' && !isAdmin(x)), dayNum);   // 🧭 v2 newcomers step by step
+  { let sup = 0; const nC = {}; for (const x of accounts.values()) if (x.login && x.login !== '__meta' && !isAdmin(x)) { sup += (+x.money || 0) + (+x.bank || 0); if ((x.seen || []).some(d => d >= today - 6)) nC[x.career || 'none'] = (nC[x.career || 'none'] || 0) + 1; }
+    ecoDay().sup = Math.round(sup);
+    const ks = Object.keys(econLog).sort(), wk = ks.slice(-7), sum = (o, k) => { for (const d of wk) for (const [n, v] of Object.entries(econLog[d][k] || {})) o[n] = (o[n] || 0) + v; return o; };
+    const top = o => Object.entries(o).sort((x, y) => y[1] - x[1]).slice(0, 12);
+    S.eco = { days: ks.map(k => { const E = econLog[k], t = o => Object.values(o).reduce((x, y) => x + y, 0); return { k, in: t(E.in), out: t(E.out), sup: E.sup ?? null }; }),
+      src: top(sum({}, 'in')), sink: top(sum({}, 'out')), car: top(sum({}, 'car')).map(([c, v]) => [D.CAREERS[c]?.name || c, v, nC[c] || 0]) }; }
   S.on = onlineStats(); S.total = total; S.online = [...online.values()].filter(o => !hidden(o) && !isAdmin(o)).length;
   return S;
 }
@@ -1932,7 +1947,7 @@ const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNe
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.auc) auc = meta.auc; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.econLog) econLog = meta.econLog; if (meta.auc) auc = meta.auc; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -2015,7 +2030,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj, econLog }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
