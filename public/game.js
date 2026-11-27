@@ -1280,14 +1280,15 @@ const hourNow = () => FORCE_PHASE !== null ? +FORCE_PHASE * 24 : hourOfPhase((((
 window.BGM_EXT = true;
 // played through Web Audio (not an <audio> element): phones then don't treat the game as a media player, so the music
 // doesn't show up in the notification shade or stop YouTube/Spotify; it mixes in and goes quiet when the game is hidden
-const BGM = { vol: .42, buf: {}, src: {}, gain: {}, loading: {} };
+const BGM = { vol: .42, buf: {}, src: {}, gain: {}, loading: {}, raw: {} };
+BGM.raw.login = fetch('assets/music/login.mp3?v=4').then(r => r.arrayBuffer());   // start downloading the login track at once, decode after the first tap
 function bgmLoad(k, ac) {
   if (BGM.loading[k]) return; BGM.loading[k] = 1;
-  fetch(`assets/music/${k}.mp3?v=3`).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
+  (BGM.raw[k] || (BGM.raw[k] = fetch(`assets/music/${k}.mp3?v=4`).then(r => r.arrayBuffer()))).then(b => b.slice(0)).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
     const n = d.length, mono = ac.createBuffer(1, n, d.sampleRate), o = mono.getChannelData(0), L = d.getChannelData(0), R = d.numberOfChannels > 1 ? d.getChannelData(1) : L;
     for (let i = 0; i < n; i++) o[i] = (L[i] + R[i]) * .5;   // mono: half the memory on phones
     BGM.buf[k] = mono; BGM.loading[k] = 0;
-  }).catch(() => { setTimeout(() => { BGM.loading[k] = 0; }, 15000); });
+  }).catch(() => { BGM.raw[k] = 0; setTimeout(() => { BGM.loading[k] = 0; }, 15000); });
 }
 function bgmTick() {
   const ac = FX.ctx(); if (!ac || ac.state !== 'running') return;   // audio starts after the first tap
