@@ -378,8 +378,16 @@ function ledPush(a, d, what, bal) {
   else { L.push([t, d, what, bal]); if (L.length > LED_MAX) L.splice(0, L.length - LED_MAX); }
   a.sd = true;
 }
+// 🩹 money must always be a real number: if anything turns it into NaN, put back the last good balance (and log where it happened)
+function fixMoney(a) {
+  if (typeof a.money === 'number' && isFinite(a.money)) return;
+  const L = a.ledger || [], lb = L.length ? L[L.length - 1][3] : null;
+  a.money = typeof a.ledBal === 'number' && isFinite(a.ledBal) ? a.ledBal : typeof lb === 'number' && isFinite(lb) ? lb : 0;
+  if (!isFinite(a.earned)) a.earned = 0;
+  a.sd = true; dirty = true; console.error('money was NaN, restored', a.login, a.money, new Error().stack.split('\n').slice(2, 5).join(' | '));
+}
 function ledSweep(a, what) {
-  if (!isFinite(a.money)) return;
+  fixMoney(a);
   if (a.ledBal == null || !isFinite(a.ledBal)) { a.ledBal = a.money; return; }
   const d = Math.round(a.money - a.ledBal); if (d) ledPush(a, d, what || a.ledCtx || 'อื่นๆ', a.money); a.ledBal = a.money;
 }
@@ -390,7 +398,7 @@ function ledAdd(a, d, what) {   // call right after changing a.money by d
   ledPush(a, Math.round(d), what, a.money); a.ledBal = a.money;
 }
 function earn(a, amount, nocap) {
-  if (!isFinite(amount)) amount = 0;   // a bad pay formula must never turn a player's money into NaN
+  fixMoney(a); if (!isFinite(amount)) amount = 0;   // a bad pay formula must never turn a player's money into NaN
   const capMul = amount > 0 && !nocap ? GD.payMul(a, dayKey()) : 1;
   if (capMul !== 1) amount *= capMul;   // 💤 daily soft cap: less pay after 3 / 5 hours of work today
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
@@ -455,7 +463,7 @@ function taxOf(a, amount) {
   return due;
 }
 function credit(o, amount) {          // pay someone who may be offline
-  amount = Math.round(amount); o.money += amount; o.earned += amount; o.sd = true; dirty = true;
+  fixMoney(o); amount = Math.round(amount) || 0; o.money += amount; o.earned += amount; o.sd = true; dirty = true;
   if (o.ws) { quest(o, 'earn', amount); markMe(o); }
 }
 
@@ -2034,7 +2042,7 @@ async function save(force) {
   if ((!dirty && !force) || saving) return;
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
-  const changed = [...accounts.values()].filter(a => a.ws || a.sd);
+  const changed = [...accounts.values()].filter(a => a.ws || a.sd); changed.forEach(fixMoney);
   const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj, econLog }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
