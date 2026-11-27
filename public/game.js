@@ -1306,6 +1306,10 @@ function bgmTick() {
   }
 }
 setInterval(bgmTick, 100);
+// login music: try to start at page load (allowed when the browser trusts the site); otherwise it starts on the very first touch/click/key
+try { FX.ensure(); } catch { }
+setInterval(() => { try { if (!me) FX.ensure(); } catch { } }, 1000);
+['click', 'pointerup', 'touchend', 'keyup'].forEach(e => addEventListener(e, () => { try { FX.ensure(); } catch { } }, { passive: true }));
 const dayNow = () => { const c = G.clock || { dawn: 0, dusk: 24, dayMin: 24 }, mid = (c.dayMin + (24 - c.dusk) * (24 - c.dayMin) / (24 - (c.dusk - c.dawn))) * 60000; return Math.floor((Date.now() + clockOff + (wd?.toff || 0) + G.dayMs - mid) / G.dayMs); };
 const isInside = rid => { const m = P.get(myId); return !!m && roomOf(m.x, m.y)?.id === rid; };
 const FORCE_PHASE = new URLSearchParams(location.search).get('phase');   // ?phase=0.95 previews a time of day
@@ -6423,6 +6427,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-27b', d: '27 พ.ย.', items: [
+    '🎵 เพลงหน้าล็อกอินเล่นทันทีที่เปิดเว็บ (ถ้าเบราว์เซอร์ไม่ยอม แตะครั้งแรกก็ดัง)',
     '🎵 เพลงใหม่! หน้าล็อกอิน เพลงกลางวัน และเพลงกลางคืน (ไฟล์เล็กลง โหลดไวขึ้น)',
   ] },
   { v: '2026-11-27', d: '27 พ.ย.', items: [
