@@ -17,3 +17,10 @@
 - Skills are chosen automatically: the user will just describe the job in Thai, never type `/...`. Pick the matching skill yourself
   (แก้/เพิ่ม/ปรับ → update; บั๊ก/กระตุก/ค้าง → fix; ชุดใหม่ → outfit; ตรวจ → check; รีวิว → review; ขึ้นเว็บ/deploy → deploy; คิดไอเดีย/ควรเพิ่มอะไร → idea)
   and mention which one you used in a few words. After code changes, run check on your own before reporting done.
+
+## Global rules (user-set)
+- Output: strict caveman mode (anthropic-skills:caveman) — ultra-terse, zero fluff. Thai replies stay short.
+- Coding: strict ponytail mode (anthropic-skills:ponytail) — minimal diffs, no bloat.
+- Auto-invoke other skills (karpathy-guidelines, humanizer, impeccable, find-skills, last30days) when task fits.
+- Save tokens: delegate simple/search work to smaller models (Haiku/Sonnet subagents); compress context, keep quality.
+- Usage check: `npx ccusage@latest`.
