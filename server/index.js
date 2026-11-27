@@ -1947,7 +1947,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['nanFix', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -2023,6 +2023,15 @@ function hydrate(r) {
   for (const k of ['money', 'earned']) if (typeof a[k] !== 'number' || !isFinite(a[k])) {   // 2026-11-27 doctor-pay bug left money NaN (saved as null): restore the last good balance
     const L = a.ledger || [], lb = L.length ? L[L.length - 1][3] : 0;
     a[k] = k === 'money' ? (isFinite(a.ledBal) && a.ledBal !== null ? a.ledBal : isFinite(lb) && lb !== null ? lb : 0) : 0; a.sd = true;
+  }
+  if (!a.nanFix && (a.ledger || []).some(e => typeof e[3] !== 'number' || !isFinite(e[3]))) {   // 🩹 2026-11-27 NaN money: the restore above fell back to ฿0 (the backup balance broke too).
+    // Refund from the ledger: the last good balance before it broke + everything earned while it was broken (those lines have no balance).
+    const L = a.ledger, i = L.findIndex(e => typeof e[3] !== 'number' || !isFinite(e[3]));
+    let good = 0; for (let j = i - 1; j >= 0; j--) if (typeof L[j][3] === 'number' && isFinite(L[j][3])) { good = L[j][3]; break; }
+    const lost = L.slice(i).filter(e => typeof e[3] !== 'number' || !isFinite(e[3])).reduce((t, e) => t + (+e[1] || 0), 0), back = Math.max(0, Math.round(good + lost));
+    for (const e of L) if (typeof e[3] !== 'number' || !isFinite(e[3])) e[3] = 0;
+    if (back > 0) { a.money += back; L.push([now(), back, '🩹 คืนเงินจากบั๊กเงินหาย', a.money]); a.ledBal = a.money; sysMail(a, `🩹 ขอโทษด้วยที่เงินหายจากบั๊ก เมืองคืนเงินให้ ${money(back)} แล้ว (ยอดก่อนเงินหาย + รายได้ที่หายไประหว่างนั้น)`); }
+    a.nanFix = 1; a.sd = true; console.log('nan refund', a.login, back);
   }
   if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
   // fixed character names for special accounts (login ID -> character name)
