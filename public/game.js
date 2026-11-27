@@ -561,6 +561,13 @@ function introWake(ov) {
     ov.querySelector('button').onclick = () => { FX.play('click'); i++; show(); };
   }; show();
 }
+const HUDV = {};
+function hudDelta(k, v, el, min) {
+  const p = HUDV[k]; HUDV[k] = v; if (p == null || v == null || !el) return;
+  const d = Math.round(v - p); if (Math.abs(d) < min) return;
+  const b = document.createElement('b'); b.className = 'hudD ' + (d > 0 ? 'up' : 'dn'); b.textContent = (d > 0 ? '+' : '') + d.toLocaleString('en-US');
+  el.appendChild(b); setTimeout(() => b.remove(), 1300);
+}
 let busyT = 0;
 // ---- loading screen: shown from the moment you press "enter the city" until the town and the characters are ready to draw
 const LD = { on: false, t0: 0, shown: 0, tip: 0 };
@@ -1282,6 +1289,8 @@ function paintHud() {
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
   $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
+  hudDelta('money', me.monInf ? null : me.money, $('#card .l1'), 1);   // floating +n / -n on the HUD when a value really moves
+  for (const [k, v] of [['energy', me.energy], ['hunger', me.hunger], ['health', me.health], ['happy', me.happy ?? 80]]) { const b = $(`.bar[data-bar="${k}"]`); if (!b) continue; b.classList.toggle('low', v < 25); hudDelta(k, v, b, 3); }
   { const fun = me.pose === 'fun', bed = me.pose === 'bed';   // ▶▶ next to the bars that are filling fast (park rides, sleeping)
     for (const [k, on] of [['energy', (fun || bed) && me.energy < 100 || (me.pose === 'seat' || me.pose === 'rest') && me.energy < 50], ['health', fun && me.health < 100], ['happy', fun && (me.happy ?? 80) < 100]]) document.querySelector(`.bar[data-bar="${k}"]`)?.classList.toggle('boost', !!on); }
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
@@ -6489,6 +6498,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27e', d: '27 พ.ย.', items: [
+    '🎨 แถบสถานะใหม่ทั้งชุด: กล่องครีมขอบน้ำเงิน เข้าชุดกับหน้าต่างในเกม อ่านง่ายขึ้น',
+    '✨ เงินหรือพลังเพิ่มลด จะมีตัวเลข +/− ลอยขึ้นให้เห็น',
+    '⚠️ ค่าไหนต่ำกว่า 25 หลอดจะกะพริบเตือน',
+  ] },
   { v: '2026-11-27d', d: '27 พ.ย.', items: [
     '🛠️ แก้บั๊กเล็กน้อย ให้เกมลื่นขึ้น',
   ] },
