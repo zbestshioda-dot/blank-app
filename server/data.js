@@ -1173,11 +1173,11 @@ const STOCKS = [
   { id: 'FUEL', name: 'พลังงานไทย', icon: '⛽', base: 150, vol: 0.004, desc: 'ปั๊มน้ำมันและพลังงาน' },
   { id: 'MOON', name: 'มูนคอยน์', icon: '🚀', base: 12, vol: 0.025, vol2: 0.015, desc: 'เสี่ยงสูงมาก ขึ้นลงทีละหลายสิบ%' },
 ];
-const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.0015, feeMin: 5, keep: 240 };
+const STOCK = { candleMs: 30000, epoch: Date.UTC(2026, 10, 1), fee: 0.005, feeMin: 5, keep: 240 };
 // the 24-hour store: what it stocks and its shelf mark-up over the base price
 const PSHOP = { items: ['popcorn', 'cottoncandy', 'icecream', 'soda', 'hotdog', 'balloon', 'parkplush'], markup: 1 };   // the amusement park's snack bar & souvenirs
 const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', 'namlamyai', 'water'], markup: 1 };
-const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
+const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 170, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'choco', 'painkiller', 'medkit', 'umbrella'], markup: 1.35 };
 const HOURS = { bakery: [6, 21], fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21], inn: [6, 22], library: [6, 22], bar: [18, 27], bstage: [18, 27] };
@@ -1206,7 +1206,7 @@ const JOBGAMES = {
   type:  { career: 'office', name: 'พิมพ์เอกสารตามแบบ', icon: '⌨️', energy: 4, cd: 20, min: 10, max: 12, per: 6, rate: .5 },
   stock: { career: 'cashier', name: 'เติมของและจัดเรียงชั้น', icon: '📦', energy: 4, cd: 15, min: 20, max: 24, per: 2.6, rate: 1.2 },
   vend:  { career: 'merchant', name: 'ส่งของเติมตู้กดน้ำ', icon: '🥤', energy: 4, cd: 20, min: 20, max: 30, per: 2.2, rate: 1.3 },
-  mix:   { career: 'bartender', name: 'ผสมเครื่องดื่มตามออเดอร์', icon: '🍸', energy: 4, cd: 15, min: 15, max: 12, per: 5.5, rate: .5 },
+  mix:   { career: 'bartender', name: 'ผสมเครื่องดื่มตามออเดอร์', icon: '🍸', energy: 4, cd: 15, min: 15, max: 12, per: 6.5, rate: .5 },
   slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 18, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
@@ -2107,7 +2107,7 @@ const FURN_GEM = { xmoto: 150, xpool: 120, xupiano: 100, jacuzzi: 100, xarcade: 
 for (const [k, g] of Object.entries(FURN_GEM)) if (FURNITURE[k]) { FURNITURE[k].gem = g; FURNITURE[k].comfort = (FURNITURE[k].comfort || 0) + 1; }
 // rates are per game day (24 real minutes): savings earn 0.5%/day, a loan costs a 2% fee up front plus 1%/day on what is still owed
 // (the bank always charges more than it pays, so borrowing to save never pays off); at most 3 game days accrue while you are offline
-const BANK = { rate: 0.005, cap: 200000, loanMax: 30000, loanFee: 0.02, loanRate: 0.01, repayShare: 0.25, offlineDays: 3 };
+const BANK = { rate: 0.0005, cap: 200000, loanMax: 30000, loanFee: 0.02, loanRate: 0.01, repayShare: 0.25, offlineDays: 3 };
 
 // ================================================================= health
 const DISEASES = {

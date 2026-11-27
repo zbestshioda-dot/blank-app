@@ -19,7 +19,7 @@ const PLACES = {
   cstore: 'door_cstore', cstore3: 'door_cstore3', furnshop: 'door_furnshop', barber: 'door_barber',
   toolshop: 'door_toolshop', dealer: 'door_dealer', pet: 'door_pet1', pet2: 'door_pet2', square: 'square', fishclub: 'fishclub', housing: 'gate_housing', temple: 'gate_temple', flower: 'door_flower', park: 'ride_ferris', farm: 'gate_farm', bar: 'door_bar',
 };
-const PAY = { templeboy: .8, undertaker: 1.05, mechanic: 1.05, thug: .95, photographer: 1, courier: 1, teacher: 1.05, detective: 1.1, office: 1.1, farmer: .95, merchant: 1, chef: 1, doctor: 1.3, police: 1.05, beggar: .65, rider: 1, bartender: 1 };
+const PAY = { templeboy: .8, undertaker: 1.05, mechanic: 1.05, thug: .95, photographer: 1, courier: 1, teacher: 1.05, detective: 1.25, office: 1.1, farmer: .95, merchant: 1, chef: 1, doctor: 1.3, police: 1.05, beggar: .65, rider: 1, bartender: 1.2 };
 
 const M = {
   teacher: [

@@ -2073,7 +2073,7 @@ let stockI = 0;                                         // index of the last fin
 const STOCK_V2 = Math.floor((Date.parse('2026-11-23T00:00:00+07:00') - D.STOCK.epoch) / D.STOCK.candleMs);   // candles from here on use the calmer model
 // a slow wandering level under the fair value: a new random target every 12 hours, eased into
 const stockLevel = (i, si, vol) => { const K = 1440, k = Math.floor(i / K), f = (1 - Math.cos(Math.PI * (i / K - k))) / 2, r = j => (sHash(j, si * 17 + 9) - 0.5) * 2 * vol * 25; return r(k) * (1 - f) + r(k + 1) * f; };
-const STOCK_CAP = 300000;   // most a player may have in one stock (at today's price): the market is a side bet, not a money press
+const STOCK_CAP = 150000;   // most a player may have in one stock (at today's price): the market is a side bet, not a money press
 function stockCandle(i, bias) {
   for (let si = 0; si < mkt.length; si++) {
     // v2 (from STOCK_V2): the fair value used to be the same big, regular wave for every stock (even the 'stable' bank swung ±35%
