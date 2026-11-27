@@ -1215,11 +1215,11 @@ const DOGQ = { next: 27000, energy: 5, base: 70, perMin: 90, early: .25, minStep
   dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],
   names: ['โมจิ', 'ถุงเงิน', 'ทองดี', 'บราวนี่', 'ข้าวปั้น', 'ลัคกี้', 'มะลิ', 'ซุปเปอร์', 'โบว์', 'หมูกรอบ', 'ลาเต้', 'ขาวจั๊วะ'],
   owners: ['คุณยายบุญมี', 'น้องปิ่น', 'ลุงสมชาย', 'ป้าแดง', 'คุณหมอใจดี', 'เด็กชายต้น', 'พี่ติ๊ก', 'ครูสมศรี'] };
-// calendar: 12 months of 5 game days (a month = 2 real hours, a year = 1 real day). Water & electricity are billed monthly.
-const MONTH_DAYS = 5;
+// calendar: 12 months of 30 game days (a month = 12 real hours, a year = 6 real days). Water & electricity are billed monthly.
+const MONTH_DAYS = 30;
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const monthIdx = t => Math.floor(dayAt(t) / MONTH_DAYS);
-const YEAR0 = Math.floor(Math.floor(Date.UTC(2026, 10, 1) / DAY_MS) / (MONTH_DAYS * 12)) * MONTH_DAYS * 12;   // year 2569 starts here
+const YEAR0 = 1247100 - 27 * MONTH_DAYS * 12;   // 30-day months start on 1 ม.ค. 2596 (game day 1247100), after the old 5-day calendar's 2595, so lotto keys never repeat
 const dateAt = t => { const d = dayAt(t) - YEAR0; return { day: d % MONTH_DAYS + 1, month: Math.floor(d / MONTH_DAYS) % 12, year: 2569 + Math.floor(d / MONTH_DAYS / 12) }; };
 // a home's monthly bill: a fixed part + what you used (nights slept, furniture that runs on power)
 const UTIL = { water: 80, waterPerSleep: 12, elec: 110, elecPerComfort: 15, elecPerSleep: 10, lateFee: 0.15 };   // roughly half of the old rates (150/25, 220/35/20)

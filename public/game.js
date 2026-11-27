@@ -6671,6 +6671,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '📅 ปฏิทินในเกมครบเดือนแล้ว: เดือนละ 30 วัน (1 เดือน = 12 ชม. จริง) เริ่มนับใหม่ 1 ม.ค. 2596',
+    '🎫 ลอตเตอรี่ยังออกทุก 2 ชม. เหมือนเดิม: วันที่ 1, 6, 11, 16, 21, 26 ของเดือน',
+  ] },
   { v: '2026-11-28e', d: '28 พ.ย.', items: [
     '📕 เรื่องหลักโชว์ใต้เควสต์วันนี้แล้ว บอกว่าต้องทำอะไรต่อ แตะเพื่อเปิดดู',
     '🏷️ ปุ่มกลมล่างหน้าเข้าเกม มีชื่อบอกแล้ว: ติดตั้งมือถือ · แชร์ลิงก์ · ติดตั้งคอม',
@@ -7903,7 +7907,7 @@ function lottoPanel() {
   const tk = n => `<span style="display:inline-block;margin:2px;padding:3px 7px;border-radius:7px;background:#fff;border:2px solid #e0404a;font:800 14px monospace;letter-spacing:2px;color:#b0202a">${n}</span>`;
   const last = L.last ? `<div class="jobbox"><b>ผลงวด ${th(L.last.key)}</b><br>🥇 รางวัลที่ 1: <b style="font:800 20px monospace;letter-spacing:3px">${L.last.first}</b><br>3 ตัวท้าย: <b>${L.last.l3.join(' , ')}</b> · 2 ตัวท้าย: <b>${L.last.l2}</b>${L.myLast && L.myLast.key === L.last.key ? `<br>คุณซื้อ ${L.myLast.n} ใบ · ${L.myLast.won ? `🎉 ถูกรางวัล ${money(L.myLast.won)} (รับที่จดหมาย ✉️)` : 'ไม่ถูกรางวัล'}` : ''}</div>` : '';
   return `<h2>🎫 ลอตเตอรี่</h2>
-    <div class="sub">ออกทุกวันที่ 1 ของเดือนในเกม เวลา 16:00 น. (ทุก 2 ชม. จริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
+    <div class="sub">ออกวันที่ 1, 6, 11, 16, 21, 26 ของเดือนในเกม เวลา 16:00 น. (ทุก 2 ชม. จริง) · ใบละ ${money(L.price)} · งวดละไม่เกิน ${L.max} ใบ<br>🥇 รางวัลที่ 1 (ตรง 6 หลัก) <b>${money(L.prize.first)}</b> · 3 ตัวท้าย (2 รางวัล) ${money(L.prize.l3)} · 2 ตัวท้าย ${money(L.prize.l2)}</div>
     <div class="jobbox">งวดถัดไป <b>${th(L.key)}</b> · อีก ${dd ? dd + ' วัน ' : ''}${hh} ชม. ${mm} นาที</div>
     <div class="grid2">${B('🎲 สุ่ม 1 ใบ', { fn: 'lotto', qty: 1 }, 'primary')}${B('🎲 สุ่ม 5 ใบ', { fn: 'lotto', qty: 5 })}${B('🎲 สุ่ม 10 ใบ', { fn: 'lotto', qty: 10 })}</div>
     <div class="rowf" style="margin-top:6px"><input id="lottoIn" inputmode="numeric" maxlength="6" placeholder="เลือกเลขเอง 6 หลัก">${B('ซื้อเลขนี้', { fn: 'lotto', pick: 1 }, 'good')}</div>
