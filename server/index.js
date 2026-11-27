@@ -6334,6 +6334,17 @@ function godAct(a, m) {
     const r = payRevoke(o, 'admin:' + a.login); send(a, payAdminView()); return toast(a, r, '↩️');
   }
   if (m.op === 'paycheck') { payVerify(String(m.ref || ''), 'admin').then(() => send(a, payAdminView())); return toast(a, 'กำลังตรวจสลิปอีกครั้ง…', '🔄'); }
+  if (m.op === 'givemoney') {               // 💰 give (or take back) cash to one player (refunds for bugs), logged in their ledger + a mail
+    const x = accounts.get(String(m.login || '').toLowerCase()), n = Math.round(+m.n || 0), why = String(m.why || '').slice(0, 80).trim();
+    if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
+    if (!n || Math.abs(n) > 10000000) return toast(a, 'จำนวนเงินต้องไม่เป็น 0 และไม่เกิน 10,000,000', '💰', false);
+    if (!isFinite(x.money)) x.money = 0;
+    const had = x.money, d = Math.max(-had, n); x.money = had + d; ledAdd(x, d, n > 0 ? '👑 แอดมินคืนเงิน' : '👑 แอดมินปรับลดเงิน'); x.sd = true; dirty = true;
+    sysMail(x, d > 0 ? `💰 แอดมินโอนเงินให้คุณ ${money(d)}${why ? `\n\n${why}` : ''}` : `💰 แอดมินปรับลดเงิน ${money(-d)}${why ? `\n\n${why}` : ''}`);
+    if (x.ws) markMe(x);
+    console.log('god money', a.login, x.login, d, why);
+    return toast(a, `${x.login}: ${money(had)} → ${money(x.money)}`, '💰');
+  }
   if (m.op === 'givegems') {                // give (or take back) diamonds to one player, with a mail telling them why
     const x = accounts.get(String(m.login || '').toLowerCase()), n = Math.round(+m.n || 0), why = String(m.why || '').slice(0, 80).trim();
     if (!x) return toast(a, 'ไม่พบไอดีนี้', '🔎', false);
