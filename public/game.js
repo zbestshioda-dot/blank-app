@@ -6421,6 +6421,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27', d: '27 พ.ย.', items: [
+    '🕵️ แก้แล้ว: เรื่อง "นักสืบหัวใจ" สำรวจหน้าร้านแฟชั่นช่วงตีสี่–หกโมงได้แล้ว (ไม่ต้องเข้าร้านที่ปิดอยู่)',
+    '📱 แก้อีโมจิเพี้ยน/แยกเป็นสองตัวบน iPad',
+    '🏷️ แก้ป้ายชื่อตัวละครหายบน iPad',
+    '👟 ปุ่มวิ่งเปลี่ยนเป็นสีเขียว มีป้าย ON เวลากำลังวิ่ง',
+  ] },
   { v: '2026-11-29d', d: '25 พ.ย.', items: [
     '🐛 แก้แล้ว: ตลาดขึ้นราคา ฿0 ทุกรายการ และของที่ลงขายเพื่อนมองไม่เห็น · ตอนนี้ราคาและของที่ลงขายกลับมาแล้ว',
   ] },
@@ -8709,6 +8715,7 @@ function shade(hex, f) {
   return `rgb(${Math.round((t - r) * p + r)},${Math.round((t - g) * p + g)},${Math.round((t - b) * p + b)})`;
 }
 const signCache = new Map();
+try { document.fonts?.ready?.then(() => { signCache.clear(); textWCache.clear(); }); document.fonts?.addEventListener?.("loadingdone", () => { signCache.clear(); textWCache.clear(); }); } catch { }   // Safari draws blank text while a web font loads: redraw the tags once fonts arrive
 function sign(text, x, y, o = {}) {
   const fs = Math.max(10, Math.round(o.size || TS * .36)), h = o.h || fs * 1.55;
   const key = `${text}|${fs}|${h}|${o.bg || ''}|${o.border || ''}|${o.color || ''}|${DPR}`;
