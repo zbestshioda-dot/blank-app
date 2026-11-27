@@ -4498,6 +4498,7 @@ function drawMini() {
 // ------------------------------------------------------------------ panels
 let panelOpenT = 0;
 function openPanel(p) {
+  if (document.activeElement?.id === 'pFindQ') document.activeElement.blur();   // a new menu starts with an empty search
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
   if (p.kind === 'achv' || p.kind === 'profile') send({ t: 'achsync' });   // unlock goals already reached (the server only checks when a number goes up)
