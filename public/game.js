@@ -869,6 +869,7 @@ function handle(m) {
     case 'hatch': { const pt = G.pets[m.id], q = P.get(myId); FX.play('pop'); if (q) { FX.burst(q.x, q.y - .6, '#fff3c4', 24); FX.sparkle(q.x, q.y - .8, '#ffe27a', 18); FX.column(q.x, q.y, m.rar >= 4 ? '#ffd34d' : '#bfe8ff'); } flashScreen(m.rar >= 4 ? '255,220,120' : '255,255,255', .3); if (pt) { const d = document.createElement('div'); d.className = 'hatchPop'; d.innerHTML = `<div><small>🐣 ไข่ฟักแล้ว!</small><canvas data-pet="${m.id}" width="120" height="120"></canvas><b>${pt.icon} ${esc(pt.name)}</b><span class="rtag r${pt.rar}">${G.fishRarity[pt.rar]}</span><small>ตั้งชื่อได้ในแอพ 🐾 สัตว์เลี้ยง · แตะเพื่อปิด</small></div>`; d.onclick = () => d.remove(); document.body.appendChild(d); try { drawPetIcon(d.querySelector('canvas'), m.id); } catch { } setTimeout(() => d.remove(), 7000); } break; }
     case 'restart': restartAt = Date.now(); restartBar(true); break;
     case 'refcode': window.__ref = m; if (panel?.kind === 'invite') refreshPanel(true); break;
+    case 'fbinfo': fbInfo.set(m.iid, m); if (panel?.kind === 'fbprof' && panel.iid === m.iid) refreshPanel(true); break;
     case 'info': infoCache.set(m.id, m); if (panel?.kind === 'player' && panel.pid === m.id) refreshPanel(true); break;
     case 'tchat': tradeChat.push(m); if (tradeChat.length > 30) tradeChat.shift(); paintTradeChat(); if (!m.mine) FX.play('pop'); break;
     case 'chat': {
@@ -4560,6 +4561,7 @@ function socHead(k) {
   const grp = k === 'career' ? `<div class="fbGrp"><b>💼 กลุ่มหางาน เมืองชีวิต</b><small>🌐 กลุ่มสาธารณะ · เลือกอาชีพที่ใช่ แล้วไปสมัครที่สถานที่ทำงานได้เลย</small></div>` : '';
   return `<div class="socHead"><b>lifebook</b><small>โซเชียลของเมืองชีวิต</small></div><div class="socTabs">${t('🏠 ฟีด', 'ideas', k === 'ideas' || k === 'bug' || k === 'gidea')}${t('👥 เพื่อน', 'friends', k === 'friends')}${t('💼 กลุ่มหางาน', 'career', k === 'career')}${t(`🔔 แจ้งเตือน${lbUnread() ? ` <em class="lbB">${lbUnread()}</em>` : ''}`, 'noti', k === 'noti')}</div>${sub}${grp}`;
 }
+const fbInfo = new Map();   // 📘 lifebook profile cards by post id
 const DETX = new Set();   // 🕵️ suspects crossed out on the case board (this device only)
 function bindPanel(root) {
   // 🛍️ a list of things to buy shows as a grid of cards (mail, contacts and other lists stay as rows)
@@ -4951,6 +4953,7 @@ const FN = {
   star(m) { const id = m.item; STARS.has(id) ? STARS.delete(id) : STARS.add(id); try { localStorage.setItem('lt_star', JSON.stringify([...STARS])); } catch { } FX.play('click'); refreshPanel(true); },
   favCar(m) { try { localStorage.getItem('lt_car') === m.v ? localStorage.removeItem('lt_car') : localStorage.setItem('lt_car', m.v); } catch { } refreshPanel(true); },
   qtab(m) { Object.assign(panel, m.set); $('#panel').classList.toggle('bagMode', panel.kind === 'bag' && (panel.gtab || 'items') === 'items'); refreshPanel(true); },
+  fbWho(m) { if (me?.name && (window.__ideas?.list || []).find(x => x.id === m.id)?.n === me.name) return openPanel({ kind: 'profile' }); send({ t: 'fbinfo', id: m.id }); openPanel({ kind: 'fbprof', iid: m.id, soc: 1 }); },
   social(m) {
     const k = m.k || 'ideas';
     if (k === 'ideas') send({ t: 'idea', op: 'list', sort: panel?.sort || 'new' });
@@ -6079,7 +6082,7 @@ function storiesBox() {
   }).join('');
 }
 const heartBar = p => { const h = Math.min(10, Math.floor((p || 0) / 10)); return '💗'.repeat(h) + '🤍'.repeat(10 - h) + (p >= 100 ? ' <small>เต็ม 10 ดวง!</small>' : ` <small>${p || 0}/100</small>`); };   // 10 hearts, 10 points each
-const whereGet = id => { const k = G.items[id]?.kind; return k === 'crop' ? 'ปลูกที่ไร่หรือซื้อที่ตลาด' : k === 'fish' ? 'ตกปลา' : k === 'meal' ? 'ร้านอาหาร/ทำอาหารเอง' : /^py_|^parkplush|balloon|popcorn|cottoncandy|hotdog/.test(id) ? 'สวนสนุก' : /malai|offering|kanomthai|khaotom|namlamyai/.test(id) ? 'แถววัด' : 'ร้านสะดวกซื้อ/ร้านค้า'; };
+const whereGet = id => { const k = G.items[id]?.kind; return k === 'crop' ? 'ปลูกที่ไร่หรือซื้อที่ตลาด' : k === 'fish' ? 'ตกปลา' : k === 'meal' ? (G.items[id]?.bake ? 'ร้านเบเกอรี่หวานใจ' : 'ร้านอาหาร/ทำอาหารเอง') : /^py_|^parkplush|balloon|popcorn|cottoncandy|hotdog/.test(id) ? 'สวนสนุก' : /malai|offering|kanomthai|khaotom|namlamyai/.test(id) ? 'แถววัด' : 'ร้านสะดวกซื้อ/ร้านค้า'; };
 const reqTxt = r => `${G.items[r.item]?.icon || ''}${esc(G.items[r.item]?.name || r.item)} x${r.n}`;
 const FOLK_LVN = ['คนแปลกหน้า', 'คนรู้จัก', 'เพื่อน', 'เพื่อนสนิท', 'เหมือนครอบครัว', 'คนพิเศษ', 'คนสำคัญที่สุด'];
 // 📜 the journal: today's favours as a list of little stories; tap one to open it (objective, progress, reward, where to find it)
@@ -6166,7 +6169,7 @@ const itemIco = (id, w = 40, h = 30) => { const it = G.items[id]; return it?.spr
 const rarTag = id => { const r = G.items[id]?.rar; return r ? `<span class="rtag r${r}">${G.fishRarity?.[r] || ''}</span>` : ''; };
 const itemRow = (id, right, sub = '') => { const it = G.items[id]; return `<div class="item"><div class="em">${itemIco(id)}</div><div class="nm">${esc(it.name)}${rarTag(id)}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; };
 function itemRowRaw(icon, name, sub, right) { return `<div class="item"><div class="em">${icon}</div><div class="nm">${name}${sub ? `<small>${sub}</small>` : ''}</div>${right}</div>`; }
-const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`].filter(Boolean).join(' ');
+const eatText = e => [e.hunger && `อิ่ม+${e.hunger}`, e.energy && `⚡+${e.energy}`, e.health && `❤️+${e.health}`, e.happy && `😊+${e.happy}`].filter(Boolean).join(' ');
 let chatTab = 'all', worldAt = 0, godTab = 'quick';
 // world chat: one line every 3 seconds. Too soon -> say so and keep what was typed, so nothing is lost
 function worldOk(ch) {
@@ -6605,6 +6608,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27s', d: '27 พ.ย.', items: [
+    '🧁 <b>ร้านใหม่: ร้านเบเกอรี่หวานใจ</b> ริมลานน้ำพุ ฝั่งตรงข้ามร้านสะดวกซื้อสาขาซอยใต้ เปิด 06:00–21:00 · ขนมปัง ครัวซองต์ โดนัท คัพเค้ก เค้กช็อกโกแลต เค้กมะพร้าวอ่อน ชีสเค้ก และเค้กวันเกิดทั้งก้อน · กินแล้ว<b>ความสุขเพิ่ม</b>',
+    '💬 กรอบคุยกับ NPC: เอาปุ่ม ✕ ออก (แตะอ่านจนจบ หรือกด 👋 ลาก่อน) รูปตัวละครชิดขอบขวาของกรอบ',
+    '📘 lifebook: แตะรูปหรือชื่อคนโพสต์ในฟีด ดูโปรไฟล์ได้ และ ➕ เพิ่มเพื่อนได้เลย (อีกฝ่ายต้องออนไลน์เพื่อกดรับ) หรือส่งจดหมายหาเขา',
+  ] },
   { v: '2026-11-27r', d: '27 พ.ย.', items: [
     '🪙 <b>เงินในเกมเปลี่ยนชื่อเป็น LifeCoin (LC)</b> · ยอดเงินเท่าเดิม แค่เปลี่ยนชื่อ (ราคาแพ็กเติมเงินยังเป็นบาทจริงเหมือนเดิม)',
     '📕 แก้แล้ว: เรื่องหลักบทที่ 4 ขั้น "ทำงาน 3 ครั้ง" นับงานทุกอาชีพแล้ว (เดิมนับแค่ออฟฟิศ)',
@@ -7847,7 +7855,7 @@ function fbAlbum() {
 function ideasPanel(p) {
   const I = window.__ideas, ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'เมื่อกี้' : m < 60 ? m + ' นาที' : m < 1440 ? Math.floor(m / 60) + ' ชม.' : Math.floor(m / 1440) + ' วัน'; };
   const posts = !I ? '<div class="sub">กำลังโหลด…</div>' : I.list.map(i => `<div class="fbPost">
-      <div class="fbTop">${i.av ? `<img class="fbAv" src="fbav/${i.id}?v=${i.av}" alt="">` : fbAv(i.n)}<div><b>${esc(i.n)}</b><small>${ago(i.t)} · 🌐</small></div>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
+      <div class="fbTop"><span class="fbWho" data-m="${esc(JSON.stringify({ fn: 'fbWho', id: i.id }))}">${i.av ? `<img class="fbAv" src="fbav/${i.id}?v=${i.av}" alt="">` : fbAv(i.n)}<span><b>${esc(i.n)}</b><small>${ago(i.t)} · 🌐</small></span></span>${i.mine ? `<span style="margin-left:auto">${B('🗑️', { fn: 'idea', op: 'del', id: i.id })}</span>` : ''}</div>
       ${i.text ? `<p class="fbTxt">${esc(i.text)}</p>` : ''}${i.img ? `<img class="fbPic phZoom" src="fbimg/${i.id}" alt="" loading="lazy">` : ''}
       <div class="fbCnt"><span>${i.likes ? '👍 ' + i.likes : ''}${i.dislikes ? ' 👎 ' + i.dislikes : ''}</span><span>${i.cm.length ? i.cm.length + ' คอมเมนต์' : ''}</span></div>
       <div class="fbAct">${B(`👍 ${i.liked ? 'ถูกใจแล้ว' : 'ถูกใจ'}`, { fn: 'idea', op: 'like', id: i.id }, i.liked ? 'on' : '')}${B(`👎 ${i.disliked ? 'ไม่ถูกใจแล้ว' : 'ไม่ถูกใจ'}`, { fn: 'idea', op: 'unlike', id: i.id }, i.disliked ? 'onN' : '')}${B('💬 คอมเมนต์', { fn: 'idea', op: 'open', id: i.id })}</div>
@@ -8126,6 +8134,10 @@ function renderPanel(p) {
       return `${head}${vend}${lot}<div class="aucReal">💎 มูลค่าจริง <b>${money(c.real)}</b></div><div class="aucResList">${rows}</div>${verdict}${B('🔨 ล็อตถัดไป (⚡4)', { t: 'act', st, a: 'auction' }, 'primary big')}`;
     }
     case 'rider': return `<h2>🛵 ศูนย์ไรเดอร์ส่งอาหาร</h2><div class="sub">${hoursTxt('rider')} · ต้องมีใบขับขี่และมอเตอร์ไซค์ · รับออเดอร์ผ่านแอพในมือถือ 📱</div>${staffHint('rider')}${job('rider') ? `<div class="jobbox">🧡 <b>แย่งลูกค้า!</b> ไรเดอร์ส้มคู่แข่งจะโผล่มาแย่งลูกค้าเป็นพักๆ (จุดสีส้มบนมินิแมพ) วิ่งไปชนแล้วสู้กันแบบผลัดกันเลือกท่า ชนะได้ค่าส่ง+ทิป · ${me.rival ? `ตอนนี้ ${esc(me.rival.name)} อยู่ในเมือง!` : B('🔎 ออกตามหาไรเดอร์ส้ม', { t: 'rbseek' }, 'primary')}</div>` + riderJobs() : ''}`;
+    case 'bakery': {   // 🧁 ร้านเบเกอรี่หวานใจ: bread and cakes, eat here or take away (can't be resold)
+      const rows = Object.entries(G.items).filter(([, it]) => it.bake).map(([id, it]) => itemRow(id, `<div class="col2">${B(`กินเลย ${money(it.base)}`, { t: 'act', st, a: 'eat', item: id }, 'good', me.money < it.base)}${B('🥡 ใส่กล่อง', { t: 'act', st, a: 'buy', item: id, qty: 1 }, '', me.money < it.base)}</div>`, `${eatText(it.eat)}`)).join('');
+      return `<h2>🧁 ร้านเบเกอรี่หวานใจ</h2><div class="sub">${hoursTxt('bakery')} · ขนมอบใหม่ทุกเช้า กินแล้ว<b>ความสุขเพิ่ม</b> · ใส่กล่องไว้กินทีหลังหรือฝากให้เพื่อนได้ (ขายคืนร้านไม่ได้)</div><div class="list">${rows}</div>`;
+    }
     case 'restaurant': {
       const rows = Object.entries(G.items).filter(([, it]) => it.menu).map(([id, it]) => itemRow(id, `<div class="col2">${B(`กินเลย ${money(it.base)}`, { t: 'act', st, a: 'eat', item: id }, 'good')}${B('🥡 ใส่กระเป๋า', { t: 'act', st, a: 'buy', item: id, qty: 1 })}</div>`, `${eatText(it.eat)} · มีในกระเป๋า ${me.inv[id] || 0}`)).join('');
       const pick = job('rider') ? (() => { const n = (me.jobs || []).filter(j => j.mine && j.state === 'taken').length; return `<div class="jobbox">${B(n ? `🥡 รับอาหาร ${n} ออเดอร์` : 'ยังไม่มีออเดอร์ให้รับ', { t: 'act', st, a: 'pickup' }, 'primary big', !n)}</div>`; })() : '';
@@ -8668,6 +8680,17 @@ function renderPanel(p) {
         👥 <b>เพื่อน</b>: คุยกับคนอื่นแล้ว "📱 ขอเบอร์" (ปฏิเสธ 2 ครั้ง ต้องรอ 10 นาที) · ดูเพื่อนที่ออนไลน์ที่เมนู 👥<br>
         💤 ไม่ได้แตะจอ 2 นาที จะขึ้นว่า "ไม่อยู่"</div>
         <div class="grid2" style="margin-top:8px">${B('📖 ดูบทช่วยสอน', { fn: 'tut' })}${B('🗺️ เปิดแผนที่', { fn: 'map' })}</div>`;
+    case 'fbprof': {   // 📘 a post writer's profile from the lifebook feed (works when they're offline too)
+      const inf = fbInfo.get(p.iid), back = B('← กลับฟีด', { fn: 'social', k: 'ideas' });
+      if (!inf) return `${back}<div class="sub">กำลังโหลด...</div>`;
+      return `${back}<h2>${inf.adm ? '👑 ' : ''}${esc(inf.name)} <span class="tag">${inf.on ? '🟢 ออนไลน์' : '⚪ ออฟไลน์'}</span></h2>
+        <div class="prof"><span class="phWrap"><img class="ph phZoom" src="${inf.pic || `assets/ui/face_${inf.sh?.g === 'f' ? 'f' : 'm'}.png`}" alt="">${frameHtml(inf.fr ?? -1, 124)}</span><div class="pi">
+        <div>${CAREER_ICON(inf.c)} ${G.careers[inf.c]?.name || 'ว่างงาน'} · Lv.${inf.lv || 1}</div><div>${titleHtml(inf.title, inf.tr)}</div>
+        <small>💰 ${money(inf.worth)} · 🎣 Lv.${inf.fishLv} · อยู่ในเมือง ${inf.days} วัน${inf.home ? ' · 🏠 มีบ้าน' : ''}${inf.degree ? ' · 🎓' : ''}${inf.phone ? ` · 📱 ${inf.phone}` : ''}</small></div></div>
+        ${inf.sh ? showCv(inf.sh) : ''}${inf.ach?.length ? `<div class="tchips">${inf.ach.map(([t, r]) => `<span class="rar${r}">🏅 ${esc(t)}</span>`).join('')}</div>` : ''}
+        <div class="grid2" style="margin-top:8px">${inf.known ? B('✓ เพื่อนกันแล้ว', {}, 'good', true) : B('➕ เพิ่มเพื่อน', { t: 'fbadd', id: p.iid }, 'primary', !inf.on)}${B('✉️ ส่งจดหมาย', { fn: 'open', kind: 'mail', set: { to: inf.name } })}</div>
+        ${inf.known || inf.on ? '' : '<div class="sub">เพิ่มเพื่อนได้ตอนเขาออนไลน์ (เขาต้องกดรับ) · ส่งจดหมายได้ตลอด</div>'}`;
+    }
     case 'player': {
       const o = P.get(p.pid); if (!o) return '';
       const m = P.get(myId), d = Math.hypot(o.x - m.x, o.y - m.y), far = d > 5.5;

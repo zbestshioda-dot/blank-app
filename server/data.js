@@ -440,6 +440,8 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   }
   // 3) 🕹️ the amusement park's game centre (on its east lawn, door onto the park), a claw-machine booth and a photo booth in the park,
   //    and a soft-play house beside the game centre. Their ground is cleared at the end of the map (after the park is built).
+  // 🧁 bakery: on the lawn across the road from the 3rd convenience store, facing the plaza (picked by the owner). Own picture b_bakery once tools/add_bakery.py has run
+  { const b = B('bakery', 'b_cafe2', 53, 52, { label: 'ร้านเบเกอรี่หวานใจ', icon: '🧁', st: 'bakery', layout: 'bakery', late: 9, clr: 1 }); if (ATLAS.sprites.b_bakery) b.sprite = 'b_bakery'; }
   B('arcade', 'b_arcade', 44, 115, { label: 'เกมเซ็นเตอร์', icon: '🕹️', st: 'arcade', layout: 'arcade', late: 5, clr: 1 });
   B('playland', 'b_playland', 44, 122, { label: 'บ้านบอลเด็กเล่น', icon: '🧒', deco: true, clr: 1 });
   B('clawbooth', 'b_clawbooth', 39, 111, { label: 'ตู้คีบตุ๊กตา', icon: '🧸', st: 'clawst', stype: 'claw', noSlot: true, clr: 1 });
@@ -523,6 +525,10 @@ const LAYOUT = {
     ['br_stool', 3.0, 4.7, false], ['br_stool', 4.6, 4.7, false], ['br_stool', 6.2, 4.7, false],
     ['br_stage', 12.7, 4.6, false], ['br_speaker', 10.9, 3.0], ['br_speaker', 14.5, 3.0], ['br_mic', 12.7, 3.9, false],
     ['br_table', 3.2, 8.0], ['br_table', 12.8, 8.0], ['br_pool', 3.6, 11.0], ['br_sofa', 12.4, 11.0, false], ['br_lamp', 1.3, 6.4], ['br_lamp', 14.8, 6.4], ['br_barrel', 6.0, 11.0], ['br_barrel2', 14.6, 11.0]],
+  // 🧁 bakery (14x10): oven and bread rack behind the counter, the cake case beside it, two café tables, plants by the door.
+  // bk_* pictures come from tools/add_bakery.py; until then older furniture stands in (BKS below)
+  bakery: [['bk_sign', 7, 1.2, false], ['bk_breadrack', 2.2, 2.7], ['bk_oven', 4.4, 2.6], ['bk_counter', 7, 2.4], ['bk_cakecase', 9.8, 2.6], ['bk_fridge', 12.2, 2.7],
+    ['bk_table', 3.4, 6.0], ['bk_table', 10.6, 6.0], ['bk_display', 3.0, 8.4], ['bk_plant', 1.4, 8.6], ['bk_plant', 12.6, 8.6], ['bk_menu', 10.2, 9.1, false]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
@@ -530,6 +536,9 @@ const LAYOUT = {
 const BRS = { br_neon: 'ad_neon', br_shelf: 'f_wine_rack', br_counter: 'cz_bar', br_fridge: 'x_drinkfridge', br_tap: 'i_bottles', br_stool: 'x_barstool', br_stage: 'cz_carpet', br_speaker: 'x_flamp',
   br_mic: 'f_guitar', br_table: 'f_round_table', br_pool: 'x_pool', br_dart: 'x_dart', br_sofa: 'f_sofa_red', br_lamp: 'f_floorlamp', br_barrel: 'barrel', br_barrel2: 'barrel' };
 for (const e of LAYOUT.bar) if (!ATLAS.sprites[e[0]]) e[0] = BRS[e[0]];
+const BKS = { bk_sign: 'i_shopsign', bk_breadrack: 'x_breadrack', bk_oven: 'x_oven', bk_counter: 'x_counter', bk_cakecase: 'x_cakecase', bk_fridge: 'x_drinkfridge',
+  bk_table: 'x_cafeset', bk_display: 'f_display', bk_plant: 'x_plant', bk_menu: 'x_menu' };
+for (const e of LAYOUT.bakery) if (!ATLAS.sprites[e[0]]) e[0] = BKS[e[0]];
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
 // university classroom: 4 desks, two students each
@@ -549,7 +558,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -1017,6 +1026,16 @@ const PARK_ARCH = { x: 46, y: 94.6 };
     for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { clearTree(i, j); set(i, j, 'B'); }
     keep(PROPS, q => !(q.x > b.x - .6 && q.x < b.x + b.w + .6 && q.y - .5 >= b.y - .5 && q.y - .5 < b.y + b.h + 1));
   }
+  // 🧁 the bakery's front: a cobbled path from the door down to the plaza and across to the sidewalk, flower boxes by the door,
+  //    two café tables on the lawn, a street lamp; the trees behind the shop stay as its garden
+  { const bk = BUILDINGS.find(b => b.id === 'bakery'), dx = Math.floor(bk.x + bk.w / 2), fy = bk.y + bk.h;
+    for (let y = fy; y <= fy + 2; y++) for (const x of [dx - 1, dx]) { clearTree(x, y); set(x, y, 'c'); }
+    for (let x = bk.x - 2; x < dx - 1; x++) { clearTree(x, fy); set(x, fy, 'c'); }
+    for (let y = fy - 1; y <= fy + 2; y++) for (let x = bk.x - 2; x <= bk.x + bk.w + 1; x++) if (get(x, y) === 'T') { clearTree(x, y); set(x, y, '.'); }
+    keep(PROPS, q => !(q.x > bk.x - 2.5 && q.x < bk.x + bk.w + 2 && q.y > fy - .2 && q.y < fy + 3) || q.s === 'manhole');
+    prop('flowerbox', bk.x + .7, fy + .35, false); prop('flowerbox', bk.x + bk.w - .7, fy + .35, false);
+    prop('x_cafeset', bk.x - .3, fy + 2.2); prop('x_cafeset', bk.x + bk.w + .3, fy + 2.2);
+    prop('o_lampball', bk.x - 2.2, fy + .6); prop('o_topiary', bk.x + bk.w + 1, fy + .4, false); }
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
   for (let y = 107; y <= 114; y++) if (get(43, y) === 'T') { clearTree(43, y); set(43, y, '.'); }   // the park's hedge of trees would hide the game centre's sign
   keep(PROPS, q => !(q.x > 40.5 && q.x < 50 && q.y > 114.6 && q.y < 117.2));
@@ -1160,7 +1179,7 @@ const PSHOP = { items: ['popcorn', 'cottoncandy', 'icecream', 'soda', 'hotdog', 
 const TSHOP = { items: ['offering', 'malai', 'amulet', 'khaotom', 'kanomthai', 'namlamyai', 'water'], markup: 1 };
 const TEMPLEQ = { pray: 20, blessMin: 20, blessMul: 1.05, almsStops: 5, almsFrom: 5, almsTo: 10, almsPay: 140, almsTip: [10, 30], almsFood: ['khaotom', 'kanomthai', 'bread', 'water', 'namlamyai'] };
 const CSTORE = { items: ['water', 'bread', 'coffee', 'bento', 'icecream', 'snack', 'drink', 'noodle', 'choco', 'painkiller', 'medkit', 'umbrella'], markup: 1.35 };
-const HOURS = { fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
+const HOURS = { bakery: [6, 21], fashion: [9, 21], furnshop: [9, 21], barber: [9, 21], police: [0, 24], square: [6, 22], office: [6, 21], market: [0, 24], warehouse: [5, 20], restaurant: [7, 23], kitchen: [5, 23], hospital: [0, 24], school: [7, 18],
   bank: [8, 17], dealer: [8, 20], toolshop: [8, 20], rider: [6, 23], coop: [5, 20], farmbuy: [5, 20], estate: [0, 24], flower: [8, 20], plantshop: [8, 20], tshop: [6, 20], fishclub: [0, 24], petshop: [9, 21], pet1: [9, 21], pet2: [9, 21], inn: [6, 22], library: [6, 22], bar: [18, 27], bstage: [18, 27] };
 const isOpen = (kind, h) => { const o = HOURS[kind]; return !o || (h >= o[0] && h < o[1]) || (o[1] > 24 && h < o[1] - 24); };   // past 24 = after midnight (the bar: 18-27 = 18:00-03:00)
 const SHIFT = { start: 8, end: 17, grace: 8.25, lunch: null, ot: 21, otMul: 1.25 };   // ot: overtime after 17:00 until the office closes, paid x1.25
@@ -1353,6 +1372,16 @@ const ITEMS = {
   noodle:  { name: 'ก๋วยเตี๋ยว', icon: '🍜', kind: 'meal', base: 80, eat: { hunger: 26 }, menu: 1 },
   somtam:  { name: 'ส้มตำ', icon: '🥗', kind: 'meal', base: 90, eat: { hunger: 22, energy: 6 }, menu: 1 },
   shabu:   { name: 'ชุดชาบู', icon: '🍲', kind: 'meal', base: 320, eat: { hunger: 70, energy: 10 }, menu: 1 },
+
+  // 🧁 bakery (sold only at ร้านเบเกอรี่หวานใจ; can't be resold to NPCs)
+  bk_bread:     { name: 'ขนมปังเนยสด', icon: '🍞', kind: 'meal', base: 40, eat: { hunger: 14, happy: 2 }, bake: 1 },
+  bk_croissant: { name: 'ครัวซองต์เนยฝรั่งเศส', icon: '🥐', kind: 'meal', base: 70, eat: { hunger: 16, energy: 4, happy: 3 }, bake: 1 },
+  bk_donut:     { name: 'โดนัทเคลือบช็อกโกแลต', icon: '🍩', kind: 'meal', base: 55, eat: { hunger: 12, happy: 5 }, bake: 1 },
+  bk_cupcake:   { name: 'คัพเค้กสตรอว์เบอร์รี', icon: '🧁', kind: 'meal', base: 80, eat: { hunger: 10, happy: 7 }, bake: 1 },
+  bk_choco:     { name: 'เค้กช็อกโกแลตหน้านิ่ม', icon: '🍰', kind: 'meal', base: 120, eat: { hunger: 18, happy: 9 }, bake: 1 },
+  bk_coconut:   { name: 'เค้กมะพร้าวอ่อน', icon: '🥥', kind: 'meal', base: 140, eat: { hunger: 18, happy: 10 }, bake: 1 },
+  bk_cheese:    { name: 'บลูเบอร์รีชีสเค้ก', icon: '🫐', kind: 'meal', base: 160, eat: { hunger: 20, happy: 11 }, bake: 1 },
+  bk_bday:      { name: 'เค้กวันเกิดทั้งก้อน', icon: '🎂', kind: 'meal', base: 900, eat: { hunger: 45, energy: 10, happy: 30 }, bake: 1 },
 
   // convenience-store goods (sold only at the 24-hour store)
   offering: { name: 'ชุดธูปเทียนดอกไม้', icon: '🪷', kind: 'goods', base: 20 },

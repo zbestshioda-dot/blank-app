@@ -2189,3 +2189,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media(max-height:520px){#dlg .dlgPic{display:none}#dlg{height:min(190px,calc(100dvh - 30px))!important}}
 .msBox{max-height:calc(100dvh - 13vh - 60px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .msOpts button{white-space:normal;overflow-wrap:anywhere}
+.fbWho{display:flex;gap:10px;align-items:center;cursor:pointer;min-width:0}.fbWho:active{opacity:.6}
+/* 💬 talk box: no ✕ (tap through the lines / 👋 ลาก่อน closes it), the portrait sits flush with the box's right edge */
+#dlg .dlgX{display:none!important}
+#dlg .dlgPic{right:-4px!important}

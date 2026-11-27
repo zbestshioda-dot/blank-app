@@ -3366,6 +3366,7 @@ function act(a, m) {
       let q = m.qty === 'all' ? have : Math.floor(+m.qty);
       if (!it || !(q > 0)) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
       if (it.nosell) return toast(a, `${it.name}ขายไม่ได้ เก็บไว้คราฟที่โรงช่าง 🔨`, '🚫', false);
+      if (it.bake) return toast(a, `${it.name}ขายคืนร้านไม่ได้ กินเองหรือฝากให้เพื่อนเลย 🧁`, '🚫', false);
       q = Math.min(q, have, 500);
       if (q <= 0) return toast(a, 'ไม่มีของชิ้นนี้', '⚠️', false);
       if (!cd(a, 'sell', 300)) return;
@@ -3397,19 +3398,21 @@ function act(a, m) {
       return toast(a, `ซื้อ ${it.icon}${it.name} x${q} ราคาส่ง ${money(unit * q)}`, '📦');
     }
     // ---------------- food
-    case 'restaurant.eat': {
-      const it = D.ITEMS[m.item]; if (!it || !it.menu) return;
+    case 'restaurant.eat': case 'bakery.eat': {
+      const it = D.ITEMS[m.item]; if (!it || !(s.type === 'bakery' ? it.bake : it.menu)) return;
       if (monkFast(a)) return;
       if (!cd(a, 'eat', 4000)) return;
       if (!pay(a, it.base)) { a.cd.eat = 0; return; }
       a.hunger = Math.min(100, a.hunger + it.eat.hunger);
-      if (it.base < 100) infect(a, 'poison', 0.03);
+      if (it.eat.energy && it.bake) a.energy = Math.min(100, a.energy + it.eat.energy);
+      if (it.eat.happy) joy(a, it.eat.happy);
+      if (it.base < 100 && !it.bake) infect(a, 'poison', 0.03);
       ate(a, m.item);
       markMe(a); quest(a, 'eat');
-      return toast(a, `กิน${it.name} อิ่ม +${it.eat.hunger}`, it.icon);
+      return toast(a, `กิน${it.name} อิ่ม +${it.eat.hunger}${it.eat.happy ? ` · สุข +${it.eat.happy}` : ''}`, it.icon);
     }
-    case 'restaurant.buy': {                         // take-away: keep it in your bag for later
-      const it = D.ITEMS[m.item]; if (!it || !it.menu) return;
+    case 'restaurant.buy': case 'bakery.buy': {      // take-away: keep it in your bag for later
+      const it = D.ITEMS[m.item]; if (!it || !(s.type === 'bakery' ? it.bake : it.menu)) return;
       const q = clamp(Math.floor(+m.qty) || 1, 1, 10);
       if (!pay(a, it.base * q)) return;
       addItem(a, m.item, q); markMe(a);
@@ -4101,11 +4104,17 @@ function jobGame(a, m) {
     return toast(a, pay > 0 ? `${J.icon} ${J.name}: ได้ ${score} คะแนน · ค่าแรง ${money(pay)}` : `${J.icon} ${J.name}: รอบนี้ยังไม่ได้คะแนน ลองใหม่นะ`, J.icon, pay > 0);
   }
 }
-function request(a, m) {
+function infoOf(a, o) {   // someone's public profile card, as seen by a
+  const sh = showOf(o), ach = (sh.ach.length ? sh.ach : o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(x => x && !x.nt).sort((x, y) => y.r - x.r).slice(0, 3);
+  return { t: 'info', id: o.id, name: o.name, pic: o.pic || '', fr: frameOf(o), c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
+        ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
+        sh: { of: sh.of, pet: sh.pet, car: sh.car, g: o.gender, lk: o.look || {} }, home: o.hown ? 1 : 0, hslot: o.hown && o.house >= 0 ? 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' };
+}
+function request(a, m, far = false) {   // far: a phone request from the lifebook feed (no need to stand close)
   if (a.down) return;
   const bn = botById(+m.to);
   if (bn) { if (dist(a, bn) > 6) return toast(a, 'เดินเข้าไปใกล้ผู้เล่นคนนั้นก่อน', '⚠️', false); botSay(bn, pick(['ขอโทษนะ ตอนนี้ไม่ว่าง 🙏', 'ไว้ทีหลังนะ กำลังทำงานอยู่', 'ยังไม่สะดวกอะ'])); return toast(a, `${bn.name} ปฏิเสธคำขอ (ไม่ว่าง)`, '🙅', false); }
-  const o = nearPlayer(a, m.to, 6);
+  const o = far ? playerById(m.to) : nearPlayer(a, m.to, 6);
   if (!o) return toast(a, 'เดินเข้าไปใกล้ผู้เล่นคนนั้นก่อน', '⚠️', false);
   if (m.kind === 'trade') {
     if (a.trade || o.trade) return toast(a, 'ฝ่ายใดฝ่ายหนึ่งกำลังแลกเปลี่ยนอยู่', '⚠️', false);
@@ -6276,10 +6285,16 @@ function onMessage0(ws, raw) {
       if (bn) eggMayor(a, bn);
       if (bn) { const b = bn.bot; return send(a, { t: 'info', id: bn.id, name: bn.name, pic: '', c: bn.c, lv: b.lv, title: b.title?.title || '', tr: b.title?.r || 0, adm: 0, ach: b.title ? [[b.title.title, b.title.r]] : [], worth: b.worth, days: b.days, fishLv: b.fishLv, home: 0, degree: 0, phone: '' }); }
       const o = playerById(m.id); if (!o || o.npc) return;
-      const sh = showOf(o), ach = (sh.ach.length ? sh.ach : o.ach || []).map(id => D.ACHIEVEMENTS.find(x => x.id === id)).filter(x => x && !x.nt).sort((x, y) => y.r - x.r).slice(0, 3);
-      return send(a, { t: 'info', id: o.id, name: o.name, pic: o.pic || '', fr: frameOf(o), c: o.career, lv: lvl(o), title: titleOf(o), tr: titleRar(o), adm: isAdmin(o) ? 1 : 0,
-        ach: ach.map(x => [x.title, x.r]), worth: Math.round(worth(o)), days: Math.max(1, Math.ceil((now() - (o.created || now())) / 86400e3)), fishLv: fishLv(o),
-        sh: { of: sh.of, pet: sh.pet, car: sh.car, g: o.gender, lk: o.look || {} }, home: o.hown ? 1 : 0, hslot: o.hown && o.house >= 0 ? 1 : 0, degree: (o.licenses || []).includes('degree') ? 1 : 0, phone: (a.contacts || []).some(c => c.n === o.name) ? o.phone : '' });
+      return send(a, infoOf(a, o));
+    }
+    case 'fbinfo': {                        // 📘 lifebook: the profile of whoever wrote a post (online or not)
+      const i = ideas.find(x => x.id === +m.id), o = i && accounts.get(i.l); if (!o) return toast(a, 'ไม่พบผู้เล่นคนนี้แล้ว', '📘', false);
+      return send(a, { ...infoOf(a, o), t: 'fbinfo', iid: i.id, on: !!(o.ws && !hidden(o)), me: o === a ? 1 : 0, known: (a.contacts || []).some(c => c.p === o.phone) ? 1 : 0 });
+    }
+    case 'fbadd': {                         // 📘 ask a post's writer for their number from the feed (they must be online to answer)
+      const i = ideas.find(x => x.id === +m.id), o = i && accounts.get(i.l); if (!o || o === a) return;
+      if (!o.ws || hidden(o)) return toast(a, `${o.name} ออฟไลน์อยู่ ลองใหม่ตอนเขาออนไลน์ หรือส่ง ✉️ จดหมายไปก่อน`, '📵', false);
+      return request(a, { kind: 'phone', to: o.id }, true);
     }
     case 'mail': {                          // letters: reach anyone, online or not
       const text = cleanText(m.text, 500), to = cleanText(m.to, 16);
