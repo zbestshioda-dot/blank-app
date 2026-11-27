@@ -841,7 +841,7 @@ function handle(m) {
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
-    case 'ms': MSV = m; if (panel?.kind === 'ms') refreshPanel(true); break;
+    case 'ms': MSV = m; msHud(); if (panel?.kind === 'ms') refreshPanel(true); break;
     case 'mscut': msCut(m); break;
     case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
     case 'tiles': for (const [x, y, c] of m.set || []) { const r = G.map.tiles[y]; if (r) G.map.tiles[y] = r.slice(0, x) + c + r.slice(x + 1); } gCache.clear(); break;   // 🏗️ the map changed (a town project was built)
@@ -1776,6 +1776,7 @@ function camera() {
   const m = P.get(myId); let x = m ? (camS.on ? camS.x : m.rx + m.ox) : 50, y = m ? (camS.on ? camS.y : m.ry + m.oy) : 36;
   if (m?.pose === 'fun' && m.fn) { const fo = funPos(m); if (fo) { camRide.x += (fo.x - camRide.x) * .08; camRide.y += (fo.y - 1 - camRide.y) * .08; x = camRide.x; y = camRide.y; } } else if (m) { camRide.x = x; camRide.y = y; }   // on a ride the view follows you, gently
   const so = specId ? P.get(specId) : null; if (so) { x = so.rx; y = so.ry; }   // 👁 watching someone else
+  if (msCam) { msCam.cx += (msCam.x - msCam.cx) * .06; msCam.cy += (msCam.y - msCam.cy) * .06; x = msCam.cx; y = msCam.cy; }   // 🎬 in-world cutscene: the view glides to whoever speaks
   if (window.__camAt) { x = window.__camAt[0]; y = window.__camAt[1]; return { x: x * TS - VW / 2, y: y * TS - VH / 2 }; }   // automated screenshots only
   const target = panel && !trade && !(VW > VH && VH <= 520) ? VH * 0.24 : 0;   // landscape popups sit in the middle, no lift
   camLift += (target - camLift) * 0.18;
@@ -6075,7 +6076,16 @@ Object.assign(FN, {
   msNew() { if (confirm('เริ่มเนื้อเรื่องรอบใหม่?\nรีเซ็ตแค่ความคืบหน้าเรื่องหลัก · เงิน บ้าน อาชีพ ไอเทม ความสนิท และสมุดฉากจบยังอยู่ครบ')) send({ t: 'ms', a: 'new' }); },
 });
 // 🎬 cutscene: letterbox, the speaker's face, typed text, tap to go on; choices / chapter end / ending card at the end
-let msQ = null;
+let msQ = null, msCam = null;
+// 📕 one line under today's quests: where the main story is at; tap opens it
+function msHud() {
+  const el = $('#msLine'), v = MSV; if (!el) return;
+  el.classList.toggle('hidden', !v || v.end || !v.step);
+  if (v?.step && !v.end) el.innerHTML = `<i>📕</i><span><b>เรื่องหลัก บท ${v.ch + 1}</b><em>${esc(msHint(v.step))}</em></span>`;
+}
+$('#msLine')?.addEventListener('click', () => { FX.play('click'); FN.openMain(); });
+// a speaker standing in the same map as you: the cutscene plays over the real town (camera on them) instead of a painted backdrop
+const msWho = id => { const m = id && P.get(myId), a = m && areaOf(m.x, m.y)?.id; return a ? [...P.values()].find(p => p.fid === id && areaOf(p.x, p.y)?.id === a) : null; };
 function msCut(m) {
   const lines = [...(m.lines || [])];
   if (m.fin) lines.push({ x: `📕 จบบทที่ ${m.fin.n} "${m.fin.t}" · ได้ ${money(m.fin.pay)}`, sys: 1 });
@@ -6093,11 +6103,14 @@ function msShow(q) {
     ov.onclick = e => { if (e.target.closest('.msOpts button')) return; if (e.target.closest('.msSkip')) { msQ.i = msQ.lines.length - 1; msQ.typed = 1; return msLine(); } msTap(); };
   }
   ov.classList.remove('hidden'); ov.dataset.ch = MSV?.ch ?? 0;
+  const w = q.lines.some(l => msWho(l.s)), m = P.get(myId); ov.classList.toggle('world', w); document.body.classList.toggle('msw', w);
+  msCam = w && m ? { cx: camS.x || m.rx, cy: camS.y || m.ry, x: m.rx, y: m.ry } : null;
   msQ = { ...q, i: 0 }; ov.querySelector('.msTitle').textContent = q.title ? `📕 ${q.title}` : ''; msLine();
 }
 function msLine() {
   const ov = $('#msCut'), l = msQ.lines[msQ.i] || { x: '' }, f = l.s && folkById(l.s), p = ov.querySelector('.msTxt p'), last = msQ.i >= msQ.lines.length - 1;
   ov.querySelector('.msFace').innerHTML = f ? folkFace(f, 72) : '';
+  if (msCam) { const w = msWho(l.s) || P.get(myId); if (w) { msCam.x = w.rx; msCam.y = w.ry + VH * .16 / TS; } }
   ov.querySelector('.msName').textContent = l.s ? l.nm || msNm(l.s) : '';
   ov.classList.toggle('narr', !l.s); ov.classList.toggle('sys', !!l.sys);
   const html = msHtml(l.x), plain = html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
@@ -6121,7 +6134,7 @@ function msTap() {
   msClose();
   const st = MSV?.step; if (st?.k === 'scene') FN.msAdv(); else if (st) toast(msHint(st), '📕');   // scenes play on by themselves; otherwise a toast says what's next (no panel to close)
 }
-function msClose() { clearInterval(msQ?.tm); msQ = null; $('#msCut')?.classList.add('hidden'); }
+function msClose() { clearInterval(msQ?.tm); msQ = null; msCam = null; document.body.classList.remove('msw'); $('#msCut')?.classList.add('hidden'); }
 function storiesBox() {
   if (!STORIES.length) return '';
   return STORIES.map(s => {
@@ -6658,6 +6671,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28e', d: '28 พ.ย.', items: [
+    '📕 เรื่องหลักโชว์ใต้เควสต์วันนี้แล้ว บอกว่าต้องทำอะไรต่อ แตะเพื่อเปิดดู',
+    '🏷️ ปุ่มกลมล่างหน้าเข้าเกม มีชื่อบอกแล้ว: ติดตั้งมือถือ · แชร์ลิงก์ · ติดตั้งคอม',
+    '🎬 คัทซีนเรื่องหลักแบบใหม่: ถ้าคนที่พูดอยู่ในแผนที่เดียวกัน กล้องจะเลื่อนไปหาตัวละครในเมืองจริง',
+  ] },
   { v: '2026-11-28d', d: '28 พ.ย.', items: [
     '📱 หน้าจอมือถือใหม่: แอปแบ่งเป็นหน้า ปัดซ้าย-ขวาเพื่อเลื่อน ไม่ต้องเลื่อนลงแล้ว (มีจุดบอกหน้าและคำแนะนำ)',
     '💎 เอาแอปเติมเงินออกจากมือถือ',
