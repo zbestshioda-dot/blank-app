@@ -2150,11 +2150,11 @@ body.dlgOn #hud,body.dlgOn #nearBtns,body.dlgOn #keyHint,body.dlgOn #placeBar{op
 #dlg{bottom:calc(14px + env(safe-area-inset-bottom))!important;height:190px;padding:22px 16px 12px!important;display:block!important}
 #dlg .dlgBody{position:static;height:100%}
 #dlg .dlgName{position:absolute;left:14px;top:-17px;margin:0;font-size:15px;padding:3px 14px;z-index:2}
-#dlg .dlgPic{position:absolute!important;left:auto!important;right:34px;bottom:calc(100% - 4px);top:auto;z-index:1}
+#dlg .dlgPic{position:absolute!important;left:auto!important;right:52px;bottom:calc(100% - 4px);top:auto;z-index:1}
 #dlg .dlgPix{width:96px;height:96px}
 #dlg .dlgText{height:100%;overflow-y:auto;padding-right:6px}
 #dlg .dlgNext{right:16px;bottom:8px}
 #dlg .dlgBody:has(.dlgCh:not(:empty)) .dlgText{display:none}
 #dlg .dlgCh{display:grid!important;grid-template-columns:1fr 1fr;gap:5px;margin:0;height:100%;overflow-y:auto;align-content:start}
-#dlg .dlgCh button{width:100%;margin:0!important;padding:4px!important;font-size:13.5px!important;line-height:1.2;min-height:0!important;height:30px}
+#dlg .dlgCh button{width:100%;margin:0!important;padding:4px 6px!important;font-size:13px!important;line-height:1.25!important;min-height:36px!important;height:auto!important;white-space:normal!important;overflow:visible!important}
 @media(min-width:601px){#dlg{height:200px}#dlg .dlgCh{grid-template-columns:1fr 1fr 1fr}}

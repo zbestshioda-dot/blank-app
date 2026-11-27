@@ -6499,6 +6499,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27j', d: '27 พ.ย.', items: [
+    '🛠️ แก้ปุ่มเมนูในกรอบคุย ตัวหนังสือยาวๆ โดนตัด อ่านครบแล้ว',
+  ] },
   { v: '2026-11-27i', d: '27 พ.ย.', items: [
     '💬 กรอบคุยสูงขึ้น อ่านข้อความและเลือกเมนูสบายขึ้น',
   ] },
