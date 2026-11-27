@@ -5079,7 +5079,7 @@ const FN = {
   payMethod(m) { paySel.m = m.id; refreshPanel(true); },
   payBuy(m, root) {
     if (!root.querySelector('#payOk')?.checked) return toast('ติ๊กยืนยันก่อนชำระเงิน', '☑️');
-    send({ t: 'pay', op: 'buy', pack: paySel.pack });
+    send({ t: 'pay', op: 'buy', pack: paySel.pack, ...(paySel.to ? { to: paySel.to } : {}) });
   },
   payShow(m) { payOpenRef = m.ref; refreshPanel(true); },
   payHide() { payOpenRef = ''; refreshPanel(true); },
@@ -6098,7 +6098,7 @@ function frameHtml(id, sz, fit = true) {
   return `<span class="pfx ${sp ? 'sp g' + id : ''}" data-k="${id}:${sz0}" data-ps="${ps}" style="--fs:${sz}px;background-position:${-(id % c) * sz}px ${-Math.floor(id / c) * sz}px;transform:translate(${Math.round(-hx * sz)}px,${Math.round(-hy * sz)}px)"></span>`;
 }
 let godFindRes = null, ledgerRes = null, payRes = null, payAdm = null, payBackRef = '';
-const paySel = { pack: 'p100', m: 'slip' };
+const paySel = { pack: 'p100', m: 'slip', to: '' };
 let payOpenRef = '';
 // 💎 PromptPay QR (draw) and slip QR (read): small libraries, loaded only when the top-up shop opens
 const libLoad = {};
@@ -6119,6 +6119,7 @@ async function readSlipQR(file) {
   return '';
 }
 function bindPay(root) {
+  const to = root.querySelector('#payTo'); if (to) to.onchange = () => { paySel.to = to.value; refreshPanel(true); };
   const cv = root.querySelector('#payQr');
   if (cv && cv.dataset.qr) loadLib('qr', QR_LIB).then(() => {
     const q = window.qrcode(0, 'M'); q.addData(cv.dataset.qr); q.make();
@@ -6208,7 +6209,7 @@ function gemSwapBox() {   // 💎 → ฿ (1💎 = ฿500, up to 💎500 a day; 
 function topupHtml() {
   const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า SLIP2GO_SECRET และ PROMPTPAY_ID ใน Fly.io ก่อน' : ''}</div>`;
-  const avail = p => !(p.kind === 'outfit' && R.hasAngel);
+  const avail = p => !(p.kind === 'outfit' && R.hasAngel && !paySel.to);
   if (!R.packs.find(p => p.id === paySel.pack && avail(p))) paySel.pack = (R.packs.find(p => p.id === 'p100') || R.packs[0]).id;
   const pk = R.packs.find(p => p.id === paySel.pack);
   if (!R.methods[paySel.m]) paySel.m = Object.keys(R.methods)[0];
@@ -6221,7 +6222,10 @@ function topupHtml() {
       : `<b style="font-size:18px">💎${p.gems}</b>${bon ? `<small style="color:var(--good)">+${bon} โบนัส</small>` : ''}`;
     return `<button class="item" ${ok ? '' : 'disabled'} style="display:block;text-align:center;${on ? 'border:3px solid #2fa34a;background:#e4ffd6;box-shadow:0 0 0 2px #2fa34a' : ''}" data-m='${JSON.stringify({ fn: 'payPack', id: p.id })}'>${on ? '<small style="color:#2fa34a;font-weight:800">✓ เลือกอยู่</small>' : ''}${head}<div style="font-weight:800">฿${p.thb}</div>${p.tag && !p.kind ? `<small class="tag">${p.tag}</small>` : ''}</button>`; };
   const special = R.packs.filter(p => p.kind), gems = R.packs.filter(p => !p.kind);
-  const what = o => o.pack === 'month' ? '💳 บัตรรายเดือน' : o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`;
+  const what = o => (o.pack === 'month' ? '💳 บัตรรายเดือน' : o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`) + (o.tn ? ` 🎁 ให้ ${esc(o.tn)}` : '');
+  const cs = me.contacts || []; if (paySel.to && !cs.some(c => c.p === paySel.to)) paySel.to = '';
+  const tn = paySel.to && cs.find(c => c.p === paySel.to).n;
+  const gift = `<div class="secT">🎁 ส่งเป็นของขวัญ</div><select id="payTo" style="width:100%"><option value="">ซื้อให้ตัวเอง</option>${cs.map(c => `<option value="${esc(c.p)}" ${c.p === paySel.to ? 'selected' : ''}>🎁 ให้ ${esc(c.n)}</option>`).join('')}</select>${cs.length ? '' : '<small style="opacity:.75">ยังไม่มีเพื่อนในรายชื่อโทรศัพท์</small>'}`;
   const my = (R.my || []).map(o => { const st = PAY_ST[o.st] || [o.st, '#999'];
     return `<div class="item"><div class="nm">${what(o)} · ฿${o.thb}<small>${new Date(o.t).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · #${o.ref}${o.why ? '<br>⚠️ ' + esc(o.why) : ''}</small></div><b style="color:${st[1]};white-space:nowrap">${st[0]}</b>${o.st === 'new' && o.qr && o.ref !== payOpenRef ? B('📷 ส่งสลิป', { fn: 'payShow', ref: o.ref }) : ''}</div>`; }).join('');
   const op = (R.my || []).find(o => o.ref === payOpenRef && o.st === 'new' && o.qr);
@@ -6231,12 +6235,12 @@ function topupHtml() {
       <div class="grid2" style="margin-top:6px"><button type="button" id="payQrSave">💾 บันทึกรูป QR</button>${B('✖ ปิด', { fn: 'payHide' })}</div>
       <div class="sub" style="margin-top:8px">โอนเสร็จแล้ว ส่งรูปสลิปจากแอปธนาคาร ของจะเข้าทันทีเมื่อตรวจผ่าน</div>
       <button type="button" class="primary big" id="paySlipPick">📷 อัปโหลดสลิป</button><input type="file" id="paySlip" data-ref="${op.ref}" accept="image/*" hidden></div>` : '';
-  const got = pk.kind === 'card' ? 'บัตรรายเดือน 💎700' : pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first ? Math.round(pk.gems * R.bonus) : 0));
+  const got = (paySel.to ? `🎁 ${esc(tn)} ได้ ` : '') + (pk.kind === 'card' ? 'บัตรรายเดือน 💎700' : pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first && !paySel.to ? Math.round(pk.gems * R.bonus) : 0)));
   return `<h2>💎 ร้านเติมเงิน</h2>${R.sb ? '<div class="jobbox">🧪 โหมดทดสอบ (Sandbox) ไม่ตัดเงินจริง</div>' : ''}
     <div class="sub">คุณมี 💎${(me?.gems || 0).toLocaleString()}${R.first ? ' · 🎉 เติมเพชรครั้งแรกรับโบนัส +' + Math.round(R.bonus * 100) + '%' : ''}</div>
     <div class="secT">✨ ของพิเศษ</div><div class="grid2">${special.map(card).join('')}</div>
     <div class="secT">💎 เพชร</div><div class="grid2">${gems.map(card).join('')}</div>
-    ${box}<div class="sub" style="margin-top:6px">📱 จ่ายด้วยการสแกน QR พร้อมเพย์จากแอปธนาคารไหนก็ได้ แล้วอัปโหลดสลิป</div>
+    ${gift}${box}<div class="sub" style="margin-top:6px">📱 จ่ายด้วยการสแกน QR พร้อมเพย์จากแอปธนาคารไหนก็ได้ แล้วอัปโหลดสลิป</div>
     <label class="sub" style="display:flex;gap:6px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="payOk" style="width:auto"> <span>ฉันอายุ 18 ปีขึ้นไป หรือได้รับอนุญาตจากผู้ปกครองแล้ว และเข้าใจว่าของที่ซื้อเป็นไอเทมในเกม ไม่สามารถแลกคืนเป็นเงินได้</span></label>
     ${B(`📱 ชำระ ฿${pk.thb} รับ ${got}`, { fn: 'payBuy' }, 'primary big')}
     <small style="opacity:.75">ตรวจสลิปอัตโนมัติ · 1 สลิปใช้ได้ครั้งเดียว · ใช้ได้เฉพาะสลิปที่โอนหลังกดชำระ · มีปัญหาแจ้งแอดมินพร้อมเลขรายการ</small>
@@ -6499,6 +6503,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27m', d: '27 พ.ย.', items: [
+    '🎁 ร้านเติมเงินส่งของขวัญให้เพื่อนได้แล้ว! เลือกเพื่อนในช่อง "ส่งเป็นของขวัญ" ก่อนชำระ',
+  ] },
   { v: '2026-11-27l', d: '27 พ.ย.', items: [
     '🛠️ แก้กรอบคุยปิดไม่ได้/ค้างบนจอ',
   ] },

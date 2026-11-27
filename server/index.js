@@ -6650,13 +6650,15 @@ function payOp(a, m) {
   if (!PAY.ON) return toast(a, 'ระบบเติมเงินยังไม่เปิดให้บริการ', '💎', false);
   const pk = PAY.PACKS.find(p => p.id === m.pack);
   if (!pk) return toast(a, 'เลือกแพ็กก่อน', '💎', false);
-  if (pk.kind === 'outfit' && (a.outfits || []).includes(pk.of)) return toast(a, 'คุณมีชุดนี้แล้ว', '👗', false);
-  const l = lk(a), t = now();
-  const same = Object.values(payOrders).find(o => o.l === l && o.st === 'new' && o.pack === pk.id && t - o.t < 30 * 60e3);
+  const g = m.to ? byPhone.get(String(m.to)) : null;   // 🎁 gift to a friend in my contacts
+  if (m.to && (!g || g === a || !(a.contacts || []).some(c => c.p === g.phone))) return toast(a, 'ส่งของขวัญได้เฉพาะเพื่อนในรายชื่อโทรศัพท์', '🎁', false);
+  if (!g && pk.kind === 'outfit' && (a.outfits || []).includes(pk.of)) return toast(a, 'คุณมีชุดนี้แล้ว', '👗', false);
+  const l = lk(a), t = now(), to = g ? lk(g) : undefined;
+  const same = Object.values(payOrders).find(o => o.l === l && o.st === 'new' && o.pack === pk.id && o.to === to && t - o.t < 30 * 60e3);
   if (same) { send(a, payView(a)); return send(a, { t: 'payqr', ref: same.ref }); }   // reuse the open order of the same pack
   if (Object.values(payOrders).filter(o => o.l === l && o.st === 'new' && t - o.t < 15 * 60e3).length >= PAY_OPEN) return toast(a, 'มีรายการที่ยังไม่จ่ายหลายรายการแล้ว รอสักครู่ค่อยลองใหม่', '⏳', false);
   let ref; do ref = PAY.newRef(); while (payOrders[ref]);
-  payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'slip', t, st: 'new' };
+  payOrders[ref] = { ref, l, n: a.name, pack: pk.id, gems: pk.gems, thb: pk.thb, m: 'slip', t, st: 'new', ...(g ? { to, tn: g.name } : {}) };
   payPrune(); gdirty();
   send(a, payView(a)); send(a, { t: 'payqr', ref });
 }
@@ -6680,7 +6682,7 @@ async function payVerify(ref, src) {
   } finally { delete o.busy; }
 }
 function payCredit(o, by) {
-  const x = accounts.get(o.l); if (!x) { o.st = 'review'; o.why = 'ไม่พบบัญชีผู้เล่น'; gdirty(); return; }
+  const x = accounts.get(o.to || o.l), b = accounts.get(o.l) || x; if (!x) { o.st = 'review'; o.why = 'ไม่พบบัญชีผู้เล่น'; gdirty(); return; }
   const pk = PAY.PACKS.find(p => p.id === o.pack) || {};
   let got;
   if (pk.kind === 'card') {                  // 💳 monthly card: 30 more days (stacks) + 💎100 now; the daily 💎20 is claimed in game
@@ -6694,19 +6696,22 @@ function payCredit(o, by) {
     if ((x.outfits || []).includes(pk.of)) { x.gems = (x.gems || 0) + 300; o.gave = { gems: 300 }; got = `คุณมี${nm}อยู่แล้ว จึงเปลี่ยนเป็น 💎300 ให้แทน`; }
     else { x.outfits = [...(x.outfits || []), pk.of]; x.outfit = pk.of; o.gave = { of: pk.of }; got = `${nm} (ใส่ให้แล้ว ถอด/ใส่ได้ที่ ⚙️ ตั้งค่า)`; }
   } else {
-    o.bonus = x.paidG ? 0 : Math.round(o.gems * PAY.FIRST_BONUS); x.paidG = 1;
+    o.bonus = o.to || x.paidG ? 0 : Math.round(o.gems * PAY.FIRST_BONUS); if (!o.to) x.paidG = 1;
     x.gems = (x.gems || 0) + o.gems + o.bonus; o.gave = { gems: o.gems + o.bonus, fb: o.bonus ? 1 : 0 }; got = `💎${o.gems}${o.bonus ? ` + โบนัสเติมครั้งแรก 💎${o.bonus}` : ''}`;
   }
-  x.paidN = (x.paidN || 0) + 1; x.paidThb = (x.paidThb || 0) + o.thb;
-  o.st = 'paid'; o.paidT = now(); o.by = by; delete o.why; x.sd = true; dirty = true; gdirty();
-  console.log('pay credited', o.ref, o.l, o.pack, o.thb, by);
-  sysMail(x, `💖 ชำระเงินสำเร็จ!\n\nได้รับ ${got}\nยอดชำระ ฿${o.thb} · รายการ ${o.ref}\n\nขอบคุณที่สนับสนุนเมืองของเรานะ 💖`);
-  if (x.ws) { markMe(x); sendRoster(); send(x, payView(x)); }
+  b.paidN = (b.paidN || 0) + 1; b.paidThb = (b.paidThb || 0) + o.thb;
+  o.st = 'paid'; o.paidT = now(); o.by = by; delete o.why; x.sd = b.sd = true; dirty = true; gdirty();
+  console.log('pay credited', o.ref, o.l, o.to || '', o.pack, o.thb, by);
+  if (o.to) {
+    sysMail(x, `🎁 คุณได้รับของขวัญจาก ${b.name}!\n\nได้รับ ${got}\n\nอย่าลืมขอบคุณเพื่อนนะ 💖`);
+    sysMail(b, `🎁 ส่งของขวัญสำเร็จ!\n\n${o.tn || x.name} ได้รับ ${got.replace(/ \(ใส่ให้แล้ว.*\)$/, '')}\nยอดชำระ ฿${o.thb} · รายการ ${o.ref}\n\nขอบคุณที่สนับสนุนเมืองของเรานะ 💖`);
+  } else sysMail(x, `💖 ชำระเงินสำเร็จ!\n\nได้รับ ${got}\nยอดชำระ ฿${o.thb} · รายการ ${o.ref}\n\nขอบคุณที่สนับสนุนเมืองของเรานะ 💖`);
+  for (const y of new Set([x, b])) if (y.ws) { markMe(y); sendRoster(); send(y, payView(y)); }
 }
 // ↩️ take back what an order gave (a test payment, a refund or a chargeback) and mark it void; unpaid orders are just cancelled
 function payRevoke(o, by) {
   if (o.st !== 'paid') { o.st = 'void'; o.by = by; o.why = 'ยกเลิกโดยแอดมิน'; gdirty(); return 'ยกเลิกรายการแล้ว'; }
-  const x = accounts.get(o.l), pk = PAY.PACKS.find(p => p.id === o.pack) || {};
+  const x = accounts.get(o.to || o.l), b = accounts.get(o.l) || x, pk = PAY.PACKS.find(p => p.id === o.pack) || {};
   const gave = o.gave || (pk.kind === 'title' ? { vip: D.PAY_TITLE.days * 86400e3 } : pk.kind === 'outfit' ? { of: pk.of } : { gems: (o.gems || 0) + (o.bonus || 0), fb: o.bonus ? 1 : 0 });
   let what = '';
   if (x) {
@@ -6714,7 +6719,7 @@ function payRevoke(o, by) {
     if (gave.vip) { x.vipT = Math.max(0, (x.vipT || 0) - gave.vip); if (x.vipT <= now()) { x.vipT = 0; if (x.title === D.PAY_TITLE.id) x.title = ''; } what = 'ฉายาผู้สนับสนุน 30 วัน'; }
     if (gave.of) { x.outfits = (x.outfits || []).filter(i => i !== gave.of); if (x.outfit === gave.of) x.outfit = ''; what = 'ชุดเทวดา/นางฟ้า'; }
     if (gave.gems) { const had = x.gems || 0; x.gems = Math.max(0, had - gave.gems); if (gave.fb) x.paidG = 0; what = `💎${gave.gems}` + (had < gave.gems ? ` (มีเหลือ 💎${had} จึงหักได้เท่านั้น)` : ''); }
-    x.paidN = Math.max(0, (x.paidN || 0) - 1); x.paidThb = Math.max(0, (x.paidThb || 0) - o.thb); x.sd = true; dirty = true;
+    if (b) { b.paidN = Math.max(0, (b.paidN || 0) - 1); b.paidThb = Math.max(0, (b.paidThb || 0) - o.thb); b.sd = true; } x.sd = true; dirty = true;
     sysMail(x, `ℹ️ รายการเติมเงิน ${o.ref} ถูกยกเลิก\n\nรายการนี้ไม่ได้มีการชำระเงินจริง (เช่น จ่ายในโหมดทดสอบ) ระบบจึงดึง ${what} คืน\nถ้าคิดว่าผิดพลาด แจ้งแอดมินพร้อมเลขรายการได้เลย`);
     if (x.ws) { markMe(x); sendRoster(); send(x, payView(x)); }
   }
