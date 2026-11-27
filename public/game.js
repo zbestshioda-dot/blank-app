@@ -841,6 +841,8 @@ function handle(m) {
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
+    case 'ms': MSV = m; if (panel?.kind === 'ms') refreshPanel(true); break;
+    case 'mscut': msCut(m); break;
     case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
     case 'tiles': for (const [x, y, c] of m.set || []) { const r = G.map.tiles[y]; if (r) G.map.tiles[y] = r.slice(0, x) + c + r.slice(x + 1); } gCache.clear(); break;   // 🏗️ the map changed (a town project was built)
     case 'storylog': STORYLOG = m; if (panel?.kind === 'storylog') refreshPanel(true); break;
@@ -5967,6 +5969,86 @@ function storySay(m) {
   FX.play(m.end ? 'chime' : 'click');
   dialog({ name: f?.name || m.label || '📖 เรื่องราว', face: f?.face || null, lines, choices: [{ label: '👌 ต่อ', fn: dialogClose }, { label: '📖 ดูเนื้อเรื่อง', fn: () => { dialogClose(); FN.openStories(); } }] });
 }
+// 📕 main story "สาย 99 ไม่เคยถึงปลายทาง" (server/mainstory.js): panel, full-screen cutscenes, ending collection
+let MSV = null;
+const msHtml = x => esc(x).replace(/&lt;(\/?)b&gt;/g, '<$1b>').replace(/\{n\}/g, `<b>${esc(me?.name || 'คุณ')}</b>`);
+const msNm = id => (folkById(id)?.name || '').replace(/\s*\(.*$/, '');
+function msHint(st) {
+  if (!st) return '';
+  const it = st.item && G.items[st.item], who = st.npc ? msNm(st.npc) || 'คนในเรื่อง' : '';
+  return ({ scene: '🎬 มีฉากใหม่รอดูอยู่', talk: `💬 ไปคุยกับ${who}`, go: `📍 ไปที่${st.label}`, give: `🎁 นำ ${it ? it.icon + it.name : ''} ×${st.n} ไปให้${who} (มี ${Math.min(st.have || 0, st.n)}/${st.n})`,
+    do: `✅ ${st.label} (${Math.min(st.prog || 0, st.n)}/${st.n})`, choice: `❓ ${st.q}` })[st.k] || '';
+}
+function msPanel() {
+  const v = MSV; if (!v) return `<h2>📕 เรื่องหลัก</h2><div class="sub">กำลังโหลด...</div>`;
+  const st = v.step, f = st?.npc && folkById(st.npc);
+  const chs = v.chs.map((t, i) => `<div class="msCh ${i < v.ch || v.end ? 'done' : i === v.ch ? 'on' : ''}">${i < v.ch || v.end ? '✅' : i === v.ch ? '▶' : '🔒'} บทที่ ${i + 1} · ${i <= v.ch ? esc(t) : '???'}</div>`).join('');
+  const act = !st ? '' : st.k === 'choice' ? B('💬 ตัดสินใจ', { fn: 'msAsk' }, 'primary') : st.k === 'scene' ? B('🎬 ดูฉากต่อ', { fn: 'msAdv' }, 'primary')
+    : `${st.nav ? B('📍 นำทาง', { fn: 'storyGuide', at: st.nav }) : ''}${B({ talk: '💬 คุยตอนนี้', go: '🔍 สำรวจตรงนี้', give: '🎁 ให้ตอนนี้', do: '✅ รายงานผล' }[st.k] || '▶ ต่อ', { fn: 'msAdv' }, 'primary')}`;
+  const cur = v.end ? `<div class="msNow"><b>🏁 จบรอบที่ ${v.run} แล้ว</b><small>อยากรู้ว่าถ้าเลือกต่างไปจะเป็นยังไง? เริ่มรอบใหม่ได้เลย เงิน บ้าน อาชีพ ไอเทม และความสนิทยังอยู่ครบ</small>${B(`🔁 เริ่มเนื้อเรื่องรอบที่ ${v.run + 1}`, { fn: 'msNew' }, 'primary')}</div>`
+    : `<div class="msNow"><b>บทที่ ${v.ch + 1} "${esc(v.chs[v.ch])}" · ขั้น ${v.si + 1}/${v.sn}</b><small>${esc(msHint(st))}</small>${f && !st.nav && st.k !== 'choice' && f.doing ? `<small>📌 ตอนนี้${esc(msNm(st.npc))}: ${esc(f.doing)}</small>` : ''}<div class="rowf" style="margin-top:6px">${act}</div></div>`;
+  const ends = v.endings.map(e => `<div class="msEnd ${e.name ? 'got' : ''}"><i>${e.name ? e.icon : '❔'}</i><b>${e.tag}</b><small>${e.name ? esc(e.name) + ` · รอบ ${e.run}` : esc('คำใบ้: ' + e.hint)}</small></div>`).join('');
+  const bonds = v.b.filter(([, n]) => n).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<span class="msBond">${esc(msNm(id) || id)} ${n > 0 ? '❤️'.repeat(Math.min(5, Math.ceil(n / 2))) : '💔'}${v.love === id ? ' 💘' : ''}</span>`).join('');
+  const mem = v.log.length ? v.log.map(([c, t]) => `<div class="msMem">บท ${c + 1}: ${esc(t)}</div>`).join('') : '<small>ยังไม่ได้ตัดสินใจอะไร</small>';
+  return `<h2>📕 สาย 99 ไม่เคยถึงปลายทาง</h2><div class="sub">เรื่องหลักของคุณเอง · รอบที่ ${v.run} · 🧩 ความจริง ${v.clues}/5 · ทุกการเลือกมีผลกับคนในเมืองและฉากจบ</div>
+    ${cur}<div class="msChs">${chs}</div>
+    <h3>🏆 สมุดฉากจบ ${v.endings.filter(e => e.name).length}/${v.endings.length}</h3><div class="msEnds">${ends}</div>
+    ${bonds ? `<h3>💞 ความผูกพันในรอบนี้</h3><div class="msBonds">${bonds}</div>` : ''}<h3>📝 ความทรงจำรอบนี้</h3>${mem}`;
+}
+Object.assign(FN, {
+  openMain() { send({ t: 'folks' }); send({ t: 'ms', a: 'view' }); openPanel({ kind: 'ms' }); },
+  msAdv() { send({ t: 'ms', a: 'adv' }); },
+  msAsk() { const st = MSV?.step; if (st?.k === 'choice') msShow({ title: MSV.chs[MSV.ch], lines: [{ s: st.npc, nm: msNm(st.npc), x: st.q }], opts: st.opts }); },
+  msNew() { if (confirm('เริ่มเนื้อเรื่องรอบใหม่?\nรีเซ็ตแค่ความคืบหน้าเรื่องหลัก · เงิน บ้าน อาชีพ ไอเทม ความสนิท และสมุดฉากจบยังอยู่ครบ')) send({ t: 'ms', a: 'new' }); },
+});
+// 🎬 cutscene: letterbox, the speaker's face, typed text, tap to go on; choices / chapter end / ending card at the end
+let msQ = null;
+function msCut(m) {
+  const lines = [...(m.lines || [])];
+  if (m.fin) lines.push({ x: `📕 จบบทที่ ${m.fin.n} "${m.fin.t}" · ได้ ${money(m.fin.pay)}`, sys: 1 });
+  if (m.end) lines.push({ x: `— ${m.end.icon} ฉากจบ —`, sys: 1 }, ...m.end.lines);
+  FX.play(m.end ? 'levelup' : m.fin ? 'chime' : 'click');
+  msShow({ title: m.title, lines, end: m.end });
+}
+function msShow(q) {
+  closePanel(); dialogClose();
+  let ov = $('#msCut');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'msCut';
+    ov.innerHTML = '<i class="msBar"></i><div class="msTitle"></div><div class="msBox"><div class="msFace"></div><div class="msTxt"><b class="msName"></b><p></p><div class="msOpts"></div></div></div><button type="button" class="msSkip">ข้าม ⏭</button><i class="msBar b"></i>';
+    document.body.appendChild(ov);
+    ov.onclick = e => { if (e.target.closest('.msOpts button')) return; if (e.target.closest('.msSkip')) { msQ.i = msQ.lines.length - 1; msQ.typed = 1; return msLine(); } msTap(); };
+  }
+  ov.classList.remove('hidden'); ov.dataset.ch = MSV?.ch ?? 0;
+  msQ = { ...q, i: 0 }; ov.querySelector('.msTitle').textContent = q.title ? `📕 ${q.title}` : ''; msLine();
+}
+function msLine() {
+  const ov = $('#msCut'), l = msQ.lines[msQ.i] || { x: '' }, f = l.s && folkById(l.s), p = ov.querySelector('.msTxt p'), last = msQ.i >= msQ.lines.length - 1;
+  ov.querySelector('.msFace').innerHTML = f ? folkFace(f, 72) : '';
+  ov.querySelector('.msName').textContent = l.s ? l.nm || msNm(l.s) : '';
+  ov.classList.toggle('narr', !l.s); ov.classList.toggle('sys', !!l.sys);
+  const html = msHtml(l.x), plain = html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  clearInterval(msQ.tm); let n = 0; msQ.typed = 0; p.textContent = '';
+  const done = () => { clearInterval(msQ.tm); msQ.typed = 1; p.innerHTML = html; if (last) msTail(); };
+  if (msQ.fast) done(); else msQ.tm = setInterval(() => { n += 2; if (n >= plain.length) done(); else p.textContent = plain.slice(0, n); }, 28);
+  msQ.done = done; ov.querySelector('.msOpts').innerHTML = '';
+}
+function msTail() {   // what comes after the last line: choices, the ending card, or nothing (tap closes)
+  const box = $('#msCut .msOpts');
+  if (msQ.opts) box.innerHTML = msQ.opts.map(o => `<button type="button" data-i="${o.i}">${esc(o.t)}</button>`).join('');
+  else if (msQ.end) { const e = msQ.end; box.innerHTML = `<div class="msCard"><i>${e.icon}</i><b>${e.tag} Ending</b><span>"${esc(e.name)}"</span><small>${e.isNew ? '✨ ปลดล็อกฉากจบใหม่! ' : ''}สะสมแล้ว ${e.n}/${e.total}</small></div><button type="button" data-go="1">📕 ดูสมุดฉากจบ</button>`; }
+  box.querySelectorAll('button[data-i]').forEach(b => b.onclick = () => { msClose(); send({ t: 'ms', a: 'adv', c: +b.dataset.i }); });   // too far from the npc: a toast says so, and the panel button asks again
+  box.querySelector('[data-go]')?.addEventListener('click', () => { msClose(); FN.openMain(); });
+}
+function msTap() {
+  if (!msQ) return;
+  if (!msQ.typed) return msQ.done();
+  if (msQ.i < msQ.lines.length - 1) { msQ.i++; return msLine(); }
+  if (msQ.opts || msQ.end) return;   // wait for a button
+  msClose();
+  const st = MSV?.step; if (st?.k === 'scene') FN.msAdv(); else FN.openMain();   // scenes play on by themselves; otherwise show what to do next
+}
+function msClose() { clearInterval(msQ?.tm); msQ = null; $('#msCut')?.classList.add('hidden'); }
 function storiesBox() {
   if (!STORIES.length) return '';
   return STORIES.map(s => {
@@ -6006,7 +6088,7 @@ function folksPanel() {
     <small>${f.talked ? '✅ คุยแล้ววันนี้' : '💬 ยังไม่ได้คุยวันนี้'} · ${f.gave ? '✅ ให้ของแล้ว' : '🎁 ยังไม่ได้ให้ของ'}</small>
     ${f.req ? `<small class="folkReq${f.req.done ? ' done' : ''}">📋 ${f.req.done ? 'ช่วยแล้ววันนี้ ✅' : `ขอ ${reqTxt(f.req)} (มี ${Math.min(me.inv?.[f.req.item] || 0, f.req.n)}/${f.req.n}) · ได้ ${money(f.req.pay)} · หาได้ที่${whereGet(f.req.item)}`}</small>` : ''}</div></div>`;
   const open = FOLKS.filter(f => f.req && !f.req.done).length;
-  const tabs = `<div class="rowf" style="margin:0 0 8px">${B('💞 ชาวเมือง', { fn: 'folkTab', tab: 'list' }, panel?.tab === 'story' ? '' : 'primary')}${B(`📖 เนื้อเรื่อง${STORIES.some(x => x.state === 'on') ? ' •' : ''}`, { fn: 'folkTab', tab: 'story' }, panel?.tab === 'story' ? 'primary' : '')}</div>`;
+  const tabs = `<div class="rowf" style="margin:0 0 8px">${B('💞 ชาวเมือง', { fn: 'folkTab', tab: 'list' }, panel?.tab === 'story' ? '' : 'primary')}${B(`📖 เนื้อเรื่อง${STORIES.some(x => x.state === 'on') ? ' •' : ''}`, { fn: 'folkTab', tab: 'story' }, panel?.tab === 'story' ? 'primary' : '')}${B('📕 เรื่องหลัก', { fn: 'openMain' })}</div>`;
   if (panel?.tab === 'story') return `<h2>📖 เนื้อเรื่อง</h2>${tabs}<div class="sub">เรื่องราวของแต่ละคน ปลดล็อกตามความสนิท วันละบท · คุยกับคนในเรื่องเพื่อเล่นต่อ (มีปุ่ม 📖 ในหน้าคุย)</div>${storiesBox()}`;
   return `<h2>💞 ชาวเมือง</h2>${tabs}${B('📜 เปิดบันทึกคำขอ', { fn: 'openJournal' }, 'primary')}${open ? `<div class="sub" style="font-weight:700">📋 คำขอวันนี้ ${open} เรื่อง · หาของให้ครบแล้วไปคุยกับเจ้าของคำขอเพื่อส่ง</div>` : '<div class="sub">📋 วันนี้ช่วยทุกคนครบแล้ว เก่งมาก!</div>'}<div class="sub">ชาวเมืองมีตารางชีวิตของตัวเอง (ทำงาน เดินเล่น กลับบ้านตอนกลางคืน) และจำคุณได้ · คุยวันละครั้ง +1 · ให้ของวันละครั้ง (ของที่ชอบ +3 ของโปรด +6 วันเกิด x2) · ความสนิทขึ้นระดับได้เงินรางวัล</div><div class="list">${FOLKS.map(row).join('')}</div>`;
 }
@@ -6503,6 +6585,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27n', d: '27 พ.ย.', items: [
+    '📕 <b>เรื่องหลักใหม่: "สาย 99 ไม่เคยถึงปลายทาง"</b> 8 บท เฉลยว่าทำไมคุณมาอยู่ในเมืองนี้ · เปิดได้ที่มือถือ → 📕 เรื่องหลัก',
+    '🎭 ทุกการเลือกเปลี่ยนเรื่อง ความผูกพันกับชาวเมือง และฉากจบ · มีฉากจบ 6 แบบ (ฉากสุดท้ายซ่อนอยู่ ต้องเล่นหลายรอบ)',
+    '🔁 จบแล้วเล่นรอบใหม่ได้ เงิน บ้าน อาชีพ ไอเทมไม่หาย · รอบใหม่มีตัวเลือกลับที่โผล่เฉพาะคนที่จำได้ 😉',
+  ] },
   { v: '2026-11-27m', d: '27 พ.ย.', items: [
     '🎁 ร้านเติมเงินส่งของขวัญให้เพื่อนได้แล้ว! เลือกเพื่อนในช่อง "ส่งเป็นของขวัญ" ก่อนชำระ',
   ] },
@@ -8387,6 +8474,7 @@ function renderPanel(p) {
     case 'folks': return folksPanel();
     case 'proj': return projPanel(p);
     case 'storylog': return storyLogPanel(p);
+    case 'ms': return msPanel();
     case 'journal': return journalPanel(p);
     case 'folkgift': return folkGiftPanel(p);
     case 'fishrecs': return fishRecsPanel();
@@ -8741,12 +8829,12 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['เรื่องหลัก', '📕', { fn: 'openMain' }, 0, 'linear-gradient(#ffd38a,#8a3b2a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['เติมเงิน', '💎', { fn: 'openTopup' }, 0, 'linear-gradient(#e6d8ff,#8a5cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];
 // the home screen, grouped so the everyday apps come first
 const PH_GROUPS = [   // 4 apps a row: every app has a group, most-used first (the 'rest' row only catches future apps)
-  ['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'ชาวเมือง', 'คู่รัก', 'บันทึก', 'แก๊ง', 'เลือกตั้ง']],
+  ['ติดต่อ', ['โทรศัพท์', 'จดหมาย', 'lifebook', 'ชาวเมือง', 'เรื่องหลัก', 'คู่รัก', 'บันทึก', 'แก๊ง', 'เลือกตั้ง']],
   ['เงินทอง', ['การเงิน', 'บิล', 'หุ้น', 'ลอตเตอรี่', 'ประมูล', 'เติมเงิน']],
   ['ไลฟ์สไตล์', ['กิจกรรม', 'บ้านสวย', 'จุดพลุ', 'เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา']],
   ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],

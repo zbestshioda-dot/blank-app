@@ -2337,6 +2337,9 @@ const ACHIEVEMENTS = [
   { id: 'story10', r: 4, g: 30, c: null, stat: 'storyDone', n: 10, title: 'นักฟังเรื่องเล่า', desc: 'จบเนื้อเรื่องของชาวเมือง 10 เรื่อง' },
   { id: 'story25', r: 5, g: 80, c: null, stat: 'storyDone', n: 25, title: 'คนที่ทั้งเมืองไว้ใจ', desc: 'จบเนื้อเรื่องของชาวเมือง 25 เรื่อง' },
   { id: 'story50', r: 7, g: 300, c: null, stat: 'storyDone', n: 50, title: 'ผู้รู้ความลับของเมือง', desc: 'จบเนื้อเรื่องครบทั้ง 50 เรื่อง · ได้ ฿100,000 ด้วย' },
+  // 📕 main story endings (server/mainstory.js)
+  ...Object.entries(require('./mainstory').ENDS).map(([k, e]) => ({ id: 'end_' + k, r: k === 'secret' ? 7 : 5, c: null, stat: 'end_' + k, n: 1, title: e.name, desc: `ได้ฉากจบ ${e.tag} ของเรื่องหลัก` })),
+  { id: 'msall', r: 7, c: null, stat: 'msEnds', n: 6, title: 'ผู้โดยสารทุกเที่ยว', desc: 'สะสมฉากจบเรื่องหลักครบทั้ง 6 แบบ' },
   ...Object.entries(require('./stories')).filter(([, v]) => v.ttl).map(([o, v]) => ({ id: 'st_' + o, r: 4, c: null, stat: 'story_' + o, n: 1, title: v.ttl, desc: `จบเรื่อง "${v.name}"` })),   // 📖 newer arcs carry their own title
   // 🛠️ equipment: job tools, vehicles, fishing rods (absolute counts, refreshed by eqSweep on the server)
   { id: 'eq_t1', r: 1, nt: 1, g: 1, stat: 'toolup', n: 1, title: 'อุปกรณ์ชิ้นแรก', desc: 'อัปเกรดอุปกรณ์อาชีพครั้งแรก' },

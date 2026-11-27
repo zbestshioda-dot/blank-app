@@ -1923,7 +1923,7 @@ function worth(a) {
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
 const SAVE_KEYS = ['devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
-  'created', 'prayDay', 'prayDays', 'folk', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
+  'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
@@ -2852,6 +2852,74 @@ function storyAdv(a, m) {
   a.sd = true; dirty = true; markMe(a);
   send(a, { t: 'storysay', o, npc: st.npc || null, label: st.label || '', lines: st.lines || [], end });
   send(a, folksView(a));
+}
+// 📕 main story (server/mainstory.js): a.ms = this run's progress (the only thing a new run resets) · a.endings = collected endings (kept forever)
+const MS = require('./mainstory');
+const msOf = a => a.ms || (a.ms = MS.fresh(1));
+const msSeen = a => Object.keys(a.endings || {}).length;
+const msName = id => (FOLK_DEF[id]?.name || '').replace(/\s*\(.*$/, '');
+const msLine = l => { const m = l.match(/^@(\w*):([\s\S]*)$/); return m ? { s: m[1] || null, nm: msName(m[1]), x: m[2] } : { x: l }; };   // '@npc:text' → speaker + text ({n} is filled in on the client)
+function msProg(a, ms, st) {   // 'do' steps count from when the step became current
+  const k = ms.ch + ':' + ms.st, v = a.stats?.[st.stat] || 0;
+  if (ms.bk !== k) { ms.bk = k; ms.bv = v; a.sd = true; }
+  return Math.max(0, v - (ms.bv || 0));
+}
+function msView(a) {
+  const ms = msOf(a), ch = MS.CH[ms.ch], st = !ms.end && ch ? ch.steps[ms.st] : null, seen = msSeen(a);
+  return { t: 'ms', run: ms.run, ch: ms.ch, total: MS.CH.length, chs: MS.CH.map(c => c.t), si: ms.st, sn: ch?.steps.length || 0, end: ms.end || null,
+    step: st ? { k: st.k, npc: st.npc || null, at: st.at, label: st.label, h: st.h, item: st.item, n: st.n, q: st.q,
+      prog: st.k === 'do' ? msProg(a, ms, st) : undefined, nav: st.at || (FOLK_DEF[st.npc]?.desk ? FOLK_DEF[st.npc].sts?.[0] : undefined), have: st.item ? a.inv[st.item] || 0 : undefined,
+      opts: st.k === 'choice' ? MS.optsOf(st, ms, seen).map(({ i, o }) => ({ i, t: o.t.replace(/\{love\}/g, msName(ms.f.love)) })) : undefined } : null,
+    clues: MS.clues(ms), love: ms.f.love || null, b: MS.CAST.map(id => [id, ms.b[id] || 0]),
+    log: ms.log, endings: MS.END_ORDER.map(k => { const e = MS.ENDS[k], got = a.endings?.[k]; return { k, icon: e.icon, tag: e.tag, name: got ? e.name : null, hint: e.hint, run: got?.run || 0 }; }) };
+}
+function msAct(a, m) {
+  a.endings = a.endings || {};
+  const ms = msOf(a), seen = msSeen(a), L = arr => MS.lines(arr, ms, seen, msName).map(msLine);
+  if (m.a === 'view') return send(a, msView(a));
+  if (m.a === 'new') {   // start over: only the story resets (money, home, job, items, friendships stay)
+    if (!ms.end) return toast(a, 'ต้องจบเรื่องรอบนี้ก่อน ถึงจะเริ่มรอบใหม่ได้', '📕', false);
+    a.ms = MS.fresh(ms.run + 1); a.sd = true; dirty = true;
+    toast(a, `🔁 เริ่มเนื้อเรื่องรอบที่ ${a.ms.run} · เงิน บ้าน อาชีพ ไอเทม ยังอยู่ครบ`, '📕'); return send(a, msView(a));
+  }
+  if (m.a !== 'adv' || ms.end) return;
+  const ch = MS.CH[ms.ch], st = ch?.steps[ms.st]; if (!st || !cd(a, 'ms', 600, true)) return;
+  if (st.npc) { const def = FOLK_DEF[st.npc]; if (!def || !folkNear(a, def)) return toast(a, `ต้องอยู่ใกล้${def?.name || 'คนนั้น'}ก่อน · กด 📍 นำทางได้`, '📕', false); }
+  if (st.k === 'go') {
+    const p = ST[st.at]; if (!p) return;
+    if (areaId(a) !== p.area || dist(a, p) > (p.r || 1) + 2.5) return toast(a, `ยังไม่ถึง${st.label} · กด 📍 นำทางได้`, '📕', false);
+    if (!inHours(hourNow(), st.h)) return toast(a, `ต้องมาช่วง ${hhmm(st.h[0])}–${hhmm(st.h[1] % 24)} (เวลาในเกม)`, '🕰️', false);
+  }
+  if (st.k === 'give') {
+    const it = D.ITEMS[st.item]; if ((a.inv[st.item] || 0) < st.n) return toast(a, `ยังมี ${it.icon}${it.name} ไม่ครบ (${a.inv[st.item] || 0}/${st.n})`, '📕', false);
+    addItem(a, st.item, -st.n);
+  }
+  if (st.k === 'do') { const got = msProg(a, ms, st); if (got < st.n) return toast(a, `${st.label} · ยังไม่ครบ (${got}/${st.n})`, '📕', false); }
+  let out = st.lines, endK = null;
+  if (st.k === 'choice') {
+    const pick = MS.optsOf(st, ms, seen).find(x => x.i === Math.floor(+m.c)); if (!pick) return;
+    const o = pick.o, got = MS.apply(ms, o); out = o.lines; ms.log.push([ms.ch, o.t.replace(/\{love\}/g, msName(ms.f.love))]);
+    if (ms.run === 1) for (const [id, n] of Object.entries(got)) if (n > 0 && FOLK_DEF[id]) folkAdd(a, FOLK_DEF[id], 1, `📕 เรื่องหลัก: ${msName(id)} ประทับใจในตัวคุณ`);
+    if (o.end) endK = MS.endingOf(ms, o.end);
+  }
+  const lines = L(out); let fin = null, end = null;
+  ms.st++;
+  if (endK || ms.st >= ch.steps.length) {
+    const pay = Math.round(MS.PAY[ms.ch] * (ms.run === 1 ? 1 : MS.REPLAY_PAY)); credit(a, pay); joy(a, 8);
+    fin = { t: ch.t, n: ms.ch + 1, pay }; ms.ch++; ms.st = 0;
+  }
+  if (endK) {
+    const E = MS.ENDS[endK], isNew = !a.endings[endK]; ms.end = endK;
+    if (isNew) {
+      a.endings[endK] = { at: now(), run: ms.run }; const g = endK === 'secret' ? 100 : 30; a.gems = (a.gems || 0) + g;
+      stat(a, 'end_' + endK); stat(a, 'msEnds', Object.keys(a.endings).length, true);
+      feed(`📕 ${a.name} ได้ฉากจบ "${E.icon} ${E.name}" ของเรื่องหลัก`);
+    }
+    end = { k: endK, icon: E.icon, tag: E.tag, name: E.name, isNew, n: Object.keys(a.endings).length, total: MS.END_ORDER.length, lines: L(E.lines) };
+  }
+  a.sd = true; dirty = true; markMe(a);
+  send(a, { t: 'mscut', title: ch.t, lines, fin, end });
+  send(a, msView(a));
 }
 function folksView(a) {
   return { t: 'folks', stories: storiesView(a), list: Object.values(FOLK_DEF).map(def => {
@@ -5775,6 +5843,7 @@ function onMessage0(ws, raw) {
     case 'folkdo': return folkDo(a, m);
     case 'folktalk': return folkTalkDesk(a, m);
     case 'story': return storyAdv(a, m);
+    case 'ms': return msAct(a, m);
     case 'storylog': return storyLog(a, m);
     case 'folks': return send(a, folksView(a));
     case 'proj': return m.op === 'give' ? projGive(a, m) : m.op === 'use' ? projUse(a, m) : send(a, projView(a));
