@@ -1283,16 +1283,16 @@ window.BGM_EXT = true;
 const BGM = { vol: .42, buf: {}, src: {}, gain: {}, loading: {} };
 function bgmLoad(k, ac) {
   if (BGM.loading[k]) return; BGM.loading[k] = 1;
-  fetch(`assets/music/${k}.mp3?v=2`).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
+  fetch(`assets/music/${k}.mp3?v=3`).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))).then(d => {
     const n = d.length, mono = ac.createBuffer(1, n, d.sampleRate), o = mono.getChannelData(0), L = d.getChannelData(0), R = d.numberOfChannels > 1 ? d.getChannelData(1) : L;
     for (let i = 0; i < n; i++) o[i] = (L[i] + R[i]) * .5;   // mono: half the memory on phones
     BGM.buf[k] = mono; BGM.loading[k] = 0;
   }).catch(() => { setTimeout(() => { BGM.loading[k] = 0; }, 15000); });
 }
 function bgmTick() {
-  const ac = FX.ctx(); if (!G || !me || !ac || ac.state !== 'running') return;   // audio starts after the first tap
-  const h = hourNow(), want = FX.opts.music ? (h >= 6 && h < 18.5 ? 'day' : 'night') : null;
-  for (const k of ['day', 'night']) {
+  const ac = FX.ctx(); if (!ac || ac.state !== 'running') return;   // audio starts after the first tap
+  const inGame = !!(G && me), want = !FX.opts.music ? null : !inGame ? 'login' : (h => h >= 6 && h < 18.5 ? 'day' : 'night')(hourNow());   // login screen has its own track
+  for (const k of ['login', 'day', 'night']) {
     const target = k === want ? BGM.vol : 0;
     if (target > 0 && !BGM.src[k]) {
       if (!BGM.buf[k]) { bgmLoad(k, ac); continue; }
@@ -6421,6 +6421,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27b', d: '27 พ.ย.', items: [
+    '🎵 เพลงใหม่! หน้าล็อกอิน เพลงกลางวัน และเพลงกลางคืน (ไฟล์เล็กลง โหลดไวขึ้น)',
+  ] },
   { v: '2026-11-27', d: '27 พ.ย.', items: [
     '🕵️ แก้แล้ว: เรื่อง "นักสืบหัวใจ" สำรวจหน้าร้านแฟชั่นช่วงตีสี่–หกโมงได้แล้ว (ไม่ต้องเข้าร้านที่ปิดอยู่)',
     '📱 แก้อีโมจิเพี้ยน/แยกเป็นสองตัวบน iPad',
