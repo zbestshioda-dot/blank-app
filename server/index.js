@@ -2828,7 +2828,9 @@ function storyAdv(a, m) {
     const got = storyProg(a, s, st); if (got < st.n) return toast(a, `${st.label} ยังไม่ครบ (${got}/${st.n})`, '📖', false);
   }
   if (st.k === 'go') {
-    const p = ST[st.at]; if (!p) return;
+    let p = ST[st.at]; if (!p) return;
+    const bd = p.room && D.BUILDINGS.find(b => b.st === st.at);
+    if (bd && st.h) p = { x: bd.x + bd.w / 2, y: bd.y + bd.h + .45, r: 1.9, area: bd.area || 'town' };   // a time-window step ("front of the shop at 4am"): the street in front of the building, the shop itself is shut
     if (areaId(a) !== p.area || dist(a, p) > (p.r || 1) + 2.5) return toast(a, `ยังไม่ถึง${st.label} · กด 📍 นำทางได้`, '📖', false);
     if (!inHours(hourNow(), st.h)) return toast(a, `ต้องมาช่วง ${hhmm(st.h[0])}–${hhmm(st.h[1] % 24)} (เวลาในเกม)`, '🕰️', false);
   }

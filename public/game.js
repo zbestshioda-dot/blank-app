@@ -2278,7 +2278,7 @@ function draw(t) {
     if (s.type === 'proj') sign(`🏗️ สร้างเมืองด้วยกัน${PROJ?.cur ? ` · ${Math.floor(PROJ.cur.got / PROJ.cur.goal * 100)}%` : ''}`, px, py - TS * 2.6 + Math.sin(t / 500) * 3, { size: TS * .42, bg: 'rgba(200,110,30,.95)', border: '#ffd77a' });   // big floating sign over the donation box
     if (s.type === 'craft') sign('🔨 โรงช่างคราฟ ✨', px + TS * .5, py - TS * 3 + Math.sin(t / 500) * 3, { size: TS * .5, bg: 'rgba(170,95,25,.95)', border: '#ffd77a' });   // floating sign over the workshop
     if (STAFF_AT[s.id]) continue;   // a shopkeeper / guide stands here: no floating sticker over their head
-    ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px serif`; ctx.fillStyle = '#fff';
+    ctx.font = `${Math.round(TS * (isNear ? .7 : .55))}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillStyle = '#fff';
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
   }
@@ -2366,7 +2366,7 @@ function drawYardLocks(A, X, Y, t) {
     if (x0 > VW || y0 > VH || x0 + w < 0 || y0 + h < 0) continue;
     ctx.fillStyle = 'rgba(28,46,24,.62)'; ctx.fillRect(x0, y0, w, h);
     ctx.strokeStyle = 'rgba(255,230,160,.55)'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.strokeRect(x0 + 3, y0 + 3, w - 6, h - 6); ctx.setLineDash([]);
-    ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .9)}px serif`; ctx.fillText('🔒', x0 + w / 2, y0 + h / 2 - TS * .4 + Math.sin(t / 500 + z) * 2);
+    ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .9)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText('🔒', x0 + w / 2, y0 + h / 2 - TS * .4 + Math.sin(t / 500 + z) * 2);
     if (A.house === me.house && price) sign(`ปลดล็อก ${money(price)}`, x0 + w / 2, y0 + h / 2 + TS * .55, { size: TS * .3 });
   }
 }
@@ -2398,9 +2398,9 @@ function drawYardCrop(e, X, Y, t) {
       ctx.fillStyle = '#3f8a2a'; ctx.fillRect(cx - 1 + sway, cy - h, 2, h); ctx.fillStyle = prog < .5 ? '#7cc843' : '#4fa632';
       ctx.beginPath(); ctx.ellipse(cx - h * .35 + sway, cy - h * .7, h * .38, h * .2, -.5, 0, 7); ctx.fill();
       ctx.beginPath(); ctx.ellipse(cx + h * .35 + sway, cy - h * .85, h * .38, h * .2, .5, 0, 7); ctx.fill();
-    } else { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .48)}px serif`; ctx.fillText(it.icon, cx, cy - TS * .12 + Math.sin(t / 260 + dx * 4) * 1.5); }
+    } else { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .48)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(it.icon, cx, cy - TS * .12 + Math.sin(t / 260 + dx * 4) * 1.5); }
   }
-  if (left <= 0) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText('✨', px + TS * .8, py - TS * .85 + Math.sin(t / 200) * 3); }
+  if (left <= 0) { ctx.font = `${Math.round(TS * .38)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText('✨', px + TS * .8, py - TS * .85 + Math.sin(t / 200) * 3); }
   else { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(px - TS * .85, py + TS * .8, TS * 1.7, 4); ctx.fillStyle = '#9be15d'; ctx.fillRect(px - TS * .85, py + TS * .8, TS * 1.7 * prog, 4); }
 }
 // a sprinkler: the ghost shows the cells it reaches; a placed one sprays a ring of droplets now and then
@@ -2461,7 +2461,7 @@ function drawSoilCrop(e, X, Y, t) {
     for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i - (n - 1) / 2) * (Math.PI * 1.1 / (n - 1)); leaf(a + Math.PI / 2, L * (i % 2 ? .82 : 1), TS * .085, i % 2 ? '#3f9a4a' : '#52b25a'); }
     leaf(0, L * 1.05, TS * .09, '#2f8a44');
     if (st === 3) { ctx.fillStyle = cropTint(crop); for (const [dx, dy] of [[-.12, -.3], [.13, -.27], [0, -.4]]) { ctx.beginPath(); ctx.arc(px + dx * TS + sway, by + dy * TS, TS * .055, 0, 7); ctx.fill(); } }
-    if (st === 4) { ctx.font = `${Math.round(TS * .5)}px serif`; ctx.textAlign = 'center'; ctx.fillText(it.icon, px + sway, by - TS * .32 + Math.sin(t / 260 + e[1] * 4) * 1.5); }
+    if (st === 4) { ctx.font = `${Math.round(TS * .5)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.fillText(it.icon, px + sway, by - TS * .32 + Math.sin(t / 260 + e[1] * 4) * 1.5); }
   }
   }
   {                                             // countdown under the crop: time left (or ready) with a thin progress bar
@@ -2475,7 +2475,7 @@ function drawSoilCrop(e, X, Y, t) {
   }
   if (left > 0 && w === 0) {                    // dry: a little water drop asks to be watered
     const bob = Math.sin(t / 300 + e[1]) * 2; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(px + TS * .3, py - TS * .32 + bob, TS * .14, 0, 7); ctx.fill();
-    ctx.font = `${Math.round(TS * .2)}px serif`; ctx.textAlign = 'center'; ctx.fillText('💧', px + TS * .3, py - TS * .25 + bob);
+    ctx.font = `${Math.round(TS * .2)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.fillText('💧', px + TS * .3, py - TS * .25 + bob);
   }
 }
 // a garden bed: wooden frame, dark tilled soil in furrows, crops planted in two rows that grow and ripen
@@ -2493,7 +2493,7 @@ function drawPlot(s, px, py, t) {
     ctx.fillStyle = 'rgba(255,220,170,.10)'; ctx.fillRect(x0 + b + 2, fy - Math.max(2, TS * .05), W - 2 * b - 4, Math.max(1, TS * .03));
   }
   if (isNear) { ctx.strokeStyle = '#ffc94d'; ctx.lineWidth = 3; ctx.strokeRect(x0 - 2, y0 - 2, W + 4, W + 4); }
-  if (!unlocked) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x0, y0, W, W); ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText(lot ? '🔒' : '', px, py); return; }
+  if (!unlocked) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x0, y0, W, W); ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .45)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(lot ? '🔒' : '', px, py); return; }
   const pl = lot[2][s.n];
   if (!pl) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = `700 ${Math.round(TS * .6)}px sans-serif`; ctx.fillText('+', px, py); return; }
   const [crop, readyAt] = pl, it = G.items[crop], total = G.crops[crop].grow * 1000;
@@ -2508,10 +2508,10 @@ function drawPlot(s, px, py, t) {
       ctx.beginPath(); ctx.ellipse(cx - h * .35 + sway, cy - h * .7, h * .38, h * .2, -.5, 0, 7); ctx.fill();
       ctx.beginPath(); ctx.ellipse(cx + h * .35 + sway, cy - h * .85, h * .38, h * .2, .5, 0, 7); ctx.fill();
     } else {                                            // ripe: the crop itself, bobbing a little
-      ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .48)}px serif`; ctx.fillText(it.icon, cx, cy - TS * .12 + Math.sin(t / 260 + dx * 4) * 1.5);
+      ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .48)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(it.icon, cx, cy - TS * .12 + Math.sin(t / 260 + dx * 4) * 1.5);
     }
   }
-  if (left <= 0) { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText('✨', px + TS * .75, py - TS * .8 + Math.sin(t / 200) * 3); }
+  if (left <= 0) { ctx.fillStyle = '#fff'; ctx.font = `${Math.round(TS * .38)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText('✨', px + TS * .75, py - TS * .8 + Math.sin(t / 200) * 3); }
   else { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x0 + b, y0 + W - b - 4, W - 2 * b, 4); ctx.fillStyle = '#9be15d'; ctx.fillRect(x0 + b, y0 + W - b - 4, (W - 2 * b) * prog, 4); }   // growth bar
 }
 // ---- pets: a pet follows its owner along the owner's own trail (so it never walks through walls), hops while it trots,
@@ -2556,11 +2556,11 @@ function drawCook(X, Y, t) {
     const st = STN(AT_ST[at]); if (!st) continue;
     list.forEach((cp, j) => {
       const px = (st.x + (j - (list.length - 1) / 2) * .7) * TS + X, py = (st.y - 1.25) * TS + Y, s0 = cookState(cp);
-      if (at === 'plate') { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(G.items[cp.ing].icon, px, py + TS * .35); return; }
+      if (at === 'plate') { ctx.font = `${Math.round(TS * .42)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(G.items[cp.ing].icon, px, py + TS * .35); return; }
       const col = s0.burnt ? '#5a3a2a' : s0.ready ? ((t / 200 | 0) % 2 ? '#7fe08a' : '#c9ffd0') : s0.warn ? '#ff8a3a' : '#ffd34d';
       ctx.fillStyle = 'rgba(20,16,12,.75)'; ctx.beginPath(); ctx.arc(px, py, TS * .36, 0, 7); ctx.fill();
       ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, TS * .36, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (s0.burnt ? 1 : s0.p || 0)); ctx.stroke();
-      ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(s0.burnt ? '💀' : G.items[cp.ing].icon, px, py + 1);
+      ctx.font = `${Math.round(TS * .38)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(s0.burnt ? '💀' : G.items[cp.ing].icon, px, py + 1);
       if ((at === 'pot' || at === 'grill') && !s0.burnt && Math.random() < .05) FX.burst(st.x, st.y - 1, at === 'pot' ? '#ffffff' : '#777777', 2);
       if (s0.burnt && Math.random() < .08) FX.burst(st.x, st.y - 1.2, '#444', 3);
       if (s0.ready && !s0.burnt) { ctx.font = `700 ${Math.round(TS * .24)}px 'Mitr',sans-serif`; ctx.fillStyle = s0.warn > .5 ? '#ff6a4a' : '#7fe08a'; ctx.fillText(s0.warn > .5 ? 'รีบยก!' : 'พร้อม!', px, py - TS * .55); }
@@ -2571,8 +2571,8 @@ function drawCook(X, Y, t) {
     const hx = P0.rx * TS + X, hy = P0.ry * TS + Y - TS * 1.85, held = typeof c.hand === 'number' && c.hand >= 0 ? c.comps[c.hand] : null;
     if (held || c.hand === 'plate') {
       ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(hx, hy, TS * .42, TS * .3, 0, 0, 7); ctx.fill();
-      ctx.font = `${Math.round(TS * .36)}px serif`; ctx.fillText(c.hand === 'plate' ? G.items[c.rid].icon : G.items[held.ing].icon, hx, hy + 1);
-      if (held) { const nx = held.ops[held.k]; ctx.font = `${Math.round(TS * .22)}px serif`; ctx.fillText(nx ? OPN[nx][0] : '🍽️', hx + TS * .36, hy - TS * .2); }
+      ctx.font = `${Math.round(TS * .36)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(c.hand === 'plate' ? G.items[c.rid].icon : G.items[held.ing].icon, hx, hy + 1);
+      if (held) { const nx = held.ops[held.k]; ctx.font = `${Math.round(TS * .22)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(nx ? OPN[nx][0] : '🍽️', hx + TS * .36, hy - TS * .2); }
     }
   }
   ctx.restore();
@@ -2715,13 +2715,13 @@ function runFrame(now) {
   quad(-2.3, 2.3, '#d8cfbf'); quad(-1.55, 1.55, '#4b4f57');
   g.fillStyle = '#e9d36a'; const off = R.dist % 6;
   for (let k = 0; k < 14; k++) { const z1 = k * 6 - off, z2 = z1 + 2.5; if (z2 < -1) continue; for (const l of [-.5, .5]) { g.beginPath(); g.moveTo(X(l - .02, z1), Y(z1)); g.lineTo(X(l + .02, z1), Y(z1)); g.lineTo(X(l + .02, z2), Y(z2)); g.lineTo(X(l - .02, z2), Y(z2)); g.fill(); } }
-  for (let k = 0; k < 10; k++) { const z = k * 9 - (R.dist % 9); if (z < -1) continue; const s = S(z); g.font = `${Math.round(70 * s)}px serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(k % 2 ? '🌳' : '💡', X(-2.6, z), Y(z)); g.fillText(k % 2 ? '💡' : '🌳', X(2.6, z), Y(z)); }
+  for (let k = 0; k < 10; k++) { const z = k * 9 - (R.dist % 9); if (z < -1) continue; const s = S(z); g.font = `${Math.round(70 * s)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(k % 2 ? '🌳' : '💡', X(-2.6, z), Y(z)); g.fillText(k % 2 ? '💡' : '🌳', X(2.6, z), Y(z)); }
   // objects far to near
   for (const o of [...R.objs].sort((a, b) => b.z - a.z)) {
     if (o.z > 62 || o.done) continue;
     const s = S(o.z), x = X(o.lane, o.z), y = Y(o.z), size = (o.i ? .42 : RUN_OBS[o.o][1] ? .95 : .62) * lw * s;
     g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, size * .45, size * .12, 0, 0, 7); g.fill();
-    g.font = `${Math.round(size)}px serif`; g.textAlign = 'center'; g.textBaseline = 'bottom';
+    g.font = `${Math.round(size)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'bottom';
     const bob = o.i ? Math.sin(now / 200 + o.z) * 4 * s : 0;
     g.fillText(o.i ? RUN_ITEMS[o.i][0] : RUN_OBS[o.o][0], x, y - (o.h || 0) * .55 * lw * s - bob);
   }
@@ -2895,14 +2895,14 @@ function drawMisThing(e, X, Y, t) {
     const pl = .5 + .5 * Math.sin(t / 200);
     ctx.fillStyle = `rgba(255,220,90,${.35 + .25 * pl})`; ctx.beginPath(); ctx.arc(px, py, TS * (.45 + .08 * pl), 0, 7); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py, TS * (.5 + .08 * pl), 0, 7); ctx.stroke();
-    ctx.globalAlpha = 1; ctx.font = `${Math.round(TS * .72)}px serif`; ctx.fillText(e.icon, px, py + b);
-    ctx.font = `${Math.round(TS * .4)}px serif`; ctx.fillText('⬇️', px, py - TS * .85 + Math.sin(t / 180) * 5);
+    ctx.globalAlpha = 1; ctx.font = `${Math.round(TS * .72)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(e.icon, px, py + b);
+    ctx.font = `${Math.round(TS * .4)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText('⬇️', px, py - TS * .85 + Math.sin(t / 180) * 5);
   } else if (e.k === 'spot') {
     const p = (misLive?.k === 'work' ? misLive.prog : me.mis?.cur?.prog) || 0, sec = me.mis?.cur?.sec || 1;
     ctx.strokeStyle = 'rgba(255,214,90,.9)'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]); ctx.lineDashOffset = -t / 60;
     ctx.beginPath(); ctx.ellipse(px, py + TS * .25, TS * 1.5, TS * .6, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = 'rgba(255,214,90,.15)'; ctx.fill();
-    ctx.font = `${Math.round(TS * .5)}px serif`; ctx.fillText(e.icon, px, py - TS * .3 + Math.sin(t / 250) * 3);
+    ctx.font = `${Math.round(TS * .5)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(e.icon, px, py - TS * .3 + Math.sin(t / 250) * 3);
     if (p > 0) { ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(px, py - TS * 1.1, TS * .3, 0, 7); ctx.stroke(); ctx.strokeStyle = '#7fe08a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py - TS * 1.1, TS * .3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, p / sec)); ctx.stroke(); }
   } else if (e.k === 'beacon') {
     const g = ctx.createLinearGradient(0, py - TS * 3, 0, py); g.addColorStop(0, 'rgba(255,220,90,0)'); g.addColorStop(1, 'rgba(255,220,90,.45)');
@@ -3129,7 +3129,7 @@ function drawZombie(p, X, Y, t) {
   p.walk = (p.walk || 0) + (moving ? (p.zb === 'run' ? .3 : .16) * FDT * 60 : 0);
   const fi = moving ? [1, 0, 2, 0][Math.floor(p.walk / 1.4) % 4] : 0, col = (dir === 'down' ? 0 : dir === 'up' ? 3 : 6) + fi;
   ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(px, py, TS * (p.zb === 'brute' ? .5 : .32), TS * .12, 0, 0, 7); ctx.fill();
-  if (!zbImg) { ctx.font = `${Math.round(TS * .9)}px serif`; ctx.textAlign = 'center'; ctx.fillText('🧟', px, py - TS * .3); return; }
+  if (!zbImg) { ctx.font = `${Math.round(TS * .9)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.fillText('🧟', px, py - TS * .3); return; }
   const k = TS * 1.55 / 96, w = ZB.w * k, h = ZB.h * k, row = ZB.rows[p.zb] || 0;
   const pul = .75 + Math.sin(t / 180) * .25;             // a pulsing red ring on the ground so they stand out in the dark
   ctx.strokeStyle = `rgba(255,40,40,${.55 * pul})`; ctx.lineWidth = Math.max(2, TS * .06); ctx.beginPath(); ctx.ellipse(px, py, TS * (p.zb === 'brute' ? .62 : .44), TS * .17, 0, 0, 7); ctx.stroke();
@@ -3218,7 +3218,7 @@ function drawWolf(p, X, Y, t, sc = 1) {
   } else {
     const s = TS * 1.35, hop = moving ? Math.abs(Math.sin(p.walk / 2)) * TS * .12 : 0;
     ctx.save(); ctx.translate(px, py - hop); if (dir === 'right') ctx.scale(-1, 1);
-    ctx.font = `${Math.round(s)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.shadowColor = 'rgba(255,40,20,.9)'; ctx.shadowBlur = 14 * pul; ctx.fillText('🐺', 0, TS * .1); ctx.restore();
+    ctx.font = `${Math.round(s)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.shadowColor = 'rgba(255,40,20,.9)'; ctx.shadowBlur = 14 * pul; ctx.fillText('🐺', 0, TS * .1); ctx.restore();
     top = py - s - hop;
   }
   nameAndBubble(p, px, top + TS * .1, p.id === myId, t);
@@ -3452,12 +3452,12 @@ function drawPlayer(p, X, Y, t) {
   const mine = p.id === myId, top = lying ? py0 - TS * .9 : py - H * .97 - bob + (sitting ? H * .19 : 0);
   if (p.bl && !lying && !fo?.swim) drawBalloon(p.bl, px, top + (umb ? -TS * .3 : 0), H, p.id, now0, p.crowd || NAME_MODE === 'none' ? 0 : TS * (p.title && NAME_MODE === 'all' ? .9 : .55));
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
+  if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText('🥣', px, py0 - TS * .05); }
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
   const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? '💫' : mine && me?.craving ? '💡' : pose === 'seat' ? '❤️' : null;
-  if (emote) { ctx.font = `${Math.round(TS * .38)}px serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
+  if (emote) { ctx.font = `${Math.round(TS * .38)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
   const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : p.sg > Date.now() + clockOff ? '🎤' : dkLv(p) === 2 ? '🥴' : p.sad ? '😞' : '';
-  if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
+  if (badge) { ctx.font = `${Math.round(TS * .42)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
   nameAndBubble(p, px, umb ? top - TS * .42 : top, mine, t);
 }
 // ------------------------------------------------------------------ amusement park: rides drawn in code (until painted sprites
@@ -3828,7 +3828,7 @@ function drawCrowdFx(e, X, Y, t) {
   } else if (e.fx === 'critter') {   // a cat or dog trotting along the pavement
     const c = e.c, px = c.x * u + X, py = c.y * u + Y, moving = c.wait <= 0, bob = moving ? Math.abs(Math.sin(T * 9 + c.ph)) * u * .06 : Math.sin(T * 1.6 + c.ph) * u * .012;
     ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(px, py, u * .2, u * .06, 0, 0, 7); ctx.fill();
-    ctx.save(); ctx.translate(px, py - bob); ctx.scale(-c.dir, 1); ctx.font = `${Math.round(u * .5)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(c.e, 0, u * .06); ctx.restore();
+    ctx.save(); ctx.translate(px, py - bob); ctx.scale(-c.dir, 1); ctx.font = `${Math.round(u * .5)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(c.e, 0, u * .06); ctx.restore();
   } else if (e.fx === 'pigeon') {
     const b = e.b, px = b.x * u + X, py = b.y * u + Y, flying = b.fly === 1 || b.fly === 3, z = b.z * u;
     ctx.save(); ctx.translate(px, py); ctx.scale(1.8, 1.8); ctx.translate(-px, -py);
@@ -3920,7 +3920,7 @@ function drawWat(s, X, Y, t) {
     ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x0 + u * .3, by - u * .1, W, u * .35);
     ctx.fillStyle = WAT.wood2; ctx.fillRect(x0, by - u * 2.6, W, u * 2.6); ctx.fillStyle = WAT.wood; ctx.fillRect(x0, by - u * 1.2, W, u * 1.2);
     for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x0 + i * W / 6, by - u * 1.2, 2, u * 1.2); }
-    ctx.font = `${Math.round(u * .62)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.font = `${Math.round(u * .62)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ['🪷', '🌼', '🍙', '🍡', '🧋'].forEach((e, i) => ctx.fillText(e, x0 + u * .7 + i * (W - u * 1.4) / 4, by - u * 1.15));
     for (const px of [x0 + u * .1, x0 + W - u * .35]) { ctx.fillStyle = WAT.red; ctx.fillRect(px, by - u * 3.6, u * .25, u * 3.6); }
     poly([[x0 - u * .4, by - u * 3.2], [x0 + u * .6, by - u * 4.3], [x0 + W - u * .6, by - u * 4.3], [x0 + W + u * .4, by - u * 3.2]], WAT.red, WAT.gold, 2);
@@ -4215,7 +4215,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   }
   if (p.emo && performance.now() < p.emoT) {
     const k = 1 - (p.emoT - performance.now()) / 4200, by = yTop - TS * .42 - Math.sin(Math.min(1, k * 4) * Math.PI / 2) * TS * .25;
-    ctx.font = `${Math.round(TS * .75)}px serif`; ctx.fillText(p.emo, px, by - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2);
+    ctx.font = `${Math.round(TS * .75)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(p.emo, px, by - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2);
   }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
@@ -4228,7 +4228,7 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
 }
 // names hidden: only the emote and the chat bubble float over the head
 function chatOnly(p, px, yTop, t) {
-  if (p.emo && performance.now() < p.emoT) { ctx.font = `${Math.round(TS * .75)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.emo, px, yTop - TS * .3 - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2); }
+  if (p.emo && performance.now() < p.emoT) { ctx.font = `${Math.round(TS * .75)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.emo, px, yTop - TS * .3 - (p.bubble && performance.now() < p.bt ? TS * .6 : 0) + Math.sin(t / 160) * 2); }
   if (p.bubble && performance.now() < p.bt) {
     const txt = p.bubble.length > 30 ? p.bubble.slice(0, 29) + '…' : p.bubble;
     ctx.font = `${Math.round(TS * .3)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -4271,7 +4271,7 @@ function drawPlayerPixel(p, X, Y, t) {
   ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(px, py, u * (lying ? 8 : 5.5), u * 2, 0, 0, 7); ctx.fill();
   if (p.veh && G.shop && !roomOf(p.x, p.y) && !sitting && !lying) {
     if (p.veh === 'car') { spr('car_blue', p.rx, p.ry + .55, X, Y, 1.05); py -= u * 4; }
-    else { ctx.save(); ctx.translate(px, py - u * 2); if (dir === 'right') ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .9)}px serif`; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= u * 3; }
+    else { ctx.save(); ctx.translate(px, py - u * 2); if (dir === 'right') ctx.scale(-1, 1); ctx.font = `${Math.round(TS * .9)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(G.shop.vehicles[p.veh].icon, 0, 0); ctx.restore(); py -= u * 3; }
   }
   ctx.save();
   if (lying) { ctx.translate(px, py - u * 3); ctx.rotate(-Math.PI / 2); px = 0; py = u * 11; }
@@ -4301,9 +4301,9 @@ function drawPlayerPixel(p, X, Y, t) {
   px = px0; if (sitting) py += u * 4;
   const mine = p.id === myId, top = (lying ? py0 - 10 * u : py - 23 * u - bob);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px serif`; ctx.fillText('🥣', px, py0 + TS * .05); }
+  if (pose === 'beg') { ctx.font = `${Math.round(TS * .45)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText('🥣', px, py0 + TS * .05); }
   const badge = pose === 'veg' ? '🥬' : pose === 'hosp' ? '🚑' : pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : p.sad ? '😞' : '';
-  if (badge) { ctx.font = `${Math.round(TS * .42)}px serif`; ctx.fillText(badge, px + 7 * u, top + Math.sin(t / 300) * 3); }
+  if (badge) { ctx.font = `${Math.round(TS * .42)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(badge, px + 7 * u, top + Math.sin(t / 300) * 3); }
   sign(`${CAREER_ICON(p.c)} ${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`, px, top - TS * .22, { size: TS * .27, bg: mine ? 'rgba(255,201,77,.95)' : 'rgba(18,22,28,.78)', color: mine ? '#222' : '#fff' });
   if (p.title) { ctx.font = `800 ${Math.round(TS * .22)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(`«${p.title}»`, px, top - TS * .58); ctx.fillStyle = RAR_COL[p.tr] || '#ffd34d'; ctx.fillText(`«${p.title}»`, px, top - TS * .58); }
   if (p.bubble && performance.now() < p.bt) {
@@ -4349,13 +4349,13 @@ function drawZonesOnMap(g, A, k, icons) {
       const sw = d[0] === 'stands' ? 6 : d[0] === 'dugout' ? 4 : d[0] === 'score' ? 3 : 2, sh = d[0] === 'stands' ? 3 : 1.6, [x, y] = L(d[1] - sw / 2, d[2] - sh);
       g.fillStyle = d[0] === 'stands' ? '#5f8fb0' : d[0] === 'score' ? '#34383f' : '#b07a4a'; g.fillRect(x, y, sw * k, sh * k);
     }
-    if (icons) { g.font = `${Math.max(10, k * 2.2)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('⚽', px + w / 2, py + h / 2); }
+    if (icons) { g.font = `${Math.max(10, k * 2.2)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('⚽', px + w / 2, py + h / 2); }
   }
   const RC = { carousel: '#f29ac1', ferris: '#f7c25c', coaster: '#e0675a', pool: '#5fc2ea', bumper: '#9b86e0', shooting: '#f2a35c' };
   for (const st of G.stations) if (st.type === 'ride' && st.w) {
     const [x, y] = L(st.cx - st.w / 2, st.cy - st.h / 2);
     g.fillStyle = RC[st.k] || '#f29ac1'; g.beginPath(); g.roundRect ? g.roundRect(x, y, st.w * k, st.h * k, Math.min(6, k)) : g.rect(x, y, st.w * k, st.h * k); g.fill();
-    if (icons) { g.font = `${Math.max(10, k * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(st.icon, x + st.w * k / 2, y + st.h * k / 2); }
+    if (icons) { g.font = `${Math.max(10, k * 1.6)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(st.icon, x + st.w * k / 2, y + st.h * k / 2); }
   }
   if (G.parkArch) { const [x, y] = L(G.parkArch.x - 2, G.parkArch.y - .8); g.fillStyle = '#e88ab4'; g.fillRect(x, y, 4 * k, .8 * k); }
 }
@@ -4399,7 +4399,7 @@ function drawMini() {
   }
   if (me?.alms && mapId === 'town') { const b = (performance.now() / 350 | 0) % 2; me.alms.pts.forEach((q, i) => { if (me.alms.got[i]) return; const x = (q[0] - A.x) * 2, y = (q[1] - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); g.fillStyle = b ? '#ffb300' : '#ffd84d'; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); });
   }
-  if (mapId === 'town') { const x = (74 - A.x) * 2, y = (67 - A.y) * 2, big = me?.alms?.got.every(Boolean); g.font = `${big ? 20 : 14}px serif`; g.textAlign = 'center'; g.fillText('🛕', x, y + 5); }
+  if (mapId === 'town') { const x = (74 - A.x) * 2, y = (67 - A.y) * 2, big = me?.alms?.got.every(Boolean); g.font = `${big ? 20 : 14}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.fillText('🛕', x, y + 5); }
   if (me?.dogq?.kind === 'thief' && mapId === 'town') { const b = (performance.now() / 300 | 0) % 2, x0 = (me.dogq.x - A.x) * 2, y0 = (me.dogq.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(x0, y0, 8, 0, 7); g.fill(); g.fillStyle = b ? '#ff2a2a' : '#a80000'; g.beginPath(); g.arc(x0, y0, 6, 0, 7); g.fill(); }
   if (me?.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc; g.strokeStyle = (performance.now() / 400 | 0) % 2 ? '#ffd23a' : '#ff9f1a'; g.lineWidth = 3; g.setLineDash([6, 4]); g.beginPath(); g.arc((hx - A.x) * 2, (hy - A.y) * 2, hr * 2, 0, 7); g.stroke(); g.setLineDash([]); g.font = '16px serif'; g.textAlign = 'center'; g.fillText('🐕', (hx - A.x) * 2, (hy - A.y) * 2 + 6); }
   { const q = PETST.get(myId); if (q && mapOf(areaOf(q.x, q.y)?.id) === mapId) { const mx = (q.x - A.x) * 2, my = (q.y - A.y) * 2; g.fillStyle = '#fff'; g.beginPath(); g.arc(mx, my, 4.5, 0, 7); g.fill(); g.fillStyle = '#ff7eb0'; g.beginPath(); g.arc(mx, my, 3, 0, 7); g.fill(); } }   // your pet: a pink dot
@@ -5168,7 +5168,7 @@ function icuDraw() {
     for (let i = 0; i < W; i += 3) { const u = ((t / 1000) * 1.8 - i / W * 3) % 1, y = u > .02 && u < .06 ? -40 : u > .06 && u < .09 ? 30 : 0; i ? x.lineTo(i, 52 + y * .6) : x.moveTo(i, 52); } x.stroke();
     // heart + closing ring
     const pulse = 1 + Math.max(0, .18 - Math.abs(ph < .5 ? ph : ph - 1) * .9);
-    x.font = `${Math.round(86 * pulse)}px serif`; x.fillText('❤️', cx, cy);
+    x.font = `${Math.round(86 * pulse)}px 'Apple Color Emoji','Noto Color Emoji',serif`; x.fillText('❤️', cx, cy);
     const rr = 46 + (1 - ph) * 90; x.strokeStyle = 'rgba(255,255,255,.85)'; x.lineWidth = 5; x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.stroke();
     x.strokeStyle = 'rgba(62,240,160,.6)'; x.lineWidth = 3; x.beginPath(); x.arc(cx, cy, 46, 0, 7); x.stroke();
     x.fillStyle = '#9fe'; x.font = '700 18px sans-serif'; x.fillText(`ครั้งที่ ${Math.min(g.n, beat + 1)}/${g.n} · ${g.c.cpr.bpm} ครั้ง/นาที`, cx, H - 22);
@@ -6421,6 +6421,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-30a', d: '27 พ.ย.', items: [
+    '📖 แก้เนื้อเรื่องคุณเมย์ "นักสืบหัวใจ": สำรวจหน้าร้านแฟชั่นช่วงตี 4–6 ได้แล้ว (ยืนหน้าร้านก็พอ ไม่ต้องเข้าร้านที่ปิดอยู่)',
+    '🍎 แก้อีโมจิเพี้ยนบน iPad (ระบุฟอนต์อีโมจิให้ชัด)',
+  ] },
   { v: '2026-11-29d', d: '25 พ.ย.', items: [
     '🐛 แก้แล้ว: ตลาดขึ้นราคา ฿0 ทุกรายการ และของที่ลงขายเพื่อนมองไม่เห็น · ตอนนี้ราคาและของที่ลงขายกลับมาแล้ว',
   ] },
@@ -8960,7 +8964,7 @@ function drawBuildingSprite(b, X, Y) {
   if (!sp) {
     const x0 = b.x * TS + X, y0 = b.y * TS + Y;
     ctx.fillStyle = '#6fae5e'; ctx.fillRect(x0, y0, b.w * TS, b.h * TS); ctx.strokeStyle = '#c9a26a'; ctx.lineWidth = Math.max(2, TS * .08); ctx.setLineDash([TS * .25, TS * .18]); ctx.strokeRect(x0 + 2, y0 + 2, b.w * TS - 4, b.h * TS - 4); ctx.setLineDash([]);
-    ctx.font = `${Math.round(TS * .7)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🌱', x0 + b.w * TS / 2, y0 + b.h * TS / 2);
+    ctx.font = `${Math.round(TS * .7)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🌱', x0 + b.w * TS / 2, y0 + b.h * TS / 2);
     return;
   }
   if (!spr(sp, b.x + b.w / 2, b.y + b.h + .02, X, Y)) { ctx.fillStyle = '#8a7a6a'; ctx.fillRect(b.x * TS + X, b.y * TS + Y, b.w * TS, b.h * TS); }
@@ -9407,7 +9411,7 @@ function openMap(mapId, keepScroll) {
     g.fillStyle = b.renov ? '#d9a21f' : b.deco ? '#b9a48f' : b.house !== undefined ? (mineHouse ? '#f2b636' : '#d98f6a') : isOpen(b.id) ? '#4d5b7a' : '#7a4a4a';
     g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
     g.beginPath(); g.roundRect(bx + 1, by + 1, b.w * k - 2, b.h * k - 2, Math.min(6, k)); g.fill(); g.stroke();
-    if (b.deco || !b.st) { if (b.label) { g.font = `${Math.max(9, k * .8)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(b.icon, bx + b.w * k / 2, by + b.h * k / 2); } continue; }
+    if (b.deco || !b.st) { if (b.label) { g.font = `${Math.max(9, k * .8)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(b.icon, bx + b.w * k / 2, by + b.h * k / 2); } continue; }
     const h = b.house !== undefined ? houseInfo(b) : null;
     places.push({ key: b.house !== undefined ? 'door_' + b.id : b.st, icon: b.house !== undefined ? '🏠' : b.icon, label: b.house !== undefined ? `บ้าน #${b.house + 1}` : b.label,
       sub: b.house !== undefined ? (mineHouse ? '⭐ บ้านของฉัน' : h.label.replace(/^\S+\s/, '')) : `${isOpen(b.id) ? '🟢 เปิด' : '🔴 ปิด'} ${hoursTxt(b.id).replace('เปิด ', '')}`,
@@ -9434,17 +9438,17 @@ function openMap(mapId, keepScroll) {
     pl.n = pl.icon;
     dot(pl.x, pl.y, r + 2, pl.hl ? '#ffc94d' : pl.kind === 'gate' ? '#2f7fd1' : pl.kind === 'home' ? '#c0623e' : pl.kind === 'spot' ? '#2e8a57' : 'rgba(255,255,255,.55)');
     dot(pl.x, pl.y, r, 'rgba(255,255,255,.92)');
-    g.font = `${Math.round(r * 1.25)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `${Math.round(r * 1.25)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(pl.n, pl.x, pl.y + 1);
   });
   staffPl.forEach((pl, i) => {
     pl.n = pl.ci;
     g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.moveTo(pl.x, pl.y + r * 1.5); g.arc(pl.x, pl.y - r * .2, r + 2, Math.PI * .8, Math.PI * 2.2); g.fill();
     g.fillStyle = pl.hl ? '#ffc94d' : '#8b4fc4'; g.beginPath(); g.moveTo(pl.x, pl.y + r * 1.3); g.arc(pl.x, pl.y - r * .2, r, Math.PI * .8, Math.PI * 2.2); g.fill();
-    g.font = `${Math.round(r * 1.15)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
+    g.font = `${Math.round(r * 1.15)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pl.n, pl.x, pl.y - r * .15);
   });
-  if (me.dogq?.kind === 'thief' && mapId === 'town') { const [x, y] = L(me.dogq.x, me.dogq.y); g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(x, y, r * 1.1, 0, 7); g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦹', x, y - r * 1.6); }
-  if (me.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc, [x, y] = L(hx, hy); g.strokeStyle = '#ffb300'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.arc(x, y, hr * k, 0, 7); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,200,0,.12)'; g.fill(); g.font = `${Math.round(r * 1.6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐕', x, y); }
+  if (me.dogq?.kind === 'thief' && mapId === 'town') { const [x, y] = L(me.dogq.x, me.dogq.y); g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(x, y, r * 1.1, 0, 7); g.fill(); g.font = `${Math.round(r * 1.6)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦹', x, y - r * 1.6); }
+  if (me.dogq?.hc && mapId === 'town') { const [hx, hy, hr] = me.dogq.hc, [x, y] = L(hx, hy); g.strokeStyle = '#ffb300'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.arc(x, y, hr * k, 0, 7); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,200,0,.12)'; g.fill(); g.font = `${Math.round(r * 1.6)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐕', x, y); }
   // online players as coloured dots with their names; you are the big white dot with a ring
   let onHere = 0;
   for (const p of P.values()) {
