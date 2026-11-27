@@ -168,3 +168,8 @@ data/
 # player-save backup used once to fill a fresh volume (holds PINs, never commit)
 seed/
 .superpowers/
+
+# FluctlightDB — team-sync: shared project brain is committed; agent spokes stay local
+.fluctlight/agents/
+.fluctlight/**/.brain.lock
+.fluctlight/.handoffs.lock

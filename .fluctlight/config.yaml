@@ -1,0 +1,13 @@
+version: 1
+project_id: blank-app
+brains:
+  project: project
+  agents:
+    claude: agents/claude
+serve:
+  enabled: false
+defaults:
+  agent: auto
+git:
+  ignore_brains: false
+  team_sync: true
