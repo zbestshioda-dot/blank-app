@@ -441,7 +441,7 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   // 3) 🕹️ the amusement park's game centre (on its east lawn, door onto the park), a claw-machine booth and a photo booth in the park,
   //    and a soft-play house beside the game centre. Their ground is cleared at the end of the map (after the park is built).
   // 🧁 bakery: on the lawn across the road from the 3rd convenience store, facing the plaza (picked by the owner). Own picture b_bakery once tools/add_bakery.py has run
-  { const b = B('bakery', 'b_cafe2', 53, 52, { label: 'ร้านเบเกอรี่หวานใจ', icon: '🧁', st: 'bakery', layout: 'bakery', late: 9, clr: 1 }); if (ATLAS.sprites.b_bakery) b.sprite = 'b_bakery'; }
+  B('bakery', ATLAS.sprites.b_bakery ? 'b_bakery' : 'b_cafe2', 53, 52, { label: 'ร้านเบเกอรี่หวานใจ', icon: '🧁', st: 'bakery', layout: 'bakery', late: 9, clr: 1, ...(ATLAS.sprites.b_bakery ? { dx: .8 } : {}) });
   B('arcade', 'b_arcade', 44, 115, { label: 'เกมเซ็นเตอร์', icon: '🕹️', st: 'arcade', layout: 'arcade', late: 5, clr: 1 });
   B('playland', 'b_playland', 44, 122, { label: 'บ้านบอลเด็กเล่น', icon: '🧒', deco: true, clr: 1 });
   B('clawbooth', 'b_clawbooth', 39, 111, { label: 'ตู้คีบตุ๊กตา', icon: '🧸', st: 'clawst', stype: 'claw', noSlot: true, clr: 1 });
@@ -528,7 +528,7 @@ const LAYOUT = {
   // 🧁 bakery (14x10): oven and bread rack behind the counter, the cake case beside it, two café tables, plants by the door.
   // bk_* pictures come from tools/add_bakery.py; until then older furniture stands in (BKS below)
   bakery: [['bk_sign', 7, 1.2, false], ['bk_breadrack', 2.2, 2.7], ['bk_oven', 4.4, 2.6], ['bk_counter', 7, 2.4], ['bk_cakecase', 9.8, 2.6], ['bk_fridge', 12.2, 2.7],
-    ['bk_table', 3.4, 6.0], ['bk_table', 10.6, 6.0], ['bk_display', 3.0, 8.4], ['bk_plant', 1.4, 8.6], ['bk_plant', 12.6, 8.6], ['bk_menu', 10.2, 9.1, false]],
+    ['bk_table', 3.4, 6.0], ['bk_table', 10.6, 6.0], ['bk_display', 2.6, 8.4], ['bk_display2', 4.4, 8.4], ['bk_plant', 1.4, 8.6], ['bk_plant', 12.6, 8.6], ['bk_menu', 10.2, 9.1, false]],
   casino: [['cz_sign', 8, 1.25, false], ['cz_cashier', 8, 2.7], ['cz_slot1', 1.7, 3.3], ['cz_slot3', 3.2, 3.4], ['cz_slot2', 4.7, 3.3], ['cz_bar', 12.9, 3.2],
     ['cz_carpet', 8, 7.2, false], ['cz_carpet', 8, 10.2, false], ['cz_roulette', 4.0, 6.8], ['cz_bj', 12.0, 6.8], ['cz_hilo', 4.0, 9.9], ['cz_poker', 12.2, 9.9],
     ['cz_palm', 1.3, 7.2], ['cz_palm', 14.7, 7.2], ['cz_armchair', 1.4, 11.0], ['cz_armchair', 14.6, 11.0], ['cz_rope', 6.3, 11.4, false], ['cz_rope', 9.7, 11.4, false], ['cz_chips', 6.6, 3.0, false]],
@@ -537,7 +537,7 @@ const BRS = { br_neon: 'ad_neon', br_shelf: 'f_wine_rack', br_counter: 'cz_bar',
   br_mic: 'f_guitar', br_table: 'f_round_table', br_pool: 'x_pool', br_dart: 'x_dart', br_sofa: 'f_sofa_red', br_lamp: 'f_floorlamp', br_barrel: 'barrel', br_barrel2: 'barrel' };
 for (const e of LAYOUT.bar) if (!ATLAS.sprites[e[0]]) e[0] = BRS[e[0]];
 const BKS = { bk_sign: 'i_shopsign', bk_breadrack: 'x_breadrack', bk_oven: 'x_oven', bk_counter: 'x_counter', bk_cakecase: 'x_cakecase', bk_fridge: 'x_drinkfridge',
-  bk_table: 'x_cafeset', bk_display: 'f_display', bk_plant: 'x_plant', bk_menu: 'x_menu' };
+  bk_table: 'x_cafeset', bk_display: 'f_display', bk_display2: 'f_display', bk_plant: 'x_plant', bk_menu: 'x_menu' };
 for (const e of LAYOUT.bakery) if (!ATLAS.sprites[e[0]]) e[0] = BKS[e[0]];
 // office: 8 work desks with a chair in front of each
 for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) LAYOUT.office.push(['f_laptop_desk', cx, by], ['f_office_chair', cx, by + 1.25]);
@@ -574,7 +574,7 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(L => BUILDINGS.filter(b =
   rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i');
   const mx = Math.floor(RW / 2);
   rect(rx + mx - 1, ry + RH - 1, 2, 1, 'D');
-  const front = { x: b.x + b.w / 2, y: b.y + b.h };
+  const front = { x: b.x + b.w / 2 + (b.dx || 0), y: b.y + b.h };   // dx: the door sits off-centre in the picture
   const room = {
     id: 'r_' + b.id, kind: 'room', bld: b.id, rk: kind, house: b.house, label: b.label, icon: b.icon, area: b.area || 'town',
     x: rx, y: ry, w: RW, h: RH, spawn: { x: rx + mx, y: ry + RH - 2.3 }, exit: { x: rx + mx, y: ry + RH - 0.5 },
@@ -1028,12 +1028,11 @@ const PARK_ARCH = { x: 46, y: 94.6 };
   }
   // 🧁 the bakery's front: a cobbled path from the door down to the plaza and across to the sidewalk, flower boxes by the door,
   //    two café tables on the lawn, a street lamp; the trees behind the shop stay as its garden
-  { const bk = BUILDINGS.find(b => b.id === 'bakery'), dx = Math.floor(bk.x + bk.w / 2), fy = bk.y + bk.h;
+  { const bk = BUILDINGS.find(b => b.id === 'bakery'), dx = Math.round(bk.x + bk.w / 2 + (bk.dx || 0)), fy = bk.y + bk.h;
     for (let y = fy; y <= fy + 2; y++) for (const x of [dx - 1, dx]) { clearTree(x, y); set(x, y, 'c'); }
     for (let x = bk.x - 2; x < dx - 1; x++) { clearTree(x, fy); set(x, fy, 'c'); }
     for (let y = fy - 1; y <= fy + 2; y++) for (let x = bk.x - 2; x <= bk.x + bk.w + 1; x++) if (get(x, y) === 'T') { clearTree(x, y); set(x, y, '.'); }
     keep(PROPS, q => !(q.x > bk.x - 2.5 && q.x < bk.x + bk.w + 2 && q.y > fy - .2 && q.y < fy + 3) || q.s === 'manhole');
-    prop('flowerbox', bk.x + .7, fy + .35, false); prop('flowerbox', bk.x + bk.w - .7, fy + .35, false);
     prop('x_cafeset', bk.x - .3, fy + 2.2); prop('x_cafeset', bk.x + bk.w + .3, fy + 2.2);
     prop('o_lampball', bk.x - 2.2, fy + .6); prop('o_topiary', bk.x + bk.w + 1, fy + .4, false); }
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
@@ -1379,7 +1378,7 @@ const ITEMS = {
   bk_donut:     { name: 'โดนัทเคลือบช็อกโกแลต', icon: '🍩', kind: 'meal', base: 55, eat: { hunger: 12, happy: 5 }, bake: 1 },
   bk_cupcake:   { name: 'คัพเค้กสตรอว์เบอร์รี', icon: '🧁', kind: 'meal', base: 80, eat: { hunger: 10, happy: 7 }, bake: 1 },
   bk_choco:     { name: 'เค้กช็อกโกแลตหน้านิ่ม', icon: '🍰', kind: 'meal', base: 120, eat: { hunger: 18, happy: 9 }, bake: 1 },
-  bk_coconut:   { name: 'เค้กมะพร้าวอ่อน', icon: '🥥', kind: 'meal', base: 140, eat: { hunger: 18, happy: 10 }, bake: 1 },
+  bk_coconut:   { name: 'เค้กมะพร้าวอ่อน', icon: '🍥', kind: 'meal', base: 140, eat: { hunger: 18, happy: 10 }, bake: 1 },
   bk_cheese:    { name: 'บลูเบอร์รีชีสเค้ก', icon: '🫐', kind: 'meal', base: 160, eat: { hunger: 20, happy: 11 }, bake: 1 },
   bk_bday:      { name: 'เค้กวันเกิดทั้งก้อน', icon: '🎂', kind: 'meal', base: 900, eat: { hunger: 45, energy: 10, happy: 30 }, bake: 1 },
 

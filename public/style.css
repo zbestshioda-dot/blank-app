@@ -1004,7 +1004,7 @@ body.hasEvent #topBar{top:146px!important}
 
 /* pixel icons that replace emoji in the UI */
 :root{--pxs:1.2em}
-.pxi{display:inline-block;width:var(--pxs);height:var(--pxs);vertical-align:-.22em;background:url(assets/icons.webp?v=2) no-repeat;background-size:calc(var(--pxcols,16) * var(--pxs)) calc(var(--pxrows,12) * var(--pxs));font-style:normal;flex:none}
+.pxi{display:inline-block;width:var(--pxs);height:var(--pxs);vertical-align:-.22em;background:url(assets/icons.webp?v=3) no-repeat;background-size:calc(var(--pxcols,16) * var(--pxs)) calc(var(--pxrows,12) * var(--pxs));font-style:normal;flex:none}
 
 /* profile frames over the profile photo; the special ones glow (each its own colours and motion) */
 .pfx{position:absolute;left:50%;top:50%;width:var(--fs);height:var(--fs);background:url(assets/frames.webp?v=2) no-repeat;background-size:calc(6 * var(--fs)) calc(6 * var(--fs));pointer-events:none;z-index:3}

@@ -41,7 +41,7 @@ function pxIconize(root) {
   for (let n = w.nextNode(); n; n = w.nextNode()) list.push(n);
   list.forEach(doNode);
 }
-fetch('assets/icons.json?v=2').then(r => r.json()).then(j => {
+fetch('assets/icons.json?v=3').then(r => r.json()).then(j => {
   PXI.map = {}; for (const [k, v] of Object.entries(j.map)) PXI.map[k.replace(/️/g, '')] = v;
   PXI.cols = j.cols; PXI.rows = j.rows;
   document.documentElement.style.setProperty('--pxrows', j.rows); document.documentElement.style.setProperty('--pxcols', j.cols);
@@ -6608,6 +6608,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27t', d: '27 พ.ย.', items: [
+    '🧁 ร้านเบเกอรี่หวานใจได้รูปใหม่ทั้งร้าน: ตึกสีชมพูมีคัพเค้กยักษ์บนหลังคา ข้างในมีเตาอบ ตู้เค้ก ชั้นขนมปัง ชั้นขนมหวาน โต๊ะคาเฟ่ · ขนมทุกชิ้นมีไอคอนพิกเซลของตัวเอง',
+  ] },
   { v: '2026-11-27s', d: '27 พ.ย.', items: [
     '🧁 <b>ร้านใหม่: ร้านเบเกอรี่หวานใจ</b> ริมลานน้ำพุ ฝั่งตรงข้ามร้านสะดวกซื้อสาขาซอยใต้ เปิด 06:00–21:00 · ขนมปัง ครัวซองต์ โดนัท คัพเค้ก เค้กช็อกโกแลต เค้กมะพร้าวอ่อน ชีสเค้ก และเค้กวันเกิดทั้งก้อน · กินแล้ว<b>ความสุขเพิ่ม</b>',
     '💬 กรอบคุยกับ NPC: เอาปุ่ม ✕ ออก (แตะอ่านจนจบ หรือกด 👋 ลาก่อน) รูปตัวละครชิดขอบขวาของกรอบ',
@@ -9021,13 +9024,13 @@ fetch('assets/pets.json?v=4').then(r => r.json()).then(j => { PET_AT = j; setTim
 // 📱 phones get the half-size atlas (~25 MB decoded instead of ~100 MB: iPhones were reloading to a white screen, and it draws faster);
 // halving every sprite rectangle and the tile size keeps every draw call the same
 const HALF_ATLAS = TOUCH_UI || IOS;
-fetch('assets/atlas.json?v=v31').then(r => r.json()).then(j => {
+fetch('assets/atlas.json?v=v32').then(r => r.json()).then(j => {
   if (HALF_ATLAS) { j.tile /= 2; for (const k in j.sprites) j.sprites[k] = j.sprites[k].map(v => v / 2); }
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
-  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v31';
+  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v32';
 });
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
-if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v31').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v31'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v32').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v32'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
