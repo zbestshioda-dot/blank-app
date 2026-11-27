@@ -2193,3 +2193,23 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* 💬 talk box: no ✕ (tap through the lines / 👋 ลาก่อน closes it), the portrait sits flush with the box's right edge */
 #dlg .dlgX{display:none!important}
 #dlg .dlgPic{right:-4px!important}
+/* ✨ panel polish (all menus, portrait + landscape) */
+.bslot .bnm{display:none}
+.pfHide{display:none!important}
+.pFind{position:relative;display:flex;align-items:center;gap:6px;margin:6px 0}
+.pFind input{flex:1;min-width:0;height:36px;padding:0 64px 0 12px;font-size:14px;border:3px solid var(--k-ink,#2b2340);border-radius:12px;background:#fff;color:var(--k-ink,#2b2340);box-shadow:inset 0 2px 0 #0001}
+.pFind input:focus{outline:3px solid var(--k-sun,#ffd34d);outline-offset:1px}
+.pfN{position:absolute;right:34px;font-size:11.5px;font-weight:700;color:#7a6a55;pointer-events:none}
+.sheet h2 small,.sheet h2 .bagCnt{display:inline-block;vertical-align:middle;margin-left:6px;padding:1px 9px;border-radius:999px;background:#fffbe9;color:var(--k-ink,#2b2340)!important;font-size:12px;font-weight:600;line-height:1.5;opacity:1;text-shadow:none!important;-webkit-text-stroke:0;white-space:nowrap}
+#panel:not(.phMode):not(.soc) .sheet h2{position:sticky;top:0;z-index:2}
+#panel .sheet .x{z-index:3}
+#panel .sheet .tabs button{min-height:34px}
+@media (orientation:portrait){#panel:not(.phMode):not(.bagMode) .sheet{max-height:72vh;max-height:72dvh}}
+@media (orientation:landscape) and (max-height:520px){
+  #panel:not(.phMode):not(.bagMode) .sheet{width:min(880px,calc(100vw - 24px));max-height:92vh;max-height:92dvh}
+  #panel:not(.phMode) .sheet .list:not(.shop){display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:6px;align-items:start}
+  #panel:not(.phMode) .sheet .list.shop{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  #panel .sheet .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  #panel .sheet .tabs button{white-space:nowrap}
+}
+@media (orientation:landscape) and (max-height:520px){.pFind{margin:3px 0}.pFind input{height:30px;font-size:13px;border-width:2px}}

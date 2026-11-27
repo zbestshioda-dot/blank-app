@@ -4528,15 +4528,34 @@ function refreshPanel(force) {
   const body = $('#panelBody'); const keep = ae && body.contains(ae) && ae.id ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
   const scroll = body.parentElement.scrollTop;
   const keepSc = [...body.querySelectorAll('*')].filter(e => e.scrollTop > 0 || e.scrollLeft > 0).map(e => { const k = scKey(e); return [k, [...body.querySelectorAll(k)].indexOf(e), e.scrollTop, e.scrollLeft]; });
-  const drafts = [...body.querySelectorAll('input[id]:not([type=checkbox]):not([type=range]),textarea[id]')].filter(e => e.value).map(e => [e.id, e.value]);   // typed text survives a refresh (mobile keyboard closed = not focused)
+  const drafts = [...body.querySelectorAll('input[id]:not([type=checkbox]):not([type=range]):not(#pFindQ),textarea[id]')].filter(e => e.value).map(e => [e.id, e.value]);   // typed text survives a refresh (mobile keyboard closed = not focused)
   const openD = [...body.querySelectorAll('details[open] > summary')].map(e => e.textContent.trim());   // sections the player opened stay open (they used to snap shut on every refresh)
-  body.innerHTML = html; bindPanel(body);
+  body.innerHTML = html; bindPanel(body); panelFind(body);
   if (openD.length) for (const sm of body.querySelectorAll('details > summary')) if (openD.includes(sm.textContent.trim())) sm.parentElement.open = true;
   body.parentElement.scrollTop = scroll;
   for (const [id, v] of drafts) { const n = document.getElementById(id); if (n && !n.value && (n.tagName === 'TEXTAREA' || n.type === 'text' || !n.type || n.type === 'search')) n.value = v; }
   for (const [k, i, t, l] of keepSc) { const e = body.querySelectorAll(k)[i]; if (e) { e.scrollTop = t; e.scrollLeft = l; } }
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch { } } }
   for (const id of ['chatMsgs', 'callMsgs']) { const cm = document.getElementById(id); if (cm) cm.scrollTop = cm.scrollHeight; }
+}
+// 🔍 long lists (bag, shops, ranks…): a search box on top that hides what does not match (display only, nothing sent)
+const PF_SEL = '.bagSlots .bslot:not(.empty), .list > .item, .looks > .look';
+function panelFind(body) {
+  if (!panel || panel.kind === 'phone' || panel.kind === 'chat') return;
+  const all = [...body.querySelectorAll(PF_SEL)];
+  if (all.length < 12) return;
+  const top = [...body.children].find(c => c.contains(all[0])); if (!top) return;
+  const w = document.createElement('div'); w.className = 'pFind';
+  w.innerHTML = '<input id="pFindQ" type="search" placeholder="🔍 ค้นหาชื่อ..." autocomplete="off" enterkeyhint="search"><span class="pfN"></span>';
+  top.before(w);
+  const inp = w.firstChild, n = w.lastChild;
+  const run = () => {
+    const q = (panel._q = inp.value).trim().toLowerCase(); let hit = 0;
+    for (const e of all) { const ok = !q || e.textContent.toLowerCase().includes(q); e.classList.toggle('pfHide', !ok); if (ok) hit++; }
+    body.querySelectorAll('.bagSlots .bslot.empty').forEach(e => e.classList.toggle('pfHide', !!q));
+    n.textContent = q ? (hit ? `เจอ ${hit}` : 'ไม่เจอ') : '';
+  };
+  inp.value = panel._q || ''; inp.oninput = run; run();
 }
 function bindStocks(root) {
   const qi = root.querySelector('#skQty');   // the typed amount is kept in the panel state, so a refresh (price tick, money change) no longer snaps it back
@@ -6608,6 +6627,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28a', d: '28 พ.ย.', items: [
+    '🔍 <b>ช่องค้นหา</b> ในเมนูที่มีของเยอะ (กระเป๋า ร้านค้า อันดับ ความสำเร็จ ฯลฯ) พิมพ์ชื่อแล้วกรองให้ทันที',
+    '🏷️ ตัวเลขบนหัวเมนู (เช่น จำนวนของ · มูลค่า ในกระเป๋า) อ่านชัดขึ้น · หัวเมนูค้างอยู่ด้านบนตอนเลื่อน',
+    '📱 แนวตั้ง: หน้าต่างเมนูสูงขึ้น เห็นของมากขึ้น · แนวนอน: หน้าต่างกว้างเต็มจอ รายการเรียง 2 คอลัมน์ แท็บเลื่อนซ้าย-ขวาได้'] },
   { v: '2026-11-27u', d: '27 พ.ย.', items: [
     '🧁 <b>น้องภูมิย้ายมาทำงานร้านเบเกอรี่หวานใจ</b> แล้ว (เนื้อเรื่องและความสนิทยังอยู่ครบ)',
     '🏪 ปิดร้านสะดวกซื้อสาขาหัวมุม · ภารกิจที่เคยไปสาขานี้ย้ายไปสาขาซอยใต้แทน',
@@ -8332,7 +8355,7 @@ function renderPanel(p) {
         const sel = list.some(([id]) => id === p.gsel) ? p.gsel : list[0]?.[0];
         const cats = `<div class="bagCats">${CATS.map(([k, l]) => { const n = k === 'all' ? ents.length : ents.filter(([id]) => catOf(id) === k).length, [ic, ...nm] = l.split(' ');
           return B(`<span>${ic}</span><small>${nm.join(' ')}</small>${n ? `<i>${n}</i>` : ''}`, { fn: 'qtab', set: { gcat: k, gsel: '' } }, 'bcat' + (gcat === k ? ' on' : '')); }).join('')}</div>`;
-        const slots = list.map(([id, q]) => { const it = G.items[id]; return B(`${itemIco(id, 44, 34)}<i>${q > 999 ? '999+' : q}</i>${STARS.has(id) ? '<b class="bstar">⭐</b>' : ''}`, { fn: 'qtab', set: { gsel: id } }, `bslot${it.rar ? ' r' + it.rar : ''}${id === sel ? ' on' : ''}`); }).join('')
+        const slots = list.map(([id, q]) => { const it = G.items[id]; return B(`${itemIco(id, 44, 34)}<i>${q > 999 ? '999+' : q}</i>${STARS.has(id) ? '<b class="bstar">⭐</b>' : ''}<s class="bnm">${esc(it.name)}</s>`, { fn: 'qtab', set: { gsel: id } }, `bslot${it.rar ? ' r' + it.rar : ''}${id === sel ? ' on' : ''}`); }).join('')
           + '<span class="bslot empty"></span>'.repeat(Math.max(0, 20 - list.length) || (5 - list.length % 5) % 5);
         const CATNM = { use: 'กิน/ใช้ได้', fish: 'ปลา', crop: 'ผลผลิต', goods: 'ของทั่วไป' };
         let det = '<div class="sub">เลือกของในช่องเพื่อดูรายละเอียด</div>';
@@ -8344,7 +8367,7 @@ function renderPanel(p) {
             <div class="bdAct">${act}${B(STARS.has(sel) ? '⭐ เลิกติดดาว' : '☆ ติดดาว (ขึ้นก่อนเสมอ)', { fn: 'star', item: sel })}${B('📍 ไปขายที่ตลาด', { fn: 'guide', key: 'market' })}</div>`; }
         const sorts = [['cat', 'หมวด'], ['value', 'มูลค่า'], ['qty', 'จำนวน'], ['name', 'ชื่อ']].map(([k, l]) => B(l, { fn: 'qtab', set: { gsort: k } }, sort === k ? 'primary' : '')).join('');
         const fu = (me.furniture || []).filter(k => k !== 'sbed' && G.shop.furniture[fbase(k)] && !G.shop.furniture[fbase(k)].field), fg = fu.filter(k => G.shop.furniture[fbase(k)].cat === 'garden').length;
-        const homeNote = me.hown && fu.length ? `<div class="setRow"><span><b>🛋️ เฟอร์นิเจอร์และของแต่งสวน ${fu.length} ชิ้น${fg ? ` (ของสวน ${fg})` : ''}</b><small>ของที่ซื้อจากร้านเฟอร์นิเจอร์/ร้านต้นไม้ไม่อยู่ในกระเป๋า แต่ส่งไปเก็บที่คลังบ้าน เข้าบ้านแล้วกดจัดบ้านเพื่อวาง</small></span>${B('เปิดคลังบ้าน', { fn: 'open', kind: 'homedeco', set: { dtab: fg ? 'garden' : 'basic' } }, 'good')}</div>` : '';
+        const homeNote = me.hown && fu.length ? `<div class="setRow"><span><b>🛋️ เฟอร์นิเจอร์และของแต่งสวน ${fu.length} ชิ้น${fg ? ` (ของสวน ${fg})` : ''}</b><small>เก็บอยู่ที่คลังบ้าน เข้าบ้านแล้วกดจัดบ้านเพื่อวาง</small></span>${B('เปิดคลังบ้าน', { fn: 'open', kind: 'homedeco', set: { dtab: fg ? 'garden' : 'basic' } }, 'good')}</div>` : '';
         const eggNote = nbEggWaiting() ? (() => { const left = Math.max(0, nextThaiMidnight() - Date.now() - clockOff), h = Math.floor(left / 36e5), mm = Math.floor(left / 6e4) % 60; return `<div class="setRow nbEggRow"><span><b>ไข่รอฟัก</b><small>ฟักพรุ่งนี้ (อีก ${h}:${String(mm).padStart(2, '0')} ชม.) เข้าเกมพรุ่งนี้แล้วได้สัตว์เลี้ยงเลย</small></span>${nbImg(left < 3 * 36e5 ? 'egg_crack' : 'egg', 52)}</div>`; })() : '';
         return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}${eggNote}${homeNote}
           <div class="bagG">${cats}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
