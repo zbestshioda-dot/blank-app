@@ -1,0 +1,31 @@
+{
+  "format_version": 4,
+  "wal_seq": 1,
+  "wal_checkpoint_seq": 1,
+  "segments": [
+    "life",
+    "development",
+    "neuromodulators",
+    "graph",
+    "hippocampus",
+    "cortex",
+    "amygdala",
+    "prefrontal",
+    "attention_schema",
+    "predictive_loop",
+    "worldview",
+    "global_workspace",
+    "connectome",
+    "core_memories",
+    "autonomic",
+    "recent_separations",
+    "semantic",
+    "muon",
+    "tau",
+    "swarm"
+  ],
+  "tenant_uuid": null,
+  "writer_epoch": 0,
+  "fence_generation": 0,
+  "durability_policy": null
+}
