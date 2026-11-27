@@ -747,7 +747,7 @@ function handle(m) {
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');
       if (restartAt) { restartAt = 0; restartBar(false); toast('อัปเดตเสร็จแล้ว เล่นต่อได้เลย', '✨'); }     // a new version was deployed
-      G = m; myId = m.id; setTimeout(joyFixShow, 0); setTimeout(pushRefresh, 4000); pushAskAt = Date.now() + 4 * 60e3; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
+      G = m; myId = m.id; setTimeout(joyFixShow, 0); if (isPwa()) setTimeout(() => me?.nb?.done && send({ t: 'nb.pwa', on: 1 }), 5000); /* 📲 home-screen 💎50 */ setTimeout(pushRefresh, 4000); pushAskAt = Date.now() + 4 * 60e3; adsInit(); P.clear(); buildAreas(); chCache.clear(); buildStaff(); fixId = 0; afkSent = false; running = false; $('#actBtn').classList.remove('run'); $('#runBtn').classList.remove('on'); lastInput = performance.now();
       creds = m.relog ? { name: m.relog.name, tok: m.relog.tok } : creds.tok ? { name: creds.name, tok: creds.tok } : { name: creds.name, pin: creds.pin }; localStorage.setItem('lt_creds', JSON.stringify(creds)); if (gPendLink) { const gc = gPendLink; gPendLink = null; setTimeout(() => send({ t: 'glink', google: gc }), 500); } promo.stop(); gMode = 'link';
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
@@ -811,7 +811,8 @@ function handle(m) {
       if (panel?.kind === 'wpray') refreshPanel(true);
       break;
     case 'siamsi': FX.play('chime'); siamsiPop(m); break;
-    case 'nbegg': setTimeout(() => nbTomorrowCard(m.tmr), $('.nbStepCard') ? 1800 : 0); break;   // after the step card, not on top of it
+    case 'nbegg': if (me.nb) me.nb.egg = { at: m.at }; setTimeout(() => nbEggCard(), $('.nbStepCard') ? 1800 : 0); break;   // after the step card, not on top of it
+    case 'nbdone': setTimeout(nbPwaCard, 2600); break;
     case 'nbfish': nbFirstFish(m.id); break;
     case 'nbstep': $('#stick')?.classList.remove('nbHint'); if (nbDay1()) { nbStepCard(m.i); if (m.i === 2) { const shown = +($('#meMoney').textContent || '0').replace(/[^\d]/g, '') || 0; nbMoneyUp(shown < me.money ? shown : nbMoneyPrev ?? shown); } } FX.play('levelup'); if (pendingDaily && !dailyWait()) { const d = pendingDaily; pendingDaily = null; setTimeout(() => showDaily(d), 2500); } setTimeout(() => { const S = G.nbSteps, p = me?.nb?.p || [], i = S ? S.findIndex((st, j) => (p[j] || 0) < st.n) : -1; if (i >= 0 && nbGo(i)) setGuide(nbGo(i), true); }, 900); break;
     case 'cz': czMsg(m); break;
@@ -1103,7 +1104,7 @@ function nbTap(i) {
   const st = G.nbSteps[i]; FX.play('click');
   if (st.go) return setGuide(nbGo(i), false, true);
   if (i === 3) { foldChat(false); const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
-  toast('เดินไปใกล้ผู้เล่นคนอื่น แล้วกดปุ่มอีโมจิ 😄 (มุมขวาล่าง) · หรือขอแลกเบอร์จากโปรไฟล์ของเขา', '👋');
+  if (i >= 5) return me.nb?.egg ? nbEggCard() : toast('ตก-ขายปลาให้ครบก่อน แล้วจะได้ไข่สัตว์เลี้ยง', '🥚');
 }
 // 🌱 newcomers: the starter list is running / a v2 newcomer's first day (quiet mode, egg, tomorrow card)
 function nbActive() { return !!me?.nb && !me.nb.done; }
@@ -1146,8 +1147,45 @@ function nbStepCard(i) {
 function nbFirstFish(id) {
   const it = G.items[id]; if (!it) return;
   const d = document.createElement('div'); d.className = 'hatchPop nbFishPop';
-  d.innerHTML = `<div><small>🎉 ตัวแรกในชีวิต!</small><b style="font-size:84px;line-height:1.1">${it.icon}</b><b>${esc(it.name)}</b><small>ตกได้อีก 2 ตัว แล้วไปขายที่สมาคมประมง · แตะเพื่อปิด</small></div>`;
-  d.onclick = () => d.remove(); document.body.appendChild(d); FX.play('levelup'); setTimeout(() => d.remove(), 3500);
+  d.innerHTML = `<div><small>🎉 ตัวแรกในชีวิต!</small><b style="font-size:84px;line-height:1.1">${it.icon}</b><b>${esc(it.name)}</b><small>${'⭐'.repeat(it.rar || 1)} ตัวใหญ่หายาก! ขายได้เงินก้อนโต · ตกอีก 2 ตัว แล้วไปขายที่สมาคมประมง</small></div>`;
+  d.onclick = () => d.remove(); document.body.appendChild(d); FX.play('levelup'); setTimeout(() => d.remove(), 5000);
+  const q = P.get(myId); if (q) { FX.burst(q.x, q.y - .6, '#ffe27a', 30); FX.sparkle(q.x, q.y - .8, '#fff3c4', 24); }
+}
+// 🥚 the newcomer's egg: name it, pat it, watch the countdown (hatches 30 min – 2 h after it is earned)
+function nbEggCard() {
+  const e = me?.nb?.egg; if (!e || e.h) return;
+  $('.nbEgg')?.remove();
+  const d = document.createElement('div'); d.className = 'hatchPop nbCard nbEgg';
+  const left = () => e.at ? Math.max(1, Math.ceil((e.at - Date.now() - clockOff) / 60e3)) + ' นาที' : 'พรุ่งนี้';
+  d.innerHTML = `<div>${nbImg('egg', 96, 'nbEggPic')}<b>${e.n ? 'เจ้า' + esc(e.n) : 'ไข่สัตว์เลี้ยงของคุณ!'}</b><span>ฟักใน ${left()}</span>
+    <input class="nbEggName" maxlength="12" placeholder="ตั้งชื่อไข่..." value="${esc(e.n || '')}"><button type="button" class="primary nbEggOk">✏️ ตั้งชื่อ</button>
+    <button type="button" class="good nbEggPat">🤚 ลูบไข่</button><small>แตะพื้นหลังเพื่อปิด</small></div>`;
+  d.onclick = ev => { if (ev.target === d) d.remove(); };
+  d.querySelector('.nbEggOk').onclick = () => { const n = d.querySelector('.nbEggName').value.trim(); if (!n) return toast('พิมพ์ชื่อก่อนนะ', '✏️'); e.n = n; send({ t: 'nb.eggname', name: n }); d.querySelector('b').textContent = 'เจ้า' + n; FX.play('chime'); };
+  d.querySelector('.nbEggPat').onclick = () => { const p = d.querySelector('.nbEggPic'); p.classList.remove('wob'); void p.offsetWidth; p.classList.add('wob'); send({ t: 'nb.eggpet' }); FX.play('pop'); };
+  document.body.appendChild(d); FX.play('chime');
+}
+// 📲 end of the starter path: add the game to the home screen = 💎50 (claimed when the game is opened from there)
+const isPwa = () => matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
+function nbPwaCard() {
+  if (isPwa()) return send({ t: 'nb.pwa', on: 1 });
+  const d = document.createElement('div'); d.className = 'hatchPop nbCard nbPwa';
+  d.innerHTML = `<div><b style="font-size:64px;line-height:1.1">📲</b><b>เพิ่มเกมลงหน้าจอมือถือ</b><span>รับทันที <b>💎50 เพชร!</b></span><small>เปิดเกมจากไอคอนบนหน้าจอครั้งแรก รับเพชรอัตโนมัติ</small>
+    <button type="button" class="primary nbPwaGo">📲 เพิ่มลงหน้าจอโฮม</button><small style="display:block;margin-top:10px">🛴 พรุ่งนี้กลับมา รับ<b>สกู๊ตเตอร์ไฟฟ้าฟรี!</b></small><small>แตะพื้นหลังเพื่อปิด</small></div>`;
+  d.onclick = ev => { if (ev.target === d) d.remove(); };
+  d.querySelector('.nbPwaGo').onclick = () => { d.remove(); document.querySelector('.instBtn[data-inst="m"]')?.click(); };
+  document.body.appendChild(d); FX.play('levelup');
+}
+// ✨ a glowing fish shadow in the lake right in front of a newcomer's spawn, until the first fish is caught
+function drawNbFish(X, Y, t) {
+  if (!me?.nb || me.nb.v !== 2 || me.nb.f1 || me.cast) return;
+  const s = Date.now() / 1000, x = (74.3 + Math.sin(s * .7) * .35) * TS + X, y = (52.7 + Math.cos(s * .5) * .2) * TS + Y, a = .55 + Math.sin(s * 3) * .25;
+  ctx.save(); const g = ctx.createRadialGradient(x, y, 0, x, y, TS * .9); g.addColorStop(0, `rgba(150,250,255,${a * .8})`); g.addColorStop(1, 'rgba(150,250,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, TS * .9, 0, 7); ctx.fill();
+  ctx.globalAlpha = .85; ctx.shadowColor = '#bffcff'; ctx.shadowBlur = TS * .6; ctx.fillStyle = 'rgba(25,70,105,.85)';
+  ctx.beginPath(); ctx.ellipse(x, y, TS * .42, TS * .16, Math.sin(s * .7) * .3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - TS * .38, y); ctx.lineTo(x - TS * .62, y - TS * .14); ctx.lineTo(x - TS * .62, y + TS * .14); ctx.fill();
+  ctx.restore();
 }
 const nbFishHelp = () => nbDay1() && !me.nb.f1;   // talk a newcomer through their very first fish
 const nbEggWaiting = () => nbDay1() && !!me.nb.egg && !me.nb.egg.h;
@@ -1164,8 +1202,8 @@ function nbTomorrowCard(tmr) {
 // ---- NB_HUD start (pure: tools/hud.test.js reads this block)
 // a v2 newcomer's first day: which HUD buttons show. ['cur', k] = from when step k is the current one (or done);
 // ['done', k] = once step k is done; 'end' = after the whole path. Anything not listed is always shown.
-const NB_N = [1, 3, 1, 1, 1, 1];   // how many of each starter step (server NB: rod, fish ×3, sell, chat, buy, social)
-const NB_HUD = { runBtn: ['done', 0], restBtn: ['done', 1], cbOpen: ['cur', 3], emoBtn: ['cur', 5], ev7Btn: 'end', lkBtn: 'end', topupBtn: 'end', eventBar: 'end' };
+const NB_N = [1, 3, 1, 1, 1, 1, 1];   // how many of each starter step (server NB: rod, fish ×3, sell, chat, buy, egg name, egg pat)
+const NB_HUD = { runBtn: ['done', 0], restBtn: ['done', 1], cbOpen: ['cur', 3], emoBtn: 'end', ev7Btn: 'end', lkBtn: 'end', topupBtn: 'end', eventBar: 'end' };
 function hudVisible(id, p, done) {
   const r = NB_HUD[id]; if (!r || done) return true;
   if (r === 'end') return false;
@@ -1227,7 +1265,7 @@ function paintHud() {
   if (me.craving) chips.push(`<span class="chip crave" data-dz="_crave">${ic('i_bulb')} อยากกิน${G.items[me.craving.item].icon}${esc(G.items[me.craving.item].name)}</span>`);
   if (me.desk >= 0 && me.enrolled) chips.push(`<span class="chip study" data-dz="_study">📖 เรียนอยู่ ${Math.round((me.study || 0) * 100)}%</span>`);
   if (me.licExp?.driving && me.licExp.driving < Date.now() + clockOff) chips.push('<span class="chip bad" data-dz="_lic">🪪 ใบขับขี่หมดอายุ</span>');
-  if (nbEggWaiting()) chips.push(`<span class="chip study" data-dz="_nbegg">${nbImg('moon', 18)} พรุ่งนี้: ${nbImg('egg', 18)} ไข่ฟัก + ${nbImg('gift', 18)}</span>`);
+  if (nbEggWaiting()) chips.push(`<span class="chip study" data-dz="_nbegg">${nbImg('egg', 18)} ${me.nb.egg.n ? esc(me.nb.egg.n) : 'ไข่'} ฟักใน ${me.nb.egg.at ? Math.max(1, Math.ceil((me.nb.egg.at - Date.now() - clockOff) / 60e3)) + ' น.' : 'พรุ่งนี้'}</span>`);
   { const tn = Date.now() + clockOff, mn = x => Math.ceil((x - tn) / 60e3);   // 🙏 active buffs (blessing from praying / giving alms, merit from releasing fish)
     if ((me.bless || 0) > tn) chips.push(`<span class="chip buff" data-dz="_bless">✨ พร ${mn(me.bless)}น.</span>`);
     if ((me.merit || 0) > tn) chips.push(`<span class="chip buff" data-dz="_merit">🙏 บุญ ${mn(me.merit)}น.</span>`); }
@@ -2312,7 +2350,7 @@ function draw(t) {
     ctx.fillText(s.type === 'door' ? '🚪' : s.icon, px, py - TS * (s.type === 'lot' || s.type === 'gate' ? 1.1 : 1.7) + Math.sin(t / 380 + s.x) * 3);
     if (s.type === 'gate') sign(`${s.icon} ${s.label}`, px, py - TS * 1.8, { size: TS * .3, bg: 'rgba(40,90,150,.92)' });
   }
-  drawOtherCasts(X, Y, t); drawBobber(X, Y, t); drawMisGuide(X, Y, t);
+  drawOtherCasts(X, Y, t); drawNbFish(X, Y, t); drawBobber(X, Y, t); drawMisGuide(X, Y, t);
   drawSirens(X, Y);
   FX.draw(ctx, X, Y, TS); drawFw(X, Y);
   drawGuide(X, Y, t); drawSniff(X, Y, t); cropTags();
@@ -6451,6 +6489,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27d', d: '27 พ.ย.', items: [
+    '🛠️ แก้บั๊กเล็กน้อย ให้เกมลื่นขึ้น',
+  ] },
   { v: '2026-11-27c', d: '27 พ.ย.', items: [
     '🎬 คนสมัครใหม่: ดูคัทซีนรถเมล์ แล้วตื่นที่โรงพยาบาล พี่ฟ้ามาทักทาย ถามชื่อ ให้เลือกตัวละคร แล้วแนะนำเมือง',
   ] },
@@ -9344,7 +9385,7 @@ function drawLights(X, Y, dark) {
 // ------------------------------------------------------------------ navigation across maps
 const GATE_TO = { field_in: 'field', town_from_field: 'town', temple_in: 'temple', town_from_temple: 'town', farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
 function targetOf(key) {
-  if (key === 'nbwater') return { x: 21, y: 61.6, label: 'ท่าตกปลา (ยืนปลายท่าแล้วกดปุ่มใหญ่)', area: 'town' };   // 🌱 where a newcomer fishes: the end of the pier by the fishing club (the lake's own fishing spot)
+  if (key === 'nbwater') return { x: 72.2, y: 52.6, label: 'ริมทะเลสาบ (ยืนริมน้ำแล้วกดปุ่มใหญ่)', area: 'town' };   // 🌱 where a newcomer fishes: the lake edge they were born at (server D.NB_SPAWN) (the lake's own fishing spot)
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
 }
@@ -9534,7 +9575,7 @@ const STORY = () => { const n = `<b>${esc(me?.name || 'คุณ')}</b>`; return
   ['office_f', 'พี่ฟ้า', `"${n} ชื่อเพราะจัง! ยินดีต้อนรับสู่<b>เมืองชีวิตนี้เลือกได้</b>นะ<br>ใครหลงมาที่นี่ได้เริ่มชีวิตใหม่ทุกคน"`],
   ['office_f', 'พี่ฟ้า', `"หมอบอกว่าน้องกระแทกหัว เลย<b>จำอะไรไม่ค่อยได้</b> ไม่ต้องห่วงนะ<br>ในกระเป๋ามีเงิน <b>${money(me?.money || 0)}</b> พอตั้งตัวได้"`],
   ['office_f', 'พี่ฟ้า', `"เขาลือกันว่าใครเจอ<b>ที่ลับ 5 แห่ง</b>ในเมือง<br>จะรู้ความจริงว่าตัวเองมาที่นี่ได้ยังไง..."`],
-  ['office_f', 'พี่ฟ้า', `"ก่อนอื่นต้องมีเงินกินข้าว! ออกจากโรงพยาบาลไปหา<b>น้าเล็ก</b>ริมบ่อน้ำ ซื้อเบ็ดตกปลาหาเงินก้อนแรกกัน<br>สงสัยอะไร พี่ยืน<b>ข้างน้ำพุกลางเมือง</b> มาถามได้ตลอดเลย!"`],
+  ['office_f', 'พี่ฟ้า', `"ก่อนอื่นต้องมีเงินกินข้าว! พี่พามาส่ง<b>ริมทะเลสาบ</b> แล้วนะ นี่<b>เบ็ด</b>ให้ยืม 🎣<br>เห็น<b>เงาปลาเรืองแสง</b>ตรงหน้าไหม? กดปุ่มใหญ่เหวี่ยงเบ็ดเลย!<br>สงสัยอะไร พี่ยืน<b>ข้างน้ำพุกลางเมือง</b> มาถามได้ตลอดเลย!"`],
 ]; };
 function showStory(i) {
   const st = STORY(); storyStep = i; const [f, title, body] = st[i], face = /^[a-z]/.test(f) && FACES ? faceStyle(f, 96) : '';
@@ -9543,7 +9584,7 @@ function showStory(i) {
   $('#tutNext').textContent = i === st.length - 1 ? 'ไปกันเลย! →' : 'ต่อ →'; $('#tutSkip').textContent = 'ข้ามเรื่อง';
 }
 function endStory() { storyStep = -1; $('#tutSkip').textContent = 'ข้าม'; showTut(0); }
-const TUT_NB = () => [['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือคนที่มีป้ายชื่อ<b>สีเหลือง</b><br>เริ่มจาก<b>ซื้อเบ็ดกับน้าเล็ก</b> แล้วตกปลาหาเงินก้อนแรก · ลูกศรสีเหลืองจะพาไป']];
+const TUT_NB = () => [['👋', 'ยินดีต้อนรับสู่เมือง!', 'ตัวคุณคือคนที่มีป้ายชื่อ<b>สีเหลือง</b><br>มี<b>เบ็ดในมือ</b>แล้ว! เห็น<b>เงาปลาเรืองแสง</b>ในน้ำตรงหน้าไหม?<br>กดปุ่มใหญ่ <b>🎣 เหวี่ยงเบ็ด</b> ได้เลย']];
 const tutSteps = () => tutFull || !nbDay1() ? TUT() : TUT_NB();
 // the login bonus waits through the tutorial, and for newcomers until their first starter step is done (one thing at a time)
 const dailyWait = () => tutPending || nbQuiet() || !!(nbActive() && !(me.nb.p || []).some(Boolean));   // v2 newcomers: after the starter path (or tomorrow)
@@ -9552,7 +9593,7 @@ function showTut(i = 0, full) {
   tutStep = i; const steps = tutSteps(), [icon, title, body] = steps[i];
   $('#tut').classList.remove('hidden');
   $('#tutBody').innerHTML = `<div class="tutIcon">${icon}</div><h2>${esc(title)}</h2><p>${body}</p><div class="dots">${steps.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
-  $('#tutNext').textContent = i === steps.length - 1 ? '🚀 เริ่มเลย! (พาไปซื้อเบ็ด)' : 'ถัดไป →';
+  $('#tutNext').textContent = i === steps.length - 1 ? (nbDay1() && !tutFull ? '🎣 เริ่มตกปลาเลย!' : '🚀 เริ่มเลย! (พาไปซื้อเบ็ด)') : 'ถัดไป →';
 }
 $('#tutNext').onclick = () => { FX.play('click'); if (storyStep >= 0) return storyStep < STORY().length - 1 ? showStory(storyStep + 1) : endStory(); if (tutStep < tutSteps().length - 1) return showTut(tutStep + 1); endTut(); };
 $('#tutSkip').onclick = () => storyStep >= 0 ? endStory() : endTut();
@@ -9914,7 +9955,7 @@ function dzInfo(id) {
   if (id === '_sad') return toast('ความสุขต่ำมาก ทำงานไม่ได้ · กินของที่อยากกิน นั่งเล่นที่จัตุรัส โทรหาเพื่อน บริจาคให้ขอทาน นอนในบ้านตัวเอง', '😞', false);
   if (id === '_crave') return toast(`อยากกิน${G.items[me.craving.item].name} หาซื้อที่ตลาด/ร้านอาหาร แล้วกินภายในเวลาจะมีความสุขเพิ่มมาก`, '🤤');
   if (id === '_bills') return openPanel({ kind: 'phone', tab: 'bills' });
-  if (id === '_nbegg') return nbTomorrowCard(me.login?.tomorrow || 0);
+  if (id === '_nbegg') return nbEggCard();
   if (id === '_pray') return toast('ไปวัด 🛕 (ทางใต้ของเมือง ใต้บ่อน้ำ) แล้วไหว้พระขอพร: ครั้งแรกของวันได้ ⚡25 + เงิน · ทำบุญครบทุก 5 วันได้ 💎3', '🪷');
   if (id === '_study') return toast('กำลังนั่งเรียน นั่งครบ 1 ชั่วโมงในเกมได้ 1 คาบ (เดินเพื่อลุก)', '📖');
   if (id === '_duty') return toast(`เข้าเวรอยู่ในโรงพยาบาล ได้เงินเดือนทุกชั่วโมงจนถึง ${hhmm(G.doctor.end)} (ออกจากโรงพยาบาล = หยุดนับ)`, '🩺');

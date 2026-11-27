@@ -15,9 +15,9 @@ T('start: run hidden, act-only buttons are not in the table', () => {
 T('run appears once the rod step is done', () => {
   assert.equal(hudVisible('runBtn', [1], false), true);
 });
-T('a step done out of order shows its button (emoji first)', () => {
-  assert.equal(hudVisible('emoBtn', [1, 0, 0, 0, 0, 1], false), true);
-  assert.equal(hudVisible('emoBtn', [1], false), false);
+T('emoji only after the path', () => {
+  assert.equal(hudVisible('emoBtn', [1, 3, 1, 1, 1, 1], false), false);
+  assert.equal(hudVisible('emoBtn', [1], true), true);
 });
 T('the current step shows its button (chat when it is step 4)', () => {
   assert.equal(hudVisible('cbOpen', [1, 3, 1], false), true);

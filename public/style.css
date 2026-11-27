@@ -2073,3 +2073,10 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 @keyframes ioWake{from{filter:blur(8px) brightness(2.2)}to{filter:none}}
 #introOv .ioTalk{background:#fff8ec;border-radius:18px;max-width:380px;width:100%;padding:16px 18px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25);color:#4a3320}
 #introOv .ioTalk h2{margin:4px 0}#introOv .ioTalk p{line-height:1.6;margin:6px 0 12px}#introOv .ioTalk button{width:100%}
+
+.nbFishPop>div{animation:nbBounce .9s cubic-bezier(.3,1.6,.5,1) both}.nbFishPop>div>b:nth-of-type(1){display:inline-block;animation:nbJump 1s ease-in-out .9s infinite}
+@keyframes nbBounce{0%{transform:scale(.2) translateY(60px);opacity:0}60%{transform:scale(1.12)}80%{transform:scale(.95)}100%{transform:scale(1);opacity:1}}
+@keyframes nbJump{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-18px) rotate(-12deg)}60%{transform:translateY(0) rotate(8deg)}}
+.nbEgg input{width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border-radius:10px;border:2px solid #f0c96a;font-size:16px;text-align:center}
+.nbEggPic.wob{animation:nbWob .6s ease}@keyframes nbWob{25%{transform:rotate(-14deg) scale(1.05)}50%{transform:rotate(12deg)}75%{transform:rotate(-6deg)}}
+.nbPwa>div{animation:nbBounce .7s cubic-bezier(.3,1.6,.5,1) both}

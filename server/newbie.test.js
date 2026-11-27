@@ -68,7 +68,7 @@ T('gift2: once, on any later day', () => {
   assert.equal(N.giftDue(a, '2026-11-27', '2026-11-23'), true);
   a.nb.g2 = '2026-11-27';
   assert.equal(N.giftDue(a, '2026-11-28', '2026-11-23'), false);
-  assert.deepEqual(N.GIFT2, { money: 500, items: { bento: 2 } });
+  assert.deepEqual(N.GIFT2, { money: 500, items: { bento: 2 }, vehicle: 'escoot' });
 });
 T('v1 untouched', () => {
   const a = { nb: { p: [1, 3, 1] } };
@@ -96,9 +96,9 @@ T('firstFish: fresh v2 only, once', () => {
   assert.equal(N.firstFish({ nb: { p: [] } }), false);
   assert.equal(N.firstFish({}), false);
 });
-T('pickFirst: most common non-junk fish of rarity 1', () => {
-  assert.equal(N.pickFirst([[null, 50], ['a', 30], ['b', 40], ['c', 35]], { a: { rar: 1 }, b: { rar: 2 }, c: { rar: 1 } }), 'c');
-  assert.equal(N.pickFirst([[null, 50], ['b', 40]], { b: { rar: 2 } }), 'b');   // no common fish here: the most common one
+T('pickFirst: the most common fish of the rarest kind up to rarity 3', () => {
+  assert.equal(N.pickFirst([[null, 50], ['a', 30], ['b', 40], ['c', 35], ['d', 1], ['e', 3], ['k', 9]], { a: { rar: 1 }, b: { rar: 2 }, c: { rar: 1 }, d: { rar: 3 }, e: { rar: 3 }, k: { rar: 4 } }), 'e');
+  assert.equal(N.pickFirst([[null, 50], ['b', 40]], { b: { rar: 2 } }), 'b');
 });
 T('view tells the phone whether the first fish is in', () => {
   const a = v2({ p: [1] });

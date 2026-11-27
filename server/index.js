@@ -667,10 +667,11 @@ function mailClaim(a, id) {
   if (g.eggs) addItem(a, 'petegg', g.eggs);
   if (g.gems) a.gems = (a.gems || 0) + g.gems;
   if (g.money) credit(a, g.money);
+  if (g.vehicle && D.VEHICLES[g.vehicle] && !(a.vehicles || []).includes(g.vehicle)) a.vehicles = [...(a.vehicles || []), g.vehicle];
   if (g.items) for (const [k, q] of Object.entries(g.items)) if (D.ITEMS[k] && q > 0) addItem(a, k, q);
   if (g.outfit && D.OUTFITS[g.outfit] && !(a.outfits || []).includes(g.outfit)) { a.outfits = [...(a.outfits || []), g.outfit]; a.outfit = g.outfit; sendRoster(); }
   a.sd = true; markMe(a); send(a, { t: 'mail', list: a.mail });
-  toast(a, `รับของขวัญแล้ว:${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.items ? Object.entries(g.items).map(([k, q]) => ` ${D.ITEMS[k]?.icon || ''}${D.ITEMS[k]?.name || k} x${q}`).join('') : ''}${g.outfit ? ` 🎽 ${a.gender === 'f' && D.OUTFITS[g.outfit]?.nf || D.OUTFITS[g.outfit]?.name} (ใส่ให้แล้ว)` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
+  toast(a, `รับของขวัญแล้ว:${g.vehicle && D.VEHICLES[g.vehicle] ? ` ${D.VEHICLES[g.vehicle].icon}${D.VEHICLES[g.vehicle].name}` : ''}${g.eggs ? ` 🥚 ไข่สัตว์เลี้ยง x${g.eggs}` : ''}${g.gems ? ` 💎${g.gems}` : ''}${g.money ? ` ${money(g.money)}` : ''}${g.items ? Object.entries(g.items).map(([k, q]) => ` ${D.ITEMS[k]?.icon || ''}${D.ITEMS[k]?.name || k} x${q}`).join('') : ''}${g.outfit ? ` 🎽 ${a.gender === 'f' && D.OUTFITS[g.outfit]?.nf || D.OUTFITS[g.outfit]?.name} (ใส่ให้แล้ว)` : ''}${g.eggs ? ' · เปิดไข่ได้ในกระเป๋า 🎒' : ''}`, '🎁');
 }
 // New Year 2570 gift: everyone who joined by 31 Dec 2569 (Bangkok) gets the Santa outfit by mail, once
 const SANTA_END = Date.parse('2027-01-01T00:00:00+07:00');
@@ -702,8 +703,8 @@ function givePet(a) {
 function nbDaily(a) {
   if (!NBM.isV2(a)) return;
   const day = dayKey();
-  if (NBM.eggReady(a, day)) { a.nb.egg.h = day; a.sd = true; givePet(a); }
-  if (NBM.giftDue(a, day, dayKeyAt(a.nb.t0))) { a.nb.g2 = day; NBM.mark(a, 'day2', now()); sysMail(a, '🎁 ยินดีต้อนรับกลับมาวันที่ 2!\n\nดีใจที่กลับมาเล่นนะ นี่ของขวัญเล็กๆ จากเมือง เปิดรับได้เลย', NBM.GIFT2); }
+  if (NBM.eggReady(a, day)) { a.nb.egg.h = day; a.sd = true; const id = givePet(a), n = a.nb.egg.n; if (id && n) { a.pnames = { ...(a.pnames || {}), [id]: n }; markMe(a); sendRoster(); } }
+  if (NBM.giftDue(a, day, dayKeyAt(a.nb.t0))) { a.nb.g2 = day; NBM.mark(a, 'day2', now()); sysMail(a, '🎁 ยินดีต้อนรับกลับมาวันที่ 2!\n\nดีใจที่กลับมาเล่นนะ นี่ของขวัญจากเมือง: 🛴 สกู๊ตเตอร์ไฟฟ้าฟรี! เปิดรับได้เลย', NBM.GIFT2); }
 }
 // ------------------------------------------------------------------ invite friends: a code to share; the new player gets an egg, the inviter an egg + 10 gems (in the mailbox)
 const REF = { gems: 10, max: 20, newHours: 72, needMin: 30 };   // the inviter is paid once the friend has really played 30 minutes
@@ -1695,12 +1696,13 @@ function accrue(a) {
 // 🌱 starter path: six small steps for the first ten minutes (first money, first thing bought, first hello), each paid at once;
 // all six = a pet egg. Shown in place of today's quests until done. Players who started before this keep playing as they were.
 const NB = [
-  { id: 'rod', ev: 'rod', n: 1, text: 'ซื้อเบ็ดกับน้าเล็ก (สมาคมประมง)', go: 'staff_fishing', money: 100 },
+  { id: 'rod', ev: 'rod', n: 1, text: 'รับเบ็ดคู่ใจ (อยู่ในมือแล้ว!)', go: 'staff_fishing', money: 100 },   // v2: done at signup
   { id: 'fish', ev: 'fish', n: 3, text: 'ตกปลา 3 ตัว (ยืนริมน้ำ กดปุ่มใหญ่)', go: 'fishclub', money: 150 },
-  { id: 'sell', ev: 'sell', n: 1, text: 'ขายปลาที่สมาคมประมง = เงินก้อนแรก!', go: 'fishclub', money: 200 },
+  { id: 'sell', ev: 'sell', n: 1, text: 'ขายปลาที่สมาคมประมง = เงินก้อนแรก!', go: 'fishclub', money: 500 },
   { id: 'chat', ev: 'chat', n: 1, text: 'ทักทายเพื่อนในแชท', money: 100 },
   { id: 'buy', ev: 'buy', n: 1, text: 'ซื้อของกิน/ของใช้ชิ้นแรก (ร้านสะดวกซื้อ)', go: 'cstore3', gems: 5 },
-  { id: 'social', ev: 'social', n: 1, text: 'ส่งอีโมจิใกล้ผู้เล่นอื่น หรือแลกเบอร์', gems: 5 },
+  { id: 'eggname', ev: 'eggname', n: 1, text: 'ตั้งชื่อไข่สัตว์เลี้ยง', gems: 5 },
+  { id: 'eggpet', ev: 'eggpet', n: 1, text: 'ลูบไข่ 1 ครั้ง', gems: 5 },
 ];
 const NB_END = { gems: 10, item: 'petegg' };
 function nbEv(a, ev, n = 1) {
@@ -1716,10 +1718,10 @@ function nbEv(a, ev, n = 1) {
     send(a, { t: 'nbstep', i });
   });
   if (!changed) return;
-  if (NBM.eggDue(a)) { S.egg = { d: dayKey() }; NBM.mark(a, 'egg', now()); send(a, { t: 'nbegg', tmr: loginView(a).tomorrow }); }   // 🥚 hatches tomorrow
+  if (NBM.eggDue(a)) { S.egg = { d: dayKey(), at: NBM.eggAt(now()) }; NBM.mark(a, 'egg', now()); send(a, { t: 'nbegg', at: S.egg.at }); }   // 🥚 hatches in 30 min – 2 h
   if (NB.every((st, i) => (S.p[i] || 0) >= st.n) && NBM.isV2(a)) {
     S.done = now(); a.gems = (a.gems || 0) + NB_END.gems;
-    toast(a, `🎉 ผ่านภารกิจมือใหม่ครบแล้ว! ได้ 💎${NB_END.gems} · 🥚 ไข่ของคุณฟักพรุ่งนี้นะ`, '🎉');
+    toast(a, `🎉 ผ่านภารกิจมือใหม่ครบแล้ว! ได้ 💎${NB_END.gems} · 🥚 ไข่ใกล้ฟักแล้ว`, '🎉'); send(a, { t: 'nbdone' });
     feed(`🌱 ${a.name} ผ่านภารกิจมือใหม่ครบแล้ว ยินดีต้อนรับสู่เมือง!`);
   } else if (NB.every((st, i) => (S.p[i] || 0) >= st.n)) {
     S.done = now(); a.gems = (a.gems || 0) + NB_END.gems; addItem(a, NB_END.item, 1);
@@ -5420,6 +5422,7 @@ function login(ws, m, pre) {
     a = hydrate({ v: VERSION, login: name, name: cname, salt, hash: hashPin(pin, salt), avatar: D.SHIRTS.indexOf(sh), gender: m.gender === 'f' ? 'f' : 'm',
       look: { hair: 'brown', shirt: sh, pants: 'gray' }, wardrobe: { hair: ['brown'], shirt: [sh], pants: ['gray'] } });
     accounts.set(lname, a); isNew = true; a.nb = NBM.start(now());
+    a.rods = ['bamboo']; a.rodEq = 'bamboo'; a.rod = 1; a.nb.p[0] = 1;   // 🎣 rod in hand from the start (spawn: NB_SPAWN below)
   }
   Q.ensure(a); santaGift(a); achSweep(a);
   if (a.career && a.career !== 'none' && !D.CAREERS[a.career]) {   // a career that has been closed
@@ -5438,7 +5441,7 @@ function login(ws, m, pre) {
   ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
-  if (isNew) { a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }   // 🏥 newcomers wake up in hospital after the bus crash (intro video)
+  if (isNew) { a.x = D.NB_SPAWN.x; a.y = D.NB_SPAWN.y; }   // 🎣 newcomers start at the lake's edge, rod in hand (after the intro)
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
   online.set(a.id, a); seenOn(a, ws);
@@ -5798,6 +5801,20 @@ function onMessage0(ws, raw) {
     case 'exit': return exitRoom(a);
     case 'use': return m.item === 'petegg' ? (cd(a, 'use', 600) && hatchEgg(a)) : useItem(a, m.item);
     case 'nbev': { if (NBM.CLIENT_EV.includes(m.k)) NBM.mark(a, m.k, now()); return; }
+    case 'nb.eggname': {                   // 🥚 name the newcomer's egg (the pet keeps the name)
+      const e = NBM.isV2(a) && a.nb.egg; if (!e || e.h) return;
+      const nm = String(m.name ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 12); if (!nm) return;
+      e.n = nm; a.sd = true; markMe(a); nbEv(a, 'eggname'); return;
+    }
+    case 'nb.eggpet': {                    // 🤚 pat the egg
+      const e = NBM.isV2(a) && a.nb.egg; if (!e || e.h || !cd(a, 'eggpet', 800, true)) return;
+      e.pat = (e.pat || 0) + 1; a.sd = true; markMe(a); nbEv(a, 'eggpet'); return;
+    }
+    case 'nb.pwa': {                       // 📲 added to the home screen (the phone reports it runs standalone): 💎50 once
+      if (a.pwa || !m.on || !a.nb) return;
+      a.pwa = 1; a.gems = (a.gems || 0) + 50; a.sd = true; markMe(a);
+      return toast(a, 'ขอบคุณที่เพิ่มเกมลงหน้าจอ! รับ 💎50 แล้ว', '📲');
+    }
     case 'spec': { const id = Math.trunc(+m.id) || 0; if (a.specOn !== id) { a.specOn = id; specChanged(); } return; }
     case 'pet.leash': { if (!a.leash) return toast(a, 'ซื้อสายจูงได้ที่ร้านสัตว์เลี้ยง', '🦮', false); a.leashOn = a.leashOn ? 0 : 1; markMe(a); sendRoster(); return toast(a, a.leashOn ? 'ใส่สายจูงแล้ว' : 'ถอดสายจูงแล้ว', '🦮'); }
     case 'pet.name': {
