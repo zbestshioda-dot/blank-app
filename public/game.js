@@ -536,6 +536,31 @@ $('#createOk').onclick = () => {
   if (cname.length < 2) { $('#createErr').textContent = 'ตั้งชื่อตัวละครก่อน (2-16 ตัว)'; return; }
   $('#createErr').textContent = ''; creds = { ...creds, create: 1, cname, gender, shirt: SHIRT_IDS[avatar] }; loginBusy(true); wantLogin = true; connect();
 };
+// 🎬 newcomers: the bus-crash cutscene, then waking up in hospital where พี่ฟ้า asks your name (the character creator)
+let introSeen = false;
+function introDone() { $('#introOv')?.remove(); $('#createBox').classList.remove('hidden'); paintSw(); setTimeout(() => $('#inCname').focus(), 50); }
+function introPlay() {
+  if (introSeen) return introDone(); introSeen = true;
+  const ov = document.createElement('div'); ov.id = 'introOv';
+  ov.innerHTML = '<video src="assets/intro.mp4?v=1" playsinline preload="auto"></video><button type="button" class="ioSkip">ข้าม ⏭</button>';
+  document.body.appendChild(ov);
+  const v = ov.querySelector('video'), next = () => { if (ov.dataset.s) return; ov.dataset.s = 1; v.pause(); introWake(ov); };
+  v.onended = next; v.onerror = next; ov.querySelector('.ioSkip').onclick = next;
+  v.play().catch(() => { v.muted = true; v.play().catch(next); });
+}
+function introWake(ov) {
+  const L = [['🏥', '...ติ๊ด ...ติ๊ด', 'เสียงเครื่องวัดชีพจรดังแผ่วๆ เพดานสีขาว กลิ่นยาฉุนจมูก<br>ลืมตาขึ้นมา... ที่นี่คือ<b>โรงพยาบาล</b>'],
+    ['office_f', 'พี่ฟ้า', '"อ๊ะ! ฟื้นแล้ว! ดีใจจังเลย~<br>พี่ชื่อ<b>ฟ้า</b> คอยดูแลคนมาใหม่ของเมืองนี้จ้า"'],
+    ['office_f', 'พี่ฟ้า', '"รถเมล์ที่น้องนั่งมาเสียหลักข้างทางหน้าเมือง<br>โชคดีมากที่ปลอดภัย หมอบอกแค่ฟกช้ำนิดหน่อย"'],
+    ['office_f', 'พี่ฟ้า', '"ว่าแต่...น้องชื่ออะไรเหรอจ๊ะ?<br>ส่องกระจกดูหน้าตาตัวเองหน่อยไหม?"']];
+  let i = 0; ov.classList.add('wake');
+  const show = () => {
+    if (i >= L.length) return introDone();
+    const [f, t, b] = L[i], fs = /^[a-z]/.test(f) && FACES ? faceStyle(f, 88) : '';
+    ov.innerHTML = `<div class="ioTalk"><div class="storyPic">${fs ? `<i class="qface" style="${fs}"></i>` : `<span>${/^[a-z]/.test(f) ? '👩' : f}</span>`}</div><h2>${t}</h2><p>${b}</p><button type="button" class="primary">${i === L.length - 1 ? '✏️ บอกชื่อพี่ฟ้า' : 'ต่อ →'}</button></div>`;
+    ov.querySelector('button').onclick = () => { FX.play('click'); i++; show(); };
+  }; show();
+}
 let busyT = 0;
 // ---- loading screen: shown from the moment you press "enter the city" until the town and the characters are ready to draw
 const LD = { on: false, t0: 0, shown: 0, tip: 0 };
@@ -716,8 +741,8 @@ function handle(m) {
   switch (m.t) {
     case 'loginfail': if (creds?.tok || creds?.google) { try { localStorage.removeItem('lt_creds'); } catch { } creds = null; } loginBusy(false); loginShake(); promo.open(); $('#loginErr').textContent = m.msg; $('#createErr').textContent = m.msg; wantLogin = false; break;
     case 'newchar':     // new ID: pick gender + first shirt once
-      loginBusy(false); wantLogin = false; $('#loginForm').classList.add('hidden'); $('#createBox').classList.remove('hidden');
-      $('#createName').textContent = 'ยินดีต้อนรับ ID: ' + m.name; $('#inCname').value = ''; paintSw(); setTimeout(() => $('#inCname').focus(), 50); break;
+      loginBusy(false); wantLogin = false; $('#loginForm').classList.add('hidden');
+      $('#createName').textContent = 'ID: ' + m.name; $('#inCname').value = ''; introPlay(); break;
     case 'kicked': wantLogin = false; toast(m.msg, '⚠️', false); break;
     case 'init':
       if (G && G.build && m.build !== G.build) $('#updBar').classList.remove('hidden');
@@ -1292,7 +1317,7 @@ function bgmLoad(k, ac) {
 }
 function bgmTick() {
   const ac = FX.ctx(); if (!ac || ac.state !== 'running') return;   // audio starts after the first tap
-  const inGame = !!(G && me), want = !FX.opts.music ? null : !inGame ? 'login' : (h => h >= 6 && h < 18.5 ? 'day' : 'night')(hourNow());   // login screen has its own track
+  const inGame = !!(G && me), want = !FX.opts.music || $('#introOv video') ? null : !inGame ? 'login' : (h => h >= 6 && h < 18.5 ? 'day' : 'night')(hourNow());   // login screen has its own track
   for (const k of ['login', 'day', 'night']) {
     const target = k === want ? BGM.vol : 0;
     if (target > 0 && !BGM.src[k]) {
@@ -6426,6 +6451,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27c', d: '27 พ.ย.', items: [
+    '🎬 คนสมัครใหม่: ดูคัทซีนรถเมล์ แล้วตื่นที่โรงพยาบาล พี่ฟ้ามาทักทาย ถามชื่อ ให้เลือกตัวละคร แล้วแนะนำเมือง',
+  ] },
   { v: '2026-11-27b', d: '27 พ.ย.', items: [
     '🎵 เพลงหน้าล็อกอินเล่นทันทีที่เปิดเว็บ (ถ้าเบราว์เซอร์ไม่ยอม แตะครั้งแรกก็ดัง)',
     '🎵 เพลงใหม่! หน้าล็อกอิน เพลงกลางวัน และเพลงกลางคืน (ไฟล์เล็กลง โหลดไวขึ้น)',
@@ -9503,11 +9531,10 @@ let tutStep = 0, tutPending = false, pendingDaily = null, tutFull = false;
 // 📖 opening story: a few talking faces right after the character is made, then the usual tutorial
 let storyStep = -1;
 const STORY = () => { const n = `<b>${esc(me?.name || 'คุณ')}</b>`; return [
-  ['🚌', 'เย็นวันศุกร์', `${n} พนักงานบริษัทธรรมดาคนหนึ่ง เลิกงานแล้วรีบขึ้นรถเมล์กลับบ้านต่างจังหวัด<br>เหนื่อยจากงานทั้งสัปดาห์ จนเผลอหลับไปกลางทาง...`],
-  ['💥', 'เอี๊ยดดด—!', `เสียงเบรกดังลั่น รถเสียหลัก ทุกอย่างหมุนคว้าง<br>แล้วโลกทั้งใบก็ดับมืดไป...`],
-  ['🌅', 'ที่นี่...ที่ไหน?', `ลืมตาขึ้นมาอีกที ${n} นอนอยู่ข้างป้ายรถเมล์ในเมืองที่ไม่เคยเห็นมาก่อน<br><b>จำอะไรไม่ได้เลย</b> ในกระเป๋ามีแค่เงิน <b>${money(me?.money || 0)}</b>`],
-  ['grandma', 'ยายใจดีข้างทาง', `"ฟื้นแล้วหรือหลาน! ที่นี่คือ<b>เมืองชีวิตนี้เลือกได้</b><br>คนที่หลงมาที่นี่ได้เริ่มชีวิตใหม่ทุกคน... เขาลือกันว่าใครเจอ<b>ที่ลับ 5 แห่ง</b>ในเมือง จะรู้ความจริงว่าตัวเองมาที่นี่ได้ยังไง"`],
-  ['fisher_m', 'น้าเล็ก ริมบ่อน้ำ', `"ท้องร้องแล้วนั่น 😄 ก่อนจะไปตามหาความจริง ต้องมีเงินกินข้าวก่อน<br>มา! <b>ซื้อเบ็ดกับน้า</b> แล้วตกปลาหาเงินก้อนแรกกัน"`],
+  ['office_f', 'พี่ฟ้า', `"${n} ชื่อเพราะจัง! ยินดีต้อนรับสู่<b>เมืองชีวิตนี้เลือกได้</b>นะ<br>ใครหลงมาที่นี่ได้เริ่มชีวิตใหม่ทุกคน"`],
+  ['office_f', 'พี่ฟ้า', `"หมอบอกว่าน้องกระแทกหัว เลย<b>จำอะไรไม่ค่อยได้</b> ไม่ต้องห่วงนะ<br>ในกระเป๋ามีเงิน <b>${money(me?.money || 0)}</b> พอตั้งตัวได้"`],
+  ['office_f', 'พี่ฟ้า', `"เขาลือกันว่าใครเจอ<b>ที่ลับ 5 แห่ง</b>ในเมือง<br>จะรู้ความจริงว่าตัวเองมาที่นี่ได้ยังไง..."`],
+  ['office_f', 'พี่ฟ้า', `"ก่อนอื่นต้องมีเงินกินข้าว! ออกจากโรงพยาบาลไปหา<b>น้าเล็ก</b>ริมบ่อน้ำ ซื้อเบ็ดตกปลาหาเงินก้อนแรกกัน<br>สงสัยอะไร พี่ยืน<b>ข้างน้ำพุกลางเมือง</b> มาถามได้ตลอดเลย!"`],
 ]; };
 function showStory(i) {
   const st = STORY(); storyStep = i; const [f, title, body] = st[i], face = /^[a-z]/.test(f) && FACES ? faceStyle(f, 96) : '';

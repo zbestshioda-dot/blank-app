@@ -5438,6 +5438,7 @@ function login(ws, m, pre) {
   ledSweep(a, '📬 ตอนออฟไลน์ (เช่น ของในตลาดขายได้)'); a.ws = ws; ws.acct = a; a.id = nextId++; a.lastPosT = now(); a.moved = true; a.loginAt = now();
   if (!D.areaAt(a.x, a.y) || D.blocked(a.x, a.y)) { a.x = D.SPAWN.x; a.y = D.SPAWN.y; }
   { const ar = D.areaAt(a.x, a.y); if (ar?.yard || ar?.rk === 'house') { const g = D.GATES.housing_in; a.x = g.x; a.y = g.y; a.wakeHome = 1; } }   // homes move between plots: wake up on the village street
+  if (isNew) { a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }   // 🏥 newcomers wake up in hospital after the bus crash (intro video)
   if (a.down && a.down.kind === 'hosp') { a.down = null; a.health = Math.max(a.health, 25); a.x = ROOM.r_hospital.spawn.x; a.y = ROOM.r_hospital.spawn.y; }
   a.afk = false; a.fixId = 0; a.mvb = moveCap(a);
   online.set(a.id, a); seenOn(a, ws);
