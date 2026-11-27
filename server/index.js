@@ -5267,6 +5267,7 @@ function npcTick(dt, ps) {
       if (!on) continue;
       if (n.worker.job && !n.path.length) n.worker.job(n);
     }
+    if (n.hold > now()) { if (n.hf) { n.hf = 0; ps.push([n.id, +n.x.toFixed(2), +n.y.toFixed(2), n.f]); } continue; }   // 💬 stands still (facing you) while someone talks to them
     if (n.wait > 0) { n.wait -= dt; if (n.say && Math.random() < dt / 20) n.say = null; continue; }
     if (!n.path.length) {
       if (n.pose) { n.pose = null; npcRosterDirty = true; }
@@ -5839,7 +5840,7 @@ function onMessage0(ws, raw) {
       addItem(a, 'umbrella', 1); markMe(a); sendRoster();
       return toast(a, `ซื้อ ☂️ร่มกันฝน ${money(UMB.price)} · กางให้เองตอนฝนตกข้างนอก ไม่เปียก ไม่เป็นหวัด`, '☂️');
     }
-    case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) { eggMayor(a, n); if (n.fid) folkTalk(a, n); } return; }
+    case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) { if (!n.zb && dist(a, n) < 6) { n.hold = now() + 20000; n.f = Math.round(((Math.atan2(a.y - n.y, a.x - n.x) + Math.PI) / (Math.PI / 4))) % 8; n.hf = 1; } eggMayor(a, n); if (n.fid) folkTalk(a, n); } return; }
     case 'folkgift': return folkGift(a, m);
     case 'folkdo': return folkDo(a, m);
     case 'folktalk': return folkTalkDesk(a, m);
