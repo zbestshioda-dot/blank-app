@@ -5651,7 +5651,7 @@ function asEco(E) {
   const bar = (label, v, of, col, extra = '') => `<div class="asBar"><span>${esc(label)}</span><i><u style="width:${Math.round(v / of * 100)}%;background:${col}"></u></i><b>${money(v)}${extra}</b></div>`;
   const days = E.days.slice(-7).map(d => `<div class="sub" style="margin-top:6px">${d.k.slice(5)} · สุทธิ <b style="color:${d.in - d.out >= 0 ? 'var(--ok)' : 'var(--bad)'}">${d.in - d.out >= 0 ? '+' : ''}${money(d.in - d.out)}</b>${d.sup != null ? ` · เงินทั้งเมือง ${money(d.sup)}` : ''}</div>${bar('เข้า', d.in, max, '#7fd38a')}${bar('ออก', d.out, max, '#f27b6b')}`).join('');
   const list = (rows, col) => rows.length ? rows.map(([n, v]) => bar(n, v, rows[0][1], col)).join('') : '<div class="sub">ยังไม่มีข้อมูล</div>';
-  const car = E.car.length ? E.car.map(([n, v, k]) => bar(n, v, E.car[0][1], '#8fb3ff', k ? ` · ${k} คน · เฉลี่ย ${money(Math.round(v / k / 7))}/คน/วัน` : '')).join('') : '<div class="sub">ยังไม่มีข้อมูล</div>';
+  const car = E.car.length ? E.car.map(([n, v, k]) => bar(n, v, E.car[0][1], '#8fb3ff') + (k ? `<div class="sub" style="margin:-2px 0 4px;text-align:right">${k} คน · เฉลี่ย ${money(Math.round(v / k / 7))}/คน/วัน</div>` : '')).join('') : '<div class="sub">ยังไม่มีข้อมูล</div>';
   return `<div class="secT">💰 เงินเข้า/ออกเมือง (รายวัน)</div><div class="sub">นับทุกบรรทัดในสมุดบัญชีผู้เล่น (ไม่รวมแอดมิน) · ซื้อขายกันเองนับทั้งสองฝั่งจึงหักล้างกันในยอดสุทธิ · "เงินทั้งเมือง" = เงินสด+ธนาคาร ตอนที่เปิดหน้านี้</div>${days}
     <div class="secT">⬆️ เงินเข้ามาจากไหน (7 วัน)</div>${list(E.src, '#7fd38a')}
     <div class="secT">⬇️ เงินออกไปทางไหน (7 วัน)</div>${list(E.sink, '#f27b6b')}
