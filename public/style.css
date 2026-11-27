@@ -2138,3 +2138,6 @@ button.x::before{content:'✕';color:#fff;font:700 18px/1 var(--ui);text-shadow:
 body #thumbs>button,body #keyHint{border-color:var(--h-ink)!important}
 body #thumbs>button:not(#actBtn){box-shadow:0 3px 0 var(--h-ink),0 5px 10px rgba(20,20,50,.25)!important}
 body #thumbs #actBtn,body #thumbs #actBtn.idle{box-shadow:0 4px 0 var(--h-ink),0 0 0 5px rgba(95,184,101,.28)!important}
+/* 💬 while someone is talking, the status card and quests step aside so only the text box is on screen */
+#card{transition:opacity .25s}
+body.dlgOn #hud #card{opacity:0;pointer-events:none}

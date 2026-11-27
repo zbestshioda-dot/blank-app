@@ -5347,21 +5347,21 @@ function dialog(opts) {
   if (!d) { d = document.createElement('div'); d.id = 'dlg'; document.body.appendChild(d); d.onclick = e => { if (e.target.closest('button')) return; dlgTap(); }; }
   d.innerHTML = `${dlgFace(opts.face, opts.npc)}<div class="dlgBody"><b class="dlgName">${esc(opts.name)}</b><p class="dlgText"></p><div class="dlgCh"></div><i class="dlgNext">▼</i></div><button class="dlgX">✕</button>`;
   d.querySelector('.dlgX').onclick = () => dialogClose();
-  d.classList.remove('hidden');
+  d.classList.remove('hidden'); document.body.classList.add('dlgOn');
   const c = d.querySelector('[data-dlg]');
   if (c) whenChars(() => { const n = STAFF.find(x => x.id === c.dataset.dlg) || (c.dataset.dlg === 'misnpc' ? MISNPC : null) || P.get(+c.dataset.dlg); if (!n) return; const g = c.getContext('2d'); g.clearRect(0, 0, 84, 84); drawCharTo(g, n, 42, 150, 150 / CH_ATLAS.h, 'front', 0); });
   dlgRender();
 }
-function dialogClose() { dlgQ = null; $('#dlg')?.classList.add('hidden'); }
+function dialogClose() { dlgQ = null; $('#dlg')?.classList.add('hidden'); document.body.classList.remove('dlgOn'); }
 function dlgRender() {
   const d = $('#dlg'); if (!d || !dlgQ) return;
   const line = dlgQ.lines[dlgQ.i] || '', last = dlgQ.i >= dlgQ.lines.length - 1, done = dlgQ.shown >= line.length;
   const fc = dlgQ.faces?.[dlgQ.i];   // a different expression for this line
   if (fc && fc !== dlgQ.curFace) { dlgQ.curFace = fc; const old = d.querySelector('.dlgPic'); if (old) old.outerHTML = dlgFace(fc); }
   d.querySelector('.dlgText').textContent = line.slice(0, Math.floor(dlgQ.shown));
-  d.querySelector('.dlgNext').style.visibility = done && !last ? 'visible' : 'hidden';
+  d.querySelector('.dlgNext').style.visibility = done && (!last || !dlgQ.menu) ? 'visible' : 'hidden';
   const ch = d.querySelector('.dlgCh');
-  if ((done && last || dlgQ.instant) && !ch.dataset.on) {   // instant: the choices show right away (townsfolk: gift / story without reading to the end)
+  if (done && last && dlgQ.menu && !ch.dataset.on) {   // the menu waits for one more tap after the last line: the talk reads as a clean text box first
     ch.dataset.on = 1;
     const list = dlgQ.choices?.length ? dlgQ.choices : [{ label: '👋 ลาก่อน', fn: () => dialogClose() }];
     ch.innerHTML = list.map((c, k) => `<button data-k="${k}" class="${c.cls || ''}">${esc(c.label)}</button>`).join('');
@@ -5385,6 +5385,7 @@ function dlgTap() {
   if (dlgQ.shown < line.length) { dlgQ.shown = line.length; return dlgRender(); }
   if (dlgQ.i < dlgQ.lines.length - 1) { dlgQ.i++; dlgQ.shown = 0; FX.play('click'); dlgRender(); }
   else if (!dlgQ.choices?.length) dialogClose();
+  else if (!dlgQ.menu) { dlgQ.menu = 1; FX.play('click'); dlgRender(); }
 }
 // talking to a shop or job NPC: greeting, then choose: use the place / chat more / bye. Quick repeat visits skip the chat.
 const talkedAt = {};
@@ -6498,6 +6499,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27f', d: '27 พ.ย.', items: [
+    '💬 คุยกับคนในเมือง: ขึ้นแค่กรอบข้อความก่อน แตะอีกครั้งถึงจะขึ้นเมนูให้เลือก',
+    '🧹 ระหว่างคุย ซ่อนกล่องสถานะ/เควสต์ให้จอโล่ง',
+  ] },
   { v: '2026-11-27e', d: '27 พ.ย.', items: [
     '🎨 แถบสถานะใหม่ทั้งชุด: กล่องครีมขอบน้ำเงิน เข้าชุดกับหน้าต่างในเกม อ่านง่ายขึ้น',
     '✨ เงินหรือพลังเพิ่มลด จะมีตัวเลข +/− ลอยขึ้นให้เห็น',
