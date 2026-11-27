@@ -390,6 +390,7 @@ function ledAdd(a, d, what) {   // call right after changing a.money by d
   ledPush(a, Math.round(d), what, a.money); a.ledBal = a.money;
 }
 function earn(a, amount, nocap) {
+  if (!isFinite(amount)) amount = 0;   // a bad pay formula must never turn a player's money into NaN
   const capMul = amount > 0 && !nocap ? GD.payMul(a, dayKey()) : 1;
   if (capMul !== 1) amount *= capMul;   // 💤 daily soft cap: less pay after 3 / 5 hours of work today
   if (amount > 0 && (a.bless || 0) > now()) amount *= D.TEMPLEQ.blessMul;   // 🙏 blessed at the temple: a little extra on everything you earn
@@ -2011,6 +2012,10 @@ function hydrate(r) {
   }
   if (a.career === 'rider' && !a.riderBike && !(a.vehicles || []).includes('delivery')) { a.vehicles = [...(a.vehicles || []), 'delivery']; a.riderBike = 1; }
   if (a.career === 'police' && !a.policeCar && !(a.vehicles || []).includes('police')) { a.vehicles = [...(a.vehicles || []), 'police']; a.policeCar = 1; }   // riders already on the job get the company bike too
+  for (const k of ['money', 'earned']) if (typeof a[k] !== 'number' || !isFinite(a[k])) {   // 2026-11-27 doctor-pay bug left money NaN (saved as null): restore the last good balance
+    const L = a.ledger || [], lb = L.length ? L[L.length - 1][3] : 0;
+    a[k] = k === 'money' ? (isFinite(a.ledBal) && a.ledBal !== null ? a.ledBal : isFinite(lb) && lb !== null ? lb : 0) : 0; a.sd = true;
+  }
   if (!a.login) a.login = a.name;                    // older saves: the name was the login ID
   // fixed character names for special accounts (login ID -> character name)
   const RENAME = isAdmin(a) && !a.god?.renamed && String(a.login).toLowerCase() === 'james2324' ? ADMIN_NAME : null;
@@ -2532,6 +2537,7 @@ function apply(a, career) {
     rider: 'เปิดแอพไรเดอร์ในมือถือ 📱 รับออเดอร์ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งลูกค้า',
     police: 'ที่สถานีตำรวจ: รับเคสหมาหาย เคสตามจับโจร เล่นจับผิดภาพหาโจร และซ้อมยิงเป้า · ได้รถสายตรวจขับฟรี',
     templeboy: 'คุยกับพี่ตุ๋ยหน้าประตูวัดเพื่อรับภารกิจช่วยงานวัด', undertaker: 'คุยกับลุงสัปหน้าประตูวัดเพื่อรับงานพิธี', mechanic: 'คุยกับช่างเปี๊ยกหน้าโชว์รูมรถ รับงานซ่อมรถทั่วเมือง',
+    teacher: 'ไปที่มหาวิทยาลัย ยืนข้างโต๊ะคนที่กำลังนั่งเรียนแล้วกด "สอน" ได้ค่าสอนทันที · รับภารกิจ (ตรวจการบ้าน ตามเด็กโดดเรียน) ได้จากแอพงานในมือถือ',
     detective: 'คุยกับผู้กองเดชในหอสมุดเมือง รับคดีค้นหาของหายและไขปริศนา', thug: 'คุยกับเสี่ยเสือในตลาด รับงานนักเลง (ใจดีๆ นะ)', photographer: 'คุยกับพี่โฟกัสที่จัตุรัส รับงานถ่ายภาพ', courier: 'คุยกับพี่ด่วนหน้าคลังสินค้า รับพัสดุไปส่ง',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
   };
@@ -3473,6 +3479,16 @@ function act(a, m) {
       return toast(a, `ลงทะเบียนเรียน${L.name}แล้ว! ต้องเข้าเรียน ${L.classes} คาบ (คาบละ 1 ชั่วโมงในเกม)`, '🎓');
     }
     case 'school.class': return toast(a, 'เดินไปนั่งที่ 📖 โต๊ะเรียนตัวไหนก็ได้ นั่งเรียนครบ 1 ชั่วโมงในเกม = 1 คาบ', '📖');
+    case 'sdesk.teach': {   // 👩‍🏫 a teacher helps the student at this desk: their class moves on faster, the teacher gets paid
+      if (!need(a, 'teacher')) return;
+      const b = desks[s.idx]; if (!b || b === a || !b.school) return toast(a, 'โต๊ะนี้ยังไม่มีใครนั่งเรียน', '📖', false);
+      if ((b.taughtT || 0) > now()) return toast(a, `${b.name} เพิ่งได้รับการสอนไป ให้เวลาเขาทำความเข้าใจก่อน (${Math.ceil((b.taughtT - now()) / 1000)} วิ)`, '⏳', false);
+      if (!cd(a, 'teach', 4000, true)) return;
+      b.taughtT = now() + 60000; b.school.p = Math.min(.99, b.school.p + .35); markMe(b); joy(b, 2);
+      toast(b, `อาจารย์${a.name}มาช่วยสอน! เข้าใจเร็วขึ้น คาบนี้ใกล้จบแล้ว`, '👩‍🏫');
+      const got = earn(a, (70 + 8 * lvl(a)) * jobPay(a) * (b.npc ? 1 : 1.3)); addXp(a); quest(a, 'work'); stat(a, 'taught');
+      return toast(a, `สอน ${b.name} เรียบร้อย ได้ค่าสอน ${money(got)}`, '👩‍🏫');
+    }
     case 'sdesk.sit': {
       const id = a.enrolled; if (!id || !D.LICENSES[id]) return toast(a, 'ต้องลงทะเบียนเรียนที่เคาน์เตอร์มหาวิทยาลัยก่อน', '🎓', false);
       if (desks[s.idx] && desks[s.idx] !== a) return toast(a, 'โต๊ะนี้มีคนนั่งแล้ว', '📖', false);
@@ -3563,7 +3579,7 @@ function act(a, m) {
       if (pt.npc) pt.dz = pt.dz.filter(x => x !== target);
       else { cure(pt, target); const f = Math.min(300, Math.floor(pt.money)); pt.money -= f; fee = f + 60; markMe(pt); toast(pt, `หมอ${a.name}รักษา${DZ[target].name}หายแล้ว! (ค่ารักษา ${money(f)})`, '💉'); }
       pt.health = Math.min(100, pt.health + 20);
-      const got = earn(a, fee * boost); addXp(a, 2); quest(a, 'treat'); stat(a, 'treated');
+      const got = earn(a, fee * bm); addXp(a, 2); quest(a, 'treat'); stat(a, 'treated');
       if (!pt.dz.length) { if (pt.npc) beds[s.idx] = null; else standUp(pt); }
       wdAt = 0;
       if (!pt.npc) feed(`🩺 หมอ${a.name} รักษา${DZ[target].name}ให้ ${pt.name} สำเร็จ`);

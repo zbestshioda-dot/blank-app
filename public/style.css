@@ -2177,3 +2177,9 @@ body.dlgOn #hud,body.dlgOn #nearBtns,body.dlgOn #keyHint,body.dlgOn #placeBar,bo
 .msOpts{display:flex;flex-direction:column;gap:6px;margin-top:8px}.msOpts button{background:#fff8ea;color:#3a2a1e;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-weight:700;text-align:left;cursor:pointer}
 .msOpts button:hover{background:#ffe2a6}.msCard{text-align:center;padding:6px 0}.msCard i{display:block;font-style:normal;font-size:48px}.msCard b{display:block;color:#ffd38a;font-size:20px}.msCard span{display:block;font-size:18px}.msCard small{display:block;opacity:.85}
 .msSkip{position:absolute;right:12px;top:calc(9vh + 8px);background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:99px;padding:5px 12px;font:inherit;cursor:pointer}
+
+/* 🤝 trade: small category icons above the bag list */
+.tTabs{display:flex;gap:4px;margin:4px 0 6px;flex-wrap:wrap}
+.tTabs button{position:relative;min-width:40px;height:36px;padding:0 8px;font-size:18px;border-radius:10px}
+.tTabs button.on{background:var(--accent,#ffd34d);color:#222}
+.tTabs i{position:absolute;top:-5px;right:-5px;font-style:normal;font-size:10px;background:#333;color:#fff;border-radius:8px;padding:0 4px;line-height:14px}

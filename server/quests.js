@@ -20,6 +20,7 @@ const DEFS = {
   job_thug: { cat: 'career', career: 'thug', text: 'ทำภารกิจนักเลงสำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
   job_photographer: { cat: 'career', career: 'photographer', text: 'ทำภารกิจช่างภาพสำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
   job_courier: { cat: 'career', career: 'courier', text: 'ทำภารกิจส่งพัสดุสำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
+  job_teacher: { cat: 'career', career: 'teacher', text: 'ทำภารกิจอาจารย์สำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
   // social / daily life
   trade:   { cat: 'social', text: 'แลกเปลี่ยนกับผู้เล่นอื่น {n} ครั้ง', n: [1, 2], per: 200 },
   chat:    { cat: 'social', text: 'พิมพ์คุยในแชท {n} ครั้ง', n: [1, 3], per: 40 },
@@ -134,6 +135,7 @@ const WDEFS = {
   job_thug: { cat: 'career', career: 'thug', text: 'ทำภารกิจนักเลงสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   job_photographer: { cat: 'career', career: 'photographer', text: 'ทำภารกิจช่างภาพสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   job_courier: { cat: 'career', career: 'courier', text: 'ทำภารกิจส่งพัสดุสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
+  job_teacher: { cat: 'career', career: 'teacher', text: 'ทำภารกิจอาจารย์สำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   earn:    { cat: 'money', text: 'หาเงินให้ได้ ฿{n}', n: [8000, 15000], step: 500, per: 0.25 },
   fish:    { cat: 'life', text: 'ตกปลาให้ได้ {n} ตัว', n: [25, 40], per: 70 },
   eat:     { cat: 'life', text: 'กินอาหาร {n} ครั้ง', n: [12, 20], per: 90 },
