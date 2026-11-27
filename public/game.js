@@ -6661,6 +6661,7 @@ const NEWS = [
   { v: '2026-11-28d', d: '28 พ.ย.', items: [
     '📱 หน้าจอมือถือใหม่: แอปแบ่งเป็นหน้า ปัดซ้าย-ขวาเพื่อเลื่อน ไม่ต้องเลื่อนลงแล้ว (มีจุดบอกหน้าและคำแนะนำ)',
     '💎 เอาแอปเติมเงินออกจากมือถือ',
+    '🎒 กระเป๋า: ปุ่มคลังบ้านย้ายไปอยู่ล่างสุดของเมนูหมวดซ้ายมือ · ช่องของโชว์ 5 แถว เลื่อนลงดูที่เหลือ',
     '💬 ชื่อในกรอบคุยยาว ๆ จะขึ้นบรรทัดใหม่ด้านบน ไม่ทับข้อความแล้ว',
   ] },
   { v: '2026-11-28c', d: '28 พ.ย.', items: [
@@ -8412,10 +8413,12 @@ function renderPanel(p) {
             <div class="bdAct">${act}${B(STARS.has(sel) ? '⭐ เลิกติดดาว' : '☆ ติดดาว (ขึ้นก่อนเสมอ)', { fn: 'star', item: sel })}${B('📍 ไปขายที่ตลาด', { fn: 'guide', key: 'market' })}</div>`; }
         const sorts = [['cat', 'หมวด'], ['value', 'มูลค่า'], ['qty', 'จำนวน'], ['name', 'ชื่อ']].map(([k, l]) => B(l, { fn: 'qtab', set: { gsort: k } }, sort === k ? 'primary' : '')).join('');
         const fu = (me.furniture || []).filter(k => k !== 'sbed' && G.shop.furniture[fbase(k)] && !G.shop.furniture[fbase(k)].field), fg = fu.filter(k => G.shop.furniture[fbase(k)].cat === 'garden').length;
-        const homeNote = me.hown && fu.length ? `<div class="setRow"><span><b>🛋️ เฟอร์นิเจอร์และของแต่งสวน ${fu.length} ชิ้น${fg ? ` (ของสวน ${fg})` : ''}</b><small>เก็บอยู่ที่คลังบ้าน เข้าบ้านแล้วกดจัดบ้านเพื่อวาง</small></span>${B('เปิดคลังบ้าน', { fn: 'open', kind: 'homedeco', set: { dtab: fg ? 'garden' : 'basic' } }, 'good')}</div>` : '';
+        // home storage sits at the bottom of the category column, like a category of its own
+        const homeNote = me.hown && fu.length ? B(`<span>🛋️</span><small>คลังบ้าน</small><i>${fu.length}</i>`, { fn: 'open', kind: 'homedeco', set: { dtab: fg ? 'garden' : 'basic' } }, 'bcat bhome') : '';
+        setTimeout(() => { const g = document.querySelector('.bagSlots'), f = g?.querySelector('.bslot'); if (f) g.style.maxHeight = (f.offsetHeight * 5 + 4 * 4 + 14) + 'px'; }, 0);   // the item grid shows 5 rows, scroll for more
         const eggNote = nbEggWaiting() ? (() => { const left = Math.max(0, nextThaiMidnight() - Date.now() - clockOff), h = Math.floor(left / 36e5), mm = Math.floor(left / 6e4) % 60; return `<div class="setRow nbEggRow"><span><b>ไข่รอฟัก</b><small>ฟักพรุ่งนี้ (อีก ${h}:${String(mm).padStart(2, '0')} ชม.) เข้าเกมพรุ่งนี้แล้วได้สัตว์เลี้ยงเลย</small></span>${nbImg(left < 3 * 36e5 ? 'egg_crack' : 'egg', 52)}</div>`; })() : '';
-        return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}${eggNote}${homeNote}
-          <div class="bagG">${cats}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
+        return `<h2>🎒 กระเป๋า <small class="bagCnt">${ents.length} อย่าง · มูลค่า ${money(totalV)}</small></h2>${gtabs}${eggNote}
+          <div class="bagG">${cats.replace(/<\/div>$/, homeNote + '</div>')}<div class="bagMain"><div class="bagSlots">${slots}</div><div class="bagBar"><span>เรียง</span>${sorts}</div></div><div class="bagDet">${det}</div></div>
           ${gcat === 'all' && (me.rods || []).length ? `<div class="secT">🎣 เบ็ดตกปลา</div><div class="list">${rodRows()}</div>` : ''}`;
       }
       if (gtab === 'info') return `<h2>🎒 กระเป๋า</h2>${gtabs}<div class="sub">ใบรับรอง: ${licTxt} · ทรัพย์สินรวม ${money(me.worth)}</div>${own}`;

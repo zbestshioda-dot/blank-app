@@ -2260,3 +2260,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @keyframes phHint{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
 /* 💬 long names wrap upward (tag anchored by its bottom edge), never over the text */
 #dlg .dlgName{top:auto!important;bottom:calc(100% - 17px);max-width:calc(100% - 28px);box-sizing:border-box;line-height:1.25}
+.bagCats .bcat.bhome{margin-top:6px;background:linear-gradient(#7fe0a8,#3fae6e);color:#fff;border-color:#2b7a4b;text-shadow:0 1px 0 rgba(0,0,0,.3)}
+.bagCats .bcat.bhome small{opacity:1}
