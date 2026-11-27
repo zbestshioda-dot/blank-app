@@ -5942,8 +5942,9 @@ function onMessage0(ws, raw) {
       e.n = nm; a.sd = true; markMe(a); nbEv(a, 'eggname'); return;
     }
     case 'nb.eggpet': {                    // 🤚 pat the egg
-      const e = NBM.isV2(a) && a.nb.egg; if (!e || e.h || !cd(a, 'eggpet', 800, true)) return;
-      e.pat = (e.pat || 0) + 1; a.sd = true; markMe(a); nbEv(a, 'eggpet'); return;
+      if (!a.nb || !cd(a, 'eggpet', 800, true)) return;   // counts even with no egg yet (old path gets it at the end) or once it hatched: nobody gets stuck on this step
+      const e = a.nb.egg; if (e && !e.h) { e.pat = (e.pat || 0) + 1; a.sd = true; markMe(a); }
+      nbEv(a, 'eggpet'); return;
     }
     case 'nb.pwa': {                       // 📲 added to the home screen (the phone reports it runs standalone): 💎50 once
       if (a.pwa || !m.on || !a.nb) return;

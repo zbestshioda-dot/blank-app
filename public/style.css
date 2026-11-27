@@ -2272,3 +2272,4 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #msCut.world .msBar{animation:msBarIn .6s ease-out}@keyframes msBarIn{from{transform:scaleY(0)}}#msCut.world .msBar{transform-origin:top}#msCut.world .msBar.b{transform-origin:bottom}
 #msCut.world .msTitle{text-shadow:0 2px 4px #000}
 body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;transition:opacity .4s}
+.nbEggPat.go{animation:tapBlink 1.2s ease-in-out infinite}

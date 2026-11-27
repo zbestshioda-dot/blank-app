@@ -1114,7 +1114,7 @@ function nbTap(i) {
   const st = G.nbSteps[i]; FX.play('click');
   if (st.go) return setGuide(nbGo(i), false, true);
   if (i === 3) { foldChat(false); const c = $('#cbIn'); if (c) { c.value = 'สวัสดีครับ/ค่ะ มือใหม่ฝากตัวด้วยนะ 🙏'; c.focus(); } return toast('กด "ส่ง" เพื่อทักทายทุกคนในเมือง', '💬'); }
-  if (i >= 5) return me.nb?.egg ? nbEggCard() : toast('ตก-ขายปลาให้ครบก่อน แล้วจะได้ไข่สัตว์เลี้ยง', '🥚');
+  if (i >= 5) return me.nb?.egg && !me.nb.egg.h ? nbEggCard() : i === 6 ? (send({ t: 'nb.eggpet' }), FX.play('pop'), toast('🤚 ลูบไข่แล้ว! ไข่สั่นดุ๊กดิ๊กเหมือนดีใจ', '🥚')) : toast('ตก-ขายปลาให้ครบก่อน แล้วจะได้ไข่สัตว์เลี้ยง', '🥚');
 }
 // 🌱 newcomers: the starter list is running / a v2 newcomer's first day (quiet mode, egg, tomorrow card)
 function nbActive() { return !!me?.nb && !me.nb.done; }
@@ -1171,7 +1171,7 @@ function nbEggCard() {
     <input class="nbEggName" maxlength="12" placeholder="ตั้งชื่อไข่..." value="${esc(e.n || '')}"><button type="button" class="primary nbEggOk">✏️ ตั้งชื่อ</button>
     <button type="button" class="good nbEggPat">🤚 ลูบไข่</button><small>แตะพื้นหลังเพื่อปิด</small></div>`;
   d.onclick = ev => { if (ev.target === d) d.remove(); };
-  d.querySelector('.nbEggOk').onclick = () => { const n = d.querySelector('.nbEggName').value.trim(); if (!n) return toast('พิมพ์ชื่อก่อนนะ', '✏️'); e.n = n; send({ t: 'nb.eggname', name: n }); d.querySelector('b').textContent = 'เจ้า' + n; FX.play('chime'); };
+  d.querySelector('.nbEggOk').onclick = () => { const n = d.querySelector('.nbEggName').value.trim(); if (!n) return toast('พิมพ์ชื่อก่อนนะ', '✏️'); e.n = n; send({ t: 'nb.eggname', name: n }); d.querySelector('b').textContent = 'เจ้า' + n; FX.play('chime'); const pb = d.querySelector('.nbEggPat'); pb.textContent = `🤚 ลูบเจ้า${n}หน่อย!`; pb.classList.add('go'); };
   d.querySelector('.nbEggPat').onclick = () => { const p = d.querySelector('.nbEggPic'); p.classList.remove('wob'); void p.offsetWidth; p.classList.add('wob'); send({ t: 'nb.eggpet' }); FX.play('pop'); };
   document.body.appendChild(d); FX.play('chime');
 }
@@ -6710,6 +6710,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '🥚 แก้ภารกิจมือใหม่ "ลูบไข่" ที่ทำไม่ผ่าน: แตะข้อนี้ในรายการแล้วผ่านเลย ตั้งชื่อไข่แล้วปุ่มลูบจะกะพริบบอก',
     '📅 ปฏิทินในเกมครบเดือนแล้ว: เดือนละ 30 วัน (1 เดือน = 12 ชม. จริง) เริ่มนับใหม่ 1 ม.ค. 2596',
     '🎫 ลอตเตอรี่ออกวันที่ 1 และ 16 ของเดือนในเกม เหมือนหวยจริง (ทุก 6 ชม. จริง)',
     '🎭 คัทซีนชีวิตคนในเมือง 14 ฉาก: เดินเข้าร้านแล้วอาจเจอ NPC คุยกัน ทะเลาะกัน หรือจัดปาร์ตี้วันเกิดให้เพื่อน (วันเกิดใครก็ไปเจอที่บาร์ ร้านอาหาร หรือร้านเบเกอรี่)',
