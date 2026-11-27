@@ -4588,6 +4588,30 @@ function bindPanel(root) {
   // 🛍️ a list of things to buy shows as a grid of cards (mail, contacts and other lists stay as rows)
   root.querySelectorAll('.list').forEach(l => { const its = [...l.children].filter(c => c.classList.contains('item'));
     if (its.length >= 2 && its.every(it => [...it.querySelectorAll('button')].some(b => /"a":"(buy|rod)"/.test(b.dataset.m || '')))) l.classList.add('shop'); });
+  // 🛒 shop grids (farm-sim style): tap a card to pick it, then buy from the bar at the bottom with − / + quantity
+  root.querySelectorAll('.list.shop').forEach(l => {
+    const its = [...l.children].filter(c => c.classList.contains('item')), mOf = b => { try { return JSON.parse(b.dataset.m); } catch { return {}; } };
+    const keyOf = (it, i) => { const b = it.querySelector('[data-m]'), m = b ? mOf(b) : {}; return String(m.item ?? m.id ?? m.k ?? i); };
+    l.classList.add('picker'); let sel = null;
+    its.forEach((it, i) => { const b0 = it.querySelector('[data-m]'); if (!b0) return; const k = keyOf(it, i);
+      const tag = document.createElement('div'); tag.className = 'pTag'; tag.textContent = b0.textContent.trim(); it.append(tag); if (b0.disabled) it.classList.add('no');
+      if (panel?.pick === k) { sel = it; it.classList.add('sel'); }
+      it.onclick = () => { if (!panel || panel.pick === k) return; FX.play('click'); panel.pick = k; panel.pq = 1; refreshPanel(true); }; });
+    const dock = document.createElement('div'); dock.className = 'pDock';
+    if (!sel) { dock.innerHTML = '<div class="pHint">👆 แตะสินค้าเพื่อดูรายละเอียดและซื้อ</div>'; l.after(dock); return; }
+    const q = clamp(panel.pq || 1, 1, 10), bs = [...sel.querySelectorAll('[data-m]')].map(b => [b, mOf(b)]);
+    const hasQ = bs.some(([, m]) => m.qty !== undefined), acts = bs.filter(([, m]) => !(m.qty > 1 && bs.some(([, o]) => o.a === m.a && o.qty === 1)));
+    const nm = sel.querySelector('.nm');
+    dock.innerHTML = `<div class="pInfo"><div class="em">${sel.querySelector('.em')?.innerHTML || ''}</div><div class="nm">${nm ? nm.innerHTML : ''}</div></div>`
+      + (hasQ ? `<div class="pQty"><button data-pq="-1"${q <= 1 ? ' disabled' : ''}>−</button><b>${q}</b><button data-pq="1"${q >= 10 ? ' disabled' : ''}>+</button></div>` : '') + '<div class="pActs"></div>';
+    for (const [b, m] of acts) { const c = b.cloneNode(true); c.className = (b.className + ' pAct').trim();
+      if (m.qty !== undefined) { m.qty = q; c.dataset.m = JSON.stringify(m); const mm = /([\d,]+)\s?LC/.exec(b.textContent);
+        if (mm) { const tot = +mm[1].replace(/,/g, '') * q, bare = /^[\d,]+\s?LC$/.test(b.textContent.trim());
+          c.innerHTML = bare ? `🛒 ซื้อ${q > 1 ? ` ×${q}` : ''} · ${money(tot)}` : b.innerHTML.replace(mm[0], q > 1 ? `×${q} · ${money(tot)}` : mm[0]); if (q > 1) c.disabled = tot > me.money; } else if (q > 1) c.innerHTML += ` ×${q}`; }
+      dock.querySelector('.pActs').append(c); }
+    dock.querySelectorAll('[data-pq]').forEach(x => x.onclick = () => { panel.pq = clamp(q + +x.dataset.pq, 1, 10); FX.play('click'); refreshPanel(true); });
+    l.after(dock);
+  });
   bindStocks(root); bindWall(root); bindPay(root);
   // 📜 a long description under a place's title folds to 2 lines; tap to read it all (stays open while this menu is open)
   if (panel?.st) { const d = root.querySelector('h2 ~ .sub'); if (d && d.scrollHeight > parseFloat(getComputedStyle(d).lineHeight) * (innerWidth > innerHeight && innerHeight <= 520 ? 1.6 : 2.6)) {
@@ -6636,6 +6660,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 const NEWS = [
   { v: '2026-11-28c', d: '28 พ.ย.', items: [
     '📱 เมนูร้านค้าแนวตั้งสูงเกือบเต็มจอ เห็นของมากขึ้นเกือบเท่าตัว · แนวนอนหัวร้านเตี้ยลง เห็นสินค้าทันที',
+    '🛒 <b>ร้านค้าแบบใหม่</b>: แตะสินค้าเพื่อเลือก แล้วซื้อจากแถบด้านล่าง กด − / + เลือกจำนวนได้ 1–10 ชิ้น (โชว์ราคารวมให้เลย)',
     '🪙 เงินที่มีอยู่โชว์บนหัวเมนูร้าน ไม่ต้องปิดเมนูไปดู',
     '📜 คำอธิบายร้านที่ยาวพับเหลือ 2 บรรทัด แตะ "อ่านต่อ" เพื่อดูทั้งหมด · ปุ่มในการ์ดสินค้าเรียงข้างกัน การ์ดเตี้ยลง',
   ] },
