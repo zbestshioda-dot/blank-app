@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "skills": {
+    "remotion-best-practices": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-best-practices/SKILL.md",
+      "computedHash": "269ff3a2eef0fcbb17e01ee5dbf1488438156e60091703f65932185fca239728"
+    },
+    "remotion-captions": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-captions/SKILL.md",
+      "computedHash": "25753a6f91013f5f9141109173a5adb2313613dcd6a99ba6e47c1f1350d831c5"
+    },
+    "remotion-create": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-create/SKILL.md",
+      "computedHash": "c0efb53c12e6cd08b364179bac63f786d954be3a966972c3aa48a8994394bb94"
+    },
+    "remotion-docs": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-docs/SKILL.md",
+      "computedHash": "fc7ce0e9b7d1b847484f48fd9305e44463e2995b7d8a19aefef0fa81a12c93d9"
+    },
+    "remotion-elements": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-elements/SKILL.md",
+      "computedHash": "d5b32cd2c6085cde92750f0fc972288207e41adebfa755d23d18d98d5c7ebd5d"
+    },
+    "remotion-interactivity": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-interactivity/SKILL.md",
+      "computedHash": "29e92af8b1ba4ca89e939f5a8f52e5d257c69b1cc68ceb4576f9764d214176e2"
+    },
+    "remotion-license": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-license/SKILL.md",
+      "computedHash": "ebce324360283256ea60c30ed4251e8a72a6005f3f232ef6682706531c25a54d"
+    },
+    "remotion-maps": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-maps/SKILL.md",
+      "computedHash": "5d52ed6c043488eb570d3f925ea356de812d3d5214b27fdad68477e0c944441f"
+    },
+    "remotion-markup": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-markup/SKILL.md",
+      "computedHash": "7203452651b1edaafd61c74b3f350ea6ba2b6b03be6ea3d38fe1a0c998b313c6"
+    },
+    "remotion-multimedia": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-multimedia/SKILL.md",
+      "computedHash": "85fed69a46d8b49f2bb5e668f8884d3f7800e35253310013fdf276fe0db8dcbf"
+    },
+    "remotion-render": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-render/SKILL.md",
+      "computedHash": "7d25456c4bef616ed1abe735febb8a061408bee4eca6df0ac118b436db4c6707"
+    },
+    "remotion-saas": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-saas/SKILL.md",
+      "computedHash": "0cff6e20ac032e4aa2550aaec40f4bbaea0d24b27a6a3c8ee2f074c60a0cb9be"
+    },
+    "remotion-studio": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-studio/SKILL.md",
+      "computedHash": "4cc6a4cb0670acbf0b7ff48c7435f45e904d459cda05d91ec050fda975d95980"
+    },
+    "remotion-upgrade": {
+      "source": "remotion-dev/skills",
+      "commit": "a3f4098a2afd0e13f6a6f8c8760e275f75457ea9",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-upgrade/SKILL.md",
+      "computedHash": "ef70077c9c394e442e832f712cc919733220cd7e81fb1ab76052ead5a1aa65ca"
+    }
+  }
+}
