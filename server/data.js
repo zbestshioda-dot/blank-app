@@ -134,7 +134,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // 24-hour convenience stores: four branches, each with its own look and its own interior (rooms laid out after all older rooms: late)
   CS = (id, spr, x, front, name, extra = {}) => B(id, spr, x, front, { label: `ร้านสะดวกซื้อ 24 ชม. · ${name}`, icon: '🏪', st: id, stype: 'cstore', rk: 'cstore', layout: id, late: true, ...extra });
   CS('cstore', 'b_cs1', 72, 13, 'สาขาถนนเหนือ');
-  CS('cstore2', 'b_cs2', 81, 13, 'สาขาหัวมุม');
+  // สาขาหัวมุม (cstore2) closed: น้องภูมิ moved to the bakery; its room slot stays reserved below so other rooms keep their place
   CS('cstore3', 'b_cs3', 42, 45, 'สาขาซอยใต้');
   B('gas', 'b_gas', 65, 13, { label: 'ปั๊มน้ำมัน', icon: '⛽', deco: true });   // scenery (no vehicles in the game)
 
@@ -566,6 +566,7 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(L => BUILDINGS.filter(b =
   }
   const kind = b.rk || (b.house !== undefined ? 'house' : b.id);
   const [RW, RH] = ROOM_SIZE[kind] || [14, 10];
+  if (b.id === 'cstore3') slot++;      // the removed cstore2's slot (between cstore and cstore3)
   const rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14; slot++;
   if (b.outdoor) {                     // served from the street: the counter is in front of the building (its room slot stays unused so other rooms keep their place)
     STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });

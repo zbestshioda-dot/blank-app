@@ -33,7 +33,7 @@ const ROWS = [
   ['d_policedesk', 'ดาบหญิงสมศรี (เวรประจำโต๊ะ)', ['police'], 'kanomkrok', ['coffee', 'thaitea', 'khaotom'], 'เวรประจำโต๊ะสายแม่ ดุแต่ห่วงทุกคน'],
   ['d_school', 'ผอ.ประเสริฐ (ผู้อำนวยการ)', ['school'], 'coffee', ['kanomthai', 'namlamyai', 'bread'], 'ผู้อำนวยการใจดี ชอบเล่าเรื่องสมัยหนุ่ม'],
   ['d_cstore1', 'น้องฝน (พนักงานร้าน)', ['cstore'], 'icecream', ['snack', 'choco', 'soda'], 'พนักงานร้านยิ้มหวาน จำเมนูประจำของลูกค้าได้'],
-  ['d_cstore2', 'น้องภูมิ (พนักงานร้าน · นักศึกษา)', ['cstore2'], 'bento', ['drink', 'hotdog', 'noodle'], 'นักศึกษาทำงานพิเศษ ง่วงตลอดเวลา'],
+  ['d_cstore2', 'น้องภูมิ (พนักงานร้านเบเกอรี่ · นักศึกษา)', ['bakery'], 'bk_croissant', ['coffee', 'bk_donut', 'drink'], 'นักศึกษาทำงานพิเศษ ง่วงตลอดเวลา'],
   ['d_cstore3', 'น้องแพร (พนักงานร้าน)', ['cstore3'], 'choco', ['cottoncandy', 'thaitea', 'icecream'], 'สาวขี้อาย ชอบวาดรูปบนกระดาษใบเสร็จ'],
   ['d_cstore4', 'ยายบุญ (เจ้าของร้าน สาขาหมู่บ้าน)', ['cstore4'], 'kanomthai', ['khaotom', 'namlamyai', 'luukchup'], 'ยายใจดีที่ให้เด็ก ๆ ติดหนี้ค่าขนมได้'],
   ['d_market', 'เจ๊ศรี (ผู้ดูแลตลาดกลาง)', ['market'], 'durian_sweet', ['durian', 'somtam', 'tomyum'], 'เจ๊ใหญ่ประจำตลาด ต่อราคาไม่เคยแพ้ใคร'],
