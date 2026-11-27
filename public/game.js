@@ -5311,9 +5311,9 @@ const TALK = {
 };
 let dlgQ = null;
 function dlgFace(face, npc, px) {   // px: draw at this size (small list icons) instead of the dialog size
-  const z = px || (innerWidth <= 600 ? 64 : 84);
-  if (typeof face === 'string' && face.startsWith('pic:')) { const b = px || (innerWidth <= 600 ? 120 : 150); return `<i class="dlgPic dlgImg" style="width:${b}px;height:${b}px;background-image:url(assets/pics.webp?v=${PICS_V});${picPos(face.slice(4), b)}"></i>`; }
-  if (typeof face === 'string' && face.startsWith('an:') && ANI) { const [, k, m] = face.split(':'), b = px || (innerWidth <= 600 ? 150 : 200); return `<i class="dlgPic dlgAni" style="width:${b}px;height:${b}px;${aniBg(k, m, b)}"></i>`; }
+  const z = px || (innerWidth <= 600 ? 96 : 120);
+  if (typeof face === 'string' && face.startsWith('pic:')) { const b = px || (innerWidth <= 600 ? 160 : 200); return `<i class="dlgPic dlgImg" style="width:${b}px;height:${b}px;background-image:url(assets/pics.webp?v=${PICS_V});${picPos(face.slice(4), b)}"></i>`; }
+  if (typeof face === 'string' && face.startsWith('an:') && ANI) { const [, k, m] = face.split(':'), b = px || (innerWidth <= 600 ? 190 : 240); return `<i class="dlgPic dlgAni" style="width:${b}px;height:${b}px;${aniBg(k, m, b)}"></i>`; }
   if (face && FACES?.faces?.[face] !== undefined) { const i = FACES.faces[face], n = Object.keys(FACES.faces).length; return `<i class="qface dlgPic" style="width:${z}px;height:${z}px;background-size:${n * z}px ${z}px;background-position:-${i * z}px 0"></i>`; }
   return npc ? `<canvas class="dlgPic dlgPix" data-dlg="${esc(npc)}" width="84" height="84"></canvas>` : '';
 }
@@ -6499,6 +6499,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27h', d: '27 พ.ย.', items: [
+    '💬 กรอบคุยใหม่: ซ่อนปุ่มทั้งหมดระหว่างคุย กรอบอยู่ล่างจอ รูปคนคุยใหญ่ขึ้นอยู่บนกรอบขวา ชื่ออยู่บนกรอบซ้าย',
+    '📋 เมนูหลังคุยเรียงเป็นตาราง อยู่ในกรอบขนาดเดิม',
+  ] },
   { v: '2026-11-27g', d: '27 พ.ย.', items: [
     'กรอบค่าสถานะเปลี่ยนเป็นสีกรมโปร่งใส เหมือนกล่องแชท',
   ] },
