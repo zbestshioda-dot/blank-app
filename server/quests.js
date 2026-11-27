@@ -28,7 +28,7 @@ const DEFS = {
   sit:     { cat: 'social', text: 'นั่งเล่นที่จัตุรัสกลางเมือง {n} ครั้ง', n: [1, 2], per: 60 },
   // general
   sell:    { cat: 'general', text: 'ขายของ {n} ชิ้น', n: [5, 15], per: 15 },
-  earn:    { cat: 'general', text: 'หาเงินให้ได้ ฿{n}', n: [800, 2000], step: 100, per: 0.1 },
+  earn:    { cat: 'general', text: 'หาเงินให้ได้ {n} LC', n: [800, 2000], step: 100, per: 0.1 },
 };
 const BONUS = 600;          // all three done; +10% per streak day (max +50%)
 
@@ -136,7 +136,7 @@ const WDEFS = {
   job_photographer: { cat: 'career', career: 'photographer', text: 'ทำภารกิจช่างภาพสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   job_courier: { cat: 'career', career: 'courier', text: 'ทำภารกิจส่งพัสดุสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   job_teacher: { cat: 'career', career: 'teacher', text: 'ทำภารกิจอาจารย์สำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
-  earn:    { cat: 'money', text: 'หาเงินให้ได้ ฿{n}', n: [8000, 15000], step: 500, per: 0.25 },
+  earn:    { cat: 'money', text: 'หาเงินให้ได้ {n} LC', n: [8000, 15000], step: 500, per: 0.25 },
   fish:    { cat: 'life', text: 'ตกปลาให้ได้ {n} ตัว', n: [25, 40], per: 70 },
   eat:     { cat: 'life', text: 'กินอาหาร {n} ครั้ง', n: [12, 20], per: 90 },
   chat:    { cat: 'life', text: 'พิมพ์คุยในแชท {n} ครั้ง', n: [10, 15], per: 90 },

@@ -79,7 +79,7 @@ function jobXp(xp) { let L = 1; xp = +xp || 0; while (L < JOB_MAX && xp >= xpNee
 const lvl = (a, c = a.career) => c === 'office' ? 1 + Math.floor((a.xp[c] || 0) / 3) : jobXp(a.xp[c] || 0).L;
 const xpGain = L => 1 / (1 + 0.08 * (L - 1));          // Lv1 100% · Lv5 76% · Lv10 58% · Lv20 40%
 const jobPay = a => 1 + 0.06 * (lvl(a) - 1);            // every level pays 6% more
-const money = n => '฿' + Math.round(n).toLocaleString('en-US');
+const money = n => Math.round(n).toLocaleString('en-US') + ' LC';   // 🪙 LifeCoin
 const cleanText = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 const hourNow = () => D.hourAt(now());
 const hhmm = h => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
@@ -439,7 +439,7 @@ let econDay = '';
 setInterval(() => {
   const dk = dayKey(); if (dk === econDay) return; const first = !econDay; econDay = dk; if (first) return;
   const v = econView(), d = v.next - v.litre;
-  feed(`⛽ ราคาน้ำมันวันนี้ ฿${v.litre.toFixed(2)}/ลิตร${v.mood === 'slow' ? ' · 📉 เศรษฐกิจซบเซา รัฐลดภาษีรายได้ครึ่งหนึ่งวันนี้' : v.mood === 'boom' ? ' · 📈 เศรษฐกิจคึกคัก' : ''}`);
+  feed(`⛽ ราคาน้ำมันวันนี้ ${v.litre.toFixed(2)} LC/ลิตร${v.mood === 'slow' ? ' · 📉 เศรษฐกิจซบเซา รัฐลดภาษีรายได้ครึ่งหนึ่งวันนี้' : v.mood === 'boom' ? ' · 📈 เศรษฐกิจคึกคัก' : ''}`);
 }, 60000);
 // fuel: your own vehicles cost a little per tile driven (faster = thirstier); company vehicles (delivery bike, patrol car) are free
 function fuel(a, d) {
@@ -450,8 +450,8 @@ function fuel(a, d) {
   if (a.money < c) { a.fuelDue = 0; a.ride = ''; a.mvb = moveCap(a); markMe(a); sendRoster(); return toast(a, 'เงินไม่พอเติมน้ำมัน ⛽ ต้องลงเดินก่อน', '⛽', false); }
   a.money -= c; ledAdd(a, -c, '⛽ ค่าน้ำมัน'); a.fuelDue -= c; a.fuelDay = a.fuelDay?.d === dayKey() ? a.fuelDay : { d: dayKey(), c: 0 }; a.fuelDay.c += c; markMe(a);
 }
-// income tax by the real (Bangkok) day: the first ฿20,000 is free, then 10%, and 20% above ฿60,000
-const TAX = [[30000, 0], [100000, .05], [Infinity, .1]];   // lowered: ฿30k free, then 5%, 10% above ฿100k
+// income tax by the real (Bangkok) day: the first 20,000 LC is free, then 10%, and 20% above 60,000 LC
+const TAX = [[30000, 0], [100000, .05], [Infinity, .1]];   // lowered: 30k LC free, then 5%, 10% above 100k LC
 function taxOf(a, amount) {
   if (!(amount > 0) || isAdmin(a)) return 0;
   const d = dayKey(), T = a.tax?.d === d ? a.tax : (a.tax = { d, e: 0, paid: 0 });
@@ -499,7 +499,7 @@ function gangAdd(g, login, n) {
   g.msn.prog += n;
   if (!g.msn.done && g.msn.prog >= gangGoal(g)) {
     g.msn.done = 1; g.bank += GANG.msnBank;
-    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (!o) continue; credit(o, GANG.msnPay); if (o.ws) toast(o, `🏴 ภารกิจแก๊งวันนี้สำเร็จ! ได้ ${GANG.msnPay} บาท`, '🎉'); }
+    for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (!o) continue; credit(o, GANG.msnPay); if (o.ws) toast(o, `🏴 ภารกิจแก๊งวันนี้สำเร็จ! ได้ ${GANG.msnPay} LC`, '🎉'); }
   }
   gdirty();
 }
@@ -531,7 +531,7 @@ function gangOp(a, m) {
     const name = String(m.name || '').replace(/\s+/g, ' ').trim().slice(0, 14);
     if (name.length < 2) return toast(a, 'ตั้งชื่อแก๊งอย่างน้อย 2 ตัวอักษร', '🏴', false);
     if (impersonates(name) || [...gangs.values()].some(g => nameKey(g.name) === nameKey(name))) return toast(a, 'ชื่อนี้ใช้ไม่ได้หรือมีคนใช้แล้ว', '🏴', false);
-    if (a.money < GANG.create) return toast(a, `ตั้งแก๊งใช้เงิน ${GANG.create.toLocaleString()} บาท`, '💸', false);
+    if (a.money < GANG.create) return toast(a, `ตั้งแก๊งใช้เงิน ${GANG.create.toLocaleString()} LC`, '💸', false);
     const icon = GANG.icons.includes(m.icon) ? m.icon : GANG.icons[0], color = GANG.colors.includes(m.color) ? m.color : GANG.colors[0];
     a.money -= GANG.create; const id = 'g' + gangSeq++;
     gangs.set(id, { id, name, icon, color, boss: me, mem: { [me]: { r: 'boss', p: 0 } }, req: [], pts: 0, wpts: 0, bank: 0, lvl: 1, week: weekKey(), t: now(), msn: null });
@@ -578,16 +578,16 @@ function gangOp(a, m) {
   }
   if (op === 'leave') {
     if (role === 'boss' && Object.keys(g.mem).length > 1) return toast(a, 'หัวหน้าต้องส่งต่อตำแหน่งให้คนอื่นก่อนออก', '🏴', false);
-    if (role === 'boss') { a.money += g.bank; gangs.delete(g.id); toast(a, `ยุบแก๊งแล้ว คืนเงินคลัง ${Math.round(g.bank).toLocaleString()} บาท`, '🏴'); }
+    if (role === 'boss') { a.money += g.bank; gangs.delete(g.id); toast(a, `ยุบแก๊งแล้ว คืนเงินคลัง ${Math.round(g.bank).toLocaleString()} LC`, '🏴'); }
     else { delete g.mem[me]; toast(a, `ออกจากแก๊ง ${g.name} แล้ว`, '🏴'); }
     a.gang = ''; a.sd = true; gdirty(); return markMe(a);
   }
   if (op === 'donate') {
     const amt = Math.floor(+m.amt) || 0;
-    if (amt < 100) return toast(a, 'บริจาคขั้นต่ำ 100 บาท', '🏴', false);
+    if (amt < 100) return toast(a, 'บริจาคขั้นต่ำ 100 LC', '🏴', false);
     if (a.money < amt) return toast(a, 'เงินสดไม่พอ', '💸', false);
     a.money -= amt; g.bank += amt; gangAdd(g, me, Math.floor(amt / 50)); markMe(a);
-    return toast(a, `บริจาค ${amt.toLocaleString()} บาทเข้าคลังแก๊ง`, '💰');
+    return toast(a, `บริจาค ${amt.toLocaleString()} LCเข้าคลังแก๊ง`, '💰');
   }
   if (op === 'rest') {
     const L = GANG.lv[g.lvl - 1];
@@ -598,7 +598,7 @@ function gangOp(a, m) {
   if (op === 'upgrade') {
     if (role !== 'boss') return toast(a, 'เฉพาะหัวหน้าแก๊ง', '🏴', false);
     const N = GANG.lv[g.lvl]; if (!N) return toast(a, 'บ้านแก๊งอัปเกรดสูงสุดแล้ว', '🏴', false);
-    if (g.bank < N.cost) return toast(a, `เงินคลังไม่พอ ต้องใช้ ${N.cost.toLocaleString()} บาท`, '💸', false);
+    if (g.bank < N.cost) return toast(a, `เงินคลังไม่พอ ต้องใช้ ${N.cost.toLocaleString()} LC`, '💸', false);
     if (g.pts < N.pts) return toast(a, `แต้มแก๊งไม่พอ ต้องมี ${N.pts.toLocaleString()} แต้ม`, '🏴', false);
     g.bank -= N.cost; g.lvl++; gdirty();
     for (const l of Object.keys(g.mem)) { const o = accounts.get(l); if (o?.ws) { toast(o, `บ้านแก๊งอัปเป็น ${N.n}! 🎉`, '🏠'); markMe(o); } }
@@ -855,7 +855,7 @@ function refTick() {
 setInterval(() => { try { refTick(); } catch (e) { console.error('refTick', e); } }, 60e3).unref?.();
 setInterval(() => { try { listingsTick(); } catch (e) { console.error('listingsTick', e); } }, 60e3).unref?.();
 // ------------------------------------------------------------------ government lottery (phone app 🎫): draws on day 1 of every game month at 16:00 game time
-// (= every 2 real hours). A money sink: tickets cost ฿100, about 45% comes back as prizes. Prizes go out by mail (claim the gift).
+// (= every 2 real hours). A money sink: tickets cost 100 LC, about 45% comes back as prizes. Prizes go out by mail (claim the gift).
 const LOTTO = { price: 100, max: 50, first: 3000000, l3: 6000, l2: 3000, hour: 16 };
 let lotto = { cur: '', last: null };
 // 🏆 weekly auction (state saved in __meta): a new week sells the lot to the top bid and opens the next one
@@ -882,7 +882,7 @@ function projPlace(id) {
 const PROJ_USE = {
   memorial: { label: '💐 วางพวงมาลัยที่อนุสรณ์', need: 'malai' },
   bridge13: { label: '🌉 เดินเล่นบนสะพานใหม่' },
-  wheel: { label: '🎡 ขึ้นชิงช้าสวรรค์ (฿500)', cost: 500, many: 1 },
+  wheel: { label: '🎡 ขึ้นชิงช้าสวรรค์ (500 LC)', cost: 500, many: 1 },
   clock: { label: '🔔 ตีระฆังหอนาฬิกา' },
 };
 function projUse(a, m) {
@@ -918,7 +918,7 @@ function projGive(a, m) {
   const P = D.PROJECTS[proj.i]; if (!P) return toast(a, 'เมืองสร้างครบทุกโปรเจกต์แล้ว ขอบคุณทุกคน!', '🏗️', false);
   const box = ST.proj_box; if (!box || areaId(a) !== box.area || dist(a, box) > 3.5) return toast(a, 'ต้องมาลงขันที่กล่องระดมทุนหน้าน้ำพุ', '🏗️', false);
   if (godInf(a)) return toast(a, 'แอดมินเงินไม่จำกัด ร่วมลงขันไม่ได้ (ไม่งั้นสร้างเสร็จทันที)', '🏗️', false);
-  const amt = Math.floor(+m.amt) || 0; if (amt < 1000) return toast(a, 'ลงขันขั้นต่ำ ฿1,000', '🏗️', false);
+  const amt = Math.floor(+m.amt) || 0; if (amt < 1000) return toast(a, 'ลงขันขั้นต่ำ 1,000 LC', '🏗️', false);
   if (!pay(a, amt)) return;
   const before = proj.got / P.goal; proj.got += amt; proj.by[lk(a)] = (proj.by[lk(a)] || 0) + amt; dirty = true;
   stat(a, 'built', amt); joy(a, Math.min(15, 3 + Math.floor(amt / 100000)));
@@ -1574,7 +1574,7 @@ setTimeout(() => { try { ghostTick(); } catch { } }, 4000);
 // Every 4 weeks the town votes. Candidates pay to run and can campaign (reputation); one vote per player per cycle.
 // The winner serves the next cycle: a title, a daily salary, one city policy and a daily announcement. Two terms in a row at most.
 const MAYOR = { minLv: 8, voteLv: 5, fee: 50000, camp: 10000, campDay: 4, salary: 3000, care: 400, tax: .03, maxTerms: 2, weeks: 4,
-  pol: { tax: { n: '💹 ลดภาษี', d: 'รายได้ของทุกคนในเมือง +3%' }, care: { n: '🎁 เบี้ยเมือง', d: 'ทุกคนรับเบี้ยเมือง 400 บาททุกวัน' } } };
+  pol: { tax: { n: '💹 ลดภาษี', d: 'รายได้ของทุกคนในเมือง +3%' }, care: { n: '🎁 เบี้ยเมือง', d: 'ทุกคนรับเบี้ยเมือง 400 LCทุกวัน' } } };
 let mayor = null;                // { l, n, pol, terms, at, ann, annD, salD }
 let elect = { cy: '', c: {} };   // c: login -> { n, rep, v: { voter: 1 }, t, rd: { d, n } }
 // candidates also earn reputation by doing good for the town (free, capped per day); paid campaigning stays on top
@@ -1625,14 +1625,14 @@ function mayorOp(a, m) {
     if (lvl(a) < MAYOR.minLv) return toast(a, `ต้องเลเวล ${MAYOR.minLv} ขึ้นไปจึงลงสมัครได้`, '🏛️', false);
     if (elect.c[me]) return toast(a, 'คุณลงสมัครแล้ว', '🏛️', false);
     if (mayor && mayor.l === me && (mayor.terms || 1) >= MAYOR.maxTerms) return toast(a, `เป็นนายกครบ ${MAYOR.maxTerms} วาระติดแล้ว ต้องพักหนึ่งสมัย`, '🏛️', false);
-    if (a.money < MAYOR.fee) return toast(a, `ค่าสมัคร ${MAYOR.fee.toLocaleString()} บาท`, '💸', false);
+    if (a.money < MAYOR.fee) return toast(a, `ค่าสมัคร ${MAYOR.fee.toLocaleString()} LC`, '💸', false);
     a.money -= MAYOR.fee; elect.c[me] = { n: a.name, rep: 0, v: {}, t: now(), rd: null }; gdirty(); markMe(a);
     feed(`🗳️ ${a.name} ลงสมัครรับเลือกตั้งนายกเมือง!`); toast(a, 'ลงสมัครแล้ว! หาเสียงเพื่อเพิ่มชื่อเสียงได้ทุกวัน', '🗳️');
   } else if (op === 'camp') {
     const c = elect.c[me]; if (!c) return toast(a, 'ต้องลงสมัครก่อน', '🏛️', false);
     if (!c.rd || c.rd.d !== d) c.rd = { d, n: 0 };
     if (c.rd.n >= MAYOR.campDay) return toast(a, `วันนี้หาเสียงครบ ${MAYOR.campDay} ครั้งแล้ว`, '📣', false);
-    if (a.money < MAYOR.camp) return toast(a, `หาเสียงใช้เงิน ${MAYOR.camp.toLocaleString()} บาท`, '💸', false);
+    if (a.money < MAYOR.camp) return toast(a, `หาเสียงใช้เงิน ${MAYOR.camp.toLocaleString()} LC`, '💸', false);
     a.money -= MAYOR.camp; c.rd.n++; c.rep++; gdirty(); markMe(a); toast(a, `หาเสียงสำเร็จ ชื่อเสียง +1 (รวม ${c.rep})`, '📣');
   } else if (op === 'vote') {
     const l = String(m.l || '').toLowerCase(), c = elect.c[l];
@@ -1644,7 +1644,7 @@ function mayorOp(a, m) {
   } else if (op === 'claim') {
     if (mayor?.pol !== 'care') return toast(a, 'ตอนนี้ไม่มีนโยบายเบี้ยเมือง', '🎁', false);
     if (a.mpd === d) return toast(a, 'วันนี้รับเบี้ยเมืองไปแล้ว', '🎁', false);
-    a.mpd = d; a.sd = true; credit(a, MAYOR.care); toast(a, `รับเบี้ยเมือง ${MAYOR.care} บาท`, '🎁');
+    a.mpd = d; a.sd = true; credit(a, MAYOR.care); toast(a, `รับเบี้ยเมือง ${MAYOR.care} LC`, '🎁');
   } else if (isMayor(a)) {
     if (op === 'pol') {
       if (!MAYOR.pol[m.k]) return; mayor.pol = m.k; gdirty();
@@ -1655,7 +1655,7 @@ function mayorOp(a, m) {
       mayor.annD = d; mayor.ann = t; gdirty(); feed(`🏛️ นายกเมือง ${mayor.n}: ${t}`);
     } else if (op === 'sal') {
       if (mayor.salD === d) return toast(a, 'วันนี้รับเงินเดือนไปแล้ว', '💰', false);
-      mayor.salD = d; gdirty(); credit(a, MAYOR.salary); toast(a, `รับเงินเดือนนายกเมือง ${MAYOR.salary.toLocaleString()} บาท`, '🏛️');
+      mayor.salD = d; gdirty(); credit(a, MAYOR.salary); toast(a, `รับเงินเดือนนายกเมือง ${MAYOR.salary.toLocaleString()} LC`, '🏛️');
     }
   }
   send(a, mayorView(a));
@@ -1768,6 +1768,7 @@ function nbWelcomeChat(a) {
 }
 function quest(a, type, n = 1) {
   ledSweep(a);
+  if ((type === 'work' || type === 'deliver' || type === 'treat' || type.startsWith('job_') || type === 'sell' && a.career === 'merchant') && now() - (a._jd || 0) > 1500) { a._jd = now(); stat(a, 'jobDone'); }   // 📕 any career task (one per action, even if it fires two quest types)
   nbEv(a, type === 'eat' ? 'buy' : type, n);
   const evs = Q.progress(a, type, n); ledSweep(a, '📜 รางวัลเควสต์');
   for (const e of evs) {
@@ -1911,7 +1912,7 @@ const NPC_BUY = 0.3;                         // NPC shops buy at a fraction of w
 const NPC_SELL = 2.5;
 const FISH_RATE = 0.45;
 // chefs: a dish sells to the restaurants for what its ingredients cost at the kitchen counter + a cook's fee
-// (12 energy a dish, ~0.75 dishes a minute on natural energy => ~฿55/min at Lv.1, on par with police; cheaper ingredients bought from players are extra profit)
+// (12 energy a dish, ~0.75 dishes a minute on natural energy => ~55 LC/min at Lv.1, on par with police; cheaper ingredients bought from players are extra profit)
 const CHEF_MARGIN = 72;
 const CHEF_COST = Object.fromEntries(D.RECIPES.map(r => [r.id, Object.entries(r.in).reduce((s, [k, q]) => s + Math.ceil(D.ITEMS[k].base * 1.3) * q, 0)]));                       // the fish club pays this share of the market price (fishing sits just above begging on the pay ladder)                         // ...and sell at a big markup
 function marketPrice(id) {
@@ -2024,7 +2025,7 @@ function hydrate(r) {
     const L = a.ledger || [], lb = L.length ? L[L.length - 1][3] : 0;
     a[k] = k === 'money' ? (isFinite(a.ledBal) && a.ledBal !== null ? a.ledBal : isFinite(lb) && lb !== null ? lb : 0) : 0; a.sd = true;
   }
-  if (!a.nanFix && (a.ledger || []).some(e => typeof e[3] !== 'number' || !isFinite(e[3]))) {   // 🩹 2026-11-27 NaN money: the restore above fell back to ฿0 (the backup balance broke too).
+  if (!a.nanFix && (a.ledger || []).some(e => typeof e[3] !== 'number' || !isFinite(e[3]))) {   // 🩹 2026-11-27 NaN money: the restore above fell back to 0 LC (the backup balance broke too).
     // Refund from the ledger: the last good balance before it broke + everything earned while it was broken (those lines have no balance).
     const L = a.ledger, i = L.findIndex(e => typeof e[3] !== 'number' || !isFinite(e[3]));
     let good = 0; for (let j = i - 1; j >= 0; j--) if (typeof L[j][3] === 'number' && isFinite(L[j][3])) { good = L[j][3]; break; }
@@ -2399,7 +2400,7 @@ function docPickup(a) {
   }
   const pool = DOC_DESTS.filter(s => s.id !== a.lastDoc), dest = pick(pool);
   const l = Math.min(lvl(a, 'office'), D.OFFICE_WAGE.length), d = Math.hypot(dest.x - OFFICE_DOOR.x, dest.y - OFFICE_DOOR.y);
-  a.docjob = { dest: dest.id, pay: Math.round(D.OFFICE_WAGE[l - 1] * (0.2 + d / 100) * 1.25), day, t };   // ~฿45/min of walking at Lv.1
+  a.docjob = { dest: dest.id, pay: Math.round(D.OFFICE_WAGE[l - 1] * (0.2 + d / 100) * 1.25), day, t };   // ~45 LC/min of walking at Lv.1
   a.lastDoc = dest.id; markMe(a);
   return toast(a, `📄 รับเอกสารแล้ว ส่งที่ ${dest.label} · ค่าส่ง ~${money(a.docjob.pay)}${h >= D.SHIFT.end ? ` (โอที x${D.SHIFT.otMul})` : ''}`, '📄');
 }
@@ -2464,7 +2465,7 @@ function classroomFun(a, id) {
   }
   const e = Math.floor(Math.random() * 4);
   if (e === 0) { joy(a, 2); toast(a, 'นกบินเข้ามาในห้องเรียน เพื่อนๆ หัวเราะกันใหญ่', '🐦'); }
-  else if (e === 1) { earn(a, 20); toast(a, 'เจอเหรียญใต้โต๊ะเรียน +฿20', '🪙'); }
+  else if (e === 1) { earn(a, 20); toast(a, 'เจอเหรียญใต้โต๊ะเรียน +20 LC', '🪙'); }
   else if (e === 2) { joy(a, 3); toast(a, 'เพื่อนส่งโน้ตตลกมาให้ ยิ้มออกเลย', '📝'); }
   else { enLog(a, Math.min(100, a.energy + 6) - a.energy, 'เพื่อนแบ่งขนม'); a.energy = Math.min(100, a.energy + 6); toast(a, 'เพื่อนข้างๆ แบ่งขนมให้ พลังงานเพิ่มขึ้น', '🍪'); }
   markMe(a);
@@ -2891,7 +2892,7 @@ function storyAdv(a, m) {
     if (end.last) {
       stat(a, 'story_' + o); stat(a, 'storyDone'); feed(`📖 ${a.name} ช่วย${FOLK_DEF[o].name}จนจบเรื่อง "${S.name}"!`);
       const all = Object.keys(SY).length;
-      if (a.stats.storyDone === all) { credit(a, 100000); feed(`🏆 ${a.name} จบเนื้อเรื่องครบทั้ง ${all} เรื่อง! รู้ความลับทั้งหมดของเมืองแล้ว`); toast(a, `🏆 จบครบทุกเรื่อง! ได้ ฿100,000 และฉายา "ผู้รู้ความลับของเมือง"`, '🏆'); }
+      if (a.stats.storyDone === all) { credit(a, 100000); feed(`🏆 ${a.name} จบเนื้อเรื่องครบทั้ง ${all} เรื่อง! รู้ความลับทั้งหมดของเมืองแล้ว`); toast(a, `🏆 จบครบทุกเรื่อง! ได้ 100,000 LC และฉายา "ผู้รู้ความลับของเมือง"`, '🏆'); }
     }
   }
   a.sd = true; dirty = true; markMe(a);
@@ -2905,7 +2906,7 @@ const msSeen = a => Object.keys(a.endings || {}).length;
 const msName = id => (FOLK_DEF[id]?.name || '').replace(/\s*\(.*$/, '');
 const msLine = l => { const m = l.match(/^@(\w*):([\s\S]*)$/); return m ? { s: m[1] || null, nm: msName(m[1]), x: m[2] } : { x: l }; };   // '@npc:text' → speaker + text ({n} is filled in on the client)
 function msProg(a, ms, st) {   // 'do' steps count from when the step became current
-  const k = ms.ch + ':' + ms.st, v = a.stats?.[st.stat] || 0;
+  const k = ms.ch + ':' + ms.st + ':' + st.stat, v = a.stats?.[st.stat] || 0;
   if (ms.bk !== k) { ms.bk = k; ms.bv = v; a.sd = true; }
   return Math.max(0, v - (ms.bv || 0));
 }
@@ -3558,7 +3559,7 @@ function act(a, m) {
       sendRoster(); wdAt = 0; markMe(a);
       const docs = [...online.values()].filter(o => o.career === 'doctor' && o !== a);
       for (const d of docs) toast(d, `🛏️ ${a.name} นอนรอหมออยู่ที่โรงพยาบาล เตียง ${s.idx + 1}`, '🩺');
-      return toast(a, docs.length ? `นอนรอหมอแล้ว (หมอออนไลน์ ${docs.length} คน) ค่ารักษาประมาณ ฿300` : 'นอนรอหมอแล้ว ตอนนี้ไม่มีหมอผู้เล่น หมอเวร NPC จะเดินมารักษาให้ (~฿450)', '🛏️');
+      return toast(a, docs.length ? `นอนรอหมอแล้ว (หมอออนไลน์ ${docs.length} คน) ค่ารักษาประมาณ 300 LC` : 'นอนรอหมอแล้ว ตอนนี้ไม่มีหมอผู้เล่น หมอเวร NPC จะเดินมารักษาให้ (~450 LC)', '🛏️');
     }
     case 'bed.exam': {                    // 🩺 a doctor starts examining this bed's patient: the treatment can be chosen once the exam is done
       if (!need(a, 'doctor')) return;
@@ -3695,7 +3696,7 @@ function act(a, m) {
       a.rods.push(id); a.rodEq = id; a.rod = 1; markMe(a); eqSweep(a); joy(a, 4); nbEv(a, 'rod');
       return toast(a, `ได้${r.icon}${r.name}แล้ว! ถือไว้ในมือแล้ว · เดินไปริมน้ำที่ไหนก็ได้ (ทะเลสาบ บ่อ ทะเล) แล้วกดปุ่มใหญ่เพื่อเหวี่ยงเบ็ด`, '🎣');
     }
-    case 'wish.toss': {                    // the wishing fountain: a ฿10 coin, a fortune, and once a day maybe ฿1,000 back
+    case 'wish.toss': {                    // the wishing fountain: a 10 LC coin, a fortune, and once a day maybe 1,000 LC back
       const E = D.EGG, e = eggOf(a), d = dayKey(); if (e.d !== d) { e.d = d; e.wn = 0; e.ww = 0; }
       if (!cd(a, 'wish', 1200, true)) return;
       if (e.wn >= E.wishDay) return toast(a, `วันนี้โยนเหรียญครบ ${E.wishDay} ครั้งแล้ว น้ำพุขอพักก่อน พรุ่งนี้มาใหม่นะ`, '⛲', false);
@@ -4811,7 +4812,7 @@ function fcSendAll() { for (const o of online.values()) send(o, fcView(o)); }
 function fcStart(mins = FC.min) {
   fc = { start: now(), end: now() + mins * 60e3, best: {} };
   feed(`🏆🎣 การแข่งตกปลาเริ่มแล้ว! ${mins} นาที ใครตกปลาตัวที่หนักที่สุดชนะ ไปที่ท่าตกปลาได้เลย`);
-  for (const o of online.values()) toast(o, `🏆 แข่งตกปลาเริ่มแล้ว! ${mins} นาที ปลาตัวหนักสุดชนะ ฿${FC.prizes[0].toLocaleString('en-US')}`, '🎣');
+  for (const o of online.values()) toast(o, `🏆 แข่งตกปลาเริ่มแล้ว! ${mins} นาที ปลาตัวหนักสุดชนะ ${FC.prizes[0].toLocaleString('en-US')} LC`, '🎣');
   fcSendAll();
 }
 function fcEnd() {
@@ -5601,7 +5602,7 @@ setInterval(() => { const t = now(); for (const [k, v] of loginFails) if (v.rese
 
 // daily login bonus: grows each consecutive day, capped at day 7 (kept small to fight inflation)
 const LOGIN_BONUS = [50, 80, 100, 120, 150, 200, 300];
-// daily bonus grows for 7 days in a row, then keeps rising slowly (+฿10 a day up to ฿500);
+// daily bonus grows for 7 days in a row, then keeps rising slowly (+10 LC a day up to 500 LC);
 // every 30 days you have logged in (in total, a missed day does not reset it) there is a big reward:
 // cash plus a piece of gift furniture you can only get this way (cash instead once you own them all)
 const loginReward = s => s <= 7 ? LOGIN_BONUS[s - 1] : Math.min(500, 300 + 10 * (s - 7));
@@ -6017,7 +6018,7 @@ function onMessage0(ws, raw) {
       place(a, a.x, a.y); markMe(a); return;
     }
     case 'god': return godAct(a, m);
-    case 'fcbait': {                        // 🪱 contest bait: only while the contest runs, 5 for ฿250
+    case 'fcbait': {                        // 🪱 contest bait: only while the contest runs, 5 for 250 LC
       if (!fc || now() > fc.end) return toast(a, 'เหยื่อแข่งตกปลาขายเฉพาะช่วงแข่ง (ทุกวัน 20:00)', '🪱', false);
       if (!cd(a, 'fcbait', 800)) return;
       if (!pay(a, 250)) return;
@@ -6114,7 +6115,7 @@ function onMessage0(ws, raw) {
       const raw = Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + boost(a, 'beggar'))), pay = Math.min(400, raw);
       if (pay > 0) earn(a, pay); addXp(a, Math.min(2, (cups + cans + bottles) / 25)); stat(a, 'trash', cups + cans + bottles); joy(a, 3); if (pay > 0) quest(a, 'job_beggar'); markMe(a);
       if (dist > (a.stats?.runBest || 0)) stat(a, 'runBest', dist, true);
-      return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}${raw > pay ? ` (เต็มเพดาน ฿400 ต่อรอบ จากที่คิดได้ ${money(raw)})` : ''}`, '♻️');
+      return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}${raw > pay ? ` (เต็มเพดาน 400 LC ต่อรอบ จากที่คิดได้ ${money(raw)})` : ''}`, '♻️');
     }
     case 'quizans': {                       // an answer to a classroom pop quiz
       const q = a.quiz; if (!q) return; a.quiz = null;
@@ -6122,7 +6123,7 @@ function onMessage0(ws, raw) {
       if (+m.i === q.ans) {
         a.school.p = Math.min(.99, a.school.p + (q.teacher ? .6 : .4)); joy(a, q.teacher ? 3 : 1); stat(a, 'quizOk', 1);
         if (q.teacher) earn(a, 40);
-        return toast(a, q.teacher ? 'ตอบถูก! อาจารย์ชม ได้โบนัส ฿40 และเรียนเร็วขึ้น' : 'ตอบถูก! เรียนเร็วขึ้น', '🎓');
+        return toast(a, q.teacher ? 'ตอบถูก! อาจารย์ชม ได้โบนัส 40 LC และเรียนเร็วขึ้น' : 'ตอบถูก! เรียนเร็วขึ้น', '🎓');
       }
       return toast(a, `ตอบผิด คำตอบที่ถูกคือ "${q.right}"`, '📖', false);
     }
@@ -6442,7 +6443,7 @@ function godAct(a, m) {
     if (a.down) revive(a, 100);
     toast(a, 'สเตตัสเต็มแล้ว', '💯');
   } else if (m.op === 'cloak') { a.god.cloak = !a.god.cloak; markMe(a); sendRoster(); toast(a, a.god.cloak ? 'สวมชุดคลุมแอดมิน + ออร่า' : 'ถอดชุดคลุมแอดมิน', '🌑'); }
-  else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน ฿999,999', '💰'); }
+  else if (m.op === 'money') { a.money = 999999; toast(a, 'เงิน 999,999 LC', '💰'); }
   else if (m.op === 'inf') {
     a.god.inf = a.god.inf === false;
     if (a.god.inf) { a.god.real = Math.min(a.money, INF_MONEY - 1); a.god.realG = a.gems || 0; godTop(a); }
@@ -6660,8 +6661,8 @@ function tick() {
     else a.awake = (a.awake || 0) + dt;
     if (slow) moodTick(a, t, indoors);
     if (frozen) { a.energy = Math.max(a.energy, frozen[0]); a.hunger = Math.max(a.hunger, frozen[1]); a.health = Math.max(a.health, frozen[2]); a.happy = Math.max(a.happy ?? 0, frozen[3] ?? 0); }
-    if (slow && !isAdmin(a)) {               // beggars: out of poverty past ฿2,000
-      if (a.career === 'beggar' && a.money + (a.bank || 0) > 2000) { a.career = 'none'; a.pose === 'beg' && standUp(a); markMe(a); sendRoster(); toast(a, '🎉 มีเงินเกิน ฿2,000 แล้ว! พ้นจากการเป็นขอทาน ไปสมัครงานใหม่ได้เลย', '🎉'); feed(`🎉 ${a.name} พ้นจากการเป็นขอทานแล้ว!`); }
+    if (slow && !isAdmin(a)) {               // beggars: out of poverty past 2,000 LC
+      if (a.career === 'beggar' && a.money + (a.bank || 0) > 2000) { a.career = 'none'; a.pose === 'beg' && standUp(a); markMe(a); sendRoster(); toast(a, '🎉 มีเงินเกิน 2,000 LC แล้ว! พ้นจากการเป็นขอทาน ไปสมัครงานใหม่ได้เลย', '🎉'); feed(`🎉 ${a.name} พ้นจากการเป็นขอทานแล้ว!`); }
     }
     if (slow && !a.down) {
       // ---- ways to get sick (often enough that doctors have work)
@@ -6685,7 +6686,7 @@ function tick() {
       if (a.career === 'office') officeTick(a, t, h, 1);
       if (a.desk >= 0) studyTick(a, h, 1);
       if (a.call?.payer) callBill(a);
-      // (leaving begging is handled with the ฿2,000 rule above)
+      // (leaving begging is handled with the 2,000 LC rule above)
       if ((a.licenses || []).includes('driving') && a.licExp?.driving) {
         const left = a.licExp.driving - t;
         if (left < 0 && !a.licWarned2) { a.licWarned2 = true; toast(a, 'ใบขับขี่หมดอายุแล้ว! ต่ออายุได้ที่โชว์รูมรถ (ไรเดอร์รับออเดอร์ไม่ได้จนกว่าจะต่อ)', '🪪', false); }

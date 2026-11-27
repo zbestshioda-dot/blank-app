@@ -20,7 +20,7 @@ function bid(s, a, amt) {
   if (!s?.lot) return { ok: false, msg: 'ตอนนี้ไม่มีของประมูล' };
   if (!Number.isFinite(amt) || amt !== Math.floor(amt)) return { ok: false, msg: 'ใส่ราคาเป็นตัวเลข' };
   if (s.by === key(a)) return { ok: false, msg: 'คุณเป็นผู้นำการประมูลอยู่แล้ว' };
-  if (amt < next(s)) return { ok: false, msg: `ต้องเสนออย่างน้อย ฿${next(s).toLocaleString('en-US')}` };
+  if (amt < next(s)) return { ok: false, msg: `ต้องเสนออย่างน้อย ${next(s).toLocaleString('en-US')} LC` };
   const refund = s.by ? { login: s.by, amt: s.bid } : null;
   s.bid = amt; s.by = key(a); s.name = a.name;
   return { ok: true, refund };

@@ -2183,3 +2183,9 @@ body.dlgOn #hud,body.dlgOn #nearBtns,body.dlgOn #keyHint,body.dlgOn #placeBar,bo
 .tTabs button{position:relative;min-width:40px;height:36px;padding:0 8px;font-size:18px;border-radius:10px}
 .tTabs button.on{background:var(--accent,#ffd34d);color:#222}
 .tTabs i{position:absolute;top:-5px;right:-5px;font-style:normal;font-size:10px;background:#333;color:#fff;border-radius:8px;padding:0 4px;line-height:14px}
+/* 📱 iPad: Safari must not inflate text on rotate; talk boxes never grow past the screen */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+#dlg{width:min(640px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important;max-height:calc(100dvh - 40px)}
+@media(max-height:520px){#dlg .dlgPic{display:none}#dlg{height:min(190px,calc(100dvh - 30px))!important}}
+.msBox{max-height:calc(100dvh - 13vh - 60px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.msOpts button{white-space:normal;overflow-wrap:anywhere}

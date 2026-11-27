@@ -214,7 +214,7 @@ function pathDown(b, toY) { const cx = Math.floor(b.x + b.w / 2); for (let y = b
   // 🔨 the crafting workshop: an open-air workbench on the lawn across the road from the bank (picked by the owner) (craft-only furniture, see CRAFTS)
   prop('x_workbench', 44.5, 19.6); prop('x_toolbox', 42.4, 19.5, false);
   STATIONS.push({ id: 'workshop', type: 'craft', label: 'โรงช่างคราฟ', icon: '🔨', x: 43.6, y: 19.9, r: 1.5, area: 'town' });
-  STATIONS.push({ id: 'wish', type: 'wish', label: 'โยนเหรียญ ฿10', icon: '⛲', x: 50, y: 34.7, r: 1.4, area: 'town' });
+  STATIONS.push({ id: 'wish', type: 'wish', label: 'โยนเหรียญ 10 LC', icon: '⛲', x: 50, y: 34.7, r: 1.4, area: 'town' });
   // five little signs in corners nobody walks to
   [[67, 25.3], [1.6, 38.5], [1.6, 87.6], [92.5, 1.6], [98, 88]].forEach(([x, y], n) => { prop('signpost', x, y - .15, false); STATIONS.push({ id: 'secret' + n, type: 'secret', n, label: 'ป้ายเล็กๆ', icon: '🪧', x, y: y + .1, r: .9, area: 'town' }); });
   STATIONS.push({ id: 'fishclub', type: 'fishclub', label: 'สมาคมประมง · ร้านขายปลา', icon: '🎣', x: 26.5, y: 55.4, r: 1.6, area: 'town' });
@@ -1659,7 +1659,7 @@ const CAREERS = {
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ประมูลสินค้าที่โรงประมูล (คลังสินค้าเดิม) แข่งกับคู่แข่ง เดาราคาให้แม่น ชนะต่ำกว่ามูลค่าจริง = กำไร สูงกว่า = ขาดทุน · ของในกระเป๋ายังวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
   doctor:   { name: 'แพทย์', icon: '🩺', where: 'hospital', need: ['degree', 'medicine'], desc: 'รับเคสฉุกเฉินที่ ICU: เดินหยิบยา/เครื่องมือแล้วรักษาคนไข้ให้ทันเวลา ได้ค่ารักษาทุกเคส + รักษาคนไข้บนเตียง (วินิจฉัยจากอาการ) ไม่ต้องเข้าเวร' },
   police:   { name: 'ตำรวจ', icon: '👮', where: 'police', need: ['hs', 'policeExam'], desc: 'ตามหาหมาที่หายไปได้ค่าตอบแทนตามเวลา ไปลาดตระเวนและช่วยเหลือชาวเมือง' },
-  beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'สมัครได้ถ้ามีเงิน (สด+ฝาก) ไม่เกิน ฿2,000 · วิ่งเก็บขยะที่ถังขยะ (หลบสิ่งกีดขวางไปเรื่อยๆ จนกว่าจะชน) หรือนั่งขอทาน (🥣) · มีเงินเกิน ฿2,000 พ้นจากขอทานอัตโนมัติ' },
+  beggar:   { name: 'ขอทาน', icon: '🥣', where: 'square', need: [], desc: 'สมัครได้ถ้ามีเงิน (สด+ฝาก) ไม่เกิน 2,000 LC · วิ่งเก็บขยะที่ถังขยะ (หลบสิ่งกีดขวางไปเรื่อยๆ จนกว่าจะชน) หรือนั่งขอทาน (🥣) · มีเงินเกิน 2,000 LC พ้นจากขอทานอัตโนมัติ' },
   monk:     { name: 'พระ', icon: '🙏', where: 'wat_pray', need: [], desc: 'บวชเป็นพระที่วัด · เช้า 05:00–10:00 ออกบิณฑบาตรอบเมือง ได้อาหารและปัจจัย · ฉันอาหารได้ถึงเที่ยงวันเท่านั้น · หิวช้ากว่าคนทั่วไป' },
   cashier:  { name: 'พนักงานซูเปอร์มาร์เก็ต', icon: '🧾', where: 'cstore', need: [], desc: 'ยืนแคชเชียร์ที่ร้านสะดวกซื้อ/ซูเปอร์มาร์เก็ตสาขาไหนก็ได้ คิดเงินและทอนเงินลูกค้าให้ถูก ยิ่งถูกยิ่งได้มาก' },
   templeboy: { name: 'เด็กวัด', icon: '🧒', where: 'gate_temple', need: [], desc: 'ช่วยงานวัด: ตามหลวงพ่อบิณฑบาต กวาดลานวัด ซื้อของไหว้พระ บอกบุญ · รับภารกิจที่พี่ตุ๋ยหน้าประตูวัด' },
@@ -1733,7 +1733,7 @@ const POLICE_TEST = [
 const JOB_COOLDOWN_MIN = [0, 5];
 const OFFICE_TITLES = ['พนักงานฝึกหัด', 'พนักงาน', 'พนักงานอาวุโส', 'หัวหน้าทีม', 'ผู้จัดการ', 'ผู้อำนวยการ', 'CEO'];
 // pay ladder (Lv.1, per real minute of work): beggar ~12 < fishing ~20 < rider ~27 < merchant ~35 < office ~45 < police ~55 < doctor ~70
-// (a game hour of daytime lasts 1.75 real minutes, so ฿80 per game hour ≈ ฿45 a minute)
+// (a game hour of daytime lasts 1.75 real minutes, so 80 LC per game hour ≈ 45 LC a minute)
 const OFFICE_WAGE = [80, 92, 106, 122, 140, 160, 185];          // per game hour seated
 const RIDER = { baseFee: 18, perTile: 0.45, npcEvery: 55, tipMax: 30 };
 // running: faster, costs energy per tile; you stop running when energy gets low
@@ -2242,7 +2242,7 @@ for (const [c, ids] of Object.entries(OUTFIT_CAT)) for (const id of ids) OUTFITS
 for (const [base, ds] of Object.entries(DYE_SETS)) for (const d of ds) { const o = OUTFITS[base], [cn, hue] = DYES[d];
   OUTFITS[`${base}_${d}`] = { ...o, name: `${o.name} (สี${cn})`, ...(o.nf ? { nf: `${o.nf} (สี${cn})` } : {}), base, hue, cat: 'dye', nosale: 1, ...(DYE_WHITE.includes(base) ? { wt: 1 } : {}) }; }
 // prestige titles bought with money (a money sink for the rich): not achievements, never counted in the achievement total
-// the supporter title from the ฿49 top-up pack: lasts 30 days per purchase (stacks), sparkly rarity 8
+// the supporter title from the 49 LC top-up pack: lasts 30 days per purchase (stacks), sparkly rarity 8
 const PAY_TITLE = { id: 'vip', title: '💖 ผู้สนับสนุนเมือง', r: 8, days: 30 };
 const LUX_TITLES = [
   { id: 'lux1', title: 'คนมีอันจะกิน', r: 4, price: 1000000 },
@@ -2280,7 +2280,7 @@ const ACHIEVEMENTS = [
   { id: 'gen5', r: 1, c: null, stat: 'donated', n: 5, title: 'ใจบุญ', desc: 'บริจาคให้ขอทาน 5 ครั้ง' },
   { id: 'gen6', r: 2, c: null, stat: 'cravings', n: 10, title: 'นักชิม', desc: 'กินของที่อยากกินได้ทันเวลา 10 ครั้ง' },
   { id: 'gen1', r: 1, c: null, stat: 'trades', n: 5, title: 'นักเจรจา', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 5 ครั้ง' },
-  { id: 'gen2', r: 3, c: null, stat: 'worth', n: 100000, title: 'เศรษฐีใหม่', desc: 'มีทรัพย์สินรวม ฿100,000' },
+  { id: 'gen2', r: 3, c: null, stat: 'worth', n: 100000, title: 'เศรษฐีใหม่', desc: 'มีทรัพย์สินรวม 100,000 LC' },
   { id: 'gen3', r: 1, c: null, stat: 'calls', n: 5, title: 'สายโทรศัพท์', desc: 'โทรคุยกับเพื่อน 5 ครั้ง' },
   { id: 'gen4', r: 3, c: null, stat: 'degree', n: 1, title: 'บัณฑิต', desc: 'เรียนจบปริญญาตรี' },
   { id: 'fis4', r: 4, c: null, stat: 'fish', n: 300, title: 'เจ้าแห่งท้องน้ำ', desc: 'ตกปลาได้ 300 ตัว' },
@@ -2293,7 +2293,7 @@ const ACHIEVEMENTS = [
   { id: 'doc4', r: 5, c: 'doctor', stat: 'treated', n: 200, title: 'แพทย์ในตำนาน', desc: 'รักษาคนไข้หาย 200 คน' },
   { id: 'rid3', r: 5, c: 'rider', stat: 'delivered', n: 300, title: 'ตำนานไรเดอร์', desc: 'ส่งอาหารสำเร็จ 300 ออเดอร์' },
   { id: 'beg2', r: 3, c: 'beggar', stat: 'alms', n: 200, title: 'ขอทานพันล้าน', desc: 'ได้รับเงินบริจาค 200 ครั้ง' },
-  { id: 'gen7', r: 5, c: null, stat: 'worth', n: 1000000, title: 'มหาเศรษฐี', desc: 'มีทรัพย์สินรวม ฿1,000,000' },
+  { id: 'gen7', r: 5, c: null, stat: 'worth', n: 1000000, title: 'มหาเศรษฐี', desc: 'มีทรัพย์สินรวม 1,000,000 LC' },
   { id: 'gen8', r: 3, c: null, stat: 'trades', n: 50, title: 'นักค้าขายตัวยง', desc: 'แลกเปลี่ยนกับผู้เล่นอื่น 50 ครั้ง' },
   { id: 'gen9', r: 4, c: null, stat: 'donated', n: 50, title: 'นักบุญแห่งเมือง', desc: 'บริจาคให้ขอทาน 50 ครั้ง' },
   { id: 'gen10', r: 2, c: null, stat: 'calls', n: 50, title: 'คนช่างคุย', desc: 'โทรคุยกับเพื่อน 50 ครั้ง' },
@@ -2315,7 +2315,7 @@ const ACHIEVEMENTS = [
     ['s_cook5', 'cooked', 5, 1, 'เข้าครัว', 'ทำอาหาร 5 จาน'], ['s_crave3', 'cravings', 3, 1, 'อยากกินต้องได้กิน', 'กินของที่อยากกินทันเวลา 3 ครั้ง'],
     ['s_rides5', 'rides', 5, 2, 'ขาเครื่องเล่น', 'เล่นเครื่องเล่นในสวนสนุก 5 ครั้ง'], ['s_pray3', 'pray', 3, 1, 'สายบุญ', 'ไหว้พระ 3 ครั้ง'],
     ['s_quiz5', 'quizOk', 5, 2, 'หัวไว', 'ตอบคำถามถูก 5 ข้อ'], ['s_miss3', 'missions', 3, 2, 'รับจ๊อบ', 'ทำภารกิจสำเร็จ 3 ครั้ง'],
-    ['s_dogs1', 'dogs', 1, 1, 'เพื่อนสี่ขา', 'ดูแลน้องหมาครั้งแรก'], ['s_worth50k', 'worth', 50000, 3, 'เริ่มมีเก็บ', 'มีทรัพย์สินรวม ฿50,000']]
+    ['s_dogs1', 'dogs', 1, 1, 'เพื่อนสี่ขา', 'ดูแลน้องหมาครั้งแรก'], ['s_worth50k', 'worth', 50000, 3, 'เริ่มมีเก็บ', 'มีทรัพย์สินรวม 50,000 LC']]
     .map(([id, stat, n, g, title, desc]) => ({ id, r: 1, nt: 1, g, stat, n, title, desc })),
   // 💼 career levels for the jobs that had no achievements yet (stat lv_<career> = highest job level reached)
   ...Object.entries({ police: ['สายตรวจหน้าใหม่', 'มือปราบประจำเมือง', 'ผู้พิทักษ์ในตำนาน'], monk: ['พระนวกะ', 'พระผู้ทรงศีล', 'หลวงพ่อศักดิ์สิทธิ์'],
@@ -2332,13 +2332,13 @@ const ACHIEVEMENTS = [
   { id: 'st_tonkla', r: 4, c: null, stat: 'story_tonkla', n: 1, title: 'ผู้เล่นคนที่ 2', desc: 'ช่วยต้นกล้าจนจบเรื่อง "ตู้เกมหมายเลขศูนย์"' },
   { id: 'st_mprang', r: 4, c: null, stat: 'story_mprang', n: 1, title: 'พี่เงาคนที่สอง', desc: 'ช่วยน้องมะปรางจนจบเรื่อง "พี่เงา"' },
   // 🏗️ building the town together (stat 'built' = baht donated in total)
-  { id: 'build1', r: 3, c: null, stat: 'built', n: 100000, title: 'ผู้ร่วมสร้างเมือง', desc: 'ลงขันสร้างเมืองรวม ฿100,000' },
-  { id: 'build2', r: 5, c: null, stat: 'built', n: 1000000, title: 'เสาหลักของเมือง', desc: 'ลงขันสร้างเมืองรวม ฿1,000,000' },
-  { id: 'build3', r: 7, c: null, stat: 'built', n: 10000000, title: 'ผู้สร้างตำนานเมือง', desc: 'ลงขันสร้างเมืองรวม ฿10,000,000' },
-  // 📖 finishing many stories: titles + diamonds (the 50th also pays ฿100,000, see storyAdv)
+  { id: 'build1', r: 3, c: null, stat: 'built', n: 100000, title: 'ผู้ร่วมสร้างเมือง', desc: 'ลงขันสร้างเมืองรวม 100,000 LC' },
+  { id: 'build2', r: 5, c: null, stat: 'built', n: 1000000, title: 'เสาหลักของเมือง', desc: 'ลงขันสร้างเมืองรวม 1,000,000 LC' },
+  { id: 'build3', r: 7, c: null, stat: 'built', n: 10000000, title: 'ผู้สร้างตำนานเมือง', desc: 'ลงขันสร้างเมืองรวม 10,000,000 LC' },
+  // 📖 finishing many stories: titles + diamonds (the 50th also pays 100,000 LC, see storyAdv)
   { id: 'story10', r: 4, g: 30, c: null, stat: 'storyDone', n: 10, title: 'นักฟังเรื่องเล่า', desc: 'จบเนื้อเรื่องของชาวเมือง 10 เรื่อง' },
   { id: 'story25', r: 5, g: 80, c: null, stat: 'storyDone', n: 25, title: 'คนที่ทั้งเมืองไว้ใจ', desc: 'จบเนื้อเรื่องของชาวเมือง 25 เรื่อง' },
-  { id: 'story50', r: 7, g: 300, c: null, stat: 'storyDone', n: 50, title: 'ผู้รู้ความลับของเมือง', desc: 'จบเนื้อเรื่องครบทั้ง 50 เรื่อง · ได้ ฿100,000 ด้วย' },
+  { id: 'story50', r: 7, g: 300, c: null, stat: 'storyDone', n: 50, title: 'ผู้รู้ความลับของเมือง', desc: 'จบเนื้อเรื่องครบทั้ง 50 เรื่อง · ได้ 100,000 LC ด้วย' },
   // 📕 main story endings (server/mainstory.js)
   ...Object.entries(require('./mainstory').ENDS).map(([k, e]) => ({ id: 'end_' + k, r: k === 'secret' ? 7 : 5, c: null, stat: 'end_' + k, n: 1, title: e.name, desc: `ได้ฉากจบ ${e.tag} ของเรื่องหลัก` })),
   { id: 'msall', r: 7, c: null, stat: 'msEnds', n: 6, title: 'ผู้โดยสารทุกเที่ยว', desc: 'สะสมฉากจบเรื่องหลักครบทั้ง 6 แบบ' },

@@ -50,7 +50,7 @@ function pick(g, i, r) {
   if (g.over || g.mon) return false; const d = g.doors[i]; if (!d) return false;
   if (d.k === 'mon') { spawn(g, r, false); return true; }
   if (d.k === 'boss') { spawn(g, r, true); return true; }
-  if (d.k === 'gold') { const n = cash(g, GOLD * g.f * (0.8 + 0.4 * r())); g.bag.money += n; say(g, `💰 เจอหีบสมบัติ ได้ ฿${n}`); const x = r(); if (x < 0.04) { g.bag.shard++; say(g, '💎 ในหีบมีชิ้นส่วนเพชร!'); } else if (x < 0.3) { g.bag.crystal++; say(g, '💠 ในหีบมีเศษคริสตัล!'); } }
+  if (d.k === 'gold') { const n = cash(g, GOLD * g.f * (0.8 + 0.4 * r())); g.bag.money += n; say(g, `💰 เจอหีบสมบัติ ได้ ${n} LC`); const x = r(); if (x < 0.04) { g.bag.shard++; say(g, '💎 ในหีบมีชิ้นส่วนเพชร!'); } else if (x < 0.3) { g.bag.crystal++; say(g, '💠 ในหีบมีเศษคริสตัล!'); } }
   else if (d.k === 'trap') {
     if (has(g, 'boots')) say(g, '🐾 รองเท้าแมวพาคุณกระโดดข้ามกับดัก!');
     else { const n = Math.round(g.mhp * (0.15 + 0.1 * r())); g.hp = Math.max(1, g.hp - n); say(g, `🪤 เหยียบกับดัก! เสียพลัง ${n}`); }
@@ -60,14 +60,14 @@ function pick(g, i, r) {
     if (x < 0.35) relic(g, r);
     else if (x < 0.6) { g.pot++; say(g, '🧪 เจอยาฟื้นพลัง +1'); }
     else if (x < 0.8) { const n = Math.round(g.mhp * 0.2); g.hp = Math.max(1, g.hp - n); say(g, `👻 คำสาปในห้องมืด! เสียพลัง ${n}`); }
-    else { g.bag.coin++; const n = cash(g, GOLD * g.f * 1.5); g.bag.money += n; say(g, `🪙 เจอเหรียญโบราณกับเงิน ฿${n}`); }
+    else { g.bag.coin++; const n = cash(g, GOLD * g.f * 1.5); g.bag.money += n; say(g, `🪙 เจอเหรียญโบราณกับเงิน ${n} LC`); }
   }
   nextFloor(g, r); return true;
 }
 
 function win(g, r) {
   const M = g.mon; let n = cash(g, GOLD * g.f * (M.boss ? 3 : 0.9) * (0.8 + 0.4 * r())); g.bag.money += n;
-  let s = `🏆 ชนะ ${M.name}! ได้ ฿${n}`;
+  let s = `🏆 ชนะ ${M.name}! ได้ ${n} LC`;
   if (M.boss) { const sh = Math.floor(g.f / 10), c = 2 + Math.floor(g.f / 5); g.bag.shard += sh; g.bag.coin += c; g.bag.crystal += 2; s += `${sh ? ` · 💎x${sh}` : ''} · 🪙x${c} · 💠x2`; }
   g.mhp += 2; g.hp = Math.min(g.mhp, g.hp + 2 + (has(g, 'blood') ? 4 : 0));   // every win makes you a little tougher
   say(g, s); if (M.boss || r() < 0.15) relic(g, r);
