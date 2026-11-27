@@ -6585,6 +6585,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27b', d: '27 พ.ย.', items: [
+    '⚖️ ปรับสมดุลอาชีพ: อุปกรณ์หมอ 🩺 และวิทยุตำรวจ 📻 ระดับสูงสุดเหลือ +40% (จาก +50%)',
+    '📕 ก่อนสอบนายสิบตำรวจ ต้องเรียน "หลักสูตรเตรียมนายสิบ" 3 คาบที่มหาวิทยาลัย (คนที่สอบผ่านแล้วไม่ต้องเรียนใหม่)',
+  ] },
   { v: '2026-11-27n', d: '27 พ.ย.', items: [
     '📕 <b>เรื่องหลักใหม่: "สาย 99 ไม่เคยถึงปลายทาง"</b> 8 บท เฉลยว่าทำไมคุณมาอยู่ในเมืองนี้ · เปิดได้ที่มือถือ → 📕 เรื่องหลัก',
     '🎭 ทุกการเลือกเปลี่ยนเรื่อง ความผูกพันกับชาวเมือง และฉากจบ · มีฉากจบ 6 แบบ (ฉากสุดท้ายซ่อนอยู่ ต้องเล่นหลายรอบ)',
@@ -8221,8 +8225,8 @@ function renderPanel(p) {
         return itemRowRaw(l.icon, l.name, `ค่าเทอม ${money(l.price)} · เรียน ${l.classes} คาบ · ${what}${blocked ? ` · <span style="color:var(--bad)">ต้องจบ${L[l.need].name}ก่อน</span>` : ''}`, B(`ลงทะเบียน ${money(l.price)}`, { t: 'act', st, a: 'enroll', lic: id }, 'good', blocked || !!me.enrolled));
       };
       const pol = lic('policeExam') ? itemRowRaw('👮', L.policeExam.name, 'สอบผ่านแล้ว ✓', '<span class="tag">ผ่าน</span>')
-        : itemRowRaw('👮', 'สอบนายสิบตำรวจ', `ค่าสมัครสอบ ${money(L.policeExam.price)} · ตอบ 3 ข้อ ต้องถูกทุกข้อ · ต้องจบ ม.6`, B('📝 สอบ', { t: 'act', st, a: 'ptest' }, 'good', !lic('hs')));
-      const degRow = course('hs', 'ปลดล็อกการเรียนปริญญาตรีและสอบตำรวจ') + course('degree', 'ปลดล็อกงานบริษัท และเรียนต่อแพทย์') + pol;
+        : itemRowRaw('👮', 'สอบนายสิบตำรวจ', `ค่าสมัครสอบ ${money(L.policeExam.price)} · ตอบ 3 ข้อ ต้องถูกทุกข้อ · ต้องจบ${L.polAcad.name}`, B('📝 สอบ', { t: 'act', st, a: 'ptest' }, 'good', !lic('hs')));
+      const degRow = course('hs', 'ปลดล็อกการเรียนปริญญาตรีและสอบตำรวจ') + course('degree', 'ปลดล็อกงานบริษัท และเรียนต่อแพทย์') + course('polAcad', 'ปลดล็อกการสอบนายสิบตำรวจ') + pol;
       const rows = ['medicine'].map(id => {
         const l = L[id], has = lic(id), blocked = l.need && !lic(l.need);
         const c = Object.values(G.careers).find(c => (c.need || []).includes(id));

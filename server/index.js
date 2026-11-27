@@ -1638,6 +1638,7 @@ function mayorOp(a, m) {
 }
 const tier = (a, c) => (a.tools && a.tools[c]) || 0;
 const BOOST = [0, .15, .3, .5];
+const boost = (a, c) => (D.TOOLS[c]?.up || BOOST)[tier(a, c)] || 0;   // tool pay bonus (doctor/police have their own, lower top tier)
 const houseOf = a => (a.house >= 0 ? a.house : -1);
 const furnOf = a => [...(a.hown ? ['sbed'] : []), ...(a.furniture || []), ...(a.keep || [])];   // sbed: the bed every home comes with (movable, cannot be stored)
 const inOwnHome = a => { const r = D.areaAt(a.x, a.y); return !!r && r.house !== undefined && r.house === a.house && (r.rk === 'house' || r.yard); };
@@ -2400,7 +2401,7 @@ function doctorTick(a, t, h, dt) {
   }
   if (!onDuty || a.afk) return;   // away from the screen: no salary
   const l = Math.min(lvl(a, 'doctor'), D.DOCTOR.wage.length), gh = dt * D.gameRate(h);
-  o.pend += D.DOCTOR.wage[l - 1] * gh * wellbeing(a) * (1 + BOOST[tier(a, 'doctor')]);
+  o.pend += D.DOCTOR.wage[l - 1] * gh * wellbeing(a) * (1 + boost(a, 'doctor'));
   o.hours += gh;
   if (o.pend >= D.DOCTOR.wage[l - 1]) { earn(a, o.pend); o.pend = 0; if (o.hours >= 4 && !o.xp) { o.xp = 1; addXp(a); } }
 }
@@ -3448,7 +3449,7 @@ function act(a, m) {
     case 'bank.deposit': case 'bank.withdraw': case 'bank.borrow': case 'bank.repay': return bankOp(a, m);
     // ---------------- university
     case 'school.enroll': {
-      const id = m.lic === 'hs' ? 'hs' : 'degree', L = D.LICENSES[id];
+      const id = ['hs', 'polAcad'].includes(m.lic) ? m.lic : 'degree', L = D.LICENSES[id];
       if (a.licenses.includes(id)) return toast(a, `คุณจบ${L.name}แล้ว`, 'ℹ️', false);
       if (L.need && !a.licenses.includes(L.need)) return toast(a, `ต้องจบ${D.LICENSES[L.need].name}ก่อน`, '🎓', false);
       if (a.enrolled) return toast(a, `คุณกำลังเรียน${D.LICENSES[a.enrolled].name}อยู่ กด "เข้าเรียน" ได้เลย`, 'ℹ️', false);
@@ -3516,11 +3517,11 @@ function act(a, m) {
       const pt = beds[s.idx];
       if (!pt || pt === a) return toast(a, 'เตียงนี้ยังไม่มีคนไข้', '🛏️', false);
       if (!cd(a, 'treat', 1500) || !spend(a, 8)) return;
-      const boost = (1 + BOOST[tier(a, 'doctor')]) * jobPay(a) * wb;
+      const bm = (1 + boost(a, 'doctor')) * jobPay(a) * wb;
       if (m.a === 'revive') {
         if (!pt.down) return toast(a, 'คนไข้รู้สึกตัวดีอยู่แล้ว', 'ℹ️', false);
         const fee = Math.min(400, Math.floor(pt.money)); pt.money -= fee;
-        const got = earn(a, (fee + 120) * boost); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2); stat(a, 'revived');
+        const got = earn(a, (fee + 120) * bm); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2); stat(a, 'revived');
         feed(`💓 หมอ${a.name} ช่วยชีวิต ${pt.name} สำเร็จ`);
         return toast(a, `ช่วยให้ ${pt.name} ฟื้นแล้ว ได้ ${money(got)} · ต่อไปวินิจฉัยโรคที่ป่วยอยู่`, '💓');
       }
@@ -3530,7 +3531,7 @@ function act(a, m) {
         let fee = 25;
         if (!pt.npc) { const f = Math.min(150, Math.floor(pt.money)); pt.money -= f; fee = f + 40; markMe(pt); toast(pt, `หมอ${a.name}ตรวจร่างกายให้ สุขภาพ +25`, '🩺'); }
         pt.health = Math.min(100, pt.health + 25);
-        const got = earn(a, fee * boost); addXp(a);
+        const got = earn(a, fee * bm); addXp(a);
         if (pt.npc) beds[s.idx] = null; else standUp(pt);   // one check-up per visit (staying in bed let a doctor tap it over and over for money)
         wdAt = 0;
         return toast(a, `ตรวจร่างกาย ${pt.name} เรียบร้อย ได้ ${money(got)}`, '🩺');
@@ -4034,7 +4035,7 @@ function jobGame(a, m) {
     a.jg = null; a.jgNext = { ...(a.jgNext || {}), [k]: now() + J.cd * 1000 };
     const secs = (now() - g.t0) / 1000;
     const score = Math.max(0, Math.min(J.max, Math.floor(+m.score) || 0, Math.ceil(secs * J.rate) + 1));
-    let pay = Math.round(score * J.per * (J.career ? jobPay(a) * (1 + BOOST[tier(a, J.career)] || 1) : 1));
+    let pay = Math.round(score * J.per * (J.career ? jobPay(a) * (1 + boost(a, J.career) || 1) : 1));
     if (J.dayCap) {   // side gigs anyone can play: capped per real day so they never beat a real job
       const d = new Date(now() + 7 * 3600e3).toISOString().slice(0, 10), u = a.jgDay?.d === d ? a.jgDay : (a.jgDay = { d, paid: 0 });
       pay = Math.max(0, Math.min(pay, J.dayCap - u.paid)); u.paid += pay; a.sd = true;
@@ -4279,7 +4280,7 @@ function rbAct(a, m) {
   if (foe.hp <= 0 || me.hp <= 0) {
     const won = foe.hp <= 0; a.rb = null;
     if (won) {
-      const pay = Math.round((120 + 40 * lvl(a)) * jobPay(a) * (1 + (BOOST[tier(a, 'rider')] || 0)));
+      const pay = Math.round((120 + 40 * lvl(a)) * jobPay(a) * (1 + boost(a, 'rider')));
       earn(a, pay); addXp(a, 1); stat(a, 'rbwin'); joy(a, 6);
       ev.push({ who: 'me', text: `${foe.name} หมดแรงใจ! ${b.cust} เลือกคุณ · ได้ค่าส่ง+ทิป ${money(pay)}`, win: 1 });
     } else { a.energy = Math.max(0, a.energy - 5); joy(a, -3); ev.push({ who: 'foe', text: `${me.name} หมดแรงใจ... ${foe.name} แย่งลูกค้าไปได้`, lose: 1 }); }
@@ -4487,7 +4488,7 @@ function misNext(a) {
   const m = a.mis; m.i++;
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
-  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0))) : Math.round((80 + 55 * Math.min(min, m.limit / 60000 * .5)) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + (BOOST[tier(a, m.car)] || 0)));
+  const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + boost(a, m.car))) : Math.round((80 + 55 * Math.min(min, m.limit / 60000 * .5)) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + boost(a, m.car)));
   a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); if (m.car === 'detective') a.cases = [...(a.cases || []), { t: m.title, i: m.icon, d: t, c: m.steps.filter(s => s.k === 'talk' || s.k === 'find').map(s => s.label).slice(0, 4) }].slice(-40); }   /* 🕵️ the case notebook */ earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(dd.gross ?? pay)}${dd.cap < 1 ? ` (เต็ม ${money(pay)} แต่วันนี้ทำงานเกิน ${dd.cap < .5 ? 5 : 3} ชม. ได้ ${Math.round(dd.cap * 100)}%)` : ''}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
@@ -4635,7 +4636,7 @@ function detAct(a, m) {
     a.case = null; a.detNext = t + DET.cd;
     if (i !== c.ci) { joy(a, -3); markMe(a); return toast(a, `❌ จับผิดตัว! ${c.sus[i].name} มีพยานยืนยัน ส่วนคนร้ายตัวจริงคือ ${c.sus[c.ci].name} (${c.sus[c.ci].desc}) หนีไปแล้ว`, '🕵️', false); }
     const left = Math.max(0, (c.until - t) / DET.limit), N = c.sus.length;
-    const pay = Math.round((120 + 30 * N) * (1 + .4 * left) * jobPay(a) * (1 + (BOOST[tier(a, 'detective')] || 0)));
+    const pay = Math.round((120 + 30 * N) * (1 + .4 * left) * jobPay(a) * (1 + boost(a, 'detective')));
     a.cases = [...(a.cases || []), { t: c.title, i: c.icon, d: t, c: [...c.clues.filter(q => q.found).map(q => q.text.replace(/\s*\(.*\)$/, '')), `คนร้าย: ${c.sus[c.ci].name}`].slice(0, 5) }].slice(-40);
     quest(a, 'job_detective'); stat(a, 'missions'); earn(a, pay); addXp(a, 2); joy(a, 8); markMe(a);
     feed(`🕵️ นักสืบ${a.name} ปิดคดี "${c.title}" จับ${c.sus[c.ci].name}ได้สำเร็จ`);
@@ -4706,7 +4707,7 @@ function dogTick(a, t) {
   if (c.kind === 'thief') {
     if (areaId(a) === 'town' && Math.hypot(a.x - c.x, a.y - c.y) < 2.2) {
       const min = (t - c.t0) / 60000, early = t - c.t0 < c.limit * .5;
-      const pay = Math.round((D.THIEFQ.base + D.THIEFQ.perMin * (c.wm ?? min / 2)) * (early ? 1.25 : 1) * jobPay(a) * (1 + BOOST[tier(a, 'police')]));
+      const pay = Math.round((D.THIEFQ.base + D.THIEFQ.perMin * (c.wm ?? min / 2)) * (early ? 1.25 : 1) * jobPay(a) * (1 + boost(a, 'police')));
       a.dogq = null; a.thiefNext = t + D.THIEFQ.next; earn(a, pay); quest(a, 'job_police'); addXp(a, 1.2); joy(a, 8); markMe(a); send(a, { t: 'caught' });
       feed(`🚓 ${a.name} จับโจร "${c.name}" ได้แล้ว!`);
       return toast(a, `🚓 จับ "${c.name}" ได้แล้ว! ได้${c.stole}คืนเจ้าของ · รางวัล ${money(pay)}${early ? ' (จับไว โบนัส +25%)' : ''}`, '🚓');
@@ -4716,7 +4717,7 @@ function dogTick(a, t) {
   }
   if (areaId(a) === 'town' && Math.hypot(a.x - c.x, a.y - c.y) < 1.5) {          // found!
     const min = (t - c.t0) / 60000, early = t - c.t0 < c.limit * .5;
-    const pay = Math.round((D.DOGQ.base + D.DOGQ.perMin * (c.wm ?? min / 2)) * (early ? 1 + D.DOGQ.early : 1) * jobPay(a) * (1 + BOOST[tier(a, 'police')]));
+    const pay = Math.round((D.DOGQ.base + D.DOGQ.perMin * (c.wm ?? min / 2)) * (early ? 1 + D.DOGQ.early : 1) * jobPay(a) * (1 + boost(a, 'police')));
     a.dogq = null; a.dogNext = t + D.DOGQ.next; earn(a, pay); quest(a, 'job_police'); addXp(a, 1); stat(a, 'dogs'); joy(a, 6); markMe(a);
     return toast(a, `🐕 เจอ "น้อง${c.name}" แล้ว! ส่งคืน${c.owner} ใช้เวลา ${Math.floor(min)} นาที ${Math.round((min % 1) * 60)} วิ${early ? ' · เจอเร็ว โบนัส +25%' : ''} · ได้ ${money(pay)}`, '🐕');
   }
@@ -4861,7 +4862,7 @@ function moodTick(a, t, indoors) {
   // monthly water & electricity bills
   billUp(a);
   // begging: passers-by drop coins now and then
-  if (a.pose === 'beg' && (a.career === 'beggar' || allJobs(a)) && Math.random() < 0.025 * (1 + BOOST[tier(a, 'beggar')]) * begSpot(a)) {
+  if (a.pose === 'beg' && (a.career === 'beggar' || allJobs(a)) && Math.random() < 0.025 * (1 + boost(a, 'beggar')) * begSpot(a)) {
     const c = Math.round(rint(4, 14) * jobPay(a)); earn(a, c); if (Math.random() < .5) addXp(a, .5); stat(a, 'alms'); toast(a, `${pick(D.NPC_NAMES)} หยอดเงินให้ ${money(c)}`, '🪙');
   }
   if (a.dogq) dogTick(a, t);
@@ -6055,7 +6056,7 @@ function onMessage0(ws, raw) {
       const n = k => clamp(Math.floor(+m[k] || 0), 0, 9999), cups = n('cups'), cans = n('cans'), bottles = n('bottles'), coins = n('coins'), dist = n('dist'), items = cups + cans + bottles + coins;
       const why = dist > sec * 31 + 40 ? `ระยะทาง ${dist} ม. เกินกว่าที่วิ่งได้ใน ${Math.round(sec)} วินาที` : items > dist * .8 + 8 ? `เก็บของ ${items} ชิ้น มากเกินกว่าที่มีบนถนน ${dist} ม.` : coins > dist / 8 + 2 ? `เหรียญ ${coins} เหรียญ มากเกินกว่าที่มีบนถนน ${dist} ม.` : '';
       if (why) { markMe(a); return toast(a, `⚠️ ผลการวิ่งผิดปกติ ไม่ได้รับเงิน: ${why} (ถ้าเล่นปกติแล้วเจอแบบนี้ กด 🐞 แจ้งบัคได้เลย)`, '⚠️', false); }
-      const raw = Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + (BOOST[tier(a, 'beggar')] || 0))), pay = Math.min(400, raw);
+      const raw = Math.round((cups * 2 + cans * 3 + bottles * 3 + coins * 8 + Math.floor(dist / 100) * 2) * (1 + boost(a, 'beggar'))), pay = Math.min(400, raw);
       if (pay > 0) earn(a, pay); addXp(a, Math.min(2, (cups + cans + bottles) / 25)); stat(a, 'trash', cups + cans + bottles); joy(a, 3); if (pay > 0) quest(a, 'job_beggar'); markMe(a);
       if (dist > (a.stats?.runBest || 0)) stat(a, 'runBest', dist, true);
       return toast(a, `🗑️ วิ่งได้ ${dist} ม. เก็บขยะ ${cups + cans + bottles} ชิ้น เหรียญ ${coins} · ขายได้ ${money(pay)}${raw > pay ? ` (เต็มเพดาน ฿400 ต่อรอบ จากที่คิดได้ ${money(raw)})` : ''}`, '♻️');
