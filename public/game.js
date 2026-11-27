@@ -6499,6 +6499,9 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-27g', d: '27 พ.ย.', items: [
+    'กรอบค่าสถานะเปลี่ยนเป็นสีกรมโปร่งใส เหมือนกล่องแชท',
+  ] },
   { v: '2026-11-27f', d: '27 พ.ย.', items: [
     '💬 คุยกับคนในเมือง: ขึ้นแค่กรอบข้อความก่อน แตะอีกครั้งถึงจะขึ้นเมนูให้เลือก',
     '🧹 ระหว่างคุย ซ่อนกล่องสถานะ/เควสต์ให้จอโล่ง',

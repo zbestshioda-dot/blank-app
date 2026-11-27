@@ -2141,3 +2141,7 @@ body #thumbs #actBtn,body #thumbs #actBtn.idle{box-shadow:0 4px 0 var(--h-ink),0
 /* 💬 while someone is talking, the status card and quests step aside so only the text box is on screen */
 #card{transition:opacity .25s}
 body.dlgOn #hud #card{opacity:0;pointer-events:none}
+/* stat card = chat look (dark translucent) */
+#hud #card.v2 .sInfo{background:rgba(34,40,74,.84)!important;color:#fbecd2!important}
+#hud #card.v2 .sInfo .money,#hud #card.v2 .sInfo .bar em,#hud #card.v2 .sInfo .bar label,#hud #card.v2 .sInfo #jx label{color:#fbecd2!important}
+#hud #card.v2 .sInfo #meGems{color:#c9b6ff!important}
