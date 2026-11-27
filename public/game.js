@@ -4520,6 +4520,7 @@ function refreshPanel(force) {
   panelLate = false;
   let html = renderPanel(panel);
   if (panel.soc) html = socHead(panel.kind) + html.replace(/<h2>[\s\S]*?<\/h2>/, '');
+  if (panel.st && me) html = html.replace('</h2>', `<small class="wal">🪙 ${money(me.money)}</small></h2>`);   // the HUD is covered on phones: show the wallet on the title
   const stf = panel.st && STAFF_AT[panel.st];
   if (stf) html = html.replace('</h2>', `</h2><div class="npcSay"><canvas class="npcFace" data-staff="${stf.id}" width="48" height="56"></canvas><div><b>${esc(stf.name)}</b>${esc(stf.line(me))}</div></div>`);
   if (!force && html === panelSig) return;
@@ -4588,6 +4589,11 @@ function bindPanel(root) {
   root.querySelectorAll('.list').forEach(l => { const its = [...l.children].filter(c => c.classList.contains('item'));
     if (its.length >= 2 && its.every(it => [...it.querySelectorAll('button')].some(b => /"a":"(buy|rod)"/.test(b.dataset.m || '')))) l.classList.add('shop'); });
   bindStocks(root); bindWall(root); bindPay(root);
+  // 📜 a long description under a place's title folds to 2 lines; tap to read it all (stays open while this menu is open)
+  if (panel?.st) { const d = root.querySelector('h2 ~ .sub'); if (d && d.scrollHeight > parseFloat(getComputedStyle(d).lineHeight) * (innerWidth > innerHeight && innerHeight <= 520 ? 1.6 : 2.6)) {
+    const more = document.createElement('span'); more.className = 'subMore'; d.classList.add('fold'); d.after(more);
+    const show = () => { d.classList.toggle('open', !!panel?.subOpen); more.textContent = panel?.subOpen ? 'ย่อ ▴' : 'อ่านต่อ ▾'; };
+    d.onclick = more.onclick = () => { if (panel) { panel.subOpen = !panel.subOpen; show(); } }; show(); } }
   root.querySelectorAll('[data-detx]').forEach(b => b.onclick = () => { const i = +b.dataset.detx; DETX.has(i) ? DETX.delete(i) : DETX.add(i); FX.play('click'); refreshPanel(); });
   root.querySelectorAll('[data-detnav]').forEach(b => b.onclick = () => { const [x, y] = b.dataset.detnav.split(',').map(Number); closePanel(); guide = { x, y, area: 'town', label: b.dataset.label, mis: 1 }; autoNav = false; paintNav(); toast(`นำทางไป ${b.dataset.label} — เดินตามลูกศร`, '📍', false); });
   root.querySelectorAll('[data-detacc]').forEach(b => b.onclick = () => { const q = me.case?.sus[+b.dataset.detacc]; if (q) popup(`👉 ชี้ตัว <b>${esc(q.name)}</b> เป็นคนร้าย?<br><small>ถ้าผิด คนร้ายตัวจริงจะหนีไป</small>`, [['👉 ชี้ตัวเลย', 'warn', () => { DETX.clear(); closePanel(); send({ t: 'det', op: 'accuse', i: +b.dataset.detacc }); }], ['ยังก่อน', 'good', () => { }]], 15000); });
@@ -6628,6 +6634,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28c', d: '28 พ.ย.', items: [
+    '📱 เมนูร้านค้าแนวตั้งสูงเกือบเต็มจอ เห็นของมากขึ้นเกือบเท่าตัว · แนวนอนหัวร้านเตี้ยลง เห็นสินค้าทันที',
+    '🪙 เงินที่มีอยู่โชว์บนหัวเมนูร้าน ไม่ต้องปิดเมนูไปดู',
+    '📜 คำอธิบายร้านที่ยาวพับเหลือ 2 บรรทัด แตะ "อ่านต่อ" เพื่อดูทั้งหมด · ปุ่มในการ์ดสินค้าเรียงข้างกัน การ์ดเตี้ยลง',
+  ] },
   { v: '2026-11-28b', d: '28 พ.ย.', items: [
     '💬 ปรับบทพูด NPC หลายคนให้เป็นธรรมชาติขึ้น เล่าเรื่องจริงในเมืองแทนคำคม',
   ] },

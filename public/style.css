@@ -2213,3 +2213,21 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   #panel .sheet .tabs button{white-space:nowrap}
 }
 @media (orientation:landscape) and (max-height:520px){.pFind{margin:3px 0}.pFind input{height:30px;font-size:13px;border-width:2px}}
+
+/* 🧭 menus v3 (mobile RPG style): full-height sheet on phones, wallet on the title, long descriptions fold, card buttons side by side */
+@media (orientation:portrait){#panel:not(.phMode):not(.bagMode) .sheet{max-height:90vh;max-height:90dvh}}
+.sheet h2 .wal{float:right;margin:3px 0 0 6px!important;background:#fff3c4!important}
+#panel .sheet .sub.fold{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;margin-bottom:0}
+#panel .sheet .sub.fold.open{display:block}
+.subMore{display:block;text-align:right;font-size:11px;font-weight:700;color:var(--k-skyDk,#1f7fb8);cursor:pointer;margin:0 2px 6px}
+.sheet .list.shop .item>div:last-child:not(.nm){display:flex;flex-wrap:wrap;gap:4px;margin-top:auto}
+.sheet .list.shop .item>div:last-child:not(.nm) button{flex:1 1 auto;width:auto!important;margin:0!important;min-width:0}
+@supports (zoom:.5){   /* the sheet is zoomed .86, so these are ~90% / ~93% of the real screen */
+  @media (orientation:portrait){#panel:not(.phMode):not(.bagMode) .sheet{max-height:104dvh}}
+  @media (orientation:landscape) and (max-height:520px){#panel:not(.phMode):not(.bagMode) .sheet{max-height:108dvh}}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #panel .sheet .npcSay{padding:2px 8px 2px 4px;margin:3px 0 4px;font-size:12px}
+  #panel .sheet .npcFace{width:26px;height:30px}
+  #panel .sheet .sub.fold{-webkit-line-clamp:1}
+}
