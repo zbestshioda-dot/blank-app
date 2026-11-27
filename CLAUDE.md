@@ -15,7 +15,7 @@
 - Model hint: at the start of a task, if it clearly fits a cheaper or stronger model, say so in one Thai line
   (Haiku = text/number tweaks; Sonnet = normal updates; Opus = big client+server features, lag, hard bugs, player data; Fable = only when Opus got stuck).
 - Skills are chosen automatically: the user will just describe the job in Thai, never type `/...`. Pick the matching skill yourself
-  (แก้/เพิ่ม/ปรับ → update; บั๊ก/กระตุก/ค้าง → fix; ชุดใหม่ → outfit; ตรวจ → check; รีวิว → review; ขึ้นเว็บ/deploy → deploy; คิดไอเดีย/ควรเพิ่มอะไร → idea)
+  (แก้/เพิ่ม/ปรับ → update; บั๊ก/กระตุก/ค้าง → fix; ชุดใหม่ → outfit; สมดุล/บาลานซ์/เลเวลเร็วช้า → balance; ตรวจ → check; รีวิว → review; ขึ้นเว็บ/deploy → deploy; คิดไอเดีย/ควรเพิ่มอะไร → idea)
   and mention which one you used in a few words. After code changes, run check on your own before reporting done.
 
 ## Global rules (user-set)
