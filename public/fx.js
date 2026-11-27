@@ -57,28 +57,38 @@ window.FX = (() => {
 
   // ------------------------------------------------------------------ sound effects
   const N = { C5: 523, D5: 587, E5: 659, G5: 784, A5: 880, B5: 988, C6: 1047, E6: 1319, G6: 1568 };
+  // signature voice: ระนาดเอก (wooden bar: short body + inharmonic bar partials + mallet click), tuned to the Thai 7-equal scale
+  const T = k => 523 * 2 ** (k / 7);   // Thai step k above C5 (each step ~171 cents, not western)
+  function ranat(f, at = 0, v = 1) {
+    tone(f, 0.26, { type: 'triangle', vol: 0.16 * v, at, attack: 0.002 });
+    tone(f * 2.76, 0.07, { vol: 0.05 * v, at, attack: 0.001 });
+    tone(f * 5.4, 0.03, { vol: 0.025 * v, at, attack: 0.001 });
+    noise(0.018, { filter: 'highpass', freq: 3500, vol: 0.09 * v, at });
+  }
+  // กรอ: fast octave roll like a ranat player ending a phrase
+  function roll(f, at, n = 7, v = 1) { for (let i = 0; i < n; i++) ranat(i % 2 ? f / 2 : f, at + i * 0.045, v * (1 - i / (n + 2))); }
   const SFX = {
     coin(big) {
-      tone(N.B5, 0.09, { type: 'square', vol: 0.12 });
-      tone(N.E6, 0.28, { type: 'square', vol: 0.12, at: 0.07 });
-      if (big) { tone(N.G6, 0.35, { type: 'triangle', vol: 0.15, at: 0.15 }); tone(N.C6 * 2, 0.4, { vol: 0.08, at: 0.22 }); }
+      ranat(T(4), 0, .8); ranat(T(9), 0.07);
+      if (big) roll(T(11), 0.16, 6, .8);
     },
     spend() { tone(660, 0.07, { type: 'triangle', vol: 0.08 }); tone(440, 0.1, { type: 'triangle', vol: 0.08, at: 0.05 }); },
     fail() { tone(220, 0.18, { type: 'square', vol: 0.07, slide: 140 }); },
     pop() { tone(500, 0.08, { vol: 0.2, slide: 950 }); },
-    click() { tone(1400, 0.03, { vol: 0.05 }); },
+    click() { ranat(T(14), 0, .25); },
     step(kind) {
       if (kind === 'p') { tone(170 + Math.random() * 30, 0.06, { type: 'triangle', vol: 0.07 }); return; }
       noise(0.05, { freq: kind === '=' || kind === ',' ? 2600 : 900, q: 1.5, vol: kind === 's' ? 0.05 : 0.035 });
     },
-    levelup() { [N.C5, N.E5, N.G5, N.C6].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.18, at: i * 0.09 })); tone(N.E6, 0.6, { vol: 0.1, at: 0.36 }); },
-    chime() { [N.G5, N.C6, N.E6].forEach((f, i) => tone(f, 0.7, { vol: 0.14, at: i * 0.08, attack: 0.01 })); },
+    // the game's signature motif "ติง ติง ตะ-ติ๊ง แล้วกรอ": same 4 notes every level-up / quest / achievement so players learn it
+    levelup() { [T(2), T(4), T(7), T(9)].forEach((f, i) => ranat(f, i * (i === 3 ? 0.1 : 0.085))); roll(T(14), 0.38, 8); tone(T(14), 0.9, { vol: 0.06, at: 0.4, attack: 0.05 }); },
+    chime() { [T(4), T(7), T(11)].forEach((f, i) => ranat(f, i * 0.09, .8)); },
     bell(k = 1) {   // big temple bell: low gong with slow-beating partials and a long tail (k: loudness, <1 = far away)
       [[98, .3], [196.5, .16], [262, .1], [331, .07], [494, .04]].forEach(([f, v]) => { tone(f, 4.2, { vol: v * k, attack: 0.004 }); tone(f * 1.006, 3.6, { vol: v * .5 * k, attack: 0.004 }); });
       noise(0.08, { filter: 'lowpass', freq: 900, vol: 0.18 * k });
     },
     pray() { [N.C5, N.G5].forEach((f, i) => tone(f, 1.6, { vol: 0.1, at: i * 0.25, attack: 0.05 })); },
-    ding() { tone(N.C6, 0.25, { vol: 0.18 }); tone(N.E6, 0.45, { vol: 0.16, at: 0.12 }); },
+    ding() { ranat(T(7), 0); ranat(T(11), 0.12); },
     bite() { for (let i = 0; i < 3; i++) tone(N.A5, 0.07, { type: 'square', vol: 0.12, at: i * 0.1 }); noise(0.3, { filter: 'lowpass', freq: 1500, sweep: 300, vol: 0.25, at: 0.05 }); },
     alarm() { for (let i = 0; i < 4; i++) { tone(620, 0.32, { type: 'sawtooth', vol: 0.07, at: i * 0.6, slide: 880 }); tone(880, 0.26, { type: 'sawtooth', vol: 0.07, at: i * 0.6 + 0.32, slide: 620 }); } },
     groan() { tone(140 + Math.random() * 40, 0.9, { type: 'sawtooth', vol: 0.05, slide: 85, attack: 0.15 }); noise(0.7, { filter: 'lowpass', freq: 500, sweep: 200, vol: 0.06, at: 0.1 }); },
@@ -88,7 +98,7 @@ window.FX = (() => {
     munch() { for (let i = 0; i < 3; i++) noise(0.06, { freq: 700, q: 2, vol: 0.18, at: i * 0.13 }); },
     sleep() { tone(392, 0.6, { vol: 0.08, attack: 0.1 }); tone(330, 0.8, { vol: 0.08, at: 0.3, attack: 0.1 }); },
     heal() { [N.E5, N.A5, N.C6].forEach((f, i) => tone(f, 0.4, { vol: 0.1, at: i * 0.1, attack: 0.02 })); },
-    notice() { tone(N.G5, 0.12, { vol: 0.06 }); tone(N.C6, 0.2, { vol: 0.06, at: 0.08 }); },
+    notice() { ranat(T(4), 0, .45); ranat(T(7), 0.08, .45); },
     // pet voices: arg = [kind, volume scale]; each kind is a few short synthesised notes with a little random pitch so it never sounds the same twice
     pet(arg) {
       const [k, v = 1] = Array.isArray(arg) ? arg : [arg], r = 1 + (Math.random() - .5) * .14;
