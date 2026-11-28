@@ -5096,6 +5096,7 @@ const FN = {
   bank(m, root) { const v = m.all ? m.all : +root.querySelector('#bankAmt')?.value || 0; send(m.st ? { t: 'act', st: m.st, a: m.op, amt: v } : { t: 'bankop', op: m.op, amt: v }); },   // from the phone: no bank needed
   price(m, root) { send({ t: 'act', st: m.st, a: m.op, price: m.zero ? 0 : +root.querySelector('#' + m.inp).value || 0 }); },
   guide(m) { closePanel(); setGuide(m.key, false, true); },
+  resignAsk() { resignAsk(); },
   guidePt(m) { closePanel(); guide = { x: m.x, y: m.y, area: m.area, label: m.label }; toast(`นำทางไป ${m.label}`, '📍'); paintNav(); placeLog(); },
   tut() { closePanel(); showTut(0, true); },
   map() { closePanel(); openMap(); },
@@ -5493,7 +5494,8 @@ function talkTo(n, st) {
   const det = n.career === 'detective' && job('detective') ? [me.case ? { label: '🗂️ กระดานสืบสวน', fn: () => { dialogClose(); openPanel({ kind: 'detcase' }); }, cls: 'good' } : { label: '🕵️ รับคดี "ใครคือคนร้าย?" (⚡8)', fn: () => { dialogClose(); send({ t: 'det', op: 'start' }); }, cls: 'good' }] : [];
   const take = { label: '📋 รับภารกิจ (⚡5)', fn: () => { dialogClose(); send({ t: 'mission', op: 'start', car: n.career, st }); }, cls: 'good' };
   const mis = misOk ? [me.mis ? { label: '📋 ภารกิจที่ทำอยู่', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } } : misWait() > 0 ? { label: `⏳ งานใหม่ในอีก ${misWait()} วินาที`, tick: () => misWait() > 0 ? `⏳ งานใหม่ในอีก ${misWait()} วินาที` : null, next: take, fn: () => toast(`ยังไม่มีงานใหม่ รออีก ${misWait()} วินาที (จะแจ้งเตือนเมื่อพร้อม)`, '⏳', false) } : take] : [];
-  let choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
+  const quit = !n.keeper && n.career && me.career === n.career ? [{ label: '📦 ลาออก', fn: () => { dialogClose(); resignAsk(); }, cls: 'warn' }] : [];
+  let choices = [{ label: act, fn: openIt, cls: 'primary' }, ...det, ...mis, ...quit, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];
   if (n.career === 'fishing' && nbDay1() && !me.rod && !(me.rods || []).length) choices = [{ label: `🎣 ซื้อเบ็ดแรก ${money(G.rods?.bamboo?.price || 150)}`, fn: () => { dialogClose(); send({ t: 'act', st, a: 'rod', rod: 'bamboo' }); }, cls: 'primary' }, { label: '💬 คุยต่อ', fn: more }, { label: '👋 ลาก่อน', fn: dialogClose }];   // 🌱 a newcomer's first rod: one tap
   const hi = String((n.lineRaw ? n.lineRaw(me) : n.line ? n.line(me) : '') || '').trim() || 'สวัสดี';   // never crash on a missing line
   if (fd) choices = [choices[0], ...staffFolkChoices(n, fd), ...choices.slice(1)];
@@ -6093,10 +6095,14 @@ function jobPick() {
       return { label: `${c.icon} ${c.name}`, cls: 'good', fn: () => { dialogClose(); FN.guide({ key: stf ? stf.st : c.where }); toast(`เดินตามลูกศร แล้วคุยกับ${stf?.short || 'เจ้าหน้าที่'}เพื่อสมัครเป็น${c.name}`, '💼'); } }; }),
       { label: '📋 ดูงานทั้งหมด', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } }, { label: '👋 ไว้ทีหลัง', fn: dialogClose }] });
 }
-$('#jobLine')?.addEventListener('click', () => { FX.play('click'); jobPick(); });
+$('#jobLine')?.addEventListener('click', () => { FX.play('click'); me?.career === 'none' ? jobPick() : openPanel({ kind: 'career' }); });
+const resignAsk = () => { const c = G.careers[me?.career]; if (c && confirm(`ลาออกจาก${c.name}?\nเลเวลอาชีพยังเก็บไว้ · สมัครงานใหม่ได้หลังรอ 5 นาที`)) send({ t: 'resign' }); };
 setInterval(() => {
-  const el = $('#jobLine'), on = !!(G && me && me.career === 'none' && !nbActive()); if (!el) return;
-  el.classList.toggle('hidden', !on); if (!on || panel || dlgQ || msQ) return;
+  const el = $('#jobLine'), on = !!(G && me && me.career === 'none' && !nbActive()), c = G && me && G.careers[me.career]; if (!el) return;
+  el.classList.toggle('hidden', !(on || (c && me.career !== 'none' && !nbActive())));
+  const h = on ? '<i>💼</i><span><b>ยังว่างงาน</b><em>แตะเลือกงานแรก พี่ฟ้าพาไปสมัคร</em></span>' : c ? `<i>${c.icon}</i><span><b>${esc(c.name)} Lv.${me.lv || 1}</b><em>แตะดูงานของฉัน · เปลี่ยนงาน · ลาออก</em></span>` : '';
+  if (el.dataset.h !== h) { el.dataset.h = h; el.innerHTML = h; }
+  if (!on || panel || dlgQ || msQ) return;
   const k = 'jobNudge_' + new Date().toDateString(); let seen = 1; try { seen = localStorage.getItem(k); } catch { }
   if (!seen && performance.now() - lastInput > 3000 && (window.__jobT = (window.__jobT || 0) + 1) > 20) { try { localStorage.setItem(k, 1); } catch { } jobPick(); }   // ~40 s into the session, while idle
 }, 2000);
@@ -6726,6 +6732,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '📦 หาปุ่มลาออกง่ายขึ้น: แตะชื่องานใต้เควสต์ หรือคุยกับคนรับสมัครงานของอาชีพตัวเอง จะมีปุ่ม "ลาออก" (ถามยืนยันก่อน)',
     '💼 ยังไม่มีงาน? ใต้เควสต์จะมีปุ่ม "เลือกงานแรก" พี่ฟ้าแนะนำงานที่สมัครได้เลยแล้วพาเดินไปสมัคร',
     '🏦 ดอกเบี้ยเงินฝากเหลือ 0.05% ต่อวันเกม (เงินในเมืองเฟ้อเร็วเกินไป)',
     '📈 หุ้น: ค่าธรรมเนียม 0.5% · ถือได้ตัวละไม่เกิน 150,000 LC (ที่ถือเกินอยู่แล้วไม่ต้องขาย)',
@@ -8174,7 +8181,7 @@ function renderPanel(p) {
           ${me.docjob ? `<div class="jobbox ok">📄 กำลังส่งเอกสารไปที่ <b>${esc(STN(me.docjob.dest)?.label || '')}</b> · ค่าส่ง ~${money(me.docjob.pay)}${B('📍 นำทาง', { fn: 'guide', key: me.docjob.dest }, 'good')}</div>` : B('📄 รับงานส่งเอกสาร', { t: 'act', st, a: 'job' }, 'primary big')}
           <div class="sub" style="margin-top:8px">📄 รับซองเอกสารที่นี่ เดินไปส่งให้ถึงหน้าอาคารปลายทาง ได้เงินทันที (ไกลได้มาก) แล้วกลับมารับงานต่อ · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} เริ่มเมื่อไหร่ก็ได้ ไม่มีมาสาย · โอทีต่อได้ถึง ${hhmm(G.shift.ot)} (ค่าส่ง x${G.shift.otMul})</div>
           ${jgBox('type', 'นั่งโต๊ะคอม พิมพ์เอกสารตามต้นแบบให้ตรงทุกตัวอักษร 12 บรรทัด')}
-          ${B('📦 ลาออก', { t: 'resign' }, 'warn')}`;
+          ${B('📦 ลาออก', { fn: 'resignAsk' }, 'warn')}`;
       }
       return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${job('office') ? '' : staffHint('office')}`;
     }
@@ -8520,7 +8527,7 @@ function renderPanel(p) {
       return `<h2>💼 งานของฉัน</h2>
         <div class="jobbox ${me.career === 'none' ? '' : 'ok'}">${me.career === 'none' ? '🙂 ตอนนี้ยัง<b>ว่างงาน</b> — เดินเข้าไปสมัครงานในอาคารต่างๆ ได้เลย' : `${cur.icon} <b>${cur.name}</b> · Lv.${me.lv}${me.jx && me.career !== 'office' ? `<div class="sub">⭐ EXP ${(Math.floor(me.jx.cur * 10) / 10).toFixed(1)}/${me.jx.need} · ได้ EXP ${me.jx.gain}% ต่อครั้ง (เลเวลยิ่งสูงยิ่งได้น้อย) · รายได้จากงาน +${me.jx.pay}%</div>` : ''}`}
         ${me.jobWait > 0 ? `<div class="sub" style="color:var(--bad)">⏳ สมัครงานใหม่ได้ในอีก ${Math.ceil(me.jobWait / 60000)} นาที</div>` : ''}
-        ${me.career !== 'none' ? B('📦 ลาออก', { t: 'resign' }, 'warn') : ''}</div>
+        ${me.career !== 'none' ? B('📦 ลาออก', { fn: 'resignAsk' }, 'warn') : ''}</div>
         ${caseBook()}${starter}<div class="sub" style="margin-top:8px">⏳ เปลี่ยนงานแล้วต้องรอ 5 นาทีถึงจะสมัครงานใหม่ได้ · 🎣 ตกปลา ทำได้ทุกคน ไม่ต้องสมัคร</div><div class="secT">👤 สมัครงาน / เปลี่ยนอาชีพ</div><div class="sub">กด 🚶 แล้วตัวละครจะเดินไปหาเจ้าหน้าที่ให้เอง</div><div class="list">${rows}</div>`;
     }
     case 'toolshop': {
