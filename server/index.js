@@ -1977,7 +1977,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -2820,6 +2820,35 @@ function folkTalk(a, n) {
   const f = folkOf(a, def.id), d = dayKey();
   if (f.talk === d) return; f.talk = d; folkAdd(a, def, 1, `คุยกับ${def.name}`); quest(a, 'folk');
 }
+// 💘 dating a townsperson: at "เหมือนครอบครัว" (lv 4+) you may confess; one partner at a time, not while married to a player;
+// a date once a (Thai) day = happiness + friendship. Kids, monks and elders are never datable.
+const NO_LOVE = new Set(['mprang', 'james', 'd_templeboy', 'd_monk']);
+const loveOk = def => !NO_LOVE.has(def.id) && !/^(น้อง|ยาย|ตา|ลุง|ป้า|หลวงพ่อ)/.test(def.name);
+function folkLove(a, m) {
+  const op = m.op, def = FOLK_DEF[String(m.fid || '')]; if (!def) return;
+  const nm = def.name.replace(/\s*\(.*$/, ''), f = folkOf(a, def.id);
+  if (op === 'end') {
+    if (a.npcLove?.id !== def.id) return;
+    a.npcLove = null; joy(a, -10); markMe(a); send(a, folksView(a)); send(a, { t: 'folklove', op: 'end', fid: def.id });
+    return toast(a, `💔 เลิกกับ${nm}แล้ว · ยังเป็นเพื่อนกันได้นะ`, '💔');
+  }
+  if (!folkNear(a, def)) return toast(a, `ต้องอยู่ใกล้${nm}ก่อน`, '💘', false);
+  if (op === 'ask') {
+    if (!loveOk(def)) return toast(a, `${nm}ไม่ใช่คนที่จะจีบได้นะ`, '💘', false);
+    if (a.npcLove) return toast(a, 'คุณมีแฟนอยู่แล้ว ต้องเลิกก่อนถึงจะจีบคนใหม่ได้', '💘', false);
+    if (a.spouse) return toast(a, 'คุณแต่งงานแล้ว จีบคนอื่นไม่ได้นะ', '💍', false);
+    if (folkLv(f.p) < 4) return toast(a, `ต้องสนิทกับ${nm}ถึงขั้น "${D.FOLK_LVN[4]}" ก่อน`, '💘', false);
+    a.npcLove = { id: def.id, since: now(), d: '' }; joy(a, 20); markMe(a);
+    feed(`💘 ${a.name} กับ${nm} เป็นแฟนกันแล้ว!`); send(a, folksView(a));
+    return send(a, { t: 'folklove', op: 'ask', fid: def.id });
+  }
+  if (op === 'date') {
+    if (a.npcLove?.id !== def.id) return;
+    const d = dayKey(); if (a.npcLove.d === d) return toast(a, `วันนี้เดทกับ${nm}ไปแล้ว พรุ่งนี้ค่อยนัดใหม่นะ`, '💘', false);
+    a.npcLove.d = d; joy(a, 12); folkAdd(a, def, 2, `ไปเดทกับ${nm}`); markMe(a); send(a, folksView(a));
+    return send(a, { t: 'folklove', op: 'date', fid: def.id });
+  }
+}
 function folkGift(a, m) {
   const n0 = m.fid ? null : npcs.find(x => x.id === m.id), def = FOLK_DEF[m.fid || n0?.fid], id = String(m.item || ''), n = def && folkNear(a, def, n0?.id);
   if (!def || !n) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะให้ของได้', '🎁', false);
@@ -2997,7 +3026,7 @@ function msAct(a, m) {
   send(a, msView(a));
 }
 function folksView(a) {
-  return { t: 'folks', stories: storiesView(a), list: Object.values(FOLK_DEF).map(def => {
+  return { t: 'folks', mylove: a.npcLove?.id || '', dated: a.npcLove?.d === dayKey() ? 1 : 0, stories: storiesView(a), list: Object.values(FOLK_DEF).map(def => {
     const n = npcs.find(x => x.fid === def.id), f = (a.folk || {})[def.id] || { p: 0, lv: 0 }, lv = folkLv(f.p), d = dayKey();
     return { id: def.id, npc: n?.id, name: def.name, face: def.face, p: f.p, lv, next: D.FOLK_LV[lv + 1] ?? null, about: def.about,
       bday: def.bday, today: folkBday(def) ? 1 : 0, desk: def.desk ? 1 : 0, doing: n ? folkDoing(n) : def.desk ? 'ประจำอยู่ที่ร้าน/ที่ทำงาน' : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0, mg: f.mg && f.gift !== d ? [f.mg[0], Math.floor((now() - f.mg[1]) / 864e5)] : null,
@@ -5935,6 +5964,7 @@ function onMessage0(ws, raw) {
     }
     case 'npctalk': { const n = npcs.find(x => x.id === m.id); if (n) { if (!n.zb && dist(a, n) < 6) { n.hold = now() + 20000; n.f = Math.round(((Math.atan2(a.y - n.y, a.x - n.x) + Math.PI) / (Math.PI / 4))) % 8; n.hf = 1; } eggMayor(a, n); if (n.fid) folkTalk(a, n); } return; }
     case 'folkgift': return folkGift(a, m);
+    case 'folklove': return folkLove(a, m);
     case 'folkdo': return folkDo(a, m);
     case 'folktalk': return folkTalkDesk(a, m);
     case 'story': return storyAdv(a, m);

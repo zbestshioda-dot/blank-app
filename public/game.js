@@ -761,7 +761,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && (m.isNew ? showStory(0) : showTut(0)), 400);   // 📖 brand-new characters get the opening story first
-      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => { send({ t: 'ms', a: 'view' }); send({ t: 'coop' }); }, 1500);   // 📕 know the main-story step so townsfolk can offer it
+      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => { send({ t: 'ms', a: 'view' }); send({ t: 'coop' }); send({ t: 'folks' }); }, 1500);   // 📕 know the main-story step so townsfolk can offer it
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
@@ -839,9 +839,10 @@ function handle(m) {
     case 'cal': CAL = m; if (panel?.kind === 'cal') refreshPanel(true); break;
     case 'auc': AUC = m; if (panel?.kind === 'auc') refreshPanel(true); break;
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
-    case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
+    case 'folks': FOLKS = m.list || []; LOVEV = { id: m.mylove || '', dated: m.dated || 0 }; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
     case 'coop': coopHud(m); break;
+    case 'folklove': loveScene(m); break;
     case 'ms': MSV = m; msHud(); if (panel?.kind === 'ms') refreshPanel(true); break;
     case 'mscut': msCut(m); break;
     case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
@@ -5502,11 +5503,28 @@ function talkTo(n, st) {
   if (fd) choices = [choices[0], ...staffFolkChoices(n, fd), ...choices.slice(1)];
   dialog({ ...base, lines: [hi], choices, instant: !!fd });
 }
+// 💘 dating a townsperson (server: folkLove): confess at lv 4+, one date a day, break up any time
+let LOVEV = { id: '', dated: 0 };
+const loveOkC = fd => !['mprang', 'james', 'd_templeboy', 'd_monk'].includes(fd.id) && !/^(น้อง|ยาย|ตา|ลุง|ป้า|หลวงพ่อ)/.test(fd.name);
+function loveChoices(o, fd) {
+  if (!fd) return [];
+  if (LOVEV.id === fd.id) return [
+    { label: LOVEV.dated ? '💕 เดทแล้ววันนี้' : '💘 ไปเดทกัน', cls: LOVEV.dated ? '' : 'primary', fn: () => { dialogClose(); if (!LOVEV.dated) send({ t: 'folklove', op: 'date', fid: fd.id }); } },
+    { label: '💔 เลิกกัน', fn: () => { dialogClose(); if (confirm(`เลิกกับ${msNm(fd.id) || fd.name}?\nความสนิทยังอยู่ แต่ความสุขลดนิดหน่อย`)) send({ t: 'folklove', op: 'end', fid: fd.id }); } }];
+  if (!LOVEV.id && fd.lv >= 4 && loveOkC(fd)) return [{ label: '💘 สารภาพรัก', cls: 'good', fn: () => { dialogClose(); send({ t: 'folklove', op: 'ask', fid: fd.id }); } }];
+  return [];
+}
+const LOVE_DATES = [['☕ คาเฟ่ริมทะเลสาบ', 'นั่งจิบกาแฟดูพระอาทิตย์ตก ลมเย็นสบาย'], ['🎡 สวนสนุก', 'ขึ้นชิงช้าสวรรค์ด้วยกัน มองเห็นทั้งเมืองจากข้างบน'], ['🍜 ร้านอาหาร', 'แบ่งกันกินคนละคำ ป้าแดงแอบยิ้มให้'], ['🌙 ริมน้ำตอนกลางคืน', 'นอนดูดาวด้วยกัน ไม่ต้องพูดอะไรก็สบายใจ'], ['🎤 คาราโอเกะ', 'ร้องเพลงคู่กันเสียงเพี้ยนทั้งคู่ แต่หัวเราะไม่หยุด']];
+function loveScene(m) {
+  const id = m.fid, nm = msNm(id);
+  if (m.op === 'ask') { FX.play('levelup'); msShow({ title: `💘 สารภาพรักกับ${nm}`, side: 1, lines: [{ x: 'หัวใจเต้นแรง... มือเย็นเฉียบ' }, { x: 'สิ่งที่อยากพูดมานาน... ในที่สุดก็พูดออกไป' }, { s: id, x: '...' }, { s: id, x: 'จริงเหรอ... ฉันก็แอบคิดแบบเดียวกันมานานแล้ว' }, { s: id, x: 'งั้น... เราลองคบกันดูนะ {n} 💕' }, { x: `💘 คุณกับ${nm}เป็นแฟนกันแล้ว! คุยกันทุกวันแล้วชวนไปเดทได้วันละครั้ง` }] }); }
+  else if (m.op === 'date') { const [where, what] = LOVE_DATES[Math.floor(Math.random() * LOVE_DATES.length)]; FX.play('chime'); msShow({ title: `💕 เดทกับ${nm} · ${where}`, side: 1, lines: [{ x: what }, { s: id, x: 'วันนี้มีความสุขจัง ขอบคุณที่ชวนออกมานะ' }, { x: '😊 ความสุข +12 · 💞 สนิทกันมากขึ้น' }] }); }
+}
 function staffFolkChoices(n, fd) {   // 💞 story / request / gift buttons for a staff member you can befriend
   const o = { id: n.id, fid: fd.id, name: n.name, face: NPC_FACE[n.id] }, rq = fd.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
   const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n} (${money(rq.pay)})` : `📋 ขอ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', fid: fd.id }); dialogClose(); } else toast(`หา${G.items[rq.item]?.name || ''}ได้ที่${whereGet(rq.item)}`, '📋', false); } }] : [];
   const gift = { label: fd.gave ? '🎁 ให้ของแล้ววันนี้' : `🎁 ให้ของขวัญ · ${FOLK_LVN[fd.lv]}`, cls: fd.gave ? '' : 'good', fn: () => { dialogClose(); if (!fd.gave) openPanel({ kind: 'folkgift', npc: n.id, fid: fd.id }); } };
-  return [...storyChoices(o), ...req, gift];
+  return [...storyChoices(o), ...req, gift, ...loveChoices(o, fd)];
 }
 const staffFolk = n => { const b = s => String(s || '').replace(/\s*\(.*$/, '').trim(), k = b(n.name); return FOLKS?.find(f => f.desk && b(f.name) === k) || null; };
 // tapping a townsperson NPC: a short chat (with their portrait), the profile one tap away
@@ -5573,7 +5591,8 @@ function talkToTown(o) {
     if (rq && !rq.done) extra.push(`[n]ขอให้ช่วยหน่อยได้ไหม... อยากได้ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${rq.n} ชิ้น (${whereGet(rq.item)}) เดี๋ยวให้ค่าเหนื่อย ${money(rq.pay)}`);
     const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id, fid: o.fid }); dialogClose(); } } }] : [];
     const gift = { label: fd?.gave ? '🎁 ให้ของแล้ววันนี้' : '🎁 ให้ของขวัญ', cls: fd?.gave ? '' : 'primary', fn: () => { dialogClose(); if (!fd?.gave) openPanel({ kind: 'folkgift', npc: o.id, fid: o.fid }); } };
-    return dialog({ name: o.name, face: o.face || null, npc: o.id, instant: true, lines: [hi, ...extra, ...t], choices: [...storyChoices(o), ...req, gift, { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
+    if (LOVEV.id === o.fid) extra.unshift(LOVEV.dated ? 'วันนี้สนุกมากเลย คิดถึงนะ 💕' : 'มาหาแล้ว! วันนี้ว่างไหม ไปเที่ยวกันเถอะ 💕');
+    return dialog({ name: o.name, face: o.face || null, npc: o.id, instant: true, lines: [hi, ...extra, ...t], choices: [...storyChoices(o), ...req, gift, ...loveChoices(o, fd), { label: '💞 ชาวเมือง', fn: () => { dialogClose(); FN.openFolks(); } }, { label: '💬 คุยต่อ', fn: () => talkToTown(o) }, bye] });
   }
   if (/^mprang/.test(o.face)) {   // น้องมะปราง changes expression as she talks
     const q = me.quests?.list.find(x => x.type === 'trade');
@@ -6742,6 +6761,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '💘 จีบชาวเมืองได้แล้ว! สนิทถึงขั้น "เหมือนครอบครัว" แล้วกด "สารภาพรัก" · มีแฟนได้ทีละคน · ชวนไปเดทได้วันละครั้ง (ความสุข +12)',
     '🤝 เป้าหมายรวมของเมืองทุกวัน (ใต้เควสต์): ทั้งเมืองช่วยกันตกปลา ทำงาน ทำอาหาร ฯลฯ ให้ครบ ใครช่วย 5 ครั้งขึ้นไปได้ 💎3',
     '💭 ชาวเมืองจำได้ว่าคุณเคยให้ของอะไร และขอบคุณที่ไปร่วมปาร์ตี้วันเกิด',
     '📦 หาปุ่มลาออกง่ายขึ้น: แตะชื่องานใต้เควสต์ หรือคุยกับคนรับสมัครงานของอาชีพตัวเอง จะมีปุ่ม "ลาออก" (ถามยืนยันก่อน)',
