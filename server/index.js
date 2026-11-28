@@ -2103,7 +2103,7 @@ const SAVE_KEYS = ['ranch', 'gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'b
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
-  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk'];
+  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk', 'virtue'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -5708,7 +5708,7 @@ function meView(a) {
     dogq: a.dogq ? { kind: a.dogq.kind || 'dog', stole: a.dogq.stole, dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0, thiefNext: a.thiefNext || 0, jgNext: a.jgNext || {},
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o) && !isAdmin(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
-    happy: a.happy, craving: a.craving, prayed: a.prayDay === dayKey() ? 1 : 0, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
+    happy: a.happy, virtue: Math.max(-1000, Math.min(1000, Math.round(a.virtue || 0))), craving: a.craving, prayed: a.prayDay === dayKey() ? 1 : 0, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
     jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], case: detView(a), detAt: a.detNext || 0, stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,

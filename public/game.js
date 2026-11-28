@@ -1324,6 +1324,7 @@ function paintHud() {
   if (!nbCount) $('#meMoney').textContent = me.monInf ? '∞' : Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
+  { const v = me.virtue || 0, e = $('#meVirtue'), t = `😇 ${v > 0 ? '+' : ''}${v}`; if (e.textContent !== t) { e.textContent = t; e.style.background = v >= 500 ? '#e8b923' : v > 0 ? '#3a9a4a' : v <= -500 ? '#8a1c1c' : v < 0 ? '#c0482b' : '#6b6b6b'; } }
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = Math.min(100, me.energy / (me.eCap || 100) * 100) + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
   $('#vE').textContent = Math.floor(me.energy) + (me.eCap > 100 ? '/' + me.eCap : ''); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
@@ -6998,6 +6999,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28b', d: '28 พ.ย.', items: ['😇 <b>ค่าความดี</b> ใหม่! โชว์มุมขวาบนของกรอบสถานะ เริ่มที่ 0 (ต่ำสุด -1000 สูงสุด 1000) สีเขียว/ทอง = ดี สีแดง = ไม่ดี'] },
   { v: '2026-11-28a', d: '28 พ.ย.', items: ['🟢 บนคอม จำนวนคนออนไลน์ย้ายไปอยู่ใต้แผนที่เล็กเหมือนมือถือ ไม่บังแผนที่แล้ว'] },
   { v: '2026-11-28shm', d: '28 พ.ย.', items: ['🧿 <b>ตัวละครลึกลับในเมืองกลับมาแล้ว</b>… ระวังอย่าเข้าใกล้เกินไป'] },
   { v: '2026-11-28v', d: '28 พ.ย.', items: ['☰ <b>ปุ่มเมนูใหม่ข้างมือถือ</b> กดแล้วกางออก: กิจกรรม คู่รัก แก๊ง สัตว์เลี้ยง ชวนเพื่อน อัปเดต ตั้งค่า สนับสนุน กลุ่มเฟสบุ๊ค', '📱 มือถือโล่งขึ้น: 🛵 เดลิเวอรีย้ายเข้าไปในแอปโทรศัพท์ · ประมูลและบ้านสวยดูได้ใน 📅 กิจกรรม · เอาเรื่องหลักกับบันทึกออก (เรื่องหลักดูได้ใต้เควสต์)'] },

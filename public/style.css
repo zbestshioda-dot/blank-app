@@ -2290,3 +2290,8 @@ body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;
 #hamMenu.hidden{display:none}
 #hamMenu button{display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:10px;border:1.5px solid #c9a77a;background:#fff;color:#3e2414;font-size:13px;font-weight:700;text-align:left;white-space:nowrap}
 #hamMenu button i{font-style:normal;font-size:18px}
+
+/* 😇 virtue (-1000..1000) badge, top-right of the status frame */
+#card.v2 .sInfo{position:relative}
+#meVirtue{position:absolute;top:-7px;right:-4px;z-index:3;padding:0 6px;border-radius:8px;border:1px solid rgba(255,255,255,.7);font:700 10px/1.5 var(--ui);color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none}
+#meVirtue:empty{display:none}
