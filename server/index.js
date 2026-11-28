@@ -2085,7 +2085,8 @@ function npcBuyPrice(a, id, rate = NPC_BUY) {
   if (a.career === 'chef' && it.kind === 'meal' && CHEF_COST[id]) return (CHEF_COST[id] + CHEF_MARGIN) * marketPrice(id) / it.base;   // restaurants pay chefs the ingredients (kitchen price) plus a fixed cook's fee, so every recipe pays about the same
   if (a.career === 'farmer' && it.kind === 'crop' && !it.ranch) b += 0.08;
   if (a.career === 'rancher' && it.ranch) b += 0.08;
-  if (it.kind === 'fish') b += 0.01 * Math.min(8, fishLv(a) - 1);       // experienced anglers know the buyers
+  if (it.kind === 'fish') b += 0.01 * Math.min(8, fishLv(a) - 1);
+  if (a.career === 'shaman' && it.kind === 'fish') b += 0.2;   // 🧿 nobody dares haggle with a shaman       // experienced anglers know the buyers
   return marketPrice(id) * rate * b;
 }
 const npcSellPrice = id => Math.ceil(D.ITEMS[id].base * NPC_SELL);
@@ -2774,6 +2775,8 @@ function apply(a, career) {
     teacher: 'ไปที่มหาวิทยาลัย ยืนข้างโต๊ะคนที่กำลังนั่งเรียนแล้วกด "สอน" ได้ค่าสอนทันที · รับภารกิจ (ตรวจการบ้าน ตามเด็กโดดเรียน) ได้จากแอพงานในมือถือ',
     detective: 'คุยกับผู้กองเดชในหอสมุดเมือง รับคดีค้นหาของหายและไขปริศนา', thug: 'คุยกับเสี่ยเสือในตลาด รับงานนักเลง (ใจดีๆ นะ)', photographer: 'คุยกับพี่โฟกัสที่จัตุรัส รับงานถ่ายภาพ', courier: 'คุยกับพี่ด่วนหน้าคลังสินค้า รับพัสดุไปส่ง',
     beggar: 'กดปุ่ม 🥣 เพื่อนั่งขอทานตรงไหนก็ได้ ที่คนพลุกพล่านได้เงินบ่อยกว่า',
+    brahmin: 'ตอนนี้คุณมองเห็นผีเร่ร่อนแล้ว 👻 เดินไปคุยแล้วเอาของที่ผีอยากได้ไปให้ ได้เงิน · ตกปลาได้ปลาหายากง่ายขึ้น',
+    shaman: 'ตอนนี้คุณมองเห็นผีเร่ร่อนแล้ว 👻 ทำตามที่ผีขอได้เงินมากกว่าพราหมณ์ · ขายปลาแพงขึ้น · ระวังอย่าเข้าใกล้พระ ความดีจะลด',
   };
   toast(a, `ยินดีด้วย! ได้งานเป็น ${c.icon} ${c.name} · ${tips[career]}`, c.icon);
 }
@@ -2792,7 +2795,8 @@ function resign(a) {
 function rollFish(a, pool) {
   const l = fishLv(a), rod0 = rodOf(a) || D.RODS.bamboo, blessed = (a.merit || 0) > now();
   const rod0b = projBuilt('bridge13') ? { ...rod0, luck: rod0.luck * 1.15 } : rod0;   // 🌉 the town built the new bridge: rarer fish for everyone
-  const rod = blessed ? { ...rod0b, luck: rod0b.luck * 1.3, junk: rod0b.junk * .8 } : rod0b;   // 🙏 merit from releasing fish at the temple
+  const rod0c = a.career === 'brahmin' ? { ...rod0b, luck: rod0b.luck * 1.3 } : rod0b;   // 🔱 a brahmin's blessing: rarer fish
+  const rod = blessed ? { ...rod0c, luck: rod0c.luck * 1.3, junk: rod0c.junk * .8 } : rod0c;   // 🙏 merit from releasing fish at the temple
   const table = D.FISH[pool] || D.FISH.lake;
   const ws = table.map(([id, w]) => {
     if (id === null) return Math.max(5, w - l) * rod.junk;
@@ -3406,6 +3410,42 @@ function bailAct(a, m) {
   if (o !== a) toast(a, `🔓 ประกันตัว ${o.name} แล้ว (${money(c)})`, '🔓');
   markMe(a);
 }
+// 👻 wandering ghosts (seen only by a brahmin or a shaman)
+const seer = a => a.career === 'brahmin' || a.career === 'shaman';
+const mapOfArea = id => D.AREAS.find(r => r.id === id)?.in || id;
+let ghostsW = [], ghostQ = [], ghostVer = 1, ghostSeq = 0, ghostPts = null, ghostSec = 0;
+function ghostMake() {
+  ghostPts ||= ['town', 'temple'].flatMap(id => areaPts(id).filter((p, i) => i % 7 === 0).map(p => [p[0], p[1], id]));
+  const [x, y, area] = pick(ghostPts), w = Math.floor(Math.random() * D.GHOST.wishes.length);
+  ghostsW.push({ id: ++ghostSeq, x: +x.toFixed(2), y: +y.toFixed(2), area, w }); ghostVer++;
+}
+const ghostList = () => ghostsW.map(g => { const [item, name, ask] = D.GHOST.wishes[g.w]; return { id: g.id, x: g.x, y: g.y, area: g.area, item, name, ask }; });
+function ghostGive(a, m) {
+  if (!seer(a)) return;
+  const g = ghostsW.find(q => q.id === +m.id); if (!g) return toast(a, 'ผีตนนี้ไปสู่สุคติแล้ว', '👻', false);
+  if (mapOfArea(areaId(a)) !== g.area || Math.hypot(a.x - g.x, a.y - g.y) > 3) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
+  const [item, name] = D.GHOST.wishes[g.w];
+  if (!(a.inv[item] > 0)) return toast(a, `ต้องมี ${D.ITEMS[item]?.name || item} ในกระเป๋า`, '👻', false);
+  if (!cd(a, 'ghost', D.GHOST.cd)) return;
+  addItem(a, item, -1); ghostsW = ghostsW.filter(q => q !== g); ghostQ.push(now() + D.GHOST.respawn); ghostVer++;
+  const pay = Math.round(D.GHOST.pay * (a.career === 'shaman' ? D.GHOST.shamanMul : 1));
+  earn(a, pay); addXp(a, 1); stat(a, 'ghost'); if (a.career === 'brahmin') addVirtue(a, 5);
+  markMe(a); toast(a, `👻 ${name} ได้สิ่งที่ปรารถนาแล้ว ไปสู่สุคติ · ได้ ${money(pay)}${a.career === 'brahmin' ? ' · ความดี +5' : ''}`, '🕯️');
+}
+function ghostTick(t) {
+  if (!ghostsW.length && !ghostQ.length) for (let i = 0; i < D.GHOST.n; i++) ghostMake();
+  ghostQ = ghostQ.filter(at => at > t || (ghostMake(), false));
+  for (const a of online.values()) {
+    const v = seer(a) ? ghostVer : 0;
+    if (a._gv !== v) { a._gv = v; send(a, { t: 'ghosts', list: v ? ghostList() : [] }); }
+  }
+  if (t - ghostSec < 1000) return; ghostSec = t;
+  for (const a of online.values()) {   // 🧿 a shaman near a monk (or on the temple grounds) loses 1 virtue a second
+    if (a.career !== 'shaman' || (a.virtue || 0) <= -1000) continue;
+    const near = areaId(a) === 'temple' || [...online.values()].some(o => o.career === 'monk' && o !== a && areaId(o) === areaId(a) && Math.hypot(o.x - a.x, o.y - a.y) < 3);
+    if (near) { addVirtue(a, -1); markMe(a); if (!a._mkw || t - a._mkw > 60e3) { a._mkw = t; toast(a, '🙏 ใกล้พระ... พลังมืดอ่อนลง ค่าความดี -1 ทุกวินาที', '🧿', false); } }
+  }
+}
 function jailTick(t) {   // keep inmates in the cell, let them out on time; the NPC patrol picks up the wanted
   const r = jailRoom(); if (!r) return;
   const cops = [...online.values()].some(o => o.career === 'police' && !inJail(o));
@@ -3423,6 +3463,10 @@ function act(a, m) {
   if (!s) return;
   if (a.down) return toast(a, 'คุณหมดสติอยู่ ทำอะไรไม่ได้', '💤', false);
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) { sus(a, 'far'); return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false); }
+  if (s.type === 'wpray' && m.a === 'brahmin') {   // 🔱 secret career: virtue 1000 unlocks the brahmin at the temple
+    if ((a.virtue || 0) < 1000) return toast(a, 'ต้องมีค่าความดีถึง 1000 ก่อน', '🔱', false);
+    return apply(a, 'brahmin');
+  }
   if (s.type === 'jailwork' || inJail(a)) {   // 🔒 in jail: folding laundry is the only work (cuts the sentence)
     if (!inJail(a) || s.type !== 'jailwork') return toast(a, inJail(a) ? 'อยู่ในคุก ทำอย่างอื่นไม่ได้จนกว่าจะพ้นโทษ' : 'ไม่ได้ติดคุก', '🔒', false);
     if (!cd(a, 'jailwork', D.JAIL.work.cd)) return;
@@ -5958,7 +6002,7 @@ function login(ws, m, pre) {
   send(a, {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, projPlace: D.PROJ_PLACE, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
-    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
+    items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, ghost: D.GHOST, licenses: D.LICENSES,
     titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, gym: D.GYM, ranch: D.RANCH, gymPass: D.GYM_PASS, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, bar: D.BAR, rich: RICH.gems, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
@@ -6394,6 +6438,12 @@ function onMessage0(ws, raw) {
     case 'crime': return crimeAct(a, m);
     case 'arrest': return arrestAct(a, m);
     case 'bail': return bailAct(a, m);
+    case 'shamanjoin': {   // 🧿 the black shaman walks the town pavements: at virtue -1000 he lets you become his apprentice
+      if ((a.virtue || 0) > -1000) return toast(a, 'หมอผีไม่สนใจคุณ... (ต้องมีค่าความดี -1000)', '🧿', false);
+      if (areaId(a) !== 'town' || a.y < 28.5 || a.y > 35.5 || a.x < 3 || a.x > 93) return toast(a, 'หมอผีอยู่ไกลเกินไป', '🧿', false);
+      return apply(a, 'shaman');
+    }
+    case 'ghostgive': return ghostGive(a, m);
     case 'rescue': {                          // 🆘 the player is stuck (can't walk, nothing responds): clear what pins them and take them to the town square
       if (inJail(a)) return toast(a, 'อยู่ในห้องขัง ออกไม่ได้จนกว่าจะพ้นโทษ', '🚔', false);
       if (a.down) return toast(a, 'คุณหมดสติอยู่ รอหมอหรือรอฟื้นก่อน', '💤', false);
@@ -6985,7 +7035,7 @@ function fbKick(a, m) {
   fbSend({ kick: a.id });
 }
 function tick() {
-  stockTick(); passTick(); jailTick(now());
+  stockTick(); passTick(); jailTick(now()); ghostTick(now());
   for (const a of online.values()) ledSweep(a, 'อื่นๆ');
   { let ch = false; for (const a of online.values()) { const v = castPub(a); if (v !== (a._fc || 0)) { a._fc = v; ch = true; } } if (ch) sendRoster(); }
   const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;

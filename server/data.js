@@ -1331,6 +1331,13 @@ const JOBGAMES = {
 // 🚔 crimes, wanted stars and the jail (virtue: -1000..1000)
 const CRIMES = { pick: { name: 'ล้วงกระเป๋า', icon: '👛', virtue: -50, star: 1, cd: 60000, take: .05, max: 300, ok: .7 },
   hit: { name: 'ทำร้ายร่างกาย', icon: '👊', virtue: -100, star: 2, cd: 60000, dmg: 10 } };
+// 👻 wandering ghosts: only a brahmin or a shaman sees them; bring what the ghost longs for and it moves on
+const GHOST = { n: 6, pay: 300, shamanMul: 1.6, respawn: 45e3, cd: 1500,
+  wishes: [['offering', 'ยายผีเฝ้าวัด', 'อยากไหว้พระครั้งสุดท้าย ขอธูปเทียนดอกไม้หน่อยลูก'], ['malai', 'ผีสาวรอคนรัก', 'เขาสัญญาจะเอามาลัยมาให้... ช่วยเอามาแทนเขาได้ไหม'],
+    ['khaotom', 'ผีตาหิวโหย', 'ไม่ได้กินข้าวต้มมัดฝีมือเมียมาตั้งนาน...'], ['kanomthai', 'ผีเด็กน้อย', 'หนูอยากกินขนมไทย แม่ไม่เคยซื้อให้เลย'],
+    ['namlamyai', 'ผีคนงานก่อสร้าง', 'ร้อนเหลือเกิน ขอน้ำลำไยเย็นๆ สักแก้ว'], ['water', 'ผีหลงทาง', 'เดินมาไกล คอแห้งมาก ขอน้ำดื่มหน่อย'],
+    ['bread', 'ผีนักเรียน', 'ตอนมีชีวิตไม่เคยได้กินขนมปังตอนพักเที่ยงเลย'], ['fried_rice', 'ผีพ่อค้าเก่า', 'คิดถึงข้าวผัดร้านประจำ ช่วยหามาให้ที'],
+    ['grilled_fish', 'ผีชาวประมง', 'ขอปลาเผาสักตัว แล้วข้าจะไปสงบ'], ['tilapia', 'ผีแมวเหมียว', 'เมี้ยว... (อยากกินปลานิล)'], ['carp', 'ผีลุงตกปลา', 'ทั้งชีวิตตกปลาไนไม่เคยได้ ช่วยเอามาให้ดูที']] };
 const JAIL = { perStar: 120e3, bail: 800, reward: 250, xp: 1, npcAfter: 60e3, npcMax: 3 * 60e3, work: { cut: 20e3, virtue: 5, cd: 8000 } };
 const THIEFQ = { energy: 6, next: 30000, base: 110, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
 const DOGQ = { next: 27000, energy: 5, base: 70, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
@@ -1822,6 +1829,8 @@ const FISHING = { rod: 150, xpPerLv: 8, maxLv: 10, zone: [0.2, 0.26, 0.32, 0.4] 
 // ================================================================= careers
 // Nobody picks a career at the start: you walk into the right building and apply.
 const CAREERS = {
+  brahmin: { name: 'พราหมณ์', icon: '🔱', secret: 1, need: [], desc: 'อาชีพลับ (ค่าความดีถึง 1000) · มองเห็นผีเร่ร่อน ช่วยทำสิ่งที่ผีปรารถนาแล้วได้เงิน · โชคปลาหายากดีขึ้น' },
+  shaman: { name: 'หมอผี', icon: '🧿', secret: 1, need: [], desc: 'อาชีพลับ (ค่าความดีถึง -1000) · มองเห็นผีเร่ร่อน ทำตามที่ผีขอได้เงินมากกว่า · ขายปลาได้แพงขึ้น · อยู่ใกล้พระความดีลด · NPC ไม่กล้าคุยด้วย' },
   none:     { name: 'ว่างงาน', icon: '🙂', where: null, desc: 'ยังไม่มีงานทำ ไปสมัครงานตามอาคารต่างๆ' },
   office:   { name: 'พนักงานบริษัท', icon: '👔', where: 'office', need: ['degree'], desc: 'เข้างาน 08:00–17:00 (โอทีต่อได้ถึง 21:00 ค่าส่ง x1.25) รับซองเอกสารที่บริษัทไปส่งตามอาคารทั่วเมือง ได้เงินทุกครั้งที่ส่งถึง ยิ่งไกลยิ่งได้มาก มาสายโดนหักเงินและอาจถูกเลิกจ้าง' },
   merchant: { name: 'พ่อค้า', icon: '🛒', where: 'warehouse', need: [], desc: 'ประมูลสินค้าที่โรงประมูล (คลังสินค้าเดิม) แข่งกับคู่แข่ง เดาราคาให้แม่น ชนะต่ำกว่ามูลค่าจริง = กำไร สูงกว่า = ขาดทุน · ของในกระเป๋ายังวางขายที่ตลาดกลางในราคาที่ตั้งเอง' },
@@ -2651,7 +2660,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { CRIMES, JAIL, RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { CRIMES, JAIL, GHOST, RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, NB_SPAWN, RADIUS, SOLID,

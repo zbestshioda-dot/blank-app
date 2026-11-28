@@ -873,6 +873,7 @@ function handle(m) {
     case 'paper': PAPER = m; xtraQueue(); if (panel?.kind === 'paper') refreshPanel(true); break;
     case 'nm': NMV = m; $('#nmBtn')?.classList.toggle('hidden', !m.open); if (panel?.kind === 'nightmkt') refreshPanel(true); break;
     case 'spon': SPONV = m; if (panel?.kind === 'spon') refreshPanel(true); break;
+    case 'ghosts': GHOSTS = m.list || []; break;
     case 'ghost': BUS = m; $('#busBtn')?.classList.toggle('hidden', !m.on); break;
     case 'ghostride': busRide(m); break;
     case 'folklove': loveScene(m); break;
@@ -2385,7 +2386,7 @@ function draw(t) {
     else if (k === 15) drawFb(e, X, Y, t);
     else if (k === 17) drawLk(e, X, Y, t);
     else if (k === 18) drawFair(e, X, Y, t);
-    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else if (e.fx === 'shaman') drawShaman(X, Y, t); else drawWatFx(e, X, Y, t); }
+    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else if (e.fx === 'shaman') drawShaman(X, Y, t); else if (e.fx === 'ghostw') drawGhostW(e.g, X, Y, t); else drawWatFx(e, X, Y, t); }
     else if (k === 41) e.draw(X, Y, t);
     else drawPlayer(e, X, Y, t);
   }
@@ -3911,6 +3912,27 @@ function shamanStep(dt) {
   const st = Math.min(d, .7 * dt); s.x += dx / d * st; s.y += dy / d * st; s.walk += dt * 6;
   s.f = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 0 : 2);   // 0 down, 1 right, 2 up, 3 left
 }
+// 👻 wandering ghosts (the server only sends them to a brahmin or a shaman): a floating sheet that drifts round its spot
+let GHOSTS = [];
+function drawGhostW(g, X, Y, t) {
+  const u = TS, k = g.id * 1.7, ox = Math.sin(t / 1900 + k) * .6, oy = Math.cos(t / 2300 + k) * .3, px = (g.x + ox) * u + X, py = (g.y + oy) * u + Y - u * (.25 + Math.sin(t / 400 + k) * .08), w = u * .7, h = u * .95;
+  ctx.save(); ctx.globalAlpha = .62 + Math.sin(t / 600 + k) * .12; ctx.shadowColor = '#bfe8ff'; ctx.shadowBlur = u * .3; ctx.fillStyle = '#eef6ff';
+  ctx.beginPath(); ctx.moveTo(px - w / 2, py); ctx.arc(px, py - h + w / 2, w / 2, Math.PI, 0); ctx.lineTo(px + w / 2, py);
+  for (let i = 3; i >= 0; i--) ctx.quadraticCurveTo(px - w / 2 + (i + .5) * w / 4, py + (i % 2 ? -u * .12 : u * .12) * Math.sin(t / 300 + i), px - w / 2 + i * w / 4, py);
+  ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#334'; ctx.beginPath(); ctx.arc(px - w * .17, py - h * .62, u * .06, 0, 7); ctx.arc(px + w * .17, py - h * .62, u * .06, 0, 7); ctx.fill(); ctx.restore();
+  const fs = Math.max(10, Math.round(u * .24)); sign(`👻 ${g.name}`, px, py - h - fs * .6, { size: fs, bg: 'rgba(60,80,120,.8)' });
+}
+function spiritBtn() {   // a talk button when you stand by a ghost (seers) or by the black shaman (virtue -1000)
+  const m = P.get(myId); let b = $('#spiritBtn'), act = null;
+  if (m && me) {
+    const g = GHOSTS.find(g => areaOf(m.x, m.y)?.id !== undefined && Math.hypot(m.rx - g.x, m.ry - g.y) < 2.4);
+    if (g) act = ['👻 คุยกับผี', () => openPanel({ kind: 'ghostw', gid: g.id })];
+    else if ((me.virtue || 0) <= -1000 && me.career !== 'shaman' && Math.hypot(m.rx - SHM.x, m.ry - SHM.y) < 2.6 && areaOf(m.x, m.y)?.id === 'town') act = ['🧿 คุยกับหมอผี', () => openPanel({ kind: 'shamanjoin' })];
+  }
+  if (!act) { if (b) b.classList.add('hidden'); return; }
+  if (!b) { b = document.createElement('button'); b.id = 'spiritBtn'; b.type = 'button'; document.body.appendChild(b); }
+  if (b.textContent !== act[0]) b.textContent = act[0]; b.onclick = act[1]; b.classList.remove('hidden');
+}
 function drawShaman(X, Y, t) {
   const s = SHM, u = TS, px = s.x * u + X, py = (s.y + .3) * u + Y, h = u * 1.85, w = h * 96 / 112;
   if (SHM_IMG.complete && SHM_IMG.naturalWidth) {
@@ -3949,6 +3971,8 @@ function crowdEnts(A, ents, vis) {
     }
     shamanStep(dt); if (vis(SHM.x, SHM.y, 3)) ents.push([SHM.y + .3, 14, { fx: 'shaman' }]);
   }
+  for (const g of GHOSTS) if (g.area === A.id && vis(g.x, g.y, 2)) ents.push([g.y + .3, 14, { fx: 'ghostw', g }]);
+  spiritBtn();
   if (A.id === 'temple' || A.id === 'town') { const me0 = P.get(myId), PIG = A.id === 'temple' ? WATB : TWNB;
     for (const b of PIG) {   // pigeons peck about the courtyard and take off when someone walks up
       const near = me0 && Math.hypot(me0.rx - b.x, me0.ry - b.y) < 1.8 || L.some(m => Math.hypot(m.rx - b.x, m.ry - b.y) < .9);
@@ -4641,6 +4665,9 @@ function drawMini() {
 // ------------------------------------------------------------------ panels
 let panelOpenT = 0;
 function openPanel(p) {
+  if (me?.career === 'shaman' && (p.kind === 'staff' && STN(p.st)?.career !== 'fishing' || p.kind === 'player' && P.get(p.pid)?.npc)) {   // 🧿 nobody dares talk to a shaman
+    const o = p.kind === 'player' ? P.get(p.pid) : STAFF_AT[p.st]; return toast(`😨 ${o?.short || o?.name || 'NPC'} ตัวสั่น ไม่กล้าคุยกับหมอผี...`, '🧿', false);
+  }
   if (document.activeElement?.id === 'pFindQ') document.activeElement.blur();   // a new menu starts with an empty search
   if (p.kind === 'chat') p.sig = 'x';
   if (p.kind === 'player') { const o = P.get(p.pid); if (o && !o.npc) send({ t: 'info', id: p.pid }); }
@@ -7034,6 +7061,11 @@ function jailList() {
     e.onpointerup = e.onpointercancel = () => { drag = null; }; }
   if (e) e.onclick = () => { if (moved) { moved = false; return; } const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28h', d: '28 พ.ย.', items: [
+    '📢 <b>ประกาศ! อาชีพลับที่เกี่ยวกับความดี</b> ไม่มีในหมวดงาน ต้องค้นหาเอง…',
+    '🔱 <b>พราหมณ์</b> ค่าความดีถึง 1000 สมัครได้ที่พระอุโบสถในวัด · มองเห็นผีเร่ร่อน ทำตามที่ผีปรารถนาแล้วได้เงิน · ตกปลาหายากง่ายขึ้น',
+    '🧿 <b>หมอผี</b> ค่าความดีถึง -1000 ไปคุยกับหมอผีสายดำที่เดินอยู่ในเมือง · เห็นผีและได้เงินจากผีมากกว่า · ขายปลาแพงขึ้น · แต่อยู่ใกล้พระความดีลดทุกวินาที และ NPC ไม่กล้าคุยด้วย',
+  ] },
   { v: '2026-11-28g', d: '28 พ.ย.', items: ['🚨 ติดหมายจับแล้วมีแถบบอกด้านบน ว่าจะโดนจับในกี่วินาที · สายตรวจ NPC มาจับใน 3 นาทีแม้มีตำรวจออนไลน์'] },
   { v: '2026-11-28f', d: '28 พ.ย.', items: ['🪟 ข้อความแจ้งเตือน (เช่น "รออีก 30 วินาที") ขึ้นทับหน้าต่างแล้ว ไม่จมอยู่ข้างหลัง'] },
   { v: '2026-11-28e', d: '28 พ.ย.', items: ['👁️ ลากปุ่มโหมดถ่ายรูปไปวางตรงไหนก็ได้ เกมจำตำแหน่งไว้ให้'] },
@@ -8644,6 +8676,13 @@ function renderPanel(p) {
           [id === 'offering' && 'ใช้ไหว้พระในโบสถ์', id === 'malai' && 'ของฝาก ขายต่อได้', id === 'amulet' && 'พกไว้ ไหว้พระแล้วได้พรนาน 2 เท่า', e.hunger && `อิ่ม +${e.hunger}`, e.energy && `พลัง +${e.energy}`, e.happy && `สุข +${e.happy}`, `มีอยู่ ${me.inv[id] || 0}`].filter(Boolean).join(' · ')); }).join('');
       return `<h2>🪔 ร้านค้าวัด</h2><div class="sub">เปิดทุกวัน · ชุดไหว้พระ พวงมาลัย ขนมไทย ของใส่บาตร · ชุดธูปเทียนใช้ไหว้พระในโบสถ์แทนการจ่ายเงิน</div><div class="list">${rows}</div>`;
     }
+    case 'ghostw': {
+      const g = GHOSTS.find(x => x.id === p.gid); if (!g) return '<h2>👻</h2><div class="sub">ผีตนนี้ไปสู่สุคติแล้ว</div>';
+      const it = G.items[g.item] || {}, has = (me.inv[g.item] || 0) > 0, pay = Math.round(G.ghost.pay * (me.career === 'shaman' ? G.ghost.shamanMul : 1));
+      return `<h2>👻 ${esc(g.name)}</h2><div class="sub">"${esc(g.ask)}"</div><div class="jobbox">ต้องการ: ${it.icon || '🎁'} <b>${esc(it.name || g.item)}</b> (มี ${me.inv[g.item] || 0}) · ได้ ${money(pay)}${me.career === 'brahmin' ? ' · ความดี +5' : ''}</div>
+        ${B(`🕯️ มอบให้ผี`, { t: 'ghostgive', id: g.id }, 'primary big', !has)}${has ? '' : '<div class="sub">ยังไม่มีของชิ้นนี้ ไปหามาก่อนนะ</div>'}`;
+    }
+    case 'shamanjoin': return `<h2>🧿 หมอผีสายดำ</h2><div class="sub">"ฮึ... ความดีเจ้าติดลบถึงก้นบึ้งแล้ว ข้าเห็นแววเจ้า มาเป็นศิษย์ข้าไหม?"</div><div class="jobbox"><b>อาชีพลับ: หมอผี</b><div class="sub">${G.careers.shaman.desc}</div>${B('🧿 ยอมเป็นศิษย์', { t: 'shamanjoin' }, 'primary big', me.jobWait > 0)}</div>${me.career !== 'none' ? `<div class="sub">สมัคร = ลาออกจากงาน${G.careers[me.career]?.name || ''}</div>` : ''}`;
     case 'wpray': {
       const bl = (me.bless || 0) > Date.now() + clockOff ? `<div class="jobbox ok">✨ ได้รับพรอยู่ เหลืออีก ${Math.ceil((me.bless - Date.now() - clockOff) / 60000)} นาที · รายได้ทุกอย่าง +5%</div>` : '';
       const h = hourNow(), A = me.alms;
@@ -8654,6 +8693,7 @@ function renderPanel(p) {
         else monk = `<div class="jobbox">🌅 ออกบิณฑบาตได้ทุกเช้า 05:00–10:00 · ตอนนี้ ${h >= 5 && h < 10 ? '<b>ได้เวลาแล้ว!</b>' : 'ยังไม่ใช่เวลา'}</div>${B('🙏 ออกบิณฑบาต (⚡6)', { t: 'act', st, a: 'alms' }, 'primary big', !(h >= 5 && h < 10))}`;
         monk += `<div class="sub">🍚 พระฉันได้แค่ 05:00–12:00 (งดฉันหลังเที่ยง ดื่มน้ำได้) · ตีระฆังในวัดได้ทุกเมื่อ</div>`;
       }
+      if ((me.virtue || 0) >= 1000 || me.career === 'brahmin') monk += me.career === 'brahmin' ? '<div class="jobbox ok">🔱 คุณเป็น<b>พราหมณ์</b> (อาชีพลับ) · มองเห็นผีเร่ร่อน ช่วยผีได้เงิน · โชคปลาหายากดีขึ้น</div>' : `<div class="jobbox">🔱 <b>อาชีพลับ: พราหมณ์</b> · ความดีของคุณถึง 1000 แล้ว เทวดาเปิดทางให้<div class="sub">${G.careers.brahmin.desc}</div>${B('🔱 รับเป็นพราหมณ์', { t: 'act', st, a: 'brahmin' }, 'primary big', me.jobWait > 0)}</div>`;
       return `<h2>🛕 พระอุโบสถ</h2><div class="sub">กราบพระประธาน ขอพรให้ทำงานรุ่ง · ใช้ชุดธูปเทียนดอกไม้จากร้านค้าวัด หรือจ่ายค่าธูปเทียนหน้าโบสถ์</div>${bl}${monk}
         ${B(`🙏 ไหว้พระขอพร ${(me.inv.offering || 0) > 0 ? '(ใช้ชุดธูปเทียน 1 ชุด)' : money(G.templeq?.pray || 20)}`, { t: 'act', st, a: 'pray' }, 'good big')}${job('monk') ? '' : staffHint('monk')}`;
     }
@@ -8918,7 +8958,7 @@ function renderPanel(p) {
     }
     case 'career': {
       const cur = G.careers[me.career];
-      const rows = Object.entries(G.careers).filter(([id]) => id !== 'none').map(([id, c]) => {
+      const rows = Object.entries(G.careers).filter(([id, c]) => id !== 'none' && (!c.secret || me.career === id)).map(([id, c]) => {
         const where = STN(c.where), stf = STAFF.find(x => x.career === id && !x.keeper);
         const miss = (c.need || []).filter(l => !licOk(l)).map(l => G.licenses[l].name + (licExp(l) ? ' (หมดอายุ)' : ''));
         return itemRowRaw(c.icon, `${c.name}${me.career === id ? ' <span class="tag">ปัจจุบัน</span>' : ''}`, `สมัคร: คุยกับ <b>${esc(stf?.short || 'เจ้าหน้าที่')}</b> ที่${where?.label || '-'}${miss.length ? ` · <span style="color:var(--bad)">ต้องมี ${miss.join(', ')}</span>` : ''}<br>${c.desc}`, B('🚶 เดินไปสมัคร', { fn: 'guide', key: stf ? stf.st : c.where }, 'good'));
