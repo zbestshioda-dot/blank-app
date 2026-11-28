@@ -985,7 +985,7 @@ function ghostBoard(a) {
   const seat = miss.length ? pick(miss) : Math.floor(Math.random() * BUS99.seats), isNew = miss.length > 0;
   if (isNew) { got.push(seat); stat(a, 'bus99', got.length, true); }
   const full = isNew && got.length === BUS99.seats;
-  if (full) { a.gems += BUS99.fullGems; feed(`🎫 ${a.name} สะสมตั๋วรถเมล์สาย 99 ครบทั้ง 12 ใบ! ผู้โดยสารทุกคนจำชื่อเขาได้แล้ว`); }
+  if (full) { a.gems += BUS99.fullGems; if (!(a.outfits || []).includes('bus99')) { a.outfits = [...(a.outfits || []), 'bus99']; a.outfit = 'bus99'; sendRoster(); } feed(`🎫 ${a.name} สะสมตั๋วรถเมล์สาย 99 ครบทั้ง 12 ใบ! ผู้โดยสารทุกคนจำชื่อเขาได้แล้ว`); }
   markMe(a);
   send(a, { t: 'ghostride', gems: BUS99.gems, seat, isNew: isNew ? 1 : 0, full: full ? BUS99.fullGems : 0, mine: got }); paperAdd(`🚌 ${a.name} ขึ้นรถเมล์สาย 99 ในคืนที่มันกลับมา`);
 }

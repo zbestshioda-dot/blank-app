@@ -119,7 +119,7 @@ const chPut = (k, c) => { chCache.set(k, c); while (chCache.size > CH_MAX) chCac
 const whenChars = fn => { if (chImg) fn(); else chWait.push(fn); };
 // one small image per outfit sheet (public/assets/pchar/, tools/split_pchar.py), loaded the first time someone wears it:
 // the old single atlas decoded to ~135 MB and iPhones reloaded the page
-const CH_V = 'b11', chSheets = {};
+const CH_V = 'b12', chSheets = {};
 function chSheet(g) {
   let e = chSheets[g]; if (e) return e.ok ? e.im : null;
   e = chSheets[g] = { im: new Image(), ok: false }; e.im.onload = () => { e.ok = true; if (g === '_base' || g === 'f') chBoot(); }; e.im.onerror = () => setTimeout(() => { delete chSheets[g]; }, 5000);
@@ -5591,20 +5591,21 @@ const PAX99 = [
   { n: 'พี่ฝน', i: '🎒', who: 'นักเรียน ม.6', l: ['เด็กสาวชุดนักเรียนกำดินสอ 2B ไว้แน่น', '"พรุ่งนี้สอบเข้ามหาลัย หนูอ่านหนังสือมาทั้งปี"', '"ถ้ามีใครในเมืองได้เรียนมหาลัย ช่วยเรียนให้จบแทนหนูด้วยนะ"'] },
   { n: 'คนแปลกหน้าเบาะหลัง', i: '🕶️', who: '???', l: ['ชายใส่แว่นดำนั่งเบาะหลังสุด ข้างเบาะที่ 13 ที่ว่างอยู่', '"เธอนั่งตรงนี้มาหลายรอบแล้วนะ รู้ตัวไหม"', '"ทุกรอบเธอเลือกต่างกัน... แต่ทุกรอบเธอยังดันเด็กคนนั้นขึ้นไปเสมอ"', '"สักวันจะมีคนขับคนต่อไป... ไม่ใช่ฉันหรอก"'] },
 ];
+const PAX_V = 1, paxFace = (i, px) => `<i class="dlgPic" style="display:block;width:${px}px;height:${px}px;border-radius:10px;background:url(assets/pax99.webp?v=${PAX_V}) -${i * px}px 0/${12 * px}px ${px}px"></i>`;   // tools/split_pax99.py
 function busRide(m) {
   if (m.mine) BUS = { ...(BUS || {}), mine: m.mine };
   const P = PAX99[m.seat] || PAX99[1], n = (m.mine || []).length;
   FX.play('levelup'); msShow({ title: '🚌 รถเมล์สาย 99', side: 1, lines: [{ x: 'ประตูรถเปิดเอง... ไม่มีคนขับ ในรถเย็นเฉียบ นาฬิกาบนรถหยุดอยู่ที่ 03:17' },
     { x: m.isNew ? `ผู้โดยสารเบาะที่ ${m.seat + 1} หันมามองคุณ... ${P.i} <b>${P.n}</b>` : `${P.i} ${P.n} พยักหน้าให้คุณเหมือนคนรู้จักกันมานาน` },
-    ...(m.isNew ? P.l : [P.l[P.l.length - 1]]).map(x => ({ x })),
+    ...(m.isNew ? P.l : [P.l[P.l.length - 1]]).map((x, k) => x.startsWith('"') ? { s: 'pax', nm: P.n, pf: paxFace(m.seat, 72), x } : { x }),
     { x: 'พริบตาเดียว คุณยืนอยู่ที่ป้ายคนเดียว รถเมล์หายไปแล้ว' },
-    { x: (m.isNew ? `🎫 ได้ตั๋วของ${P.n} (${n}/12) · ` : '') + `🎁 💎${m.gems} + 🧧 ผ้ายันต์นำโชค` + (m.full ? `<br>🎉 ครบ 12 ใบ! ได้อีก 💎${m.full} + ฉายา "ผู้โดยสารคนที่ 13"` : '') }] });
+    { x: (m.isNew ? `🎫 ได้ตั๋วของ${P.n} (${n}/12) · ` : '') + `🎁 💎${m.gems} + 🧧 ผ้ายันต์นำโชค` + (m.full ? `<br>🎉 ครบ 12 ใบ! ได้อีก 💎${m.full} + ฉายา "ผู้โดยสารคนที่ 13" + 👮 ชุดคนขับรถเมล์สาย 99 (ใส่ให้แล้ว)` : '') }] });
 }
 function bus99Panel() {
   const mine = BUS?.mine || [], rows = PAX99.map((P, i) => mine.includes(i)
-    ? itemRowRaw(P.i, `เบาะ ${i + 1} · ${esc(P.n)} <small>${esc(P.who)}</small>`, P.l.map(x => esc(x)).join('<br>'), '')
+    ? itemRowRaw(paxFace(i, 56), `เบาะ ${i + 1} · ${esc(P.n)} <small>${esc(P.who)}</small>`, P.l.map(x => esc(x)).join('<br>'), '')
     : itemRowRaw('❔', `เบาะ ${i + 1} · ???`, 'ยังไม่เคยเจอ', '')).join('');
-  return `<h2>🎫 ตั๋วรถเมล์สาย 99 (${mine.length}/12)</h2><div class="sub">สัปดาห์ละคืน (20:00–23:00) รถสาย 99 จะจอดหน้าอนุสรณ์ 10 นาที · ขึ้นรถแล้วได้เจอผู้โดยสาร 1 คนที่ยังไม่เคยเจอ · ครบ 12 ใบได้ 💎100 + ฉายา "ผู้โดยสารคนที่ 13"</div><div class="list">${rows}</div>`;
+  return `<h2>🎫 ตั๋วรถเมล์สาย 99 (${mine.length}/12)</h2><div class="sub">สัปดาห์ละคืน (20:00–23:00) รถสาย 99 จะจอดหน้าอนุสรณ์ 10 นาที · ขึ้นรถแล้วได้เจอผู้โดยสาร 1 คนที่ยังไม่เคยเจอ · ครบ 12 ใบได้ 💎100 + ฉายา "ผู้โดยสารคนที่ 13" + ชุดคนขับรถเมล์สาย 99</div><div class="list">${rows}</div>`;
 }
 // 🏮 the market stall and 🚌 the ghost bus stand in the world (sorted by depth with people)
 function xtraEnts(ents, vis) {
@@ -6264,7 +6265,7 @@ function msShow(q) {
 }
 function msLine() {
   const ov = $('#msCut'), l = msQ.lines[msQ.i] || { x: '' }, f = l.s && folkById(l.s), p = ov.querySelector('.msTxt p'), last = msQ.i >= msQ.lines.length - 1;
-  ov.querySelector('.msFace').innerHTML = f ? folkFace(f, 72) : '';
+  ov.querySelector('.msFace').innerHTML = l.pf || (f ? folkFace(f, 72) : '');   // pf: a ready-made face (bus 99 passengers)
   if (msCam) { const w = msWho(l.s) || P.get(myId); if (w) { msCam.x = w.rx; msCam.y = w.ry + VH * .16 / TS; } }
   ov.querySelector('.msName').textContent = l.s ? l.nm || msNm(l.s) : '';
   ov.classList.toggle('narr', !l.s); ov.classList.toggle('sys', !!l.sys);
@@ -6865,8 +6866,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28i', d: '28 พ.ย.', items: [
-    '🎫 <b>สะสมตั๋วรถเมล์สาย 99</b>: ขึ้นรถแต่ละครั้งได้เจอผู้โดยสาร 1 ใน 12 คน ฟังเรื่องลับของเขา แล้วเก็บตั๋วไว้',
-    '🏅 สะสม 3 ใบได้ฉายา "ขาประจำสาย 99" · ครบ 12 ใบได้ 💎100 + ฉายาหายาก "ผู้โดยสารคนที่ 13"',
+    '🎫 <b>สะสมตั๋วรถเมล์สาย 99</b>: ขึ้นรถแต่ละครั้งได้เจอผู้โดยสาร 1 ใน 12 คน (มีรูปหน้าทุกคน) ฟังเรื่องลับของเขา แล้วเก็บตั๋วไว้',
+    '🏅 สะสม 3 ใบได้ฉายา "ขาประจำสาย 99" · ครบ 12 ใบได้ 💎100 + ฉายาหายาก "ผู้โดยสารคนที่ 13" + 👮 ชุดคนขับรถเมล์สาย 99 (ชาย/หญิง)',
     '📱 ดูตั๋วที่สะสมได้ในแอป 🚌 ตั๋วสาย 99 ในมือถือ',
   ] },
   { v: '2026-11-28h', d: '28 พ.ย.', items: [

@@ -2242,6 +2242,7 @@ const OUTFITS = { fisher: { name: 'ชุดนักตกปลา', how: 'ต
   cathood:   { name: 'ชุดฮู้ดแมวพาสเทล', how: 'ซื้อที่ร้านแฟชั่น', gems: 150 },
   wedding:   { name: 'ชุดเจ้าบ่าว', nf: 'ชุดเจ้าสาว', how: 'ได้ฟรีตอนแต่งงาน หรือซื้อที่ร้านแฟชั่น', gems: 150 },
   kitsune:   { name: 'ชุดจิ้งจอกเก้าหาง', nf: 'ชุดจิ้งจอกเก้าหางสาว', how: 'เร็วๆ นี้ (ยังไม่เปิดขาย)' },   // locked for now: not in OUTFIT_CAT, so no shop slot
+  bus99:     { name: 'ชุดคนขับรถเมล์สาย 99', nf: 'ชุดคนขับรถเมล์สาย 99 สาว', how: 'สะสมตั๋วรถเมล์สาย 99 ครบ 12 ใบ (ไม่มีขาย)' },
   winter:    { name: 'ชุดไหมพรมกันหนาว', nf: 'ชุดไหมพรมกันหนาวสาว', how: 'กิจกรรมล็อกอิน 7 วัน (แจกฟรี ไม่มีขาย)' } };
 // 🎁 a login event: log in on 7 different days between start and end; each day unlocks the next reward, day 7 is the outfit
 // 🎉 the festival calendar: every entry repeats each year by itself (Bangkok dates). from = fixed 'MM-DD'; lunar = the start date
