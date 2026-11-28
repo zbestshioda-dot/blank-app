@@ -12,6 +12,14 @@ const FARM = { id: 'farm', kind: 'map', name: 'ไร่ชานเมือง
 const HOUSING = { id: 'housing', kind: 'map', name: 'หมู่บ้านจัดสรร', x: 184, y: 0, w: 70, h: 50 };
 const PARK = { id: 'park', kind: 'zone', in: 'town', name: 'สวนสนุก', x: 4, y: 95, w: 40, h: 28 };   // a zone of the town now (its south district), walked into from the street   // compact: every ride a short walk from the gate   // added later, in the free space under the farm (nothing older moves)
 const FIELD = { id: 'field', kind: 'zone', in: 'town', name: 'สนามฟุตบอล', x: 52, y: 96, w: 30, h: 23 };   // ⚽ the public football ground, where the old farm used to be
+// 🐄 the ranch (ฟาร์มปศุสัตว์) on the old temple lawn under the town pond: a white fence all round (x0..x1, y0..y1 are the fence
+// lines), a wooden gate in the south fence anyone can open or close, three barns along the back and the animals' yards in front
+const RANCH = { x0: 63, y0: 59, x1: 88, y1: 71, gate: [73, 75],
+  barns: [{ k: 'chicken', x: 67.5, label: 'เล้าไก่', icon: '🐔' }, { k: 'pig', x: 75.5, label: 'คอกหมู', icon: '🐷' }, { k: 'cow', x: 83.5, label: 'โรงวัว', icon: '🐄' }],
+  pens: [{ k: 'chicken', n: 8, x0: 64.6, y0: 64.9, x1: 71, y1: 70.3 }, { k: 'pig', n: 4, x0: 72.3, y0: 65.3, x1: 78.8, y1: 70.2 }, { k: 'cow', n: 3, x0: 79.8, y0: 65.4, x1: 86.6, y1: 70.2 }],
+  // rancher work at each barn: feed (energy), wait `sec`, then collect `n` of `item` (+1 every 4 job levels)
+  work: { chicken: { item: 'r_egg', n: 3, sec: 60, feed: 'โปรยข้าวโพดให้ไก่', got: 'เก็บไข่' }, pig: { item: 'r_pork', n: 1, sec: 150, feed: 'เทอาหารลงรางให้หมู', got: 'ได้เนื้อหมู' },
+    cow: { item: 'r_milk', n: 2, sec: 90, feed: 'ให้หญ้าแห้งวัว', got: 'รีดนมวัว' } } };
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 // 🎄 limited Christmas items (reindeer, sleigh) and their showcase in the square: until the end of 31 Dec 2569 (Bangkok)
 const XMAS_END = Date.parse('2027-01-01T00:00:00+07:00');
@@ -875,21 +883,22 @@ const RIDES = {
   for (const [x, y] of [[X + 3, Y + 14.9], [X + 11, Y + 14.9], [X + 21, Y + 29.9], [X + 38, Y + 19.9]]) prop('o_flowerbed', x, y, false);
   for (const [x, y] of [[X + 30, Y + 26.9], [X + 34, Y + 26.9]]) prop('x_orchids', x, y);
   STATIONS.push({ id: 'gate_town_t', type: 'gate', to: 'town_from_temple', label: 'กลับเข้าเมือง', icon: '🏙️', x: X + 1.6, y: Y + 17, r: 1.6, area: 'temple' });
-  // the way in from town: the temple front (painted head-on, like the town's buildings) on the lawn south of the town pond: two
-  // ordination halls either side of a golden chedi. Its front edge is a straight line (lv 0); the tiles behind it are solid.
-  const F = { cx: 74, bv: 72.2, hw: 9.2, lv: 0, x0: 64.22, by: 72.2, w: 18.4 };   // the chedi's steps (53% across the picture) line up with the gate
+  // the way in from town: the temple front (painted head-on, like the town's buildings), moved (by the owner) to the lawn
+  // between the fountain square and the log cabin; drawn at half size so it fits. Its old spot under the town pond is the ranch now.
+  // The old grounds are cleared here (the ranch is built on them further down)
   for (let y = 56; y <= 75; y++) for (let x = 62; x <= 86; x++) { const c = get(x, y); if (c === 'T' || c === 'o' || (y >= 72 && c === 'c' && x > 64 && x < 83)) set(x, y, '.'); }
   for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (q.x >= 62 && q.x < 87 && q.y >= 56.5 && q.y < 76.5 && q.s !== 'pond' && !(q.x < 66 || q.x > 82)) PROPS.splice(i, 1); }
   for (let i = TREES.length - 1; i >= 0; i--) { const q = TREES[i]; if (q[0] >= 62 && q[0] <= 86 && q[1] >= 56 && q[1] <= 75) TREES.splice(i, 1); }
-  rect(64, 65, 19, 7, 'o'); rect(72, 61, 5, 4, 'o');                              // the halls and the chedi (its spire rises behind)
-  rect(64, 72, 19, 1, 'c'); rect(72, 73, 5, 3, 'c');                              // a stone terrace along the front, a wide walk down to the road
-  for (const [x, y] of [[66, 74], [81, 74]]) { set(x, y, 'T'); TREES.push([x, y, 'tree_white']); }   // frangipani, as at every temple
-  for (const x of [69, 79]) prop('o_flowerbed', x, 74.4, false);
-  for (const x of [71.4, 77.6]) prop('o_lantern', x, 74.95);
-  for (const x of [67.5, 70.2, 77.8, 80.5]) prop('bush2', x, 75.9, false);
-  prop('signpost', 78.9, 75.9, false);
-  STATIONS.push({ id: 'gate_temple', type: 'gate', to: 'temple_in', label: 'เข้าวัด', icon: '🛕', x: 74, y: 72.8, r: 1.9, area: 'town', facade: F });
-  GATES.temple_in = { x: X + 3.5, y: Y + 17 }; GATES.town_from_temple = { x: 74, y: 73.8 };
+  const F = { cx: 57.4, bv: 70.2, hw: 4.8, lv: 0, x0: 52.6, by: 70.2, w: 9.6 };
+  for (let y = 63; y <= 70; y++) for (let x = 52; x <= 62; x++) { const c = get(x, y); if (c === 'T' || c === 'o') set(x, y, '.'); }
+  for (let i = TREES.length - 1; i >= 0; i--) { const q = TREES[i]; if (q[0] >= 52 && q[0] <= 62 && q[1] >= 63 && q[1] <= 70) TREES.splice(i, 1); }
+  set(52, 67, 'o');   // keeps the later row of shade trees (x 52) off the temple's left corner
+  for (let i = PROPS.length - 1; i >= 0; i--) { const q = PROPS[i]; if (q.x >= 52 && q.x < 64.5 && q.y >= 63 && q.y < 72) PROPS.splice(i, 1); }   // the camping tent and its campfire
+  rect(53, 66, 9, 4, 'o'); rect(57, 64, 2, 2, 'o');                              // the halls and the chedi
+  rect(53, 70, 9, 1, 'c');                                                       // the stone terrace along the front
+  for (const x of [53.3, 61.5]) prop('o_lantern', x, 70.95, false);
+  STATIONS.push({ id: 'gate_temple', type: 'gate', to: 'temple_in', label: 'เข้าวัด', icon: '🛕', x: F.cx, y: 70.8, r: 1.9, area: 'town', facade: F });
+  GATES.temple_in = { x: X + 3.5, y: Y + 17 }; GATES.town_from_temple = { x: 57.4, y: 71.7 };
 }
 // ================================================================= town streets, round 1: pavements along every road that had none
 // (the avenue, the coast road, the west road, the south road), lamps and street trees on the verge behind them, and the odd tree
@@ -1107,6 +1116,23 @@ const PARK_ARCH = { x: 46, y: 94.6 };
       prop('o_hedgecube', c.x - .5, fy - .05); prop('o_hedgecube', c.x + c.w + .5, fy - .05);
       prop('o_lampball', c.x - .4, fy + 1.6); prop('o_lampball', c.x + c.w + .4, fy + 1.6);
       prop('o_planter', c.x + .9, fy + 2.0, false); prop('o_planter', c.x + c.w - .9, fy + 2.0, false); prop('i_bike', c.x + c.w + .2, fy + .9, false); } }
+  // 🐄 the ranch: fence, gate (starts closed; index.js opens/closes it), barns, hay, the pigs' muddy yard and its sign by the road
+  { const R = RANCH;
+    for (let y = R.y0; y <= R.y1; y++) for (let x = R.x0; x <= R.x1; x++) { clearTree(x, y); if (!'ws'.includes(get(x, y))) set(x, y, '.'); }
+    keep(PROPS, q => !(q.x > R.x0 - .6 && q.x < R.x1 + 1.6 && q.y > R.y0 - .2 && q.y < R.y1 + 1.4));
+    for (let y = 65; y <= 70; y++) for (let x = 72; x <= 78; x++) set(x, y, 'm');
+    const hf = (a, b, y) => { let x = a; for (; x + 3 <= b + 1; x += 3) prop('fence_white', x + 1.5, y + .95, false); for (; x <= b; x++) prop('fence_post', x + .5, y + .95, false); };
+    hf(R.x0, R.x1, R.y0); hf(R.x0, R.gate[0] - 1, R.y1); hf(R.gate[1] + 1, R.x1, R.y1);
+    for (let y = R.y0 + 1; y < R.y1; y++) for (const x of [R.x0, R.x1]) prop('fence_post', x + .5, y + .95, false);
+    for (let x = R.x0; x <= R.x1; x++) { set(x, R.y0, 'o'); set(x, R.y1, 'o'); }
+    for (let y = R.y0; y <= R.y1; y++) { set(R.x0, y, 'o'); set(R.x1, y, 'o'); }
+    PROPS.push({ s: 'gate_wood_l', x: R.gate[0] + .87, y: R.y1 + .95, rg: 1 }, { s: 'gate_wood_r', x: R.gate[1] + .13, y: R.y1 + .95, rg: 2 });
+    STATIONS.push({ id: 'rgate', type: 'rgate', label: 'ประตูฟาร์ม', icon: '🚪', x: R.gate[0] + 1.5, y: R.y1 + .5, r: 1.7, area: 'town' });
+    for (const b of R.barns) { prop('b_barn', b.x, R.y0 + 4.6, false); rect(Math.floor(b.x - 2), R.y0 + 1, 4, 4, 'o');
+      STATIONS.push({ id: 'rbarn_' + b.k, type: 'rbarn', k: b.k, label: b.label, icon: b.icon, x: b.x, y: R.y0 + 5.35, r: 1.4, area: 'town' }); }
+    for (const [s, x, y] of [['hay', 64.9, 65.0], ['hay2', 70.4, 64.9], ['barrel', 79.9, 64.9], ['hay', 87.0, 65.0], ['hay2', 87.0, 70.4], ['wheelbarrow', 64.9, 70.4]]) prop(s, x, y);
+    STATIONS.push({ id: 'ranch', type: 'ranch', label: 'สำนักงานฟาร์ม', icon: '🐄', x: 70.6, y: 69.9, r: 1.3, area: 'town' }); prop('signpost', 70.6, 69.4);
+    prop('o_lampball', 71.4, 72.6); prop('o_lampball', 77.6, 72.6); }
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
   for (let y = 107; y <= 114; y++) if (get(43, y) === 'T') { clearTree(43, y); set(43, y, '.'); }   // the park's hedge of trees would hide the game centre's sign
   keep(PROPS, q => !(q.x > 40.5 && q.x < 50 && q.y > 114.6 && q.y < 117.2));
@@ -1308,6 +1334,10 @@ const ITEMS = {
   sunflower: { name: 'ทานตะวัน', icon: '🌻', kind: 'crop', base: 75 },
   pumpkin: { name: 'ฟักทอง', icon: '🎃', kind: 'crop', base: 140, eat: { hunger: 15 } },
   watermelon: { name: 'แตงโม', icon: '🍉', kind: 'crop', base: 190, eat: { hunger: 12, energy: 3 } },
+  // 🐄 ranch goods (rancher work at the barns; sold at the central market, cooked at the kitchen)
+  r_egg:  { name: 'ไข่ไก่สด', icon: '🥚', kind: 'crop', base: 25, ranch: 1 },
+  r_milk: { name: 'นมวัวสด', icon: '🥛', kind: 'crop', base: 60, ranch: 1, eat: { hunger: 6, energy: 4 } },
+  r_pork: { name: 'เนื้อหมู', icon: '🥩', kind: 'crop', base: 140, ranch: 1 },
 
   // fish (rar = rarity 1 ทั่วไป · 2 ไม่ธรรมดา · 3 หายาก · 4 มหากาพย์ · 5 ตำนาน; spr = sprite in the atlas)
   sfish:     { name: 'ปลาซิว', icon: '🐟', kind: 'fish', base: 25, rar: 1 },
@@ -1438,6 +1468,9 @@ const ITEMS = {
   grilled_fish: { name: 'ปลาเผา', icon: '🍤', kind: 'meal', base: 260, eat: { hunger: 45, energy: 10 } },
   tomyum:       { name: 'ต้มยำ', icon: '🍲', kind: 'meal', base: 500, eat: { hunger: 50, energy: 15 } },
   durian_sweet: { name: 'ทุเรียนเชื่อม', icon: '🍨', kind: 'meal', base: 650, eat: { hunger: 30, energy: 25, health: 5 } },
+  omelet:       { name: 'ไข่เจียวฟู', icon: '🍳', kind: 'meal', base: 180, eat: { hunger: 35, energy: 6 } },
+  kaprao_moo:   { name: 'กะเพราหมูไข่ดาว', icon: '🍛', kind: 'meal', base: 420, eat: { hunger: 55, energy: 12 } },
+  milk_pudding: { name: 'พุดดิ้งนมสด', icon: '🍮', kind: 'meal', base: 300, eat: { hunger: 25, energy: 10, happy: 4 } },
   // restaurant menu (sold at the restaurant and through the delivery app)
   kaprao:  { name: 'ข้าวกะเพรา', icon: '🍛', kind: 'meal', base: 100, eat: { hunger: 32 }, menu: 1 },
   noodle:  { name: 'ก๋วยเตี๋ยว', icon: '🍜', kind: 'meal', base: 80, eat: { hunger: 26 }, menu: 1 },
@@ -1531,6 +1564,9 @@ const RECIPES = [
   { id: 'grilled_fish', in: { catfish: 1, chili: 1 }, ops: { catfish: ['chop', 'grill'], chili: ['chop'] } },
   { id: 'tomyum',       in: { tilapia: 1, chili: 1, corn: 1 }, ops: { tilapia: ['chop', 'boil'], chili: ['chop'], corn: ['chop', 'boil'] } },
   { id: 'durian_sweet', in: { durian: 1, rice: 1 }, ops: { durian: ['chop'], rice: ['boil'] } },
+  { id: 'omelet',       in: { r_egg: 2, rice: 1 }, ops: { r_egg: ['fry'], rice: ['boil'] } },
+  { id: 'kaprao_moo',   in: { r_pork: 1, chili: 1, r_egg: 1, rice: 1 }, ops: { r_pork: ['chop', 'fry'], chili: ['chop'], r_egg: ['fry'], rice: ['boil'] } },
+  { id: 'milk_pudding', in: { r_milk: 2, r_egg: 1 }, ops: { r_milk: ['boil'], r_egg: ['boil'] } },
 ];
 // 🔨 crafting at the town workshop: in = items used up; out = the craft-only furniture of the same id
 const CRAFTS = [
@@ -1772,6 +1808,7 @@ const CAREERS = {
   chef:     { name: 'เชฟ', icon: '🍳', where: 'kitchen', need: [], desc: 'ทำอาหารที่ครัวใหญ่: ซื้อวัตถุดิบ หั่น ผัด ต้ม ย่าง แล้วจัดจาน · อาหารที่เชฟทำขายให้ร้านอาหารได้ราคาดีกว่าคนทั่วไป (ยิ่งเลเวลสูงยิ่งได้มาก) · รับภารกิจเชฟที่เชฟหมีในครัว' },
   bartender: { name: 'บาร์เทนเดอร์', icon: '🍸', where: 'bar', need: [], desc: 'ผสมเครื่องดื่มที่บาร์ชิลล์ราตรี (เปิด 18:00–03:00): ดูออเดอร์ หยิบส่วนผสมให้ถูกสูตรตามลำดับ ยิ่งไวยิ่งได้มาก · ลูกค้าในบาร์ให้ทิปได้' },
   teacher:  { name: 'อาจารย์', icon: '👩‍🏫', where: 'school', need: ['degree'], desc: 'สอนที่มหาวิทยาลัย: ยืนข้างโต๊ะนักเรียนที่กำลังนั่งเรียนแล้วกด "สอน" ช่วยให้เรียนจบคาบเร็วขึ้น ได้ค่าสอน · รับภารกิจ ตรวจการบ้าน ทำเอกสาร ตามเด็กโดดเรียน · ใส่ชุดกากี' },
+  rancher:  { name: 'คนเลี้ยงสัตว์', icon: '🐄', where: 'ranch', need: [], desc: 'ทำงานที่ฟาร์มปศุสัตว์ (ใต้ทะเลสาบกลางเมือง): ให้อาหารไก่ หมู วัว ที่โรงเรือน รอสักพักแล้วกลับมาเก็บไข่ นม เนื้อหมู · เอาไปขายที่ตลาดกลาง ให้เชฟซื้อไปทำอาหาร' },
   rider:    { name: 'ไรเดอร์ส่งอาหาร', icon: '🛵', where: 'rider', need: ['driving'], desc: 'รับออเดอร์จากแอพ ไปรับอาหารที่ร้านอาหาร แล้วไปส่งให้ลูกค้า ได้ค่าส่ง + ทิป (ใบขับขี่ต้องต่ออายุทุกปี)' },
 };
 // the degree comes from classes at the university; other licences are bought
@@ -2582,7 +2619,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, NB_SPAWN, RADIUS, SOLID,

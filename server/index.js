@@ -2076,7 +2076,8 @@ function npcBuyPrice(a, id, rate = NPC_BUY) {
   if (a.career === 'merchant' && it.kind === 'goods') rate = 0.74 + Math.min(0.08, 0.01 * (lvl(a, 'merchant') - 1));   // shops restock from merchants
   else if (a.career === 'merchant') b += 0.05;
   if (a.career === 'chef' && it.kind === 'meal' && CHEF_COST[id]) return (CHEF_COST[id] + CHEF_MARGIN) * marketPrice(id) / it.base;   // restaurants pay chefs the ingredients (kitchen price) plus a fixed cook's fee, so every recipe pays about the same
-  if (a.career === 'farmer' && it.kind === 'crop') b += 0.08;
+  if (a.career === 'farmer' && it.kind === 'crop' && !it.ranch) b += 0.08;
+  if (a.career === 'rancher' && it.ranch) b += 0.08;
   if (it.kind === 'fish') b += 0.01 * Math.min(8, fishLv(a) - 1);       // experienced anglers know the buyers
   return marketPrice(id) * rate * b;
 }
@@ -2096,7 +2097,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'bus99', 'condo', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['ranch', 'gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'bus99', 'condo', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -3609,7 +3610,7 @@ function act(a, m) {
       const own = a.career === 'merchant' && it.kind === 'goods' || a.career === 'chef' && it.kind === 'meal' ? msat(a, id) : null;   // a merchant's restock sales only press their own price, not everyone's
       for (let i = 0; i < q; i++) { if (own) { total += npcBuyPrice(a, id, rate) * own[0]; own[0] = Math.max(0.55, own[0] * 0.985); } else { total += npcBuyPrice(a, id, rate); market[id].mult = Math.max(0.4, market[id].mult * 0.985); } }
       addItem(a, id, -q);
-      if ({ merchant: 'goods', farmer: 'crop', chef: 'meal' }[a.career] === it.kind) total *= jobPay(a);   // your own trade's goods sell better the higher your job level
+      if ({ merchant: 'goods', farmer: 'crop', chef: 'meal' }[a.career] === it.kind && !it.ranch || a.career === 'rancher' && it.ranch) total *= jobPay(a);   // your own trade's goods sell better the higher your job level
       const got = earn(a, total); quest(a, 'sell', q);
       return toast(a, `ขาย ${it.icon}${it.name} x${q} ให้ NPC ได้ ${money(got)} (วางขายให้ผู้เล่นที่ตลาดกลางได้ราคาดีกว่ามาก)`, '💰');
     }
@@ -3749,6 +3750,28 @@ function act(a, m) {
       toast(b, `อาจารย์${a.name}มาช่วยสอน! เข้าใจเร็วขึ้น คาบนี้ใกล้จบแล้ว`, '👩‍🏫');
       const got = earn(a, (70 + 8 * lvl(a)) * jobPay(a) * (b.npc ? 1 : 1.3)); addXp(a); quest(a, 'work'); stat(a, 'taught');
       return toast(a, `สอน ${b.name} เรียบร้อย ได้ค่าสอน ${money(got)}`, '👩‍🏫');
+    }
+    case 'rgate.use': {                       // 🐄 the ranch gate: anyone can open or close it (not on someone standing in it)
+      const R = D.RANCH, y = R.y1; if (!cd(a, 'rgate', 800, true)) return;
+      const open = D.TILES[y][R.gate[0]] !== 'o';
+      if (open && [...online.values()].some(o => Math.abs(o.y - (y + .5)) < .9 && o.x > R.gate[0] - .3 && o.x < R.gate[1] + 1.3)) return toast(a, 'มีคนยืนขวางประตูอยู่', '🚪', false);
+      const set = []; for (let x = R.gate[0]; x <= R.gate[1]; x++) if (D.setTile(x, y, open ? 'o' : '.')) set.push([x, y, open ? 'o' : '.']);
+      broadcast({ t: 'tiles', set }); return toast(a, open ? 'ปิดประตูฟาร์มแล้ว สัตว์ไม่หนีออกไปแน่นอน' : 'เปิดประตูฟาร์มแล้ว', '🚪');
+    }
+    case 'rbarn.use': {                       // 🐄 rancher work: feed the animals, come back when they are ready, collect
+      if (!need(a, 'rancher')) return;
+      const W = D.RANCH.work[s.k]; if (!W) return;
+      const r = a.ranch = a.ranch || {}, t = now();
+      if (!r[s.k]) {
+        if (!cd(a, 'rbarn', 1200) || !spend(a, 5)) return;
+        r[s.k] = t + W.sec * 1000; markMe(a); quest(a, 'work');
+        return toast(a, `${W.feed}แล้ว อีก ${W.sec} วิ กลับมา${W.got}ได้`, s.icon);
+      }
+      if (t < r[s.k]) return toast(a, `ยังไม่พร้อม อีก ${Math.ceil((r[s.k] - t) / 1000)} วิ`, '⏳', false);
+      if (!cd(a, 'rbarn', 1200)) return;
+      const it = D.ITEMS[W.item], n = W.n + Math.floor((lvl(a) - 1) / 4);
+      addItem(a, W.item, n); r[s.k] = 0; addXp(a); stat(a, 'ranch', n); markMe(a);
+      return toast(a, `${W.got}ได้ ${it.icon}${it.name} x${n} · ขายที่ตลาดกลาง หรือให้อาหารต่อได้เลย`, s.icon);
     }
     case 'gym.use': {                         // 🏋️ step onto a machine (or off it again)
       if (a.gym?.idx === s.idx) { standUp(a); markMe(a); return toast(a, 'พักจากเครื่องแล้ว', '🏋️'); }
@@ -4520,7 +4543,7 @@ function ate(a, id) {
     a.craving = null; a.craveNext = now() + rnd(5, 10) * 60000;
   }
 }
-const WORK = new Set(['icu.start', 'chair.sit', 'warehouse.buy', 'warehouse.auction', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'sdesk.sit']);
+const WORK = new Set(['rbarn.use', 'icu.start', 'chair.sit', 'warehouse.buy', 'warehouse.auction', 'kitchen.cook', 'pier.cast', 'gplot.plant', 'gplot.harvest', 'bed.treat', 'bed.revive', 'restaurant.pickup', 'sdesk.sit']);
 function holdsHome(a) {
   if (a.house >= 0 && !tenants[a.house]) return a.house;
   if (a.rent && a.rent.until > now()) return a.rent.idx;
@@ -5260,7 +5283,7 @@ const walkCache = {};
 function walkableIn(areaId) {
   if (walkCache[areaId]) return walkCache[areaId];
   const A = D.AREAS.find(r => r.id === areaId), out = [];
-  for (let y = A.y + 1; y < A.y + A.h - 1; y++) for (let x = A.x + 1; x < A.x + A.w - 1; x++) if (!D.blocked(x + .5, y + .5) && D.TILES[y][x] !== 'D') out.push([x, y]);
+  for (let y = A.y + 1; y < A.y + A.h - 1; y++) for (let x = A.x + 1; x < A.x + A.w - 1; x++) if (!D.blocked(x + .5, y + .5) && D.TILES[y][x] !== 'D' && !(areaId === 'town' && x >= D.RANCH.x0 && x <= D.RANCH.x1 && y >= D.RANCH.y0 && y <= D.RANCH.y1)) out.push([x, y]);   // townsfolk keep out of the fenced ranch
   return (walkCache[areaId] = out);
 }
 // shortest tile walk from n to goal [x, y] inside area A (null = unreachable)
@@ -5666,7 +5689,7 @@ function meView(a) {
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
   const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
   return {
-    t: 'me', condo: a.condo || null, gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, eCap: eCap(a), gymK: a.gym?.k || '', gymPass: a.gymPass > now() ? a.gymPass : 0, gymT: a.eB ? a.gymT || 0 : 0, hunger: a.hunger, health: a.health,
+    t: 'me', condo: a.condo || null, gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, eCap: eCap(a), gymK: a.gym?.k || '', ranch: a.ranch || null, gymPass: a.gymPass > now() ? a.gymPass : 0, gymT: a.eB ? a.gymT || 0 : 0, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * wwSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], fortune: a.fortune?.d === dayKey() ? a.fortune : null, balloon: a.balloon || '',
@@ -5837,7 +5860,7 @@ function login(ws, m, pre) {
     t: 'init', id: a.id, parkArch: D.PARK_ARCH, relog: pre && a.stok ? { name: a.login, tok: a.stok } : null, gid: GOOGLE_ID,
     map: { w: D.W, h: D.H, tiles: D.TILES, buildings: D.BUILDINGS }, projPlace: D.PROJ_PLACE, stations: D.STATIONS.filter(s => s.type !== 'fishspot'), areas: D.AREAS, looks: D.LOOKS, shirts: D.SHIRTS, solid: D.SOLID,
     items: D.ITEMS, cats: D.CATEGORIES, crops: D.CROPS, recipes: D.RECIPES, crafts: D.CRAFTS, shardGems: D.SHARD_GEMS, fireworks: D.FIREWORKS, cook: D.COOK, careers: D.CAREERS, licenses: D.LICENSES,
-    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, gym: D.GYM, gymPass: D.GYM_PASS, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
+    titles: D.OFFICE_TITLES, wages: D.OFFICE_WAGE, speed: SPEED, clock: D.CLOCK, run: D.RUN, build: BUILD, fishing: D.FISHING, rides: D.RIDES, gym: D.GYM, ranch: D.RANCH, gymPass: D.GYM_PASS, football: D.FOOTBALL, lk: D.LK, fair: D.FAIR, pool: D.POOL, pshop: D.PSHOP, tarot: D.TAROT, fortuneCfg: D.FORTUNE, energyMul: D.ENERGY_MUL, pay: PAY.ON || isAdmin(a) ? { on: PAY.ON ? 1 : 0, sb: PAY.SANDBOX ? 1 : 0, vip: PAY.PACKS.find(x => x.id === 'vip').thb, angel: PAY.PACKS.find(x => x.id === 'angel').thb } : null, ads: ADS_GAME ? { client: ADS_CLIENT, test: ADS_TEST ? 1 : 0, daily: ADS.daily, gems: ADS.gems, energy: ADS.energy } : null, tshop: D.TSHOP, templeq: { pray: D.TEMPLEQ.pray }, homeTiers: D.HOME_TIERS, homeStyles: D.HOME_STYLES, jobGames: D.JOBGAMES, balloons: D.BALLOONS, taxi: { phone: TAXI.phone, base: TAXI.base, perTile: TAXI.perTile, far: TAXI.far, dest: TAXI_DEST }, outfitDefs: D.OUTFITS, doctor: D.DOCTOR, icu: D.ICU, adminName: ADMIN_NAME, adminTitle: ADMIN_TITLE, radius: D.RADIUS, chat: [...sysLog.slice(-10), ...chatLog.filter(m => !(m.id < 0)).slice(-30), ...(gangOf(a)?.chat || []).slice(-15)].sort((x, y) => (x.ts || 0) - (y.ts || 0)), isNew, dayMs: D.DAY_MS, hours: D.HOURS, shift: D.SHIFT, months: D.MONTHS, monthDays: D.MONTH_DAYS,
     props: D.PROPS, trees: D.TREES, lotsDef: D.LOTS, garden: D.GARDEN, yard: D.YARD, cstore: D.CSTORE, stocks: D.STOCKS.map(({ id, name, icon, desc }) => ({ id, name, icon, desc })), stockFee: [D.STOCK.fee, D.STOCK.feeMin], diseases: D.DISEASES, treatments: D.TREATMENTS, ach: D.ACHIEVEMENTS, lux: D.LUX_TITLES, payTitle: D.PAY_TITLE, fish: D.FISH, fishRarity: D.FISH_RARITY, fishCol: D.FISH_COL, casino: D.CASINO, arcade: D.ARCADE, bar: D.BAR, rich: RICH.gems, xmasEnd: D.XMAS_END, vapid: PUSH.publicKey(), nbSteps: NB.map(({ text, n, go, money, gems }) => ({ text, n, go, money, gems })), nbEnd: NB_END, pets: D.PETS, frameDefs: D.FRAMES, rods: D.RODS, rodOrder: D.ROD_ORDER,
     shop: { vehicles: D.VEHICLES, tools: D.TOOLS, toolPrices: D.TOOL_PRICES, housePrices: D.HOUSE_PRICES, houseRent: D.HOUSE_RENT, furniture: D.FURNITURE, plantIndoor: D.PLANT_INDOOR, hfloors: D.HOME_FLOORS, hwalls: D.HOME_WALLS, floorPrice: D.FLOOR_PRICE, floors: D.HOUSE_FLOORS, bank: D.BANK },
   });

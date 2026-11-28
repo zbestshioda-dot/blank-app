@@ -180,7 +180,7 @@ function femOutfitFrame(sheet, step, lk) {
   return chPut(key, c);
 }
 // draw one character with its feet at (fx, fy), k = scale per sprite pixel; view = front | side | back; step = walk step 0-3; faceLeft for the side view
-const OUTFIT_SHEET = { bartender: 'tuxedo', templeboy: 'scout', teacher: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
+const OUTFIT_SHEET = { rancher: 'farmer', bartender: 'tuxedo', templeboy: 'scout', teacher: 'scout', undertaker: 'tuxedo', mechanic: 'tracksuit', thug: 'hoodie', photographer: 'student', detective: 'detective', courier: 'rider', cashier: 'merchant', doctor: 'doctor', police: 'police', farmer: 'farmer', chef: 'chef', merchant: 'merchant', office: 'office', fisher: 'fisher', fishing: 'fisher', rider: 'rider', beggar: 'beggar', thief: 'thief',
   pajama: 'pajama', tracksuit: 'tracksuit', hoodie: 'hoodie', cowboy: 'cowboy', devil: 'devil', pilot: 'pilot', magician: 'magician', thai: 'thai', tuxedo: 'tuxedo', admin: 'admin',
   student: 'student', scout: 'scout', songkran: 'songkran', lanna: 'lanna', phasin: 'phasin', muaythai: 'muaythai', bunny: 'bunny', chinese: 'chinese', lukthung: 'lukthung', chakri: 'chakri', angel: 'angel', santa: 'santa',
   tigerpj: 'tigerpj', photog: 'photog', scrubs: 'scrubs', raincoat: 'raincoat', explorer: 'explorer', catsuit: 'catsuit', chicken: 'chicken', surf: 'surf', hiphop: 'hiphop', thairoyal: 'thairoyal', martial: 'martial', knight: 'knight', fortune: 'fortune', dino: 'dino', tanktop: 'tanktop', bear: 'bear', panda: 'panda', cathood: 'cathood', kitsune: 'kitsune', swim: 'swim', maid: 'maid', coat: 'coat', racer: 'racer', winter: 'winter', loykrathong: 'loykrathong', wedding: 'wedding' };   // women's versions are the 'f' + name sheets
@@ -2104,6 +2104,8 @@ function onAction() {
   if (near.type === 'sdesk' && me.career === 'teacher') { if (t < actCd) return; actCd = t + 800; return doAct(near.id, 'teach'); }
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
   if (near.type === 'gym') { if (t < actCd) return; actCd = t + 600; return doAct(near.id, 'use'); }
+  if (near.type === 'rgate') { if (t < actCd) return; actCd = t + 800; return doAct(near.id, 'use'); }
+  if (near.type === 'rbarn') { if (me.career !== 'rancher' && !me.admin) return toast('ต้องเป็นคนเลี้ยงสัตว์ก่อน · คุยกับลุงทุ่งที่สำนักงานฟาร์มเพื่อสมัครงาน', '🐄', false); if (t < actCd) return; actCd = t + 1200; return doAct(near.id, 'use'); }
   if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type)) { if (t < actCd) return; actCd = t + 250; return doAct(near.id, 'use'); }   // cooking battle stations
   if (near.type === 'kitchen' && me.cook?.hand === 'plate') return doAct(near.id, 'serve');
   if (near.type === 'pier') {                                         // fishing is all on the big button: cast, strike, (hold to reel), lift
@@ -2244,7 +2246,7 @@ function frame(t) {
     if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) ico = cookCue(near)[0];
     if (near.type === 'pier') actRod(); else actIco(ico);
     ACT_LBL.v = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
-      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'gym' ? (me.pose === 'gym' && Math.hypot(me.x - near.x, me.y - near.y) < .5 ? '⏹️ หยุด' : near.label + (me.gymPass > Date.now() + clockOff ? '' : ` 🎫${G.gymPass?.price || ''}`)) : near.type === 'sdesk' ? (me.career === 'teacher' ? '👩‍🏫 สอน' : 'นั่งเรียน')
+      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'rgate' ? (ranchOpen() ? '🚪 ปิดประตู' : '🚪 เปิดประตู') : near.type === 'rbarn' ? rbarnLbl(near) : near.type === 'gym' ? (me.pose === 'gym' && Math.hypot(me.x - near.x, me.y - near.y) < .5 ? '⏹️ หยุด' : near.label + (me.gymPass > Date.now() + clockOff ? '' : ` 🎫${G.gymPass?.price || ''}`)) : near.type === 'sdesk' ? (me.career === 'teacher' ? '👩‍🏫 สอน' : 'นั่งเรียน')
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('tap', '<img class="hudI" src="assets/hud/tap.webp?v=1" alt="" style="width:1.15em;height:1.15em">'); ACT_LBL.v = 'ใช้งาน'; }
@@ -2333,7 +2335,8 @@ function draw(t) {
     ents.push([-1e8, 14, { fx: 'koi' }], [-1e8, 14, { fx: 'lotus' }], [A.y + 12.75, 14, { fx: 'incense', x: A.x + 22, y: A.y + 12.7 }], [A.y + 14, 14, { fx: 'leaves' }]); }
   { const s = A?.id === 'town' && STN('gate_temple'), F = s?.facade;   // the temple complex: one strip per tile column, each sorted by the ground's front edge there
     if (F && vis(F.cx, F.bv - 6, 16)) { loadWat(); if (WIMG) { const n = Math.ceil(F.w); for (let i = 0; i < n; i++) { const xm = F.x0 + i + .5, d = Math.min(1, Math.abs(xm - F.cx) / F.hw); ents.push([F.bv - F.lv * d + .05, 13, { s, i }]); } } else ents.push([s.y + 2.2, 13, { s }]); } }
-  { const g = G.parkArch; if (A?.id === 'town' && g && vis(g.x, g.y, 8)) ents.push([g.y, 10, { x: g.x, y: g.y - .7, id: 'gate_park' }]); }   // the amusement park's arch over the walk from the avenue
+  { const g = G.parkArch; if (A?.id === 'town' && g && vis(g.x, g.y, 8)) ents.push([g.y, 10, { x: g.x, y: g.y - .7, id: 'gate_park' }]); }
+  if (A?.id === 'town' && G.ranch && vis((G.ranch.x0 + G.ranch.x1) / 2, (G.ranch.y0 + G.ranch.y1) / 2, 20)) for (const q of ranchAnimals(Date.now() + clockOff)) ents.push([q.y, 40, q]);   // the amusement park's arch over the walk from the avenue
   for (const p of P.values()) if (vis(p.rx, p.ry, 3)) {
     if (p.ps && P.get(p.ps)?.veh) continue;   // passengers are drawn with the bike / inside the car they ride in
     const rs = p.pose === 'fun' && p.fn ? STN('ride_' + String(p.fn).split(':')[0]) : null;   // riders are drawn with their ride (in front of it; behind the shooting counter)
@@ -2358,7 +2361,7 @@ function draw(t) {
   drawZDecals(X, Y, t, A);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
-    else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x, e.y - (e.z || 0), X, Y, e.sc || 1); }   // z: hung on a wall; open: only while that shop is open
+    else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x + (e.rg && ranchOpen() ? (e.rg === 1 ? -1.55 : 1.55) : 0), e.y - (e.z || 0), X, Y, e.sc || 1); }   // rg: the ranch gate's two leaves slide aside when it is open   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) { const tr = e, sw = Math.sin(t / 1300 + tr[0] * .7 + tr[1] * .4) * .022 + Math.sin(t / 470 + tr[0]) * .006, bx = (tr[0] + .5) * TS + X, byy = (tr[1] + 1.05) * TS + Y; ctx.save(); ctx.translate(bx, byy); ctx.transform(1, 0, -sw, 1, 0, 0); ctx.translate(-bx, -byy); spr(tr[2], tr[0] + .5, tr[1] + 1.05, X, Y); ctx.restore(); }   // trees sway in the breeze
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
@@ -2376,6 +2379,7 @@ function draw(t) {
     else if (k === 12) drawWatWall(e, X, Y);
     else if (k === 31) drawProj(e, X, Y, t);
     else if (k === 13) drawWatTownGate(e, X, Y);
+    else if (k === 40) drawAnimal(e, X, Y);
     else if (k === 15) drawFb(e, X, Y, t);
     else if (k === 17) drawLk(e, X, Y, t);
     else if (k === 18) drawFair(e, X, Y, t);
@@ -2386,12 +2390,13 @@ function draw(t) {
   if (A?.id === 'town') townXtraDraw(X, Y, t);
   if (A?.yard) drawYardLocks(A, X, Y, t);
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) drawBuildingSign(b, X, Y);
+  if (A?.id === 'town' && G.ranch && vis(G.ranch.gate[0] + 1.5, G.ranch.y1, 6)) { const R = G.ranch; sign(`🐄 ฟาร์มปศุสัตว์ · ${ranchOpen() ? 'ประตูเปิด' : 'ประตูปิด'}`, (R.gate[0] + 1.5) * TS + X, (R.y1 - .9) * TS + Y, { size: TS * .3, bg: 'rgba(110,70,35,.92)', border: '#e8c58a88' }); for (const b of R.barns) sign(`${b.icon} ${b.label}`, b.x * TS + X, (R.y0 + .2) * TS + Y, { size: TS * .26, bg: 'rgba(150,50,40,.9)', border: '#ffd9a088' }); }
   for (const s of G.stations) {
     if (s.type === 'gplot' || !inside(s.x, s.y)) continue;
     const px = s.x * TS + X, py = s.y * TS + Y;
     if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
     const isNear = near && near.id === s.id;
-    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note|gym)$/.test(s.type) && !isNear) continue;
+    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note|gym|rgate|ranch)$/.test(s.type) && !isNear) continue;
     if ((s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
     if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
@@ -4074,6 +4079,41 @@ function drawWatWall(side, X, Y) {
     poly([[gx - u * .7, gy - u * 3.8], [gx, gy - u * 5.4], [gx + u * .7, gy - u * 3.8]], WAT.red, WAT.gold, 2);
   } else seg(T.x, bot, T.x + T.w, bot);
 }
+// 🐄 the ranch: chickens, pigs and cows wander their yards. Positions come from the clock alone, so everyone sees the same herd.
+const rbarnLbl = s => { const W = G.ranch?.work?.[s.k], r = me.ranch?.[s.k], left = r ? Math.ceil((r - Date.now() - clockOff) / 1000) : 0; return !W || me.career !== 'rancher' ? s.label : !r ? `${s.icon} ให้อาหาร` : left > 0 ? `⏳ อีก ${left} วิ` : `${s.icon} ${W.got}`; };
+const ranchOpen = () => { const R = G.ranch; return !!R && G.map.tiles[R.y1]?.[R.gate[0]] !== 'o'; };
+const AN_PAL = { W: '#f6f5ef', G: '#d5d3c8', r: '#d8383a', o: '#f29a1f', k: '#262222', y: '#e3a12b', P: '#f4a9b8', D: '#d98197', n: '#e57e98', B: '#2e2a2a', h: '#eadfc4', b: '#8a5a3a' };
+const AN_ART = {   // side view facing right: body rows, then two sets of leg rows (walk frames)
+  chicken: { h: .62, rows: ['....rr....', '...WWWW...', '...WWkWoo.', 'W..WWWW...', 'WW.WWWW...', 'WWWWWWW...', '.GWWWWG...', '..GGGG....'], legs: [['...y.y....', '..yy.yy...'], ['....yy....', '...yy.y...']] },
+  pig: { h: .78, rows: ['.........DD...', 'D.PPPPPPPPPP..', '.PPPPPPPPPPkP.', 'PPPPPPPPPPPPnn', 'PPPPPPPPPPPPnn', '.PPPPPPPPPPPP.', '..DPPPPPPPPD..'], legs: [['..DD.DD.DD.DD.', '..DD.DD.DD.DD.'], ['.DD..DD..DD.DD', '.DD...DD.DD..D']] },
+  cow: { h: 1.25, rows: ['............h.h.', '...........BBBB.', 'BWWWWWWWWWWBkBBn', 'BBBWWWWBBWWWBBnn', 'WBBBWWWBBBWWWW..', 'WWBWWWWWBWWWWW..', 'WWWWWWWWWWWWWW..', '.WWWWWWWWWWWWW..'], legs: [['.WW.WW...WW.WW..', '.kk.kk...kk.kk..'], ['WW..WW..WW..WW..', 'kk...kk.kk...kk.']] },
+};
+const anCache = new Map();
+function anImg(k, f) {   // the pixel art as a little canvas (1 px per cell), cached
+  const key = k + f; let c = anCache.get(key); if (c) return c;
+  const A = AN_ART[k], rows = [...A.rows, ...A.legs[f]], w = rows[0].length, h = rows.length;
+  c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (AN_PAL[ch]) { g.fillStyle = AN_PAL[ch]; g.fillRect(x, y, 1, 1); } }));
+  anCache.set(key, c); return c;
+}
+const anRnd = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+function ranchAnimals(now) {
+  const out = [], R = G.ranch; let id = 0;
+  for (const p of R.pens) for (let i = 0; i < p.n; i++, id++) {
+    const P = p.k === 'cow' ? 13 : p.k === 'pig' ? 9 : 5, walk = p.k === 'chicken' ? .35 : .5, ts = now / 1000 / P + anRnd(id, 7), n = Math.floor(ts), f = ts - n;
+    const pt = j => [p.x0 + anRnd(id, j * 2) * (p.x1 - p.x0), p.y0 + anRnd(id, j * 2 + 1) * (p.y1 - p.y0)];
+    const a = pt(n - 1), b = pt(n), u = Math.min(1, f / walk), e = u * u * (3 - 2 * u);
+    out.push({ k: p.k, id, x: a[0] + (b[0] - a[0]) * e, y: a[1] + (b[1] - a[1]) * e, left: b[0] < a[0], moving: u < 1, peck: p.k === 'chicken' && u >= 1 && Math.sin(now / 160 + id) > .6 });
+  }
+  return out;
+}
+function drawAnimal(q, X, Y) {
+  const A = AN_ART[q.k], c = anImg(q.k, q.moving && Math.floor(performance.now() / 170 + q.id) % 2 ? 1 : 0), px = TS * A.h / c.height, w = c.width * px, h = c.height * px;
+  const x = q.x * TS + X, y = q.y * TS + Y; if (x < -60 || y < -60 || x > VW + 60 || y > VH + 60) return;
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x, y, w * .4, TS * .08, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(Math.round(x), Math.round(y + (q.peck ? px : 0) - (q.moving && q.k !== 'cow' ? Math.abs(Math.sin(performance.now() / 110 + q.id)) * px : 0)));
+  if (q.left) ctx.scale(-1, 1); ctx.drawImage(c, -w / 2, -h, w, h); ctx.restore();
+}
 // the way in from town: a small Thai arch at the end of the south-west lane
 function drawWatTownGate(e, X, Y) {
   const s = e.s, F = s.facade;
@@ -4179,6 +4219,7 @@ function npcPatient(b, s) {
 }
 // ---- job staff: an NPC at every place that hires (plus the rod seller), each with its own talk spot next to the counter
 const STAFF_DEF = {   // every officer looks like their painted portrait (NPC_FACE): gender, hair, clothes
+  rancher:  { name: 'ลุงทุ่ง (เจ้าของฟาร์มปศุสัตว์)', short: 'ลุงทุ่ง', of: 'farmer', lk: { hair: 'silver' }, hi: 'มาช่วยลุงเลี้ยงไก่ หมู วัว ไหมหลาน! ให้อาหารแล้วรอเก็บไข่ รีดนม เอาไปขายตลาดได้เงินดีเลย', yes: 'ขยันดีหลาน! ไก่หิวแล้วนะ ไปให้อาหารที่เล้าเลย แล้วอย่าลืมปิดประตูฟาร์มด้วย สัตว์จะหนี' },
   templeboy: { name: 'พี่ตุ๋ย (เด็กวัดรุ่นพี่)', short: 'พี่ตุ๋ย', of: '-', lk: { hair: 'black', shirt: 'white', pants: '#3a3a3a' }, hi: 'เฮ้ย! มาช่วยงานวัดกับพี่ตุ๋ยไหม ได้บุญ ได้เงิน แถมได้กินขนมวัด... ครบสามเด้ง!', yes: 'หลวงพ่อฝากงานไว้แล้ว รับเลย! เดี๋ยวพี่กวาดลานรอ ฟึ่บ ฟึ่บ 🧹' },
   undertaker: { name: 'ลุงสัป (สัปเหร่อประจำวัด)', short: 'ลุงสัป', of: '-', lk: { hair: 'silver', shirt: '#262626', pants: '#262626' }, hi: 'หลานกลัวผีไหม... ถ้าไม่กลัว มาเป็นสัปเหร่อกับลุงสิ งานเงียบ แต่ใจสงบนะ', yes: 'คืนนี้มีงาน เตรียมตัวให้พร้อม... ไม่ต้องกลัว ผีแถวนี้รู้จักลุงหมดแล้ว' },
   mechanic: { name: 'ช่างเปี๊ยก (อู่หน้าโชว์รูม)', short: 'ช่างเปี๊ยก', of: '-', lk: { hair: 'black', shirt: '#2d3d66', pants: '#2d3d66' }, hi: 'โย่! รถเสียเต็มเมือง เสียงเครื่องมันร้องเรียกช่างอยู่ มาช่วยพี่ฟังหน่อยดิ', yes: 'มีรถรอซ่อมอยู่ คว้าประแจแล้วลุย! ฟังเสียงเครื่องดีๆ มันบอกเองว่าเจ็บตรงไหน' },
@@ -4224,6 +4265,8 @@ function buildStaff() {
   }
 }
 const KEEPERS = [   // shopkeepers, each matching their painted portrait (NPC_FACE)
+  { st: 'gym', name: 'โค้ชบิ๊ก (เทรนเนอร์ฟิตเนส)', short: 'โค้ชบิ๊ก', icon: '💪', dx: 1.6, dy: .2, of: 'mechanic', lk: { hair: 'black' }, hi: ['มาเบิร์นกันหน่อย! วิ่งกับปั่นจักรยานช่วยเพิ่มเพดานพลังงานนะ', 'ยกเวทเพิ่มสุขภาพ โยคะช่วยผ่อนคลาย เลือกเลย!', 'หยุดออกกำลังนาน เพดานพลังงานจะค่อยๆ ลดนะ มาบ่อยๆ'] },
+  { st: 'condo', name: 'คุณแพรว (นิติบุคคลคอนโด)', short: 'คุณแพรว', icon: '🏢', g: 'f', dx: 1.5, dy: .1, of: 'office', lk: { hair: 'black' }, hi: ['สวัสดีค่ะ ยินดีต้อนรับสู่ Life Condo ค่ะ เช่าห้องได้ที่เคาน์เตอร์นี้เลย', 'ห้องพักมีหลายสไตล์ให้เลือกนะคะ นอนแล้วฟื้นพลังงานด้วย', 'เช่าห้องแล้ว ขึ้นลิฟต์ทางขวามือได้เลยค่ะ'] },
   { st: 'workshop', name: 'ช่างโต (โรงช่างคราฟ)', short: 'ช่างโต', icon: '🔨', dx: 2.5, dy: -.3, lk: { hair: 'black', shirt: 'black', pants: 'jeans' }, hi: ['มาคราฟของที่ร้านไหนก็ไม่มีขายกัน! 🔨', 'ไม้ ผ้า เปลือกหอย คริสตัล... ได้ตอนตกปลา เก็บผัก ทำงานนะ', 'ซุ้มเพชรเรืองแสงน่ะ ทั้งเมืองยังมีไม่กี่คนหรอก ✨', 'ไม่มีบ้านก็คราฟได้ ลุงเก็บไว้ให้ก่อน'] },
   { st: 'balloon', name: 'ลุงโป่ง (ร้านลูกโป่ง)', short: 'ลุงโป่ง', icon: '🎈', dx: 0, dy: 1, of: 'magician', bl: 'bunch', lk: { hair: 'silver', shirt: 'yellow' }, hi: ['ลูกโป่งมาแล้วจ้า! ปุ้ง! 🎈', 'สีไหนดีหลาน ลุงมีครบ... ยกเว้นสีที่แตกไปแล้ว', 'ลูกโป่งหัวใจ เอาไปให้คนที่ชอบสิ ลุงเชียร์!'] },
   { st: 'fortune', name: 'แม่หมอจันทรา (แม่หมอพยากรณ์)', short: 'แม่หมอจันทรา', icon: '🔮', g: 'f', of: 'fortune', dx: -1.6, dy: .3, lk: { hair: 'brown' }, hi: ['ดวงชะตาเรียกเธอมาที่นี่... มานั่งสิลูก 🔮', 'ไพ่บอกว่า... เธอกำลังจะเดินมาหาแม่หมอ ...ถูกไหมล่ะ', 'การเงิน การงาน หรือความรัก ใจเธอถามเรื่องไหนอยู่?'] },
@@ -5367,7 +5410,7 @@ function icuDraw() {
 // ------------------------------------------------------------------ dialog box (talking to people)
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
-const NPC_FACE = { staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
+const NPC_FACE = { staff_rancher: 'folk_m4', keep_gym: 'folk_m5', keep_condo: 'folk_f2', staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_bartender: 'shop_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
   keep_workshop: 'worker_m', keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_bakery: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
@@ -6896,6 +6939,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28o', d: '28 พ.ย.', items: [
+    '🐄 <b>ฟาร์มปศุสัตว์เปิดแล้ว!</b> (ใต้ทะเลสาบกลางเมือง) มีไก่ หมู วัว เดินในคอก มีเล้าไก่ คอกหมู โรงวัว รั้วรอบ และประตูเปิด-ปิดได้',
+    '👨‍🌾 <b>อาชีพใหม่: คนเลี้ยงสัตว์</b> สมัครกับลุงทุ่ง ให้อาหารแล้วเก็บไข่ รีดนม ได้เนื้อหมู ขายที่ตลาดกลาง · เมนูใหม่ในครัว ไข่เจียว กะเพราหมูไข่ดาว พุดดิ้งนม',
+    '🛕 <b>ย้ายทางเข้าวัด</b> ไปลานเหนือบ้านไม้ซุง ข้างลานน้ำพุ · NPC ใหม่ โค้ชบิ๊ก (ฟิตเนส) คุณแพรว (คอนโด)'] },
   { v: '2026-11-28n', d: '28 พ.ย.', items: ['📉 <b>เพดานพลังงานลดเร็วขึ้น</b> หยุดออกกำลัง 2 ชม. เพดานลด 1 ทุก 20 นาทีจนเหลือ 100 (มีแจ้งเตือนทุกครั้งที่ลด)'] },
   { v: '2026-11-28m', d: '28 พ.ย.', items: ['🎫 <b>ฟิตเนสมีบัตรรายวัน 150 LC</b> จ่ายตอนขึ้นเครื่องแรก เล่นได้ทุกเครื่อง 24 ชม.'] },
   { v: '2026-11-28l', d: '28 พ.ย.', items: [
@@ -8393,6 +8440,11 @@ function renderPanel(p) {
           ${B('📦 ลาออก', { fn: 'resignAsk' }, 'warn')}`;
       }
       return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${job('office') ? '' : staffHint('office')}`;
+    }
+    case 'ranch': {   // 🐄 the ranch office board: what the job is and what the barns give
+      const R = G.ranch, rows = R.barns.map(b => { const W = R.work[b.k], it = G.items[W.item]; return `<div class="item"><div><b>${b.icon} ${b.label}</b><small>${W.feed} → รอ ${W.sec} วิ → ${W.got} ${it.icon}${it.name} x${W.n}+ · ขาย NPC ~${money(it.base * .3)}/ชิ้น</small></div></div>`; }).join('');
+      return `<h2>🐄 ฟาร์มปศุสัตว์</h2><div class="sub">อาชีพคนเลี้ยงสัตว์ ใช้พลังงาน 5 ต่อการให้อาหาร 1 ครั้ง · เลเวลยิ่งสูงยิ่งเก็บได้มากขึ้น · ของขายที่ตลาดกลาง (วางขายให้ผู้เล่นได้ราคาดีกว่า) เชฟเอาไปทำ 🍳ไข่เจียว 🍛กะเพราหมูไข่ดาว 🍮พุดดิ้งนม</div>
+        ${me.career === 'rancher' ? '<div class="jobbox ok">✅ คุณเป็นคนเลี้ยงสัตว์แล้ว ไปที่หน้าโรงเรือนแล้วกดปุ่มเพื่อให้อาหาร</div>' : '<div class="jobbox">✍️ อยากทำงานนี้? คุยกับ <b>ลุงทุ่ง</b> ข้างป้ายนี้เพื่อสมัคร</div>'}<div class="list">${rows}</div>`;
     }
     case 'gymdesk': {   // 🏋️ the gym's notice board: what each machine does and your current ceiling
       const cap = me.eCap || 100, rows = Object.values(G.gym || {}).map(g => `<div class="item"><div><b>${g.icon} ${g.name}</b><small>${g.desc} · พลังงาน ${g.energy > 0 ? '+' : ''}${Math.round(g.energy * 60)}/นาที${g.cap ? ` · เพดาน +1 ทุก ${g.cap} วิ` : ''}</small></div></div>`).join('');
