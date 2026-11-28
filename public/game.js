@@ -2383,7 +2383,7 @@ function draw(t) {
     else if (k === 15) drawFb(e, X, Y, t);
     else if (k === 17) drawLk(e, X, Y, t);
     else if (k === 18) drawFair(e, X, Y, t);
-    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
+    else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else if (e.fx === 'shaman') drawShaman(X, Y, t); else drawWatFx(e, X, Y, t); }
     else if (k === 41) e.draw(X, Y, t);
     else drawPlayer(e, X, Y, t);
   }
@@ -3891,7 +3891,34 @@ function crowdMake(A) {
   }
   return CROWD[A.id] = L;
 }
-const WATB = [], TWNB = [], TWNC = [];   // temple pigeons, town-square pigeons, town cats and dogs
+const WATB = [], TWNB = [], TWNC = [];
+// 🧿 the black-magic shaman: grumbles his way round the town pavements, shoos anyone who comes close, and knows full well he is an NPC
+const SHM_IMG = new Image(); SHM_IMG.src = 'assets/shaman_black.webp?v=1';
+const SHM = { x: 20, y: 33.5, i: 1, wait: 0, f: 0, walk: 0, say: '', st: 0, next: 4, near: 0,
+  path: [[20, 33.5], [90, 33.5], [90, 30.5], [62, 30.5], [62, 33.5], [40, 33.5], [40, 30.5], [6, 30.5], [6, 33.5]] };
+const SHM_MUT = ['เดินวนทางเดิมมากี่รอบแล้วเนี่ย…', 'คนเขียนโค้ดให้ข้าเดินแค่ทางนี้', 'ข้าเป็น NPC รู้ตัวดี อย่ามาสงสาร', 'ของดำ ของขลัง… ไม่มีปุ่มซื้อ', 'มีบทพูดแค่นี้ อย่าหวังมาก',
+  'เฟรมเดินข้ามีแค่ 3 เฟรม เศร้า', 'เดี๋ยวก็รีเซ็ตตอนเซิร์ฟรีสตาร์ท', 'ศัตรูข้าคือหมอผีสายขาว… ยังไม่ถูกใส่เกม', 'ข้าเห็นพวกเจ้าคลิกรัว ๆ นะ', 'ฮึ… มนุษย์ผู้เล่น'];
+const SHM_SHOO = ['อย่าเข้ามาใกล้! ข้าไม่มีเควสให้', 'ถอยไป… ข้าไม่มีปุ่มคุย', 'เจ้าจะกดข้าทำไม? ข้าไม่มีเมนู', 'ระวัง… ฮิตบ็อกซ์ข้าคำสาปนะ', 'ไปเล่นของเจ้าไป ผู้เล่น'];
+function shamanStep(dt) {
+  const s = SHM, me0 = P.get(myId), near = me0 && Math.hypot(me0.rx - s.x, me0.ry - s.y) < 2.2, pick = a => a[Math.floor(Math.random() * a.length)], now = performance.now() / 1000;
+  if (near && !s.near) { s.say = pick(SHM_SHOO); s.st = now + 3.5; s.next = 7 + Math.random() * 5; s.wait = Math.max(s.wait, 1.2); }
+  s.near = near; if ((s.next -= dt) <= 0) { s.say = pick(SHM_MUT); s.st = now + 4; s.next = 8 + Math.random() * 8; }
+  if (s.wait > 0) { s.wait -= dt; if (near) s.f = me0.rx < s.x ? 3 : me0.rx > s.x ? 1 : 0; return; }   // glares at whoever came close
+  const [tx, ty] = s.path[s.i], dx = tx - s.x, dy = ty - s.y, d = Math.hypot(dx, dy);
+  if (d < .05) { s.i = (s.i + 1) % s.path.length; if (Math.random() < .35) s.wait = 2 + Math.random() * 4; return; }
+  const st = Math.min(d, .7 * dt); s.x += dx / d * st; s.y += dy / d * st; s.walk += dt * 6;
+  s.f = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 0 : 2);   // 0 down, 1 right, 2 up, 3 left
+}
+function drawShaman(X, Y, t) {
+  const s = SHM, u = TS, px = s.x * u + X, py = (s.y + .3) * u + Y, h = u * 1.85, w = h * 96 / 112;
+  if (SHM_IMG.complete && SHM_IMG.naturalWidth) {
+    const row = [0, 2, 1, 2][s.f], col = s.wait > 0 ? 1 : [0, 1, 2, 1][Math.floor(s.walk) % 4];
+    ctx.save(); ctx.translate(px, py); if (s.f === 3) ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(SHM_IMG, col * 96, row * 112, 96, 112, -w / 2, -h, w, h); ctx.restore();
+    ctx.globalAlpha = .35 + Math.sin(t / 300) * .15; ctx.fillStyle = '#7a1e2a'; ctx.beginPath(); ctx.arc(px + Math.sin(t / 500) * u * .5, py - h * .55 + Math.cos(t / 400) * u * .3, u * .07, 0, 7); ctx.fill(); ctx.globalAlpha = 1;   // a dark wisp circling him
+  }
+  if (s.say && performance.now() / 1000 < s.st) chatOnly({ bubble: s.say, bt: performance.now() + 1 }, px, py - h - u * .1, t);
+}   // temple pigeons, town-square pigeons, town cats and dogs
 function crowdEnts(A, ents, vis) {
   const L = CROWD[A.id] || crowdMake(A), now0 = performance.now(), dt = Math.min(.1, (now0 - (CROWD['t' + A.id] || now0)) / 1000); CROWD['t' + A.id] = now0;
   for (const m of L) {
@@ -3913,6 +3940,7 @@ function crowdEnts(A, ents, vis) {
       if (c.wait > 0) c.wait -= dt; else { const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy); if (d < .1) { c.wait = 2 + Math.random() * 6; c.tx = c.x + (Math.random() - .5) * 8; c.ty = c.home; c.tx = clamp(c.tx, 8, 90); } else { const st = Math.min(d, (c.e === '🐈' ? .9 : 1.3) * dt); c.x += dx / d * st; c.y += dy / d * st; c.dir = dx < 0 ? -1 : 1; } }
       if (vis(c.x, c.y, 2)) ents.push([c.y + .2, 14, { fx: 'critter', c }]);
     }
+    shamanStep(dt); if (vis(SHM.x, SHM.y, 3)) ents.push([SHM.y + .3, 14, { fx: 'shaman' }]);
   }
   if (A.id === 'temple' || A.id === 'town') { const me0 = P.get(myId), PIG = A.id === 'temple' ? WATB : TWNB;
     for (const b of PIG) {   // pigeons peck about the courtyard and take off when someone walks up
@@ -6965,6 +6993,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28w', d: '28 พ.ย.', items: ['🧿 <b>หมอผีสายดำ</b> เดินบ่นอยู่ริมถนนในเมือง ลึกลับ ไม่ชอบให้ใครเข้าใกล้ และรู้ตัวว่าเป็น NPC'] },
   { v: '2026-11-28v', d: '28 พ.ย.', items: ['☰ <b>ปุ่มเมนูใหม่ข้างมือถือ</b> กดแล้วกางออก: กิจกรรม คู่รัก แก๊ง สัตว์เลี้ยง ชวนเพื่อน อัปเดต ตั้งค่า สนับสนุน กลุ่มเฟสบุ๊ค', '📱 มือถือโล่งขึ้น: 🛵 เดลิเวอรีย้ายเข้าไปในแอปโทรศัพท์ · ประมูลและบ้านสวยดูได้ใน 📅 กิจกรรม · เอาเรื่องหลักกับบันทึกออก (เรื่องหลักดูได้ใต้เควสต์)'] },
   { v: '2026-11-28u', d: '28 พ.ย.', items: ['🩺 <b>แก้ EXP หมอไม่ขึ้น</b> รักษา/ช่วยชีวิตคนไข้ ปฐมพยาบาล และภารกิจ ICU ได้ EXP เข้าอาชีพแพทย์ถูกต้องแล้ว (แอดมินที่ทำงานข้ามอาชีพด้วย)'] },
   { v: '2026-11-28t', d: '28 พ.ย.', items: ['🏢 <b>คุณแพรวนิติบุคคลมีรูปหน้าแล้ว</b> คุยที่เคาน์เตอร์คอนโดจะเห็นหน้าคุณแพรว (ผมบ็อบใส่แว่น)'] },
