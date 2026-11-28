@@ -6563,7 +6563,7 @@ function fcMsg(m) {
 }
 function fcChip() {
   let c = $('#fcChip');
-  if (!c) { c = document.createElement('button'); c.id = 'fcChip'; c.onclick = () => openPanel({ kind: 'fishcomp' }); document.body.appendChild(c); }
+  if (!c) { c = document.createElement('button'); c.id = 'fcChip'; c.onclick = () => openPanel({ kind: 'fishcomp' }); document.body.appendChild(c); makeDrag(c, 'lt_fcchip'); }
   if (!FCS.on) { c.classList.add('hidden'); return; }
   const left = Math.max(0, FCS.end - Date.now() - (G?.toff || 0)), mm = Math.floor(left / 60000), ss = Math.floor(left / 1000) % 60;
   const t = `🏆🎣 แข่งตกปลา ${mm}:${String(ss).padStart(2, '0')}${FCS.me ? ` · อันดับ ${FCS.me.rank} (${FCS.me.kg.toFixed(2)} กก.)` : ' · ไปตกปลาเลย!'}`;
@@ -7058,15 +7058,22 @@ function jailList() {
     ${wd.length ? `<div class="sub" style="margin-top:6px"><b>🚨 หมายจับ</b></div><div class="list">${wd.map(o => itemRowRaw('🦹', esc(o.name), '⭐'.repeat(o.wd), '')).join('')}</div>` : ''}`;
 }
 // 📸 photo mode: the 👁️ button hides every button and box so only the town is left (tap again to bring them back)
-{ const e = document.getElementById('eyeBtn');   // drag it anywhere (spot remembered); a tap toggles
-  let drag = null, moved = false;
-  const put = (x, y) => { x = Math.max(0, Math.min(innerWidth - 34, x)); y = Math.max(0, Math.min(innerHeight - 34, y)); e.style.left = x + 'px'; e.style.top = y + 'px'; e.style.right = 'auto'; return [x, y]; };
-  try { const v = JSON.parse(localStorage.getItem('lt_eye') || 'null'); if (v) put(v[0], v[1]); } catch { }
-  if (e) { e.onpointerdown = ev => { const r = e.getBoundingClientRect(); drag = [ev.clientX - r.left, ev.clientY - r.top, ev.clientX, ev.clientY]; moved = false; e.setPointerCapture(ev.pointerId); };
-    e.onpointermove = ev => { if (!drag) return; if (!moved && Math.hypot(ev.clientX - drag[2], ev.clientY - drag[3]) < 6) return; moved = true; const p = put(ev.clientX - drag[0], ev.clientY - drag[1]); try { localStorage.setItem('lt_eye', JSON.stringify(p)); } catch { } };
-    e.onpointerup = e.onpointercancel = () => { drag = null; }; }
-  if (e) e.onclick = () => { if (moved) { moved = false; return; } const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
+// ✋ drag a floating button anywhere (spot remembered per button); a real drag doesn't count as a tap
+function makeDrag(e, key) {
+  if (!e || e._drag) return; e._drag = 1;
+  let drag = null; e._moved = false;
+  const put = (x, y) => { x = Math.max(0, Math.min(innerWidth - e.offsetWidth, x)); y = Math.max(0, Math.min(innerHeight - e.offsetHeight, y)); Object.assign(e.style, { left: x + 'px', top: y + 'px', right: 'auto', bottom: 'auto', transform: 'none' }); return [x, y]; };
+  try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v) requestAnimationFrame(() => put(v[0], v[1])); } catch { }
+  e.style.touchAction = 'none';
+  e.addEventListener('pointerdown', ev => { const r = e.getBoundingClientRect(); drag = [ev.clientX - r.left, ev.clientY - r.top, ev.clientX, ev.clientY]; e._moved = false; try { e.setPointerCapture(ev.pointerId); } catch { } });
+  e.addEventListener('pointermove', ev => { if (!drag) return; if (!e._moved && Math.hypot(ev.clientX - drag[2], ev.clientY - drag[3]) < 6) return; e._moved = true; const p = put(ev.clientX - drag[0], ev.clientY - drag[1]); try { localStorage.setItem(key, JSON.stringify(p)); } catch { } });
+  e.addEventListener('pointerup', () => { drag = null; }); e.addEventListener('pointercancel', () => { drag = null; });
+  e.addEventListener('click', ev => { if (e._moved) { e._moved = false; ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
+}
+{ const e = document.getElementById('eyeBtn'); makeDrag(e, 'lt_eye');
+  if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28zh', d: '28 พ.ย.', items: ['🏆 ป้ายแข่งตกปลาลากไปวางตรงไหนก็ได้แล้ว (เกมจำตำแหน่งไว้ให้)'] },
   { v: '2026-11-28zg', d: '28 พ.ย.', items: ['🚨 ติดหมายจับแล้วมีแถบบอกด้านบน ว่าจะโดนจับในกี่วินาที · สายตรวจ NPC มาจับใน 3 นาทีแม้มีตำรวจออนไลน์'] },
   { v: '2026-11-28zf', d: '28 พ.ย.', items: ['🪟 ข้อความแจ้งเตือน (เช่น "รออีก 30 วินาที") ขึ้นทับหน้าต่างแล้ว ไม่จมอยู่ข้างหลัง'] },
   { v: '2026-11-28ze', d: '28 พ.ย.', items: ['👁️ ลากปุ่มโหมดถ่ายรูปไปวางตรงไหนก็ได้ เกมจำตำแหน่งไว้ให้'] },
