@@ -475,6 +475,32 @@ function faceFrame(fr, ex) {
   g.putImageData(im, 0, 0);
   return (m[ex] = c);
 }
+// 🏋️ a player working out, drawn on the machine (ctx is saved by the caller): each machine has its own motion
+function drawGym(p, gk, px, py, k, H, t) {
+  const ph = t / 1000 + ((+p.id || 0) % 13);
+  if (gk === 'tread') {                    // running in place on the belt, belt stripes rushing back under the feet
+    const by = py - TS * .3;
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) { const x = px - TS * .55 + ((t / 4 + i * TS * .4) % (TS * 1.2)); ctx.beginPath(); ctx.moveTo(x, by + 2); ctx.lineTo(x + TS * .14, by + 2); ctx.stroke(); }
+    drawCharTo(ctx, p, px, by - Math.abs(Math.sin(ph * 9)) * TS * .05, k, 'side', Math.floor(t / 85) % 4, true);
+  } else if (gk === 'bike') {              // pedalling: seated, the body rocks with each push and the crank spins
+    const cx = px + TS * .05, cy = py - TS * .42, a = ph * 7;
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - Math.cos(a) * TS * .13, cy - Math.sin(a) * TS * .13); ctx.lineTo(cx + Math.cos(a) * TS * .13, cy + Math.sin(a) * TS * .13); ctx.stroke();
+    drawCharTo(ctx, p, px - TS * .2, py - TS * .5 + Math.sin(a * 2) * TS * .025, k, 'side', 0, false, true);
+  } else if (gk === 'bench') {             // bench press: lying on the bench, the bar goes up and down over the chest
+    const lift = (1 - Math.cos(ph * 2.4)) / 2;
+    ctx.save(); ctx.translate(px, py - TS * .55); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0, false, false, false); ctx.restore();
+    const bx = px - H * .1, cy = py - TS * .82, bY = cy - TS * .35 - lift * TS * .4;   // the barbell seen end-on: arms push the plate up from the chest
+    ctx.strokeStyle = '#e8b48a'; ctx.lineWidth = TS * .09; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, cy); ctx.lineTo(bx, bY); ctx.stroke();
+    ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(bx, bY, TS * .2, 0, 7); ctx.fill(); ctx.fillStyle = '#8b939c'; ctx.beginPath(); ctx.arc(bx, bY, TS * .07, 0, 7); ctx.fill();
+  } else {                                 // yoga: a slow flow of stretches (reach up, lean left, lean right, low squat)
+    const st = Math.floor(ph / 2.5) % 4, e = Math.min(1, (ph % 2.5) / .6), y0 = py - TS * .1;
+    ctx.translate(px, y0);
+    if (st === 0) ctx.scale(1 - .06 * e, 1 + .08 * e); else if (st === 3) ctx.scale(1 + .08 * e, 1 - .14 * e); else ctx.rotate((st === 1 ? -1 : 1) * .2 * e);
+    ctx.translate(-px, -y0); drawCharTo(ctx, p, px, y0, k, 'front', 0, false);
+  }
+  if (gk !== 'yoga') { ctx.globalAlpha = .8; ctx.fillStyle = '#8fd3ff'; const d = (ph * 1.3) % 1; ctx.beginPath(); ctx.ellipse(px + TS * .22, py - H * (gk === 'bench' ? .35 : .95) + d * TS * .5, 2, 3, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }   // a sweat drop
+}
 function drawCharTo(g, p, fx, fy, k, view, step, faceLeft, seated, asleep) {
   // outfits (job clothes, reward outfits) are whole sheets; only the hair colour is applied on top
   const ofd = G?.outfitDefs?.[p.of], sheet0 = OUTFIT_SHEET[ofd?.base || p.of], sheet = sheet0 && p.g === 'f' && CH_ATLAS.rows[`f${sheet0}:down0`] !== undefined ? 'f' + sheet0 : sheet0,   // women's uniform when there is one
@@ -781,7 +807,7 @@ function handle(m) {
         let s = P.get(p.id);
         if (!s) { s = { x: p.x, y: p.y, rx: p.x, ry: p.y, ox: 0, oy: 0, f: p.f, bubble: '', bt: 0 }; P.set(p.id, s); }
         if (p.fn && p.fn !== s.fn && String(p.fn).startsWith('pool:') && s.name) setTimeout(() => { const q = s.fn && funPos(s); if (!q) return; FX.burst(q.x, q.y - .5, '#d8f2ff', 22); FX.ring(q.x, q.y - .4, '#ffffff', 900, 1.4); FX.play('splash'); }, 60);   // jumping into the pool: a big splash
-        Object.assign(s, { mc: p.mc || 0, um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0, fid: p.fid || '' });
+        Object.assign(s, { gk: p.gk || '', mc: p.mc || 0, um: p.um || 0, umb: p.umb || 0, id: p.id, name: p.name, av: p.av, c: p.c, lv: p.lv, dz: p.dz || [], pose: p.pose, title: p.title, tr: p.tr, g: p.g, lk: p.lk, npc: p.npc, zb: p.zb || '', ap: p.ap || 0, adm: p.adm, w: p.w, sad: p.sad, of: p.of || '', face: p.face || '', th: p.th, afk: p.afk, wk: p.wk, desc: p.desc, tf: p.tf, fn: p.fn || '', veh: p.veh || '', ps: p.ps || 0, pt: p.pt || '', pn: p.pn || '', pl: p.pl || 0, gg: p.gg || 0, bl: p.bl || '', wwm: p.wwm || 0, fid: p.fid || '' });
         if (p.id !== myId) { if (p.fc && !s.fc) { s.fcB = findWater(p.x, p.y); s.fcT = performance.now(); } s.fc = p.fc || 0; if (!s.fc) s.fcB = null; }
         if (p.id === myId && !s.init) { s.init = true; s.x = s.rx = p.x; s.y = s.ry = p.y; }
       }
@@ -1299,12 +1325,12 @@ function paintHud() {
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
-  $('#bE').style.width = me.energy + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
-  $('#vE').textContent = Math.floor(me.energy); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
+  $('#bE').style.width = Math.min(100, me.energy / (me.eCap || 100) * 100) + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
+  $('#vE').textContent = Math.floor(me.energy) + (me.eCap > 100 ? '/' + me.eCap : ''); $('#vH').textContent = Math.floor(me.hunger); $('#vL').textContent = Math.floor(me.health);
   hudDelta('money', me.monInf ? null : me.money, $('#card .l1'), 1);   // floating +n / -n on the HUD when a value really moves
   for (const [k, v] of [['energy', me.energy], ['hunger', me.hunger], ['health', me.health], ['happy', me.happy ?? 80]]) { const b = $(`.bar[data-bar="${k}"]`); if (!b) continue; b.classList.toggle('low', v < 25); hudDelta(k, v, b, 3); }
   { const fun = me.pose === 'fun', bed = me.pose === 'bed';   // ▶▶ next to the bars that are filling fast (park rides, sleeping)
-    for (const [k, on] of [['energy', (fun || bed) && me.energy < 100 || (me.pose === 'seat' || me.pose === 'rest') && me.energy < 50], ['health', fun && me.health < 100], ['happy', fun && (me.happy ?? 80) < 100]]) document.querySelector(`.bar[data-bar="${k}"]`)?.classList.toggle('boost', !!on); }
+    for (const [k, on] of [['energy', (fun || bed) && me.energy < (me.eCap || 100) || (me.pose === 'seat' || me.pose === 'rest') && me.energy < 50], ['health', fun && me.health < 100], ['happy', fun && (me.happy ?? 80) < 100]]) document.querySelector(`.bar[data-bar="${k}"]`)?.classList.toggle('boost', !!on); }
   $('#card').style.borderLeftColor = COLORS[me.avatar ?? 0] || '#999';
   placeLog();
   $('#restBtn').classList.toggle('on', me.pose === 'rest');
@@ -2077,6 +2103,7 @@ function onAction() {
   if (near.type === 'chair' && me.career === 'office') return doAct(near.id, 'sit');
   if (near.type === 'sdesk' && me.career === 'teacher') { if (t < actCd) return; actCd = t + 800; return doAct(near.id, 'teach'); }
   if (near.type === 'sdesk' && me.enrolled) return doAct(near.id, 'sit');
+  if (near.type === 'gym') { if (t < actCd) return; actCd = t + 600; return doAct(near.id, 'use'); }
   if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type)) { if (t < actCd) return; actCd = t + 250; return doAct(near.id, 'use'); }   // cooking battle stations
   if (near.type === 'kitchen' && me.cook?.hand === 'plate') return doAct(near.id, 'serve');
   if (near.type === 'pier') {                                         // fishing is all on the big button: cast, strike, (hold to reel), lift
@@ -2217,7 +2244,7 @@ function frame(t) {
     if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) ico = cookCue(near)[0];
     if (near.type === 'pier') actRod(); else actIco(ico);
     ACT_LBL.v = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
-      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'sdesk' ? (me.career === 'teacher' ? '👩‍🏫 สอน' : 'นั่งเรียน')
+      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'gym' ? (me.pose === 'gym' && Math.hypot(me.x - near.x, me.y - near.y) < .5 ? '⏹️ หยุด' : near.label) : near.type === 'sdesk' ? (me.career === 'teacher' ? '👩‍🏫 สอน' : 'นั่งเรียน')
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('tap', '<img class="hudI" src="assets/hud/tap.webp?v=1" alt="" style="width:1.15em;height:1.15em">'); ACT_LBL.v = 'ใช้งาน'; }
@@ -2364,7 +2391,7 @@ function draw(t) {
     const px = s.x * TS + X, py = s.y * TS + Y;
     if (px < -60 || py < -60 || px > VW + 60 || py > VH + 60) continue;
     const isNear = near && near.id === s.id;
-    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note)$/.test(s.type) && !isNear) continue;
+    if (/^(door|exit|bed|hbed|chair|seat|staff|sdesk|trash|wish|secret|note|gym)$/.test(s.type) && !isNear) continue;
     if ((s.type === 'lk' || s.type === 'lksky') && !lkOnC()) continue;
     if (s.until && Date.now() + clockOff >= s.until) continue;
     if (s.type === 'door' && s.house !== undefined) continue;
@@ -3533,7 +3560,8 @@ function drawPlayer(p, X, Y, t) {
   const aura = (p.of === 'admin' || p.of === 'thai' || p.of === 'angel' || p.of === 'kitsune') && !lying, gold = p.of === 'angel' ? (p.g === 'f' ? 'fairy' : 'angel') : p.of === 'kitsune' ? 'fox' : p.of === 'thai', now0 = performance.now();   // admin cloak: violet · golden Thai outfit: gold · angel / fairy outfit: white-gold / pink
   if (aura) drawAura(px, py, H, now0, false, gold);
   ctx.save();
-  if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0, false, false, true); }
+  if (pose === 'gym' && p.gk) drawGym(p, p.gk, px, py, k, H, now0);
+  else if (lying) { ctx.translate(px, py - TS * .25); ctx.rotate(-Math.PI / 2); drawCharTo(ctx, p, H * .45, TS * .25, k, 'front', 0, false, false, true); }
   else if (fo?.swim) { ctx.beginPath(); ctx.rect(px - TS, py - H * 1.2, TS * 2, H * .78); ctx.clip(); drawCharTo(ctx, p, px, py + Math.sin(t / 380 + p.id) * TS * .05, k, 'front', 0); }   // swimming: only head and shoulders above the water
   else if (sitting) drawCharTo(ctx, p, px, py, k, view, 0, dir === 'left', true);   // seated: whole body, legs folded (facing the way the bench does)
   else { if (!moving) { const br = 1 + Math.sin(now0 / 650 + ((+p.id || 0) % 97)) * .012; ctx.translate(px, py); ctx.scale(2 - br, br); ctx.translate(-px, -py); } drawCharTo(ctx, p, px, py - bob, k, view, frame, dir === 'left'); }   // standing still: a soft breath
@@ -3550,7 +3578,7 @@ function drawPlayer(p, X, Y, t) {
   // little emote sprites from the sheet: dizzy when sick or knocked out, a light bulb over your head when you crave something
   const emote = pose === 'hosp' || pose === 'veg' || (p.dz || []).length ? '💫' : mine && me?.craving ? '💡' : pose === 'seat' ? '❤️' : null;
   if (emote) { ctx.font = `${Math.round(TS * .38)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(emote, px + TS * .42, top + TS * .05 + Math.sin(t / 300) * 3); }
-  const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : p.sg > Date.now() + clockOff ? '🎤' : dkLv(p) === 2 ? '🥴' : p.sad ? '😞' : '';
+  const badge = pose === 'jail' ? '⛓️' : pose === 'rest' || pose === 'bed' ? '💤' : pose === 'study' ? '📖' : pose === 'gym' ? '💪' : p.sg > Date.now() + clockOff ? '🎤' : dkLv(p) === 2 ? '🥴' : p.sad ? '😞' : '';
   if (badge) { ctx.font = `${Math.round(TS * .42)}px 'Apple Color Emoji','Noto Color Emoji',serif`; ctx.fillText(badge, px - TS * .42, top + Math.sin(t / 300) * 3); }
   nameAndBubble(p, px, umb ? top - TS * .42 : top, mine, t);
 }
@@ -6868,6 +6896,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28l', d: '28 พ.ย.', items: [
+    '🏋️ <b>ฟิตเนส โรงยิม เปิดแล้ว!</b> (ถนนเหนือ) เครื่องเล่นได้จริง ตัวละครวิ่ง ปั่น ยกเวท เล่นโยคะ',
+    '⚡ <b>เพดานพลังงานเกิน 100 ได้</b> ลู่วิ่งเพิ่มถึง 115 จักรยานถึง 130 · ไม่ออกกำลัง 12 ชม. จะค่อยๆ ลดกลับเหลือ 100',
+    '🏋️ ยกน้ำหนักเพิ่มสุขภาพเร็ว · 🧘 โยคะฟื้นพลังงานและความสุข'] },
   { v: '2026-11-28k', d: '28 พ.ย.', items: ['📷 <b>แจ้งบัคแนบรูปได้แล้ว</b> กด "📷 แนบรูป" ในหน้าแจ้งบัค ส่งภาพหน้าจอให้ทีมงานดูได้เลย'] },
   { v: '2026-11-28j', d: '28 พ.ย.', items: [
     '🏢 <b>คอนโด Life Condo เปิดแล้ว!</b> ตึก 6 ชั้นหน้าลานน้ำพุ · ไม่มีบ้านก็มีที่นอน เช่าห้องสัปดาห์ละ 2,000 LC ที่เคาน์เตอร์ในล็อบบี้',
@@ -8359,6 +8391,11 @@ function renderPanel(p) {
           ${B('📦 ลาออก', { fn: 'resignAsk' }, 'warn')}`;
       }
       return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${job('office') ? '' : staffHint('office')}`;
+    }
+    case 'gymdesk': {   // 🏋️ the gym's notice board: what each machine does and your current ceiling
+      const cap = me.eCap || 100, rows = Object.values(G.gym || {}).map(g => `<div class="item"><div><b>${g.icon} ${g.name}</b><small>${g.desc} · พลังงาน ${g.energy > 0 ? '+' : ''}${Math.round(g.energy * 60)}/นาที${g.cap ? ` · เพดาน +1 ทุก ${g.cap} วิ` : ''}</small></div></div>`).join('');
+      return `<h2>🏋️ ฟิตเนส โรงยิม</h2><div class="sub">เข้าฟรี! เดินไปยืนที่เครื่องแล้วกดปุ่มเพื่อเริ่ม เดินออกเพื่อหยุด</div>
+        <div class="jobbox">⚡ เพดานพลังงานตอนนี้ <b>${cap}</b>${cap > 100 ? ' · ถ้าไม่ออกกำลัง 12 ชม. จะลดลงชั่วโมงละ 1 จนเหลือ 100' : ' · วิ่งหรือปั่นจักรยานเพื่อเพิ่มได้ถึง 130'}</div><div class="list">${rows}</div>`;
     }
     case 'sdesk': {
       const L = me.enrolled && G.licenses[me.enrolled];
@@ -10682,7 +10719,7 @@ function onMeDiff(a, b) {
   for (const [k, q] of Object.entries(b.inv)) { const d = q - (a.inv[k] || 0); if (d > 0) gained.push(`+${d}${G.items[k].icon}`); }
   if (gained.length) { FX.play('pop'); FX.float(x - .3, y - .4, gained.join(' '), '#ffffff', .5); FX.burst(x, y, '#ffffff', 6); FX.sparkle(x, y - .4, '#ffffff', 5); }
   if (b.career === a.career && b.lv > a.lv) { FX.play('levelup'); FX.ring(x, y, '#ffd34d', 900, 1.6); FX.float(x, y - .6, `LEVEL UP! Lv.${b.lv}`, '#ffd34d', .55); FX.burst(x, y, '#ffd34d', 20); FX.column(x, y); FX.sparkle(x, y - .6, '#ffffff', 18, 1.4); flashScreen('255,235,170', .3); }
-  if (a.energy < 99.5 && b.energy >= 100) toast('พลังงานเต็มแล้ว!', '⚡');
+  if (a.energy < (b.eCap || 100) - .5 && b.energy >= (b.eCap || 100)) toast('พลังงานเต็มแล้ว!', '⚡');
   if (b.energy - a.energy >= 8) FX.float(x + .5, y + .2, `+${Math.round(b.energy - a.energy)}⚡`, '#f2c94c', .34);
   if (b.health - a.health >= 8) { FX.float(x - .5, y + .2, `+${Math.round(b.health - a.health)}❤️`, '#ff8a8a', .34); FX.ring(x, y, '#8fe3a6', 700, 1); }
   if (b.hunger - a.hunger >= 8) FX.float(x, y + .4, `+${Math.round(b.hunger - a.hunger)}🍗`, '#8fe3a6', .34);

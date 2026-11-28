@@ -387,9 +387,9 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   const nearWay = (x, y, r) => { for (let j = -r; j <= r; j++) for (let k = -r; k <= r; k++) if (way(get(x + k, y + j) || '.')) return true; return false; };
   const propNear = (x, y, r) => PROPS.some(p => Math.hypot(p.x - x, p.y - y) < r) || STATIONS.some(s => s.area === 'town' && Math.hypot(s.x - x, s.y - y) < r + .5);
   // 0) new shops, all closed for renovation for now: two pet shops and two gyms (added here so nothing older moves)
-  for (const [id, spr, x, front, label, icon, st] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾', 'petshop1'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️'],
+  for (const [id, spr, x, front, label, icon, st] of [['pet1', 'b_pet1', 51, 13, 'ร้านสัตว์เลี้ยง', '🐾', 'petshop1'], ['gym1', 'b_gym1', 89, 13, 'ฟิตเนส โรงยิม', '🏋️', 'gym'],
     ['pet2', 'b_pet2', 5, 13, 'ร้านสัตว์เลี้ยง สาขา 2', '🐶', 'petshop2'], ['gym2', 'b_gym2', 60, 45, 'โรงยิมมวย', '🥊']]) {
-    const b = B(id, spr, x, front, st ? { label, icon, st, stype: 'petshop', rk: 'petshop', layout: id === 'pet2' ? 'petshop2' : 'petshop', late: 2 } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
+    const b = B(id, spr, x, front, st === 'gym' ? { label, icon, st, rk: 'gym', layout: 'gym', late: 11 } : st ? { label, icon, st, stype: 'petshop', rk: 'petshop', layout: id === 'pet2' ? 'petshop2' : 'petshop', late: 2 } : { label, icon, deco: true, renov: true });   // pet shops are open (street counters); gyms stay closed
     for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) { dropTree(i, j); if (get(i, j) === '.') set(i, j, 'B'); }
     for (let k = PROPS.length - 1; k >= 0; k--) { const q = PROPS[k]; if (q.x >= b.x && q.x < b.x + b.w && q.y - .5 >= b.y && q.y - .5 < b.y + b.h + 1) PROPS.splice(k, 1); }
     // a paved doorstep from the door down to the street
@@ -457,9 +457,24 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { condo: [16, 12], condounit: [16, 11], inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
+// 🏋️ gym machines (per real second while working out). cap: +1 to the energy ceiling every `cap` seconds, up to 100 + max.
+// The extra ceiling fades back to 100 when you stop training (index.js gymDecay)
+const GYM = {
+  tread: { name: 'ลู่วิ่ง', icon: '🏃', energy: -.25, health: .06, happy: .02, cap: 40, max: 15, desc: 'วิ่งเพิ่มเพดานพลังงานถึง 115 + สุขภาพ' },
+  bike:  { name: 'จักรยานออกกำลัง', icon: '🚴', energy: -.18, health: .03, happy: .02, cap: 30, max: 30, desc: 'ปั่นเพิ่มเพดานพลังงานได้สูงสุด 130' },
+  bench: { name: 'ม้านั่งยกน้ำหนัก', icon: '🏋️', energy: -.3, health: .14, happy: .04, desc: 'ยกเวทเพิ่มสุขภาพเร็ว (ไม่เพิ่มเพดาน)' },
+  yoga:  { name: 'เสื่อโยคะ', icon: '🧘', energy: .12, health: .03, happy: .12, desc: 'โยคะผ่อนคลาย ฟื้นพลังงานและความสุข' },
+};
+const GYM_SPR = { x_treadmill: 'tread', x_ebike: 'bike', x_wbench: 'bench', x_yoga: 'yoga' };
+const GYM_GRACE = 12 * 3600e3, GYM_FADE = 3600e3;   // the extra ceiling holds 12 hours after the last workout, then loses 1 per hour
+const ROOM_SIZE = { gym: [16, 12], condo: [16, 12], condounit: [16, 11], inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
+  // 🏋️ gym (16x12): lockers, mirrors, clock and water along the back wall; treadmills and bikes in the front row, weight benches
+  // and yoga mats behind; the machines are not solid (players stand on them to work out, see GYM)
+  gym: [['x_lockers', 1.9, 2.8], ['x_mirror', 4.2, 2.6, false], ['x_mirror', 5.4, 2.6, false], ['x_wclock', 8, 1.0, false], ['x_mirror', 10.6, 2.6, false], ['x_mirror', 11.8, 2.6, false],
+    ['f_water', 14.4, 2.6], ['x_treadmill', 3.0, 5.8, false], ['x_treadmill', 5.6, 5.8, false], ['x_ebike', 10.4, 5.8, false], ['x_ebike', 13.0, 5.8, false],
+    ['x_wbench', 3.0, 8.9, false], ['x_wbench', 5.6, 8.9, false], ['x_yoga', 10.4, 8.9, false], ['x_yoga', 13.0, 8.9, false], ['x_plant', 1.5, 11.0], ['x_plant', 14.5, 11.0]],
   // 🏢 condo lobby (16x12): mailboxes, the reception counter and a notice board along the back wall, two lifts and the parcel
   // shelf on the right behind the key-card gates, a lounge (sofa, rug, lamp, plant) on the left, a water dispenser, plants by the door
   condo: [['cl_mail', 1.9, 2.5], ['cl_counter', 4.7, 2.75], ['cl_board', 7.6, 1.5, false], ['cl_elev', 10.4, 2.35], ['cl_elev', 12.3, 2.35], ['cl_parcel', 14.05, 2.65],
@@ -572,11 +587,11 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
-  if (!b.st) continue;
+function mkRoom(b) {   // one building's room (and its stations), in the next free slot
+  if (!b.st) return;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
-    continue;
+    return;
   }
   const kind = b.rk || (b.house !== undefined ? 'house' : b.id);
   const [RW, RH] = ROOM_SIZE[kind] || [14, 10];
@@ -584,7 +599,7 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(L => BUILDINGS.filter
   const rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14; slot++;
   if (b.outdoor) {                     // served from the street: the counter is in front of the building (its room slot stays unused so other rooms keep their place)
     STATIONS.push({ id: b.st, type: b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
-    continue;
+    return;
   }
   rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i');
   const mx = Math.floor(RW / 2);
@@ -609,13 +624,17 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(L => BUILDINGS.filter
     STATIONS.push({ id: 'hbed' + b.house, type: 'hbed', idx: b.house, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 3.4, y: ry + 3.7, r: 1.4 });
     STATIONS.push({ id: `hstair${b.house}_1`, type: 'hstair', idx: b.house, fl: 1, room: room.id, label: 'บันไดขึ้นชั้น 2', icon: '🪜', x: rx + STAIR_UP[0], y: ry + STAIR_UP[1] + .4, r: 1.1 });
     room.furniture.push(['~stairs', rx + STAIR_UP[0], ry + STAIR_UP[1]]);
-    continue;
+    return;
   }
   const s = { id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
   if (kind === 'condo') {               // 🏢 the counter (rent a room, pick its style) and the lifts up to the rooms
     s.x = rx + 4.7; s.y = ry + 3.6; s.r = 1.6; s.label = 'เคาน์เตอร์นิติบุคคล';
     STATIONS.push({ id: 'celev', type: 'celev', label: 'ลิฟต์ขึ้นห้องพัก', icon: '🛗', room: room.id, x: rx + 11.35, y: ry + 3.6, r: 1.7 });
+  }
+  if (kind === 'gym') {                 // 🏋️ each machine is its own station: the player stands (or lies) on it while working out
+    s.type = 'gymdesk'; s.x = rx + 8; s.y = ry + 3.4; s.r = 1.4; s.label = 'บอร์ดฟิตเนส';
+    let n = 0; for (const [sp, x, y] of LAYOUT.gym) { const k = GYM_SPR[sp]; if (k) STATIONS.push({ id: 'gym' + n, type: 'gym', idx: n++, k, room: room.id, label: GYM[k].name, icon: GYM[k].icon, x: rx + x, y: ry + y + .05, r: .85 }); }
   }
   // the rider hub's waiting bench seats two side by side
   if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
@@ -661,6 +680,7 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(L => BUILDINGS.filter
     for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) STATIONS.push({ id: 'chair' + n, type: 'chair', idx: n++, room: room.id, label: 'โต๊ะทำงาน', icon: '💺', x: rx + cx, y: ry + by + .95, r: .9 });
   }
 }
+for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) mkRoom(b);   // late buildings take room slots after all the older ones, so existing rooms keep their place
 // 🏢 the condo's 12 rooms: the lift brings a renter up to one of them; the door leads back down to the lobby (by the lifts)
 const CONDO_UNITS = 12;
 { const lobby = ROOMS.find(r => r.rk === 'condo');
@@ -681,6 +701,7 @@ const CONDO_UNITS = 12;
     STATIONS.push({ id: 'cbed' + u, type: 'cbed', idx: u, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 13.45, y: ry + 7.3, r: 1.5 });
   }
 }
+for (const b of BUILDINGS.filter(b => +b.late === 11)) mkRoom(b);   // 🏋️ the gym: after the condo's units so they keep their slots
 {
   let fslot = 0;
   for (const g of ROOMS.filter(r => r.rk === 'house')) for (let fl = 2; fl <= HOUSE_FLOORS; fl++) {
@@ -2560,7 +2581,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { GYM, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, NB_SPAWN, RADIUS, SOLID,
