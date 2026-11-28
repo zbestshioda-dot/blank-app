@@ -210,6 +210,7 @@ function gymDecay(a, t) {
   if (!(a.eB > 0) || t - (a.gymT || 0) < D.GYM_GRACE) return;
   const from = Math.max((a.gymT || 0) + D.GYM_GRACE, a.eBd || 0), n = Math.floor((t - from) / D.GYM_FADE); if (n <= 0) return;
   a.eB = Math.max(0, a.eB - n); a.eBd = from + n * D.GYM_FADE; a.energy = Math.min(a.energy, eCap(a)); markMe(a);
+  if (a.ws) toast(a, a.eB ? `ไม่ได้ออกกำลังนาน เพดานพลังงานลดเหลือ ${eCap(a)} (ไปฟิตเนสเพื่อรักษาไว้)` : 'เพดานพลังงานกลับเป็น 100 แล้ว ไปฟิตเนสเพื่อเพิ่มใหม่ได้', '📉');
 }
 function standUp(a) {
   if (a.chair >= 0) { if (chairs[a.chair] === a) chairs[a.chair] = null; a.chair = -1; }
@@ -5665,7 +5666,7 @@ function meView(a) {
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
   const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
   return {
-    t: 'me', condo: a.condo || null, gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, eCap: eCap(a), gymK: a.gym?.k || '', gymPass: a.gymPass > now() ? a.gymPass : 0, hunger: a.hunger, health: a.health,
+    t: 'me', condo: a.condo || null, gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, eCap: eCap(a), gymK: a.gym?.k || '', gymPass: a.gymPass > now() ? a.gymPass : 0, gymT: a.eB ? a.gymT || 0 : 0, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * wwSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], fortune: a.fortune?.d === dayKey() ? a.fortune : null, balloon: a.balloon || '',
@@ -6930,7 +6931,7 @@ function tick() {
         if (!a.down) a.health = Math.min(100, a.health + M.health * dt); a.happy = Math.min(100, (a.happy ?? 80) + M.happy * dt); a.gymT = t;
         if (M.cap && (a.gym.acc += dt) >= M.cap) {
           a.gym.acc -= M.cap;
-          if ((a.eB || 0) < M.max) { a.eB = (a.eB || 0) + 1; toast(a, `เพดานพลังงานเพิ่มเป็น ${eCap(a)} แล้ว! (ไม่ออกกำลัง 12 ชม. จะค่อยๆ ลดลงจนเหลือ 100)`, '💪'); }
+          if ((a.eB || 0) < M.max) { a.eB = (a.eB || 0) + 1; toast(a, `เพดานพลังงานเพิ่มเป็น ${eCap(a)} แล้ว! (หยุดออกกำลัง 2 ชม. เพดานจะลดลง 1 ทุก 20 นาทีจนเหลือ 100)`, '💪'); }
           else if (!a.gym.full) { a.gym.full = 1; toast(a, `${M.name}เพิ่มเพดานได้สูงสุด ${100 + M.max} แล้ว${M.max < 30 ? ' ลองจักรยานดู ไปได้ถึง 130' : ''}`, M.icon); }
         }
         if (M.energy < 0 && a.energy < 3) { standUp(a); markMe(a); toast(a, 'หมดแรงแล้ว! พักหรือกินอะไรก่อนค่อยมาต่อ', '😮‍💨'); }

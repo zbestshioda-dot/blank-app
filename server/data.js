@@ -467,7 +467,7 @@ const GYM = {
 };
 const GYM_PASS = { price: 150, hours: 24 };   // 🎫 day pass: bought on the first machine you step on, good for 24 real hours
 const GYM_SPR = { x_treadmill: 'tread', x_ebike: 'bike', x_wbench: 'bench', x_yoga: 'yoga' };
-const GYM_GRACE = 12 * 3600e3, GYM_FADE = 3600e3;   // the extra ceiling holds 12 hours after the last workout, then loses 1 per hour
+const GYM_GRACE = 2 * 3600e3, GYM_FADE = 20 * 60e3;   // the extra ceiling holds 2 hours after the last workout, then loses 1 every 20 minutes back to 100
 const ROOM_SIZE = { gym: [16, 12], condo: [16, 12], condounit: [16, 11], inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {

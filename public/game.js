@@ -6896,10 +6896,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28n', d: '28 พ.ย.', items: ['📉 <b>เพดานพลังงานลดเร็วขึ้น</b> หยุดออกกำลัง 2 ชม. เพดานลด 1 ทุก 20 นาทีจนเหลือ 100 (มีแจ้งเตือนทุกครั้งที่ลด)'] },
   { v: '2026-11-28m', d: '28 พ.ย.', items: ['🎫 <b>ฟิตเนสมีบัตรรายวัน 150 LC</b> จ่ายตอนขึ้นเครื่องแรก เล่นได้ทุกเครื่อง 24 ชม.'] },
   { v: '2026-11-28l', d: '28 พ.ย.', items: [
     '🏋️ <b>ฟิตเนส โรงยิม เปิดแล้ว!</b> (ถนนเหนือ) เครื่องเล่นได้จริง ตัวละครวิ่ง ปั่น ยกเวท เล่นโยคะ',
-    '⚡ <b>เพดานพลังงานเกิน 100 ได้</b> ลู่วิ่งเพิ่มถึง 115 จักรยานถึง 130 · ไม่ออกกำลัง 12 ชม. จะค่อยๆ ลดกลับเหลือ 100',
+    '⚡ <b>เพดานพลังงานเกิน 100 ได้</b> ลู่วิ่งเพิ่มถึง 115 จักรยานถึง 130 · ไม่ออกกำลัง 2 ชม. จะค่อยๆ ลดกลับเหลือ 100',
     '🏋️ ยกน้ำหนักเพิ่มสุขภาพเร็ว · 🧘 โยคะฟื้นพลังงานและความสุข'] },
   { v: '2026-11-28k', d: '28 พ.ย.', items: ['📷 <b>แจ้งบัคแนบรูปได้แล้ว</b> กด "📷 แนบรูป" ในหน้าแจ้งบัค ส่งภาพหน้าจอให้ทีมงานดูได้เลย'] },
   { v: '2026-11-28j', d: '28 พ.ย.', items: [
@@ -8397,7 +8398,7 @@ function renderPanel(p) {
       const cap = me.eCap || 100, rows = Object.values(G.gym || {}).map(g => `<div class="item"><div><b>${g.icon} ${g.name}</b><small>${g.desc} · พลังงาน ${g.energy > 0 ? '+' : ''}${Math.round(g.energy * 60)}/นาที${g.cap ? ` · เพดาน +1 ทุก ${g.cap} วิ` : ''}</small></div></div>`).join('');
       return `<h2>🏋️ ฟิตเนส โรงยิม</h2><div class="sub">เดินไปยืนที่เครื่องแล้วกดปุ่มเพื่อเริ่ม เดินออกเพื่อหยุด</div>
         <div class="jobbox${me.gymPass > Date.now() + clockOff ? ' ok' : ''}">🎫 ${me.gymPass > Date.now() + clockOff ? `มีบัตรรายวันแล้ว ใช้ได้ถึง ${new Date(me.gymPass - clockOff).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}` : `บัตรรายวัน ${money(G.gymPass?.price || 0)} เล่นได้ทุกเครื่อง ${G.gymPass?.hours || 24} ชม. (จ่ายตอนขึ้นเครื่องแรก)`}</div>
-        <div class="jobbox">⚡ เพดานพลังงานตอนนี้ <b>${cap}</b>${cap > 100 ? ' · ถ้าไม่ออกกำลัง 12 ชม. จะลดลงชั่วโมงละ 1 จนเหลือ 100' : ' · วิ่งหรือปั่นจักรยานเพื่อเพิ่มได้ถึง 130'}</div><div class="list">${rows}</div>`;
+        <div class="jobbox">⚡ เพดานพลังงานตอนนี้ <b>${cap}</b>${cap > 100 ? (() => { const g = (me.gymT || 0) + 2 * 3600e3 - Date.now() - clockOff; return g > 0 ? ` · เริ่มลดในอีก ${Math.floor(g / 3600e3)} ชม. ${Math.ceil(g % 3600e3 / 60e3)} นาที ถ้าไม่ออกกำลัง` : ' · 📉 กำลังลดลง 1 ทุก 20 นาที ออกกำลังเพื่อหยุดการลด'; })() : ' · วิ่งหรือปั่นจักรยานเพื่อเพิ่มได้ถึง 130'}</div><div class="list">${rows}</div>`;
     }
     case 'sdesk': {
       const L = me.enrolled && G.licenses[me.enrolled];
