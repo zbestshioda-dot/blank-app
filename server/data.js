@@ -19,7 +19,7 @@ const RANCH = { x0: 63, y0: 59, x1: 88, y1: 71, gate: [73, 75],
   pens: [{ k: 'chicken', n: 8, x0: 64.6, y0: 64.9, x1: 71, y1: 70.3 }, { k: 'pig', n: 4, x0: 72.3, y0: 65.3, x1: 78.8, y1: 70.2 }, { k: 'cow', n: 3, x0: 79.8, y0: 65.4, x1: 86.6, y1: 70.2 }],
   // rancher work at each barn: feed (energy), wait `sec`, then collect `n` of `item` (+1 every 4 job levels)
   work: { chicken: { item: 'r_egg', n: 3, sec: 60, feed: 'โปรยข้าวโพดให้ไก่', got: 'เก็บไข่' }, pig: { item: 'r_pork', n: 1, sec: 150, feed: 'เทอาหารลงรางให้หมู', got: 'ได้เนื้อหมู' },
-    cow: { item: 'r_milk', n: 2, sec: 90, feed: 'ให้หญ้าแห้งวัว', got: 'รีดนมวัว' } } };
+    cow: { item: 'r_milk', n: 2, sec: 90, feed: 'ให้หญ้าแห้งวัว', got: 'รีดนมวัว', extra: ['r_beef', 1] } } };   // extra: a second product from the same barn
 const TEMPLE = { id: 'temple', kind: 'map', name: 'วัดเมืองชีวิต', x: 184, y: 52, w: 44, h: 32 };   // the temple grounds, under the housing estate
 // 🎄 limited Christmas items (reindeer, sleigh) and their showcase in the square: until the end of 31 Dec 2569 (Bangkok)
 const XMAS_END = Date.parse('2027-01-01T00:00:00+07:00');
@@ -1342,7 +1342,8 @@ const ITEMS = {
   // 🐄 ranch goods (rancher work at the barns; sold at the central market, cooked at the kitchen)
   r_egg:  { name: 'ไข่ไก่สด', icon: '🥚', kind: 'crop', base: 25, ranch: 1 },
   r_milk: { name: 'นมวัวสด', icon: '🥛', kind: 'crop', base: 60, ranch: 1, eat: { hunger: 6, energy: 4 } },
-  r_pork: { name: 'เนื้อหมู', icon: '🥩', kind: 'crop', base: 140, ranch: 1 },
+  r_pork: { name: 'เนื้อหมู', icon: '🥓', kind: 'crop', base: 140, ranch: 1 },
+  r_beef: { name: 'เนื้อวัว', icon: '🥩', kind: 'crop', base: 160, ranch: 1 },
 
   // fish (rar = rarity 1 ทั่วไป · 2 ไม่ธรรมดา · 3 หายาก · 4 มหากาพย์ · 5 ตำนาน; spr = sprite in the atlas)
   sfish:     { name: 'ปลาซิว', icon: '🐟', kind: 'fish', base: 25, rar: 1 },
@@ -1476,6 +1477,9 @@ const ITEMS = {
   omelet:       { name: 'ไข่เจียวฟู', icon: '🍳', kind: 'meal', base: 180, eat: { hunger: 35, energy: 6 } },
   kaprao_moo:   { name: 'กะเพราหมูไข่ดาว', icon: '🍛', kind: 'meal', base: 420, eat: { hunger: 55, energy: 12 } },
   milk_pudding: { name: 'พุดดิ้งนมสด', icon: '🍮', kind: 'meal', base: 300, eat: { hunger: 25, energy: 10, happy: 4 } },
+  steak:        { name: 'สเต็กเนื้อย่าง', icon: '🥩', kind: 'meal', base: 560, eat: { hunger: 60, energy: 15, health: 3 } },
+  beef_salad:   { name: 'น้ำตกเนื้อ', icon: '🥗', kind: 'meal', base: 480, eat: { hunger: 50, energy: 12 } },
+  pork_rice:    { name: 'ข้าวผัดหมูใส่ไข่', icon: '🍚', kind: 'meal', base: 400, eat: { hunger: 50, energy: 10 } },
   // restaurant menu (sold at the restaurant and through the delivery app)
   kaprao:  { name: 'ข้าวกะเพรา', icon: '🍛', kind: 'meal', base: 100, eat: { hunger: 32 }, menu: 1 },
   noodle:  { name: 'ก๋วยเตี๋ยว', icon: '🍜', kind: 'meal', base: 80, eat: { hunger: 26 }, menu: 1 },
@@ -1572,6 +1576,9 @@ const RECIPES = [
   { id: 'omelet',       in: { r_egg: 2, rice: 1 }, ops: { r_egg: ['fry'], rice: ['boil'] } },
   { id: 'kaprao_moo',   in: { r_pork: 1, chili: 1, r_egg: 1, rice: 1 }, ops: { r_pork: ['chop', 'fry'], chili: ['chop'], r_egg: ['fry'], rice: ['boil'] } },
   { id: 'milk_pudding', in: { r_milk: 2, r_egg: 1 }, ops: { r_milk: ['boil'], r_egg: ['boil'] } },
+  { id: 'steak',        in: { r_beef: 1, corn: 1, tomato: 1 }, ops: { r_beef: ['grill'], corn: ['boil'], tomato: ['chop'] } },
+  { id: 'beef_salad',   in: { r_beef: 1, chili: 1, rice: 1 }, ops: { r_beef: ['chop', 'grill'], chili: ['chop'], rice: ['boil'] } },
+  { id: 'pork_rice',    in: { r_pork: 1, r_egg: 1, rice: 2 }, ops: { r_pork: ['chop', 'fry'], r_egg: ['fry'], rice: ['fry'] } },
 ];
 // 🔨 crafting at the town workshop: in = items used up; out = the craft-only furniture of the same id
 const CRAFTS = [

@@ -6963,6 +6963,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28r', d: '28 พ.ย.', items: ['🥩 <b>เนื้อวัวมาแล้ว!</b> โรงวัวให้นม + เนื้อวัว · ไข่ เนื้อหมู เนื้อวัว ขายที่ตลาดกลาง ให้เชฟซื้อไปทำอาหาร', '🍳 <b>เมนูใหม่ในครัว</b> สเต็กเนื้อย่าง · น้ำตกเนื้อ · ข้าวผัดหมูใส่ไข่'] },
   { v: '2026-11-28q', d: '28 พ.ย.', items: ['📜 <b>เควสต์ใหม่ฟาร์มปศุสัตว์</b> คนเลี้ยงสัตว์มีเควสต์ประจำวันและรายสัปดาห์ · ทุกคนมีเควสต์กินของจากฟาร์ม (นม ไข่เจียว กะเพราหมู พุดดิ้ง)', '🗺️ <b>มินิแมพอัปเดต</b> เห็นฟาร์ม (รั้ว โรงเรือน ประตูเปิด/ปิด) และวัดจุดใหม่'] },
   { v: '2026-11-28p', d: '28 พ.ย.', items: ['🎨 <b>ฟาร์มปศุสัตว์โฉมใหม่</b> เล้าไก่ คอกหมู โรงวัวรูปใหม่ ไก่จิกข้าว หมูนอนหลับ วัวกินหญ้า รั้วไม้ขาว ประตูเปิด-ปิดเห็นชัด ป้าย RANCH รางอาหาร บ่อโคลน'] },
   { v: '2026-11-28o', d: '28 พ.ย.', items: [
@@ -8468,8 +8469,8 @@ function renderPanel(p) {
       return `<h2>🏢 บริษัท ไทยเทค · ฝ่ายบุคคล</h2><div class="sub">${hoursTxt('office')} · เวลางาน ${hhmm(G.shift.start)}–${hhmm(G.shift.end)} + โอทีถึง ${hhmm(G.shift.ot)} (x${G.shift.otMul}) · ได้เงินตามจำนวนเอกสารที่ส่ง (ต้องจบปริญญาตรี)</div>${status}${job('office') ? '' : staffHint('office')}`;
     }
     case 'ranch': {   // 🐄 the ranch office board: what the job is and what the barns give
-      const R = G.ranch, rows = R.barns.map(b => { const W = R.work[b.k], it = G.items[W.item]; return `<div class="item"><div><b>${b.icon} ${b.label}</b><small>${W.feed} → รอ ${W.sec} วิ → ${W.got} ${it.icon}${it.name} x${W.n}+ · ขาย NPC ~${money(it.base * .3)}/ชิ้น</small></div></div>`; }).join('');
-      return `<h2>🐄 ฟาร์มปศุสัตว์</h2><div class="sub">อาชีพคนเลี้ยงสัตว์ ใช้พลังงาน 5 ต่อการให้อาหาร 1 ครั้ง · เลเวลยิ่งสูงยิ่งเก็บได้มากขึ้น · ของขายที่ตลาดกลาง (วางขายให้ผู้เล่นได้ราคาดีกว่า) เชฟเอาไปทำ 🍳ไข่เจียว 🍛กะเพราหมูไข่ดาว 🍮พุดดิ้งนม</div>
+      const R = G.ranch, rows = R.barns.map(b => { const W = R.work[b.k], it = G.items[W.item]; return `<div class="item"><div><b>${b.icon} ${b.label}</b><small>${W.feed} → รอ ${W.sec} วิ → ${W.got} ${it.icon}${it.name} x${W.n}+${W.extra ? ` + ${G.items[W.extra[0]].icon}${G.items[W.extra[0]].name} x${W.extra[1]}` : ''}</small></div></div>`; }).join('');
+      return `<h2>🐄 ฟาร์มปศุสัตว์</h2><div class="sub">อาชีพคนเลี้ยงสัตว์ ใช้พลังงาน 5 ต่อการให้อาหาร 1 ครั้ง · เลเวลยิ่งสูงยิ่งเก็บได้มากขึ้น · ของขายที่ตลาดกลาง (วางขายให้ผู้เล่นได้ราคาดีกว่า) เชฟเอาไปทำ 🍳ไข่เจียว 🍛กะเพราหมูไข่ดาว 🍚ข้าวผัดหมู 🥩สเต็กเนื้อ 🥗น้ำตกเนื้อ 🍮พุดดิ้งนม</div>
         ${me.career === 'rancher' ? '<div class="jobbox ok">✅ คุณเป็นคนเลี้ยงสัตว์แล้ว ไปที่หน้าโรงเรือนแล้วกดปุ่มเพื่อให้อาหาร</div>' : '<div class="jobbox">✍️ อยากทำงานนี้? คุยกับ <b>ลุงทุ่ง</b> ข้างป้ายนี้เพื่อสมัคร</div>'}<div class="list">${rows}</div>`;
     }
     case 'gymdesk': {   // 🏋️ the gym's notice board: what each machine does and your current ceiling
