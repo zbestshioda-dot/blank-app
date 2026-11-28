@@ -5576,10 +5576,35 @@ Object.assign(FN, { openSpon() { send({ t: 'spon' }); openPanel({ kind: 'spon' }
 $('#paperBtn')?.addEventListener('click', () => { FX.play('click'); send({ t: 'xtra' }); openPanel({ kind: 'paper' }); });
 $('#nmBtn')?.addEventListener('click', () => { FX.play('click'); send({ t: 'nm', op: 'view' }); openPanel({ kind: 'nightmkt' }); });
 $('#busBtn')?.addEventListener('click', () => { FX.play('click'); const m = P.get(myId); if (!BUS?.on || !m) return; if (Math.hypot(m.x - BUS.x, m.y - BUS.y) < 4) send({ t: 'ghost' }); else { setGuide('bus99', false, true); toast('🚌 รีบไป! รถเมล์จะออกใน ' + Math.max(1, Math.ceil((BUS.until - Date.now() - clockOff) / 60000)) + ' นาที', '🚌'); } });
+// 🎫 the 12 passengers of bus 99 (the night it fell off the bridge, 30 years ago): each ride you meet one you haven't met and keep their ticket
+const PAX99 = [
+  { n: 'ลุงสมหมาย', i: '👨', who: 'คนนั่งข้างคนขับ', l: ['ชายวัยกลางคนนั่งเบาะหน้าสุด ข้างที่นั่งคนขับที่ว่างอยู่', '"คืนนั้นผมชวนตาเฉยคุยทั้งทาง กลัวแกหลับ... แต่สุดท้ายผมหลับเอง"', '"ฝากบอกตาเฉยด้วยนะ ว่าผมไม่เคยโกรธแกเลย"'] },
+  { n: 'ยายจำปี', i: '👵', who: 'คนให้ผ้ายันต์', l: ['หญิงชราแถวหน้ายิ้มให้คุณ มือถือผ้ายันต์ผืนเก่า', '"ยายทำผ้ายันต์ไว้ 13 ผืน แจกได้แค่ 12"', '"ผืนสุดท้ายเก็บไว้ให้หนู... ยายรู้ว่าหนูจะกลับมา"'] },
+  { n: 'น้องแก้ว', i: '👧', who: 'น้องสาวของป้านวล', l: ['เด็กหญิงตัวเล็กกอดตุ๊กตากระต่ายหูขาด', '"พี่นวลบอกว่าจะเย็บหูให้ แต่หนูขึ้นรถก่อน"', '"ถ้าเจอพี่นวล บอกด้วยนะว่าหนูไม่ได้งอนแล้ว"'] },
+  { n: 'พ่อเฒ่าดำรง', i: '🎣', who: 'พ่อของพี่ดำ', l: ['ชายแก่ผิวคล้ำ กลิ่นทะเลสาบติดตัว', '"ลูกชายข้ายังตกปลาที่ท่าน้ำอยู่ใช่ไหม"', '"บอกมันว่าป้ายที่มันเกี่ยวขึ้นมา... ข้าโยนลงไปเองแหละ ให้มันได้เจอ"'] },
+  { n: 'ช่างวิชัย', i: '🕰️', who: 'ช่างซ่อมนาฬิกา', l: ['ชายใส่แว่นหนา ก้มมองนาฬิกาพกที่หยุดเดิน', '"03:17 นาฬิกาทุกเรือนในเมืองหยุดพร้อมกันตอนนั้น"', '"ถ้ามีคนสร้างหอนาฬิกาใหม่ ช่วยตั้งให้มันเดินต่อด้วยนะ"'] },
+  { n: 'พลทหารเอก', i: '🪖', who: 'ทหารเกณฑ์ปลดประจำการ', l: ['ชายหนุ่มทรงผมเกรียน ใบปลดทหารอยู่ในกระเป๋าเสื้อ', '"วันนั้นผมปลดพอดี กำลังจะกลับไปหาแม่"', '"สองปีที่ไม่ได้กินแกงของแม่... คิดถึงชะมัด"'] },
+  { n: 'ป้าบุญมี', i: '🎟️', who: 'แม่ค้าลอตเตอรี่', l: ['หญิงวัยกลางคนถือแผงลอตเตอรี่ที่เปียกน้ำ', '"งวดนั้นป้าเก็บใบนึงไว้เอง เลข 0317"', '"ออกรางวัลที่หนึ่งด้วยนะ... ตลกดีเนอะ"'] },
+  { n: 'หมอนก', i: '🩺', who: 'นักศึกษาแพทย์ฝึกหัด', l: ['หญิงสาวสวมเสื้อกาวน์ทับชุดนักศึกษา', '"ฉันกำลังจะไปเข้าเวรที่โรงพยาบาลเป็นวันแรก"', '"ฝากบอกหมอที่โรงพยาบาลด้วยนะ ว่าช่วยดูแลคนไข้แทนฉันที"'] },
+  { n: 'ครูมานพ', i: '🎶', who: 'ครูระนาด', l: ['ชายผมขาวเคาะนิ้วบนเบาะเป็นจังหวะเพลง', '"ได้ยินเสียงระนาดในเมืองไหม? นั่นเพลงที่ครูแต่งไม่จบ"', '"ใครเล่นต่อให้จบได้ ครูจะได้ลงจากรถเสียที"'] },
+  { n: 'พระมหาเอก', i: '🙏', who: 'พระหนุ่มจากวัดในเมือง', l: ['พระหนุ่มนั่งนิ่ง สงบกว่าใครบนรถ', '"อาตมาไม่ได้ค้างคาอะไร"', '"แต่ยังอยู่เป็นเพื่อนคนอื่นบนรถจนกว่าทุกคนจะพร้อมไป ขอบใจที่ทำบุญมาให้นะโยม"'] },
+  { n: 'พี่ฝน', i: '🎒', who: 'นักเรียน ม.6', l: ['เด็กสาวชุดนักเรียนกำดินสอ 2B ไว้แน่น', '"พรุ่งนี้สอบเข้ามหาลัย หนูอ่านหนังสือมาทั้งปี"', '"ถ้ามีใครในเมืองได้เรียนมหาลัย ช่วยเรียนให้จบแทนหนูด้วยนะ"'] },
+  { n: 'คนแปลกหน้าเบาะหลัง', i: '🕶️', who: '???', l: ['ชายใส่แว่นดำนั่งเบาะหลังสุด ข้างเบาะที่ 13 ที่ว่างอยู่', '"เธอนั่งตรงนี้มาหลายรอบแล้วนะ รู้ตัวไหม"', '"ทุกรอบเธอเลือกต่างกัน... แต่ทุกรอบเธอยังดันเด็กคนนั้นขึ้นไปเสมอ"', '"สักวันจะมีคนขับคนต่อไป... ไม่ใช่ฉันหรอก"'] },
+];
 function busRide(m) {
-  FX.play('levelup'); msShow({ title: '🚌 รถเมล์สาย 99', side: 1, lines: [{ x: 'ประตูรถเปิดเอง... ไม่มีคนขับ ในรถเย็นเฉียบ' }, { x: 'ผู้โดยสาร 12 คนนั่งนิ่ง ทุกคนหันมามองคุณพร้อมกัน' },
-    { x: 'นาฬิกาบนรถหยุดอยู่ที่ 03:17... เหมือนหอนาฬิกากลางเมือง' }, { x: 'หญิงชราแถวหน้ายื่นผ้ายันต์ให้ แล้วกระซิบว่า "ขอบคุณที่ยังจำพวกเราได้"' },
-    { x: 'พริบตาเดียว คุณยืนอยู่ที่ป้ายคนเดียว รถเมล์หายไปแล้ว' }, { x: `🎁 ได้ 💎${m.gems} + 🧧 ผ้ายันต์นำโชค` }] });
+  if (m.mine) BUS = { ...(BUS || {}), mine: m.mine };
+  const P = PAX99[m.seat] || PAX99[1], n = (m.mine || []).length;
+  FX.play('levelup'); msShow({ title: '🚌 รถเมล์สาย 99', side: 1, lines: [{ x: 'ประตูรถเปิดเอง... ไม่มีคนขับ ในรถเย็นเฉียบ นาฬิกาบนรถหยุดอยู่ที่ 03:17' },
+    { x: m.isNew ? `ผู้โดยสารเบาะที่ ${m.seat + 1} หันมามองคุณ... ${P.i} <b>${P.n}</b>` : `${P.i} ${P.n} พยักหน้าให้คุณเหมือนคนรู้จักกันมานาน` },
+    ...(m.isNew ? P.l : [P.l[P.l.length - 1]]).map(x => ({ x })),
+    { x: 'พริบตาเดียว คุณยืนอยู่ที่ป้ายคนเดียว รถเมล์หายไปแล้ว' },
+    { x: (m.isNew ? `🎫 ได้ตั๋วของ${P.n} (${n}/12) · ` : '') + `🎁 💎${m.gems} + 🧧 ผ้ายันต์นำโชค` + (m.full ? `<br>🎉 ครบ 12 ใบ! ได้อีก 💎${m.full} + ฉายา "ผู้โดยสารคนที่ 13"` : '') }] });
+}
+function bus99Panel() {
+  const mine = BUS?.mine || [], rows = PAX99.map((P, i) => mine.includes(i)
+    ? itemRowRaw(P.i, `เบาะ ${i + 1} · ${esc(P.n)} <small>${esc(P.who)}</small>`, P.l.map(x => esc(x)).join('<br>'), '')
+    : itemRowRaw('❔', `เบาะ ${i + 1} · ???`, 'ยังไม่เคยเจอ', '')).join('');
+  return `<h2>🎫 ตั๋วรถเมล์สาย 99 (${mine.length}/12)</h2><div class="sub">สัปดาห์ละคืน (20:00–23:00) รถสาย 99 จะจอดหน้าอนุสรณ์ 10 นาที · ขึ้นรถแล้วได้เจอผู้โดยสาร 1 คนที่ยังไม่เคยเจอ · ครบ 12 ใบได้ 💎100 + ฉายา "ผู้โดยสารคนที่ 13"</div><div class="list">${rows}</div>`;
 }
 // 🏮 the market stall and 🚌 the ghost bus stand in the world (sorted by depth with people)
 function xtraEnts(ents, vis) {
@@ -6839,6 +6864,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28i', d: '28 พ.ย.', items: [
+    '🎫 <b>สะสมตั๋วรถเมล์สาย 99</b>: ขึ้นรถแต่ละครั้งได้เจอผู้โดยสาร 1 ใน 12 คน ฟังเรื่องลับของเขา แล้วเก็บตั๋วไว้',
+    '🏅 สะสม 3 ใบได้ฉายา "ขาประจำสาย 99" · ครบ 12 ใบได้ 💎100 + ฉายาหายาก "ผู้โดยสารคนที่ 13"',
+    '📱 ดูตั๋วที่สะสมได้ในแอป 🚌 ตั๋วสาย 99 ในมือถือ',
+  ] },
   { v: '2026-11-28h', d: '28 พ.ย.', items: [
     '🏮 ตลาดนัดเปิดวันละ 2 รอบแล้ว: 12:00–13:00 และ 21:00–22:00 · ของเติมใหม่ทุกรอบ',
     '🚌👻 รถเมล์สาย 99 แจ้งเตือนทั้งเมืองก่อนมา 10 นาที และจอดรอนานขึ้นเป็น 10 นาที',
@@ -8835,6 +8865,7 @@ function renderPanel(p) {
     case 'n3': return n3Panel();
     case 'paper': return paperPanel();
     case 'nightmkt': return nmPanel();
+    case 'bus99': return bus99Panel();
     case 'spon': return sponPanel();
     case 'journal': return journalPanel(p);
     case 'folkgift': return folkGiftPanel(p);
@@ -9200,7 +9231,7 @@ const PH_APPS = [
   ['ตั้งค่า', { fn: 'open', kind: 'settings' }, 9], ['รางวัล', { fn: 'open', kind: 'achv' }, 11, 'ach'],
   ['สัตว์เลี้ยง', { fn: 'open', kind: 'pets' }, 12], ['สมุดปลา', { fn: 'qtab', set: { tab: 'fish' } }, 13]];
 // the rest of the old menu, as plain apps on the last row
-const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['เรื่องหลัก', '📕', { fn: 'openMain' }, 0, 'linear-gradient(#ffd38a,#8a3b2a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
+const PH_MORE = [['คู่รัก', '💍', { fn: 'openCouple' }, 0, 'linear-gradient(#ffd1e3,#e0508a)'], ['กิจกรรม', '📅', { fn: 'openCal' }, 0, 'linear-gradient(#bfe3ff,#3b7bd1)'], ['ประมูล', '🏆', { fn: 'openAuc' }, 0, 'linear-gradient(#ffe680,#b8860b)'], ['จุดพลุ', '🎆', { fn: 'openFw' }, 0, 'linear-gradient(#3b2a6e,#e0508a)'], ['บ้านสวย', '🏡', { fn: 'openHomes' }, 0, 'linear-gradient(#ffe7a8,#e08a2c)'], ['lifebook', '📘', { fn: 'social', k: 'ideas' }, 0, 'linear-gradient(#8ec5ff,#1d6fe0)'], ['ชาวเมือง', '💞', { fn: 'openFolks' }, 0, 'linear-gradient(#ffd0e4,#e0508a)'], ['เรื่องหลัก', '📕', { fn: 'openMain' }, 0, 'linear-gradient(#ffd38a,#8a3b2a)'], ['บันทึก', '📜', { fn: 'openJournal' }, 0, 'linear-gradient(#fff0c8,#e0a23a)'], ['วอลเปเปอร์', '🖼️', { fn: 'qtab', set: { tab: 'wall' } }, 0, 'linear-gradient(#ffe0f4,#b07cf0)'], ['การเงิน', '💸', { fn: 'openLedger' }, 0, 'linear-gradient(#d2f5ff,#2fa0c8)'], ['อัปเดต', '🆕', { fn: 'open', kind: 'news' }, 0, 'linear-gradient(#d8ffd2,#3fb54f)'], ['เรื่องเล่า', '📕', { fn: 'story' }, 0, 'linear-gradient(#ffe3c2,#e0613a)'], ['บทช่วยสอน', '📖', { fn: 'tut' }, 0, 'linear-gradient(#ffe9c8,#e0913a)'], ['ลอตเตอรี่', '🎫', { fn: 'openLotto' }, 0, 'linear-gradient(#ffd0d0,#e0404a)'], ['ตั๋วสาย 99', '🚌', { fn: 'open', kind: 'bus99' }, 0, 'linear-gradient(#5a6b7a,#1e2a36)'], ['ชวนเพื่อน', '🎟️', { fn: 'openInvite' }, 0, 'linear-gradient(#c7f7c0,#2fb36a)'], ['เลือกตั้ง', '🏛️', { fn: 'openMayor' }, 0, 'linear-gradient(#9bb8ff,#3d5bd9)'], ['แก๊ง', '🏴', { fn: 'openGang' }, 0, 'linear-gradient(#ff9a8a,#c9302c)'], ['ดูโฆษณา', '🎁', { fn: 'adReward' }, 0, 'linear-gradient(#ffe08a,#ff9f43)'], ['อันดับ', '🏅', { fn: 'open', kind: 'rank' }, 0, 'linear-gradient(#ffe7a0,#d9a93a)'],
   ['กลุ่มเฟสบุ๊ค', '👥', { fn: 'fbGroup' }, 0, 'linear-gradient(#7fb0ff,#1877f2)'], ['สนับสนุน', '💖', { fn: 'qtab', set: { tab: 'support' } }, 0, 'linear-gradient(#ffd0e4,#f06b9c)'],
   ['ตู้เสื้อผ้า', '👗', { fn: 'open', kind: 'bag', set: { gtab: 'wear' } }, 0, 'linear-gradient(#ffe0f0,#c95fa0)'],
   ['God', '👑', { fn: 'open', kind: 'god' }, 1, 'linear-gradient(#fff1a8,#f0b830)']];

@@ -2282,6 +2282,8 @@ const LUX_TITLES = [
 const ACHIEVEMENTS = [
   { id: 'zsurv1', r: 3, c: null, stat: 'zsurvive', n: 1, title: 'ผู้รอดชีวิต', desc: 'รอดจากคืนปล่อยผีได้ 1 ครั้ง' },
   { id: 'zsurv5', r: 5, c: null, stat: 'zsurvive', n: 5, title: 'นักล่าซอมบี้', desc: 'รอดจากคืนปล่อยผีได้ 5 ครั้ง' },
+  { id: 'bus99_3', r: 4, c: null, stat: 'bus99', n: 3, title: 'ขาประจำสาย 99', desc: 'สะสมตั๋วรถเมล์สาย 99 ได้ 3 ใบ' },
+  { id: 'bus99_12', r: 7, c: null, stat: 'bus99', n: 12, title: 'ผู้โดยสารคนที่ 13', desc: 'สะสมตั๋วรถเมล์สาย 99 ครบทั้ง 12 ใบ' },
   { id: 'egg_legend', r: 7, c: null, stat: 'legendfish', n: 1, title: 'ผู้พิชิตตำนาน', desc: 'ตกปลาในตำนานได้', secret: 1 },
   { id: 'egg_explore', r: 4, c: null, stat: 'secrets', n: 1, title: 'นักสำรวจ', desc: 'เจอที่ลับในเมือง', secret: 1 },
   { id: 'egg_explore5', r: 5, c: null, stat: 'secrets', n: 5, title: 'นักสำรวจตัวจริง', desc: 'เจอที่ลับครบทั้ง 5 จุด', secret: 1 },

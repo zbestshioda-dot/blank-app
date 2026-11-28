@@ -968,25 +968,31 @@ function sponOp(a, m) {
   for (const o of online.values()) send(o, sponView(o));
 }
 // 🚌 bus 99 comes back: one random evening a week (20:00–22:55 Thai time) it waits at the memorial for 10 minutes; the town hears about it 10 minutes before
-const BUS99 = { x: 56, y: 63.2, mins: 10, warn: 10, gems: 10 };
+const BUS99 = { x: 56, y: 63.2, mins: 10, warn: 10, gems: 10, seats: 12, fullGems: 100 };   // each ride: talk to one passenger you haven't met → their ticket (a.bus99 = seat numbers)
 function ghostWin(t = now()) {
   const bk = t + 7 * 3600e3, day = Math.floor(bk / 864e5), mon = day - ((day + 3) % 7);   // Monday (Thai) of this week
   let h = mon * 2654435761 >>> 0; h = (h ^ (h >>> 13)) >>> 0; const dd = h % 7, mm = 20 * 60 + (h >>> 3) % 175;
   const start = (mon + dd) * 864e5 + mm * 60e3 - 7 * 3600e3; return { start, end: start + BUS99.mins * 60e3, key: String(mon) };
 }
 const ghostOn = () => { const w = ghostWin(); return now() >= w.start && now() < w.end ? w : null; };
-const ghostView = () => { const w = ghostOn(); return { t: 'ghost', on: w ? 1 : 0, x: BUS99.x, y: BUS99.y, until: w ? w.end : 0 }; };
+const ghostView = a => { const w = ghostOn(); return { t: 'ghost', on: w ? 1 : 0, x: BUS99.x, y: BUS99.y, until: w ? w.end : 0, mine: a?.bus99 || [] }; };
 function ghostBoard(a) {
   const w = ghostOn(); if (!w) return toast(a, 'รถเมล์ไปแล้ว... หรือว่ามันไม่เคยมาจริงๆ?', '🚌', false);
   if (areaId(a) !== 'town' || dist(a, BUS99) > 4) return toast(a, '🚌 ต้องไปยืนที่ป้ายหน้าอนุสรณ์ก่อน', '🚌', false);
   if (a.ghostGot === w.key) return toast(a, 'คุณขึ้นรถคันนี้ไปแล้ว', '🚌', false);
-  a.ghostGot = w.key; a.gems = (a.gems || 0) + BUS99.gems; addItem(a, 'amulet', 1); joy(a, 10); markMe(a);
-  send(a, { t: 'ghostride', gems: BUS99.gems }); paperAdd(`🚌 ${a.name} ขึ้นรถเมล์สาย 99 ในคืนที่มันกลับมา`);
+  a.ghostGot = w.key; a.gems = (a.gems || 0) + BUS99.gems; addItem(a, 'amulet', 1); joy(a, 10);
+  const got = a.bus99 = Array.isArray(a.bus99) ? a.bus99 : [], miss = [...Array(BUS99.seats).keys()].filter(i => !got.includes(i));
+  const seat = miss.length ? pick(miss) : Math.floor(Math.random() * BUS99.seats), isNew = miss.length > 0;
+  if (isNew) { got.push(seat); stat(a, 'bus99', got.length, true); }
+  const full = isNew && got.length === BUS99.seats;
+  if (full) { a.gems += BUS99.fullGems; feed(`🎫 ${a.name} สะสมตั๋วรถเมล์สาย 99 ครบทั้ง 12 ใบ! ผู้โดยสารทุกคนจำชื่อเขาได้แล้ว`); }
+  markMe(a);
+  send(a, { t: 'ghostride', gems: BUS99.gems, seat, isNew: isNew ? 1 : 0, full: full ? BUS99.fullGems : 0, mine: got }); paperAdd(`🚌 ${a.name} ขึ้นรถเมล์สาย 99 ในคืนที่มันกลับมา`);
 }
 let ghostWas = false, ghostWarned = '';
 setInterval(() => { try { const w = ghostWin(), t = now(); if (t >= w.start - BUS99.warn * 60e3 && t < w.start && ghostWarned !== w.key) { ghostWarned = w.key; feed(`🚌 ได้ยินเสียงรถเมล์สาย 99 แว่วมาไกลๆ... อีก ${BUS99.warn} นาทีมันจะจอดหน้าอนุสรณ์`); for (const p of online.values()) toast(p, `🚌 รถเมล์สาย 99 จะมาที่ป้ายหน้าอนุสรณ์ในอีก ${BUS99.warn} นาที!`, '🚌'); }
-  const o = !!ghostOn(); if (o !== ghostWas) { ghostWas = o; if (o) feed(`🚌👻 มีคนเห็นรถเมล์สาย 99 จอดอยู่หน้าอนุสรณ์!! อยู่แค่ ${BUS99.mins} นาที รีบไป!`); for (const p of online.values()) send(p, ghostView()); } } catch (e) { console.error('ghost', e); } }, 10000).unref?.();
-function xtraSend(a) { const n = n3View(a); if (n) send(a, n); send(a, paperView()); send(a, nmView(a)); send(a, sponView(a)); send(a, ghostView()); }
+  const o = !!ghostOn(); if (o !== ghostWas) { ghostWas = o; if (o) feed(`🚌👻 มีคนเห็นรถเมล์สาย 99 จอดอยู่หน้าอนุสรณ์!! อยู่แค่ ${BUS99.mins} นาที รีบไป!`); for (const p of online.values()) send(p, ghostView(p)); } } catch (e) { console.error('ghost', e); } }, 10000).unref?.();
+function xtraSend(a) { const n = n3View(a); if (n) send(a, n); send(a, paperView()); send(a, nmView(a)); send(a, sponView(a)); send(a, ghostView(a)); }
 setInterval(() => { try { const c = coopNow(), v = c.got + ':' + c.done; if (v === coopSent) return; coopSent = v; for (const o of online.values()) send(o, coopView(o)); } catch (e) { console.error('coop', e); } }, 4000).unref?.();
 const projTop = (by, n = 10) => Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, n).map(([l, v]) => [accounts.get(l)?.name || l, v]);
 function projView(a) {
@@ -2080,7 +2086,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['n3', 'ghostGot', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['n3', 'ghostGot', 'bus99', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
