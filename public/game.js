@@ -6965,6 +6965,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28v', d: '28 พ.ย.', items: ['☰ <b>ปุ่มเมนูใหม่ข้างมือถือ</b> กดแล้วกางออก: กิจกรรม คู่รัก แก๊ง สัตว์เลี้ยง ชวนเพื่อน อัปเดต ตั้งค่า สนับสนุน กลุ่มเฟสบุ๊ค', '📱 มือถือโล่งขึ้น: 🛵 เดลิเวอรีย้ายเข้าไปในแอปโทรศัพท์ · ประมูลและบ้านสวยดูได้ใน 📅 กิจกรรม · เอาเรื่องหลักกับบันทึกออก (เรื่องหลักดูได้ใต้เควสต์)'] },
   { v: '2026-11-28u', d: '28 พ.ย.', items: ['🩺 <b>แก้ EXP หมอไม่ขึ้น</b> รักษา/ช่วยชีวิตคนไข้ ปฐมพยาบาล และภารกิจ ICU ได้ EXP เข้าอาชีพแพทย์ถูกต้องแล้ว (แอดมินที่ทำงานข้ามอาชีพด้วย)'] },
   { v: '2026-11-28t', d: '28 พ.ย.', items: ['🏢 <b>คุณแพรวนิติบุคคลมีรูปหน้าแล้ว</b> คุยที่เคาน์เตอร์คอนโดจะเห็นหน้าคุณแพรว (ผมบ็อบใส่แว่น)'] },
   { v: '2026-11-28s', d: '28 พ.ย.', items: ['👨‍🌾 <b>ลุงทุ่งมีรูปหน้าแล้ว</b> คุยกับลุงทุ่งที่ฟาร์มปศุสัตว์จะเห็นหน้าลุงตอนสนทนา'] },
@@ -9396,6 +9397,24 @@ const PH_GROUPS = [   // 4 apps a row: every app has a group, most-used first (t
   ['ไลฟ์สไตล์', ['ตู้เสื้อผ้า', 'กิจกรรม', 'บ้านสวย', 'จุดพลุ', 'เดลิเวอรี', 'สัตว์เลี้ยง', 'สมุดปลา']],
   ['รางวัล', ['รางวัล', 'อันดับ', 'ชวนเพื่อน', 'ดูโฆษณา']],
   ['ช่วยเหลือ & ตั้งค่า', ['อัปเดต', 'เรื่องเล่า', 'บทช่วยสอน', 'ตั้งค่า', 'วอลเปเปอร์', 'กลุ่มเฟสบุ๊ค', 'สนับสนุน', 'God']]];
+// not in the phone any more: dropped (main story is under the quests, auction/best home are in 📅 กิจกรรม, delivery is inside 📞 โทรศัพท์) or moved to the ☰ menu
+const HAM = ['กิจกรรม', 'คู่รัก', 'แก๊ง', 'สัตว์เลี้ยง', 'ชวนเพื่อน', 'อัปเดต', 'ตั้งค่า', 'สนับสนุน', 'กลุ่มเฟสบุ๊ค'];
+const PH_OUT = new Set(['เรื่องหลัก', 'บันทึก', 'ประมูล', 'บ้านสวย', 'เดลิเวอรี', ...HAM]);
+const HAM_IC = { 'สัตว์เลี้ยง': '🐾', 'ตั้งค่า': '⚙️' };
+function hamToggle(on) {
+  const el = $('#hamMenu'), b = $('#hamBtn'); if (!el || !b) return;
+  on = on ?? el.classList.contains('hidden'); el.classList.toggle('hidden', !on); b.classList.toggle('on', on); if (!on) return;
+  const all = {}; for (const a of PH_MORE) all[a[0]] = [a[1], a[2]]; for (const a of PH_APPS) all[a[0]] = [HAM_IC[a[0]] || '📱', a[1]];
+  const sup = { 'สนับสนุน': { fn: 'open', kind: 'phone', set: { tab: 'support' } } };
+  el.innerHTML = HAM.filter(n => all[n]).map(n => `<button data-h="${esc(JSON.stringify(sup[n] || all[n][1]))}"><i>${all[n][0]}</i>${n}</button>`).join('');
+  const r = b.getBoundingClientRect(); el.style.top = r.top + 'px'; el.style.right = Math.max(6, innerWidth - r.left + 6) + 'px';
+}
+document.addEventListener('click', e => {
+  if (e.target.closest?.('#hamBtn')) { FX.play('click'); return hamToggle(); }
+  const h = e.target.closest?.('#hamMenu [data-h]');
+  if (h) { FX.play('click'); hamToggle(false); const m = JSON.parse(h.dataset.h); return m.fn ? FN[m.fn](m, document) : openPanel(m); }
+  if (!e.target.closest?.('#hamMenu')) hamToggle(false);
+});
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
 const PH_TITLE = { wall: 'วอลเปเปอร์', mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 let phPg = 0;   // the phone home page the player swiped to (kept across re-renders)
@@ -9416,8 +9435,8 @@ function phonePanel(p) {
     const badge = k => (k === 'call' && call) || (k === 'mail' && (me.mailN || 0) > 0) || (k === 'bills' && (me.bills || []).length) || (k === 'ach' && achTodo().length) ? '<em></em>' : '';
     const app = ([l, m, i, bk]) => `<button class="phApp" data-m="${esc(JSON.stringify(m))}"><i style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100 / 3}%"></i>${badge(bk)}<small>${l}</small></button>`;
     const emApp = ([l, e, m, , bg]) => `<button class="phApp em" data-m="${esc(JSON.stringify(m))}"><i style="background:${bg}">${e}</i>${l === 'lifebook' && lbUnread() ? '<em></em>' : ''}<small>${l}</small></button>`;
-    const all = {}; for (const a of PH_APPS) all[a[0]] = app(a);
-    for (const a of PH_MORE.filter(a => (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay))) all[a[0]] = emApp(a);
+    const all = {}; for (const a of PH_APPS) if (!PH_OUT.has(a[0])) all[a[0]] = app(a);
+    for (const a of PH_MORE.filter(a => !PH_OUT.has(a[0]) && (!a[3] || me.admin) && (a[2].fn !== 'adReward' || G.ads) && (a[2].fn !== 'openTopup' || G.pay))) all[a[0]] = emApp(a);
     // one swipeable page per group (no scrolling down); anything not in a group goes on the last page
     const used = new Set(), pgs = PH_GROUPS.map(([t, names]) => [t, names.filter(n => all[n]).map(n => (used.add(n), all[n])).join('')]).filter(g => g[1]);
     const rest = Object.keys(all).filter(n => !used.has(n)).map(n => all[n]).join(''); if (rest) pgs.push(['อื่น ๆ', rest]);
@@ -9433,6 +9452,7 @@ function phonePanel(p) {
     const rows = list.map(c => itemRowRaw(onl.has(c.p) ? '🟢' : '⚪', `${fav.has(c.p) ? '⭐ ' : ''}${esc(c.n)}`, c.p, `<div class="rowf">${B(fav.has(c.p) ? '★' : '☆', { t: 'contact_pin', phone: c.p }, fav.has(c.p) ? 'primary' : '')}${B('📞', { t: 'call', phone: c.p }, 'good', !!call)}${B('🗑️', { fn: 'delContact', phone: c.p, n: c.n })}</div>`)).join('');
     const taxiRow = G.taxi ? itemRowRaw('🚕', '<b>แท็กซี่เมืองชีวิต</b>', `${G.taxi.phone.replace(/(\d{3})(\d{3})/, '$1-$2')} · เรียกได้ 24 ชม.`, B('📞 เรียก', { fn: 'qtab', set: { tab: 'taxi' } }, 'good')) : '';
     body = `<div class="jobbox">📱 เบอร์ของคุณ: <b style="font-size:18px;letter-spacing:2px">${me.phone}</b><div class="sub">บอกเบอร์นี้ให้เพื่อน แล้วเพื่อนจะบันทึกและโทรหาคุณได้</div></div>
+      <div class="rowf" style="margin:8px 0 0">${B('🛵 สั่งเดลิเวอรี', { fn: 'qtab', set: { tab: 'food' } }, 'good')}</div>
       <div class="rowf" style="margin:10px 0"><input id="phIn" inputmode="numeric" maxlength="6" placeholder="เบอร์เพื่อน 6 หลัก">${B('บันทึก', { fn: 'addContact' }, 'good')}</div>
       <div class="list">${taxiRow}${rows || (taxiRow ? '' : '<div class="sub">ยังไม่มีรายชื่อ</div>')}</div>`;
   } else if (tab === 'taxi') {

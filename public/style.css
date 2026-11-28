@@ -2282,3 +2282,11 @@ body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;
 .n3c i{display:block;font-style:normal;font-size:28px;margin:4px 0}.n3c span{font-size:12px}.n3c.now{border-color:#5ac85a;background:rgba(90,200,90,.18)}.n3c.lock,.n3c.miss{opacity:.55}
 .npPaper{font-family:Georgia,serif}.npHead{text-align:center;border-bottom:3px double currentColor;padding-bottom:6px;margin-bottom:6px}.npHead b{display:block;font-size:22px;letter-spacing:1px}
 .npItem{padding:5px 2px;border-bottom:1px dotted rgba(127,127,127,.5);font-size:14px;line-height:1.5}.npCols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ☰ the side menu next to the phone */
+#hamBtn b.q{font-size:24px;line-height:1}
+#hamBtn.on{filter:brightness(.92)}
+#hamMenu{position:fixed;z-index:60;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;max-width:min(300px,calc(100vw - 80px));background:#fff8ec;border:2px solid #3e2414;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.35);pointer-events:auto}
+#hamMenu.hidden{display:none}
+#hamMenu button{display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:10px;border:1.5px solid #c9a77a;background:#fff;color:#3e2414;font-size:13px;font-weight:700;text-align:left;white-space:nowrap}
+#hamMenu button i{font-style:normal;font-size:18px}
