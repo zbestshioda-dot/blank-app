@@ -3914,8 +3914,14 @@ function shamanStep(dt) {
 }
 // 👻 wandering ghosts (the server only sends them to a brahmin or a shaman): a floating sheet that drifts round its spot
 let GHOSTS = [];
+const GHOST_IMG = new Image(); GHOST_IMG.src = 'assets/ghost_w.png?v=1';
 function drawGhostW(g, X, Y, t) {
   const u = TS, k = g.id * 1.7, ox = Math.sin(t / 1900 + k) * .6, oy = Math.cos(t / 2300 + k) * .3, px = (g.x + ox) * u + X, py = (g.y + oy) * u + Y - u * (.25 + Math.sin(t / 400 + k) * .08), w = u * .7, h = u * .95;
+  if (GHOST_IMG.complete && GHOST_IMG.naturalWidth) {   // the painted ghost: 3 floating frames (ping-pong)
+    const fr = [0, 1, 2, 1][Math.floor(t / 260 + k) % 4], gh = u * 1.5, gw = gh * 96 / 112;
+    ctx.save(); ctx.globalAlpha = .8 + Math.sin(t / 600 + k) * .12; ctx.imageSmoothingEnabled = false; ctx.drawImage(GHOST_IMG, fr * 96, 0, 96, 112, px - gw / 2, py - gh + u * .3, gw, gh); ctx.restore();
+    const fs = Math.max(10, Math.round(u * .24)); return sign(`👻 ${g.name}`, px, py - gh + u * .1, { size: fs, bg: 'rgba(60,80,120,.8)' });
+  }
   ctx.save(); ctx.globalAlpha = .62 + Math.sin(t / 600 + k) * .12; ctx.shadowColor = '#bfe8ff'; ctx.shadowBlur = u * .3; ctx.fillStyle = '#eef6ff';
   ctx.beginPath(); ctx.moveTo(px - w / 2, py); ctx.arc(px, py - h + w / 2, w / 2, Math.PI, 0); ctx.lineTo(px + w / 2, py);
   for (let i = 3; i >= 0; i--) ctx.quadraticCurveTo(px - w / 2 + (i + .5) * w / 4, py + (i % 2 ? -u * .12 : u * .12) * Math.sin(t / 300 + i), px - w / 2 + i * w / 4, py);
@@ -7061,6 +7067,7 @@ function jailList() {
     e.onpointerup = e.onpointercancel = () => { drag = null; }; }
   if (e) e.onclick = () => { if (moved) { moved = false; return; } const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28i', d: '28 พ.ย.', items: ['👻 ผีเร่ร่อนมีหน้าตาใหม่ ลอยขึ้นลงน่ารัก (เห็นเฉพาะพราหมณ์และหมอผี)'] },
   { v: '2026-11-28h', d: '28 พ.ย.', items: [
     '📢 <b>ประกาศ! อาชีพลับที่เกี่ยวกับความดี</b> ไม่มีในหมวดงาน ต้องค้นหาเอง…',
     '🔱 <b>พราหมณ์</b> ค่าความดีถึง 1000 สมัครได้ที่พระอุโบสถในวัด · มองเห็นผีเร่ร่อน ทำตามที่ผีปรารถนาแล้วได้เงิน · ตกปลาหายากง่ายขึ้น',
