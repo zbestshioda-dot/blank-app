@@ -7120,6 +7120,7 @@ function makeDrag(e, key) {
 { const e = document.getElementById('eyeBtn'); makeDrag(e, 'lt_eye');
   if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28zk', d: '28 พ.ย.', items: ['🏠 ร้านและอาคารคมชัดบนมือถือทุกรุ่น รวม iPhone (โหลดเฉพาะอาคารที่อยู่ใกล้ ไม่กินแรม)'] },
   { v: '2026-11-28zj', d: '28 พ.ย.', items: ['🏠 มือถือ Android: ร้านและอาคารคมชัดแล้ว ไม่เบลอ', '📱 จอมือถือโล่งขึ้น: ปุ่มวิ่ง/พัก/อิโมจิ รวมไว้ในปุ่ม ⋯ แถบพลังย่อเหลือ 2 แถว', '💬 แชทหุบเองถ้าไม่ได้แตะ 15 วินาที'] },
   { v: '2026-11-28zi', d: '28 พ.ย.', items: ['🎟️ ใหม่! พาสเมืองรายเดือน 30 ขั้น เริ่ม 1 ธ.ค. เล่นเก็บแต้มรับรางวัลฟรีทุกขั้น ปุ่ม 🎟️ มุมขวาบน', '👑 พาสพรีเมียม ฿59 ได้เพชร 350+ ไข่สัตว์เลี้ยง 4 ใบ รับย้อนหลังได้', '🎁 แพ็กมือใหม่ ฿19 💎120 + ไข่ 2 ใบ (ซื้อได้ครั้งเดียว)'] },
   { v: '2026-11-28zh', d: '28 พ.ย.', items: ['🏆 ป้ายแข่งตกปลาลากไปวางตรงไหนก็ได้แล้ว (เกมจำตำแหน่งไว้ให้)'] },
@@ -9732,8 +9733,15 @@ fetch('assets/atlas.json?v=v34').then(r => r.json()).then(j => {
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
   im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v34';
 });
-let BLDA = null;   // 📱 Android phones: buildings come from a full-size sheet (the half atlas made shops blurry); iPhones keep the half one (memory)
-if (HALF_ATLAS && !IOS) fetch('assets/atlas_bld.json?v=1').then(r => r.json()).then(j => setTimeout(() => { const im = new Image(); im.onload = () => { BLDA = { ...j, img: im }; }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_bld.webp?v=1'; }, 2500)).catch(() => { });
+// 📱 phones: buildings are drawn from their own full-size file (assets/bld/), loaded when near and dropped when far,
+// so they stay sharp (the half atlas made shops blurry) without the memory of the full atlas; until one arrives the half atlas stands in
+const BLDI = new Map();   // name -> { img, ok, used }
+function bldImg(name) {
+  let e = BLDI.get(name);
+  if (!e) { e = { img: new Image(), ok: false, used: 0 }; e.img.decoding = 'async'; e.img.onload = () => { e.ok = true; }; e.img.onerror = () => { e.bad = true; }; e.img.src = `assets/bld/${name}${SNOW ? '_s' : ''}.webp?v=1`; BLDI.set(name, e); }
+  e.used = performance.now(); return e.ok ? e.img : null;
+}
+if (HALF_ATLAS) setInterval(() => { const t = performance.now(); for (const [k, e] of BLDI) if (t - e.used > 30e3) { e.img.src = ''; BLDI.delete(k); } }, 10e3);   // not drawn for 30 s = far away: let it go
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
 if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v34').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v34'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
@@ -9775,9 +9783,11 @@ function snowAtlas(im, j) {
 }
 function spr(name, cx, by, X, Y, scale = 1) {
   if (name[0] === 'b' && name[1] === 'n' && name[2] === '_') return benchSpr(name, cx, by, X, Y);
-  const Bs = BLDA?.sprites[name], s = Bs || atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
-  const q = Bs ? BLDA.tile : atlas.tile, w = s[2] / q * TS * scale, h = s[3] / q * TS * scale;
-  ctx.drawImage(Bs ? BLDA.img : atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
+  const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
+  const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
+  const bi = HALF_ATLAS && name[0] === 'b' && name[1] === '_' && bldImg(name);
+  if (bi) { ctx.drawImage(bi, Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h)); return true; }
+  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
   return true;
 }
 // 🪑 the benches (assets/benches.webp): wood / stone, seen from the front, the back and both sides

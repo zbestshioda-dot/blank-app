@@ -18,21 +18,15 @@ for name in ([] if ONLY_BLD else ['atlas', 'atlas_snow']):
 # the ground and floor textures stay sharp: a small full-size sheet of just those (tex() in game.js uses it on phones)
 J = json.load(open(os.path.join(A, 'atlas.json')))
 
-# buildings (b_*) stay sharp too: they are big and detailed, so halving them made shops blurry on phones (spr() in game.js uses it)
-def sheet(prefix, W, suffix):
-    names = sorted(k for k in J['sprites'] if k.startswith(prefix))
-    for name in ['atlas', 'atlas_snow']:
-        im = Image.open(os.path.join(A, name + '.webp')).convert('RGBA'); out, x, y, rh, sp = [], 0, 0, 0, {}
-        for k in names:
-            X, Y, w, h = J['sprites'][k]
-            if x + w > W: x, y, rh = 0, y + rh + 2, 0
-            out.append((im.crop((X, Y, X + w, Y + h)), x, y)); sp[k] = [x, y, w, h]; x += w + 2; rh = max(rh, h)
-        T = Image.new('RGBA', (W, y + rh))
-        for c, px, py in out: T.paste(c, (px, py))
-        T.save(os.path.join(A, name + suffix + '.webp'), 'WEBP', quality=92, method=6)
-        print(name + suffix, T.size, os.path.getsize(os.path.join(A, name + suffix + '.webp')), 'bytes')
-    json.dump({'tile': J['tile'], 'sprites': sp}, open(os.path.join(A, 'atlas' + suffix + '.json'), 'w'), separators=(',', ':'))
-sheet(('b_',), 2048, '_bld')
+# buildings (b_*) stay sharp too: one full-size file each in assets/bld/ (<name>.webp, snow: <name>_s.webp);
+# phones load only the ones near the player and drop the far ones (spr() in game.js), so memory stays small
+os.makedirs(os.path.join(A, 'bld'), exist_ok=True)
+for name, suf in [('atlas', ''), ('atlas_snow', '_s')]:
+    im = Image.open(os.path.join(A, name + '.webp')).convert('RGBA'); tot = 0
+    for k, (X, Y, w, h) in J['sprites'].items():
+        if not k.startswith('b_'): continue
+        f = os.path.join(A, 'bld', k + suf + '.webp'); im.crop((X, Y, X + w, Y + h)).save(f, 'WEBP', quality=92, method=6); tot += os.path.getsize(f)
+    print(name, '-> bld/*' + suf + '.webp', tot, 'bytes')
 if ONLY_BLD: sys.exit()
 names = sorted(k for k in J['sprites'] if k.startswith(('g_', 'fl_')))
 for name in ['atlas', 'atlas_snow']:
