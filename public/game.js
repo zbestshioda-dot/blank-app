@@ -2289,6 +2289,7 @@ function draw(t) {
   if (PROJ?.done?.length && PART.ok && (A?.id === 'town')) for (const d of PROJ.done) { const L = G.projPlace?.[d.id]; if (!L || !vis(L.cx, L.by - 3, 10)) continue;   // 🏗️ what the town built
     if (d.id === 'bridge13') { ents.push([L.by - 3.2, 31, { id: d.id, part: 'deck', L }]); ents.push([L.by - .7, 31, { id: d.id, part: 'rail', L }]); }
     else ents.push([L.by, 31, { id: d.id, L }]); }
+  if (A?.id === 'town') xtraEnts(ents, vis);
   if (Date.now() + clockOff < (G.xmasEnd || 0) && vis(XMAS_DEER.x, XMAS_DEER.y, 3)) ents.push([XMAS_DEER.y + .3, 6, XMAS_DEER]);   // 🎄 the showcase reindeer pulling the sleigh   // manholes, puddles, grass tufts lie flat
   for (const tr of G.trees) if (vis(tr[0] + .5, tr[1] + 1, 4)) ents.push([tr[1] + .95, 2, tr]);
   for (const f of roomFurniture) if (vis(f[1], f[2], 4)) ents.push([/rug|carpet|welcome|f_mat|ad_mat|ad_neon|br_stage|^~|^y_soil/.test(f[0]) ? -1e9 : f[2], 3, f]);   // rugs and mats lie on the floor: always under people
@@ -2351,6 +2352,7 @@ function draw(t) {
     else if (k === 17) drawLk(e, X, Y, t);
     else if (k === 18) drawFair(e, X, Y, t);
     else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
+    else if (k === 41) e.draw(X, Y, t);
     else drawPlayer(e, X, Y, t);
   }
   if (A?.id === 'town') townXtraDraw(X, Y, t);
@@ -5529,6 +5531,7 @@ function loveScene(m) {
 }
 // ---- 🌱 first three days · 📰 morning paper · 🏮 night market · 🪑 named benches · 🚌 bus 99 (server: n3View / paperView / nmOp / sponOp / ghost*)
 let N3V = null, PAPER = null, NMV = null, SPONV = null, BUS = null, xtraT = 0;
+const BUS_IMG = new Image(), NM_IMG = new Image(), NM_SPOT = { x: 50.6, y: 28.2 }; BUS_IMG.src = 'assets/bus99_ghost.png?v=1'; NM_IMG.src = 'assets/nightmarket_stall.png?v=1';
 const xtraSeen = k => { try { return localStorage.getItem(k); } catch { return 1; } }, xtraMark = k => { try { localStorage.setItem(k, 1); } catch { } };
 function xtraQueue() {   // show today's gift, then the paper, once each, when nothing else is on screen
   clearTimeout(xtraT); xtraT = setTimeout(() => {
@@ -5578,12 +5581,18 @@ function busRide(m) {
     { x: 'นาฬิกาบนรถหยุดอยู่ที่ 03:17... เหมือนหอนาฬิกากลางเมือง' }, { x: 'หญิงชราแถวหน้ายื่นผ้ายันต์ให้ แล้วกระซิบว่า "ขอบคุณที่ยังจำพวกเราได้"' },
     { x: 'พริบตาเดียว คุณยืนอยู่ที่ป้ายคนเดียว รถเมล์หายไปแล้ว' }, { x: `🎁 ได้ 💎${m.gems} + 🧧 ผ้ายันต์นำโชค` }] });
 }
-// world overlays in town: names over sponsored benches, and the ghost bus while it waits
+// 🏮 the market stall and 🚌 the ghost bus stand in the world (sorted by depth with people)
+function xtraEnts(ents, vis) {
+  if (NMV?.open && NM_IMG.complete && NM_IMG.naturalWidth && vis(NM_SPOT.x, NM_SPOT.y, 5)) ents.push([NM_SPOT.y, 41, { draw: (X, Y) => { const w = TS * 3.6, h = w * NM_IMG.naturalHeight / NM_IMG.naturalWidth; ctx.drawImage(NM_IMG, NM_SPOT.x * TS + X - w / 2, NM_SPOT.y * TS + Y - h, w, h); } }]);
+  if (BUS?.on && Date.now() + clockOff < BUS.until && BUS_IMG.complete && BUS_IMG.naturalWidth && vis(BUS.x, BUS.y, 5)) ents.push([BUS.y, 41, { draw: (X, Y, t) => { const w = TS * 3.4, h = w * BUS_IMG.naturalHeight / BUS_IMG.naturalWidth;
+    ctx.save(); ctx.globalAlpha = .75 + Math.sin(t / 400) * .2; ctx.drawImage(BUS_IMG, BUS.x * TS + X - w / 2, BUS.y * TS + Y - h + Math.sin(t / 700) * TS * .05, w, h); ctx.restore(); } }]);
+}
+// world overlays in town: names over sponsored benches, and the ghost bus while it waits (drawn shape only if its picture failed to load)
 function townXtraDraw(X, Y, t) {
   if (SPONV) for (const s of SPONV.list) if (s.n) { const x = s.x * TS + X, y = (s.y - 1.55) * TS + Y; if (x < -80 || x > VW + 80 || y < -40 || y > VH + 40) continue;
     ctx.save(); ctx.font = `bold ${Math.round(TS * .32)}px sans-serif`; ctx.textAlign = 'center'; const w = ctx.measureText('🪑 ' + s.n).width + 10;
     ctx.fillStyle = 'rgba(60,40,20,.8)'; ctx.fillRect(x - w / 2, y - TS * .3, w, TS * .42); ctx.fillStyle = '#ffe9a8'; ctx.fillText('🪑 ' + s.n, x, y); ctx.restore(); }
-  if (BUS?.on && Date.now() + clockOff < BUS.until) { const x = BUS.x * TS + X, y = BUS.y * TS + Y, w = TS * 5.5, h = TS * 2.4; if (x < -w || x > VW + w || y < -h * 2 || y > VH + h) return;
+  if (BUS?.on && Date.now() + clockOff < BUS.until && !(BUS_IMG.complete && BUS_IMG.naturalWidth)) { const x = BUS.x * TS + X, y = BUS.y * TS + Y, w = TS * 5.5, h = TS * 2.4; if (x < -w || x > VW + w || y < -h * 2 || y > VH + h) return;
     ctx.save(); ctx.globalAlpha = .55 + Math.sin(t / 300) * .2; ctx.fillStyle = '#7fd4c8'; ctx.shadowColor = '#9ff'; ctx.shadowBlur = 24;
     ctx.fillRect(x - w / 2, y - h, w, h * .85); ctx.shadowBlur = 0; ctx.fillStyle = '#163a3a';
     for (let i = 0; i < 5; i++) ctx.fillRect(x - w / 2 + TS * .3 + i * TS * 1.02, y - h + TS * .3, TS * .75, TS * .7);
@@ -6831,6 +6840,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '🎨 รูปใหม่: แผงตลาดนัดกลางคืนตั้งอยู่หน้าศาลาประชาคมตอนเปิด และรถเมล์ผีสาย 99 ตัวจริง',
     '🌱 ผู้เล่นใหม่: ของขวัญ 3 วันแรก เข้าเกมทุกวันรับเพชร+เงิน วันที่ 3 ใหญ่สุด',
     '📰 หนังสือพิมพ์เมืองทุกเช้า: ข่าวเมื่อวาน คนรวยสุด วันเกิดวันนี้ (ปุ่ม 📰 ด้านบน)',
     '🏮 ตลาดนัดกลางคืนหน้าศาลาประชาคม ทุกคืน 21:00–22:00 ของจำกัด + ถุงสุ่ม',
