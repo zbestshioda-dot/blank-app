@@ -919,13 +919,15 @@ function paperView() {
   const bd = Object.values(FOLK_DEF).filter(folkBday).map(def => def.name.replace(/\s*\(.*$/, ''));
   return { t: 'paper', d, y, items: (paperLogs[y] || []).slice(-12), rich: paperRich.top, bday: bd };
 }
-// 🏮 night market at the square, 21:00–22:00 Thai time: a few things in limited stock for the whole town + a lucky bag
-const NM = { from: 21, to: 22, near: 9, bag: 3000, bagMax: 3,
+// 🏮 night market at the square, 12:00–13:00 and 21:00–22:00 Thai time (stock refills each round): a few things in limited stock for the whole town + a lucky bag
+const NM = { wins: [[12, 13], [21, 22]], near: 9, bag: 3000, bagMax: 3,
   items: [{ id: 'petegg', price: 25000, n: 3 }, { id: 'gshard', price: 8000, n: 8 }, { id: 'crystal', price: 600, n: 20 }, { id: 'amulet', price: 999, n: 15 }] };
 let nm = { d: '', left: {} };
-const nmOpen = () => { const h = bkHour(); return h >= NM.from && h < NM.to; };
-function nmNow() { const d = dayKey(); if (nm.d !== d) { nm = { d, left: Object.fromEntries(NM.items.map(x => [x.id, x.n])) }; dirty = true; } return nm; }
-const nmView = a => ({ t: 'nm', open: nmOpen() ? 1 : 0, from: NM.from, to: NM.to, items: NM.items.map(x => ({ ...x, left: nmNow().left[x.id] || 0 })), bag: NM.bag, bagLeft: Math.max(0, NM.bagMax - (a.nmBag?.d === dayKey() ? a.nmBag.n : 0)) });
+const nmWin = () => { const h = bkHour(); return NM.wins.findIndex(([f, t]) => h >= f && h < t); };
+const nmOpen = () => nmWin() >= 0;
+const nmNext = () => { const h = bkHour(); return NM.wins.find(([f, t]) => h < t) || NM.wins[0]; };
+function nmNow() { const d = dayKey() + ':' + nmWin(); if (nm.d !== d) { nm = { d, left: Object.fromEntries(NM.items.map(x => [x.id, x.n])) }; dirty = true; } return nm; }
+const nmView = a => ({ t: 'nm', open: nmOpen() ? 1 : 0, from: nmNext()[0], to: nmNext()[1], hrs: NM.wins.map(([f, t]) => `${f}:00–${t}:00`).join(' และ '), items: NM.items.map(x => ({ ...x, left: nmNow().left[x.id] || 0 })), bag: NM.bag, bagLeft: Math.max(0, NM.bagMax - (a.nmBag?.d === dayKey() ? a.nmBag.n : 0)) });
 function nmOp(a, m) {
   if (m.op === 'view' || !nmOpen()) return send(a, nmView(a));
   const sq = ST.square; if (!sq || areaId(a) !== sq.area || dist(a, sq) > NM.near) return toast(a, '🏮 ต้องมาที่ตลาดนัดหน้าศาลาประชาคมก่อน', '🏮', false);
@@ -947,7 +949,7 @@ function nmOp(a, m) {
   send(a, nmView(a));
 }
 let nmWas = false;
-setInterval(() => { try { const o = nmOpen(); if (o && !nmWas) { nmNow(); feed('🏮 ตลาดนัดกลางคืนเปิดแล้วที่หน้าศาลาประชาคม! ของมีจำกัด ถึง 22:00 น.'); for (const p of online.values()) send(p, nmView(p)); } else if (!o && nmWas) for (const p of online.values()) send(p, nmView(p)); nmWas = o; } catch (e) { console.error('nm', e); } }, 20000).unref?.();
+setInterval(() => { try { const o = nmOpen(); if (o && !nmWas) { nmNow(); feed(`🏮 ตลาดนัดเปิดแล้วที่หน้าศาลาประชาคม! ของมีจำกัด ถึง ${nmNext()[1]}:00 น.`); for (const p of online.values()) send(p, nmView(p)); } else if (!o && nmWas) for (const p of online.values()) send(p, nmView(p)); nmWas = o; } catch (e) { console.error('nm', e); } }, 20000).unref?.();
 // 🪑 put your name on one of the town's benches for 30 days (only a few exist): status that drains money out of town
 const SPON = { price: 250000, days: 30, slots: D.STATIONS.filter(st => st.area === 'town' && st.label === 'ม้านั่ง').reduce((L, st) => {   // the town's benches (two seats each = one slot)
   const b = L.find(q => Math.abs(q.y - st.y) < .3 && Math.abs(q.x - st.x) < 1.4); if (b) b.x = (b.x + st.x) / 2; else L.push({ x: st.x, y: st.y }); return L; }, []).slice(0, 12) };   // only 12: scarce on purpose
@@ -965,8 +967,8 @@ function sponOp(a, m) {
   toast(a, `🪑 ม้านั่งนี้มีชื่อ "${a.name}" แล้ว อีก ${SPON.days} วัน`, '🪑'); if (!cur) { feed(`🪑 ${a.name} จองม้านั่งในเมืองเป็นชื่อตัวเองแล้ว!`); paperAdd(`🪑 ม้านั่งตัวใหม่ในเมืองติดป้ายชื่อ "${a.name}"`); }
   for (const o of online.values()) send(o, sponView(o));
 }
-// 🚌 bus 99 comes back: one random evening a week (20:00–22:55 Thai time) it waits at the memorial for 5 minutes
-const BUS99 = { x: 56, y: 63.2, mins: 5, gems: 10 };
+// 🚌 bus 99 comes back: one random evening a week (20:00–22:55 Thai time) it waits at the memorial for 10 minutes; the town hears about it 10 minutes before
+const BUS99 = { x: 56, y: 63.2, mins: 10, warn: 10, gems: 10 };
 function ghostWin(t = now()) {
   const bk = t + 7 * 3600e3, day = Math.floor(bk / 864e5), mon = day - ((day + 3) % 7);   // Monday (Thai) of this week
   let h = mon * 2654435761 >>> 0; h = (h ^ (h >>> 13)) >>> 0; const dd = h % 7, mm = 20 * 60 + (h >>> 3) % 175;
@@ -981,8 +983,9 @@ function ghostBoard(a) {
   a.ghostGot = w.key; a.gems = (a.gems || 0) + BUS99.gems; addItem(a, 'amulet', 1); joy(a, 10); markMe(a);
   send(a, { t: 'ghostride', gems: BUS99.gems }); paperAdd(`🚌 ${a.name} ขึ้นรถเมล์สาย 99 ในคืนที่มันกลับมา`);
 }
-let ghostWas = false;
-setInterval(() => { try { const o = !!ghostOn(); if (o !== ghostWas) { ghostWas = o; if (o) feed('🚌👻 มีคนเห็นรถเมล์สาย 99 จอดอยู่หน้าอนุสรณ์!! อยู่แค่ 5 นาที รีบไป!'); for (const p of online.values()) send(p, ghostView()); } } catch (e) { console.error('ghost', e); } }, 10000).unref?.();
+let ghostWas = false, ghostWarned = '';
+setInterval(() => { try { const w = ghostWin(), t = now(); if (t >= w.start - BUS99.warn * 60e3 && t < w.start && ghostWarned !== w.key) { ghostWarned = w.key; feed(`🚌 ได้ยินเสียงรถเมล์สาย 99 แว่วมาไกลๆ... อีก ${BUS99.warn} นาทีมันจะจอดหน้าอนุสรณ์`); for (const p of online.values()) toast(p, `🚌 รถเมล์สาย 99 จะมาที่ป้ายหน้าอนุสรณ์ในอีก ${BUS99.warn} นาที!`, '🚌'); }
+  const o = !!ghostOn(); if (o !== ghostWas) { ghostWas = o; if (o) feed(`🚌👻 มีคนเห็นรถเมล์สาย 99 จอดอยู่หน้าอนุสรณ์!! อยู่แค่ ${BUS99.mins} นาที รีบไป!`); for (const p of online.values()) send(p, ghostView()); } } catch (e) { console.error('ghost', e); } }, 10000).unref?.();
 function xtraSend(a) { const n = n3View(a); if (n) send(a, n); send(a, paperView()); send(a, nmView(a)); send(a, sponView(a)); send(a, ghostView()); }
 setInterval(() => { try { const c = coopNow(), v = c.got + ':' + c.done; if (v === coopSent) return; coopSent = v; for (const o of online.values()) send(o, coopView(o)); } catch (e) { console.error('coop', e); } }, 4000).unref?.();
 const projTop = (by, n = 10) => Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, n).map(([l, v]) => [accounts.get(l)?.name || l, v]);

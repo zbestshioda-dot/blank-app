@@ -5557,11 +5557,11 @@ function paperPanel() {
     <div class="secT">📢 ข่าวเมื่อวาน</div>${news}
     <div class="npCols"><div><div class="secT">💰 รวยที่สุดในเมือง</div><div class="npItem">${rich}</div></div>
     <div><div class="secT">🎂 วันเกิดวันนี้</div><div class="npItem">${p.bday.length ? p.bday.map(esc).join(', ') + '<br><small>ให้ของขวัญวันนี้ได้ความสนิท x2</small>' : 'ไม่มีใครเกิดวันนี้'}</div></div></div>
-    <div class="secT">📣 โฆษณา</div><div class="npItem">🏮 ตลาดนัดกลางคืน หน้าศาลาประชาคม ทุกคืน 21:00–22:00 · ของจำกัด!<br>🪑 อยากให้ชื่อคุณอยู่บนม้านั่งในเมือง? ${B('จองม้านั่ง', { fn: 'openSpon' })}</div></div>`;
+    <div class="secT">📣 โฆษณา</div><div class="npItem">🏮 ตลาดนัด หน้าศาลาประชาคม ทุกวัน 12:00–13:00 และ 21:00–22:00 · ของจำกัด!<br>🪑 อยากให้ชื่อคุณอยู่บนม้านั่งในเมือง? ${B('จองม้านั่ง', { fn: 'openSpon' })}</div></div>`;
 }
 function nmPanel() {
   const v = NMV; if (!v) return '<h2>🏮 ตลาดนัดกลางคืน</h2>';
-  if (!v.open) return `<h2>🏮 ตลาดนัดกลางคืน</h2><div class="sub">เปิดทุกคืน ${v.from}:00–${v.to}:00 น. หน้าศาลาประชาคม · ตอนนี้ปิดอยู่</div>`;
+  if (!v.open) return `<h2>🏮 ตลาดนัดกลางคืน</h2><div class="sub">เปิดทุกวัน ${v.hrs || `${v.from}:00–${v.to}:00`} น. หน้าศาลาประชาคม · ตอนนี้ปิดอยู่ (รอบต่อไป ${v.from}:00)</div>`;
   const rows = v.items.map(x => { const it = G.items[x.id]; return itemRowRaw(it?.icon || '❔', `${esc(it?.name || x.id)} <small>เหลือ ${x.left}</small>`, `ราคา ${money(x.price)}`, B(x.left > 0 ? '🛒 ซื้อ' : 'หมด', { t: 'nm', op: 'buy', id: x.id }, 'good', !(x.left > 0))); }).join('');
   return `<h2>🏮 ตลาดนัดกลางคืน</h2><div class="sub">ถึง ${v.to}:00 น. · ของมีจำกัดทั้งเมือง ใครมาก่อนได้ก่อน · ต้องยืนอยู่หน้าศาลาประชาคม ${B('📍 นำทาง', { fn: 'guide', key: 'square' })}</div>
     <div class="list">${rows}</div><div class="secT">🎁 ถุงสุ่มลุ้นโชค</div><div class="sub">ลุ้นได้ไข่สัตว์เลี้ยง ชิ้นส่วนเพชร คริสตัล หรือของเล็กๆ · คืนนี้ซื้อได้อีก ${v.bagLeft} ถุง</div>${B(`🎁 เปิดถุงสุ่ม ${money(v.bag)}`, { t: 'nm', op: 'bag' }, 'primary', !v.bagLeft)}`;
@@ -6839,6 +6839,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28h', d: '28 พ.ย.', items: [
+    '🏮 ตลาดนัดเปิดวันละ 2 รอบแล้ว: 12:00–13:00 และ 21:00–22:00 · ของเติมใหม่ทุกรอบ',
+    '🚌👻 รถเมล์สาย 99 แจ้งเตือนทั้งเมืองก่อนมา 10 นาที และจอดรอนานขึ้นเป็น 10 นาที',
+    '🆕 หน้าอัปเดตโชว์แค่ 3 เรื่องเด่น กด "ดูอัปเดตทั้งหมด" เพื่ออ่านครบ',
+  ] },
   { v: '2026-11-28g', d: '28 พ.ย.', items: [
     '📇 รายชื่อเพื่อนในมือถือเพิ่มจาก 30 เป็น 100 คน · ถ้าเต็มจะแจ้งเตือน ไม่หายเงียบ ๆ อีก',
     '🖱️ เล่นบนคอม: เลื่อนหน้ามือถือได้ด้วยล้อเมาส์ ลากเมาส์ หรือกดจุดด้านล่าง',
@@ -8062,7 +8067,13 @@ function fbText(n) {
   return [`🆕 อัปเดตเกม Life Town เมืองชีวิตนี้เลือกได้! (${L[0].d.replace(/\s*\(.*\)/, '')})`, '',
     ...L.flatMap(x => x.items.map(t => '• ' + fbClean(t))), '', `🎮 เล่นฟรีบนมือถือ/คอม ไม่ต้องโหลด: ${location.origin}`, '#LifeTown #เกมมือถือ #เกมออนไลน์'].join('\n');
 }
-function newsHtml() {
+// the pop-up after an update shows only the top 3 lines (put the big ones first in NEWS); ⚙️ → 🆕 shows everything
+function newsHtml(p) {
+  if (p?.brief) {
+    const i = NEWS.findIndex(n => n.v === p.since), L = NEWS.slice(0, i < 1 ? 1 : i).flatMap(n => n.items), more = L.length - 3;
+    return `<h2>🆕 มีอะไรใหม่</h2><ul style="margin:4px 0 0;padding-left:20px;line-height:1.7;font-size:15px">${L.slice(0, 3).map(t => `<li>${t}</li>`).join('')}</ul>`
+      + (more > 0 ? `<div class="sub" style="margin-top:8px">และอีก ${more} อย่าง</div>` : '') + `<div style="margin-top:10px">${B('📜 ดูอัปเดตทั้งหมด', { fn: 'open', kind: 'news' })}</div>`;
+  }
   return `<h2>🆕 อัปเดตล่าสุด</h2>` + NEWS.slice(0, 5).map((n, i) => `<div class="sub" style="margin-top:${i ? 12 : 4}px"><b>${n.d}</b></div><ul style="margin:4px 0 0;padding-left:20px;line-height:1.7;font-size:14px">${n.items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('');
 }
 // the news pops up only while the player is idle: it used to open the moment a farm/shop panel closed and swallow the next tap
@@ -8075,7 +8086,7 @@ function checkNews() {
   const dw = $('#dailyWrap'), busy = panel || $('#payBan') || (dw && dw.offsetParent) || $('#tut')?.offsetParent && !$('#tut').classList.contains('hidden') || !$('#mg')?.classList.contains('hidden');
   if (busy || Date.now() - lastTapT < 8000) return void setTimeout(checkNews, 2500);   // wait until nothing else is on screen (daily reward, top-up banner, a panel...) and the player has stopped tapping
   newsDone = true; try { localStorage.setItem('lt_news', NEWS[0].v); } catch { }
-  openPanel({ kind: 'news' });
+  openPanel({ kind: 'news', brief: 1, since: seen });
 }
 
 // ---- gang / club panel (phone app 🏴)
@@ -8255,7 +8266,7 @@ function craftHtml(st) {
 function renderPanel(p) {
   const k = p.kind, st = p.st;
   switch (k) {
-    case 'news': return newsHtml();
+    case 'news': return newsHtml(p);
     case 'xmasshow': return xmasHtml();
     case 'casino': case 'slot': case 'hilo': case 'roul': case 'bj': return czHtml(k, st);
     case 'arcade': case 'arcm': case 'claw': return arcHtml(k, st);
