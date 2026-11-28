@@ -475,7 +475,7 @@ const GYM = {
 };
 // 🎟️ Town Pass: one season per Thai calendar month. 1 point per minute of real play; every `pts` points = 1 tier.
 // outfit: { '2026-12': '<outfit id>' } = the premium tier-30 outfit of that month (missing → 💎200 instead)
-const PASS = { thb: 59, tiers: 30, pts: 40, refund: 200, ofGems: 200, outfit: {},
+const PASS = { from: Date.parse('2026-12-01T00:00:00+07:00'), thb: 59, tiers: 30, pts: 40, refund: 200, ofGems: 200, outfit: {},
   free: Array.from({ length: 30 }, (_, i) => { const t = i + 1; return t % 10 === 0 ? { eggs: 1 } : t % 5 === 0 ? { gems: 5 } : { money: 500 * Math.ceil(t / 3) }; }),
   prem: Array.from({ length: 30 }, (_, i) => { const t = i + 1; return t === 30 ? { outfit: 1, gems: 100 } : t % 10 === 0 ? { eggs: 2, gems: 20 } : t % 5 === 0 ? { gems: 30 } : t % 2 ? { gems: 10 } : { money: 3000 * Math.ceil(t / 5) }; }) };
 const GYM_PASS = { price: 150, hours: 24 };   // 🎫 day pass: bought on the first machine you step on, good for 24 real hours

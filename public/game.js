@@ -6743,7 +6743,7 @@ function gemSwapBox() {   // 💎 → LC (1💎 = 500 LC, up to 💎500 a day; t
 function topupHtml() {
   const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า SLIP2GO_SECRET และ PROMPTPAY_ID ใน Fly.io ก่อน' : ''}</div>`;
-  const avail = p => !(p.kind === 'outfit' && R.hasAngel && !paySel.to) && !(p.kind === 'starter' && (R.stBuy || paySel.to)) && !(p.kind === 'pass' && R.prem && !paySel.to);
+  const avail = p => !(p.kind === 'outfit' && R.hasAngel && !paySel.to) && !(p.kind === 'starter' && (R.stBuy || paySel.to)) && !(p.kind === 'pass' && (R.prem && !paySel.to || !R.tpOn));
   if (!R.packs.find(p => p.id === paySel.pack && avail(p))) paySel.pack = (R.packs.find(p => p.id === 'p100') || R.packs[0]).id;
   const pk = R.packs.find(p => p.id === paySel.pack);
   if (!R.methods[paySel.m]) paySel.m = Object.keys(R.methods)[0];
@@ -6751,7 +6751,7 @@ function topupHtml() {
   const vipLeft = R.vipT > Date.now() + clockOff ? Math.ceil((R.vipT - Date.now() - clockOff) / 86400e3) : 0;
   const card = p => { const on = p.id === paySel.pack, ok = avail(p), bon = !p.kind && R.first ? Math.round(p.gems * R.bonus) : 0;
     const head = p.kind === 'card' ? `<b style="font-size:15px">💳 บัตรรายเดือน</b><b style="font-size:17px">รวม 💎${p.total}</b><small>💎${p.gems} ทันที + 💎${p.daily}/วัน × ${p.days} วัน<br>ถ้าซื้อเพชรแยก ~${p.worth} LC · <b style="color:var(--good)">คุ้มกว่า 4 เท่า!</b>${me.card ? `<br>✅ มีอยู่ เหลือ ${Math.ceil((me.card.until - Date.now() - clockOff) / 864e5)} วัน (ซื้อเพิ่มต่ออายุ)` : ''}</small>`
-      : p.kind === 'pass' ? `<b style="font-size:26px">🎟️</b><b style="font-size:15px">👑 พาสเมืองพรีเมียม</b><small>${R.prem && !paySel.to ? '✅ มีแล้วเดือนนี้' : 'รางวัล 30 ขั้น · 💎350+ ไข่ 4 ใบ · รับย้อนหลังได้'}</small>`
+      : p.kind === 'pass' ? `<b style="font-size:26px">🎟️</b><b style="font-size:15px">👑 พาสเมืองพรีเมียม</b><small>${!R.tpOn ? '⏳ เริ่ม 1 ธ.ค.' : R.prem && !paySel.to ? '✅ มีแล้วเดือนนี้' : 'รางวัล 30 ขั้น · 💎350+ ไข่ 4 ใบ · รับย้อนหลังได้'}</small>`
       : p.kind === 'starter' ? `<b style="font-size:26px">🎁</b><b style="font-size:15px">แพ็กมือใหม่</b><small>${R.stBuy ? '✅ ซื้อไปแล้ว' : `💎${p.gems} + 🥚×${p.eggs} · ครั้งเดียว`}</small>`
       : p.kind === 'title' ? `<canvas class="ppCv" data-pp="title"></canvas><b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
       : p.kind === 'outfit' ? `<canvas class="ppCv" data-pp="angel"></canvas><b style="font-size:15px">😇 ${esc(ofn)}</b><small>${ok ? 'ชุดพิเศษ + ออร่า · ไม่มีขายในร้าน' : '✅ คุณมีชุดนี้แล้ว'}</small>`
@@ -6786,6 +6786,7 @@ function topupHtml() {
 let passRes = null;
 function passHtml() {
   const R = passRes; if (!R) return `<h2>🎟️ พาสเมือง</h2><div class="sub">กำลังโหลด…</div>`;
+  if (R.from) { const d = Math.max(0, Math.ceil((R.from - Date.now() - clockOff) / 864e5)); return `<h2>🎟️ พาสเมือง</h2><div class="jobbox" style="text-align:center"><b style="font-size:18px">🎉 เริ่ม 1 ธ.ค. นี้!${d ? ` (อีก ${d} วัน)` : ''}</b><br><small>เล่นเก็บแต้มรับรางวัล 30 ขั้น ทั้งสายฟรีและสายพรีเมียม 👑<br>รางวัลรวม 💎350+ ไข่สัตว์เลี้ยง เงิน และชุดพิเศษประจำเดือน</small></div>`; }
   const N = R.free.length, tier = Math.min(N, Math.floor(R.p / R.pts)), days = Math.max(0, Math.ceil((R.end - Date.now() - clockOff) / 864e5));
   const back = tier - R.g.length, can = tier - R.f.length + (R.prem ? back : 0);
   const txt = r => [r.money ? money(r.money) : '', r.gems ? `💎${r.gems}` : '', r.eggs ? `🥚x${r.eggs}` : '', r.outfit ? (R.of ? '🎽ชุดพิเศษ' : `💎${R.ofG}`) : ''].filter(Boolean).join(' ');
@@ -7109,7 +7110,7 @@ function makeDrag(e, key) {
 { const e = document.getElementById('eyeBtn'); makeDrag(e, 'lt_eye');
   if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
-  { v: '2026-11-28zi', d: '28 พ.ย.', items: ['🎟️ ใหม่! พาสเมืองรายเดือน 30 ขั้น เล่นเก็บแต้มรับรางวัลฟรีทุกขั้น ปุ่ม 🎟️ มุมขวาบน', '👑 พาสพรีเมียม ฿59 ได้เพชร 350+ ไข่สัตว์เลี้ยง 4 ใบ รับย้อนหลังได้', '🎁 แพ็กมือใหม่ ฿19 💎120 + ไข่ 2 ใบ (ซื้อได้ครั้งเดียว)'] },
+  { v: '2026-11-28zi', d: '28 พ.ย.', items: ['🎟️ ใหม่! พาสเมืองรายเดือน 30 ขั้น เริ่ม 1 ธ.ค. เล่นเก็บแต้มรับรางวัลฟรีทุกขั้น ปุ่ม 🎟️ มุมขวาบน', '👑 พาสพรีเมียม ฿59 ได้เพชร 350+ ไข่สัตว์เลี้ยง 4 ใบ รับย้อนหลังได้', '🎁 แพ็กมือใหม่ ฿19 💎120 + ไข่ 2 ใบ (ซื้อได้ครั้งเดียว)'] },
   { v: '2026-11-28zh', d: '28 พ.ย.', items: ['🏆 ป้ายแข่งตกปลาลากไปวางตรงไหนก็ได้แล้ว (เกมจำตำแหน่งไว้ให้)'] },
   { v: '2026-11-28zg', d: '28 พ.ย.', items: ['🚨 ติดหมายจับแล้วมีแถบบอกด้านบน ว่าจะโดนจับในกี่วินาที · สายตรวจ NPC มาจับใน 3 นาทีแม้มีตำรวจออนไลน์'] },
   { v: '2026-11-28zf', d: '28 พ.ย.', items: ['🪟 ข้อความแจ้งเตือน (เช่น "รออีก 30 วินาที") ขึ้นทับหน้าต่างแล้ว ไม่จมอยู่ข้างหลัง'] },

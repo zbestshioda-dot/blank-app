@@ -5840,7 +5840,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, tp: passTier(a) * (passPrem(a) ? 2 : 1) - passOf(a).f.length - (passPrem(a) ? passOf(a).g.length : 0), czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb ? NBM.view(a, dayKey(), dayKeyAt(a.nb.t0)) : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, tp: !passOn() ? 0 : passTier(a) * (passPrem(a) ? 2 : 1) - passOf(a).f.length - (passPrem(a) ? passOf(a).g.length : 0), czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb ? NBM.view(a, dayKey(), dayKeyAt(a.nb.t0)) : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -7228,12 +7228,14 @@ function tick() {
 
 // ------------------------------------------------------------------ 🎟️ Town Pass (monthly season; free + premium track) and 🎁 the one-time starter pack offer
 const passSeason = () => dayKey().slice(0, 7);
+const passOn = () => now() >= D.PASS.from;   // 🎟️ the first season starts on 1 Dec
 const passEnd = () => { const [y, m] = passSeason().split('-').map(Number); return Date.UTC(y, m, 1) - 7 * 3600e3; };
 function passOf(a) { const s = passSeason(); if (a.tpass?.s !== s) a.tpass = { s, p: 0, f: [], g: [] }; return a.tpass; }
 const passTier = a => Math.min(D.PASS.tiers, Math.floor(passOf(a).p / D.PASS.pts));
 const passPrem = a => a.tpassP === passSeason();
-const passView = a => { const P = passOf(a); return { t: 'tpass', s: P.s, p: P.p, f: P.f, g: P.g, prem: passPrem(a) ? 1 : 0, end: passEnd(), pts: D.PASS.pts, free: D.PASS.free, premR: D.PASS.prem, of: D.PASS.outfit[P.s] || '', ofG: D.PASS.ofGems, thb: D.PASS.thb, pay: PAY.ON ? 1 : 0 }; };
+const passView = a => { const P = passOf(a); return { t: 'tpass', s: P.s, p: P.p, f: P.f, g: P.g, prem: passPrem(a) ? 1 : 0, end: passEnd(), pts: D.PASS.pts, free: D.PASS.free, premR: D.PASS.prem, of: D.PASS.outfit[P.s] || '', ofG: D.PASS.ofGems, thb: D.PASS.thb, pay: PAY.ON ? 1 : 0, from: passOn() ? 0 : D.PASS.from }; };
 function passPt(a) {
+  if (!passOn()) return;
   const before = passTier(a); passOf(a).p++;
   const n = passTier(a); if (n <= before) return;
   toast(a, `🎟️ พาสเมืองขึ้นขั้น ${n}! กดรับรางวัลที่ปุ่ม 🎟️${passPrem(a) ? '' : ' (มีพาสพรีเมียมได้เพิ่มอีกช่อง)'}`, '🎟️');
@@ -7252,7 +7254,7 @@ function passGive(a, r) {
   return got.join(' ');
 }
 function passOp(a, m) {
-  if (m.op === 'claim') {
+  if (m.op === 'claim' && passOn()) {
     const P = passOf(a), tr = m.tr === 'g' ? 'g' : 'f', n = Math.floor(+m.n), all = m.n === 'all';
     if (tr === 'g' && !passPrem(a)) return toast(a, 'ช่องนี้สำหรับพาสพรีเมียม ซื้อได้ที่ 💎 เติมเงิน', '🎟️', false);
     const list = all ? Array.from({ length: passTier(a) }, (_, i) => i + 1) : [n];
@@ -7280,7 +7282,7 @@ const PAY_TTL = 24 * 3600e3;
 function payMine(a) { const l = lk(a); return Object.values(payOrders).filter(o => o.l === l && o.st !== 'exp').sort((x, y) => y.t - x.t).slice(0, 10).map(o => ({ ref: o.ref, pack: o.pack, gems: o.gems, bonus: o.bonus || 0, thb: o.thb, m: o.m, t: o.t, st: o.st, why: o.st === 'review' ? o.why || '' : '', ...(o.st === 'new' && o.m === 'slip' ? { qr: PAY.promptPayQR(o.thb) } : {}) })); }
 function payView(a) {
   return { t: 'pay', on: PAY.ON ? 1 : 0, sb: 0, packs: PAY.PACKS, first: a.paidG ? 0 : 1, bonus: PAY.FIRST_BONUS, methods: {}, banks: {}, my: payMine(a), gems: a.gems || 0,
-    vipT: a.vipT || 0, stBuy: a.stBuy ? 1 : 0, prem: passPrem(a) ? 1 : 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0, to: PAY.NAME, pp: PAY.ppShow() };
+    vipT: a.vipT || 0, stBuy: a.stBuy ? 1 : 0, tpOn: passOn() ? 1 : 0, prem: passPrem(a) ? 1 : 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0, to: PAY.NAME, pp: PAY.ppShow() };
 }
 function payOp(a, m) {
   if (m.op === 'view') return send(a, payView(a));
@@ -7306,6 +7308,7 @@ function payOp(a, m) {
   const g = m.to ? byPhone.get(String(m.to)) : null;   // 🎁 gift to a friend in my contacts
   if (m.to && (!g || g === a || !(a.contacts || []).some(c => c.p === g.phone))) return toast(a, 'ส่งของขวัญได้เฉพาะเพื่อนในรายชื่อโทรศัพท์', '🎁', false);
   if (pk.kind === 'starter' && (g || a.stBuy)) return toast(a, g ? 'แพ็กมือใหม่ซื้อให้เพื่อนไม่ได้' : 'คุณซื้อแพ็กมือใหม่ไปแล้ว (ซื้อได้ครั้งเดียว)', '🎁', false);
+  if (pk.kind === 'pass' && !passOn()) return toast(a, 'พาสเมืองเริ่ม 1 ธ.ค. นี้ รอซื้อวันนั้นนะ', '🎟️', false);
   if (!g && pk.kind === 'pass' && passPrem(a)) return toast(a, 'คุณมีพาสเมืองเดือนนี้แล้ว', '🎟️', false);
   if (!g && pk.kind === 'outfit' && (a.outfits || []).includes(pk.of)) return toast(a, 'คุณมีชุดนี้แล้ว', '👗', false);
   const l = lk(a), t = now(), to = g ? lk(g) : undefined;
