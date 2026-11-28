@@ -2,6 +2,10 @@
 
 - Every time you ship an update to the game, add a short Thai summary entry at the top of `NEWS` in `public/game.js`
   (new `v` id + date + one line per change, biggest first: the update pop-up shows only the top 3). Players see it once after the update, and under ⚙️ → 🆕 อัปเดต.
+  The `v` id must be NEW (never reused anywhere in NEWS, or the pop-up never shows): check with `node tools/news.test.js`.
+- Art: follow `.claude/ART_STYLE.md` (sheet layouts, frame sizes, how to clean AI pictures, prompt skeleton).
+- Play-test in a real browser: `node tools/play.js --set career=police,virtue=1000 --out shot.png` (scratch data dir, test account,
+  clears the anti-bot check + tutorial with trusted clicks, prints page/server errors). Add `--phone` for a phone screen.
 - Character sprites: the game loads `public/assets/pchar/<sheet>.webp` (one per outfit). After any change to `pchar.webp` (add_fashion.py, dye_masks.py, …) run `python3 tools/split_pchar.py` and bump `CH_V` in `public/game.js`.
 - Room interiors are laid out in slots in declaration order; buildings added later use `late` (1, 2, …) so existing rooms keep their place.
 
