@@ -2276,3 +2276,9 @@ body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;
 
 #coopLine s{display:block;height:4px;margin-top:2px;border-radius:3px;background:rgba(127,127,127,.3);overflow:hidden}#coopLine s u{display:block;height:100%;background:#5ac85a}
 #card.v2.mini #msLine,#card.v2.mini #coopLine,#card.v2.mini #jobLine{display:none}
+
+/* 🌱 3-day gifts · 📰 paper */
+.n3row{display:flex;gap:8px;margin:10px 0}.n3c{flex:1;text-align:center;padding:8px 4px;border-radius:12px;border:2px solid #c9a45a;background:rgba(201,164,90,.12)}
+.n3c i{display:block;font-style:normal;font-size:28px;margin:4px 0}.n3c span{font-size:12px}.n3c.now{border-color:#5ac85a;background:rgba(90,200,90,.18)}.n3c.lock,.n3c.miss{opacity:.55}
+.npPaper{font-family:Georgia,serif}.npHead{text-align:center;border-bottom:3px double currentColor;padding-bottom:6px;margin-bottom:6px}.npHead b{display:block;font-size:22px;letter-spacing:1px}
+.npItem{padding:5px 2px;border-bottom:1px dotted rgba(127,127,127,.5);font-size:14px;line-height:1.5}.npCols{display:grid;grid-template-columns:1fr 1fr;gap:10px}

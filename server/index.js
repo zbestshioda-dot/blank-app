@@ -875,6 +875,7 @@ const COOP_MIN = 5, COOP_GEMS = 3;
 let coop = null, coopSent = 0;
 function coopNow() {
   const d = dayKey();
+  if (coop && coop.d !== d && !coop.done) paperAdd(`🤝 เป้าหมายเมือง "${COOP[coop.i]?.name}" ไปได้ ${coop.got}/${COOP[coop.i]?.n} ไม่ทันครบ วันนี้ลุยกันใหม่!`, coop.d);
   if (!coop || coop.d !== d) { coop = { d, i: Math.floor(Date.parse(d) / 864e5) % COOP.length, got: 0, by: {}, done: 0, paid: {} }; dirty = true; }
   return coop;
 }
@@ -888,8 +889,101 @@ function coopEv(a, type, n = 1) {
   if (type === 'deliver' || type === 'treat' || type.startsWith('job_')) type = 'work';   // every career's job counts as work
   if (g.type !== type || c.done || !(n > 0)) return;
   const k = lk(a); c.got += n; c.by[k] = (c.by[k] || 0) + n; dirty = true;
-  if (c.got >= g.n) { c.done = now(); feed(`🤝 ทั้งเมืองช่วยกัน "${g.name}" ครบ ${g.n.toLocaleString()} ${g.unit} แล้ว! คนที่ช่วย ${COOP_MIN}+ ได้ 💎${COOP_GEMS}`); for (const o of online.values()) coopPay(o); }
+  if (c.got >= g.n) { c.done = now(); paperAdd(`🤝 ทั้งเมืองช่วยกัน${g.name}ครบ ${g.n.toLocaleString()} ${g.unit}`); feed(`🤝 ทั้งเมืองช่วยกัน "${g.name}" ครบ ${g.n.toLocaleString()} ${g.unit} แล้ว! คนที่ช่วย ${COOP_MIN}+ ได้ 💎${COOP_GEMS}`); for (const o of online.values()) coopPay(o); }
 }
+// ---------------------------------------------------------------- 🌱 first three days · 📰 morning paper · 🏮 night market · 🪑 named benches · 🚌 bus 99
+const bkHour = () => new Date(now() + 7 * 3600e3).getUTCHours();
+const dayDiff = (a, b) => Math.round((Date.parse(a) - Date.parse(b)) / 864e5);
+// 🌱 a new player's first three (Thai) days: come back each day for a bigger gift
+const N3 = [{ gems: 5, money: 500 }, { gems: 10, money: 1500 }, { gems: 20, money: 5000 }];
+function n3View(a) {
+  if (!a.created || isAdmin(a)) return null; const day = dayDiff(dayKey(), dayKeyAt(a.created)); if (day < 0 || day > 2) return null;
+  return { t: 'n3', day, got: a.n3 || [], rw: N3 };
+}
+function n3Claim(a) {
+  const v = n3View(a); if (!v || v.got.includes(v.day)) return; const r = N3[v.day];
+  a.n3 = [...v.got, v.day]; a.gems = (a.gems || 0) + r.gems; earn(a, r.money, true); joy(a, 5); markMe(a);
+  toast(a, `🌱 ของขวัญวันที่ ${v.day + 1}: 💎${r.gems} + ${money(r.money)}${v.day < 2 ? ` · พรุ่งนี้มารับ 💎${N3[v.day + 1].gems} + ${money(N3[v.day + 1].money)}` : ' · ครบ 3 วันแล้ว เก่งมาก!'}`, '🌱');
+  send(a, n3View(a));
+}
+// 📰 the morning paper: yesterday's headlines (logged as they happen) + who is richest + today's birthdays
+let paperLogs = {};
+function paperAdd(text, d = dayKey()) {
+  (paperLogs[d] || (paperLogs[d] = [])).push(String(text).slice(0, 140)); if (paperLogs[d].length > 40) paperLogs[d].shift();
+  for (const k of Object.keys(paperLogs)) if (dayDiff(dayKey(), k) > 3) delete paperLogs[k]; dirty = true;
+}
+let paperRich = { d: '', top: [] };
+function paperView() {
+  const d = dayKey(), y = new Date(Date.parse(d) - 864e5).toISOString().slice(0, 10);
+  if (paperRich.d !== d) paperRich = { d, top: [...accounts.values()].filter(o => !isAdmin(o) && !o.ban).map(o => [o.name, Math.round((o.money || 0) + (o.bank || 0))]).sort((p, q) => q[1] - p[1]).slice(0, 3) };
+  const bd = Object.values(FOLK_DEF).filter(folkBday).map(def => def.name.replace(/\s*\(.*$/, ''));
+  return { t: 'paper', d, y, items: (paperLogs[y] || []).slice(-12), rich: paperRich.top, bday: bd };
+}
+// 🏮 night market at the square, 21:00–22:00 Thai time: a few things in limited stock for the whole town + a lucky bag
+const NM = { from: 21, to: 22, near: 9, bag: 3000, bagMax: 3,
+  items: [{ id: 'petegg', price: 25000, n: 3 }, { id: 'gshard', price: 8000, n: 8 }, { id: 'crystal', price: 600, n: 20 }, { id: 'amulet', price: 999, n: 15 }] };
+let nm = { d: '', left: {} };
+const nmOpen = () => { const h = bkHour(); return h >= NM.from && h < NM.to; };
+function nmNow() { const d = dayKey(); if (nm.d !== d) { nm = { d, left: Object.fromEntries(NM.items.map(x => [x.id, x.n])) }; dirty = true; } return nm; }
+const nmView = a => ({ t: 'nm', open: nmOpen() ? 1 : 0, from: NM.from, to: NM.to, items: NM.items.map(x => ({ ...x, left: nmNow().left[x.id] || 0 })), bag: NM.bag, bagLeft: Math.max(0, NM.bagMax - (a.nmBag?.d === dayKey() ? a.nmBag.n : 0)) });
+function nmOp(a, m) {
+  if (m.op === 'view' || !nmOpen()) return send(a, nmView(a));
+  const sq = ST.square; if (!sq || areaId(a) !== sq.area || dist(a, sq) > NM.near) return toast(a, '🏮 ต้องมาที่ตลาดนัดหน้าศาลาประชาคมก่อน', '🏮', false);
+  const n = nmNow();
+  if (m.op === 'buy') {
+    const it = NM.items.find(x => x.id === m.id); if (!it) return;
+    if (!(n.left[it.id] > 0)) return toast(a, 'หมดแล้ว! พรุ่งนี้มาไวๆ นะ', '🏮', false);
+    if (!pay(a, it.price)) return;
+    n.left[it.id]--; addItem(a, it.id, 1); markMe(a); dirty = true; ledSweep(a, '🏮 ตลาดนัดกลางคืน');
+    const I = D.ITEMS[it.id]; toast(a, `🏮 ได้ ${I.icon}${I.name} แล้ว`, '🏮');
+    if (it.id === 'petegg') { feed(`🏮 ${a.name} คว้า${I.icon}${I.name}ที่ตลาดนัดได้! เหลืออีก ${n.left[it.id]} ใบ`); paperAdd(`🏮 ${a.name} ได้${I.name}จากตลาดนัดกลางคืน`); }
+  } else if (m.op === 'bag') {
+    const b = a.nmBag?.d === dayKey() ? a.nmBag : (a.nmBag = { d: dayKey(), n: 0 }); if (b.n >= NM.bagMax) return toast(a, `ถุงสุ่มซื้อได้คืนละ ${NM.bagMax} ถุง`, '🎁', false);
+    if (!pay(a, NM.bag)) return; b.n++;
+    const r = Math.random(), got = r < .03 ? ['petegg', 1] : r < .15 ? ['gshard', 1] : r < .45 ? ['crystal', 4] : [pick(['amulet', 'umbrella', 'choco', 'malai']), 3];
+    addItem(a, got[0], got[1]); markMe(a); ledSweep(a, '🏮 ถุงสุ่มตลาดนัด'); const I = D.ITEMS[got[0]];
+    toast(a, `🎁 ถุงสุ่มได้ ${I.icon}${I.name} x${got[1]}!`, '🎁'); if (got[0] === 'petegg') feed(`🎁 ${a.name} เปิดถุงสุ่มตลาดนัดได้${I.icon}${I.name}!! โชคดีสุดๆ`);
+  }
+  send(a, nmView(a));
+}
+let nmWas = false;
+setInterval(() => { try { const o = nmOpen(); if (o && !nmWas) { nmNow(); feed('🏮 ตลาดนัดกลางคืนเปิดแล้วที่หน้าศาลาประชาคม! ของมีจำกัด ถึง 22:00 น.'); for (const p of online.values()) send(p, nmView(p)); } else if (!o && nmWas) for (const p of online.values()) send(p, nmView(p)); nmWas = o; } catch (e) { console.error('nm', e); } }, 20000).unref?.();
+// 🪑 put your name on one of the town's benches for 30 days (only a few exist): status that drains money out of town
+const SPON = { price: 250000, days: 30, slots: D.STATIONS.filter(st => st.area === 'town' && st.label === 'ม้านั่ง').reduce((L, st) => {   // the town's benches (two seats each = one slot)
+  const b = L.find(q => Math.abs(q.y - st.y) < .3 && Math.abs(q.x - st.x) < 1.4); if (b) b.x = (b.x + st.x) / 2; else L.push({ x: st.x, y: st.y }); return L; }, []).slice(0, 12) };   // only 12: scarce on purpose
+let spon = {};   // slot index -> { n, login, until }
+const sponList = () => SPON.slots.map((s, i) => { const o = spon[i] && spon[i].until > now() ? spon[i] : null; return { ...s, i, n: o?.n || '', until: o?.until || 0 }; });
+const sponView = a => ({ t: 'spon', price: SPON.price, days: SPON.days, list: sponList(), mine: a ? sponList().find(s => spon[s.i]?.login === lk(a) && s.until)?.i ?? -1 : -1 });
+function sponOp(a, m) {
+  if (m.op !== 'buy') return send(a, sponView(a));
+  const i = +m.i, s = SPON.slots[i]; if (!s) return; const cur = spon[i] && spon[i].until > now() ? spon[i] : null;
+  if (cur && cur.login !== lk(a)) return toast(a, `ม้านั่งตัวนี้เป็นของ ${cur.n} อยู่`, '🪑', false);
+  if (!cur && sponList().some(x => x.until && spon[x.i].login === lk(a))) return toast(a, 'มีม้านั่งชื่อคุณอยู่แล้ว 1 ตัว (ต่ออายุตัวเดิมได้)', '🪑', false);
+  if (godInf(a)) return toast(a, 'แอดมินซื้อป้ายชื่อไม่ได้', '🪑', false);
+  if (!pay(a, SPON.price)) return;
+  spon[i] = { n: a.name, login: lk(a), until: Math.max(now(), cur?.until || 0) + SPON.days * 864e5 }; dirty = true; ledSweep(a, '🪑 ป้ายชื่อม้านั่ง'); markMe(a);
+  toast(a, `🪑 ม้านั่งนี้มีชื่อ "${a.name}" แล้ว อีก ${SPON.days} วัน`, '🪑'); if (!cur) { feed(`🪑 ${a.name} จองม้านั่งในเมืองเป็นชื่อตัวเองแล้ว!`); paperAdd(`🪑 ม้านั่งตัวใหม่ในเมืองติดป้ายชื่อ "${a.name}"`); }
+  for (const o of online.values()) send(o, sponView(o));
+}
+// 🚌 bus 99 comes back: one random evening a week (20:00–22:55 Thai time) it waits at the memorial for 5 minutes
+const BUS99 = { x: 56, y: 63.2, mins: 5, gems: 10 };
+function ghostWin(t = now()) {
+  const bk = t + 7 * 3600e3, day = Math.floor(bk / 864e5), mon = day - ((day + 3) % 7);   // Monday (Thai) of this week
+  let h = mon * 2654435761 >>> 0; h = (h ^ (h >>> 13)) >>> 0; const dd = h % 7, mm = 20 * 60 + (h >>> 3) % 175;
+  const start = (mon + dd) * 864e5 + mm * 60e3 - 7 * 3600e3; return { start, end: start + BUS99.mins * 60e3, key: String(mon) };
+}
+const ghostOn = () => { const w = ghostWin(); return now() >= w.start && now() < w.end ? w : null; };
+const ghostView = () => { const w = ghostOn(); return { t: 'ghost', on: w ? 1 : 0, x: BUS99.x, y: BUS99.y, until: w ? w.end : 0 }; };
+function ghostBoard(a) {
+  const w = ghostOn(); if (!w) return toast(a, 'รถเมล์ไปแล้ว... หรือว่ามันไม่เคยมาจริงๆ?', '🚌', false);
+  if (areaId(a) !== 'town' || dist(a, BUS99) > 4) return toast(a, '🚌 ต้องไปยืนที่ป้ายหน้าอนุสรณ์ก่อน', '🚌', false);
+  if (a.ghostGot === w.key) return toast(a, 'คุณขึ้นรถคันนี้ไปแล้ว', '🚌', false);
+  a.ghostGot = w.key; a.gems = (a.gems || 0) + BUS99.gems; addItem(a, 'amulet', 1); joy(a, 10); markMe(a);
+  send(a, { t: 'ghostride', gems: BUS99.gems }); paperAdd(`🚌 ${a.name} ขึ้นรถเมล์สาย 99 ในคืนที่มันกลับมา`);
+}
+let ghostWas = false;
+setInterval(() => { try { const o = !!ghostOn(); if (o !== ghostWas) { ghostWas = o; if (o) feed('🚌👻 มีคนเห็นรถเมล์สาย 99 จอดอยู่หน้าอนุสรณ์!! อยู่แค่ 5 นาที รีบไป!'); for (const p of online.values()) send(p, ghostView()); } } catch (e) { console.error('ghost', e); } }, 10000).unref?.();
+function xtraSend(a) { const n = n3View(a); if (n) send(a, n); send(a, paperView()); send(a, nmView(a)); send(a, sponView(a)); send(a, ghostView()); }
 setInterval(() => { try { const c = coopNow(), v = c.got + ':' + c.done; if (v === coopSent) return; coopSent = v; for (const o of online.values()) send(o, coopView(o)); } catch (e) { console.error('coop', e); } }, 4000).unref?.();
 const projTop = (by, n = 10) => Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, n).map(([l, v]) => [accounts.get(l)?.name || l, v]);
 function projView(a) {
@@ -957,7 +1051,7 @@ function projGive(a, m) {
   for (const q of [.25, .5, .75]) if (before < q && after >= q && after < 1) feed(`🏗️ ${P.icon} ${P.name} สร้างไปแล้ว ${q * 100}%! มาช่วยกันลงขันที่หน้าน้ำพุ`);
   if (proj.got >= P.goal) {   // built! the plaque keeps the top three; the extra money goes to the next project
     const top = projTop(proj.by, 3).map(x => x[0]);
-    proj.done.push({ id: P.id, t: now(), top }); proj.got -= P.goal; proj.by = {}; proj.i++;
+    paperAdd(`🏗️ ทั้งเมืองช่วยกันสร้าง${P.name}เสร็จแล้ว!`); proj.done.push({ id: P.id, t: now(), top }); proj.got -= P.goal; proj.by = {}; proj.i++;
     feed(`🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ขอบคุณทุกคน · ผู้ให้มากที่สุด: ${top.join(', ')}`);
     const tiles = projPlace(P.id);   // it appears in town right away, for everyone
     for (const o of online.values()) { toast(o, `🎉 ${P.icon} ${P.name} สร้างเสร็จแล้ว! ทั้งเมืองช่วยกันสำเร็จ`, '🎉'); joy(o, 10); if (tiles.length) send(o, { t: 'tiles', set: tiles }); if (o !== a) send(o, projView(o)); }
@@ -1082,7 +1176,7 @@ function wedTick() {
   MR.marry(A, B, wed.ring, t); A.sd = B.sd = true; dirty = true;
   for (const o of [A, B]) if (o.ws) { markMe(o); toast(o, `💞 ยินดีด้วย! คุณกับ${o === A ? wed.bn : wed.an}แต่งงานกันแล้ว`, '💒'); }
   for (const o of online.values()) send(o, { t: 'fw', k: wed.ring === 'diamond' ? 'l' : 'm', n: `${wed.an} 💞 ${wed.bn}` });
-  feed(`💞 ${wed.an} กับ ${wed.bn} แต่งงานกันแล้ว! ${D.RINGS[wed.ring]?.icon || '💍'}`); sendRoster(); wed = null;
+  paperAdd(`💍 ${wed.an} กับ ${wed.bn} แต่งงานกันแล้ว`); feed(`💞 ${wed.an} กับ ${wed.bn} แต่งงานกันแล้ว! ${D.RINGS[wed.ring]?.icon || '💍'}`); sendRoster(); wed = null;
 }
 setInterval(() => { try { wedTick(); } catch (e) { console.error('wedTick', e); } }, 2000).unref?.();
 function lottoNext(t = now()) {   // the next draw: [key 'Y-MM-DD' (game date, Buddhist year), real time]
@@ -1502,7 +1596,13 @@ function pushTick() {
     else if (!xmasPush.b && D.XMAS_END - now() < 3 * 864e5) { xmasPush.b = 1; gdirty(); pushAll('⏰ เหลืออีก 3 วัน! ของคริสต์มาสรุ่นจำกัด', 'เรนเดียร์กับรถเลื่อนซานต้าจะเลิกขายหลัง 31 ธ.ค. แล้วจะไม่กลับมาอีก', 'xmas'); }
   }
   const y = new Date(now() + 7 * 3600e3 - 864e5).toISOString().slice(0, 10);
-  for (const o of accounts.values()) if (o.push?.length && !o.ws && o.lastLogin === y && (o.loginStreak || 0) >= 2)
+  for (const o of accounts.values()) if (o.push?.length && !o.ws && o.lastLogin && o.lastLogin < today && o.pushBack !== o.lastLogin) {   // 💌 away 1-5 days: their sweetheart (or closest townsperson) misses them, once per absence
+    const gap = Math.round((Date.parse(today) - Date.parse(o.lastLogin)) / 864e5); if (gap < 1 || gap > 5 || (gap === 1 && (o.loginStreak || 0) >= 2 && !o.npcLove)) continue;
+    const lv = o.npcLove && FOLK_DEF[o.npcLove.id], best = lv ? null : Object.entries(o.folk || {}).filter(([id, f]) => FOLK_DEF[id] && f.p >= 3).sort((x, y2) => y2[1].p - x[1].p)[0], def = lv || (best && FOLK_DEF[best[0]]); if (!def) continue;
+    const nm = def.name.replace(/\s*\(.*$/, ''); o.pushBack = o.lastLogin; o.sd = true; dirty = true;
+    PUSH.send(o, lv ? `💌 ${nm}: คิดถึงนะ...` : `💬 ${nm}: ช่วงนี้ไม่เห็นหน้าเลย`, lv ? 'วันนี้ว่างไหม มาเดทกันหน่อยสิ 💕' : gap > 1 ? `หายไป ${gap} วันแล้ว คนในเมืองถามถึงอยู่นะ` : 'วันนี้แวะมาคุยกันหน่อยไหม', { tag: 'miss' });
+  }
+  for (const o of accounts.values()) if (o.push?.length && !o.ws && o.lastLogin === y && (o.loginStreak || 0) >= 2 && !o.npcLove)
     PUSH.send(o, `🔥 ต่อสตรีควันที่ ${o.loginStreak + 1} กันเถอะ!`, 'เข้าเมืองวันนี้รับโบนัสเข้าเกม ก่อนสตรีคหาย', { tag: 'streak' });
   for (const o of accounts.values()) if (o.push?.length && !o.ws && cardOn(o) && o.card.last !== today)
     PUSH.send(o, '💳 อย่าลืมรับเพชรวันนี้!', `บัตรรายเดือน: เข้าเกมกดรับ 💎${MCARD()?.daily || 20} วันละครั้ง วันไหนไม่รับจะหายไปนะ`, { tag: 'card' });
@@ -1977,7 +2077,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['n3', 'ghostGot', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -1986,7 +2086,7 @@ const SAVE_KEYS = ['npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.econLog) econLog = meta.econLog; if (meta.auc) auc = meta.auc; if (meta.coop) coop = meta.coop; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.econLog) econLog = meta.econLog; if (meta.auc) auc = meta.auc; if (meta.coop) coop = meta.coop; if (meta.paperLogs) paperLogs = meta.paperLogs; if (meta.spon) spon = meta.spon; if (meta.nm) nm = meta.nm; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -2086,7 +2186,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd); changed.forEach(fixMoney);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj, coop, econLog }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj, coop, paperLogs, spon, nm, econLog }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -2839,7 +2939,7 @@ function folkLove(a, m) {
     if (a.spouse) return toast(a, 'คุณแต่งงานแล้ว จีบคนอื่นไม่ได้นะ', '💍', false);
     if (folkLv(f.p) < 4) return toast(a, `ต้องสนิทกับ${nm}ถึงขั้น "${D.FOLK_LVN[4]}" ก่อน`, '💘', false);
     a.npcLove = { id: def.id, since: now(), d: '' }; joy(a, 20); markMe(a);
-    feed(`💘 ${a.name} กับ${nm} เป็นแฟนกันแล้ว!`); send(a, folksView(a));
+    feed(`💘 ${a.name} กับ${nm} เป็นแฟนกันแล้ว!`); paperAdd(`💘 ${a.name} กับ${nm} คบกันแล้ว!`); send(a, folksView(a));
     return send(a, { t: 'folklove', op: 'ask', fid: def.id });
   }
   if (op === 'date') {
@@ -5972,6 +6072,11 @@ function onMessage0(ws, raw) {
     case 'storylog': return storyLog(a, m);
     case 'folks': return send(a, folksView(a));
     case 'coop': return send(a, coopView(a));
+    case 'xtra': return xtraSend(a);
+    case 'n3': return n3Claim(a);
+    case 'nm': return nmOp(a, m);
+    case 'spon': return sponOp(a, m);
+    case 'ghost': return ghostBoard(a);
     case 'proj': return m.op === 'give' ? projGive(a, m) : m.op === 'use' ? projUse(a, m) : send(a, projView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));

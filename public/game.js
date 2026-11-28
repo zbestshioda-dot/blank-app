@@ -761,7 +761,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && (m.isNew ? showStory(0) : showTut(0)), 400);   // 📖 brand-new characters get the opening story first
-      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => { send({ t: 'ms', a: 'view' }); send({ t: 'coop' }); send({ t: 'folks' }); }, 1500);   // 📕 know the main-story step so townsfolk can offer it
+      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => { send({ t: 'ms', a: 'view' }); send({ t: 'coop' }); send({ t: 'folks' }); send({ t: 'xtra' }); }, 1500);   // 📕 know the main-story step so townsfolk can offer it
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
@@ -842,6 +842,12 @@ function handle(m) {
     case 'folks': FOLKS = m.list || []; LOVEV = { id: m.mylove || '', dated: m.dated || 0 }; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
     case 'coop': coopHud(m); break;
+    case 'n3': N3V = m; xtraQueue(); if (panel?.kind === 'n3') refreshPanel(true); break;
+    case 'paper': PAPER = m; xtraQueue(); if (panel?.kind === 'paper') refreshPanel(true); break;
+    case 'nm': NMV = m; $('#nmBtn')?.classList.toggle('hidden', !m.open); if (panel?.kind === 'nightmkt') refreshPanel(true); break;
+    case 'spon': SPONV = m; if (panel?.kind === 'spon') refreshPanel(true); break;
+    case 'ghost': BUS = m; $('#busBtn')?.classList.toggle('hidden', !m.on); break;
+    case 'ghostride': busRide(m); break;
     case 'folklove': loveScene(m); break;
     case 'ms': MSV = m; msHud(); if (panel?.kind === 'ms') refreshPanel(true); break;
     case 'mscut': msCut(m); break;
@@ -1215,7 +1221,7 @@ function nbTomorrowCard(tmr) {
 // a v2 newcomer's first day: which HUD buttons show. ['cur', k] = from when step k is the current one (or done);
 // ['done', k] = once step k is done; 'end' = after the whole path. Anything not listed is always shown.
 const NB_N = [1, 3, 1, 1, 1, 1, 1];   // how many of each starter step (server NB: rod, fish ×3, sell, chat, buy, egg name, egg pat)
-const NB_HUD = { runBtn: ['done', 0], restBtn: ['done', 1], cbOpen: ['cur', 3], emoBtn: 'end', ev7Btn: 'end', lkBtn: 'end', topupBtn: 'end', eventBar: 'end' };
+const NB_HUD = { runBtn: ['done', 0], restBtn: ['done', 1], cbOpen: ['cur', 3], emoBtn: 'end', ev7Btn: 'end', lkBtn: 'end', paperBtn: 'end', nmBtn: 'end', topupBtn: 'end', eventBar: 'end' };
 function hudVisible(id, p, done) {
   const r = NB_HUD[id]; if (!r || done) return true;
   if (r === 'end') return false;
@@ -2347,6 +2353,7 @@ function draw(t) {
     else if (k === 14) { if (e.fx === 'balloon' || e.fx === 'bunting' || e.fx === 'bubbles' || e.fx === 'pigeon' || e.fx === 'butterflies' || e.fx === 'critter') drawCrowdFx(e, X, Y, t); else drawWatFx(e, X, Y, t); }
     else drawPlayer(e, X, Y, t);
   }
+  if (A?.id === 'town') townXtraDraw(X, Y, t);
   if (A?.yard) drawYardLocks(A, X, Y, t);
   for (const b of G.map.buildings) if (vis(b.x + b.w / 2, b.y + b.h)) drawBuildingSign(b, X, Y);
   for (const s of G.stations) {
@@ -5520,6 +5527,69 @@ function loveScene(m) {
   if (m.op === 'ask') { FX.play('levelup'); msShow({ title: `💘 สารภาพรักกับ${nm}`, side: 1, lines: [{ x: 'หัวใจเต้นแรง... มือเย็นเฉียบ' }, { x: 'สิ่งที่อยากพูดมานาน... ในที่สุดก็พูดออกไป' }, { s: id, x: '...' }, { s: id, x: 'จริงเหรอ... ฉันก็แอบคิดแบบเดียวกันมานานแล้ว' }, { s: id, x: 'งั้น... เราลองคบกันดูนะ {n} 💕' }, { x: `💘 คุณกับ${nm}เป็นแฟนกันแล้ว! คุยกันทุกวันแล้วชวนไปเดทได้วันละครั้ง` }] }); }
   else if (m.op === 'date') { const [where, what] = LOVE_DATES[Math.floor(Math.random() * LOVE_DATES.length)]; FX.play('chime'); msShow({ title: `💕 เดทกับ${nm} · ${where}`, side: 1, lines: [{ x: what }, { s: id, x: 'วันนี้มีความสุขจัง ขอบคุณที่ชวนออกมานะ' }, { x: '😊 ความสุข +12 · 💞 สนิทกันมากขึ้น' }] }); }
 }
+// ---- 🌱 first three days · 📰 morning paper · 🏮 night market · 🪑 named benches · 🚌 bus 99 (server: n3View / paperView / nmOp / sponOp / ghost*)
+let N3V = null, PAPER = null, NMV = null, SPONV = null, BUS = null, xtraT = 0;
+const xtraSeen = k => { try { return localStorage.getItem(k); } catch { return 1; } }, xtraMark = k => { try { localStorage.setItem(k, 1); } catch { } };
+function xtraQueue() {   // show today's gift, then the paper, once each, when nothing else is on screen
+  clearTimeout(xtraT); xtraT = setTimeout(() => {
+    if (!me || panel || dlgQ || msQ || !$('#tut')?.classList.contains('hidden') || $('.hatchPop')) return xtraQueue();
+    if (N3V && !N3V.got.includes(N3V.day)) return N3V.day > 0 || !nbActive() ? openPanel({ kind: 'n3' }) : xtraQueue();   // day 1: after the starter path
+    if (PAPER && !nbActive() && (PAPER.items.length || PAPER.rich.length) && !xtraSeen('paper_' + PAPER.d)) { xtraMark('paper_' + PAPER.d); return openPanel({ kind: 'paper' }); }
+  }, 2500);
+}
+function n3Panel() {
+  const v = N3V; if (!v) return '<h2>🌱 ของขวัญ 3 วันแรก</h2>';
+  const cards = v.rw.map((r, i) => { const got = v.got.includes(i), now = i === v.day, past = i < v.day;
+    return `<div class="n3c ${got ? 'got' : now ? 'now' : past ? 'miss' : 'lock'}"><b>วันที่ ${i + 1}</b><i>${got ? '✅' : now ? '🎁' : past ? '💨' : '🔒'}</i><span>💎${r.gems}<br>${money(r.money)}</span></div>`; }).join('');
+  const todayGot = v.got.includes(v.day), nx = v.rw[v.day + 1];
+  return `<h2>🌱 ของขวัญ 3 วันแรก</h2><div class="sub">เข้าเกม 3 วันติดกัน รับของขวัญทุกวัน วันที่ 3 ใหญ่ที่สุด!</div><div class="n3row">${cards}</div>
+    ${todayGot ? `<div class="jobbox ok">✅ รับของวันนี้แล้ว${nx ? ` · <b>พรุ่งนี้กลับมารับ 💎${nx.gems} + ${money(nx.money)}</b>` : ' · ครบ 3 วันแล้ว เก่งมาก!'}</div>` : B(`🎁 รับของขวัญวันที่ ${v.day + 1}`, { t: 'n3' }, 'primary big')}`;
+}
+function paperPanel() {
+  const p = PAPER; if (!p) return '<h2>📰 ข่าวเมือง</h2><div class="sub">กำลังโหลด...</div>';
+  const [y, mo, d] = p.d.split('-'), date = `${+d}/${+mo}/${+y + 543}`;
+  const news = p.items.length ? p.items.slice().reverse().map(x => `<div class="npItem">${esc(x)}</div>`).join('') : '<div class="sub">เมื่อวานเมืองเงียบสงบ... วันนี้มาสร้างข่าวกันเถอะ!</div>';
+  const rich = p.rich.length ? p.rich.map((r, i) => `${['🥇', '🥈', '🥉'][i]} <b>${esc(r[0])}</b> ${money(r[1])}`).join('<br>') : '-';
+  return `<div class="npPaper"><div class="npHead"><b>หนังสือพิมพ์เมืองชีวิต</b><small>ฉบับวันที่ ${date} · ราคา 0 LC</small></div>
+    <div class="secT">📢 ข่าวเมื่อวาน</div>${news}
+    <div class="npCols"><div><div class="secT">💰 รวยที่สุดในเมือง</div><div class="npItem">${rich}</div></div>
+    <div><div class="secT">🎂 วันเกิดวันนี้</div><div class="npItem">${p.bday.length ? p.bday.map(esc).join(', ') + '<br><small>ให้ของขวัญวันนี้ได้ความสนิท x2</small>' : 'ไม่มีใครเกิดวันนี้'}</div></div></div>
+    <div class="secT">📣 โฆษณา</div><div class="npItem">🏮 ตลาดนัดกลางคืน หน้าศาลาประชาคม ทุกคืน 21:00–22:00 · ของจำกัด!<br>🪑 อยากให้ชื่อคุณอยู่บนม้านั่งในเมือง? ${B('จองม้านั่ง', { fn: 'openSpon' })}</div></div>`;
+}
+function nmPanel() {
+  const v = NMV; if (!v) return '<h2>🏮 ตลาดนัดกลางคืน</h2>';
+  if (!v.open) return `<h2>🏮 ตลาดนัดกลางคืน</h2><div class="sub">เปิดทุกคืน ${v.from}:00–${v.to}:00 น. หน้าศาลาประชาคม · ตอนนี้ปิดอยู่</div>`;
+  const rows = v.items.map(x => { const it = G.items[x.id]; return itemRowRaw(it?.icon || '❔', `${esc(it?.name || x.id)} <small>เหลือ ${x.left}</small>`, `ราคา ${money(x.price)}`, B(x.left > 0 ? '🛒 ซื้อ' : 'หมด', { t: 'nm', op: 'buy', id: x.id }, 'good', !(x.left > 0))); }).join('');
+  return `<h2>🏮 ตลาดนัดกลางคืน</h2><div class="sub">ถึง ${v.to}:00 น. · ของมีจำกัดทั้งเมือง ใครมาก่อนได้ก่อน · ต้องยืนอยู่หน้าศาลาประชาคม ${B('📍 นำทาง', { fn: 'guide', key: 'square' })}</div>
+    <div class="list">${rows}</div><div class="secT">🎁 ถุงสุ่มลุ้นโชค</div><div class="sub">ลุ้นได้ไข่สัตว์เลี้ยง ชิ้นส่วนเพชร คริสตัล หรือของเล็กๆ · คืนนี้ซื้อได้อีก ${v.bagLeft} ถุง</div>${B(`🎁 เปิดถุงสุ่ม ${money(v.bag)}`, { t: 'nm', op: 'bag' }, 'primary', !v.bagLeft)}`;
+}
+function sponPanel() {
+  const v = SPONV; if (!v) return '<h2>🪑 ป้ายชื่อบนม้านั่ง</h2>';
+  const rows = v.list.map(s => itemRowRaw('🪑', s.n ? `ม้านั่งของ <b>${esc(s.n)}</b>` : 'ม้านั่งว่าง', s.n ? `ถึง ${new Date(s.until).toLocaleDateString('th-TH')}` : `จองได้ ${v.days} วัน`,
+    s.n && s.i !== v.mine ? '' : B(s.i === v.mine ? `ต่ออายุ ${money(v.price)}` : `จอง ${money(v.price)}`, { t: 'spon', op: 'buy', i: s.i }, 'good', v.mine >= 0 && s.i !== v.mine))).join('');
+  return `<h2>🪑 ชื่อคุณบนเมือง</h2><div class="sub">ม้านั่งในเมืองมีแค่ ${v.list.length} ตัว จองแล้วชื่อคุณจะลอยอยู่บนม้านั่งให้ทุกคนเห็น ${v.days} วัน · คนละ 1 ตัว</div><div class="list">${rows}</div>`;
+}
+Object.assign(FN, { openSpon() { send({ t: 'spon' }); openPanel({ kind: 'spon' }); } });
+$('#paperBtn')?.addEventListener('click', () => { FX.play('click'); send({ t: 'xtra' }); openPanel({ kind: 'paper' }); });
+$('#nmBtn')?.addEventListener('click', () => { FX.play('click'); send({ t: 'nm', op: 'view' }); openPanel({ kind: 'nightmkt' }); });
+$('#busBtn')?.addEventListener('click', () => { FX.play('click'); const m = P.get(myId); if (!BUS?.on || !m) return; if (Math.hypot(m.x - BUS.x, m.y - BUS.y) < 4) send({ t: 'ghost' }); else { setGuide('bus99', false, true); toast('🚌 รีบไป! รถเมล์จะออกใน ' + Math.max(1, Math.ceil((BUS.until - Date.now() - clockOff) / 60000)) + ' นาที', '🚌'); } });
+function busRide(m) {
+  FX.play('levelup'); msShow({ title: '🚌 รถเมล์สาย 99', side: 1, lines: [{ x: 'ประตูรถเปิดเอง... ไม่มีคนขับ ในรถเย็นเฉียบ' }, { x: 'ผู้โดยสาร 12 คนนั่งนิ่ง ทุกคนหันมามองคุณพร้อมกัน' },
+    { x: 'นาฬิกาบนรถหยุดอยู่ที่ 03:17... เหมือนหอนาฬิกากลางเมือง' }, { x: 'หญิงชราแถวหน้ายื่นผ้ายันต์ให้ แล้วกระซิบว่า "ขอบคุณที่ยังจำพวกเราได้"' },
+    { x: 'พริบตาเดียว คุณยืนอยู่ที่ป้ายคนเดียว รถเมล์หายไปแล้ว' }, { x: `🎁 ได้ 💎${m.gems} + 🧧 ผ้ายันต์นำโชค` }] });
+}
+// world overlays in town: names over sponsored benches, and the ghost bus while it waits
+function townXtraDraw(X, Y, t) {
+  if (SPONV) for (const s of SPONV.list) if (s.n) { const x = s.x * TS + X, y = (s.y - 1.55) * TS + Y; if (x < -80 || x > VW + 80 || y < -40 || y > VH + 40) continue;
+    ctx.save(); ctx.font = `bold ${Math.round(TS * .32)}px sans-serif`; ctx.textAlign = 'center'; const w = ctx.measureText('🪑 ' + s.n).width + 10;
+    ctx.fillStyle = 'rgba(60,40,20,.8)'; ctx.fillRect(x - w / 2, y - TS * .3, w, TS * .42); ctx.fillStyle = '#ffe9a8'; ctx.fillText('🪑 ' + s.n, x, y); ctx.restore(); }
+  if (BUS?.on && Date.now() + clockOff < BUS.until) { const x = BUS.x * TS + X, y = BUS.y * TS + Y, w = TS * 5.5, h = TS * 2.4; if (x < -w || x > VW + w || y < -h * 2 || y > VH + h) return;
+    ctx.save(); ctx.globalAlpha = .55 + Math.sin(t / 300) * .2; ctx.fillStyle = '#7fd4c8'; ctx.shadowColor = '#9ff'; ctx.shadowBlur = 24;
+    ctx.fillRect(x - w / 2, y - h, w, h * .85); ctx.shadowBlur = 0; ctx.fillStyle = '#163a3a';
+    for (let i = 0; i < 5; i++) ctx.fillRect(x - w / 2 + TS * .3 + i * TS * 1.02, y - h + TS * .3, TS * .75, TS * .7);
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(TS * .6)}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('99', x + w / 2 - TS * .6, y - h + TS * .9);
+    ctx.fillStyle = '#163a3a'; ctx.beginPath(); ctx.arc(x - w / 3, y - h * .12, TS * .35, 0, 7); ctx.arc(x + w / 3, y - h * .12, TS * .35, 0, 7); ctx.fill(); ctx.restore(); }
+}
 function staffFolkChoices(n, fd) {   // 💞 story / request / gift buttons for a staff member you can befriend
   const o = { id: n.id, fid: fd.id, name: n.name, face: NPC_FACE[n.id] }, rq = fd.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
   const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n} (${money(rq.pay)})` : `📋 ขอ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', fid: fd.id }); dialogClose(); } else toast(`หา${G.items[rq.item]?.name || ''}ได้ที่${whereGet(rq.item)}`, '📋', false); } }] : [];
@@ -6761,6 +6831,12 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '🌱 ผู้เล่นใหม่: ของขวัญ 3 วันแรก เข้าเกมทุกวันรับเพชร+เงิน วันที่ 3 ใหญ่สุด',
+    '📰 หนังสือพิมพ์เมืองทุกเช้า: ข่าวเมื่อวาน คนรวยสุด วันเกิดวันนี้ (ปุ่ม 📰 ด้านบน)',
+    '🏮 ตลาดนัดกลางคืนหน้าศาลาประชาคม ทุกคืน 21:00–22:00 ของจำกัด + ถุงสุ่ม',
+    '🪑 จองม้านั่งในเมืองให้มีชื่อคุณลอยอยู่ 30 วัน (มีแค่ไม่กี่ตัว)',
+    '🚌👻 สัปดาห์ละคืน รถเมล์สาย 99 จะกลับมาจอด 5 นาที... ใครขึ้นทันได้ของพิเศษ',
+    '💌 แฟน NPC หรือเพื่อนสนิทจะส่งข้อความหาเมื่อคุณหายไป',
     '💘 จีบชาวเมืองได้แล้ว! สนิทถึงขั้น "เหมือนครอบครัว" แล้วกด "สารภาพรัก" · มีแฟนได้ทีละคน · ชวนไปเดทได้วันละครั้ง (ความสุข +12)',
     '🤝 เป้าหมายรวมของเมืองทุกวัน (ใต้เควสต์): ทั้งเมืองช่วยกันตกปลา ทำงาน ทำอาหาร ฯลฯ ให้ครบ ใครช่วย 5 ครั้งขึ้นไปได้ 💎3',
     '💭 ชาวเมืองจำได้ว่าคุณเคยให้ของอะไร และขอบคุณที่ไปร่วมปาร์ตี้วันเกิด',
@@ -8731,6 +8807,10 @@ function renderPanel(p) {
     case 'proj': return projPanel(p);
     case 'storylog': return storyLogPanel(p);
     case 'ms': return msPanel();
+    case 'n3': return n3Panel();
+    case 'paper': return paperPanel();
+    case 'nightmkt': return nmPanel();
+    case 'spon': return sponPanel();
     case 'journal': return journalPanel(p);
     case 'folkgift': return folkGiftPanel(p);
     case 'fishrecs': return fishRecsPanel();
@@ -9791,6 +9871,7 @@ function drawLights(X, Y, dark) {
 // ------------------------------------------------------------------ navigation across maps
 const GATE_TO = { field_in: 'field', town_from_field: 'town', temple_in: 'temple', town_from_temple: 'town', farm_in: 'farm', town_from_farm: 'town', housing_in: 'housing', town_from_housing: 'town', park_in: 'park', town_from_park: 'town' };
 function targetOf(key) {
+  if (key === 'bus99' && BUS) return { x: BUS.x, y: BUS.y, label: 'ป้ายรถเมล์หน้าอนุสรณ์', area: 'town' };
   if (key === 'nbwater') return { x: 72.2, y: 52.6, label: 'ริมทะเลสาบ (ยืนริมน้ำแล้วกดปุ่มใหญ่)', area: 'town' };   // 🌱 where a newcomer fishes: the lake edge they were born at (server D.NB_SPAWN) (the lake's own fishing spot)
   if (key && key[0] === 'p' && /^p\d+$/.test(key)) { const p = P.get(+key.slice(1)); return p && { player: p.id, label: p.name }; }
   const s = STN(key); return s && { x: s.x, y: s.y, label: s.label, area: s.area };
