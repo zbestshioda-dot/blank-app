@@ -1121,16 +1121,21 @@ const PARK_ARCH = { x: 46, y: 94.6 };
     for (let y = R.y0; y <= R.y1; y++) for (let x = R.x0; x <= R.x1; x++) { clearTree(x, y); if (!'ws'.includes(get(x, y))) set(x, y, '.'); }
     keep(PROPS, q => !(q.x > R.x0 - .6 && q.x < R.x1 + 1.6 && q.y > R.y0 - .2 && q.y < R.y1 + 1.4));
     for (let y = 65; y <= 70; y++) for (let x = 72; x <= 78; x++) set(x, y, 'm');
-    const hf = (a, b, y) => { let x = a; for (; x + 3 <= b + 1; x += 3) prop('fence_white', x + 1.5, y + .95, false); for (; x <= b; x++) prop('fence_post', x + .5, y + .95, false); };
+    const art = !!ATLAS.sprites.rf_h, FH = art ? 'rf_h' : 'fence_white', FP = art ? 'rf_post' : 'fence_post';   // tools/add_ranch.py art, else older fences
+    const hf = (a, b, y) => { let x = a; for (; x + 3 <= b + 1; x += 3) prop(FH, x + 1.5, y + .95, false); for (; x <= b; x++) prop(FP, x + .5, y + .95, false); };
     hf(R.x0, R.x1, R.y0); hf(R.x0, R.gate[0] - 1, R.y1); hf(R.gate[1] + 1, R.x1, R.y1);
-    for (let y = R.y0 + 1; y < R.y1; y++) for (const x of [R.x0, R.x1]) prop('fence_post', x + .5, y + .95, false);
+    for (let y = R.y0 + 1; y < R.y1; y++) for (const x of [R.x0, R.x1]) prop(FP, x + .5, y + .95, false);
     for (let x = R.x0; x <= R.x1; x++) { set(x, R.y0, 'o'); set(x, R.y1, 'o'); }
     for (let y = R.y0; y <= R.y1; y++) { set(R.x0, y, 'o'); set(R.x1, y, 'o'); }
-    PROPS.push({ s: 'gate_wood_l', x: R.gate[0] + .87, y: R.y1 + .95, rg: 1 }, { s: 'gate_wood_r', x: R.gate[1] + .13, y: R.y1 + .95, rg: 2 });
+    if (art) PROPS.push({ s: 'rf_gate', x: R.gate[0] + 1.5, y: R.y1 + .95, rg: 3 }, { s: 'rf_open_l', x: R.gate[0] + .45, y: R.y1 + .95, rg: 4 }, { s: 'rf_open_r', x: R.gate[1] + .55, y: R.y1 + .95, rg: 4 });   // rg 3: shown closed, 4: shown open
+    else PROPS.push({ s: 'gate_wood_l', x: R.gate[0] + .87, y: R.y1 + .95, rg: 1 }, { s: 'gate_wood_r', x: R.gate[1] + .13, y: R.y1 + .95, rg: 2 });
     STATIONS.push({ id: 'rgate', type: 'rgate', label: 'ประตูฟาร์ม', icon: '🚪', x: R.gate[0] + 1.5, y: R.y1 + .5, r: 1.7, area: 'town' });
-    for (const b of R.barns) { prop('b_barn', b.x, R.y0 + 4.6, false); rect(Math.floor(b.x - 2), R.y0 + 1, 4, 4, 'o');
+    const BARN = { chicken: 'rb_coop', pig: 'rb_sty', cow: 'rb_barn' };
+    for (const b of R.barns) { prop(ATLAS.sprites[BARN[b.k]] ? BARN[b.k] : 'b_barn', b.x, R.y0 + 4.6, false); rect(Math.floor(b.x - 2), R.y0 + 1, 4, 4, 'o');
       STATIONS.push({ id: 'rbarn_' + b.k, type: 'rbarn', k: b.k, label: b.label, icon: b.icon, x: b.x, y: R.y0 + 5.35, r: 1.4, area: 'town' }); }
-    for (const [s, x, y] of [['hay', 64.9, 65.0], ['hay2', 70.4, 64.9], ['barrel', 79.9, 64.9], ['hay', 87.0, 65.0], ['hay2', 87.0, 70.4], ['wheelbarrow', 64.9, 70.4]]) prop(s, x, y);
+    if (art) { for (const [s, x, y] of [['rp_eggs', 70.6, 64.9], ['rp_trough', 64.9, 67.9], ['rp_bucket', 78.4, 64.9], ['rp_milkcan', 79.9, 64.9], ['rp_hay', 87.0, 65.4], ['rp_water', 86.9, 69.4], ['wheelbarrow', 64.9, 70.4]]) prop(s, x, y);
+      PROPS.push({ s: 'rp_mud', x: 75.4, y: 68.6 }); prop('rp_sign', 79.4, 73.1, false); }
+    else for (const [s, x, y] of [['hay', 64.9, 65.0], ['hay2', 70.4, 64.9], ['barrel', 79.9, 64.9], ['hay', 87.0, 65.0], ['hay2', 87.0, 70.4], ['wheelbarrow', 64.9, 70.4]]) prop(s, x, y);
     STATIONS.push({ id: 'ranch', type: 'ranch', label: 'สำนักงานฟาร์ม', icon: '🐄', x: 70.6, y: 69.9, r: 1.3, area: 'town' }); prop('signpost', 70.6, 69.4);
     prop('o_lampball', 71.4, 72.6); prop('o_lampball', 77.6, 72.6); }
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }

@@ -2361,7 +2361,7 @@ function draw(t) {
   drawZDecals(X, Y, t, A);
   for (const [, k, e] of ents) {
     if (k === 0) drawBuildingSprite(e, X, Y);
-    else if (k === 1) { if (!e.open || isOpen(e.open)) spr(e.s, e.x + (e.rg && ranchOpen() ? (e.rg === 1 ? -1.55 : 1.55) : 0), e.y - (e.z || 0), X, Y, e.sc || 1); }   // rg: the ranch gate's two leaves slide aside when it is open   // z: hung on a wall; open: only while that shop is open
+    else if (k === 1) { if ((!e.open || isOpen(e.open)) && !(e.rg === 3 && ranchOpen()) && !(e.rg === 4 && !ranchOpen())) spr(e.s, e.x + (e.rg < 3 && ranchOpen() ? (e.rg === 1 ? -1.55 : 1.55) : 0), e.y - (e.z || 0), X, Y, e.sc || 1); }   // rg: the ranch gate (1/2 old leaves slide aside; 3 closed, 4 open pictures)   // rg: the ranch gate's two leaves slide aside when it is open   // z: hung on a wall; open: only while that shop is open
     else if (k === 2) { const tr = e, sw = Math.sin(t / 1300 + tr[0] * .7 + tr[1] * .4) * .022 + Math.sin(t / 470 + tr[0]) * .006, bx = (tr[0] + .5) * TS + X, byy = (tr[1] + 1.05) * TS + Y; ctx.save(); ctx.translate(bx, byy); ctx.transform(1, 0, -sw, 1, 0, 0); ctx.translate(-bx, -byy); spr(tr[2], tr[0] + .5, tr[1] + 1.05, X, Y); ctx.restore(); }   // trees sway in the breeze
     else if (k === 3) {
       if (e[0][0] === '~') drawStairs(e[1], e[2], e[0] === '~stairs_d', X, Y);
@@ -4107,7 +4107,16 @@ function ranchAnimals(now) {
   }
   return out;
 }
+const AN_N = { chicken: 5, pig: 5, cow: 4 }, AN_IDLE = { chicken: 'an_chicken_peck', pig: 'an_pig_sleep', cow: 'an_cow_eat' };
 function drawAnimal(q, X, Y) {
+  const sp = atlas?.sprites?.['an_' + q.k + '0'];
+  if (sp && atlasImg) {   // the painted frames (tools/add_ranch.py): walk cycle while moving; peck / doze / graze while still
+    const t = performance.now(), idle = !q.moving && (q.k === 'chicken' ? q.peck : Math.sin(t / 2600 + q.id * 1.7) > .2);
+    const name = q.moving ? `an_${q.k}${Math.floor(t / 150 + q.id) % AN_N[q.k]}` : idle ? AN_IDLE[q.k] : `an_${q.k}0`, s = atlas.sprites[name] || sp;
+    const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS, x = q.x * TS + X, y = q.y * TS + Y; if (x < -90 || y < -90 || x > VW + 90 || y > VH + 90) return;
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(x, y, w * .38, TS * .09, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(Math.round(x), Math.round(y)); if (q.left) ctx.scale(-1, 1); ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], -w / 2, -h, w, h); ctx.restore(); return;
+  }
   const A = AN_ART[q.k], c = anImg(q.k, q.moving && Math.floor(performance.now() / 170 + q.id) % 2 ? 1 : 0), px = TS * A.h / c.height, w = c.width * px, h = c.height * px;
   const x = q.x * TS + X, y = q.y * TS + Y; if (x < -60 || y < -60 || x > VW + 60 || y > VH + 60) return;
   ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x, y, w * .4, TS * .08, 0, 0, 7); ctx.fill();
@@ -6939,6 +6948,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28p', d: '28 พ.ย.', items: ['🎨 <b>ฟาร์มปศุสัตว์โฉมใหม่</b> เล้าไก่ คอกหมู โรงวัวรูปใหม่ ไก่จิกข้าว หมูนอนหลับ วัวกินหญ้า รั้วไม้ขาว ประตูเปิด-ปิดเห็นชัด ป้าย RANCH รางอาหาร บ่อโคลน'] },
   { v: '2026-11-28o', d: '28 พ.ย.', items: [
     '🐄 <b>ฟาร์มปศุสัตว์เปิดแล้ว!</b> (ใต้ทะเลสาบกลางเมือง) มีไก่ หมู วัว เดินในคอก มีเล้าไก่ คอกหมู โรงวัว รั้วรอบ และประตูเปิด-ปิดได้',
     '👨‍🌾 <b>อาชีพใหม่: คนเลี้ยงสัตว์</b> สมัครกับลุงทุ่ง ให้อาหารแล้วเก็บไข่ รีดนม ได้เนื้อหมู ขายที่ตลาดกลาง · เมนูใหม่ในครัว ไข่เจียว กะเพราหมูไข่ดาว พุดดิ้งนม',
@@ -9492,13 +9502,13 @@ fetch('assets/pets.json?v=4').then(r => r.json()).then(j => { PET_AT = j; setTim
 // 📱 phones get the half-size atlas (~25 MB decoded instead of ~100 MB: iPhones were reloading to a white screen, and it draws faster);
 // halving every sprite rectangle and the tile size keeps every draw call the same
 const HALF_ATLAS = TOUCH_UI || IOS;
-fetch('assets/atlas.json?v=v33').then(r => r.json()).then(j => {
+fetch('assets/atlas.json?v=v34').then(r => r.json()).then(j => {
   if (HALF_ATLAS) { j.tile /= 2; for (const k in j.sprites) j.sprites[k] = j.sprites[k].map(v => v / 2); }
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
-  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v33';
+  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v34';
 });
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
-if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v33').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v33'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v34').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v34'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
@@ -9828,7 +9838,7 @@ addEventListener('pagehide', () => { try { ws?.close(); } catch { } });   // tab
 addEventListener('pageshow', e => { if (e.persisted) { gfxRecover(); if (wantLogin && (!ws || ws.readyState > 1)) connect(); } });
 cv.addEventListener('contextrestored', gfxRecover);
 const FLAT = /^(f_rug|flowerbed|fl_|g_|pond|grass_tuft|manhole|puddle|tuft)/;
-const GROUND_PROP = /^(manhole|puddle|tuft|grass_tuft)$/;
+const GROUND_PROP = /^(manhole|puddle|tuft|grass_tuft|rp_mud)$/;
 function drawCastShadows(ents, X, Y, night) {
   const sa = silhouettes(); if (!sa) return;
   const day = 1 - night / 0.55; if (day < 0.05) return;
