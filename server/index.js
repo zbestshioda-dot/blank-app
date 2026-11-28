@@ -6569,7 +6569,10 @@ function bugReport(a, m) {
   const text = cleanText(m.text, 600); if (text.length < 5) return toast(a, 'เขียนรายละเอียดอีกนิด (อย่างน้อย 5 ตัวอักษร)', '🐞', false);
   if (!cd(a, 'bug', 60000)) return;
   const area = D.areaAt(a.x, a.y);
-  bugs.push({ t: now(), by: a.name, login: a.login, text, where: `${area?.name || area?.label || '?'} (${a.x.toFixed(1)}, ${a.y.toFixed(1)})`, ua: cleanText(m.ua, 160), st: cleanText(m.st, 300), build: BUILD });
+  const img = String(m.img || '');
+  if (img && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 70000)) return toast(a, 'รูปใหญ่เกินไปหรือไม่ใช่ไฟล์รูป', '📸', false);
+  bugs.push({ t: now(), by: a.name, login: a.login, text, where: `${area?.name || area?.label || '?'} (${a.x.toFixed(1)}, ${a.y.toFixed(1)})`, ua: cleanText(m.ua, 160), st: cleanText(m.st, 300), build: BUILD, ...(img ? { img } : {}) });
+  { let k = 0; for (let j = bugs.length - 1; j >= 0; j--) if (bugs[j].img && ++k > 20) delete bugs[j].img; }   // only the newest 20 screenshots are kept (they live in the saved meta)
   if (bugs.length > 300) bugs = bugs.slice(-300);
   bugsDirty = true; dirty = true;
   console.log(`[bug] ${a.name}: ${text}`);

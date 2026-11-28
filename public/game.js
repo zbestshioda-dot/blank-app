@@ -5130,7 +5130,9 @@ const FN = {
   share() { shareGame(); },
   look(m) { send({ t: 'look', ...m.set }); },
   reel() { strike(); },
-  bug(m, root) { const v = root.querySelector('#bugIn').value.trim(); if (v.length < 5) return toast('เขียนรายละเอียดอีกนิด', '🐞', false); send({ t: 'bug', text: v, ua: navigator.userAgent.slice(0, 160) + ` ${innerWidth}x${innerHeight}`, st: JSON.stringify({ cast: me.cast?.state || 0, FG: !!FG, joy: !!joy, hat: holdAfterTp, pose: me.pose || 0, down: me.down?.kind || 0, panel: panel?.kind || 0, dlg: !!dlgQ, run: !!RUN, rb: !!RB, mis: me.mis?.title || 0, cook: !!me.cook }).slice(0, 300) }); root.querySelector('#bugIn').value = ''; },
+  bugPic: () => fbAlbum(d => { bugImg = d; setBugPrev(); }),
+  bugClr() { bugImg = ''; setBugPrev(); },
+  bug(m, root) { const v = root.querySelector('#bugIn').value.trim(); if (v.length < 5) return toast('เขียนรายละเอียดอีกนิด', '🐞', false); send({ t: 'bug', text: v, ...(bugImg ? { img: bugImg } : {}), ua: navigator.userAgent.slice(0, 160) + ` ${innerWidth}x${innerHeight}`, st: JSON.stringify({ cast: me.cast?.state || 0, FG: !!FG, joy: !!joy, hat: holdAfterTp, pose: me.pose || 0, down: me.down?.kind || 0, panel: panel?.kind || 0, dlg: !!dlgQ, run: !!RUN, rb: !!RB, mis: me.mis?.title || 0, cook: !!me.cook }).slice(0, 300) }); root.querySelector('#bugIn').value = ''; bugImg = ''; setBugPrev(); },
   reset(m, root) {
     const pin = root.querySelector('#resetPin').value, ok = root.querySelector('#resetOk').value.trim();
     if (ok !== 'รีเซ็ต') return toast('พิมพ์คำว่า "รีเซ็ต" ในช่องยืนยันก่อน', '⚠️', false);
@@ -6866,6 +6868,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28k', d: '28 พ.ย.', items: ['📷 <b>แจ้งบัคแนบรูปได้แล้ว</b> กด "📷 แนบรูป" ในหน้าแจ้งบัค ส่งภาพหน้าจอให้ทีมงานดูได้เลย'] },
   { v: '2026-11-28j', d: '28 พ.ย.', items: [
     '🏢 <b>คอนโด Life Condo เปิดแล้ว!</b> ตึก 6 ชั้นหน้าลานน้ำพุ · ไม่มีบ้านก็มีที่นอน เช่าห้องสัปดาห์ละ 2,000 LC ที่เคาน์เตอร์ในล็อบบี้',
     '🛗 ขึ้นลิฟต์ไปห้องของตัวเอง: ห้องสตูดิโอมีครัว ตู้เย็น ระเบียงวิวเมือง · นอนได้พลังงาน +50⚡',
@@ -8151,7 +8154,9 @@ function lottoPanel() {
     <div class="secT">ลอตเตอรี่ของฉันงวดนี้ (${L.my.length} ใบ)</div><div>${L.my.map(tk).join('') || '<small>ยังไม่ได้ซื้อ</small>'}</div>
     ${last}<small style="opacity:.7">เล่นแต่พอดี เงินในเกมเท่านั้น</small>`;
 }
-let fbImg = '';   // 📸 the photo waiting in the LifeBook composer
+let fbImg = '', bugImg = '';   // 📸 the photo waiting in the LifeBook composer / the bug report
+const setBugPrev = () => { const e = $('#bugPrev'); if (!e) return; e.innerHTML = bugPrev(); const x = e.querySelector('button'); if (x) x.onclick = () => { bugImg = ''; setBugPrev(); }; };
+const bugPrev = () => bugImg ? `<div class="fbPrev"><img src="${bugImg}" alt="">${B('✖', { fn: 'bugClr' })}</div>` : '';
 const fbAv = n => `<span class="fbAv" style="background:hsl(${[...String(n)].reduce((h, c) => h * 31 + c.charCodeAt(0) | 0, 7) % 360} 60% 52%)">${esc([...String(n)][0] || '?')}</span>`;
 function fbShrink(src, done) {   // any picture → a small JPEG/WebP (≤ ~68 KB) the server accepts
   const W = Math.min(560, src.width), H = Math.round(src.height * W / src.width), c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -8174,14 +8179,14 @@ function fbSnap() {   // hide the phone, count down, then photograph the town ar
   };
   tick();
 }
-function fbAlbum() {
+function fbAlbum(cb) {
   let inp = document.getElementById('fbIn');
   if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.id = 'fbIn'; inp.style.display = 'none'; document.body.appendChild(inp); }
   inp.value = '';
   inp.onchange = () => {
     const f = inp.files?.[0]; if (!f) return;
     const url = URL.createObjectURL(f), im = new Image();
-    im.onload = () => { URL.revokeObjectURL(url); fbShrink(im, d => { fbImg = d; refreshPanel(true); }); };
+    im.onload = () => { URL.revokeObjectURL(url); fbShrink(im, cb || (d => { fbImg = d; refreshPanel(true); })); };
     im.onerror = () => toast('เปิดรูปนี้ไม่ได้', '🖼️', false);
     im.src = url;
   };
@@ -9093,12 +9098,12 @@ function renderPanel(p) {
     }
     case 'bug':
       return `<h2>🐞 แจ้งบัค / ปัญหา</h2><div class="sub">เล่าว่าเกิดอะไรขึ้น ทำอะไรอยู่ตอนนั้น (ระบบจะแนบตำแหน่งและรุ่นเครื่องให้อัตโนมัติ)</div>
-        <textarea id="bugIn" maxlength="600" placeholder="เช่น เดินเข้าโรงพยาบาลแล้วตัวละครติดผนัง..."></textarea>${B('📨 ส่งรายงาน', { fn: 'bug' }, 'primary big')}
+        <textarea id="bugIn" maxlength="600" placeholder="เช่น เดินเข้าโรงพยาบาลแล้วตัวละครติดผนัง..."></textarea><div id="bugPrev">${bugPrev()}</div>${B('📷 แนบรูป (ไม่บังคับ)', { fn: 'bugPic' })}${B('📨 ส่งรายงาน', { fn: 'bug' }, 'primary big')}
         <div class="jobbox" style="margin-top:10px">🆘 ตัวติด เดินไม่ได้ หรือกดอะไรก็ไม่ทำงาน? กดปุ่มนี้ พากลับจัตุรัสกลางเมือง (ใช้ได้ทุก 1 นาที)${B('🆘 ตัวติด พากลับเมือง', { t: 'rescue' }, 'warn')}</div>`;
     case 'god': {
       if (!me.admin) return '';
       const g = me.god || {};
-      const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small>${b.done ? '<small style="color:var(--ok)">✅ แจ้งผู้เล่นแล้ว</small>' : B('✅ ตอบกลับว่าแก้แล้ว', { fn: 'bugReply', bt: b.t, login: b.login || '' }, 'good')}</div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
+      const bl = bugList ? (bugList.length ? bugList.map(b => `<div class="bugItem">${esc(b.text)}<small>${esc(b.by)} · ${esc(b.where)} · ${new Date(b.t).toLocaleString('th-TH')}${b.img ? `<br><a href="${b.img}" target="_blank"><img src="${b.img}" alt="" style="max-width:100%;max-height:220px;border-radius:8px;margin-top:4px"></a>` : ''}${b.st ? `<br><code style="font-size:10px;opacity:.7">${esc(b.st)}</code>` : ''}</small>${b.done ? '<small style="color:var(--ok)">✅ แจ้งผู้เล่นแล้ว</small>' : B('✅ ตอบกลับว่าแก้แล้ว', { fn: 'bugReply', bt: b.t, login: b.login || '' }, 'good')}</div>`).join('') : '<div class="sub">ไม่มีรายงานบัค</div>') : '';
       const GT = [['quick', '⚡ ด่วน'], ['me', '🧍 ตัวฉัน'], ['look', '👀 หน้าตา'], ['event', '🎉 อีเวนต์'], ['admin', '📊 จัดการ'], ['bug', `🐞 บัค${bugList?.length ? ` (${bugList.length})` : ''}`]];
       const tab = {
         quick: `<div class="grid2">${B('💯 สเตตัสเต็ม', { fn: 'god', op: 'fill' }, 'primary')}${B('💰 เงิน 999,999', { fn: 'god', op: 'money' }, 'primary')}</div><div class="grid2" style="margin-top:6px">${B('💎 เพชร +1,000', { fn: 'god', op: 'gems' }, 'primary')}</div>
