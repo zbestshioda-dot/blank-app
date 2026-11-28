@@ -2244,7 +2244,7 @@ function frame(t) {
     if (/^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook) ico = cookCue(near)[0];
     if (near.type === 'pier') actRod(); else actIco(ico);
     ACT_LBL.v = stf ? `คุยกับ${stf.short}` : near.type === 'door' ? (near.house !== undefined ? `บ้าน #${near.house + 1}` : near.renov ? '🚧 ปิดปรับปรุง' : closed ? '🔒 ปิดอยู่' : 'เข้า ' + near.label)
-      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'gym' ? (me.pose === 'gym' && Math.hypot(me.x - near.x, me.y - near.y) < .5 ? '⏹️ หยุด' : near.label) : near.type === 'sdesk' ? (me.career === 'teacher' ? '👩‍🏫 สอน' : 'นั่งเรียน')
+      : near.type === 'exit' ? 'ออกจากอาคาร' : near.type === 'gate' ? (near.renov ? '🚧 ปิดปรับปรุง' : near.label) : near.type === 'seat' ? 'นั่ง' : near.type === 'gym' ? (me.pose === 'gym' && Math.hypot(me.x - near.x, me.y - near.y) < .5 ? '⏹️ หยุด' : near.label + (me.gymPass > Date.now() + clockOff ? '' : ` 🎫${G.gymPass?.price || ''}`)) : near.type === 'sdesk' ? (me.career === 'teacher' ? '👩‍🏫 สอน' : 'นั่งเรียน')
       : near.type === 'pier' ? (me.cast ? fishCue()[1] : 'เหวี่ยงเบ็ด') : /^k(pantry|board|pan|pot|grill|plate)$/.test(near.type) || near.type === 'kitchen' && me.cook ? cookCue(near)[1] : near.label;
     ab.classList.toggle('closed', closed);
   } else { ab.classList.add('idle'); ab.classList.remove('closed'); actIco('tap', '<img class="hudI" src="assets/hud/tap.webp?v=1" alt="" style="width:1.15em;height:1.15em">'); ACT_LBL.v = 'ใช้งาน'; }
@@ -6896,6 +6896,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28m', d: '28 พ.ย.', items: ['🎫 <b>ฟิตเนสมีบัตรรายวัน 150 LC</b> จ่ายตอนขึ้นเครื่องแรก เล่นได้ทุกเครื่อง 24 ชม.'] },
   { v: '2026-11-28l', d: '28 พ.ย.', items: [
     '🏋️ <b>ฟิตเนส โรงยิม เปิดแล้ว!</b> (ถนนเหนือ) เครื่องเล่นได้จริง ตัวละครวิ่ง ปั่น ยกเวท เล่นโยคะ',
     '⚡ <b>เพดานพลังงานเกิน 100 ได้</b> ลู่วิ่งเพิ่มถึง 115 จักรยานถึง 130 · ไม่ออกกำลัง 12 ชม. จะค่อยๆ ลดกลับเหลือ 100',
@@ -8394,7 +8395,8 @@ function renderPanel(p) {
     }
     case 'gymdesk': {   // 🏋️ the gym's notice board: what each machine does and your current ceiling
       const cap = me.eCap || 100, rows = Object.values(G.gym || {}).map(g => `<div class="item"><div><b>${g.icon} ${g.name}</b><small>${g.desc} · พลังงาน ${g.energy > 0 ? '+' : ''}${Math.round(g.energy * 60)}/นาที${g.cap ? ` · เพดาน +1 ทุก ${g.cap} วิ` : ''}</small></div></div>`).join('');
-      return `<h2>🏋️ ฟิตเนส โรงยิม</h2><div class="sub">เข้าฟรี! เดินไปยืนที่เครื่องแล้วกดปุ่มเพื่อเริ่ม เดินออกเพื่อหยุด</div>
+      return `<h2>🏋️ ฟิตเนส โรงยิม</h2><div class="sub">เดินไปยืนที่เครื่องแล้วกดปุ่มเพื่อเริ่ม เดินออกเพื่อหยุด</div>
+        <div class="jobbox${me.gymPass > Date.now() + clockOff ? ' ok' : ''}">🎫 ${me.gymPass > Date.now() + clockOff ? `มีบัตรรายวันแล้ว ใช้ได้ถึง ${new Date(me.gymPass - clockOff).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}` : `บัตรรายวัน ${money(G.gymPass?.price || 0)} เล่นได้ทุกเครื่อง ${G.gymPass?.hours || 24} ชม. (จ่ายตอนขึ้นเครื่องแรก)`}</div>
         <div class="jobbox">⚡ เพดานพลังงานตอนนี้ <b>${cap}</b>${cap > 100 ? ' · ถ้าไม่ออกกำลัง 12 ชม. จะลดลงชั่วโมงละ 1 จนเหลือ 100' : ' · วิ่งหรือปั่นจักรยานเพื่อเพิ่มได้ถึง 130'}</div><div class="list">${rows}</div>`;
     }
     case 'sdesk': {

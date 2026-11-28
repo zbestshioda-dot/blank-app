@@ -465,6 +465,7 @@ const GYM = {
   bench: { name: 'ม้านั่งยกน้ำหนัก', icon: '🏋️', energy: -.3, health: .14, happy: .04, desc: 'ยกเวทเพิ่มสุขภาพเร็ว (ไม่เพิ่มเพดาน)' },
   yoga:  { name: 'เสื่อโยคะ', icon: '🧘', energy: .12, health: .03, happy: .12, desc: 'โยคะผ่อนคลาย ฟื้นพลังงานและความสุข' },
 };
+const GYM_PASS = { price: 150, hours: 24 };   // 🎫 day pass: bought on the first machine you step on, good for 24 real hours
 const GYM_SPR = { x_treadmill: 'tread', x_ebike: 'bike', x_wbench: 'bench', x_yoga: 'yoga' };
 const GYM_GRACE = 12 * 3600e3, GYM_FADE = 3600e3;   // the extra ceiling holds 12 hours after the last workout, then loses 1 per hour
 const ROOM_SIZE = { gym: [16, 12], condo: [16, 12], condounit: [16, 11], inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
@@ -2581,7 +2582,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { GYM, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, NB_SPAWN, RADIUS, SOLID,
