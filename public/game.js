@@ -7017,8 +7017,16 @@ function jailList() {
     ${wd.length ? `<div class="sub" style="margin-top:6px"><b>🚨 หมายจับ</b></div><div class="list">${wd.map(o => itemRowRaw('🦹', esc(o.name), '⭐'.repeat(o.wd), '')).join('')}</div>` : ''}`;
 }
 // 📸 photo mode: the 👁️ button hides every button and box so only the town is left (tap again to bring them back)
-{ const e = document.getElementById('eyeBtn'); if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
+{ const e = document.getElementById('eyeBtn');   // drag it anywhere (spot remembered); a tap toggles
+  let drag = null, moved = false;
+  const put = (x, y) => { x = Math.max(0, Math.min(innerWidth - 34, x)); y = Math.max(0, Math.min(innerHeight - 34, y)); e.style.left = x + 'px'; e.style.top = y + 'px'; e.style.right = 'auto'; return [x, y]; };
+  try { const v = JSON.parse(localStorage.getItem('lt_eye') || 'null'); if (v) put(v[0], v[1]); } catch { }
+  if (e) { e.onpointerdown = ev => { const r = e.getBoundingClientRect(); drag = [ev.clientX - r.left, ev.clientY - r.top, ev.clientX, ev.clientY]; moved = false; e.setPointerCapture(ev.pointerId); };
+    e.onpointermove = ev => { if (!drag) return; if (!moved && Math.hypot(ev.clientX - drag[2], ev.clientY - drag[3]) < 6) return; moved = true; const p = put(ev.clientX - drag[0], ev.clientY - drag[1]); try { localStorage.setItem('lt_eye', JSON.stringify(p)); } catch { } };
+    e.onpointerup = e.onpointercancel = () => { drag = null; }; }
+  if (e) e.onclick = () => { if (moved) { moved = false; return; } const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28e', d: '28 พ.ย.', items: ['👁️ ลากปุ่มโหมดถ่ายรูปไปวางตรงไหนก็ได้ เกมจำตำแหน่งไว้ให้'] },
   { v: '2026-11-28d', d: '28 พ.ย.', items: ['🙏 ปล่อยปลาที่สระบัวในวัด ได้ค่าความดี +2 ต่อตัวด้วย (สูงสุด +50 ต่อวัน)', '📸 <b>โหมดถ่ายรูป</b> กดปุ่ม 👁️ ขวามือ ซ่อนปุ่มและกรอบทั้งหมด เหลือแค่เมืองให้แคปจอสวยๆ · กด 🙈 อีกครั้งเพื่อเอากลับมา'] },
   { v: '2026-11-28c', d: '28 พ.ย.', items: [
     '🚔 <b>คุกมาแล้ว!</b> ล้วงกระเป๋า (ความดี -50, ⭐1) หรือทำร้ายคน (ความดี -100, ⭐⭐) = ติดหมายจับ มีดาวลอยบนหัวให้ทุกคนเห็น',
