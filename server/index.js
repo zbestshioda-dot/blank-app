@@ -3764,13 +3764,13 @@ function act(a, m) {
       const r = a.ranch = a.ranch || {}, t = now();
       if (!r[s.k]) {
         if (!cd(a, 'rbarn', 1200) || !spend(a, 5)) return;
-        r[s.k] = t + W.sec * 1000; markMe(a); quest(a, 'work');
+        r[s.k] = t + W.sec * 1000; markMe(a);
         return toast(a, `${W.feed}แล้ว อีก ${W.sec} วิ กลับมา${W.got}ได้`, s.icon);
       }
       if (t < r[s.k]) return toast(a, `ยังไม่พร้อม อีก ${Math.ceil((r[s.k] - t) / 1000)} วิ`, '⏳', false);
       if (!cd(a, 'rbarn', 1200)) return;
       const it = D.ITEMS[W.item], n = W.n + Math.floor((lvl(a) - 1) / 4);
-      addItem(a, W.item, n); r[s.k] = 0; addXp(a); stat(a, 'ranch', n); markMe(a);
+      addItem(a, W.item, n); r[s.k] = 0; addXp(a); stat(a, 'ranch', n); quest(a, 'job_rancher'); markMe(a);
       return toast(a, `${W.got}ได้ ${it.icon}${it.name} x${n} · ขายที่ตลาดกลาง หรือให้อาหารต่อได้เลย`, s.icon);
     }
     case 'gym.use': {                         // 🏋️ step onto a machine (or off it again)
@@ -4272,6 +4272,7 @@ function monkFast(a) {
   const h = hourNow(); if (h >= 5 && h < 12) return false;
   toast(a, 'พระฉันอาหารได้ตั้งแต่เช้าถึงเที่ยงวันเท่านั้น 🙏 (ดื่มน้ำได้)', '🙏', false); return true;
 }
+const RANCH_FOOD = new Set(['r_milk', 'omelet', 'kaprao_moo', 'milk_pudding']);
 function useItem(a, id) {
   const it = D.ITEMS[id];
   if (a.down || !it || !it.eat || !a.inv[id]) return;
@@ -4281,6 +4282,7 @@ function useItem(a, id) {
   addItem(a, id, -1);
   const e = it.eat;
   if (e.hunger) { a.hunger = Math.min(100, a.hunger + e.hunger); quest(a, 'eat'); }
+  if (RANCH_FOOD.has(id)) quest(a, 'ranchfood');
   if (e.energy) { enLog(a, Math.min(eCap(a), a.energy + e.energy) - a.energy, 'กิน/ใช้ ' + it.name); a.energy = Math.min(eCap(a), a.energy + e.energy); }
   if (e.health) a.health = Math.min(100, a.health + e.health);
   if (e.happy) joy(a, e.happy);

@@ -879,7 +879,7 @@ function handle(m) {
     case 'ms': MSV = m; msHud(); if (panel?.kind === 'ms') refreshPanel(true); break;
     case 'mscut': msCut(m); break;
     case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
-    case 'tiles': for (const [x, y, c] of m.set || []) { const r = G.map.tiles[y]; if (r) G.map.tiles[y] = r.slice(0, x) + c + r.slice(x + 1); } gCache.clear(); break;   // 🏗️ the map changed (a town project was built)
+    case 'tiles': for (const [x, y, c] of m.set || []) { const r = G.map.tiles[y]; if (r) G.map.tiles[y] = r.slice(0, x) + c + r.slice(x + 1); } gCache.clear(); buildMini(); break;   // 🏗️ the map changed (a town project was built)
     case 'storylog': STORYLOG = m; if (panel?.kind === 'storylog') refreshPanel(true); break;
     case 'folksay': { const o = m.id != null && P.get(m.id); if (o) { o.bubble = m.text; o.bt = performance.now(); } else toast(m.text, '💞'); FX.play(m.mood === 'ok' ? 'click' : 'chime'); if (m.mood !== 'ok' && o) FX.float(o.x, o.y - 1.6, m.mood === 'love' ? '💖' : '💗', '#ff8fc0', .6); break; }
     case 'frecs': FRECS = m.list || []; if (panel?.kind === 'fishrecs') refreshPanel(true); break;
@@ -4533,6 +4533,21 @@ function drawZonesOnMap(g, A, k, icons) {
     if (icons) { g.font = `${Math.max(10, k * 1.6)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(st.icon, x + st.w * k / 2, y + st.h * k / 2); }
   }
   if (G.parkArch) { const [x, y] = L(G.parkArch.x - 2, G.parkArch.y - .8); g.fillStyle = '#e88ab4'; g.fillRect(x, y, 4 * k, .8 * k); }
+  const R = G.ranch;
+  if (R) {   // 🐄 the ranch: pasture, white fence with its gate, the three barns and the pigs' mud
+    const [x0, y0] = L(R.x0, R.y0), w = (R.x1 - R.x0 + 1) * k, h = (R.y1 - R.y0 + 1) * k;
+    g.fillStyle = SNOW ? '#e7eef3' : '#8cc46a'; g.fillRect(x0, y0, w, h);
+    g.fillStyle = '#7a5a3c'; { const [mx, my] = L(72, 65); g.fillRect(mx, my, 7 * k, 6 * k); }
+    g.strokeStyle = '#fbf6ea'; g.lineWidth = Math.max(1, k * .35); g.strokeRect(x0 + .5, y0 + .5, w - 1, h - 1);
+    { const [gx, gy] = L(R.gate[0], R.y1); g.fillStyle = ranchOpen() ? (SNOW ? '#e7eef3' : '#8cc46a') : '#a0703f'; g.fillRect(gx, gy, (R.gate[1] - R.gate[0] + 1) * k, k); }
+    for (const b of R.barns) { const [bx, by] = L(b.x - 2, R.y0 + 1); g.fillStyle = b.k === 'cow' ? '#c8382f' : b.k === 'pig' ? '#9a8f80' : '#b8875a'; g.fillRect(bx, by, 4 * k, 4 * k); }
+    if (icons) { g.font = `${Math.max(12, k * 3)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🐄', x0 + w / 2, y0 + h * .62); }
+  }
+  const T = STN('gate_temple')?.facade;
+  if (T) {   // 🛕 the temple front in town: a gold block, the way in to the temple grounds
+    const [tx, ty] = L(T.x0, T.by - 5.6); g.fillStyle = '#e2b13c'; g.fillRect(tx, ty, T.w * k, 5.6 * k); g.fillStyle = '#c9472f'; g.fillRect(tx, ty + 1.6 * k, T.w * k, 1.2 * k);
+    if (icons) { g.font = `${Math.max(12, k * 2.6)}px 'Apple Color Emoji','Noto Color Emoji',serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🛕', tx + T.w * k / 2, ty + 2.8 * k); }
+  }
 }
 const outPos = (x, y) => { const r = roomOf(x, y); return r ? r.outside : { x, y }; };
 function drawMini() {
@@ -6948,6 +6963,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28q', d: '28 พ.ย.', items: ['📜 <b>เควสต์ใหม่ฟาร์มปศุสัตว์</b> คนเลี้ยงสัตว์มีเควสต์ประจำวันและรายสัปดาห์ · ทุกคนมีเควสต์กินของจากฟาร์ม (นม ไข่เจียว กะเพราหมู พุดดิ้ง)', '🗺️ <b>มินิแมพอัปเดต</b> เห็นฟาร์ม (รั้ว โรงเรือน ประตูเปิด/ปิด) และวัดจุดใหม่'] },
   { v: '2026-11-28p', d: '28 พ.ย.', items: ['🎨 <b>ฟาร์มปศุสัตว์โฉมใหม่</b> เล้าไก่ คอกหมู โรงวัวรูปใหม่ ไก่จิกข้าว หมูนอนหลับ วัวกินหญ้า รั้วไม้ขาว ประตูเปิด-ปิดเห็นชัด ป้าย RANCH รางอาหาร บ่อโคลน'] },
   { v: '2026-11-28o', d: '28 พ.ย.', items: [
     '🐄 <b>ฟาร์มปศุสัตว์เปิดแล้ว!</b> (ใต้ทะเลสาบกลางเมือง) มีไก่ หมู วัว เดินในคอก มีเล้าไก่ คอกหมู โรงวัว รั้วรอบ และประตูเปิด-ปิดได้',

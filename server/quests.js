@@ -21,11 +21,13 @@ const DEFS = {
   job_photographer: { cat: 'career', career: 'photographer', text: 'ทำภารกิจช่างภาพสำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
   job_courier: { cat: 'career', career: 'courier', text: 'ทำภารกิจส่งพัสดุสำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
   job_teacher: { cat: 'career', career: 'teacher', text: 'ทำภารกิจอาจารย์สำเร็จ {n} ครั้ง', n: [2, 4], per: 110 },
+  job_rancher: { cat: 'career', career: 'rancher', text: 'เก็บไข่ รีดนม หรือเก็บเนื้อหมูที่ฟาร์มปศุสัตว์ {n} ครั้ง', n: [4, 7], per: 70 },
   // social / daily life
   trade:   { cat: 'social', text: 'แลกเปลี่ยนกับผู้เล่นอื่น {n} ครั้ง', n: [1, 2], per: 200 },
   chat:    { cat: 'social', text: 'พิมพ์คุยในแชท {n} ครั้ง', n: [1, 3], per: 40 },
   eat:     { cat: 'social', text: 'กินอาหาร {n} ครั้ง', n: [2, 4], per: 40 },
   sit:     { cat: 'social', text: 'นั่งเล่นที่จัตุรัสกลางเมือง {n} ครั้ง', n: [1, 2], per: 60 },
+  ranchfood: { cat: 'social', text: 'กินของจากฟาร์ม (นมสด ไข่เจียว กะเพราหมูไข่ดาว พุดดิ้งนม) {n} ครั้ง', n: [1, 2], per: 80 },
   // general
   sell:    { cat: 'general', text: 'ขายของ {n} ชิ้น', n: [5, 15], per: 15 },
   earn:    { cat: 'general', text: 'หาเงินให้ได้ {n} LC', n: [800, 2000], step: 100, per: 0.1 },
@@ -136,6 +138,8 @@ const WDEFS = {
   job_photographer: { cat: 'career', career: 'photographer', text: 'ทำภารกิจช่างภาพสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   job_courier: { cat: 'career', career: 'courier', text: 'ทำภารกิจส่งพัสดุสำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
   job_teacher: { cat: 'career', career: 'teacher', text: 'ทำภารกิจอาจารย์สำเร็จ {n} ครั้ง', n: [12, 18], per: 210 },
+  job_rancher: { cat: 'career', career: 'rancher', text: 'เก็บผลผลิตจากฟาร์มปศุสัตว์ {n} ครั้ง', n: [25, 40], per: 120 },
+  ranchfood: { cat: 'life', text: 'กินของจากฟาร์ม (นมสด ไข่เจียว กะเพราหมูไข่ดาว พุดดิ้งนม) {n} ครั้ง', n: [5, 8], per: 90 },
   earn:    { cat: 'money', text: 'หาเงินให้ได้ {n} LC', n: [8000, 15000], step: 500, per: 0.25 },
   fish:    { cat: 'life', text: 'ตกปลาให้ได้ {n} ตัว', n: [25, 40], per: 70 },
   eat:     { cat: 'life', text: 'กินอาหาร {n} ครั้ง', n: [12, 20], per: 90 },
