@@ -5281,6 +5281,8 @@ const FN = {
 let bugList = null;
 // quest givers: every quest comes from a townsperson with a painted portrait (public/assets/portraits.*)
 const QUEST_GIVER = {
+  job_rancher: { f: 'rancher_m', name: 'ลุงทุ่ง (ฟาร์มปศุสัตว์)', ask: 'ไก่ หมู วัว หิวกันหมดแล้ว มาช่วยลุงเลี้ยงหน่อยหลาน', thx: 'ขยันจริงหลาน ลุงภูมิใจ!' },
+  ranchfood: { f: 'rancher_m', name: 'ลุงทุ่ง (ฟาร์มปศุสัตว์)', ask: 'ลองชิมของจากฟาร์มลุงสิ สดใหม่ทุกวันเลย', thx: 'อร่อยใช่ไหมล่ะ ของสดจากฟาร์มลุงเอง' },
   work:     { f: 'office_f',  name: 'คุณนภา (ฝ่ายบุคคล)', ask: 'ช่วยเคลียร์งานเอกสารที่บริษัทหน่อยนะคะ', thx: 'งานเสร็จทันเวลา ขอบคุณมากค่ะ!' },
   harvest:  { f: 'farmer_f',  name: 'พี่ข้าวหอม (ประธานสหกรณ์)', ask: 'ผักสุกเต็มแปลงเลย มาช่วยเก็บหน่อยสิ', thx: 'ได้ผลผลิตเต็มตะกร้า ขอบใจจ้า!' },
   fish:     { f: 'fisher_m',  name: 'น้าเล็ก (สมาคมประมง)', ask: 'ตลาดอยากได้ปลาสด ช่วยตกมาหน่อยนะ', thx: 'ปลาสดๆ แบบนี้แหละ เก่งมาก!' },
@@ -5344,7 +5346,7 @@ function buildCast() {
   const online = () => fetch('/api/status').then(r => r.json()).then(j => { for (const id of ['heroOnline', 'promoOnline']) { const e = document.getElementById(id); if (e) e.innerHTML = j.online > 0 ? `<i></i>ตอนนี้มีคนออนไลน์ ${j.online} คน` : '<i></i>🌸 เมืองกำลังรอคุณอยู่'; } }).catch(() => { });
   online(); setInterval(() => { if (!login.classList.contains('hidden')) online(); }, 20000);
 })();
-fetch('assets/portraits.json?v=5').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
+fetch('assets/portraits.json?v=6').then(r => r.json()).then(j => { FACES = j; buildCast(); }).catch(() => { });
 fetch('assets/anime.json?v=2').then(r => r.json()).then(j => { ANI = j; buildCast(); }).catch(() => { });
 const faceHtml = (type, px = 46, alt) => { const g = QUEST_GIVER[type], st = faceStyle(alt || g?.f, px) || faceStyle(g?.f, px); return st ? `<i class="qface" style="${st}"></i>` : ''; };
 function questPop(type, title, line, reward) {
@@ -5434,7 +5436,7 @@ function icuDraw() {
 // ------------------------------------------------------------------ dialog box (talking to people)
 // A box at the bottom of the screen: portrait, name, the line typing itself out. Tap = finish the line / next line;
 // the last line shows the choices. Portraits: painted faces where the townsperson has one, else their pixel sprite.
-const NPC_FACE = { staff_rancher: 'folk_m4', keep_gym: 'folk_m5', keep_condo: 'folk_f2', staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
+const NPC_FACE = { staff_rancher: 'rancher_m', keep_gym: 'folk_m5', keep_condo: 'folk_f2', staff_detective: 'detective_m', staff_monk: 'monk_m', staff_office: 'office_f', staff_farmer: 'farmer_f', staff_fishing: 'fisher_m', staff_chef: 'chef_m', staff_rider: 'rider_m', staff_merchant: 'grocer_m', staff_police: 'police_m',
   staff_doctor: 'doctor_f', staff_bartender: 'shop_f', staff_beggar: 'beggar_m', keep_restaurant: 'shop_f', keep_barber: 'barber_m', keep_furnshop: 'thief_m', keep_plantshop: 'farmer_f', keep_police: 'police_f', keep_school: 'elder_m',
   keep_workshop: 'worker_m', keep_petshop1: 'girl', keep_petshop2: 'folk_m1', keep_cstore: 'sad_f', keep_bakery: 'student_m', keep_cstore3: 'nurse_f', keep_cstore4: 'grandma', keep_market: 'market_f', keep_estate: 'teacher_f', keep_toolshop: 'worker_m', keep_bank: 'banker_f', keep_office: 'folk_f1', keep_fashion: 'girl', keep_rider: 'folk_m2', keep_dealer: 'folk_m3' };
 // what each person talks about: a few short conversations (each a list of lines), picked at random with 💬 คุยต่อ
@@ -6963,6 +6965,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28s', d: '28 พ.ย.', items: ['👨‍🌾 <b>ลุงทุ่งมีรูปหน้าแล้ว</b> คุยกับลุงทุ่งที่ฟาร์มปศุสัตว์จะเห็นหน้าลุงตอนสนทนา'] },
   { v: '2026-11-28r', d: '28 พ.ย.', items: ['🥩 <b>เนื้อวัวมาแล้ว!</b> โรงวัวให้นม + เนื้อวัว · ไข่ เนื้อหมู เนื้อวัว ขายที่ตลาดกลาง ให้เชฟซื้อไปทำอาหาร', '🍳 <b>เมนูใหม่ในครัว</b> สเต็กเนื้อย่าง · น้ำตกเนื้อ · ข้าวผัดหมูใส่ไข่'] },
   { v: '2026-11-28q', d: '28 พ.ย.', items: ['📜 <b>เควสต์ใหม่ฟาร์มปศุสัตว์</b> คนเลี้ยงสัตว์มีเควสต์ประจำวันและรายสัปดาห์ · ทุกคนมีเควสต์กินของจากฟาร์ม (นม ไข่เจียว กะเพราหมู พุดดิ้ง)', '🗺️ <b>มินิแมพอัปเดต</b> เห็นฟาร์ม (รั้ว โรงเรือน ประตูเปิด/ปิด) และวัดจุดใหม่'] },
   { v: '2026-11-28p', d: '28 พ.ย.', items: ['🎨 <b>ฟาร์มปศุสัตว์โฉมใหม่</b> เล้าไก่ คอกหมู โรงวัวรูปใหม่ ไก่จิกข้าว หมูนอนหลับ วัวกินหญ้า รั้วไม้ขาว ประตูเปิด-ปิดเห็นชัด ป้าย RANCH รางอาหาร บ่อโคลน'] },
