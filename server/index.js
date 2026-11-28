@@ -2038,11 +2038,12 @@ function need(a, career) {
   }
   return true;
 }
-function addXp(a, n = 1) {
-  const c = a.career; if (!c || c === 'none') return;
-  const before = lvl(a), g = c === 'office' ? n : n * xpGain(before);
+function addXp(a, n = 1, c = a.career) {   // c: the job whose work this was (admins can do any job's work, so it may not be their own career)
+  if (!c || c === 'none' || !D.CAREERS[c]) return;
+  const before = lvl(a, c), g = c === 'office' ? n : n * xpGain(before);
   a.xp[c] = +((a.xp[c] || 0) + g).toFixed(3); markMe(a);
-  if (c !== 'office' && lvl(a) > (a.stats?.['lv_' + c] || 0)) stat(a, 'lv_' + c, lvl(a), true);
+  if (c !== 'office' && lvl(a, c) > (a.stats?.['lv_' + c] || 0)) stat(a, 'lv_' + c, lvl(a, c), true);
+  if (c !== a.career) { if (lvl(a, c) > before) toast(a, `🎉 เลเวลอาชีพ${D.CAREERS[c].name}อัปเป็น Lv.${lvl(a, c)}!`, '🎉'); return; }
   if (c === 'office' && lvl(a) > before && lvl(a) <= D.OFFICE_TITLES.length) {   // 🎊 promotion, whatever gave the XP (shift, mission, typing game)
     const ti = D.OFFICE_TITLES[lvl(a) - 1]; stat(a, 'promo'); feed(`🎊 ${a.name} ได้เลื่อนตำแหน่งเป็น${ti}`); toast(a, `🎊 ได้เลื่อนตำแหน่งเป็น${ti}! เงินเดือนขึ้น`, '🎊');
   }
@@ -3770,7 +3771,7 @@ function act(a, m) {
       if (t < r[s.k]) return toast(a, `ยังไม่พร้อม อีก ${Math.ceil((r[s.k] - t) / 1000)} วิ`, '⏳', false);
       if (!cd(a, 'rbarn', 1200)) return;
       const it = D.ITEMS[W.item], n = W.n + Math.floor((lvl(a) - 1) / 4);
-      addItem(a, W.item, n); r[s.k] = 0; addXp(a); stat(a, 'ranch', n); quest(a, 'job_rancher'); markMe(a);
+      addItem(a, W.item, n); r[s.k] = 0; addXp(a, 1, 'rancher'); stat(a, 'ranch', n); quest(a, 'job_rancher'); markMe(a);
       const ex = W.extra && D.ITEMS[W.extra[0]]; if (ex) addItem(a, W.extra[0], W.extra[1]);
       return toast(a, `${W.got}ได้ ${it.icon}${it.name} x${n}${ex ? ` + ${ex.icon}${ex.name} x${W.extra[1]}` : ''} · เอาไปขายที่ตลาดกลาง ให้เชฟซื้อไปทำอาหาร`, s.icon);
     }
@@ -3850,7 +3851,7 @@ function act(a, m) {
       if (m.a === 'revive') {
         if (!pt.down) return toast(a, 'คนไข้รู้สึกตัวดีอยู่แล้ว', 'ℹ️', false);
         const fee = Math.min(400, Math.floor(pt.money)); pt.money -= fee;
-        const got = earn(a, (fee + 120) * bm); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2); stat(a, 'revived');
+        const got = earn(a, (fee + 120) * bm); revive(pt, 35, `หมอ${a.name}`); addXp(a, 2, 'doctor'); stat(a, 'revived');
         feed(`💓 หมอ${a.name} ช่วยชีวิต ${pt.name} สำเร็จ`);
         return toast(a, `ช่วยให้ ${pt.name} ฟื้นแล้ว ได้ ${money(got)} · ต่อไปวินิจฉัยโรคที่ป่วยอยู่`, '💓');
       }
@@ -3860,7 +3861,7 @@ function act(a, m) {
         let fee = 25;
         if (!pt.npc) { const f = Math.min(150, Math.floor(pt.money)); pt.money -= f; fee = f + 40; markMe(pt); toast(pt, `หมอ${a.name}ตรวจร่างกายให้ สุขภาพ +25`, '🩺'); }
         pt.health = Math.min(100, pt.health + 25);
-        const got = earn(a, fee * bm); addXp(a);
+        const got = earn(a, fee * bm); addXp(a, 1, 'doctor');
         if (pt.npc) beds[s.idx] = null; else standUp(pt);   // one check-up per visit (staying in bed let a doctor tap it over and over for money)
         wdAt = 0;
         return toast(a, `ตรวจร่างกาย ${pt.name} เรียบร้อย ได้ ${money(got)}`, '🩺');
@@ -3877,7 +3878,7 @@ function act(a, m) {
       if (pt.npc) pt.dz = pt.dz.filter(x => x !== target);
       else { cure(pt, target); const f = Math.min(300, Math.floor(pt.money)); pt.money -= f; fee = f + 60; markMe(pt); toast(pt, `หมอ${a.name}รักษา${DZ[target].name}หายแล้ว! (ค่ารักษา ${money(f)})`, '💉'); }
       pt.health = Math.min(100, pt.health + 20);
-      const got = earn(a, fee * bm); addXp(a, 2); quest(a, 'treat'); stat(a, 'treated');
+      const got = earn(a, fee * bm); addXp(a, 2, 'doctor'); quest(a, 'treat'); stat(a, 'treated');
       if (!pt.dz.length) { if (pt.npc) beds[s.idx] = null; else standUp(pt); }
       wdAt = 0;
       if (!pt.npc) feed(`🩺 หมอ${a.name} รักษา${DZ[target].name}ให้ ${pt.name} สำเร็จ`);
@@ -4436,7 +4437,7 @@ function answerReq(a, m) {
     if (a.money < r.fee) return toast(a, 'เงินไม่พอจ่ายค่ารักษา', '💸', false);
     a.money -= r.fee; earn(f, r.fee);
     const heal = 25 + 4 * lvl(f, 'doctor') + 8 * tier(f, 'doctor');
-    a.health = Math.min(100, a.health + heal); f.xp.doctor = (f.xp.doctor || 0) + 1;
+    a.health = Math.min(100, a.health + heal); addXp(f, 1, 'doctor');
     markMe(a); markMe(f);
     toast(a, `${f.name} ปฐมพยาบาลให้ สุขภาพ +${heal} (จ่าย ${money(r.fee)})`, '💉');
     toast(f, `ปฐมพยาบาล ${a.name} สำเร็จ ได้ค่ารักษา ${money(r.fee)}`, '💉');
@@ -4829,7 +4830,7 @@ function misNext(a) {
   if (m.i < m.steps.length) { FX0(a, 'step'); markMe(a); return; }
   const t = now(), min = (t - m.t0) / 60000, early = t - m.t0 < m.limit * .5;
   const pay = m.payFixed ? Math.round(m.payFixed * (early ? 1.25 : 1) * jobPay(a) * (1 + boost(a, m.car))) : Math.round((80 + 55 * Math.min(min, m.limit / 60000 * .5)) * (MIS.PAY[m.car] || 1) * (early ? 1.25 : 1) * jobPay(a) * (1 + boost(a, m.car)));
-  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); if (m.car === 'detective') a.cases = [...(a.cases || []), { t: m.title, i: m.icon, d: t, c: m.steps.filter(s => s.k === 'talk' || s.k === 'find').map(s => s.label).slice(0, 4) }].slice(-40); }   /* 🕵️ the case notebook */ earn(a, pay); addXp(a, 1.5); stat(a, 'missions'); joy(a, 6); markMe(a);
+  a.mis = null; if (m.kind === 'icu') { a.icuNext = t + D.ICU.next; quest(a, 'treat'); stat(a, 'treated'); feed(`🚑 หมอ${a.name} ช่วยชีวิตคนไข้ในเคส "${m.title}" สำเร็จ`); } else { a.misNext = t + 18000; quest(a, 'job_' + m.car); if (m.car === 'detective') a.cases = [...(a.cases || []), { t: m.title, i: m.icon, d: t, c: m.steps.filter(s => s.k === 'talk' || s.k === 'find').map(s => s.label).slice(0, 4) }].slice(-40); }   /* 🕵️ the case notebook */ earn(a, pay); addXp(a, 1.5, m.car); stat(a, 'missions'); joy(a, 6); markMe(a);
   const dd = a.lastDed || { tax: 0, loan: 0, net: pay }, ded = [dd.tax ? `ภาษี ${money(dd.tax)}` : '', dd.loan ? `ผ่อนกู้ ${money(dd.loan)}` : ''].filter(Boolean).join(' · ');
   toast(a, `${m.icon} ภารกิจ "${m.title}" สำเร็จ! ใช้เวลา ${Math.floor(min)} นาที ${Math.round(min % 1 * 60)} วิ${early ? ' · ทำเร็ว โบนัส +25%' : ''} · ค่าจ้าง ${money(dd.gross ?? pay)}${dd.cap < 1 ? ` (เต็ม ${money(pay)} แต่วันนี้ทำงานเกิน ${dd.cap < .5 ? 5 : 3} ชม. ได้ ${Math.round(dd.cap * 100)}%)` : ''}${ded ? ` (หัก${ded}) เข้ากระเป๋า ${money(dd.net)}` : ''}`, '🏅');
 }
