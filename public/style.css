@@ -2265,11 +2265,14 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .bagCats .bcat.bhome small{opacity:1}
 
 /* 📕 main story line under today's quests (inside #qBox, so it never overlaps anything) */
-#msLine,#jobLine{display:flex;gap:6px;align-items:flex-start;width:100%;margin-top:4px;padding:4px 5px;border:0;border-top:1px dashed currentColor;border-radius:0;background:none;box-shadow:none;color:inherit;font:inherit;font-size:11.5px;line-height:1.3;text-align:left;cursor:pointer}
-#msLine.hidden,#jobLine.hidden{display:none}#msLine i,#jobLine i{font-style:normal;flex:none}#msLine span,#jobLine span{min-width:0}#msLine em,#jobLine em{display:block;font-style:normal;font-size:10.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#msLine,#jobLine,#coopLine{display:flex;gap:6px;align-items:flex-start;width:100%;margin-top:4px;padding:4px 5px;border:0;border-top:1px dashed currentColor;border-radius:0;background:none;box-shadow:none;color:inherit;font:inherit;font-size:11.5px;line-height:1.3;text-align:left;cursor:pointer}
+#msLine.hidden,#jobLine.hidden,#coopLine.hidden{display:none}#msLine i,#jobLine i,#coopLine i{font-style:normal;flex:none}#msLine span,#jobLine span,#coopLine span{flex:1;min-width:0}#msLine em,#jobLine em,#coopLine em{display:block;font-style:normal;font-size:10.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 🎬 in-world cutscene: the town shows through, black bars slide in, the HUD fades away */
 #msCut.world{background:none!important;animation:none}
 #msCut.world .msBar{animation:msBarIn .6s ease-out}@keyframes msBarIn{from{transform:scaleY(0)}}#msCut.world .msBar{transform-origin:top}#msCut.world .msBar.b{transform-origin:bottom}
 #msCut.world .msTitle{text-shadow:0 2px 4px #000}
 body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;transition:opacity .4s}
 .nbEggPat.go{animation:tapBlink 1.2s ease-in-out infinite}
+
+#coopLine s{display:block;height:4px;margin-top:2px;border-radius:3px;background:rgba(127,127,127,.3);overflow:hidden}#coopLine s u{display:block;height:100%;background:#5ac85a}
+#card.v2.mini #msLine,#card.v2.mini #coopLine,#card.v2.mini #jobLine{display:none}

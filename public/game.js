@@ -761,7 +761,7 @@ function handle(m) {
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
       $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
       if (tutPending) setTimeout(() => me && (m.isNew ? showStory(0) : showTut(0)), 400);   // 📖 brand-new characters get the opening story first
-      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => send({ t: 'ms', a: 'view' }), 1500);   // 📕 know the main-story step so townsfolk can offer it
+      else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => { send({ t: 'ms', a: 'view' }); send({ t: 'coop' }); }, 1500);   // 📕 know the main-story step so townsfolk can offer it
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
       break;
     case 'me': { if (!me) { try { const rc = localStorage.getItem('ltRef'); if (rc) { localStorage.removeItem('ltRef'); setTimeout(() => send({ t: 'refuse', code: rc }), 2500); } } catch { } }
@@ -841,6 +841,7 @@ function handle(m) {
     case 'homes': HOMES = m; if (panel?.kind === 'homes') refreshPanel(true); break;
     case 'folks': FOLKS = m.list || []; if (m.stories) STORIES = m.stories; if (panel?.kind === 'folks' || panel?.kind === 'folkgift' || panel?.kind === 'journal') refreshPanel(true); break;
     case 'storysay': storySay(m); break;
+    case 'coop': coopHud(m); break;
     case 'ms': MSV = m; msHud(); if (panel?.kind === 'ms') refreshPanel(true); break;
     case 'mscut': msCut(m); break;
     case 'proj': PROJ = m; if (panel?.kind === 'proj') refreshPanel(true); break;
@@ -5565,7 +5566,9 @@ function talkToTown(o) {
     const lv = fd?.lv || 0, nm = me.name;
     const hi = (FOLK_HI[o.face] || [`สวัสดีจ้า`, `อ้าว สวัสดีคุณ{n}`, `{n} มาแล้ว! สบายดีไหม`, `{n}~ คิดถึงพอดีเลย`, `{n}! วันนี้เป็นไงบ้าง เล่าให้ฟังหน่อย`])[Math.min(lv, 4)].replaceAll('{n}', nm || 'เธอ');
     const pool = FOLK_TALK[o.face] || TALK.town, t = pool[Math.floor(Math.random() * pool.length)];
-    const extra = [fd?.today ? '🎂 วันนี้วันเกิดฉันเองนะ!' : null, fd?.doing && lv >= 1 ? `ตอนนี้${fd.doing}` : null].filter(Boolean);
+    const mgIt = fd?.mg && G.items[fd.mg[0]], mgD = fd?.mg?.[1], party = (() => { try { return localStorage.getItem('nevbd_' + o.fid); } catch { return null; } })();   // 💭 they remember you
+    const mem = party && fd && !fd.today ? `ขอบคุณที่มาร่วมปาร์ตี้วันเกิดฉันนะ ยังจำได้อยู่เลย 🎂` : mgIt ? `${mgD < 1 ? 'เมื่อวาน' : mgD < 2 ? 'เมื่อวาน' : mgD + ' วันก่อน'}เธอให้${mgIt.icon}${mgIt.name}มา ${fd.love === fd.mg[0] ? 'ของโปรดฉันเลย ยังดีใจไม่หาย!' : 'ยังจำได้นะ ขอบใจจ้า'}` : null;
+    const extra = [fd?.today ? '🎂 วันนี้วันเกิดฉันเองนะ!' : null, mem, fd?.doing && lv >= 1 ? `ตอนนี้${fd.doing}` : null].filter(Boolean);
     const rq = fd?.req, have = rq ? (me.inv?.[rq.item] || 0) : 0;
     if (rq && !rq.done) extra.push(`[n]ขอให้ช่วยหน่อยได้ไหม... อยากได้ ${G.items[rq.item]?.icon || ''}${G.items[rq.item]?.name || ''} ${rq.n} ชิ้น (${whereGet(rq.item)}) เดี๋ยวให้ค่าเหนื่อย ${money(rq.pay)}`);
     const req = rq && !rq.done ? [{ label: have >= rq.n ? `📦 ส่ง ${G.items[rq.item]?.icon || ''} x${rq.n}` : `📋 ยังมี ${have}/${rq.n}`, cls: have >= rq.n ? 'good' : '', fn: () => { if (have >= rq.n) { send({ t: 'folkdo', id: o.id, fid: o.fid }); dialogClose(); } } }] : [];
@@ -6086,6 +6089,13 @@ function msHud() {
   if (v?.step && !v.end) el.innerHTML = `<i>📕</i><span><b>เรื่องหลัก บท ${v.ch + 1}</b><em>${esc(msHint(v.step))}</em></span>`;
 }
 $('#msLine')?.addEventListener('click', () => { FX.play('click'); FN.openMain(); });
+// 🤝 today's town co-op goal: everyone's progress together, and your share
+let COOPV = null;
+function coopHud(m) {
+  COOPV = m; const el = $('#coopLine'); if (!el) return; el.classList.remove('hidden');
+  el.innerHTML = `<i>🤝</i><span><b>ทั้งเมือง: ${m.icon} ${esc(m.name)} ${m.got.toLocaleString()}/${m.n.toLocaleString()}${m.done ? ' ✅' : ''}</b><em>${m.done ? (m.me >= m.min ? `สำเร็จแล้ว! คุณช่วย ${m.me} ${m.unit} ได้ 💎${m.gems}` : 'สำเร็จแล้ว! พรุ่งนี้มาช่วยกันใหม่') : `คุณช่วยแล้ว ${m.me} ${m.unit} · ช่วยครบ ${m.min} ได้ 💎${m.gems}`}</em><s><u style="width:${Math.round(m.got / m.n * 100)}%"></u></s></span>`;
+}
+$('#coopLine')?.addEventListener('click', () => { FX.play('click'); const m = COOPV; if (m) toast(`🤝 เป้าหมายวันนี้ของทั้งเมือง: ${m.name} ให้ครบ ${m.n.toLocaleString()} ${m.unit} · ใครช่วย ${m.min} ${m.unit}ขึ้นไป ได้ 💎${m.gems} ตอนครบ · เปลี่ยนเป้าทุกวัน`, '🤝'); });
 // 💼 first job: unemployed players who finished the starter path get a line under the quests + a once-a-day nudge from พี่ฟ้า
 const FIRST_JOBS = ['courier', 'cashier', 'chef', 'mechanic', 'photographer'];
 function jobPick() {
@@ -6190,7 +6200,7 @@ function nevTick() {
   const dt = me.date, day = `${dt.year}-${dt.month}-${dt.day}`;
   const ev = (NEV_PARTY.includes(rk) && nevParty(rk, dt)) || NEV.filter(e => e.rk === rk && nevHourOk(e.h) && !nevSeen(e.id + '_' + day)).sort(() => Math.random() - .5)[0];
   if (!ev || nevSeen(ev.id + '_' + day) || (!ev.id.startsWith('bd_') && Math.random() > .7)) return;
-  nevMark(ev.id + '_' + day); nevT = Date.now();
+  nevMark(ev.id + '_' + day); nevT = Date.now(); if (ev.id.startsWith('bd_')) try { localStorage.setItem('nevbd_' + ev.id.slice(3), 1); } catch { }
   setTimeout(() => { if (msQ || panel || dlgQ) return; FX.play('chime'); msShow({ title: ev.t, side: 1, lines: ev.L.map(([s, x]) => s ? { s, nm: msNm(s), x } : { x }) }); }, 900);
 }
 setInterval(() => { try { nevTick(); } catch (e) { console.error('nev', e); } }, 1000);
@@ -6732,6 +6742,8 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '🤝 เป้าหมายรวมของเมืองทุกวัน (ใต้เควสต์): ทั้งเมืองช่วยกันตกปลา ทำงาน ทำอาหาร ฯลฯ ให้ครบ ใครช่วย 5 ครั้งขึ้นไปได้ 💎3',
+    '💭 ชาวเมืองจำได้ว่าคุณเคยให้ของอะไร และขอบคุณที่ไปร่วมปาร์ตี้วันเกิด',
     '📦 หาปุ่มลาออกง่ายขึ้น: แตะชื่องานใต้เควสต์ หรือคุยกับคนรับสมัครงานของอาชีพตัวเอง จะมีปุ่ม "ลาออก" (ถามยืนยันก่อน)',
     '💼 ยังไม่มีงาน? ใต้เควสต์จะมีปุ่ม "เลือกงานแรก" พี่ฟ้าแนะนำงานที่สมัครได้เลยแล้วพาเดินไปสมัคร',
     '🏦 ดอกเบี้ยเงินฝากเหลือ 0.05% ต่อวันเกม (เงินในเมืองเฟ้อเร็วเกินไป)',

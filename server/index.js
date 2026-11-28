@@ -862,6 +862,35 @@ let lotto = { cur: '', last: null };
 let auc = null;
 // 🏗️ build the town together (D.PROJECTS): one open project, the baht given by each login, the ones already built
 let proj = { i: 0, got: 0, by: {}, done: [] };
+// 🤝 town co-op goal: one goal a (Thai) day the whole town works toward together, no money needed;
+// everyone who chipped in COOP_MIN+ gets a small gift once it is reached (paid on their next action if they were offline)
+const COOP = [
+  { type: 'fish', n: 600, name: 'ตกปลารวมกันทั้งเมือง', icon: '🎣', unit: 'ตัว' },
+  { type: 'work', n: 300, name: 'ทำงานรวมกันทั้งเมือง', icon: '💼', unit: 'งาน' },
+  { type: 'folk', n: 250, name: 'คุยกับชาวเมืองรวมกัน', icon: '💬', unit: 'ครั้ง' },
+  { type: 'harvest', n: 250, name: 'เก็บผักรวมกันทั้งเมือง', icon: '🥕', unit: 'ครั้ง' },
+  { type: 'cook', n: 150, name: 'ทำอาหารรวมกันทั้งเมือง', icon: '🍳', unit: 'จาน' },
+];
+const COOP_MIN = 5, COOP_GEMS = 3;
+let coop = null, coopSent = 0;
+function coopNow() {
+  const d = dayKey();
+  if (!coop || coop.d !== d) { coop = { d, i: Math.floor(Date.parse(d) / 864e5) % COOP.length, got: 0, by: {}, done: 0, paid: {} }; dirty = true; }
+  return coop;
+}
+const coopView = a => { const c = coopNow(), g = COOP[c.i]; return { t: 'coop', ...g, got: Math.min(c.got, g.n), me: a ? c.by[lk(a)] || 0 : 0, min: COOP_MIN, gems: COOP_GEMS, done: c.done ? 1 : 0 }; };
+function coopPay(a) {
+  const c = coopNow(), k = lk(a); if (!c.done || c.paid[k] || (c.by[k] || 0) < COOP_MIN) return;
+  c.paid[k] = 1; a.gems = (a.gems || 0) + COOP_GEMS; markMe(a); toast(a, `🤝 ทั้งเมืองทำ "${COOP[c.i].name}" สำเร็จ! คุณช่วยไป ${c.by[k]} ${COOP[c.i].unit} · ได้ 💎${COOP_GEMS}`, '🤝');
+}
+function coopEv(a, type, n = 1) {
+  if (isAdmin(a)) return; const c = coopNow(), g = COOP[c.i]; coopPay(a);
+  if (type === 'deliver' || type === 'treat' || type.startsWith('job_')) type = 'work';   // every career's job counts as work
+  if (g.type !== type || c.done || !(n > 0)) return;
+  const k = lk(a); c.got += n; c.by[k] = (c.by[k] || 0) + n; dirty = true;
+  if (c.got >= g.n) { c.done = now(); feed(`🤝 ทั้งเมืองช่วยกัน "${g.name}" ครบ ${g.n.toLocaleString()} ${g.unit} แล้ว! คนที่ช่วย ${COOP_MIN}+ ได้ 💎${COOP_GEMS}`); for (const o of online.values()) coopPay(o); }
+}
+setInterval(() => { try { const c = coopNow(), v = c.got + ':' + c.done; if (v === coopSent) return; coopSent = v; for (const o of online.values()) send(o, coopView(o)); } catch (e) { console.error('coop', e); } }, 4000).unref?.();
 const projTop = (by, n = 10) => Object.entries(by).sort((x, y) => y[1] - x[1]).slice(0, n).map(([l, v]) => [accounts.get(l)?.name || l, v]);
 function projView(a) {
   const P = D.PROJECTS[proj.i];
@@ -1769,7 +1798,7 @@ function nbWelcomeChat(a) {
 function quest(a, type, n = 1) {
   ledSweep(a);
   if ((type === 'work' || type === 'deliver' || type === 'treat' || type.startsWith('job_') || type === 'sell' && a.career === 'merchant') && now() - (a._jd || 0) > 1500) { a._jd = now(); stat(a, 'jobDone'); }   // 📕 any career task (one per action, even if it fires two quest types)
-  nbEv(a, type === 'eat' ? 'buy' : type, n);
+  nbEv(a, type === 'eat' ? 'buy' : type, n); coopEv(a, type, n);
   const evs = Q.progress(a, type, n); ledSweep(a, '📜 รางวัลเควสต์');
   for (const e of evs) {
     send(a, { t: 'quest', ...e });
@@ -1957,7 +1986,7 @@ const SAVE_KEYS = ['nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', '
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
-  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.econLog) econLog = meta.econLog; if (meta.auc) auc = meta.auc; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
+  const meta = rows.find(r => r && r.login === '__meta'); if (meta) { if (meta.mayor !== undefined) mayor = meta.mayor; if (meta.ghosts) ghosts = meta.ghosts; if (meta.richWk) richWk = meta.richWk; if (meta.lotto) lotto = meta.lotto; if (meta.econLog) econLog = meta.econLog; if (meta.auc) auc = meta.auc; if (meta.coop) coop = meta.coop; if (meta.proj) { proj = meta.proj; for (const d of proj.done) projPlace(d.id); } if (meta.znDone) znDone = meta.znDone; if (meta.payOrders) payOrders = meta.payOrders; if (meta.ideas) { ideas = meta.ideas; ideaSeq = 1 + Math.max(0, ...ideas.map(x => x.id)); } if (meta.elect) elect = meta.elect; for (const g of meta.gangs || []) { gangs.set(g.id, g); gangSeq = Math.max(gangSeq, (+String(g.id).slice(1) || 0) + 1); } bugs = meta.bugs || []; if (meta.botCap != null) botCap = meta.botCap; if (meta.ann != null) announceText = meta.ann; if (meta.fishRecs) fishRecs = meta.fishRecs; }
   vapidKeys = PUSH.init(meta?.vapid); if (!meta?.vapid && vapidKeys) gdirty();   // 🔔 push keys live with the town data (they must survive deploys)
   if (Array.isArray(meta?.onLog)) onLog = meta.onLog;
   if (meta?.xmasPush) xmasPush = meta.xmasPush;
@@ -2057,7 +2086,7 @@ async function save(force) {
   saving = true; dirty = false;
   const rec = a => Object.fromEntries(SAVE_KEYS.map(k => [k, a[k]]));
   const changed = [...accounts.values()].filter(a => a.ws || a.sd); changed.forEach(fixMoney);
-  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj, econLog }, wroteBugs = bugsDirty; bugsDirty = false;
+  const meta = { login: '__meta', savedAt: now(), vapid: vapidKeys, onLog, xmasPush, bugs, botCap, ann: announceText, gangs: [...gangs.values()], mayor, elect, ghosts, richWk, ideas, lotto, znDone, payOrders, fishRecs, auc, proj, coop, econLog }, wroteBugs = bugsDirty; bugsDirty = false;
   try {
     await store.save(changed.map(rec).concat(wroteBugs ? [meta] : []), () => [...accounts.values()].map(rec).concat([meta]), force);
     changed.forEach(a => { if (!a.ws) a.sd = false; });
@@ -2796,7 +2825,7 @@ function folkGift(a, m) {
   if (!def || !n) return toast(a, 'ต้องยืนใกล้ๆ ถึงจะให้ของได้', '🎁', false);
   if (!(a.inv[id] > 0) || !D.ITEMS[id]) return toast(a, 'ไม่มีของชิ้นนี้ในกระเป๋า', '🎁', false);
   const f = folkOf(a, def.id), d = dayKey(); if (f.gift === d) return toast(a, `วันนี้ให้ของ${def.name}ไปแล้ว พรุ่งนี้ค่อยมาใหม่นะ`, '🎁', false);
-  addItem(a, id, -1); f.gift = d;
+  addItem(a, id, -1); f.gift = d; f.mg = [id, now()];   // 💭 the townsperson remembers your last gift
   const love = def.love === id, like = def.likes.includes(id), bd = folkBday(def);
   if (love || like) f.known = [...new Set([...(f.known || []), id])];
   const pts = (love ? 6 : like ? 3 : 1) * (bd ? 2 : 1), it = D.ITEMS[id];
@@ -2971,7 +3000,7 @@ function folksView(a) {
   return { t: 'folks', stories: storiesView(a), list: Object.values(FOLK_DEF).map(def => {
     const n = npcs.find(x => x.fid === def.id), f = (a.folk || {})[def.id] || { p: 0, lv: 0 }, lv = folkLv(f.p), d = dayKey();
     return { id: def.id, npc: n?.id, name: def.name, face: def.face, p: f.p, lv, next: D.FOLK_LV[lv + 1] ?? null, about: def.about,
-      bday: def.bday, today: folkBday(def) ? 1 : 0, desk: def.desk ? 1 : 0, doing: n ? folkDoing(n) : def.desk ? 'ประจำอยู่ที่ร้าน/ที่ทำงาน' : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0,
+      bday: def.bday, today: folkBday(def) ? 1 : 0, desk: def.desk ? 1 : 0, doing: n ? folkDoing(n) : def.desk ? 'ประจำอยู่ที่ร้าน/ที่ทำงาน' : '', talked: f.talk === d ? 1 : 0, gave: f.gift === d ? 1 : 0, mg: f.mg && f.gift !== d ? [f.mg[0], Math.floor((now() - f.mg[1]) / 864e5)] : null,
       rel: (REL[def.id] || []).filter(r => FOLK_DEF[r.w]).map(r => r.sec && lv < 3 ? { ic: '🔒' } : { ic: r.ic, w: r.w, n: FOLK_DEF[r.w].name.replace(/\s*\(.*$/, ''), d: r.d }),
       req: folkReq(a, def), known: f.known || [], love: lv >= 3 ? def.love : (f.known || []).includes(def.love) ? def.love : '', likes: lv >= 2 ? def.likes : (f.known || []).filter(x => def.likes.includes(x)) };
   }) };
@@ -5912,6 +5941,7 @@ function onMessage0(ws, raw) {
     case 'ms': return msAct(a, m);
     case 'storylog': return storyLog(a, m);
     case 'folks': return send(a, folksView(a));
+    case 'coop': return send(a, coopView(a));
     case 'proj': return m.op === 'give' ? projGive(a, m) : m.op === 'use' ? projUse(a, m) : send(a, projView(a));
 
     case 'achclaim': return achClaim(a, String(m.id || 'all'));
