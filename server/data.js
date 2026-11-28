@@ -442,6 +442,9 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
   //    and a soft-play house beside the game centre. Their ground is cleared at the end of the map (after the park is built).
   // 🧁 bakery: on the lawn across the road from the 3rd convenience store, facing the plaza (picked by the owner). Own picture b_bakery once tools/add_bakery.py has run
   B('bakery', ATLAS.sprites.b_bakery ? 'b_bakery' : 'b_cafe2', 53, 52, { label: 'ร้านเบเกอรี่หวานใจ', icon: '🧁', st: 'bakery', layout: 'bakery', late: 9, clr: 1, ...(ATLAS.sprites.b_bakery ? { dx: .8 } : {}) });
+  // 🏢 Life Condo: a 6-storey tower facing the fountain square, where a sakura and a few pines stood (they moved to its sides).
+  //    The lobby (counter, lifts) leads up to the rooms; the rooms are lent to renters while they are inside (server CONDO)
+  if (ATLAS.sprites.b_condo) B('condo', 'b_condo', 63, 56, { label: 'คอนโด Life Condo', icon: '🏢', st: 'condo', rk: 'condo', layout: 'condo', late: 10, clr: 1 });
   B('arcade', 'b_arcade', 44, 115, { label: 'เกมเซ็นเตอร์', icon: '🕹️', st: 'arcade', layout: 'arcade', late: 5, clr: 1 });
   B('playland', 'b_playland', 44, 122, { label: 'บ้านบอลเด็กเล่น', icon: '🧒', deco: true, clr: 1 });
   B('clawbooth', 'b_clawbooth', 39, 111, { label: 'ตู้คีบตุ๊กตา', icon: '🧸', st: 'clawst', stype: 'claw', noSlot: true, clr: 1 });
@@ -454,9 +457,20 @@ for (let y = 0; y < H; y++) for (let x = 0; x < RX0; x++) if (grid[y][x] === 'T'
 // ================================================================= interiors
 // Every enterable building has a room. Furniture is real: solid pieces block movement
 // (on the server too). Layout entries: [sprite, x, y(bottom), solid?] relative to the room.
-const ROOM_SIZE = { inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
+const ROOM_SIZE = { condo: [16, 12], condounit: [16, 11], inn: [16, 12], office: [16, 12], hospital: [16, 11], house: [14, 10], casino: [16, 12], arcade: [16, 12], bar: [16, 12] };
 const SOFT = /rug|window|pictures|clock|welcome|bed|chair|beanbag|curtains|picture/;
 const LAYOUT = {
+  // 🏢 condo lobby (16x12): mailboxes, the reception counter and a notice board along the back wall, two lifts and the parcel
+  // shelf on the right behind the key-card gates, a lounge (sofa, rug, lamp, plant) on the left, a water dispenser, plants by the door
+  condo: [['cl_mail', 1.9, 2.5], ['cl_counter', 4.7, 2.75], ['cl_board', 7.6, 1.5, false], ['cl_elev', 10.4, 2.35], ['cl_elev', 12.3, 2.35], ['cl_parcel', 14.05, 2.65],
+    ['cl_gate', 11.35, 5.3, false], ['cs_rug_loft', 3.6, 9.5, false], ['cl_sofa', 3.6, 7.7], ['cl_table', 3.6, 9.1, false], ['cl_lamp', 1.5, 7.6], ['cl_plant', 6.0, 7.7],
+    ['cl_water', 14.3, 7.9], ['cl_plant', 5.9, 11.0], ['cl_plant', 10.1, 11.0]],
+  // 🏢 a condo room (16x11), studio style: bathroom door, kitchenette, fridge, air-con, the city window, the balcony door and the
+  // wardrobe along the back wall; TV corner and dining table on the left, sofa on a rug in the middle, the bed and a desk on the
+  // right, shoe rack by the door. cs_*_min are swapped for the renter's style (bed, sofa, rug) by the client
+  condounit: [['cu_bathdoor', 1.9, 2.45, false], ['cu_kitchen', 4.1, 2.75], ['cu_fridge', 5.95, 2.6], ['cu_ac', 7.3, 1.3, false], ['cu_window', 9.1, 2.2, false],
+    ['cu_balcony', 11.35, 2.55, false], ['cu_wardrobe', 13.95, 2.75], ['cs_rug_min', 8.6, 8.4, false], ['cs_sofa_min', 8.6, 6.6], ['cs_bed_min', 13.45, 6.9],
+    ['cl_lamp', 11.55, 6.0], ['cu_desk', 13.55, 9.95], ['cu_tv', 3.9, 6.7], ['cu_dining', 3.3, 9.7], ['cu_shoes', 5.6, 10.05], ['cl_plant', 11.0, 10.0]],
   office: [['f_window', 4, 1.1], ['f_window', 12, 1.1], ['f_reception', 8, 2.4], ['f_filing_grey', 1.6, 2.6], ['x_vending', 14.2, 2.7], ['x_drinkfridge', 12.6, 2.6], ['x_plant', 1.6, 10.7], ['f_water', 14.4, 10.7], ['x_wclock', 10.2, 1.0, false], ['f_corkboard', 5.5, 1.15, false], ['x_aircon', 8, 1.0, false], ['f_extinguisher', 3.2, 2.4], ['x_coatrack', 12.6, 10.8], ['x_magrack', 3.6, 10.8], ['x_fern', 9.6, 10.8]],
   warehouse: [['x_storage', 2.4, 2.7], ['x_mshelf2', 4.6, 2.7], ['f_cabinet', 7, 2.3], ['x_storage', 9.6, 2.7], ['x_water', 11.9, 2.6], ['x_crate', 2.0, 5.6], ['crate', 3.4, 5.6], ['x_fruit', 11.4, 5.6], ['x_eggs', 2.2, 8.7], ['x_cart2', 4.4, 8.7], ['barrel', 9.6, 8.6], ['x_drum', 10.6, 8.7], ['i_rice_sack', 11.6, 8.6, false], ['x_tires2', 12.5, 8.7]],
   fashion: [['x_shoes', 2.4, 2.7], ['x_bags', 4.6, 2.7], ['x_cashdesk', 7, 2.5], ['x_mirror', 9.4, 2.6], ['x_curtain', 11.6, 2.7], ['x_clothes', 3, 5.8], ['x_clothes', 11, 5.8], ['f_rug_round', 7, 6.6], ['x_mannequin2', 5.0, 6.6], ['x_mannequin3', 9.0, 6.6], ['x_hats', 1.6, 8.8], ['x_jewelcase', 3.6, 8.7], ['x_hats2', 12.4, 8.8], ['x_fabric', 10.6, 8.8], ['i_poster', 5, 1.05, false], ['x_wclock', 9.4, 0.95, false], ['x_pos', 7.6, 1.75, false]],
@@ -558,7 +572,7 @@ let slot = 0;
 // house expansions: every house owns rooms for floors 2 and 3 (unlocked by buying them), reached by stairs
 const HOUSE_FLOORS = 3, STAIR_UP = [12.6, 8.2], STAIR_DOWN = [12.6, 8.2], STAIR_UP2 = [1.4, 8.2];
 const FLOOR_PRICE = [0, 0, 60000, 150000];   // [floor] -> price to build it
-for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
+for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap(L => BUILDINGS.filter(b => +(b.late || 0) === L))) {   // late buildings take room slots after all the older ones, so existing rooms keep their place   // late buildings take room slots after all the older ones, so existing rooms keep their place
   if (!b.st) continue;
   if (b.noSlot) {                       // a street counter added later: takes no room slot, so every other room keeps its place
     STATIONS.push({ id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, x: b.x + b.w / 2, y: b.y + b.h + .45, r: 1.9, area: b.area || 'town' });
@@ -599,6 +613,10 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(L => BUILDINGS.filter(b =
   }
   const s = { id: b.st, type: b.stype || b.st, label: b.label, icon: b.icon, room: room.id, x: rx + mx, y: ry + 2.6, r: 1.8 };
   if (kind === 'office') { s.x = rx + 8; s.label = 'ฝ่ายบุคคล (สมัครงาน)'; }
+  if (kind === 'condo') {               // 🏢 the counter (rent a room, pick its style) and the lifts up to the rooms
+    s.x = rx + 4.7; s.y = ry + 3.6; s.r = 1.6; s.label = 'เคาน์เตอร์นิติบุคคล';
+    STATIONS.push({ id: 'celev', type: 'celev', label: 'ลิฟต์ขึ้นห้องพัก', icon: '🛗', room: room.id, x: rx + 11.35, y: ry + 3.6, r: 1.7 });
+  }
   // the rider hub's waiting bench seats two side by side
   if (kind === 'rider') for (const [i, dx] of [[1, -.45], [2, .45]]) STATIONS.push({ id: 'seat_rider' + i, type: 'seat', label: 'ม้านั่งรอออเดอร์', icon: '🪑', room: room.id, x: rx + 9.4 + dx, y: ry + 8.7, r: .55 });
   if (kind === 'kitchen') {             // cooking: work stations around the kitchen (anyone can cook; the counter at the top takes orders)
@@ -641,6 +659,26 @@ for (const b of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(L => BUILDINGS.filter(b =
   if (kind === 'office') {
     let n = 0;
     for (const cx of [2.5, 5.5, 10.5, 13.5]) for (const by of [5.2, 8.3]) STATIONS.push({ id: 'chair' + n, type: 'chair', idx: n++, room: room.id, label: 'โต๊ะทำงาน', icon: '💺', x: rx + cx, y: ry + by + .95, r: .9 });
+  }
+}
+// 🏢 the condo's 12 rooms: the lift brings a renter up to one of them; the door leads back down to the lobby (by the lifts)
+const CONDO_UNITS = 12;
+{ const lobby = ROOMS.find(r => r.rk === 'condo');
+  if (lobby) for (let u = 0; u < CONDO_UNITS; u++) {
+    const [RW, RH] = ROOM_SIZE.condounit, rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14, mx = Math.floor(RW / 2); slot++;
+    rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i'); rect(rx + mx - 1, ry + RH - 1, 2, 1, 'D');
+    const room = { id: 'r_condo' + u, kind: 'room', bld: 'condo', rk: 'condounit', unit: u, label: 'ห้องพักคอนโด', icon: '🏢', area: 'town',
+      x: rx, y: ry, w: RW, h: RH, spawn: { x: rx + mx, y: ry + RH - 2.3 }, exit: { x: rx + mx, y: ry + RH - 0.5 },
+      outside: { x: lobby.x + 11.35, y: lobby.y + 4.4 }, doorPt: null, hours: null };
+    ROOMS.push(room);
+    room.furniture = LAYOUT.condounit.map(([s, x, y]) => [s, rx + x, ry + y]);
+    for (const [s, x, y, solid] of LAYOUT.condounit) {
+      if (solid === false || SOFT.test(s) || y < 1.3 || !ATLAS.sprites[s]) continue;
+      const w = SPR(s).w, row = ry + Math.floor(y - 0.45);
+      for (let i = Math.floor(rx + x - w / 2 + 0.3); i <= Math.floor(rx + x + w / 2 - 0.3); i++) if (get(i, row) === 'i') set(i, row, 'o');
+    }
+    STATIONS.push({ id: 'exit_condo' + u, type: 'exit', room: room.id, label: 'ลงลิฟต์ไปล็อบบี้', icon: '🛗', x: rx + mx, y: ry + RH - 0.55, r: 1.2 });
+    STATIONS.push({ id: 'cbed' + u, type: 'cbed', idx: u, room: room.id, label: 'เตียงนอน', icon: '🛏️', x: rx + 13.45, y: ry + 7.3, r: 1.5 });
   }
 }
 {
@@ -1036,6 +1074,17 @@ const PARK_ARCH = { x: 46, y: 94.6 };
     keep(PROPS, q => !(q.x > bk.x - 2.5 && q.x < bk.x + bk.w + 2 && q.y > fy - .2 && q.y < fy + 3) || q.s === 'manhole');
     prop('x_cafeset', bk.x - .3, fy + 2.2); prop('x_cafeset', bk.x + bk.w + .3, fy + 2.2);
     prop('o_lampball', bk.x - 2.2, fy + .6); prop('o_topiary', bk.x + bk.w + 1, fy + .4, false); }
+  // 🏢 Life Condo's forecourt: brick paving like the square it opens onto, hedge cubes beside the entrance, lamps at the corners,
+  //    flower planters at the front corners, a parked bicycle; the sakura and pines that stood here moved to either side of the tower
+  { const c = BUILDINGS.find(b => b.id === 'condo');
+    if (c) { const fy = c.y + c.h;
+      for (let y = fy; y <= fy + 1; y++) for (let x = c.x - 1; x <= c.x + c.w; x++) { clearTree(x, y); if (get(x, y) !== 'o') set(x, y, 'k'); }
+      for (const [x, y] of [[c.x + c.w, fy - 1], [c.x + c.w, fy - 2]]) if (get(x, y) === 'T') { clearTree(x, y); set(x, y, '.'); }
+      keep(PROPS, q => !(q.x > c.x - .5 && q.x < c.x + c.w + 1.2 && q.y > fy - .2 && q.y < fy + 2.4));
+      for (const [x, y, k] of [[c.x - 2, c.y + 2, 'pine'], [c.x - 2, c.y + 5, 'tree_pink2'], [c.x + c.w + 1, c.y + 4, 'tree_pink']]) if (get(x, y) === '.') { set(x, y, 'T'); TREES.push([x, y, k]); }
+      prop('o_hedgecube', c.x - .5, fy - .05); prop('o_hedgecube', c.x + c.w + .5, fy - .05);
+      prop('o_lampball', c.x - .4, fy + 1.6); prop('o_lampball', c.x + c.w + .4, fy + 1.6);
+      prop('o_planter', c.x + .9, fy + 2.0, false); prop('o_planter', c.x + c.w - .9, fy + 2.0, false); prop('i_bike', c.x + c.w + .2, fy + .9, false); } }
   for (let y = 115; y <= 116; y++) for (let x = 41; x <= 49; x++) { clearTree(x, y); set(x, y, 'k'); }
   for (let y = 107; y <= 114; y++) if (get(43, y) === 'T') { clearTree(43, y); set(43, y, '.'); }   // the park's hedge of trees would hide the game centre's sign
   keep(PROPS, q => !(q.x > 40.5 && q.x < 50 && q.y > 114.6 && q.y < 117.2));

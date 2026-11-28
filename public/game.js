@@ -56,7 +56,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const hhmm = h => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
 // ------------------------------------------------------------------ state
-let ws, G = null, lastHouses = '';
+let ws, G = null, lastHouses = '', lastCondo = '';
 let me = null, wd = null, myId = 0;
 const P = new Map();                    // id -> player sprite
 let clockOff = 0;
@@ -772,6 +772,7 @@ function handle(m) {
       wd = m.d && wd ? { ...wd, ...m } : m; clockOff = m.now - Date.now(); paintEvent(); if (wd.fest) festCardSoon();
       if (!m.d || Object.keys(m).some(k => k !== 't' && k !== 'd' && k !== 'now' && k !== 'on')) refreshPanel();
       if (m.houses) { const hs = JSON.stringify(m.houses.map(h => [h[2], h[7], h[8], h[9], h[15]])); if (G && hs !== lastHouses) { lastHouses = hs; layoutFurniture(); } }
+      if (m.condo) { const cs = JSON.stringify(m.condo); if (G && cs !== lastCondo) { lastCondo = cs; layoutFurniture(); } }   // 🏢 who is in which condo room, in what style
       break; }
     case 'roster': {
       const ids = new Set();
@@ -6865,6 +6866,11 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28j', d: '28 พ.ย.', items: [
+    '🏢 <b>คอนโด Life Condo เปิดแล้ว!</b> ตึก 6 ชั้นหน้าลานน้ำพุ · ไม่มีบ้านก็มีที่นอน เช่าห้องสัปดาห์ละ 2,000 LC ที่เคาน์เตอร์ในล็อบบี้',
+    '🛗 ขึ้นลิฟต์ไปห้องของตัวเอง: ห้องสตูดิโอมีครัว ตู้เย็น ระเบียงวิวเมือง · นอนได้พลังงาน +50⚡',
+    '🛋️ เลือกสไตล์ห้องได้ 4 แบบ: มินิมอล · พาสเทลชมพู · ลอฟต์ · ไทยโมเดิร์น (เปลี่ยนฟรี)',
+  ] },
   { v: '2026-11-28i', d: '28 พ.ย.', items: [
     '🎫 <b>สะสมตั๋วรถเมล์สาย 99</b>: ขึ้นรถแต่ละครั้งได้เจอผู้โดยสาร 1 ใน 12 คน (มีรูปหน้าทุกคน) ฟังเรื่องลับของเขา แล้วเก็บตั๋วไว้',
     '🏅 สะสม 3 ใบได้ฉายา "ขาประจำสาย 99" · ครบ 12 ใบได้ 💎100 + ฉายาหายาก "ผู้โดยสารคนที่ 13" + 👮 ชุดคนขับรถเมล์สาย 99 (ชาย/หญิง)',
@@ -8576,6 +8582,24 @@ function renderPanel(p) {
       }).join('');
       return head + `<div class="looks">${cards || '<div class="sub">หมวดนี้ยังไม่มีของ ซื้อได้ที่ 🛋️ ร้านเฟอร์นิเจอร์ในเมือง</div>'}</div>`;
     }
+    case 'condo': {   // 🏢 the lobby counter: rent a room by the week, pick its style
+      const c = me.condo, ok = c && c.until > Date.now() + clockOff, d = ok ? Math.ceil((c.until - Date.now() - clockOff) / 864e5) : 0;
+      const STY = [['min', '🤍 มินิมอลไม้ขาว'], ['pink', '🎀 พาสเทลชมพู'], ['loft', '🖤 ลอฟต์อินดัสเทรียล'], ['thai', '🪷 ไทยโมเดิร์น']];
+      const rent = [1, 2, 4].map(w => B(`${ok ? 'ต่อ' : 'เช่า'} ${w} สัปดาห์ · ${money(2000 * w)}`, { t: 'act', st, a: 'rent', w }, w === 1 && !ok ? 'primary' : '', ok && d + w * 7 > 28)).join('');
+      return `<h2>🏢 คอนโด Life Condo</h2><div class="sub">ห้องสตูดิโอพร้อมอยู่ วิวเมือง มีครัว เตียง ระเบียง · นอนพักได้พลังงาน +50⚡ (ทุก 2 นาที) · ไม่ต้องซื้อบ้าน</div>
+        ${c ? `<div class="npItem">🔑 ห้อง <b>${esc(c.no)}</b> · ${ok ? `เหลือสัญญา <b>${d} วัน</b>` : '<b style="color:#e05555">สัญญาหมดแล้ว</b>'}</div>` : ''}
+        <div class="secT">📝 สัญญาเช่า (สัปดาห์ละ ${money(2000)} · ล่วงหน้าได้สูงสุด 28 วัน)</div><div class="grid2">${rent}</div>
+        ${c ? `<div class="secT">🛋️ สไตล์ห้อง (เปลี่ยนได้ฟรี)</div><div class="grid2">${STY.map(([k, n]) => B(n + (c.style === k ? ' ✓' : ''), { t: 'act', st, a: 'style', s: k }, c.style === k ? 'good' : '')).join('')}</div>` : ''}
+        <div class="sub" style="margin-top:8px">ขึ้นห้องได้ที่ 🛗 ลิฟต์ด้านขวา</div>`;
+    }
+    case 'celev': {
+      const c = me.condo, ok = c && c.until > Date.now() + clockOff;
+      return `<h2>🛗 ลิฟต์ขึ้นห้องพัก</h2>${ok ? `<div class="sub">ห้อง ${esc(c.no)} ของคุณ</div>${B(`⬆️ ขึ้นห้อง ${esc(c.no)}`, { t: 'act', st, a: 'up' }, 'primary big')}` : `<div class="sub">${c ? 'สัญญาเช่าหมดแล้ว ต่อสัญญาที่เคาน์เตอร์นิติบุคคล' : 'ลิฟต์ใช้ได้เฉพาะผู้เช่า · เช่าห้องได้ที่เคาน์เตอร์นิติบุคคลทางซ้าย'}</div>`}`;
+    }
+    case 'cbed': {
+      const s = STN(st), u = wd?.condo?.[s.idx], mine = u && u[0] === me.name;
+      return mine ? `<h2>🛏️ เตียงนอน · ห้อง ${esc(u[2])}</h2><div class="sub">นอนแล้วได้พลังงาน หายง่วง หายอ่อนเพลีย (ทุก 2 นาที)</div>${B('😴 นอนพัก (+50⚡)', { t: 'act', st, a: 'sleep' }, 'primary big')}` : '<h2>🛏️ เตียงนอน</h2><div class="sub">นอนได้เฉพาะคนเช่าห้องนี้</div>';
+    }
     case 'hbed': {
       const s = STN(st), h = wd?.houses?.[s.idx], own = me.house === s.idx && !(h && h[5]), rent = me.rent && me.rent.idx === s.idx;
       return own || rent ? `<h2>🛏️ เตียงนอน</h2><div class="sub">นอนแล้วได้พลังงาน หายง่วง หายอ่อนเพลีย (ทุก 2 นาที)</div>${B(`😴 นอนพัก (+${50 + (own ? me.comfort * 2 : 0)}⚡)`, { t: 'act', st, a: 'sleep' }, 'primary big')}` : '<h2>🛏️ เตียงนอน</h2><div class="sub">นอนได้เฉพาะเจ้าของบ้านหรือผู้เช่า</div>';
@@ -9371,13 +9395,13 @@ fetch('assets/pets.json?v=4').then(r => r.json()).then(j => { PET_AT = j; setTim
 // 📱 phones get the half-size atlas (~25 MB decoded instead of ~100 MB: iPhones were reloading to a white screen, and it draws faster);
 // halving every sprite rectangle and the tile size keeps every draw call the same
 const HALF_ATLAS = TOUCH_UI || IOS;
-fetch('assets/atlas.json?v=v32').then(r => r.json()).then(j => {
+fetch('assets/atlas.json?v=v33').then(r => r.json()).then(j => {
   if (HALF_ATLAS) { j.tile /= 2; for (const k in j.sprites) j.sprites[k] = j.sprites[k].map(v => v / 2); }
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
-  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v32';
+  im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v33';
 });
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
-if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v32').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v32'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
+if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v33').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v33'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
 // so every place that draws grass or a tree (ground chunks, the map edge, shop thumbnails) gets the snowy look for free.
 // Not run in the game any more: tools/build_snow_atlas.js runs it once and saves assets/atlas_snow.webp
@@ -9464,9 +9488,9 @@ function wallPat(w, px, py, S, tx) {          // brick / wood plank / damask tex
   else if (w.pat === 'damask') { ctx.fillStyle = shade(w.c, .25); for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) { const cx = px + (c + .5 + (r % 2) * .5) * TS / 2, cy = top + (r + .5) * TS * .4; ctx.beginPath(); ctx.moveTo(cx, cy - TS * .1); ctx.lineTo(cx + TS * .07, cy); ctx.lineTo(cx, cy + TS * .1); ctx.lineTo(cx - TS * .07, cy); ctx.fill(); } }
   ctx.restore();
 }
-const FLOOR = { fashion: 'fl_marble', police: 'fl_concrete', office: 'fl_carpet_blue', market: 'fl_beige', warehouse: 'fl_concrete', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_concrete',
+const FLOOR = { condo: 'fl_marble', condounit: 'fl_wood', fashion: 'fl_marble', police: 'fl_concrete', office: 'fl_carpet_blue', market: 'fl_beige', warehouse: 'fl_concrete', rider: 'fl_stone', dealer: 'fl_white', toolshop: 'fl_concrete',
   restaurant: 'fl_checker', kitchen: 'fl_bluecheck', hospital: 'fl_mint', school: 'fl_tatami', bank: 'fl_marble', house: 'fl_wood', cstore: 'fl_white', petshop: 'fl_wood' };
-const WALL = { fashion: '#f6d6e4', police: '#c7d3e6', office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', rider: '#3f6b63', dealer: '#dfe6ec', toolshop: '#b9a17f',
+const WALL = { condo: '#e4e9ec', condounit: '#efe7dc', fashion: '#f6d6e4', police: '#c7d3e6', office: '#c9d3dc', market: '#f1e3c4', warehouse: '#8d7a5e', rider: '#3f6b63', dealer: '#dfe6ec', toolshop: '#b9a17f',
   restaurant: '#e9cfa4', kitchen: '#f3f3f3', hospital: '#e6f1f6', school: '#cfe0c4', bank: '#efe2bb', house: '#ecd2b2', cstore: '#e4efe9', petshop: '#f6e6c8' };
 function under(tx, ty) {
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) { const c = tileAt(tx + dx, ty + dy); if (',=kmspc'.includes(c)) return c; }
@@ -10399,7 +10423,8 @@ function layoutFurniture() {
       continue;
     }
     if (r.kind !== 'room') continue;
-    for (const f of r.furniture || []) roomFurniture.push(f);
+    const cu = r.rk === 'condounit' && wd?.condo?.[r.unit];   // 🏢 a condo room: the renter's style of bed, sofa and rug
+    for (const f of r.furniture || []) roomFurniture.push(cu && /^cs_\w+_min$/.test(f[0]) ? [f[0].replace(/_min$/, '_' + cu[1]), f[1], f[2]] : f);
     if (r.rk === 'house') {
       const h = wd?.houses?.[r.house], fl = r.floor || 1; if (!h) continue;
       if (fl === 1) { const bs = G.stations.find(x => x.id === 'hbed' + r.house), bp = h[0] ? furnPos(h, 'sbed') : null; if (bs) { if (!h[0]) { bs.x = r.x + 3.4; bs.y = r.y + 3.7; } else if (bp && bp[0] === 1) { bs.x = r.x + bp[1]; bs.y = r.y + bp[2] + .4; } } }

@@ -2086,7 +2086,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['n3', 'ghostGot', 'bus99', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['n3', 'ghostGot', 'bus99', 'condo', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -2305,6 +2305,62 @@ function plotTick() {
   for (const a of online.values()) if (a.ws && a.house >= 0 && PLOT_AREAS[a.house].has(areaId(a))) a.homeT = now();   // last time at home
   for (const a of online.values()) if (a.ws && a.hown && a.house < 0 && plotGive(a, inVillage(a)) >= 0 && a.wakeHome) { a.wakeHome = 0; const y = D.YARDS[a.house]; if (y) teleport(a, y.spawn.x, y.spawn.y); }
 }
+// 🏢 Life Condo: rent a room by the week at the lobby counter (for players without a house, or anyone who wants a flat in town).
+// The 12 room interiors are lent out like the house plots: the lift gives a renter one that nobody is in, styled their way,
+// and it is freed again once they have left. a.condo = { until, style, no }
+const CONDO = { week: 2000, maxDays: 28, sleep: 50, styles: { min: '🤍 มินิมอลไม้ขาว', pink: '🎀 พาสเทลชมพู', loft: '🖤 ลอฟต์อินดัสเทรียล', thai: '🪷 ไทยโมเดิร์น' } };
+const CONDO_ROOMS = D.ROOMS.filter(r => r.rk === 'condounit'), condoUnits = CONDO_ROOMS.map(() => null);
+const condoOk = a => !!a.condo && a.condo.until > now();
+const condoIn = (i, but) => [...online.values()].some(o => o !== but && o.ws && areaId(o) === CONDO_ROOMS[i].id);
+function condoUnit(a) {
+  let i = condoUnits.indexOf(a); if (i >= 0) return i;
+  i = condoUnits.findIndex((o, j) => !condoIn(j) && (!o || !o.ws || areaId(o) !== CONDO_ROOMS[j].id)); if (i < 0) return -1;
+  condoUnits[i] = a; wdAt = 0; return i;
+}
+function condoAct(a, s, m) {
+  const k = s.type + '.' + m.a;
+  if (k === 'condo.rent') {
+    const w = Math.max(1, Math.min(4, m.w | 0)), from = condoOk(a) ? a.condo.until : now(), until = from + w * 7 * 864e5;
+    if (until - now() > CONDO.maxDays * 864e5 + 60e3) return toast(a, `เช่าล่วงหน้าได้สูงสุด ${CONDO.maxDays} วัน`, '🏢', false);
+    if (!cd(a, 'condo', 1500) || !pay(a, CONDO.week * w)) return;
+    const first = !a.condo;
+    a.condo = { until, style: a.condo?.style || 'min', no: a.condo?.no || `${2 + Math.floor(Math.random() * 5)}${String(1 + Math.floor(Math.random() * 8)).padStart(2, '0')}` };
+    ledSweep(a, '🏢 ค่าเช่าคอนโด'); markMe(a); wdAt = 0;
+    if (first) paperAdd(`🏢 ${a.name} ย้ายเข้าคอนโด Life Condo ห้อง ${a.condo.no}`);
+    return toast(a, `🏢 เช่าห้อง ${a.condo.no} แล้ว ${w} สัปดาห์ · ขึ้นลิฟต์ไปห้องได้เลย`, '🔑');
+  }
+  if (k === 'condo.style') {
+    if (!a.condo || !CONDO.styles[m.s]) return;
+    a.condo.style = m.s; markMe(a); wdAt = 0;
+    return toast(a, `เปลี่ยนห้องเป็นสไตล์${CONDO.styles[m.s]}แล้ว`, '🛋️');
+  }
+  if (k === 'celev.up') {
+    if (!condoOk(a)) return toast(a, a.condo ? 'สัญญาเช่าหมดแล้ว ต่อสัญญาที่เคาน์เตอร์นิติบุคคลก่อน' : 'ต้องเช่าห้องก่อน ที่เคาน์เตอร์นิติบุคคลข้างลิฟต์', '🔑', false);
+    const i = condoUnit(a); if (i < 0) return toast(a, 'ลิฟต์คนแน่นมาก รอสักครู่แล้วลองใหม่นะ', '🛗', false);
+    if (!cd(a, 'door', 1200, true)) return;
+    const R = CONDO_ROOMS[i]; return teleport(a, R.spawn.x, R.spawn.y);
+  }
+  if (k === 'cbed.sleep') {
+    if (condoUnits[s.idx] !== a || !condoOk(a)) return toast(a, 'นอนได้เฉพาะคนเช่าห้องนี้', '🔒', false);
+    if (!cd(a, 'homesleep', 120000)) return;
+    const e = CONDO.sleep;
+    enLog(a, Math.min(100, a.energy + e) - a.energy, 'นอนที่คอนโด'); a.energy = Math.min(100, a.energy + e); a.health = Math.min(100, a.health + 5); sleepWell(a);
+    a.usage = { sleep: (a.usage?.sleep || 0) + 1 }; joy(a, 6); markMe(a);
+    return toast(a, `นอนหลับสบายในห้อง ${a.condo.no} พลังงาน +${e} 😊`, '😴');
+  }
+}
+setInterval(() => { try {
+  for (const p of online.values()) {   // back from a disconnect inside a room: keep it if it is still free, else down to the lobby
+    const i = p.ws ? CONDO_ROOMS.findIndex(R => R.id === areaId(p)) : -1;
+    if (i < 0 || condoUnits[i] === p) continue;
+    if (!condoUnits[i] && condoOk(p) && condoUnits.indexOf(p) < 0) { condoUnits[i] = p; wdAt = 0; } else teleport(p, CONDO_ROOMS[i].outside.x, CONDO_ROOMS[i].outside.y);
+  }
+  condoUnits.forEach((o, i) => {
+    const inside = o && o.ws && areaId(o) === CONDO_ROOMS[i].id;
+    if (inside && !condoOk(o)) { toast(o, 'สัญญาเช่าคอนโดหมดแล้ว ต่อสัญญาได้ที่เคาน์เตอร์ในล็อบบี้', '🏢', false); teleport(o, CONDO_ROOMS[i].outside.x, CONDO_ROOMS[i].outside.y); }
+    else if (o && !inside && !condoIn(i)) { condoUnits[i] = null; wdAt = 0; }
+  });
+} catch (e) { console.error('condo', e); } }, 10000).unref?.();
 function goHome(a, o = a) {
   if (o !== a && !canVisit(a, o.house)) return toast(a, `${o.name} ยังไม่ได้บันทึกเบอร์คุณเป็นเพื่อน เข้าบ้านไม่ได้`, '🔒', false);
   const i = o === a ? plotGive(a, true) : o.house;
@@ -3274,6 +3330,7 @@ function act(a, m) {
   const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
   if (/^(slot|hilo|roul|bj)$/.test(s.type)) return czAct(a, s, m);
   if (s.type === 'bar' && m.a !== 'apply' || s.type === 'bstage') return barAct(a, s, m);
+  if (/^(condo|celev|cbed)$/.test(s.type)) return condoAct(a, s, m);
   if (WORK.has(key) && a.hc && !isAdmin(a)) {   // 🤖 a person-check is waiting: hold work until it is tapped
     if (GD.blocked(a, now()) === 'late' && !a.hc.late) { a.hc.late = 1; sus(a, 'hcfail'); }
     send(a, { t: 'hc', tok: a.hc.tok, x: a.hc.x, y: a.hc.y, sec: Math.max(0, Math.ceil((a.hc.until - now()) / 1000)) });
@@ -5586,7 +5643,7 @@ function meView(a) {
   const myOrders = [...orders.values()].filter(o => o.cust === a).map(orderView);
   const jobs = isRider ? [...orders.values()].filter(o => o.state === 'open' || o.rider === a).map(o => ({ ...orderView(o), mine: o.rider === a, custId: o.cust?.id || 0 })) : [];
   return {
-    t: 'me', gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
+    t: 'me', condo: a.condo || null, gang: gangView(a), id: a.id, name: a.name, avatar: a.avatar, x: +a.x.toFixed(2), y: +a.y.toFixed(2), money: Math.round(a.money), energy: a.energy, hunger: a.hunger, health: a.health,
     career: a.career, licenses: a.licenses, lv: lvl(a), xp: a.xp, jx: jobView(a), inv: a.inv, phone: a.phone, contacts: a.contacts || [],
     tools: a.tools, vipT: a.vipT || 0, gems: a.gems || 0, gemInf: godInf(a) ? 1 : 0, monInf: godInf(a) ? 1 : 0, vehicles: a.vehicles || [], ride: a.ride || '', pass: a.pass || 0, gmail: a.gsub ? a.gmail || 'linked' : '', hown: a.hown || null, bless: a.bless || 0, alms: a.alms ? { pts: a.alms.pts, got: a.alms.got } : null, almsDay: a.almsDay ?? -1, adLeft: ADS_GAME ? Math.max(0, ADS.daily - (a.adDay === new Date(now() + 7 * 3600e3).toISOString().slice(0, 10) ? a.adN || 0 : 0)) : 0, house: a.house, furniture: a.furniture, hlv: a.hlv || 0, fpos: a.fpos || {}, yz: a.yz || [], wstock: a.career === 'merchant' ? wstockView(a) : null, stocks: a.stocks || {}, docjob: a.docjob ? { dest: a.docjob.dest, pay: a.docjob.pay } : null, npcp: tradePrices(a), comfort: comfort(a), speed: speedOf(a), speedBase: dzProd(a, 'speed') * godSpeed(a) * wwSpeed(a), rent: a.rent, houseSale: a.houseSale, houseRent: a.houseRent,
     bank: Math.floor(a.bank), loan: Math.ceil(a.loan), listings: a.listings || [], dz: a.dz || [], awake: Math.floor(a.awake || 0), bed: a.bed ?? -1, chair: a.chair, balloons: a.balloons || [], fortune: a.fortune?.d === dayKey() ? a.fortune : null, balloon: a.balloon || '',
@@ -5633,6 +5690,7 @@ function worldView() {
     beds: beds.map(p => p ? [p.name, p.id, p.dz.length ? bedSym(p) : [], Math.floor(p.health), p.dz.length, p.npc ? 1 : 0, p.down ? 1 : 0] : 0),
     houses: houses.map((h, i) => [h ? h.name : '', h ? comfort(h) : 0, h ? furnOf(h).filter(k => !h.fpos?.[k] || h.fpos[k][0]).slice(0, 600) : [], h ? h.houseSale || 0 : 0, h ? h.houseRent || 0 : 0, tenants[i] ? tenants[i].name : '', tenants[i] ? tenants[i].rent.until : 0, h ? h.fpos || {} : {}, h ? h.hlv || 0 : 0, h ? h.yz || [] : [], h ? h.ycrops || {} : {}, h?.hown ? h.hown.style : -1, h?.hown ? h.hown.tier : 0, h ? h.id : 0, h ? h.hdeco || {} : {}, h ? aqShown(h) : []]),
     chairs: chairs.map(c => c ? c.name : ''),
+    condo: condoUnits.map(o => o ? [o.name, o.condo?.style || 'min', o.condo?.no || ''] : 0),
     ev: event ? { id: event.id, text: event.text, until: event.until } : null, lb, sk: stockView(), fo: fishOrders,
   };
 }
