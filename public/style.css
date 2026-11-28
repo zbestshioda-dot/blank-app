@@ -2265,8 +2265,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .bagCats .bcat.bhome small{opacity:1}
 
 /* 📕 main story line under today's quests (inside #qBox, so it never overlaps anything) */
-#msLine{display:flex;gap:6px;align-items:flex-start;width:100%;margin-top:4px;padding:4px 5px;border:0;border-top:1px dashed currentColor;border-radius:0;background:none;box-shadow:none;color:inherit;font:inherit;font-size:11.5px;line-height:1.3;text-align:left;cursor:pointer}
-#msLine.hidden{display:none}#msLine i{font-style:normal;flex:none}#msLine span{min-width:0}#msLine em{display:block;font-style:normal;font-size:10.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#msLine,#jobLine{display:flex;gap:6px;align-items:flex-start;width:100%;margin-top:4px;padding:4px 5px;border:0;border-top:1px dashed currentColor;border-radius:0;background:none;box-shadow:none;color:inherit;font:inherit;font-size:11.5px;line-height:1.3;text-align:left;cursor:pointer}
+#msLine.hidden,#jobLine.hidden{display:none}#msLine i,#jobLine i{font-style:normal;flex:none}#msLine span,#jobLine span{min-width:0}#msLine em,#jobLine em{display:block;font-style:normal;font-size:10.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 🎬 in-world cutscene: the town shows through, black bars slide in, the HUD fades away */
 #msCut.world{background:none!important;animation:none}
 #msCut.world .msBar{animation:msBarIn .6s ease-out}@keyframes msBarIn{from{transform:scaleY(0)}}#msCut.world .msBar{transform-origin:top}#msCut.world .msBar.b{transform-origin:bottom}

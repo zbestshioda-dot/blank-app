@@ -6084,6 +6084,22 @@ function msHud() {
   if (v?.step && !v.end) el.innerHTML = `<i>📕</i><span><b>เรื่องหลัก บท ${v.ch + 1}</b><em>${esc(msHint(v.step))}</em></span>`;
 }
 $('#msLine')?.addEventListener('click', () => { FX.play('click'); FN.openMain(); });
+// 💼 first job: unemployed players who finished the starter path get a line under the quests + a once-a-day nudge from พี่ฟ้า
+const FIRST_JOBS = ['courier', 'cashier', 'chef', 'mechanic', 'photographer'];
+function jobPick() {
+  const picks = FIRST_JOBS.filter(id => G.careers[id] && !(G.careers[id].need || []).length).slice(0, 4);
+  dialog({ name: 'พี่ฟ้า', face: 'office_f', lines: ['[h]มีงานทำแล้วได้เงินทุกวัน เลเวลอาชีพขึ้นยิ่งได้เยอะ!', 'งานพวกนี้สมัครได้เลย ไม่ต้องมีใบอะไร เลือกมาสักงานสิจ๊ะ พี่พาเดินไปหาคนรับสมัคร'],
+    choices: [...picks.map(id => { const c = G.careers[id], stf = STAFF.find(x => x.career === id && !x.keeper);
+      return { label: `${c.icon} ${c.name}`, cls: 'good', fn: () => { dialogClose(); FN.guide({ key: stf ? stf.st : c.where }); toast(`เดินตามลูกศร แล้วคุยกับ${stf?.short || 'เจ้าหน้าที่'}เพื่อสมัครเป็น${c.name}`, '💼'); } }; }),
+      { label: '📋 ดูงานทั้งหมด', fn: () => { dialogClose(); openPanel({ kind: 'career' }); } }, { label: '👋 ไว้ทีหลัง', fn: dialogClose }] });
+}
+$('#jobLine')?.addEventListener('click', () => { FX.play('click'); jobPick(); });
+setInterval(() => {
+  const el = $('#jobLine'), on = !!(G && me && me.career === 'none' && !nbActive()); if (!el) return;
+  el.classList.toggle('hidden', !on); if (!on || panel || dlgQ || msQ) return;
+  const k = 'jobNudge_' + new Date().toDateString(); let seen = 1; try { seen = localStorage.getItem(k); } catch { }
+  if (!seen && performance.now() - lastInput > 3000 && (window.__jobT = (window.__jobT || 0) + 1) > 20) { try { localStorage.setItem(k, 1); } catch { } jobPick(); }   // ~40 s into the session, while idle
+}, 2000);
 // a speaker standing in the same map as you: the cutscene plays over the real town (camera on them) instead of a painted backdrop
 const msWho = id => { const m = id && P.get(myId), a = m && areaOf(m.x, m.y)?.id; return a ? [...P.values()].find(p => p.fid === id && areaOf(p.x, p.y)?.id === a) : null; };
 function msCut(m) {
@@ -6710,6 +6726,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
+    '💼 ยังไม่มีงาน? ใต้เควสต์จะมีปุ่ม "เลือกงานแรก" พี่ฟ้าแนะนำงานที่สมัครได้เลยแล้วพาเดินไปสมัคร',
     '🏦 ดอกเบี้ยเงินฝากเหลือ 0.05% ต่อวันเกม (เงินในเมืองเฟ้อเร็วเกินไป)',
     '📈 หุ้น: ค่าธรรมเนียม 0.5% · ถือได้ตัวละไม่เกิน 150,000 LC (ที่ถือเกินอยู่แล้วไม่ต้องขาย)',
     '💼 เพิ่มค่าจ้าง: บาร์เทนเดอร์ +20% · นักสืบ +14% · พระบิณฑบาต 140 → 170 LC',
