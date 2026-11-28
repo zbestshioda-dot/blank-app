@@ -4329,6 +4329,7 @@ function answerReq(a, m) {
 }
 
 // asking someone for their number: yes saves both numbers; two no's in a row = 10 minutes before you can ask them again
+const CONTACT_MAX = 100;   // phone contacts per player (was 30: full lists silently dropped exchanged numbers)
 function answerPhone(a, f, ok) {
   f.phoneAsk = f.phoneAsk || {};
   if (!ok) {
@@ -4337,7 +4338,9 @@ function answerPhone(a, f, ok) {
     return toast(f, n >= 2 ? `${a.name} ไม่ให้เบอร์อีกแล้ว — ขอคนนี้ได้อีกใน 10 นาที` : `${a.name} ไม่ให้เบอร์`, '🙅', false);
   }
   delete f.phoneAsk[a.login];
-  const add = (x, y) => { if (!(x.contacts || []).some(c => c.p === y.phone) && (x.contacts || []).length < 30) x.contacts = [...(x.contacts || []), { p: y.phone, n: y.name }]; markMe(x); };
+  const add = (x, y) => { if (!(x.contacts || []).some(c => c.p === y.phone) && (x.contacts || []).length < CONTACT_MAX) x.contacts = [...(x.contacts || []), { p: y.phone, n: y.name }]; markMe(x); };
+  const full = [f, a].filter(x => (x.contacts || []).length >= CONTACT_MAX && !(x.contacts || []).some(c => c.p === (x === f ? a : f).phone));
+  if (full.length) { for (const x of [f, a]) toast(x, full.includes(x) ? `รายชื่อในมือถือคุณเต็มแล้ว (${CONTACT_MAX}) — ลบบางคนก่อนนะ` : `รายชื่อของอีกฝ่ายเต็มแล้ว แลกเบอร์ไม่สำเร็จ`, '📇', false); return; }
   add(f, a); add(a, f); nbEv(f, 'social'); nbEv(a, 'social'); lbNote(f, '📇', `แลกเบอร์กับ ${a.name} แล้ว · เป็นเพื่อนกันบน lifebook`); lbNote(a, '📇', `แลกเบอร์กับ ${f.name} แล้ว · เป็นเพื่อนกันบน lifebook`);
   toast(f, `${a.name} ให้เบอร์แล้ว 📇 ${a.phone} (บันทึกในรายชื่อให้แล้ว)`, '📱'); toast(a, `แลกเบอร์กับ ${f.name} แล้ว (บันทึกในรายชื่อให้แล้ว)`, '📱');
 }
@@ -4350,7 +4353,7 @@ function phoneAct(a, m) {
     if (!o) return toast(a, 'ไม่พบเบอร์นี้', '📵', false);
     if (o === a) return toast(a, 'นี่เบอร์ของคุณเอง', '📱', false);
     if ((a.contacts || []).some(c => c.p === num)) return toast(a, `มี ${o.name} ในรายชื่อแล้ว`, '📇', false);
-    if ((a.contacts || []).length >= 30) return toast(a, 'รายชื่อเต็มแล้ว (30)', '📇', false);
+    if ((a.contacts || []).length >= CONTACT_MAX) return toast(a, `รายชื่อเต็มแล้ว (${CONTACT_MAX})`, '📇', false);
     a.contacts = [...(a.contacts || []), { p: num, n: o.name }]; markMe(a); lbNote(o, '📇', `${a.name} บันทึกเบอร์ของคุณแล้ว`);
     return toast(a, `บันทึกเบอร์ ${o.name} แล้ว`, '📇');
   }

@@ -6839,6 +6839,10 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28g', d: '28 พ.ย.', items: [
+    '📇 รายชื่อเพื่อนในมือถือเพิ่มจาก 30 เป็น 100 คน · ถ้าเต็มจะแจ้งเตือน ไม่หายเงียบ ๆ อีก',
+    '🖱️ เล่นบนคอม: เลื่อนหน้ามือถือได้ด้วยล้อเมาส์ ลากเมาส์ หรือกดจุดด้านล่าง',
+  ] },
   { v: '2026-11-28f', d: '28 พ.ย.', items: [
     '🎨 รูปใหม่: แผงตลาดนัดกลางคืนตั้งอยู่หน้าศาลาประชาคมตอนเปิด และรถเมล์ผีสาย 99 ตัวจริง',
     '🌱 ผู้เล่นใหม่: ของขวัญ 3 วันแรก เข้าเกมทุกวันรับเพชร+เงิน วันที่ 3 ใหญ่สุด',
@@ -9199,6 +9203,14 @@ const PH_GROUPS = [   // 4 apps a row: every app has a group, most-used first (t
 const FB_GROUP = 'https://www.facebook.com/share/g/1JTskmvnm1/';   // the game's Facebook group (the 👥 app in the phone)
 const PH_TITLE = { wall: 'วอลเปเปอร์', mkt: 'เดลิเวอรี', taxi: 'แท็กซี่', support: 'สนับสนุน', contacts: 'โทรศัพท์', call: 'กำลังคุย', food: 'เดลิเวอรี', rider: 'งานไรเดอร์', bills: 'บิล', fish: 'สมุดปลา', wx: 'อากาศ', music: 'เพลง' };
 let phPg = 0;   // the phone home page the player swiped to (kept across re-renders)
+// 🖱️ computers: the wheel, a mouse drag, or a tap on the dots flips the phone pages (no swiping with a mouse)
+const phGo = (el, i) => el.scrollTo({ left: Math.max(0, Math.min(i, el.children.length - 1)) * el.clientWidth, behavior: 'smooth' });
+document.addEventListener('wheel', e => { const el = e.target.closest?.('.phPages'); if (!el) return; e.preventDefault(); if (el._wT > performance.now()) return; el._wT = performance.now() + 350; phGo(el, phPg + (e.deltaY + e.deltaX > 0 ? 1 : -1)); }, { passive: false });
+document.addEventListener('click', e => { const d = e.target.closest?.('.phDots i'); if (!d) return; const el = d.closest('.phScr')?.querySelector('.phPages'); if (el) phGo(el, [...d.parentNode.children].indexOf(d)); });
+let phDrag = null;
+document.addEventListener('pointerdown', e => { const el = e.pointerType === 'mouse' && e.target.closest?.('.phPages'); phDrag = el ? { el, x: e.clientX, sl: el.scrollLeft, mv: 0 } : null; });
+document.addEventListener('pointermove', e => { if (!phDrag || !(e.buttons & 1)) return; const dx = e.clientX - phDrag.x; if (Math.abs(dx) > 8) { phDrag.mv = 1; phDrag.el.style.scrollSnapType = 'none'; phDrag.el.scrollLeft = phDrag.sl - dx; } });
+document.addEventListener('pointerup', e => { if (!phDrag) return; const { el, x, mv } = phDrag; phDrag = null; if (!mv) return; el.style.scrollSnapType = ''; const dx = e.clientX - x; phGo(el, phPg + (dx < -40 ? 1 : dx > 40 ? -1 : 0)); addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true }); });
 document.addEventListener('scroll', e => { const el = e.target; if (!el.classList?.contains('phPages')) return; phPg = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)); el.parentNode.querySelectorAll('.phDots i').forEach((d, i) => d.classList.toggle('on', i === phPg)); }, true);
 function phonePanel(p) {
   const tab = p.tab || (call ? 'call' : 'home');
@@ -9216,7 +9228,7 @@ function phonePanel(p) {
     phPg = Math.min(phPg, pgs.length - 1); setTimeout(() => { const el = document.querySelector('.phPages'); if (el && phPg) el.scrollLeft = phPg * el.clientWidth; }, 0);
     const pages = pgs.map(([t, h]) => `<div class="phPage"><div class="phSec">${t}</div><div class="phApps">${h}</div></div>`).join('');
     const dots = pgs.map((g, i) => `<i class="${i === phPg ? 'on' : ''}"></i>`).join('');
-    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div>${evBanners()}<div class="phPages">${pages}</div><div class="phDots">${dots}</div><div class="phHint">👆 ปัดซ้าย-ขวา เพื่อเลื่อนดูแอปอื่น</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
+    return `<div class="phone"><div class="phScr home">${wallLayer()}${status}<div class="phClock"><b>${clock}</b><small>${dt ? `${dt.day} ${G.months[dt.month]}` : ''}</small></div>${evBanners()}<div class="phPages">${pages}</div><div class="phDots">${dots}</div><div class="phHint">👆 ปัดซ้าย-ขวา (คอม: หมุนล้อเมาส์ / ลาก / กดจุด) เพื่อดูแอปอื่น</div><button class="phBar" data-m='{"fn":"phClose"}' title="ปิด"></button></div><img class="phFrame" src="assets/phone/frame.webp" alt=""></div>`;
   }
   let body = '';
   if (tab === 'contacts') {

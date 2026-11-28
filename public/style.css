@@ -2255,7 +2255,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .phPage .phSec{margin:6px 6px 10px;text-align:center;border:0;padding:3px 0;border-radius:999px;background:rgba(20,12,6,.32);backdrop-filter:blur(4px);font-size:11px;letter-spacing:.3px}
 .phPage .phApps{flex:none;overflow:visible;padding:0 2px;gap:10px 2px}
 .phDots{display:flex;justify-content:center;gap:6px;margin:2px 0 2px;position:relative;z-index:1}
-.phDots i{width:7px;height:7px;border-radius:4px;background:rgba(255,255,255,.55);box-shadow:0 0 2px rgba(0,0,0,.5);transition:width .2s,background .2s}
+.phDots i{cursor:pointer;width:7px;height:7px;border-radius:4px;background:rgba(255,255,255,.55);box-shadow:0 0 2px rgba(0,0,0,.5);transition:width .2s,background .2s}
 .phDots i.on{width:16px;background:#fff}
 .phHint{display:table;flex:none;font-size:10.5px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);margin:2px auto 22px;padding:3px 12px;border-radius:999px;background:rgba(20,12,6,.5);position:relative;z-index:1;animation:phHint 2.4s ease-in-out infinite}
 @keyframes phHint{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
