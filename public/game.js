@@ -254,7 +254,7 @@ function drawVeh(key, view, faceLeft, px, py, glow) {
       g.shadowColor = glow; g.shadowBlur = TS * .4; g.drawImage(atlasImg, s[0], s[1], s[2], s[3], 0, 0, w, h); g.drawImage(atlasImg, s[0], s[1], s[2], s[3], 0, 0, w, h);
     });
     ctx.drawImage(c, -w / 2 - pad, -h - pad, w + pad * 2, h + pad * 2);
-  } else ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), w, h);
+  } else aDraw(`w_${key}_${s === vehSpr(key, 'front') ? 'f' : s === vehSpr(key, 'side') ? 's' : 'b'}`, s, Math.round(-w / 2), Math.round(-h), w, h);
   ctx.restore();
 }
 function drawRide(p, v, px, py, k, view, dir) {
@@ -2588,7 +2588,7 @@ function drawSoilCrop(e, X, Y, t) {
   if (cs && atlasImg) {                          // the painted plant (anchored at its feet, sways a touch, ripe ones bob)
     const w = cs[2] / atlas.tile * TS, h = cs[3] / atlas.tile * TS, bob = st === 4 ? Math.sin(t / 420 + e[1] * 3) * 1 : 0;
     ctx.save(); ctx.translate(Math.round(px), Math.round(py + TS * .46)); ctx.transform(1, 0, -sway / TS * .6, 1, 0, 0);
-    ctx.drawImage(atlasImg, cs[0], cs[1], cs[2], cs[3], Math.round(-w / 2), Math.round(-h + bob), Math.round(w), Math.round(h)); ctx.restore();
+    aDraw(`cr_${crop}_${st}`, cs, Math.round(-w / 2), Math.round(-h + bob), Math.round(w), Math.round(h)); ctx.restore();
   } else {
   const leaf = (ang, len, wid, col) => { ctx.save(); ctx.translate(px + sway * .5, by - TS * .04); ctx.rotate(ang + sway / TS); ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(0, -len / 2, wid, len / 2, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(20,60,20,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -len * .8); ctx.stroke(); ctx.restore(); };
   if (st === 0) {                               // seeds just sown
@@ -4192,7 +4192,7 @@ function drawAnimal(q, X, Y) {
     const name = q.moving ? `an_${q.k}${Math.floor(t / 150 + q.id) % AN_N[q.k]}` : idle ? AN_IDLE[q.k] : `an_${q.k}0`, s = atlas.sprites[name] || sp;
     const w = s[2] / atlas.tile * TS, h = s[3] / atlas.tile * TS, x = q.x * TS + X, y = q.y * TS + Y; if (x < -90 || y < -90 || x > VW + 90 || y > VH + 90) return;
     ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(x, y, w * .38, TS * .09, 0, 0, 7); ctx.fill();
-    ctx.save(); ctx.translate(Math.round(x), Math.round(y)); if (q.left) ctx.scale(-1, 1); ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], -w / 2, -h, w, h); ctx.restore(); return;
+    ctx.save(); ctx.translate(Math.round(x), Math.round(y)); if (q.left) ctx.scale(-1, 1); aDraw(atlas.sprites[name] ? name : 'an_' + q.k + '0', s, -w / 2, -h, w, h); ctx.restore(); return;
   }
   const A = AN_ART[q.k], c = anImg(q.k, q.moving && Math.floor(performance.now() / 170 + q.id) % 2 ? 1 : 0), px = TS * A.h / c.height, w = c.width * px, h = c.height * px;
   const x = q.x * TS + X, y = q.y * TS + Y; if (x < -60 || y < -60 || x > VW + 60 || y > VH + 60) return;
@@ -4218,7 +4218,7 @@ function drawParkGate(x, y, X, Y, town) {
   const sp = town && atlas?.sprites?.b_parkgate;
   if (sp && atlasImg) {                              // the big painted entrance by the south avenue (seen from town)
     const W = 7.2, w = W * TS, h = w * sp[3] / sp[2], px = x * TS + X, py = (y + .8) * TS + Y;
-    ctx.drawImage(atlasImg, sp[0], sp[1], sp[2], sp[3], Math.round(px - w / 2), Math.round(py - h), Math.round(w), Math.round(h));
+    aDraw('b_parkgate', sp, Math.round(px - w / 2), Math.round(py - h), Math.round(w), Math.round(h));
     ctx.font = `700 ${Math.round(TS * .5)}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#b4467a';
     ctx.fillText('🎡 สวนสนุก', px, py - h * (1 - .256)); return;
   }
@@ -7120,6 +7120,7 @@ function makeDrag(e, key) {
 { const e = document.getElementById('eyeBtn'); makeDrag(e, 'lt_eye');
   if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28zl', d: '28 พ.ย.', items: ['🌳 มือถือ: ต้นไม้ รถ ม้านั่ง ของแต่งเมือง สัตว์ในฟาร์ม และพืชผล คมชัดแล้ว', '⚡ โหลดภาพคมทีละนิดเฉพาะที่อยู่ใกล้ ไม่ทำให้เกมกระตุก'] },
   { v: '2026-11-28zk', d: '28 พ.ย.', items: ['🏠 ร้านและอาคารคมชัดบนมือถือทุกรุ่น รวม iPhone (โหลดเฉพาะอาคารที่อยู่ใกล้ ไม่กินแรม)'] },
   { v: '2026-11-28zj', d: '28 พ.ย.', items: ['🏠 มือถือ Android: ร้านและอาคารคมชัดแล้ว ไม่เบลอ', '📱 จอมือถือโล่งขึ้น: ปุ่มวิ่ง/พัก/อิโมจิ รวมไว้ในปุ่ม ⋯ แถบพลังย่อเหลือ 2 แถว', '💬 แชทหุบเองถ้าไม่ได้แตะ 15 วินาที'] },
   { v: '2026-11-28zi', d: '28 พ.ย.', items: ['🎟️ ใหม่! พาสเมืองรายเดือน 30 ขั้น เริ่ม 1 ธ.ค. เล่นเก็บแต้มรับรางวัลฟรีทุกขั้น ปุ่ม 🎟️ มุมขวาบน', '👑 พาสพรีเมียม ฿59 ได้เพชร 350+ ไข่สัตว์เลี้ยง 4 ใบ รับย้อนหลังได้', '🎁 แพ็กมือใหม่ ฿19 💎120 + ไข่ 2 ใบ (ซื้อได้ครั้งเดียว)'] },
@@ -9733,15 +9734,30 @@ fetch('assets/atlas.json?v=v34').then(r => r.json()).then(j => {
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
   im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v34';
 });
-// 📱 phones: buildings are drawn from their own full-size file (assets/bld/), loaded when near and dropped when far,
+// 📱 phones: buildings, trees, props and cars are drawn from their own full-size file (assets/bld/), loaded when near and dropped when far,
 // so they stay sharp (the half atlas made shops blurry) without the memory of the full atlas; until one arrives the half atlas stands in
-const BLDI = new Map();   // name -> { img, ok, used }
+const SHARP_OK = (name, s) => s[2] * s[3] >= 400 && !name.startsWith('g_') && !name.startsWith('fl_');   // half-atlas size; tools/build_half_atlas.py exports the same set (40x40+ full size)
+const BLDI = new Map(), BLDQ = []; let bldBusy = 0, bldT = 0;   // name -> { img, ok, used } · waiting names · loads in flight · seconds tick
+setInterval(() => bldT++, 1000);
+function bldPump() {
+  while (bldBusy < 4 && BLDQ.length) {
+    const e = BLDI.get(BLDQ.shift()); if (!e || e.img.src) continue;
+    bldBusy++; const done = ok => { bldBusy--; if (ok) e.ok = true; else e.bad = true; bldPump(); };
+    e.img.onload = () => (e.img.decode ? e.img.decode() : Promise.resolve()).then(() => done(1), () => done(1));   // decode before the first draw: no hitch mid-frame
+    e.img.onerror = () => done(0); e.img.src = `assets/bld/${e.n}${SNOW ? '_s' : ''}.webp?v=1`;
+  }
+}
 function bldImg(name) {
   let e = BLDI.get(name);
-  if (!e) { e = { img: new Image(), ok: false, used: 0 }; e.img.decoding = 'async'; e.img.onload = () => { e.ok = true; }; e.img.onerror = () => { e.bad = true; }; e.img.src = `assets/bld/${name}${SNOW ? '_s' : ''}.webp?v=1`; BLDI.set(name, e); }
-  e.used = performance.now(); return e.ok ? e.img : null;
+  if (!e) { e = { n: name, img: new Image(), ok: false, used: 0 }; BLDI.set(name, e); BLDQ.push(name); bldPump(); }
+  e.used = bldT; return e.ok ? e.img : null;
 }
-if (HALF_ATLAS) setInterval(() => { const t = performance.now(); for (const [k, e] of BLDI) if (t - e.used > 30e3) { e.img.src = ''; BLDI.delete(k); } }, 10e3);   // not drawn for 30 s = far away: let it go
+if (HALF_ATLAS) setInterval(() => { for (const [k, e] of BLDI) if (bldT - e.used > 30 && (e.ok || e.bad)) { e.img.src = ''; BLDI.delete(k); } }, 10e3);   // not drawn for 30 s = far away: let it go
+// draw atlas sprite `name` (rect s) at dx,dy,dw,dh: the sharp single file on phones once it is in, else the atlas
+function aDraw(name, s, dx, dy, dw, dh) {
+  const bi = HALF_ATLAS && SHARP_OK(name, s) && bldImg(name);
+  if (bi) ctx.drawImage(bi, dx, dy, dw, dh); else ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], dx, dy, dw, dh);
+}
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
 if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v34').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v34'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
@@ -9785,9 +9801,7 @@ function spr(name, cx, by, X, Y, scale = 1) {
   if (name[0] === 'b' && name[1] === 'n' && name[2] === '_') return benchSpr(name, cx, by, X, Y);
   const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
   const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
-  const bi = HALF_ATLAS && name[0] === 'b' && name[1] === '_' && bldImg(name);
-  if (bi) { ctx.drawImage(bi, Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h)); return true; }
-  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
+  aDraw(name, s, Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
   return true;
 }
 // 🪑 the benches (assets/benches.webp): wood / stone, seen from the front, the back and both sides
@@ -10270,7 +10284,7 @@ function drawCar(c, X, Y) {
   const w = s[2] / atlas.tile * TS * sc, h = s[3] / atlas.tile * TS * sc;
   const cx = Math.round(c.x * TS + X), by = Math.round((c.y + halfY(c) * (c.dx ? 1.1 : .9)) * TS + Y);
   ctx.save(); ctx.translate(cx, by); if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
+  aDraw(name, s, Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); ctx.restore();
 }
 function drawSirens(X, Y) {
   if (!ambs.length) return;

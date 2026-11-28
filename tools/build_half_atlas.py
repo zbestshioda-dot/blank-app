@@ -18,13 +18,14 @@ for name in ([] if ONLY_BLD else ['atlas', 'atlas_snow']):
 # the ground and floor textures stay sharp: a small full-size sheet of just those (tex() in game.js uses it on phones)
 J = json.load(open(os.path.join(A, 'atlas.json')))
 
-# buildings (b_*) stay sharp too: one full-size file each in assets/bld/ (<name>.webp, snow: <name>_s.webp);
+# buildings, trees, props, cars (any sprite of 40x40+ that is not a ground/floor texture) stay sharp too: one full-size file each in assets/bld/ (<name>.webp, snow: <name>_s.webp);
 # phones load only the ones near the player and drop the far ones (spr() in game.js), so memory stays small
 os.makedirs(os.path.join(A, 'bld'), exist_ok=True)
+sharpOk = lambda k, w, h: not k.startswith(('g_', 'fl_')) and w * h >= 1600   # keep in step with SHARP_OK in game.js
 for name, suf in [('atlas', ''), ('atlas_snow', '_s')]:
     im = Image.open(os.path.join(A, name + '.webp')).convert('RGBA'); tot = 0
     for k, (X, Y, w, h) in J['sprites'].items():
-        if not k.startswith('b_'): continue
+        if not sharpOk(k, w, h): continue
         f = os.path.join(A, 'bld', k + suf + '.webp'); im.crop((X, Y, X + w, Y + h)).save(f, 'WEBP', quality=92, method=6); tot += os.path.getsize(f)
     print(name, '-> bld/*' + suf + '.webp', tot, 'bytes')
 if ONLY_BLD: sys.exit()
