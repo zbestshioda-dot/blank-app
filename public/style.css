@@ -2308,3 +2308,16 @@ body.noHud #eyeBtn{opacity:.75}
 #spiritBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 230px);z-index:40;padding:7px 16px;border-radius:20px;font-weight:700;background:linear-gradient(#5a6b9a,#2c3658);color:#fff;border:2px solid #cfe2ff;box-shadow:0 0 12px rgba(190,220,255,.7)}
 #spiritBtn.hidden{display:none}
 body.noHud #spiritBtn{visibility:hidden}
+/* 🎟️ Town Pass */
+#passBtn{position:relative;background:linear-gradient(#fff1c2,#f0b43a);border-color:#8a5a10}#passBtn b.q{color:#fff;text-shadow:0 1px 2px #8a5a10}
+#passBtn s{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#e33;color:#fff;font:800 11px/18px sans-serif;text-decoration:none;display:none}
+#passBtn.tpHas s{display:block}#passBtn.tpHas{animation:tuGlow 1.6s ease-in-out infinite}
+.tpBar{position:relative;height:22px;border-radius:11px;background:#e8e2d4;overflow:hidden;margin:6px 0 8px}.tpBar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#f7c948,#f08a24)}
+.tpBar span{position:relative;display:block;text-align:center;font:800 12px/22px sans-serif;color:#3a2a08}
+.tpL{max-height:52vh;overflow:auto;border-radius:10px}
+.tpR{display:grid;grid-template-columns:38px 1fr 1fr;gap:6px;align-items:stretch;margin:4px 0}.tpH{font-size:13px;text-align:center}
+.tpN{display:flex;align-items:center;justify-content:center;border-radius:8px;background:#ddd;color:#555}.tpR.on .tpN{background:#f7c948;color:#3a2a08}
+.tpC{min-height:44px;border-radius:8px;border:2px solid #ddd;background:#fafafa;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;text-align:center}
+.tpC.big{border-color:#c9a0ff;background:#f5edff}.tpC.got{opacity:.55}.tpC.lock{filter:grayscale(.6);opacity:.75}
+.tpC.ok{border-color:#2fa34a;background:#e4ffd6;cursor:pointer}.tpC.ok b{color:#2fa34a}
+.tpBuy{text-align:center;background:linear-gradient(#fff6d8,#ffe19a)}

@@ -858,7 +858,7 @@ function refTick() {
   const t = now();
   for (const a of online.values()) {
     markSeen(a); nbDaily(a);
-    if (t - (a.lastMoveT || 0) < 120e3) { a.playMin = (a.playMin || 0) + 1; a.sd = true; }   // 📊 minutes of real play (for the admin stats)
+    if (t - (a.lastMoveT || 0) < 120e3) { a.playMin = (a.playMin || 0) + 1; a.sd = true; passPt(a); if (a.playMin === 40) offerStarter(a, 'play'); }   // 📊 minutes of real play (for the admin stats) · 🎟️ pass points
     if (!a.refPend || t - (a.lastMoveT || 0) > 120e3) continue;
     a.actMin = (a.actMin || 0) + 1; a.sd = true;
     if (a.actMin < REF.needMin) continue;
@@ -2053,6 +2053,7 @@ function addXp(a, n = 1, c = a.career) {   // c: the job whose work this was (ad
   if (c === 'office' && lvl(a) > before && lvl(a) <= D.OFFICE_TITLES.length) {   // 🎊 promotion, whatever gave the XP (shift, mission, typing game)
     const ti = D.OFFICE_TITLES[lvl(a) - 1]; stat(a, 'promo'); feed(`🎊 ${a.name} ได้เลื่อนตำแหน่งเป็น${ti}`); toast(a, `🎊 ได้เลื่อนตำแหน่งเป็น${ti}! เงินเดือนขึ้น`, '🎊');
   }
+  if (lvl(a) > before) offerStarter(a, 'lv');
   if (c !== 'office' && lvl(a) > before) { toast(a, `🎉 เลเวลอาชีพ${D.CAREERS[c].name}อัปเป็น Lv.${lvl(a)}! ได้เงินจากงานเพิ่มเป็น +${Math.round((jobPay(a) - 1) * 100)}%`, '⭐'); if (lvl(a) % 5 === 0) feed(`⭐ ${a.name} เลเวล${D.CAREERS[c].name}ถึง Lv.${lvl(a)}`); }
 }
 // licences that expire: the driving licence must be renewed every in-game year (1 real day)
@@ -2105,7 +2106,7 @@ function worth(a) {
 // ------------------------------------------------------------------ persistence
 function hashPin(pin, salt) { return crypto.createHash('sha256').update(salt + ':' + pin).digest('hex'); }
 const PET_LEASH = 800;
-const SAVE_KEYS = ['ranch', 'gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'bus99', 'condo', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
+const SAVE_KEYS = ['ranch', 'gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'bus99', 'condo', 'nmBag', 'pushBack', 'npcLove', 'nanFix', 'nanGem', 'devs', 'ips', 'ban', 'susL', 'docLog', 'mis', 'case', 'misNext', 'detNext', 'cases', 'docjob', 'dogq', 'ev7', 'lk', 'paidG', 'vipT', 'tpass', 'tpassP', 'stBuy', 'offT', 'offN', 'paidN', 'paidThb', 'ledger', 'ledBal', 'lastOff', 'hfl', 'hwl', 'hdeco', 'koDay', 'luxT', 'useDay', 'tax', 'fuelDay', 'fuelDue', 'lotto', 'lottoRes', 'jgDay', 'santa', 'rcode', 'refBy', 'refN', 'refPend', 'refPaid', 'actMin', 'pnames', 'leash', 'leashOn', 'gang', 'gpd', 'mpd', 'idd', 'v', 'login', 'name', 'salt', 'hash', 'avatar', 'money', 'energy', 'hunger', 'health', 'career', 'licenses', 'xp', 'inv', 'x', 'y', 'earned',
   'created', 'prayDay', 'prayDays', 'folk', 'ms', 'endings', 'playMin', 'projUse', 'gsw', 'festGot', 'quests', 'qStreak', 'lastLogin', 'loginStreak', 'loginDays', 'wquests', 'keep', 'achGot', 'tools', 'vehicles', 'ride', 'gems', 'house', 'furniture', 'hlv', 'fpos', 'yz', 'ycrops', 'yfree', 'wst', 'msat', 'stocks', 'bank', 'bankT', 'loan', 'dz', 'awake', 'listings',
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
@@ -5839,7 +5840,7 @@ function meView(a) {
     pose: a.pose, down: a.down, cast: a.cast ? { state: a.cast.state, x: a.cast.x, y: a.cast.y, fight: a.cast.state === 'fight' ? a.cast.fight : null } : null, garden: a.garden, enrolled: a.enrolled, classes: a.classes || 0,
     office: a.office ? { n: a.office.n || 0, strikes: a.office.strikes, day: a.office.day, late: a.office.late, hours: +(a.office.hours || 0).toFixed(2), closed: a.office.closed } : null,
     gender: a.gender, look: a.look, wardrobe: a.wardrobe, admin: isAdmin(a), god: isAdmin(a) ? (a.god || {}) : null,
-    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb ? NBM.view(a, dayKey(), dayKeyAt(a.nb.t0)) : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
+    run: !!a.run, rod: a.rod || 0, fishLv: fishLv(a), frec: a.fishRec || {}, fcol: a.fcol || [], merit: a.merit || 0, aq: a.aq || [], aqSlots: aqSlots(a), pushN: (a.push || []).length, card: cardOn(a) ? { until: a.card.until, got: a.card.last === dayKey() ? 1 : 0 } : null, tp: passTier(a) * (passPrem(a) ? 2 : 1) - passOf(a).f.length - (passPrem(a) ? passOf(a).g.length : 0), czNet: a.cz?.d === dayKey() ? a.cz.net : 0, dk: Math.round(drunkLv(a)), bar: inBar(a) ? barView() : null, tix: a.tix || 0, pyd: a.pyd || [], nb: a.nb ? NBM.view(a, dayKey(), dayKeyAt(a.nb.t0)) : null, lbn: a.lbn || [], lbnSeen: a.lbnSeen || 0, fishXp: a.xp?.fisher || 0, hideJob: !!a.hideJob, outfit: a.outfit || '', pets: a.pets || [], pet: a.pet || '', show: showOf(a), pnames: a.pnames || {}, leash: a.leash ? 1 : 0, leashOn: a.leashOn ? 1 : 0, leashPrice: PET_LEASH, frames: a.frames || [], frame: frameOf(a), rods: a.rods || [], rodEq: rodOf(a) ? (a.rods.includes(a.rodEq) ? a.rodEq : a.rods[0]) : '', outfits: a.outfits || [], fishdex: a.fishdex || {}, wearing: outfitOf(a),
     licExp: a.licExp || {}, desk: a.desk ?? -1, study: a.school ? +(a.school.p || 0).toFixed(3) : 0,
     mis: misView(a), misNext: a.misNext || 0, rival: a.rival ? { x: a.rival.x, y: a.rival.y, name: a.rival.name, until: a.rival.until, lv: a.rival.lv } : null, rb: a.rb ? 1 : 0,
     auc: a.auc ? { stage: a.auc.stage, name: a.auc.name, icon: a.auc.icon, items: a.auc.items, cond: a.auc.cond, lo: a.auc.lo, hi: a.auc.hi, until: a.auc.until, my: a.auc.my, bots: a.auc.bots.map(b => ({ name: b.name, style: b.style, sent: !!b.sent })), real: a.auc.stage === 'done' ? a.auc.real : null, result: a.auc.result || null, win: a.auc.win || null, net: a.auc.net ?? null } : null, aucNext: a.aucNext || 0,
@@ -6300,6 +6301,7 @@ function onMessage0(ws, raw) {
     case 'idea': { if (!cd(a, 'idea', 300, true)) return; if (m.op === 'list') return ideaView(a, m.sort); return ideaOp(a, m); }
     case 'mayor': { if (a.down) return; if (!cd(a, 'mayor', 400, true)) return; return mayorOp(a, m); }
     case 'pay': { if (!cd(a, 'pay', 800, true)) return; return payOp(a, m); }
+    case 'tpass': { if (!cd(a, 'tpass', 300, true)) return; return passOp(a, m); }
     case 'gemswap': {   // 💎 → ฿: 1 gem = GEM_RATE baht, at most GEM_DAY gems a day
       if (!cd(a, 'gsw', 800, true)) return;
       if (godInf(a)) return toast(a, 'แอดมินเพชรไม่จำกัด แลกเป็นเงินไม่ได้', '💎', false);
@@ -7224,6 +7226,53 @@ function tick() {
   if (t > saveAt) { saveAt = t + 15000; save(); }
 }
 
+// ------------------------------------------------------------------ 🎟️ Town Pass (monthly season; free + premium track) and 🎁 the one-time starter pack offer
+const passSeason = () => dayKey().slice(0, 7);
+const passEnd = () => { const [y, m] = passSeason().split('-').map(Number); return Date.UTC(y, m, 1) - 7 * 3600e3; };
+function passOf(a) { const s = passSeason(); if (a.tpass?.s !== s) a.tpass = { s, p: 0, f: [], g: [] }; return a.tpass; }
+const passTier = a => Math.min(D.PASS.tiers, Math.floor(passOf(a).p / D.PASS.pts));
+const passPrem = a => a.tpassP === passSeason();
+const passView = a => { const P = passOf(a); return { t: 'tpass', s: P.s, p: P.p, f: P.f, g: P.g, prem: passPrem(a) ? 1 : 0, end: passEnd(), pts: D.PASS.pts, free: D.PASS.free, premR: D.PASS.prem, of: D.PASS.outfit[P.s] || '', ofG: D.PASS.ofGems, thb: D.PASS.thb, pay: PAY.ON ? 1 : 0 }; };
+function passPt(a) {
+  const before = passTier(a); passOf(a).p++;
+  const n = passTier(a); if (n <= before) return;
+  toast(a, `🎟️ พาสเมืองขึ้นขั้น ${n}! กดรับรางวัลที่ปุ่ม 🎟️${passPrem(a) ? '' : ' (มีพาสพรีเมียมได้เพิ่มอีกช่อง)'}`, '🎟️');
+  markMe(a);
+}
+function passGive(a, r) {
+  const got = [];
+  if (r.money) { earn(a, r.money, true); got.push(money(r.money)); }
+  if (r.gems) { a.gems = (a.gems || 0) + r.gems; got.push(`💎${r.gems}`); }
+  if (r.eggs) { addItem(a, 'petegg', r.eggs); got.push(`🥚 ไข่สัตว์เลี้ยง x${r.eggs}`); }
+  if (r.outfit) {
+    const of = D.PASS.outfit[passOf(a).s];
+    if (of && D.OUTFITS[of] && !(a.outfits || []).includes(of)) { a.outfits = [...(a.outfits || []), of]; a.outfit = of; sendRoster(); got.push(`🎽 ${a.gender === 'f' && D.OUTFITS[of].nf || D.OUTFITS[of].name} (ใส่ให้แล้ว)`); }
+    else { a.gems = (a.gems || 0) + D.PASS.ofGems; got.push(`💎${D.PASS.ofGems}`); }
+  }
+  return got.join(' ');
+}
+function passOp(a, m) {
+  if (m.op === 'claim') {
+    const P = passOf(a), tr = m.tr === 'g' ? 'g' : 'f', n = Math.floor(+m.n), all = m.n === 'all';
+    if (tr === 'g' && !passPrem(a)) return toast(a, 'ช่องนี้สำหรับพาสพรีเมียม ซื้อได้ที่ 💎 เติมเงิน', '🎟️', false);
+    const list = all ? Array.from({ length: passTier(a) }, (_, i) => i + 1) : [n];
+    const got = [];
+    for (const t of list) {
+      if (!(t >= 1 && t <= passTier(a)) || P[tr].includes(t)) continue;
+      P[tr].push(t); got.push(passGive(a, (tr === 'g' ? D.PASS.prem : D.PASS.free)[t - 1]));
+    }
+    if (!got.length) return toast(a, 'ยังไม่มีรางวัลให้รับในช่องนี้', '🎟️', false);
+    a.sd = true; markMe(a); toast(a, `🎟️ รับรางวัลพาสแล้ว: ${got.join(' · ')}`, '🎁');
+  }
+  send(a, passView(a));
+}
+function offerStarter(a, why) {
+  if (!PAY.ON || a.stBuy || !a.ws || now() - (a.offT || 0) < 20 * 3600e3 || (a.offN || 0) >= 6) return;
+  const pk = PAY.PACKS.find(p => p.kind === 'starter'); if (!pk) return;
+  a.offT = now(); a.offN = (a.offN || 0) + 1; a.sd = true;
+  setTimeout(() => { if (a.ws && !a.stBuy) send(a, { t: 'offer', why, pk }); }, 2500);   // after the level-up toast
+}
+
 // ------------------------------------------------------------------ 💎 real-money top-up (PromptPay QR + slip check by Slip2Go, see pay.js)
 let payOrders = {};   // ref -> { ref, l, n, pack, gems, thb, m, t, st: new|paid|review|exp|void, why, bonus, slip, qr, tries, paidT, by }
 const PAY_OPEN = 6;   // at most this many unpaid orders per player in 15 minutes
@@ -7231,7 +7280,7 @@ const PAY_TTL = 24 * 3600e3;
 function payMine(a) { const l = lk(a); return Object.values(payOrders).filter(o => o.l === l && o.st !== 'exp').sort((x, y) => y.t - x.t).slice(0, 10).map(o => ({ ref: o.ref, pack: o.pack, gems: o.gems, bonus: o.bonus || 0, thb: o.thb, m: o.m, t: o.t, st: o.st, why: o.st === 'review' ? o.why || '' : '', ...(o.st === 'new' && o.m === 'slip' ? { qr: PAY.promptPayQR(o.thb) } : {}) })); }
 function payView(a) {
   return { t: 'pay', on: PAY.ON ? 1 : 0, sb: 0, packs: PAY.PACKS, first: a.paidG ? 0 : 1, bonus: PAY.FIRST_BONUS, methods: {}, banks: {}, my: payMine(a), gems: a.gems || 0,
-    vipT: a.vipT || 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0, to: PAY.NAME, pp: PAY.ppShow() };
+    vipT: a.vipT || 0, stBuy: a.stBuy ? 1 : 0, prem: passPrem(a) ? 1 : 0, hasAngel: (a.outfits || []).includes('angel') ? 1 : 0, to: PAY.NAME, pp: PAY.ppShow() };
 }
 function payOp(a, m) {
   if (m.op === 'view') return send(a, payView(a));
@@ -7256,6 +7305,8 @@ function payOp(a, m) {
   if (!pk) return toast(a, 'เลือกแพ็กก่อน', '💎', false);
   const g = m.to ? byPhone.get(String(m.to)) : null;   // 🎁 gift to a friend in my contacts
   if (m.to && (!g || g === a || !(a.contacts || []).some(c => c.p === g.phone))) return toast(a, 'ส่งของขวัญได้เฉพาะเพื่อนในรายชื่อโทรศัพท์', '🎁', false);
+  if (pk.kind === 'starter' && (g || a.stBuy)) return toast(a, g ? 'แพ็กมือใหม่ซื้อให้เพื่อนไม่ได้' : 'คุณซื้อแพ็กมือใหม่ไปแล้ว (ซื้อได้ครั้งเดียว)', '🎁', false);
+  if (!g && pk.kind === 'pass' && passPrem(a)) return toast(a, 'คุณมีพาสเมืองเดือนนี้แล้ว', '🎟️', false);
   if (!g && pk.kind === 'outfit' && (a.outfits || []).includes(pk.of)) return toast(a, 'คุณมีชุดนี้แล้ว', '👗', false);
   const l = lk(a), t = now(), to = g ? lk(g) : undefined;
   const same = Object.values(payOrders).find(o => o.l === l && o.st === 'new' && o.pack === pk.id && o.to === to && t - o.t < 30 * 60e3);
@@ -7292,6 +7343,13 @@ function payCredit(o, by) {
   if (pk.kind === 'card') {                  // 💳 monthly card: 30 more days (stacks) + 💎100 now; the daily 💎20 is claimed in game
     x.card = { until: Math.max(now(), x.card?.until || 0) + pk.days * 864e5, last: x.card?.last || '' }; x.gems = (x.gems || 0) + pk.gems; o.bonus = 0; o.gave = { gems: pk.gems, card: pk.days * 864e5 };
     got = `บัตรรายเดือน 30 วัน + 💎${pk.gems} ทันที · กดรับ 💎${pk.daily} ทุกวันได้ถึง ${new Date(x.card.until + 7 * 3600e3).toISOString().slice(0, 10)}`;
+  } else if (pk.kind === 'pass') {           // 🎟️ this month's premium track (already had it → diamonds instead)
+    o.bonus = 0;
+    if (passPrem(x)) { x.gems = (x.gems || 0) + D.PASS.refund; o.gave = { gems: D.PASS.refund }; got = `💎${D.PASS.refund} (มีพาสเมืองเดือนนี้อยู่แล้ว)`; }
+    else { x.tpassP = passSeason(); o.gave = { pass: x.tpassP }; got = `พาสเมืองพรีเมียมเดือนนี้ (รับรางวัลย้อนหลังได้ทุกขั้นที่ปุ่ม 🎟️)`; }
+  } else if (pk.kind === 'starter') {        // 🎁 one-time starter pack
+    o.bonus = 0; x.stBuy = 1; x.gems = (x.gems || 0) + pk.gems; addItem(x, 'petegg', pk.eggs); o.gave = { gems: pk.gems, eggs: pk.eggs, st: 1 };
+    got = `💎${pk.gems} + 🥚 ไข่สัตว์เลี้ยง x${pk.eggs} (เปิดไข่ได้ในกระเป๋า 🎒)`;
   } else if (pk.kind === 'title') {                 // supporter title: +30 days (stacks), switched on right away
     const T = D.PAY_TITLE; x.vipT = Math.max(now(), x.vipT || 0) + T.days * 86400e3; x.title = T.id; o.bonus = 0; o.gave = { vip: T.days * 86400e3 };
     got = `ฉายาพิเศษ «${T.title}» ใช้ได้ถึง ${new Date(x.vipT + 7 * 3600e3).toISOString().slice(0, 10)} (ใส่ให้แล้ว เปลี่ยนได้ที่ 🏅 ฉายา)`;
@@ -7321,6 +7379,8 @@ function payRevoke(o, by) {
   if (x) {
     if (gave.card && x.card) { x.card.until = Math.max(0, x.card.until - gave.card); what = 'บัตรรายเดือน 30 วัน + '; }
     if (gave.vip) { x.vipT = Math.max(0, (x.vipT || 0) - gave.vip); if (x.vipT <= now()) { x.vipT = 0; if (x.title === D.PAY_TITLE.id) x.title = ''; } what = 'ฉายาผู้สนับสนุน 30 วัน'; }
+    if (gave.pass && x.tpassP === gave.pass) { x.tpassP = ''; what = 'พาสเมืองพรีเมียม'; }
+    if (gave.st) { x.stBuy = 0; if (gave.eggs) addItem(x, 'petegg', -Math.min(gave.eggs, x.inv?.petegg || 0)); what = 'แพ็กมือใหม่ + '; }
     if (gave.of) { x.outfits = (x.outfits || []).filter(i => i !== gave.of); if (x.outfit === gave.of) x.outfit = ''; what = 'ชุดเทวดา/นางฟ้า'; }
     if (gave.gems) { const had = x.gems || 0; x.gems = Math.max(0, had - gave.gems); if (gave.fb) x.paidG = 0; what = `💎${gave.gems}` + (had < gave.gems ? ` (มีเหลือ 💎${had} จึงหักได้เท่านั้น)` : ''); }
     if (b) { b.paidN = Math.max(0, (b.paidN || 0) - 1); b.paidThb = Math.max(0, (b.paidThb || 0) - o.thb); b.sd = true; } x.sd = true; dirty = true;

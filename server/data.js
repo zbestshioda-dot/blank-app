@@ -473,6 +473,11 @@ const GYM = {
   bench: { name: 'ม้านั่งยกน้ำหนัก', icon: '🏋️', energy: -.3, health: .14, happy: .04, desc: 'ยกเวทเพิ่มสุขภาพเร็ว (ไม่เพิ่มเพดาน)' },
   yoga:  { name: 'เสื่อโยคะ', icon: '🧘', energy: .12, health: .03, happy: .12, desc: 'โยคะผ่อนคลาย ฟื้นพลังงานและความสุข' },
 };
+// 🎟️ Town Pass: one season per Thai calendar month. 1 point per minute of real play; every `pts` points = 1 tier.
+// outfit: { '2026-12': '<outfit id>' } = the premium tier-30 outfit of that month (missing → 💎200 instead)
+const PASS = { thb: 59, tiers: 30, pts: 40, refund: 200, ofGems: 200, outfit: {},
+  free: Array.from({ length: 30 }, (_, i) => { const t = i + 1; return t % 10 === 0 ? { eggs: 1 } : t % 5 === 0 ? { gems: 5 } : { money: 500 * Math.ceil(t / 3) }; }),
+  prem: Array.from({ length: 30 }, (_, i) => { const t = i + 1; return t === 30 ? { outfit: 1, gems: 100 } : t % 10 === 0 ? { eggs: 2, gems: 20 } : t % 5 === 0 ? { gems: 30 } : t % 2 ? { gems: 10 } : { money: 3000 * Math.ceil(t / 5) }; }) };
 const GYM_PASS = { price: 150, hours: 24 };   // 🎫 day pass: bought on the first machine you step on, good for 24 real hours
 const GYM_SPR = { x_treadmill: 'tread', x_ebike: 'bike', x_wbench: 'bench', x_yoga: 'yoga' };
 const GYM_GRACE = 2 * 3600e3, GYM_FADE = 20 * 60e3;   // the extra ceiling holds 2 hours after the last workout, then loses 1 every 20 minutes back to 100
@@ -2660,7 +2665,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { CRIMES, JAIL, GHOST, RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { PASS, CRIMES, JAIL, GHOST, RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, NB_SPAWN, RADIUS, SOLID,

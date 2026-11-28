@@ -24,6 +24,8 @@ const SANDBOX = false;
 // packs: price in baht -> diamonds, or a special item (kind title / outfit). The first diamond top-up of each account gets +50%.
 const PACKS = [
   { id: 'month', kind: 'card', gems: 100, thb: 39, name: 'บัตรรายเดือน 30 วัน', tag: 'คุ้มสุด', daily: 20, days: 30, total: 700, worth: 160 },   // 💳 100 now + 20 a day you claim it
+  { id: 'tpass', kind: 'pass', gems: 0, thb: 59, name: 'พาสเมืองเดือนนี้', tag: 'รางวัลเยอะสุด' },   // 🎟️ premium track of this month's Town Pass
+  { id: 'starter', kind: 'starter', gems: 120, eggs: 2, thb: 19, name: 'แพ็กมือใหม่', tag: 'ซื้อได้ครั้งเดียว' },   // 🎁 once per account, not a gift
   { id: 'vip', kind: 'title', gems: 0, thb: 49, name: 'ฉายาพิเศษ 30 วัน', tag: 'ฉายาวิ้งวับ' },
   { id: 'angel', kind: 'outfit', of: 'angel', gems: 0, thb: 99, name: 'ชุดเทวดา / นางฟ้า', tag: 'ชุดพิเศษ' },
   { id: 'p50', gems: 50, thb: 19 },

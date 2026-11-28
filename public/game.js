@@ -785,7 +785,7 @@ function handle(m) {
       $('#login').classList.add('hidden'); $('#hud').classList.remove('hidden'); document.body.classList.add('inGame');
       chatLog.length = 0; m.chat.forEach(c => chatLog.push(c)); setTimeout(() => paintChatBox(), 0);
       { let tutDone = false; try { tutDone = !!localStorage.getItem('lt_tut2'); } catch { } tutPending = !!(m.isNew || !tutDone); }
-      $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup();
+      $('#topupBtn').classList.toggle('hidden', !m.pay); $('#topupBtn').onclick = () => FN.openTopup(); $('#passBtn').onclick = () => FN.openPass();
       if (tutPending) setTimeout(() => me && (m.isNew ? showStory(0) : showTut(0)), 400);   // 📖 brand-new characters get the opening story first
       else { setTimeout(lkBanner, 1300); if (m.pay?.on && !payBackRef) setTimeout(payBanner, 1600); setTimeout(() => me && checkNews(), 900); } setTimeout(() => { send({ t: 'ms', a: 'view' }); send({ t: 'coop' }); send({ t: 'folks' }); send({ t: 'xtra' }); }, 1500);   // 📕 know the main-story step so townsfolk can offer it
       if (payBackRef) { const r = payBackRef; payBackRef = ''; setTimeout(() => { send({ t: 'pay', op: 'check', ref: r }); openPanel({ kind: 'topup' }); }, 1200); }
@@ -923,6 +923,8 @@ function handle(m) {
     }
     case 'ledger': ledgerRes = m; if (panel?.kind === 'ledger') refreshPanel(true); break;
     case 'pay': payRes = m; if (panel?.kind === 'topup') refreshPanel(true); break;
+    case 'tpass': passRes = m; if (panel?.kind === 'tpass') refreshPanel(true); break;
+    case 'offer': offerPop(m); break;
     case 'payadmin': payAdm = m; if (panel?.kind === 'payadmin') refreshPanel(true); break;
     case 'payqr': payOpenRef = m.ref; if (panel?.kind === 'topup') refreshPanel(true); else openPanel({ kind: 'topup' }); break;
     case 'payredir': toast('กำลังไปหน้าชำระเงิน…', '💳'); setTimeout(() => { location.href = m.url; }, 300); break;
@@ -5312,6 +5314,8 @@ const FN = {
   shareGo() { shareOpen(); },
   godMoney(m, root) { const v = Math.floor(+(root.querySelector('#godMoney')?.value || 0)); if (!(v > 0) && m.op !== 'setmoney') return toast('ใส่จำนวนเงิน', '💰', false); send({ t: 'god', op: m.op || 'addmoney', v }); root.querySelector('#godMoney').value = ''; },
   openTopup() { payRes = null; send({ t: 'pay', op: 'view' }); openPanel({ kind: 'topup' }); },
+  openPass() { send({ t: 'tpass', op: 'view' }); openPanel({ kind: 'tpass' }); },
+  passBuy() { paySel.pack = 'tpass'; paySel.to = ''; FN.openTopup(); },
   payPack(m) { paySel.pack = m.id; refreshPanel(true); },
   payMethod(m) { paySel.m = m.id; refreshPanel(true); },
   payBuy(m, root) {
@@ -6739,7 +6743,7 @@ function gemSwapBox() {   // 💎 → LC (1💎 = 500 LC, up to 💎500 a day; t
 function topupHtml() {
   const R = payRes; if (!R) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
   if (!R.on) return `<h2>💎 ร้านเติมเงิน</h2><div class="sub">ระบบเติมเงินยังไม่เปิดให้บริการ${me?.admin ? '<br>แอดมิน: ตั้งค่า SLIP2GO_SECRET และ PROMPTPAY_ID ใน Fly.io ก่อน' : ''}</div>`;
-  const avail = p => !(p.kind === 'outfit' && R.hasAngel && !paySel.to);
+  const avail = p => !(p.kind === 'outfit' && R.hasAngel && !paySel.to) && !(p.kind === 'starter' && (R.stBuy || paySel.to)) && !(p.kind === 'pass' && R.prem && !paySel.to);
   if (!R.packs.find(p => p.id === paySel.pack && avail(p))) paySel.pack = (R.packs.find(p => p.id === 'p100') || R.packs[0]).id;
   const pk = R.packs.find(p => p.id === paySel.pack);
   if (!R.methods[paySel.m]) paySel.m = Object.keys(R.methods)[0];
@@ -6747,12 +6751,14 @@ function topupHtml() {
   const vipLeft = R.vipT > Date.now() + clockOff ? Math.ceil((R.vipT - Date.now() - clockOff) / 86400e3) : 0;
   const card = p => { const on = p.id === paySel.pack, ok = avail(p), bon = !p.kind && R.first ? Math.round(p.gems * R.bonus) : 0;
     const head = p.kind === 'card' ? `<b style="font-size:15px">💳 บัตรรายเดือน</b><b style="font-size:17px">รวม 💎${p.total}</b><small>💎${p.gems} ทันที + 💎${p.daily}/วัน × ${p.days} วัน<br>ถ้าซื้อเพชรแยก ~${p.worth} LC · <b style="color:var(--good)">คุ้มกว่า 4 เท่า!</b>${me.card ? `<br>✅ มีอยู่ เหลือ ${Math.ceil((me.card.until - Date.now() - clockOff) / 864e5)} วัน (ซื้อเพิ่มต่ออายุ)` : ''}</small>`
+      : p.kind === 'pass' ? `<b style="font-size:26px">🎟️</b><b style="font-size:15px">👑 พาสเมืองพรีเมียม</b><small>${R.prem && !paySel.to ? '✅ มีแล้วเดือนนี้' : 'รางวัล 30 ขั้น · 💎350+ ไข่ 4 ใบ · รับย้อนหลังได้'}</small>`
+      : p.kind === 'starter' ? `<b style="font-size:26px">🎁</b><b style="font-size:15px">แพ็กมือใหม่</b><small>${R.stBuy ? '✅ ซื้อไปแล้ว' : `💎${p.gems} + 🥚×${p.eggs} · ครั้งเดียว`}</small>`
       : p.kind === 'title' ? `<canvas class="ppCv" data-pp="title"></canvas><b style="font-size:15px">💖 ฉายาพิเศษ</b><div>${titleHtml(G.payTitle?.title || 'ผู้สนับสนุนเมือง', 8)}</div><small>30 วัน · สีวิ้งวับ${vipLeft ? ` · เหลือ ${vipLeft} วัน (ต่ออายุได้)` : ''}</small>`
       : p.kind === 'outfit' ? `<canvas class="ppCv" data-pp="angel"></canvas><b style="font-size:15px">😇 ${esc(ofn)}</b><small>${ok ? 'ชุดพิเศษ + ออร่า · ไม่มีขายในร้าน' : '✅ คุณมีชุดนี้แล้ว'}</small>`
       : `<b style="font-size:18px">💎${p.gems}</b>${bon ? `<small style="color:var(--good)">+${bon} โบนัส</small>` : ''}`;
     return `<button class="item" ${ok ? '' : 'disabled'} style="display:block;text-align:center;${on ? 'border:3px solid #2fa34a;background:#e4ffd6;box-shadow:0 0 0 2px #2fa34a' : ''}" data-m='${JSON.stringify({ fn: 'payPack', id: p.id })}'>${on ? '<small style="color:#2fa34a;font-weight:800">✓ เลือกอยู่</small>' : ''}${head}<div style="font-weight:800">฿${p.thb}</div>${p.tag && !p.kind ? `<small class="tag">${p.tag}</small>` : ''}</button>`; };
   const special = R.packs.filter(p => p.kind), gems = R.packs.filter(p => !p.kind);
-  const what = o => (o.pack === 'month' ? '💳 บัตรรายเดือน' : o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`) + (o.tn ? ` 🎁 ให้ ${esc(o.tn)}` : '');
+  const what = o => (o.pack === 'tpass' ? '🎟️ พาสเมือง' : o.pack === 'starter' ? '🎁 แพ็กมือใหม่' : o.pack === 'month' ? '💳 บัตรรายเดือน' : o.pack === 'vip' ? '💖 ฉายาพิเศษ 30 วัน' : o.pack === 'angel' ? '😇 ' + ofn : `💎${o.gems}${o.bonus ? ` +${o.bonus}` : ''}`) + (o.tn ? ` 🎁 ให้ ${esc(o.tn)}` : '');
   const cs = me.contacts || []; if (paySel.to && !cs.some(c => c.p === paySel.to)) paySel.to = '';
   const tn = paySel.to && cs.find(c => c.p === paySel.to).n;
   const gift = `<div class="secT">🎁 ส่งเป็นของขวัญ</div><select id="payTo" style="width:100%"><option value="">ซื้อให้ตัวเอง</option>${cs.map(c => `<option value="${esc(c.p)}" ${c.p === paySel.to ? 'selected' : ''}>🎁 ให้ ${esc(c.n)}</option>`).join('')}</select>${cs.length ? '' : '<small style="opacity:.75">ยังไม่มีเพื่อนในรายชื่อโทรศัพท์</small>'}`;
@@ -6765,7 +6771,7 @@ function topupHtml() {
       <div class="grid2" style="margin-top:6px"><button type="button" id="payQrSave">💾 บันทึกรูป QR</button>${B('✖ ปิด', { fn: 'payHide' })}</div>
       <div class="sub" style="margin-top:8px">โอนเสร็จแล้ว ส่งรูปสลิปจากแอปธนาคาร ของจะเข้าทันทีเมื่อตรวจผ่าน</div>
       <button type="button" class="primary big" id="paySlipPick">📷 อัปโหลดสลิป</button><input type="file" id="paySlip" data-ref="${op.ref}" accept="image/*" hidden></div>` : '';
-  const got = (paySel.to ? `🎁 ${esc(tn)} ได้ ` : '') + (pk.kind === 'card' ? 'บัตรรายเดือน 💎700' : pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first && !paySel.to ? Math.round(pk.gems * R.bonus) : 0)));
+  const got = (paySel.to ? `🎁 ${esc(tn)} ได้ ` : '') + (pk.kind === 'pass' ? 'พาสเมืองพรีเมียม' : pk.kind === 'starter' ? `💎${pk.gems} + ไข่ ${pk.eggs} ใบ` : pk.kind === 'card' ? 'บัตรรายเดือน 💎700' : pk.kind === 'title' ? 'ฉายาพิเศษ 30 วัน' : pk.kind === 'outfit' ? ofn : '💎' + (pk.gems + (R.first && !paySel.to ? Math.round(pk.gems * R.bonus) : 0)));
   return `<h2>💎 ร้านเติมเงิน</h2>${R.sb ? '<div class="jobbox">🧪 โหมดทดสอบ (Sandbox) ไม่ตัดเงินจริง</div>' : ''}
     <div class="sub">คุณมี 💎${(me?.gems || 0).toLocaleString()}${R.first ? ' · 🎉 เติมเพชรครั้งแรกรับโบนัส +' + Math.round(R.bonus * 100) + '%' : ''}</div>
     <div class="secT">✨ ของพิเศษ</div><div class="grid2">${special.map(card).join('')}</div>
@@ -6776,6 +6782,36 @@ function topupHtml() {
     <small style="opacity:.75">ตรวจสลิปอัตโนมัติ · 1 สลิปใช้ได้ครั้งเดียว · ใช้ได้เฉพาะสลิปที่โอนหลังกดชำระ · มีปัญหาแจ้งแอดมินพร้อมเลขรายการ</small>
     ${my ? `<div class="secT">รายการของฉัน</div><div class="list">${my}</div>` : ''}`;
 }
+// 🎟️ Town Pass panel: 30 tiers a month, free row + premium row; 🎁 starter-pack pop-up
+let passRes = null;
+function passHtml() {
+  const R = passRes; if (!R) return `<h2>🎟️ พาสเมือง</h2><div class="sub">กำลังโหลด…</div>`;
+  const N = R.free.length, tier = Math.min(N, Math.floor(R.p / R.pts)), days = Math.max(0, Math.ceil((R.end - Date.now() - clockOff) / 864e5));
+  const back = tier - R.g.length, can = tier - R.f.length + (R.prem ? back : 0);
+  const txt = r => [r.money ? money(r.money) : '', r.gems ? `💎${r.gems}` : '', r.eggs ? `🥚x${r.eggs}` : '', r.outfit ? (R.of ? '🎽ชุดพิเศษ' : `💎${R.ofG}`) : ''].filter(Boolean).join(' ');
+  const cell = (tr, t) => { const r = (tr === 'g' ? R.premR : R.free)[t - 1], got = R[tr].includes(t), lock = tr === 'g' && !R.prem;
+    return !got && !lock && t <= tier ? `<button class="tpC ok" data-m="${esc(JSON.stringify({ t: 'tpass', op: 'claim', n: t, tr }))}"><small>${txt(r)}</small><b>รับ</b></button>`
+      : `<div class="tpC${got ? ' got' : ''}${lock ? ' lock' : ''}${r.outfit || r.eggs ? ' big' : ''}"><small>${got ? '✅ ' : lock ? '🔒 ' : ''}${txt(r)}</small></div>`; };
+  let rows = ''; for (let t = 1; t <= N; t++) rows += `<div class="tpR${t <= tier ? ' on' : ''}"><b class="tpN">${t}</b>${cell('f', t)}${cell('g', t)}</div>`;
+  return `<h2>🎟️ พาสเมือง · ${esc(R.s)}</h2>
+    <div class="sub">เล่นจริง 1 นาที = 1 แต้ม · ทุก ${R.pts} แต้มขึ้น 1 ขั้น · เหลือ ${days} วัน (รีเซ็ตทุกต้นเดือน)</div>
+    <div class="tpBar"><i style="width:${tier >= N ? 100 : Math.round(R.p % R.pts / R.pts * 100)}%"></i><span>ขั้น ${tier}/${N}${tier < N ? ` · ${R.p % R.pts}/${R.pts}` : ' · ครบแล้ว!'}</span></div>
+    ${can ? B(`🎁 รับทั้งหมด (${can})`, { t: 'tpass', op: 'claim', n: 'all', tr: 'f' }, 'primary') + (R.prem && back ? ' ' + B('💎 รับพรีเมียมทั้งหมด', { t: 'tpass', op: 'claim', n: 'all', tr: 'g' }, 'primary') : '') : ''}
+    ${!R.prem && R.pay ? `<div class="jobbox tpBuy"><b>👑 ปลดล็อกพาสพรีเมียม ฿${R.thb}</b><br><small>ได้ 💎${R.premR.reduce((s, r) => s + (r.gems || 0), 0)}+ ไข่สัตว์เลี้ยง 4 ใบ เงินอีกเพียบ${R.of ? ' และชุดพิเศษประจำเดือน' : ''}${back > 0 ? `<br>🔥 ซื้อตอนนี้รับย้อนหลังได้ทันที ${back} ช่อง!` : ''}</small><br>${B(`👑 ปลดล็อก ฿${R.thb}`, { fn: 'passBuy' }, 'primary big')}</div>` : R.prem ? '<div class="sub">👑 คุณมีพาสพรีเมียมเดือนนี้แล้ว</div>' : ''}
+    <div class="tpR tpH"><b class="tpN">ขั้น</b><b>🆓 ฟรี</b><b>👑 พรีเมียม</b></div><div class="tpL">${rows}</div>`;
+}
+function offerPop(m) {
+  if ($('#payBan') || panel?.kind === 'topup') return;
+  const pk = m.pk, el = document.createElement('div'); el.id = 'payBan';
+  el.innerHTML = `<div class="pbBox"><button class="pbX" title="ปิด">✕</button><div class="pbH">${m.why === 'lv' ? '🎉 เลเวลอัปแล้ว! ' : ''}🎁 ${esc(pk.name)}</div>
+    <div style="font-size:30px;margin:6px 0">💎${pk.gems} + 🥚×${pk.eggs}</div><small>ซื้อได้ครั้งเดียวต่อบัญชี · คุ้มกว่าแพ็กปกติเกือบ 2 เท่า</small>
+    <button class="primary big pbGo">แค่ ฿${pk.thb} · ดูเลย</button></div>`;
+  const close = () => el.remove();
+  el.querySelector('.pbX').onclick = close; el.onclick = e => { if (e.target === el) close(); };
+  el.querySelector('.pbGo').onclick = () => { close(); paySel.pack = pk.id; paySel.to = ''; FN.openTopup(); };
+  document.body.appendChild(el); FX.play('chime');
+}
+setInterval(() => { const b = $('#passBtn'); if (!b || !me) return; const n = Math.max(0, me.tp || 0); b.classList.toggle('tpHas', n > 0); const s = b.querySelector('s'); if (s) s.textContent = n > 9 ? '9+' : n || ''; }, 1500);
 function payAdminHtml() {
   const R = payAdm, back = B('‹ กลับ', { fn: 'open', kind: 'god' }) + ' ';
   if (!R) return `<h2>${back}💎 รายการเติมเงิน</h2><div class="sub">กำลังโหลด…</div>`;
@@ -7073,6 +7109,7 @@ function makeDrag(e, key) {
 { const e = document.getElementById('eyeBtn'); makeDrag(e, 'lt_eye');
   if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28zi', d: '28 พ.ย.', items: ['🎟️ ใหม่! พาสเมืองรายเดือน 30 ขั้น เล่นเก็บแต้มรับรางวัลฟรีทุกขั้น ปุ่ม 🎟️ มุมขวาบน', '👑 พาสพรีเมียม ฿59 ได้เพชร 350+ ไข่สัตว์เลี้ยง 4 ใบ รับย้อนหลังได้', '🎁 แพ็กมือใหม่ ฿19 💎120 + ไข่ 2 ใบ (ซื้อได้ครั้งเดียว)'] },
   { v: '2026-11-28zh', d: '28 พ.ย.', items: ['🏆 ป้ายแข่งตกปลาลากไปวางตรงไหนก็ได้แล้ว (เกมจำตำแหน่งไว้ให้)'] },
   { v: '2026-11-28zg', d: '28 พ.ย.', items: ['🚨 ติดหมายจับแล้วมีแถบบอกด้านบน ว่าจะโดนจับในกี่วินาที · สายตรวจ NPC มาจับใน 3 นาทีแม้มีตำรวจออนไลน์'] },
   { v: '2026-11-28zf', d: '28 พ.ย.', items: ['🪟 ข้อความแจ้งเตือน (เช่น "รออีก 30 วินาที") ขึ้นทับหน้าต่างแล้ว ไม่จมอยู่ข้างหลัง'] },
@@ -9217,6 +9254,7 @@ function renderPanel(p) {
     case 'rewards': return rewardsPanel();
     case 'ach':
     case 'ledger': return ledgerHtml(p);
+    case 'tpass': return passHtml();
     case 'topup': return topupHtml().replace('</h2>', '</h2>' + gemSwapBox());
     case 'payadmin': return me.admin ? payAdminHtml() : '';
     case 'profile': {
