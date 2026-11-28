@@ -711,6 +711,22 @@ const CONDO_UNITS = 12;
   }
 }
 for (const b of BUILDINGS.filter(b => +b.late === 11)) mkRoom(b);   // 🏋️ the gym: after the condo's units so they keep their slots
+// 🔒 the jail cell (police station): no door from the street, you only get in by being arrested; laid out after the gym so every other room keeps its slot
+{ const pol = ROOMS.find(r => r.rk === 'police'), RW = 14, RH = 10, rx = RX0 + (slot % 6) * 18, ry = 1 + Math.floor(slot / 6) * 14, mx = Math.floor(RW / 2); slot++;
+  rect(rx, ry, RW, RH, '#'); rect(rx + 1, ry + 1, RW - 2, RH - 2, 'i');
+  const room = { id: 'r_jail', kind: 'room', bld: 'police', rk: 'jail', label: 'ห้องขัง', icon: '🔒', area: 'town', x: rx, y: ry, w: RW, h: RH,
+    spawn: { x: rx + mx, y: ry + RH - 2.3 }, exit: { x: -99, y: -99 }, outside: pol ? pol.outside : { x: 50, y: 20 }, doorPt: null, hours: null };
+  ROOMS.push(room);
+  const items = [['x_cot', 2.6, 3], ['f_toilet', 11.8, 2.2], ['x_laundry', 7, 2.4], ['x_basket', 8.8, 2.8, false], ['x_iron', 5.2, 2.8, false],
+    ...[2, 4, 6, 8, 10, 12].map(x => ['fence_iron', x, 9.1, false])];
+  room.furniture = items.map(([s, x, y]) => [s, rx + x, ry + y]);
+  for (const [s, x, y, solid] of items) {
+    if (solid === false || SOFT.test(s) || y < 1.3 || !ATLAS.sprites[s]) continue;
+    const w = SPR(s).w, row = ry + Math.floor(y - 0.45);
+    for (let i = Math.floor(rx + x - w / 2 + 0.3); i <= Math.floor(rx + x + w / 2 - 0.3); i++) if (get(i, row) === 'i') set(i, row, 'o');
+  }
+  STATIONS.push({ id: 'jailwork', type: 'jailwork', room: room.id, label: 'พับผ้า (ลดโทษ)', icon: '👕', x: rx + 7, y: ry + 3.7, r: 1.7 });
+}
 {
   let fslot = 0;
   for (const g of ROOMS.filter(r => r.rk === 'house')) for (let fl = 2; fl <= HOUSE_FLOORS; fl++) {
@@ -1312,6 +1328,10 @@ const JOBGAMES = {
   slice: { career: '', name: 'หั่นผักผลไม้', icon: '🔪', energy: 5, cd: 18, min: 10, max: 70, per: 1.5, rate: 2.5, dayCap: 3000 },   // anyone, at the big kitchen; capped per day
 };
 // the police "find the thief" case: like the lost dog, but drive out to where the red-named thief was seen and catch him
+// 🚔 crimes, wanted stars and the jail (virtue: -1000..1000)
+const CRIMES = { pick: { name: 'ล้วงกระเป๋า', icon: '👛', virtue: -50, star: 1, cd: 60000, take: .05, max: 300, ok: .7 },
+  hit: { name: 'ทำร้ายร่างกาย', icon: '👊', virtue: -100, star: 2, cd: 60000, dmg: 10 } };
+const JAIL = { perStar: 120e3, bail: 800, reward: 250, xp: 1, npcAfter: 60e3, npcMax: 10 * 60e3, work: { cut: 20e3, virtue: 5, cd: 8000 } };
 const THIEFQ = { energy: 6, next: 30000, base: 110, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
 const DOGQ = { next: 27000, energy: 5, base: 70, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
   dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],
@@ -2631,7 +2651,7 @@ const PLANT_INDOOR = ['xfern', 'xbonsai', 'xtree', 'xplantx', 'xvases', 'xflower
   }
 }
 TILES.splice(0, TILES.length, ...grid.map(r => r.join('')));   // tiles changed after the first snapshot (benches, clean-ups) reach the client too
-module.exports = { RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
+module.exports = { CRIMES, JAIL, RANCH, GYM, GYM_PASS, GYM_GRACE, GYM_FADE, PROJECTS, PROJ_PLACE, setTile, FESTS, ANGPAO, DUNGEON, RINGS, AUC_LOTS, FIREWORKS, CRAFTS, MAT_DROPS, SHARD_GEMS, FAIR, LK, EV7, FIELD, FOOTBALL, PARK_ARCH, ZONES, zoneAt, TAROT, FORTUNE, BALLOONS, QUIZ, PLANT_INDOOR, POOL, PSHOP, TSHOP, TEMPLEQ, EGG, FORTUNES, RIDES, ENERGY_MUL,
   RUN, CLOCK, gameRate, DOCTOR, ICU, FISHING, OUTFITS, LUX_TITLES, PAY_TITLE,
   LOOKS, SHIRTS, NPC_LINES, FOLK, MONTH_DAYS, MONTHS, monthIdx, dateAt, YEAR0, UTIL, POLICE_TEST, POLICE, HAPPY,
   W, H, TILES, AREAS, ROOMS, BUILDINGS, STATIONS, PROPS, TREES, LOTS, GARDEN, GATES, CSTORE, STOCKS, STOCK, YARD, YARDS, yardZone, SPAWN, NB_SPAWN, RADIUS, SOLID,

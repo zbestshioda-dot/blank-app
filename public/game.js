@@ -1324,6 +1324,7 @@ function paintHud() {
   if (!nbCount) $('#meMoney').textContent = me.monInf ? '∞' : Math.round(me.money).toLocaleString('en-US'); $('#meGems').textContent = me.gemInf ? '∞' : (me.gems || 0).toLocaleString('en-US');
   const qs = me.quests; if (qs) { const d = qs.list.filter(x => x.done).length; const ql = $('#qline'); ql.textContent = d === 3 ? 'เควสต์ครบแล้ว ✅' : `เควสต์ ${d}/3 · กดดู`; ql.classList.toggle('all', d === 3); }
   $('#bJ').style.width = (me.happy ?? 80) + '%'; $('#vJ').textContent = Math.floor(me.happy ?? 80);
+  jailBar();
   { const v = me.virtue || 0, e = $('#meVirtue'), t = `😇 ${v > 0 ? '+' : ''}${v}`; if (e.textContent !== t) { e.textContent = t; e.style.background = v >= 500 ? '#e8b923' : v > 0 ? '#3a9a4a' : v <= -500 ? '#8a1c1c' : v < 0 ? '#c0482b' : '#6b6b6b'; } }
   $('#bJ').style.background = me.happy < 20 ? '#7d7d9c' : me.happy < 45 ? '#d9a94a' : '#f08ad0';
   $('#bE').style.width = Math.min(100, me.energy / (me.eCap || 100) * 100) + '%'; $('#bH').style.width = me.hunger + '%'; $('#bL').style.width = me.health + '%';
@@ -4385,9 +4386,9 @@ function nameAndBubble(p, px, top, mine, t = performance.now()) {
   if (NAME_MODE === 'name' && (p.gg || p.title)) p = { ...p, gg: null, title: '' };
   const icon = p.red ? '🦹' : p.umb ? '☂️' : p.keeper ? p.icon : p.c === 'waiter' ? '🍽️' : p.staff || p.wk ? CAREER_ICON(p.c) || '💬' : p.npc ? '🏘️' : CAREER_ICON(p.c);
   const admTag = p.adm && !p.ap;   // an admin can switch the coloured name tag off (God panel)
-  const label = `${admTag ? '👑 ' : ''}${icon} ${p.mc ? '💳' : ''}${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
+  const label = `${p.wd ? '⭐'.repeat(p.wd) + ' ' : ''}${p.jl ? '🔒' : ''}${admTag ? '👑 ' : ''}${icon} ${p.mc ? '💳' : ''}${p.name}${(p.dz || []).length ? ' ' + p.dz.join('') : ''}`;
   if (admTag) premiumName(label, px, top - TS * .22, t);
-  else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
+  else sign(label, px, top - TS * .22, { size: TS * .27, bg: p.red || p.bad ? 'rgba(210,24,24,.95)' : mine ? 'rgba(255,214,110,.96)' : p.npc ? 'rgba(80,70,50,.62)' : 'rgba(58,36,20,.82)', color: mine ? '#222' : '#fff' });
   if (p.afk) sign('💤 ไม่อยู่', px, top + TS * .12, { size: TS * .2, bg: 'rgba(60,60,80,.85)' });
   // stack the labels from their real pixel sizes so they never overlap: name → gang tag → title, 3px apart
   const nY = top - TS * .22, nFs = Math.max(10, Math.round(TS * (admTag ? .29 : .27))), GAP = 3;
@@ -6998,7 +6999,30 @@ function applyBox(career, st) {
 const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="color:var(--bad)">⚠️ ต้องเป็น ${G.careers[c].icon} ${G.careers[c].name} ก่อน</div>`;
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
+// 🔒 jail: countdown bar while you're inside; the police station lists inmates (online) and the wanted
+const jailLeft = () => { const ms = Math.max(0, (me?.jail?.until || 0) - Date.now()), sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+function jailBar() {
+  let e = $('#jailBar'); const j = me?.jail;
+  if (!j) { if (e) e.remove(); return; }
+  if (!e) { e = document.createElement('div'); e.id = 'jailBar'; e.innerHTML = '<b></b><s><u></u></s><button type="button">💸 ประกันตัว</button>'; document.body.appendChild(e); e.querySelector('button').onclick = () => send({ t: 'bail' }); }
+  const tot = j.s * 120e3, left = Math.max(0, j.until - Date.now());
+  e.querySelector('b').textContent = `🔒 ติดคุก ${'⭐'.repeat(j.s)} · พ้นโทษใน ${jailLeft()} · เดินไปพับผ้าลดโทษ`;
+  e.querySelector('u').style.width = (100 - left / tot * 100).toFixed(1) + '%';
+  e.querySelector('button').textContent = `💸 ประกันตัว ${money(j.bail)}`;
+}
+setInterval(() => { if (me?.jail) jailBar(); }, 1000);
+function jailList() {
+  const ps = [...P.values()].filter(o => !o.npc && o.id !== myId), jl = ps.filter(o => o.jl), wd = ps.filter(o => o.wd && !o.jl);
+  return `<div class="sub" style="margin-top:8px"><b>🔒 ห้องขัง</b> (${jl.length} คน) · ประกันตัวให้เพื่อนได้</div>${jl.length ? `<div class="list">${jl.map(o => itemRowRaw('🔒', esc(o.name), 'ติดคุกอยู่', B('💸 ประกันตัว', { t: 'bail', id: o.id }, 'good', !!me.jail))).join('')}</div>` : ''}
+    ${wd.length ? `<div class="sub" style="margin-top:6px"><b>🚨 หมายจับ</b></div><div class="list">${wd.map(o => itemRowRaw('🦹', esc(o.name), '⭐'.repeat(o.wd), '')).join('')}</div>` : ''}`;
+}
 const NEWS = [
+  { v: '2026-11-28c', d: '28 พ.ย.', items: [
+    '🚔 <b>คุกมาแล้ว!</b> ล้วงกระเป๋า (ความดี -50, ⭐1) หรือทำร้ายคน (ความดี -100, ⭐⭐) = ติดหมายจับ มีดาวลอยบนหัวให้ทุกคนเห็น',
+    '👮 ตำรวจแตะคนติดหมายจับแล้วกด "🚔 จับกุม" ได้เงิน + EXP · ไม่มีตำรวจออนไลน์ สายตรวจ NPC จับเองใน 1 นาที',
+    '🔒 ติดคุกดาวละ 2 นาที (นับต่อตอนออฟไลน์) ทำงานไม่ได้ · พับผ้าลดโทษ (ความดี +5) หรือจ่ายประกันตัว เพื่อนประกันให้ได้ที่สถานีตำรวจ',
+    '😈 ค่าความดี -500 ลงไป ชื่อเป็นสีแดง · มือใหม่ที่มาไม่ถึง 1 วันโดนทำร้ายไม่ได้',
+  ] },
   { v: '2026-11-28b', d: '28 พ.ย.', items: ['😇 <b>ค่าความดี</b> ใหม่! โชว์มุมขวาบนของกรอบสถานะ เริ่มที่ 0 (ต่ำสุด -1000 สูงสุด 1000) สีเขียว/ทอง = ดี สีแดง = ไม่ดี'] },
   { v: '2026-11-28a', d: '28 พ.ย.', items: ['🟢 บนคอม จำนวนคนออนไลน์ย้ายไปอยู่ใต้แผนที่เล็กเหมือนมือถือ ไม่บังแผนที่แล้ว'] },
   { v: '2026-11-28shm', d: '28 พ.ย.', items: ['🧿 <b>ตัวละครลึกลับในเมืองกลับมาแล้ว</b>… ระวังอย่าเข้าใกล้เกินไป'] },
@@ -9082,7 +9106,8 @@ function renderPanel(p) {
           return `<div class="look ${on ? 'on' : ''}"><canvas data-of="${id}" width="72" height="96"></canvas><small>${esc(ofName(o))}</small>${has ? B(on ? 'ถอด' : 'ใส่', { t: 'act', st, a: 'outfit', id }, on ? '' : 'good') : B(o.gems ? `💎${o.gems}` : money(o.price), { t: 'act', st, a: 'outfit', id }, '')}</div>`;
         }).join('')}</div>`; })()}`}`;
     }
-    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคสตามจับโจร 🚨 เคสหมาหาย 🐕 เล่นจับผิดภาพหาโจร 🔍 และซ้อมยิงเป้า 🎯 · ได้รถสายตรวจขับฟรี · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) : ''}`;
+    case 'jailwork': return me.jail ? `<h2>👕 งานในคุก</h2><div class="sub">พับผ้าครั้งละ 20 วิ ลดโทษ · ความดี +5 · พ้นโทษใน ${jailLeft()}</div><div class="grid2">${B('👕 พับผ้า', { t: 'act', st, a: 'fold' }, 'primary')}${B(`💸 ประกันตัว ${money(me.jail.bail)}`, { t: 'bail' }, 'good')}</div>` : '<h2>👕 งานในคุก</h2><div class="sub">ไม่ได้ติดคุก</div>';
+    case 'police': return `<h2>👮 สถานีตำรวจ</h2><div class="sub">เปิด 24 ชม. · ตำรวจรับเคสตามจับโจร 🚨 เคสหมาหาย 🐕 เล่นจับผิดภาพหาโจร 🔍 และซ้อมยิงเป้า 🎯 · ได้รถสายตรวจขับฟรี · ต้องจบ ม.6 และสอบนายสิบตำรวจที่มหาวิทยาลัย</div>${staffHint('police')}${job('police') ? dogBox(st) : ''}${jailList()}`;
     case 'square': return `<h2>📋 ศาลาประชาคม</h2><div class="sub">${hoursTxt('square')} · สมัครเป็นขอทานได้ที่นี่ (เงินสด+ฝากไม่เกิน 2,000 LC) · หาเงินโดย<b>วิ่งเก็บขยะ</b>ที่ถังขยะ หรือนั่งขอทาน (ปุ่ม 🥣) · มีเงินเกิน 2,000 LC พ้นจากขอทานอัตโนมัติ</div>${staffHint('beggar')}`;
     case 'ride': {
       const S = STN(st), R = G.rides?.[S?.k]; if (!R) return '';
@@ -9236,7 +9261,9 @@ function renderPanel(p) {
       return `<h2>${o.adm ? '👑 ' : ''}${esc(o.name)}${o.afk ? ' <span class="tag">💤 ไม่อยู่</span>' : ''}</h2>${prof}
         <div class="grid2" style="margin-bottom:6px">${B('✉️ ส่งจดหมาย', { fn: 'open', kind: 'mail', set: { to: o.name } })}</div>
         <div class="sub">${far ? '⚠️ อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน' : 'อยู่ใกล้พอที่จะติดต่อกันได้'}</div>
+        ${o.jl ? `<div class="jobbox">🔒 ${esc(o.name)} ติดคุกอยู่${B('💸 ประกันตัวให้', { t: 'bail', id: o.id }, 'good', !!me.jail)}</div>` : o.wd && job('police') ? `<div class="jobbox">🚨 ติดหมายจับ ${'⭐'.repeat(o.wd)}${B('🚔 จับกุม', { t: 'arrest', id: o.id }, 'primary', far)}</div>` : ''}
         <div class="grid2">${B('🤝 แลกเปลี่ยน', { fn: 'tradeReq', to: o.id }, 'primary', far)}${B(known ? '📇 มีเบอร์แล้ว' : '📱 ขอเบอร์', { t: 'req', kind: 'phone', to: o.id }, 'good', far || known)}</div>
+        ${o.jl || me.jail ? '' : `<div class="grid2" style="margin-top:6px">${B('👛 ล้วงกระเป๋า', { t: 'crime', k: 'pick', id: o.id }, 'bad', far)}${B('👊 ทำร้าย', { t: 'crime', k: 'hit', id: o.id }, 'bad', far)}</div><div class="sub">😈 ทำผิด = ค่าความดีลด + ติดหมายจับ ⭐ ตำรวจจับเข้าคุก</div>`}
         ${o.veh && G.shop.vehicles[o.veh] && G.shop.vehicles[o.veh].kind !== 'heli' && o.veh !== 'escoot' ? `<div class="jobbox">${G.shop.vehicles[o.veh].kind === 'moto' ? '🛵' : '🚗'} ${esc(o.name)} กำลังขี่${esc(G.shop.vehicles[o.veh].name)}${B(me.pass === o.id ? '🚶 ลงรถ' : G.shop.vehicles[o.veh].kind === 'moto' ? '🛵 ขอซ้อนท้าย' : '🚗 ขอขึ้นรถ', me.pass === o.id ? { t: 'hopoff' } : { t: 'req', kind: 'hop', to: o.id }, 'good', far && me.pass !== o.id)}</div>` : ''}
         ${job('doctor') ? `<div class="rowf" style="margin-top:8px">ค่ารักษา ${fee} ${B('💉 เสนอปฐมพยาบาล', { fn: 'heal', to: o.id }, 'good', far)}</div>` : ''}
         ${o.c === 'monk' ? `<div class="jobbox">🙏 ใส่บาตรพระ · เลือกอาหารในกระเป๋า ได้บุญ ความสุขเพิ่ม และได้รับพร 10 นาที<div class="rowf" style="margin-top:6px;flex-wrap:wrap;gap:4px">${Object.entries(me.inv).filter(([id, q]) => q > 0 && G.items[id]?.eat?.hunger > 0).slice(0, 6).map(([id]) => B(`${G.items[id].icon} ${G.items[id].name}`, { t: 'alms_give', to: o.id, item: id }, 'good', far)).join('') || '<small>ไม่มีอาหารในกระเป๋า · ซื้อข้าวต้มมัด/ขนมไทยที่ร้านค้าวัดได้</small>'}</div></div>` : ''}
@@ -10168,6 +10195,7 @@ function nextHop(m, g) {
   let tgt = g;
   if (g.player) { const p = P.get(g.player); if (!p) return null; tgt = { x: p.x, y: p.y, area: areaOf(p.x, p.y)?.id, label: p.name }; }
   if (curA.id === tgt.area) return { ...tgt, final: true };
+  if (curA.rk === 'jail') return null;   // 🔒 no way out of the cell
   if (curA.kind === 'room') return { x: curA.exit.x, y: curA.exit.y - 1, label: 'ทางออก', area: curA.id };
   const tMap = mapOf(tgt.area);
   if (tMap !== curA.id) {
@@ -10629,7 +10657,7 @@ function layoutFurniture() {
 function drawRoomLabels(r, X, Y, t) {
   const px = r.x * TS + X, py = r.y * TS + Y;
   const h = r.rk === 'house' ? wd?.houses?.[r.house] : null;
-  const exit = r.floor ? '' : '  ·  ⬇ ทางออก';   // the room's name sits at the bottom with the way out (on the top wall it covered the desk staff's name tags)
+  const exit = r.floor || r.rk === 'jail' ? '' : '  ·  ⬇ ทางออก';   // the room's name sits at the bottom with the way out (on the top wall it covered the desk staff's name tags)
   sign((r.rk === 'house' ? (h && h[0] ? `🏠 บ้านของ ${h[0]}` : `🏠 บ้านเลขที่ ${r.house + 1}`) + (r.floor ? ` · ชั้น ${r.floor}` : (h && h[8] ? ' · ชั้น 1' : '')) : `${r.icon} ${r.label}`) + exit, px + Math.floor(r.w / 2) * TS, py + (r.h + .5) * TS + Math.sin(t / 300) * 2, { size: TS * .3, border: '#ffc94d88' });
 }
 

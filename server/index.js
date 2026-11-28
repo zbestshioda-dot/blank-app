@@ -95,6 +95,12 @@ function feed(text) {
   broadcast(m);
 }
 function markMe(a) { a.meDirty = true; dirty = true; }
+// 🚔 virtue, wanted stars, the jail
+const addVirtue = (a, d) => { a.virtue = Math.max(-1000, Math.min(1000, Math.round((a.virtue || 0) + d))); };
+const wantedOf = a => a.wantedT ? Math.min(5, Math.max(0, Math.floor(+a.wanted) || 0)) : 0;   // old saves had a different "wanted": ignored
+const inJail = a => !!a.jail && a.jail.until > now();
+const jailRoom = () => D.ROOMS.find(r => r.id === 'r_jail');
+const bailCost = a => Math.max(1, Math.ceil(Math.max(0, a.jail.until - now()) / D.JAIL.perStar)) * D.JAIL.bail;
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
 function wellbeing(a) {
@@ -2103,7 +2109,7 @@ const SAVE_KEYS = ['ranch', 'gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'b
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
-  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk', 'virtue'];
+  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk', 'virtue', 'jail', 'wantedT', 'arrPaid'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -3330,6 +3336,86 @@ function barAct(a, s, m) {
     return toast(a, `💵 ทิป ${money(amt)} ให้${o.name}แล้ว`, '🎤');
   }
 }
+// 🚔 crimes: virtue down + wanted stars; police (or the NPC patrol) arrest; the jail; bail
+function jailUp(a, stars, by) {
+  const r = jailRoom(); if (!r || godLock(a)) return;
+  stars = Math.max(1, Math.min(5, stars));
+  if (a.pass) hopOff(a); if (a.fun) rideOff(a); a.ride = ''; a.cast = null;
+  a.jail = { until: now() + stars * D.JAIL.perStar, s: stars, by: by || '' }; a.wanted = 0; a.wantedT = 0; a.npcWarn = 0;
+  teleport(a, r.spawn.x, r.spawn.y); sendRoster();
+  toast(a, `🔒 ถูกจับเข้าคุก ${stars * D.JAIL.perStar / 60e3} นาที${by ? ` (โดย ${by})` : ''} · พับผ้าลดโทษ หรือจ่ายประกันตัว`, '🚔', false);
+  feed(`🚔 ${a.name} ถูกจับเข้าคุก ${'⭐'.repeat(stars)}`);
+}
+function jailFree(a, why) {
+  a.jail = null; const r = jailRoom();
+  if (r && areaId(a) === 'r_jail') teleport(a, r.outside.x, r.outside.y);
+  sendRoster(); markMe(a); toast(a, why || '🔓 พ้นโทษแล้ว ออกจากคุก', '🔓');
+}
+const nearP = (a, o, d = 2.6) => areaId(a) === areaId(o) && Math.hypot(a.x - o.x, a.y - o.y) <= d;
+function crimeAct(a, m) {
+  const C = D.CRIMES[m.k], o = online.get(+m.id); if (!C || !o || o === a) return;
+  if (inJail(a) || a.down) return toast(a, 'ตอนนี้ทำไม่ได้', '🚫', false);
+  if (!nearP(a, o)) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
+  if (godLock(o) || inJail(o) || o.down) return toast(a, 'ตอนนี้ทำกับคนนี้ไม่ได้', '🚫', false);
+  if (now() - (o.created || 0) < 24 * 3600e3) return toast(a, 'คนนี้เพิ่งมาเมืองไม่ถึงวัน ทำร้ายมือใหม่ไม่ได้', '🛡️', false);
+  if (now() - (a.created || 0) < 24 * 3600e3) return toast(a, 'มาเมืองไม่ถึงวัน ยังทำผิดไม่ได้นะ 😇', '🛡️', false);
+  if (!cd(a, 'crime', C.cd)) return;
+  addVirtue(a, C.virtue); a.wanted = Math.min(5, wantedOf(a) + C.star); a.wantedT = now(); stat(a, 'crime');
+  if (m.k === 'pick') {
+    const amt = Math.random() < C.ok ? Math.floor(Math.min(C.max, Math.max(0, o.money) * C.take)) : 0;
+    if (amt > 0) { o.money -= amt; a.money += amt; }
+    toast(a, amt ? `👛 ล้วงได้ ${money(amt)} · ความดี ${C.virtue} · ติดหมายจับ ⭐${a.wanted}` : `👛 พลาด! ถูกจับได้คาหนังคาเขา · ความดี ${C.virtue} · ติดหมายจับ ⭐${a.wanted}`, '🦹', false);
+    toast(o, amt ? `👛 ${a.name} ล้วงกระเป๋าคุณไป ${money(amt)}! ตำรวจกำลังตามจับ` : `👛 ${a.name} พยายามล้วงกระเป๋าคุณ แต่พลาด!`, '🚨', false);
+  } else {
+    o.health = Math.max(5, o.health - C.dmg); joy(o, -5);
+    toast(a, `👊 ทำร้าย ${o.name} · ความดี ${C.virtue} · ติดหมายจับ ⭐${a.wanted}`, '🦹', false);
+    toast(o, `👊 ${a.name} ทำร้ายคุณ! เลือด -${C.dmg} · ตำรวจกำลังตามจับ`, '🚨', false);
+  }
+  const cops = [...online.values()].filter(p => p !== a && p.career === 'police' && !inJail(p));
+  for (const p of cops) toast(p, `🚨 แจ้งเหตุ: ${a.name} ${C.name} (⭐${a.wanted}) · เดินไปแตะตัวแล้วกด "🚔 จับกุม"`, '🚓');
+  if (!cops.length) toast(a, `🚓 ไม่มีตำรวจออนไลน์ สายตรวจ NPC จะตามจับคุณใน ${D.JAIL.npcAfter / 1000} วินาที`, '🚓', false);
+  markMe(a); markMe(o); sendRoster();
+}
+function arrestAct(a, m) {
+  const o = online.get(+m.id); if (!o || o === a) return;
+  if (a.career !== 'police' && !allJobs(a)) return toast(a, 'ต้องเป็นตำรวจถึงจะจับกุมได้', '👮', false);
+  if (inJail(a) || a.down) return;
+  const s = wantedOf(o); if (!s || inJail(o)) return toast(a, 'คนนี้ไม่มีหมายจับ', '👮', false);
+  if (!nearP(a, o)) return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false);
+  if (godLock(o)) return toast(a, 'จับคนนี้ไม่ได้', '🚫', false);
+  if (!cd(a, 'arrest', 3000)) return;
+  jailUp(o, s, a.name);
+  const day = dayKey(), key = String(o.login || o.name); if (a.arrPaid?.d !== day) a.arrPaid = { d: day, ids: [] };
+  const same = (o.devs || []).some(d => (a.devs || []).includes(d));   // 🛡️ your own second account (same phone/browser): no reward
+  if (same) { sus(a, 'arrestalt'); toast(a, `🚔 จับ ${o.name} เข้าคุกแล้ว (ไม่ได้รางวัล: บัญชีเครื่องเดียวกัน)`, '🚔'); }
+  else if (a.arrPaid.ids.includes(key)) toast(a, `🚔 จับ ${o.name} เข้าคุกแล้ว (จับคนนี้ได้รางวัลวันละครั้ง)`, '🚔');
+  else {
+    a.arrPaid.ids.push(key); a.arrPaid.ids = a.arrPaid.ids.slice(-200);
+    const r = D.JAIL.reward * s; earn(a, r); addXp(a, D.JAIL.xp * s, 'police'); quest(a, 'job_police'); addVirtue(a, 10);
+    toast(a, `🚔 จับกุม ${o.name} สำเร็จ! ได้ ${money(r)} · ความดี +10`, '🚔');
+  }
+  markMe(a);
+}
+function bailAct(a, m) {
+  const o = m.id ? online.get(+m.id) : a;
+  if (!o || !inJail(o)) return toast(a, 'คนนี้ไม่ได้อยู่ในคุก', '🔓', false);
+  if (o !== a && inJail(a)) return;
+  if (!cd(a, 'bail', 2000)) return;
+  const c = bailCost(o); if (!pay(a, c)) return;
+  jailFree(o, o === a ? `🔓 ประกันตัวแล้ว (${money(c)})` : `🔓 ${a.name} จ่ายประกันตัวให้คุณ (${money(c)})`);
+  if (o !== a) toast(a, `🔓 ประกันตัว ${o.name} แล้ว (${money(c)})`, '🔓');
+  markMe(a);
+}
+function jailTick(t) {   // keep inmates in the cell, let them out on time; the NPC patrol picks up the wanted
+  const r = jailRoom(); if (!r) return;
+  const cops = [...online.values()].some(o => o.career === 'police' && !inJail(o));
+  for (const a of online.values()) {
+    if (a.jail) { if (!inJail(a)) jailFree(a); else if (areaId(a) !== 'r_jail') teleport(a, r.spawn.x, r.spawn.y); continue; }
+    if (areaId(a) === 'r_jail') teleport(a, r.outside.x, r.outside.y);
+    const w = wantedOf(a); if (!w || godLock(a)) continue;
+    if (t - a.wantedT > (cops ? D.JAIL.npcMax : D.JAIL.npcAfter)) jailUp(a, w, 'สายตรวจ NPC');
+  }
+}
 function act(a, m) {
   if (/^hbed\d+$/.test(m.st || '')) { const o = houses[ST[m.st]?.idx]; if (o) syncBed(o); }   // the bed may have been moved
   const s = m.st === 'water' ? waterSpot(a) : ST[m.st];
@@ -3337,6 +3423,13 @@ function act(a, m) {
   if (!s) return;
   if (a.down) return toast(a, 'คุณหมดสติอยู่ ทำอะไรไม่ได้', '💤', false);
   if (areaId(a) !== s.area || Math.hypot(a.x - s.x, a.y - s.y) > s.r + 0.9) { sus(a, 'far'); return toast(a, 'อยู่ไกลเกินไป เดินเข้าไปใกล้ๆ ก่อน', '⚠️', false); }
+  if (s.type === 'jailwork' || inJail(a)) {   // 🔒 in jail: folding laundry is the only work (cuts the sentence)
+    if (!inJail(a) || s.type !== 'jailwork') return toast(a, inJail(a) ? 'อยู่ในคุก ทำอย่างอื่นไม่ได้จนกว่าจะพ้นโทษ' : 'ไม่ได้ติดคุก', '🔒', false);
+    if (!cd(a, 'jailwork', D.JAIL.work.cd)) return;
+    a.jail.until -= D.JAIL.work.cut; addVirtue(a, D.JAIL.work.virtue); stat(a, 'jailwork'); sendRoster();
+    if (!inJail(a)) return jailFree(a, '🔓 พับผ้าจนพ้นโทษแล้ว! ออกจากคุกได้');
+    markMe(a); return toast(a, `👕 พับผ้าเสร็จ ลดโทษ ${D.JAIL.work.cut / 1000} วิ · ความดี +${D.JAIL.work.virtue}`, '👕');
+  }
   const h = hourNow();
   if (!D.isOpen(s.type, h) && !(s.type === 'restaurant' && m.a === 'pickup')) { const o = D.HOURS[s.type]; return toast(a, `${s.label} ปิดแล้ว (เปิด ${hhmm(o[0])}–${hhmm(o[1])})`, '🔒', false); }
   const key = (s.type === 'door' && s.house !== undefined ? 'house' : s.type) + '.' + m.a;
@@ -5656,7 +5749,7 @@ function frameOf(a) { const f = D.FRAMES[a.frame]; return f && ((a.frames || [])
 function pubInfo(a) {
   return { id: a.id, name: a.name, av: a.avatar, c: a.career, lv: lvl(a), dz: (a.dz || []).map(() => '🤒'),   // which disease it is: only the patient knows (a doctor reads the symptoms)
     pose: a.down ? a.down.kind : a.pose, title: titleOf(a), tr: titleRar(a), pic: a.pic ? 1 : 0, sad: depressed(a) ? 1 : 0, g: a.gender, lk: a.look, adm: isAdmin(a) ? 1 : 0, ap: isAdmin(a) && a.god?.plain ? 1 : 0,
-    of: outfitOf(a), afk: a.afk ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', gk: a.pose === 'gym' && a.gym ? a.gym.k : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, mc: cardOn(a) ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', dk: drunkPub(a), sg: barStage && barStage.id === a.id && barStage.until > now() ? barStage.until : 0, gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
+    of: outfitOf(a), afk: a.afk ? 1 : 0, wd: wantedOf(a), bad: (a.virtue || 0) <= -500 ? 1 : 0, jl: inJail(a) ? 1 : 0, fn: a.fun ? `${a.fun.k}:${a.fun.slot}` : '', gk: a.pose === 'gym' && a.gym ? a.gym.k : '', veh: a.ride || '', ps: a.pass || 0, pt: a.pet && (a.pets || []).includes(a.pet) ? a.pet : '', pn: a.pet ? a.pnames?.[a.pet] || '' : '', pl: a.leash && a.leashOn ? 1 : 0, mc: cardOn(a) ? 1 : 0, fc: castPub(a), um: hasUmb(a) ? 1 : 0, bl: a.balloon && (a.balloons || []).includes(a.balloon) ? a.balloon : '', dk: drunkPub(a), sg: barStage && barStage.id === a.id && barStage.until > now() ? barStage.until : 0, gg: (() => { const g = gangOf(a); return g ? [g.icon, g.name, g.color] : 0; })() };
 }
 // others see you fishing: 1 waiting, 2 a bite, 3 fighting a fish
 const castPub = a => a.cast ? ({ wait: 1, bite: 2, fight: 3 })[a.cast.state] || 1 : 0;
@@ -5708,7 +5801,7 @@ function meView(a) {
     dogq: a.dogq ? { kind: a.dogq.kind || 'dog', stole: a.dogq.stole, dog: a.dogq.dog, name: a.dogq.name, owner: a.dogq.owner, x: a.dogq.x, y: a.dogq.y, t0: a.dogq.t0, until: a.dogq.until, hint: a.dogq.hint, hc: a.dogq.hc } : null, dogNext: a.dogNext || 0, thiefNext: a.thiefNext || 0, jgNext: a.jgNext || {},
     icu: null, icuNext: a.icuNext || 0,
     friends: (a.contacts || []).map(c => { const o = byPhone.get(c.p); return { p: c.p, fav: c.fav ? 1 : 0, n: o ? o.name : c.n, home: o && o.ws && o.hown ? (friendOf(o, a) ? 1 : 2) : 0, on: !!(o && o.ws && !hidden(o) && !isAdmin(o)), afk: !!(o && o.afk), where: o && o.ws ? (D.areaAt(o.x, o.y)?.name || D.areaAt(o.x, o.y)?.label || '') : '' }; }),
-    happy: a.happy, virtue: Math.max(-1000, Math.min(1000, Math.round(a.virtue || 0))), craving: a.craving, prayed: a.prayDay === dayKey() ? 1 : 0, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
+    happy: a.happy, virtue: Math.max(-1000, Math.min(1000, Math.round(a.virtue || 0))), wanted: wantedOf(a), jail: inJail(a) ? { until: a.jail.until, s: a.jail.s, bail: bailCost(a) } : null, craving: a.craving, prayed: a.prayDay === dayKey() ? 1 : 0, bills: a.bills || [], utilOff: !!a.utilOff, home: holdsHome(a), date: D.dateAt(now()), month: D.monthIdx(now()),
     mailN: (a.mail || []).filter(x => !x.read).length, hasPic: a.pic ? 1 : 0, taxT: a.tax?.d === dayKey() ? { e: a.tax.e, paid: a.tax.paid } : null, fuelT: a.fuelDay?.d === dayKey() ? a.fuelDay.c : 0, econ: econView(),
     jobWait: jobCooldown(a), misAt: a.misNext || 0, cases: a.cases || [], case: detView(a), detAt: a.detNext || 0, stats: a.stats || {}, ach: a.ach || [], luxT: a.luxT || [], title: a.title || '', myOrders, jobs,
     earned: a.earned, worth: Math.round(worth(a)), quests: Q.view(a), wquests: Q.wview(a), login: loginView(a), keep: a.keep || [], hfl: a.hfl || [], hwl: a.hwl || [], achGot: a.achGot || [], achReward: ACH_GEMS,
@@ -6296,8 +6389,11 @@ function onMessage0(ws, raw) {
       a.show = sh; markMe(a); return;
     }
     case 'bug': return bugReport(a, m);
+    case 'crime': return crimeAct(a, m);
+    case 'arrest': return arrestAct(a, m);
+    case 'bail': return bailAct(a, m);
     case 'rescue': {                          // 🆘 the player is stuck (can't walk, nothing responds): clear what pins them and take them to the town square
-      if (a.pose === 'jail') return toast(a, 'อยู่ในห้องขัง ออกไม่ได้จนกว่าจะพ้นโทษ', '🚔', false);
+      if (inJail(a)) return toast(a, 'อยู่ในห้องขัง ออกไม่ได้จนกว่าจะพ้นโทษ', '🚔', false);
       if (a.down) return toast(a, 'คุณหมดสติอยู่ รอหมอหรือรอฟื้นก่อน', '💤', false);
       if (!cd(a, 'rescue', 60000)) return;
       if (a.pass) hopOff(a); if (a.fun) rideOff(a); a.ride = ''; a.cast = null; a.fixId = 0;
@@ -6887,7 +6983,7 @@ function fbKick(a, m) {
   fbSend({ kick: a.id });
 }
 function tick() {
-  stockTick(); passTick();
+  stockTick(); passTick(); jailTick(now());
   for (const a of online.values()) ledSweep(a, 'อื่นๆ');
   { let ch = false; for (const a of online.values()) { const v = castPub(a); if (v !== (a._fc || 0)) { a._fc = v; ch = true; } } if (ch) sendRoster(); }
   const t = now(), dt = Math.min(1, (t - lastTick) / 1000); lastTick = t;
