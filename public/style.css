@@ -2321,3 +2321,12 @@ body.noHud #spiritBtn{visibility:hidden}
 .tpC.big{border-color:#c9a0ff;background:#f5edff}.tpC.got{opacity:.55}.tpC.lock{filter:grayscale(.6);opacity:.75}
 .tpC.ok{border-color:#2fa34a;background:#e4ffd6;cursor:pointer}.tpC.ok b{color:#2fa34a}
 .tpBuy{text-align:center;background:linear-gradient(#fff6d8,#ffe19a)}
+/* 📱 phones: fewer buttons (⋯ opens run/rest/emoji/God in a column) and a shorter stats card (2 bars per row) */
+#moreBtn{display:none}
+body.tui #moreBtn:not(.hidden){display:flex;right:19px!important;bottom:100px!important;width:50px!important;height:50px!important}
+body.tui #thumbs.more #moreBtn{background:linear-gradient(#5fc46a,#2f8a3a)!important}
+body.tui #runBtn,body.tui #restBtn,body.tui #emoBtn,body.tui #godBtn{display:none!important}
+body.tui #thumbs.more #runBtn:not(.hidden),body.tui #thumbs.more #restBtn:not(.hidden),body.tui #thumbs.more #emoBtn:not(.hidden),body.tui #thumbs.more #godBtn:not(.hidden){display:flex!important;right:19px!important;width:50px!important;height:50px!important;animation:none}
+body.tui #thumbs.more #runBtn{bottom:158px!important}body.tui #thumbs.more #restBtn{bottom:216px!important}body.tui #thumbs.more #emoBtn{bottom:274px!important}body.tui #thumbs.more #godBtn{bottom:332px!important}
+body.tui #card.v2 .bars{grid-template-columns:1fr 1fr!important;column-gap:8px!important;row-gap:3px!important;padding:4px 7px!important}
+body.tui #card.v2 .bar label{width:auto!important;min-width:44px;gap:2px}

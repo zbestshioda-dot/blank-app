@@ -1007,6 +1007,16 @@ function foldChat(f) {
 }
 $('#cbFold').onclick = () => { FX.play('click'); foldChat(true); };
 $('#cbOpen').onclick = () => { FX.play('click'); foldChat(false); };
+// 📱 phones: the chat folds itself after 15 s untouched (it covered the town), and the small right-hand buttons sit behind one ⋯ button
+if (TOUCH_UI) {
+  document.body.classList.add('tui');
+  let cbT = 0; const kick = () => { clearTimeout(cbT); cbT = setTimeout(() => { if (cbFolded) return; if (document.activeElement?.id === 'cbIn') kick(); else foldChat(true); }, 15000); };
+  $('#chatBox').addEventListener('pointerdown', kick); $('#cbIn').addEventListener('input', kick); $('#cbOpen').addEventListener('click', kick); kick();
+  const TH = $('#thumbs'), MORE = ['runBtn', 'restBtn', 'emoBtn', 'godBtn'];
+  $('#moreBtn').onclick = () => { FX.play('click'); TH.classList.toggle('more'); };
+  for (const id of MORE) $('#' + id)?.addEventListener('click', () => setTimeout(() => TH.classList.remove('more'), 400));
+  setInterval(() => $('#moreBtn').classList.toggle('hidden', !MORE.some(id => { const b = $('#' + id); return b && !b.classList.contains('hidden'); })), 1000);
+}
 document.querySelectorAll('#chatBox [data-ct]').forEach(b => b.onclick = () => {
   cbTab = b.dataset.ct; document.querySelectorAll('#chatBox [data-ct]').forEach(x => x.classList.toggle('on', x === b));
   $('#cbIn').placeholder = cbTab === 'gang' ? (me?.gang ? 'แตะเพื่อพิมพ์ · แชทแก๊ง (เห็นแค่สมาชิก)' : 'ยังไม่มีแก๊ง · เข้าร่วมได้ในแอป 🏴') : cbTab === 'world' || cbTab === 'all' ? 'แตะเพื่อพิมพ์ · แชทโลก (ทุกคนในเมืองเห็น)' : 'แตะเพื่อพิมพ์ · คุยกับคนใกล้ๆ';
@@ -7110,6 +7120,7 @@ function makeDrag(e, key) {
 { const e = document.getElementById('eyeBtn'); makeDrag(e, 'lt_eye');
   if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28zj', d: '28 พ.ย.', items: ['🏠 มือถือ Android: ร้านและอาคารคมชัดแล้ว ไม่เบลอ', '📱 จอมือถือโล่งขึ้น: ปุ่มวิ่ง/พัก/อิโมจิ รวมไว้ในปุ่ม ⋯ แถบพลังย่อเหลือ 2 แถว', '💬 แชทหุบเองถ้าไม่ได้แตะ 15 วินาที'] },
   { v: '2026-11-28zi', d: '28 พ.ย.', items: ['🎟️ ใหม่! พาสเมืองรายเดือน 30 ขั้น เริ่ม 1 ธ.ค. เล่นเก็บแต้มรับรางวัลฟรีทุกขั้น ปุ่ม 🎟️ มุมขวาบน', '👑 พาสพรีเมียม ฿59 ได้เพชร 350+ ไข่สัตว์เลี้ยง 4 ใบ รับย้อนหลังได้', '🎁 แพ็กมือใหม่ ฿19 💎120 + ไข่ 2 ใบ (ซื้อได้ครั้งเดียว)'] },
   { v: '2026-11-28zh', d: '28 พ.ย.', items: ['🏆 ป้ายแข่งตกปลาลากไปวางตรงไหนก็ได้แล้ว (เกมจำตำแหน่งไว้ให้)'] },
   { v: '2026-11-28zg', d: '28 พ.ย.', items: ['🚨 ติดหมายจับแล้วมีแถบบอกด้านบน ว่าจะโดนจับในกี่วินาที · สายตรวจ NPC มาจับใน 3 นาทีแม้มีตำรวจออนไลน์'] },
@@ -9721,6 +9732,8 @@ fetch('assets/atlas.json?v=v34').then(r => r.json()).then(j => {
   atlas = j; const im = new Image(); im.onload = () => { atlasImg = im; };
   im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + (HALF_ATLAS ? '_half' : '') + '.webp?v=v34';
 });
+let BLDA = null;   // 📱 Android phones: buildings come from a full-size sheet (the half atlas made shops blurry); iPhones keep the half one (memory)
+if (HALF_ATLAS && !IOS) fetch('assets/atlas_bld.json?v=1').then(r => r.json()).then(j => setTimeout(() => { const im = new Image(); im.onload = () => { BLDA = { ...j, img: im }; }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_bld.webp?v=1'; }, 2500)).catch(() => { });
 let TEXA = null;   // 📱 with the half atlas, the ground/floor textures come from a small full-size sheet so lawns and floors stay sharp
 if (HALF_ATLAS) fetch('assets/atlas_tex.json?v=v34').then(r => r.json()).then(j => { const im = new Image(); im.onload = () => { TEXA = { ...j, img: im }; gCache.clear(); }; im.src = 'assets/' + (SNOW ? 'atlas_snow' : 'atlas') + '_tex.webp?v=v34'; }).catch(() => { });   // ❄️ the snowy atlas is baked ahead (tools/build_snow_atlas.js): building it on the phone ran iPhones out of memory
 // ❄️ winter: the lawns are snow and trees / bushes carry snow on top. Done once on a copy of the atlas when it loads,
@@ -9762,9 +9775,9 @@ function snowAtlas(im, j) {
 }
 function spr(name, cx, by, X, Y, scale = 1) {
   if (name[0] === 'b' && name[1] === 'n' && name[2] === '_') return benchSpr(name, cx, by, X, Y);
-  const s = atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
-  const w = s[2] / atlas.tile * TS * scale, h = s[3] / atlas.tile * TS * scale;
-  ctx.drawImage(atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
+  const Bs = BLDA?.sprites[name], s = Bs || atlas && atlasImg && atlas.sprites[name]; if (!s) return false;
+  const q = Bs ? BLDA.tile : atlas.tile, w = s[2] / q * TS * scale, h = s[3] / q * TS * scale;
+  ctx.drawImage(Bs ? BLDA.img : atlasImg, s[0], s[1], s[2], s[3], Math.round(cx * TS + X - w / 2), Math.round(by * TS + Y - h), Math.round(w), Math.round(h));
   return true;
 }
 // 🪑 the benches (assets/benches.webp): wood / stone, seen from the front, the back and both sides
