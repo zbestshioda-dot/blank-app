@@ -3914,10 +3914,15 @@ function drawShaman(X, Y, t) {
   if (SHM_IMG.complete && SHM_IMG.naturalWidth) {
     const row = [0, 2, 1, 2][s.f], col = s.wait > 0 ? 1 : [0, 1, 2, 1][Math.floor(s.walk) % 4];
     ctx.save(); ctx.translate(px, py); if (s.f === 3) ctx.scale(-1, 1);
-    ctx.imageSmoothingEnabled = false; ctx.drawImage(SHM_IMG, col * 96, row * 112, 96, 112, -w / 2, -h, w, h); ctx.restore();
+    ctx.imageSmoothingEnabled = false; ctx.shadowColor = `rgba(200,20,30,${.55 + Math.sin(t / 350) * .2})`; ctx.shadowBlur = u * .35;   // faint smoky red aura round his outline
+    ctx.drawImage(SHM_IMG, col * 96, row * 112, 96, 112, -w / 2, -h, w, h); ctx.shadowBlur = u * .12; ctx.drawImage(SHM_IMG, col * 96, row * 112, 96, 112, -w / 2, -h, w, h); ctx.restore();
+    for (let k = 0; k < 4; k++) { const ph = (t / 2600 + k / 4) % 1; ctx.globalAlpha = (1 - ph) * .22; ctx.fillStyle = '#8a1420'; ctx.beginPath(); ctx.arc(px + Math.sin(t / 700 + k * 1.7) * w * .35, py - h * (.15 + ph * .8), u * (.12 + ph * .18), 0, 7); ctx.fill(); } ctx.globalAlpha = 1;   // drifting smoke
+    const nm = 'หมอผีสายดำ', fs = Math.max(10, Math.round(u * .28)); ctx.font = `bold ${fs}px 'Mitr','Noto Sans Thai',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const nw = textW(nm) + 14, ny = py - h - fs * .2; ctx.fillStyle = 'rgba(30,6,10,.82)'; ctx.beginPath(); ctx.roundRect(px - nw / 2, ny - fs * .75, nw, fs * 1.5, fs * .75); ctx.fill();
+    ctx.shadowColor = '#ff2a3a'; ctx.shadowBlur = 8; ctx.fillStyle = '#ff4a55'; ctx.fillText(nm, px, ny + 1); ctx.shadowBlur = 0;
     ctx.globalAlpha = .35 + Math.sin(t / 300) * .15; ctx.fillStyle = '#7a1e2a'; ctx.beginPath(); ctx.arc(px + Math.sin(t / 500) * u * .5, py - h * .55 + Math.cos(t / 400) * u * .3, u * .07, 0, 7); ctx.fill(); ctx.globalAlpha = 1;   // a dark wisp circling him
   }
-  if (s.say && performance.now() / 1000 < s.st) chatOnly({ bubble: s.say, bt: performance.now() + 1 }, px, py - h - u * .1, t);
+  if (s.say && performance.now() / 1000 < s.st) chatOnly({ bubble: s.say, bt: performance.now() + 1 }, px, py - h - u * .55, t);
 }   // temple pigeons, town-square pigeons, town cats and dogs
 function crowdEnts(A, ents, vis) {
   const L = CROWD[A.id] || crowdMake(A), now0 = performance.now(), dt = Math.min(.1, (now0 - (CROWD['t' + A.id] || now0)) / 1000); CROWD['t' + A.id] = now0;
@@ -6993,6 +6998,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28shm', d: '28 พ.ย.', items: ['🧿 <b>ตัวละครลึกลับในเมืองกลับมาแล้ว</b>… ระวังอย่าเข้าใกล้เกินไป'] },
   { v: '2026-11-28v', d: '28 พ.ย.', items: ['☰ <b>ปุ่มเมนูใหม่ข้างมือถือ</b> กดแล้วกางออก: กิจกรรม คู่รัก แก๊ง สัตว์เลี้ยง ชวนเพื่อน อัปเดต ตั้งค่า สนับสนุน กลุ่มเฟสบุ๊ค', '📱 มือถือโล่งขึ้น: 🛵 เดลิเวอรีย้ายเข้าไปในแอปโทรศัพท์ · ประมูลและบ้านสวยดูได้ใน 📅 กิจกรรม · เอาเรื่องหลักกับบันทึกออก (เรื่องหลักดูได้ใต้เควสต์)'] },
   { v: '2026-11-28u', d: '28 พ.ย.', items: ['🩺 <b>แก้ EXP หมอไม่ขึ้น</b> รักษา/ช่วยชีวิตคนไข้ ปฐมพยาบาล และภารกิจ ICU ได้ EXP เข้าอาชีพแพทย์ถูกต้องแล้ว (แอดมินที่ทำงานข้ามอาชีพด้วย)'] },
   { v: '2026-11-28t', d: '28 พ.ย.', items: ['🏢 <b>คุณแพรวนิติบุคคลมีรูปหน้าแล้ว</b> คุยที่เคาน์เตอร์คอนโดจะเห็นหน้าคุณแพรว (ผมบ็อบใส่แว่น)'] },
