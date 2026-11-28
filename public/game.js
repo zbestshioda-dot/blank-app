@@ -5499,13 +5499,13 @@ const PICS = { 'พี่โจ้': 'joe', 'คุณเมย์': 'may', 'ป
   'ผู้กองเอก': 'ek', 'ดาบหญิงสมศรี': 'somsri', 'ผู้กองเดช': 'det', 'หมอแพร': 'prae', 'หลวงพ่อเย็น': 'yen', 'พี่ตุ๋ย': 'tui', 'ลุงสัป': 'sap', 'แม่หมอจันทรา': 'chantra', 'พี่แนน': 'nan', 'น้องฝน': 'fon',
   'น้องภูมิ': 'poom', 'น้องแพร': 'praeshop', 'ยายบุญ': 'boon', 'เจ๊ศรี': 'sri', 'เสี่ยเสือ': 'suea', 'เฮียชัย': 'chai', 'น้องมุก': 'muk', 'ช่างโอ๋': 'oh', 'ป้าสายใจ': 'saijai', 'น้องเก่ง': 'keng',
   'ป้าแดง': 'daeng', 'เชฟหมี': 'mee', 'พี่ต่อ': 'tor', 'พี่แบงค์': 'bank', 'พี่ด่วน': 'duan', 'พี่ข้าวหอม': 'khaohom', 'น้าเล็ก': 'lek', 'พี่โฟกัส': 'focus', 'ลุงจุก': 'juk', 'ลุงชัย': 'umbrella',
-  'น้องมะลิ': 'mali', 'พี่ภูผา': 'phupha', 'ลุงโป่ง': 'pong', 'ช่างเปี๊ยก': 'piak' };
-const PICS_V = 3;
-const PICS_ORDER = ['joe', 'may', 'somjai', 'dam', 'tonkla', 'mprang', 'nuan', 'choei', 'james', 'napa', 'praew', 'nid', 'prasert', 'jim', 'om', 'fah', 'ek', 'somsri', 'det', 'prae', 'yen', 'tui', 'sap', 'chantra', 'nan', 'fon', 'poom', 'praeshop', 'boon', 'sri', 'suea', 'chai', 'muk', 'oh', 'saijai', 'keng', 'daeng', 'mee', 'tor', 'bank', 'duan', 'khaohom', 'lek', 'focus', 'juk', 'umbrella', 'mali', 'phupha', 'pong', 'piak'];
-const PICS_COLS = 10, PICS_ROWS = 5;
+  'น้องมะลิ': 'mali', 'พี่ภูผา': 'phupha', 'ลุงโป่ง': 'pong', 'ช่างเปี๊ยก': 'piak', 'คุณแพรว (นิติบุคคลคอนโด)': 'praewcondo' };
+const PICS_V = 4;
+const PICS_ORDER = ['joe', 'may', 'somjai', 'dam', 'tonkla', 'mprang', 'nuan', 'choei', 'james', 'napa', 'praew', 'nid', 'prasert', 'jim', 'om', 'fah', 'ek', 'somsri', 'det', 'prae', 'yen', 'tui', 'sap', 'chantra', 'nan', 'fon', 'poom', 'praeshop', 'boon', 'sri', 'suea', 'chai', 'muk', 'oh', 'saijai', 'keng', 'daeng', 'mee', 'tor', 'bank', 'duan', 'khaohom', 'lek', 'focus', 'juk', 'umbrella', 'mali', 'phupha', 'pong', 'piak', 'praewcondo'];
+const PICS_COLS = 10, PICS_ROWS = 6;
 
 const picPos = (k, b) => { const i = Math.max(0, PICS_ORDER.indexOf(k)); return `background-size:${PICS_COLS * b}px ${PICS_ROWS * b}px;background-position:-${(i % PICS_COLS) * b}px -${Math.floor(i / PICS_COLS) * b}px`; };
-const picOf = name => PICS[String(name || '').replace(/\s*\(.*$/, '').trim()];
+const picOf = name => PICS[String(name || '').trim()] || PICS[String(name || '').replace(/\s*\(.*$/, '').trim()];
 function dialog(opts) {
   closePanel();
   const pk = picOf(opts.name);
@@ -6965,6 +6965,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28t', d: '28 พ.ย.', items: ['🏢 <b>คุณแพรวนิติบุคคลมีรูปหน้าแล้ว</b> คุยที่เคาน์เตอร์คอนโดจะเห็นหน้าคุณแพรว (ผมบ็อบใส่แว่น)'] },
   { v: '2026-11-28s', d: '28 พ.ย.', items: ['👨‍🌾 <b>ลุงทุ่งมีรูปหน้าแล้ว</b> คุยกับลุงทุ่งที่ฟาร์มปศุสัตว์จะเห็นหน้าลุงตอนสนทนา'] },
   { v: '2026-11-28r', d: '28 พ.ย.', items: ['🥩 <b>เนื้อวัวมาแล้ว!</b> โรงวัวให้นม + เนื้อวัว · ไข่ เนื้อหมู เนื้อวัว ขายที่ตลาดกลาง ให้เชฟซื้อไปทำอาหาร', '🍳 <b>เมนูใหม่ในครัว</b> สเต็กเนื้อย่าง · น้ำตกเนื้อ · ข้าวผัดหมูใส่ไข่'] },
   { v: '2026-11-28q', d: '28 พ.ย.', items: ['📜 <b>เควสต์ใหม่ฟาร์มปศุสัตว์</b> คนเลี้ยงสัตว์มีเควสต์ประจำวันและรายสัปดาห์ · ทุกคนมีเควสต์กินของจากฟาร์ม (นม ไข่เจียว กะเพราหมู พุดดิ้ง)', '🗺️ <b>มินิแมพอัปเดต</b> เห็นฟาร์ม (รั้ว โรงเรือน ประตูเปิด/ปิด) และวัดจุดใหม่'] },
