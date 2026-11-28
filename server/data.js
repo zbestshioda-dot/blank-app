@@ -1331,7 +1331,7 @@ const JOBGAMES = {
 // 🚔 crimes, wanted stars and the jail (virtue: -1000..1000)
 const CRIMES = { pick: { name: 'ล้วงกระเป๋า', icon: '👛', virtue: -50, star: 1, cd: 60000, take: .05, max: 300, ok: .7 },
   hit: { name: 'ทำร้ายร่างกาย', icon: '👊', virtue: -100, star: 2, cd: 60000, dmg: 10 } };
-const JAIL = { perStar: 120e3, bail: 800, reward: 250, xp: 1, npcAfter: 60e3, npcMax: 10 * 60e3, work: { cut: 20e3, virtue: 5, cd: 8000 } };
+const JAIL = { perStar: 120e3, bail: 800, reward: 250, xp: 1, npcAfter: 60e3, npcMax: 3 * 60e3, work: { cut: 20e3, virtue: 5, cd: 8000 } };
 const THIEFQ = { energy: 6, next: 30000, base: 110, perMin: 100, names: ['ไอ้เสือดำ', 'ไอ้โจ๊ก', 'เจ้ามืด', 'ไอ้ตี๋มือไว', 'เจ้าหน้ากาก', 'ไอ้ปลาไหล', 'เจ้าจิ้งจก'], stole: ['กระเป๋าสตางค์', 'มือถือ', 'สร้อยทอง', 'กล้องถ่ายรูป', 'จักรยาน', 'นาฬิกาหรู'] };
 const DOGQ = { next: 27000, energy: 5, base: 70, perMin: 90, early: .25, minSteps: 40, maxSteps: 150,
   dogs: ['shiba', 'golden', 'corgi', 'pug', 'husky', 'dalmatian', 'poodle', 'pom', 'chihuahua'],

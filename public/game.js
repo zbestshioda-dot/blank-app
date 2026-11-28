@@ -7002,7 +7002,15 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 // 🔒 jail: countdown bar while you're inside; the police station lists inmates (online) and the wanted
 const jailLeft = () => { const ms = Math.max(0, (me?.jail?.until || 0) - Date.now()), sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
 function jailBar() {
-  let e = $('#jailBar'); const j = me?.jail;
+  let e = $('#jailBar'); const j = me?.jail, w = !j && me?.wanted;
+  if (w) {   // 🚨 wanted: tell the crook what happens next
+    if (e && !e.classList.contains('wd')) { e.remove(); e = null; }
+    if (!e) { e = document.createElement('div'); e.id = 'jailBar'; e.className = 'wd'; e.innerHTML = '<b></b>'; document.body.appendChild(e); }
+    const sec = Math.max(0, Math.ceil(((me.wantedAt || 0) - Date.now()) / 1000));
+    e.querySelector('b').textContent = me.wLock ? `🚨 ติดหมายจับ ${'⭐'.repeat(me.wanted)} · 👑 โหมด God กันโดนจับอยู่ (ปิดใน God เพื่อทดสอบ)` : `🚨 ติดหมายจับ ${'⭐'.repeat(me.wanted)} · ตำรวจหรือสายตรวจจะจับใน ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    return;
+  }
+  if (e && e.classList.contains('wd')) { e.remove(); e = null; }
   if (!j) { if (e) e.remove(); return; }
   if (!e) { e = document.createElement('div'); e.id = 'jailBar'; e.innerHTML = '<b></b><s><u></u></s><button type="button">💸 ประกันตัว</button>'; document.body.appendChild(e); e.querySelector('button').onclick = () => send({ t: 'bail' }); }
   const tot = j.s * 120e3, left = Math.max(0, j.until - Date.now());
@@ -7010,7 +7018,7 @@ function jailBar() {
   e.querySelector('u').style.width = (100 - left / tot * 100).toFixed(1) + '%';
   e.querySelector('button').textContent = `💸 ประกันตัว ${money(j.bail)}`;
 }
-setInterval(() => { if (me?.jail) jailBar(); }, 1000);
+setInterval(() => { if (me?.jail || me?.wanted || $('#jailBar')) jailBar(); }, 1000);
 function jailList() {
   const ps = [...P.values()].filter(o => !o.npc && o.id !== myId), jl = ps.filter(o => o.jl), wd = ps.filter(o => o.wd && !o.jl);
   return `<div class="sub" style="margin-top:8px"><b>🔒 ห้องขัง</b> (${jl.length} คน) · ประกันตัวให้เพื่อนได้</div>${jl.length ? `<div class="list">${jl.map(o => itemRowRaw('🔒', esc(o.name), 'ติดคุกอยู่', B('💸 ประกันตัว', { t: 'bail', id: o.id }, 'good', !!me.jail))).join('')}</div>` : ''}
@@ -7026,12 +7034,13 @@ function jailList() {
     e.onpointerup = e.onpointercancel = () => { drag = null; }; }
   if (e) e.onclick = () => { if (moved) { moved = false; return; } const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28g', d: '28 พ.ย.', items: ['🚨 ติดหมายจับแล้วมีแถบบอกด้านบน ว่าจะโดนจับในกี่วินาที · สายตรวจ NPC มาจับใน 3 นาทีแม้มีตำรวจออนไลน์'] },
   { v: '2026-11-28f', d: '28 พ.ย.', items: ['🪟 ข้อความแจ้งเตือน (เช่น "รออีก 30 วินาที") ขึ้นทับหน้าต่างแล้ว ไม่จมอยู่ข้างหลัง'] },
   { v: '2026-11-28e', d: '28 พ.ย.', items: ['👁️ ลากปุ่มโหมดถ่ายรูปไปวางตรงไหนก็ได้ เกมจำตำแหน่งไว้ให้'] },
   { v: '2026-11-28d', d: '28 พ.ย.', items: ['🙏 ปล่อยปลาที่สระบัวในวัด ได้ค่าความดี +2 ต่อตัวด้วย (สูงสุด +50 ต่อวัน)', '📸 <b>โหมดถ่ายรูป</b> กดปุ่ม 👁️ ขวามือ ซ่อนปุ่มและกรอบทั้งหมด เหลือแค่เมืองให้แคปจอสวยๆ · กด 🙈 อีกครั้งเพื่อเอากลับมา'] },
   { v: '2026-11-28c', d: '28 พ.ย.', items: [
     '🚔 <b>คุกมาแล้ว!</b> ล้วงกระเป๋า (ความดี -50, ⭐1) หรือทำร้ายคน (ความดี -100, ⭐⭐) = ติดหมายจับ มีดาวลอยบนหัวให้ทุกคนเห็น',
-    '👮 ตำรวจแตะคนติดหมายจับแล้วกด "🚔 จับกุม" ได้เงิน + EXP · ไม่มีตำรวจออนไลน์ สายตรวจ NPC จับเองใน 1 นาที',
+    '👮 ตำรวจแตะคนติดหมายจับแล้วกด "🚔 จับกุม" ได้เงิน + EXP · ไม่มีตำรวจออนไลน์ สายตรวจ NPC จับเองใน 1 นาที (มีตำรวจออนไลน์แต่ไม่จับ 3 นาที)',
     '🔒 ติดคุกดาวละ 2 นาที (นับต่อตอนออฟไลน์) ทำงานไม่ได้ · พับผ้าลดโทษ (ความดี +5) หรือจ่ายประกันตัว เพื่อนประกันให้ได้ที่สถานีตำรวจ',
     '😈 ค่าความดี -500 ลงไป ชื่อเป็นสีแดง · มือใหม่ที่มาไม่ถึง 1 วันโดนทำร้ายไม่ได้',
   ] },

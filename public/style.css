@@ -2304,3 +2304,4 @@ body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;
 #login:not(.hidden)~#eyeBtn,body:has(#login:not(.hidden)) #eyeBtn{display:none}
 body.noHud>*:not(#cv):not(#eyeBtn):not(script){visibility:hidden!important}
 body.noHud #eyeBtn{opacity:.75}
+#jailBar.wd{display:block;border-color:#e8b923;background:rgba(120,20,20,.9);text-align:center}
