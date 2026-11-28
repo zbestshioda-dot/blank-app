@@ -1131,7 +1131,7 @@ const quitAsk = (txt, go) => popup(txt, [['ยกเลิกเลย', 'warn',
 $('#dogChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); const q = me?.dogq; if (q) quitAsk(q.kind === 'thief' ? `ยกเลิกเคสจับโจร "${esc(q.name)}"?` : `ยกเลิกเคสตามหาน้อง${esc(q.name)}?`, () => send({ t: 'questquit' })); }, true);
 $('#misChip').addEventListener('click', e => { if (!e.target.closest('.chipX')) return; e.stopImmediatePropagation(); if (me?.case && !me.mis) return quitAsk('ส่งคดีนี้คืนผู้กอง? (คดีจะปิดไม่สำเร็จ)', () => send({ t: 'det', op: 'quit' })); const m = me?.mis; if (m) quitAsk(`ยกเลิกภารกิจ "${esc(m.title)}"?`, () => send({ t: 'mission', op: 'quit' })); }, true);
 $('#dogChip').onclick = () => { const q = me?.dogq; if (q) popup(`🐕 ตามหา "น้อง${q.name}" ของ${q.owner}<br>📍 แถว ${q.hint} · ดูวงสีเหลืองบนมินิแมพ ฟังเสียงเห่า`, [['ตกลง', 'good', () => { }]], 8000); };
-{ const mq = matchMedia('(max-width:600px), (max-height:520px) and (orientation:landscape)'), put = () => mq.matches ? $('#miniWrap').after($('#cbOn')) : $('#miniWrap').appendChild($('#cbOn')); put(); mq.addEventListener?.('change', put); }   /* on the minimap; under it on phones */ $('#cbOn').onclick = e => { e.stopPropagation(); openPanel({ kind: 'friends' }); };
+$('#miniWrap').after($('#cbOn'));   /* under the minimap on every screen */ $('#cbOn').onclick = e => { e.stopPropagation(); openPanel({ kind: 'friends' }); };
 $('#callChip').onclick = () => openPanel({ kind: 'phone', tab: 'call' });
 const CAREER_ICON = c => G?.careers[c]?.icon || '';
 
@@ -6998,6 +6998,7 @@ const needCareer = c => job(c) || !G.careers[c] ? '' : `<div class="sub" style="
 
 // what's new: a short summary of every update (newest first). Shown once after each update; also under ⚙️ → 🆕 อัปเดต
 const NEWS = [
+  { v: '2026-11-28a', d: '28 พ.ย.', items: ['🟢 บนคอม จำนวนคนออนไลน์ย้ายไปอยู่ใต้แผนที่เล็กเหมือนมือถือ ไม่บังแผนที่แล้ว'] },
   { v: '2026-11-28shm', d: '28 พ.ย.', items: ['🧿 <b>ตัวละครลึกลับในเมืองกลับมาแล้ว</b>… ระวังอย่าเข้าใกล้เกินไป'] },
   { v: '2026-11-28v', d: '28 พ.ย.', items: ['☰ <b>ปุ่มเมนูใหม่ข้างมือถือ</b> กดแล้วกางออก: กิจกรรม คู่รัก แก๊ง สัตว์เลี้ยง ชวนเพื่อน อัปเดต ตั้งค่า สนับสนุน กลุ่มเฟสบุ๊ค', '📱 มือถือโล่งขึ้น: 🛵 เดลิเวอรีย้ายเข้าไปในแอปโทรศัพท์ · ประมูลและบ้านสวยดูได้ใน 📅 กิจกรรม · เอาเรื่องหลักกับบันทึกออก (เรื่องหลักดูได้ใต้เควสต์)'] },
   { v: '2026-11-28u', d: '28 พ.ย.', items: ['🩺 <b>แก้ EXP หมอไม่ขึ้น</b> รักษา/ช่วยชีวิตคนไข้ ปฐมพยาบาล และภารกิจ ICU ได้ EXP เข้าอาชีพแพทย์ถูกต้องแล้ว (แอดมินที่ทำงานข้ามอาชีพด้วย)'] },
