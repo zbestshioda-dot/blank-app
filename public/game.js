@@ -7016,7 +7016,10 @@ function jailList() {
   return `<div class="sub" style="margin-top:8px"><b>🔒 ห้องขัง</b> (${jl.length} คน) · ประกันตัวให้เพื่อนได้</div>${jl.length ? `<div class="list">${jl.map(o => itemRowRaw('🔒', esc(o.name), 'ติดคุกอยู่', B('💸 ประกันตัว', { t: 'bail', id: o.id }, 'good', !!me.jail))).join('')}</div>` : ''}
     ${wd.length ? `<div class="sub" style="margin-top:6px"><b>🚨 หมายจับ</b></div><div class="list">${wd.map(o => itemRowRaw('🦹', esc(o.name), '⭐'.repeat(o.wd), '')).join('')}</div>` : ''}`;
 }
+// 📸 photo mode: the 👁️ button hides every button and box so only the town is left (tap again to bring them back)
+{ const e = document.getElementById('eyeBtn'); if (e) e.onclick = () => { const on = document.body.classList.toggle('noHud'); e.textContent = on ? '🙈' : '👁️'; e.title = on ? 'แสดงปุ่มกลับมา' : 'ซ่อนปุ่มทั้งหมด (โหมดถ่ายรูป)'; }; }
 const NEWS = [
+  { v: '2026-11-28d', d: '28 พ.ย.', items: ['🙏 ปล่อยปลาที่สระบัวในวัด ได้ค่าความดี +2 ต่อตัวด้วย (สูงสุด +50 ต่อวัน)', '📸 <b>โหมดถ่ายรูป</b> กดปุ่ม 👁️ ขวามือ ซ่อนปุ่มและกรอบทั้งหมด เหลือแค่เมืองให้แคปจอสวยๆ · กด 🙈 อีกครั้งเพื่อเอากลับมา'] },
   { v: '2026-11-28c', d: '28 พ.ย.', items: [
     '🚔 <b>คุกมาแล้ว!</b> ล้วงกระเป๋า (ความดี -50, ⭐1) หรือทำร้ายคน (ความดี -100, ⭐⭐) = ติดหมายจับ มีดาวลอยบนหัวให้ทุกคนเห็น',
     '👮 ตำรวจแตะคนติดหมายจับแล้วกด "🚔 จับกุม" ได้เงิน + EXP · ไม่มีตำรวจออนไลน์ สายตรวจ NPC จับเองใน 1 นาที',

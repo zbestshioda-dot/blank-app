@@ -2109,7 +2109,7 @@ const SAVE_KEYS = ['ranch', 'gymPass', 'eB', 'eBd', 'gymT', 'n3', 'ghostGot', 'b
   'phone', 'contacts', 'stats', 'ach', 'title', 'jobChanges', 'enrolled', 'classes', 'office', 'garden', 'rent', 'houseSale', 'houseRent', 'down', 'happy', 'bills', 'billMonth', 'usage', 'utilOff', 'wanted', 'crimes', 'craving', 'gender', 'look', 'wardrobe',
   'balloons', 'balloon', 'fortune', 'god', 'rod', 'rods', 'rodEq', 'hideJob', 'outfit', 'outfits', 'licExp', 'phoneAsk', 'school', 'pic', 'mail', 'fishdex', 'fcol', 'merit', 'lbn', 'lbnSeen', 'aq', 'seen', 'push', 'pushDay', 'nb', 'nbw', 'cz', 'tix', 'pyd', 'pydSet', 'card', 'pets', 'pet', 'show', 'frames', 'frame', 'egg', 'riderBike', 'policeCar', 'gsub', 'gmail', 'stok', 'hown', 'bless', 'almsDay', 'adDay', 'adN',
   // 💞 marriage, 🗝️ the treasure cave, 🏡 home likes, 🎣 fish records, weekly titles, work caps, 🍸 how drunk (these were never saved: lost on every restart)
-  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk', 'virtue', 'jail', 'wantedT', 'arrPaid'];
+  'spouse', 'bond', 'divAt', 'ring', 'dgc', 'dgBest', 'dgw', 'dgd', 'dgTorch', 'dgPot', 'dgCharm', 'dgKing', 'cpKing', 'homeKing', 'fcKing', 'richKing', 'hl', 'hlp', 'fishRec', 'wk', 'mgDay', 'mgPaid', 'jgNext', 'dk', 'virtue', 'jail', 'wantedT', 'arrPaid', 'vRel'];
 let nextListing = 1, botCap = 6;   // AI townsfolk still in town (counts down to 0, saved)
 async function load() {
   const rows = await store.loadAll();
@@ -4037,7 +4037,9 @@ function act(a, m) {
       const t = now(), mins = Math.min(60, Math.max(2, Math.round(it.base / 10)));
       addItem(a, id, -1); a.merit = Math.min(t + 3 * 3600e3, Math.max(a.merit || 0, t) + mins * 60e3);
       stat(a, 'merit'); a.sd = true; markMe(a);
-      return toast(a, `🙏 ปล่อย ${it.icon}${it.name} คืนสระบัว ได้บุญ +${mins} นาที · โชคปลาหายากดีขึ้น (เหลือ ${Math.ceil((a.merit - t) / 60e3)} นาที)`, '🙏');
+      if (a.vRel?.d !== dayKey()) a.vRel = { d: dayKey(), n: 0 };   // 😇 releasing fish also raises virtue: +2 a fish, up to +50 a day
+      const vg = Math.min(2, 50 - a.vRel.n); if (vg > 0) { a.vRel.n += vg; addVirtue(a, vg); sendRoster(); }
+      return toast(a, `🙏 ปล่อย ${it.icon}${it.name} คืนสระบัว ได้บุญ +${mins} นาที${vg > 0 ? ` · ความดี +${vg}` : ' · ความดีวันนี้เต็มแล้ว'} · โชคปลาหายากดีขึ้น (เหลือ ${Math.ceil((a.merit - t) / 60e3)} นาที)`, '🙏');
     }
     case 'petshop.buy': {                                  // adopt a pet at a pet shop (kept forever) and bring it out
       m.id = m.pet; const P = D.PETS[m.id]; if (!P) return;

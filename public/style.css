@@ -2299,3 +2299,8 @@ body.msw #hud,body.msw #topBar,body.msw #topRight{opacity:0;pointer-events:none;
 #jailBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 30px);z-index:45;width:min(420px,calc(100vw - 32px));background:rgba(30,20,20,.92);color:#fff;border:2px solid #8a1c1c;border-radius:12px;padding:6px 10px;display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;font-size:12px}
 #jailBar b{grid-column:1}#jailBar s{grid-column:1;display:block;height:7px;background:#555;border-radius:4px;overflow:hidden;text-decoration:none}#jailBar u{display:block;height:100%;background:#e8b923}
 #jailBar button{grid-column:2;grid-row:1/3;padding:4px 8px;font-size:12px;min-height:0}
+/* 📸 photo mode (👁️): hide every overlay, keep only the town and the toggle */
+#eyeBtn{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(env(safe-area-inset-top) + 200px);z-index:46;width:34px;height:34px;min-height:0;padding:0;border-radius:50%;font-size:17px;line-height:1;background:rgba(20,16,12,.55);border:1px solid rgba(255,255,255,.35);box-shadow:none}
+#login:not(.hidden)~#eyeBtn,body:has(#login:not(.hidden)) #eyeBtn{display:none}
+body.noHud>*:not(#cv):not(#eyeBtn):not(script){visibility:hidden!important}
+body.noHud #eyeBtn{opacity:.75}
